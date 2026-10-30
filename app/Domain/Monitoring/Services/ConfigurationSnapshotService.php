@@ -7,7 +7,9 @@ use App\Domain\Monitoring\Data\ProtocolObservation;
 use App\Domain\Monitoring\Exceptions\SnapshotStoreUnavailable;
 use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\ControlRoom\SignalSource;
 use App\Models\User;
 use App\Services\Integration\Contracts\SnapshotCollectionCapability;
 use Carbon\CarbonImmutable;
@@ -27,7 +29,10 @@ final class ConfigurationSnapshotService
     ];
 
     private const array ROOT_ALLOWLIST = [
+        'acls',
         'configuration',
+        'dns',
+        'firewall_rules',
         'firmware_version',
         'hostname',
         'interfaces',
@@ -43,11 +48,18 @@ final class ConfigurationSnapshotService
         'installed_packages',
         'manufacturer',
         'model',
+        'nat_rules',
+        'ntp',
         'os_version',
+        'poe',
         'routes',
+        'running_config_lines',
         'serial_number',
         'services',
+        'snmp',
+        'spanning_tree',
         'system',
+        'vlans',
         'volume_count',
     ];
 
@@ -55,6 +67,7 @@ final class ConfigurationSnapshotService
         private readonly SnapshotStore $store,
         private readonly CanonicalDeviceSiteResolver $sites,
         private readonly SecurityDevicesAccessService $access,
+        private readonly NetworkConfigurationRedactor $redactor,
     ) {}
 
     public function captureFromProvider(
@@ -121,12 +134,45 @@ final class ConfigurationSnapshotService
         );
     }
 
+    public function captureFromCommand(
+        Device $device,
+        int $siteId,
+        string $source,
+        array $payload,
+        ?CarbonImmutable $capturedAt = null,
+        ?int $retentionPolicyId = null,
+        ?int $actorId = null,
+    ): ConfigurationSnapshot {
+        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $source) !== 1) {
+            throw new InvalidArgumentException('Snapshot command source is invalid.');
+        }
+
+        return $this->capture(
+            $device,
+            $siteId,
+            sourceKind: 'command',
+            source: $source,
+            payload: $payload,
+            capturedAt: $capturedAt ?? CarbonImmutable::now('UTC'),
+            retentionPolicyId: $retentionPolicyId,
+            actorId: $actorId,
+        );
+    }
+
+    public function canViewSnapshots(?User $actor): bool
+    {
+        if (! $actor instanceof User || ! $actor->canDo('securityDevices.devices.view')) {
+            return false;
+        }
+
+        return $actor->canDo('securityDevices.reports.view')
+            || $actor->canDo('securityDevices.maintenance.view')
+            || $actor->canDo('securityDevices.integrations.view');
+    }
+
     public function retrieve(ConfigurationSnapshot $snapshot, User $actor): string
     {
-        abort_unless($actor->canDo('securityDevices.devices.view'), 403);
-        if ($snapshot->source_kind === 'provider') {
-            abort_unless($actor->canDo('securityDevices.integrations.view'), 403);
-        }
+        abort_unless($this->canViewSnapshots($actor), 403);
 
         $device = Device::query()->findOrFail($snapshot->device_id);
         $this->access->assertCanViewDevice($actor, $device);
@@ -278,6 +324,28 @@ final class ConfigurationSnapshotService
                     'meta' => $meta,
                 ])->save();
 
+                if ($previous !== null && ! hash_equals((string) $previous->configuration_hash, $configurationHash)) {
+                    $eventAttributes = [
+                        'device_id' => $device->id,
+                        'event_type' => 'config_changed',
+                        'severity' => 'info',
+                        'source' => 'oblivion_configuration_snapshot',
+                        'occurred_at' => $capturedAt->utc(),
+                        'payload' => [
+                            'snapshot_id' => $snapshot->id,
+                            'previous_snapshot_id' => $previous->id,
+                            'source_kind' => $sourceKind,
+                            'source' => $source,
+                            'changed_count' => count($diff['added']) + count($diff['removed']) + count($diff['changed']),
+                        ],
+                    ];
+                    if (SignalSource::query()->where('slug', 'security_devices')->exists()) {
+                        DeviceEvent::query()->create($eventAttributes);
+                    } else {
+                        DeviceEvent::withoutEvents(fn () => DeviceEvent::query()->create($eventAttributes));
+                    }
+                }
+
                 return $snapshot;
             }, 3);
         } catch (Throwable $exception) {
@@ -390,22 +458,28 @@ final class ConfigurationSnapshotService
     /** @return array<string, mixed> */
     private function allowlistedPayload(array $payload): array
     {
+        if (isset($payload['running_config']) && is_string($payload['running_config']) && ! isset($payload['running_config_lines'])) {
+            $payload['running_config_lines'] = $this->redactor->redactTextToLines($payload['running_config']);
+            unset($payload['running_config']);
+        }
+
         $safe = [];
         foreach (self::ROOT_ALLOWLIST as $key) {
             if (! array_key_exists($key, $payload)) {
                 continue;
             }
-            $candidate = $this->sanitise($payload[$key], 1);
+            $candidate = $this->sanitise($payload[$key], 1, $key === 'running_config_lines' ? NetworkConfigurationRedactor::MAX_CONFIG_LINES : 1000);
             if ($candidate !== null) {
                 $safe[$key] = $candidate;
             }
         }
+        $safe = $this->redactor->redactPayload($safe);
         ksort($safe, SORT_STRING);
 
         return $safe;
     }
 
-    private function sanitise(mixed $value, int $depth): mixed
+    private function sanitise(mixed $value, int $depth, int $maxArrayItems = 1000): mixed
     {
         if ($depth > 16) {
             throw new InvalidArgumentException('Snapshot structure is too deep.');
@@ -421,7 +495,7 @@ final class ConfigurationSnapshotService
         if (is_float($value)) {
             return is_finite($value) ? $value : null;
         }
-        if (! is_array($value) || count($value) > 1000) {
+        if (! is_array($value) || count($value) > $maxArrayItems) {
             return null;
         }
 

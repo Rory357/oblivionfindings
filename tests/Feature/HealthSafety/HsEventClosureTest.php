@@ -104,6 +104,42 @@ class HsEventClosureTest extends TestCase
         $this->assertHardBlockerAndFailedClose($event, $actor, 'worksafe_notification');
     }
 
+    public function test_unsigned_or_preliminary_decisions_never_claim_notification_work_is_not_required(): void
+    {
+        $site = Site::factory()->create();
+        $actor = $this->roleUser('health_safety_officer', $site);
+        foreach ([null, false, true] as $notifiable) {
+            $event = HsEvent::factory()->worksafeUndecided()->create([
+                'site_id' => $site->id,
+                'owner_user_id' => $actor->id,
+                'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+                'investigation_required' => false,
+                'worksafe_notifiable' => $notifiable,
+            ]);
+            $requirements = collect(app(HsEventClosureService::class)->readiness($event)->requirements)->keyBy('key');
+            foreach (['worksafe_notification', 'worksafe_acknowledgement', 'site_preservation'] as $key) {
+                $this->assertFalse($requirements[$key]['complete']);
+                $this->assertStringContainsString('signed WorkSafe decision', $requirements[$key]['label']);
+                $this->assertSame("/health-safety/events/{$event->id}?action=worksafe-decision", $requirements[$key]['href']);
+            }
+            $this->assertHardBlockerAndFailedClose($event, $actor, 'worksafe_decision');
+            $this->assertSame($notifiable, $event->fresh()->worksafe_notifiable);
+        }
+    }
+
+    public function test_signed_negative_decision_keeps_unneeded_notification_work_complete(): void
+    {
+        $site = Site::factory()->create();
+        $actor = $this->roleUser('health_safety_officer', $site);
+        $event = $this->cleanEvent($actor, $site);
+        $requirements = collect(app(HsEventClosureService::class)->readiness($event)->requirements)->keyBy('key');
+        foreach (['worksafe_notification', 'worksafe_acknowledgement', 'site_preservation'] as $key) {
+            $this->assertTrue($requirements[$key]['complete']);
+            $this->assertStringContainsString('not required by the recorded decision', $requirements[$key]['label']);
+        }
+        $this->assertSame("/health-safety/events/{$event->id}?section=actions", $requirements['corrective_actions']['href']);
+    }
+
     public function test_worksafe_acknowledgement_is_a_hard_non_overridable_blocker(): void
     {
         $site = Site::factory()->create();

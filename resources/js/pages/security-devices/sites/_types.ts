@@ -46,6 +46,9 @@ export type Monitor = {
     name: string;
     kind: string | null;
     state: string;
+    collector_id?: number | null;
+    collector_name?: string | null;
+    runs_from?: string;
     last_observation_at: string | null;
 };
 
@@ -89,7 +92,18 @@ export type Collector = {
     name: string;
     status: string;
     state: string;
+    freshness_state?: string;
+    software_version?: string | null;
     last_seen_at: string | null;
+    last_heartbeat_at?: string | null;
+    revoked_at?: string | null;
+    is_home_site?: boolean;
+    home_site?: { id: number; name: string; href: string } | null;
+    monitor_load?: number;
+    scope_load?: number;
+    covered_site_ids?: number[];
+    covered_sites?: Array<{ id: number; name: string; href: string }>;
+    update_url?: string | null;
 };
 
 export type ContactItem = {
@@ -100,6 +114,43 @@ export type ContactItem = {
     phone: string | null;
     email: string | null;
     is_primary: boolean;
+};
+
+export type SiteTopologyTreeNode = {
+    id: number;
+    device_uid: string;
+    name: string;
+    tier: 'gateway' | 'switch' | 'access_point' | 'device' | string;
+    domain: string | null;
+    category: string | null;
+    subcategory: string | null;
+    manufacturer: string | null;
+    model: string | null;
+    ip_address: string | null;
+    mac_address: string | null;
+    status: string;
+    health: string;
+    href: string;
+    uplink: {
+        protocol: string;
+        label: string;
+        port: string | null;
+    } | null;
+    children: SiteTopologyTreeNode[];
+};
+
+export type SiteTopologyTree = {
+    tier_counts: {
+        gateways: number;
+        switches: number;
+        access_points: number;
+        devices: number;
+    };
+    sources: string[];
+    last_captured_at: string | null;
+    mapped_count: number;
+    roots: SiteTopologyTreeNode[];
+    unplaced: SiteTopologyTreeNode[];
 };
 
 export type SiteTechnologyProps = {
@@ -122,6 +173,7 @@ export type SiteTechnologyProps = {
             type: string;
             port: string | null;
         }>;
+        tree?: SiteTopologyTree;
     };
     deviceGroups: DeviceGroup[];
     monitoring: {
@@ -136,6 +188,11 @@ export type SiteTechnologyProps = {
     itWork: ItWork[];
     maintenance: Maintenance[];
     collectors: Collector[];
+    hub_wizard?: {
+        options_url: string;
+        issue_url: string;
+        sites: Array<{ id: number; name: string }>;
+    } | null;
     changes: Array<{
         key: string;
         device_name: string | null;
@@ -148,6 +205,7 @@ export type SiteTechnologyProps = {
         view_control_room: boolean;
         view_it_work: boolean;
         view_site_profile: boolean;
+        manage_collectors?: boolean;
         export: boolean;
     };
 };

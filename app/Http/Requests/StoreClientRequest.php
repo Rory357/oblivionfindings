@@ -50,6 +50,10 @@ class StoreClientRequest extends FormRequest
 
             // ── Cultural identity ────────────────────────────────────────────
             'ethnicity' => ['nullable', 'string', 'max:255'],
+            'iwi' => ['nullable', 'string', 'max:255'],
+            'hapu' => ['nullable', 'string', 'max:255'],
+            'marae' => ['nullable', 'string', 'max:255'],
+            'cultural_dietary_needs' => ['nullable', 'string', 'max:2000'],
             'languages' => ['nullable', 'array'],
             'languages.*' => ['string', 'max:100'],
             'religion' => ['nullable', 'string', 'max:255'],
@@ -75,7 +79,8 @@ class StoreClientRequest extends FormRequest
             'employment_status' => ['nullable', 'string', 'max:255'],
 
             // ── Care setup ───────────────────────────────────────────────────
-            'service_start_date' => ['nullable', 'date'],
+            // Recorded by the separate commencement review only when the organisation requires it for everyone.
+            'service_start_date' => \App\Domain\Referrals\Services\ReferralActivationGuard::requiredForEveryone() ? ['prohibited'] : ['nullable', 'date'],
             'key_worker_id' => ['nullable', 'integer', 'exists:users,id'],
             'risk_level' => ['nullable', 'in:low,medium,high,critical'],
             'safeguarding_flag' => ['nullable', 'boolean'],
@@ -272,6 +277,7 @@ class StoreClientRequest extends FormRequest
     {
         return [
             'email.required_if' => 'An email is required to create a portal login.',
+            'service_start_date.prohibited' => 'Create the person in onboarding, then use Prepare support to arrange the separate service-start review.',
         ];
     }
 }

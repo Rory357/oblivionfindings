@@ -14,6 +14,7 @@ vi.mock('@/components/page', () => ({
         value: string;
         onSelect: (key: string) => void;
     }) => <div role="tablist">
+        {/* eslint-disable-next-line no-restricted-syntax -- test double for the mocked PageHeaderRail; production uses the shared rail */}
         {items.map((item) => <button key={item.key} role="tab"
             aria-selected={item.key === value} onClick={() => onSelect(item.key)}>
             {item.label}
@@ -24,6 +25,7 @@ vi.mock('@/components/page', () => ({
         options: { value: string; label: string }[];
         onChange: (value: string) => void;
     }) => <div role="group" aria-label={label}>
+        {/* eslint-disable-next-line no-restricted-syntax -- test double for the mocked PageHeaderFilterSelect; production uses the shared select */}
         {options.map((option) => <button key={option.value}
             onClick={() => onChange(option.value)}>{option.label}</button>)}
     </div>,

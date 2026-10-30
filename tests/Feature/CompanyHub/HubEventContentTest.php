@@ -103,7 +103,7 @@ test('history uses New Zealand year boundaries and waits for all day events to f
 
 test('past content rechecks story publication and private event audience on every read', function () {
     $publisher = app(HubPublishing::class);
-    $story = $publisher->create($this->editor, 'news', 'The gathering story');
+    $story = $publisher->create($this->editor, 'news', 'The gathering story', 'blank');
     $publisher->publish($this->editor, $story, 1, null, null);
     $this->event->update(['rrule' => null, 'starts_at' => now()->subDays(2), 'ends_at' => now()->subDay()]);
     $this->put($this->url, ['edit_version' => 1, 'hub_content' => [...$this->content, 'story_id' => $story->id], 'files' => [($this->photo)()]])->assertRedirect()->assertSessionHasNoErrors();

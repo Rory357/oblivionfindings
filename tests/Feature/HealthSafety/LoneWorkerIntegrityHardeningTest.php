@@ -17,6 +17,7 @@ use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Models\LoneWorkerAlert;
+use App\Models\LoneWorkerCommandReceipt;
 use App\Models\LoneWorkerSession;
 use App\Models\Permission;
 use App\Models\Queclink\QueclinkDevice;
@@ -24,6 +25,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\HealthSafety\LoneWorkerEmergencyDeliveryService;
 use App\Services\HealthSafety\LoneWorkerSignalService;
 use App\Services\Queclink\LocateNowService;
 use App\Services\UserSiteAccessService;
@@ -33,6 +35,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Illuminate\Testing\Fluent\AssertableJson;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
@@ -41,7 +47,7 @@ use Tests\TestCase;
 
 class LoneWorkerIntegrityHardeningTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\LoneWorkerReviewedCommandFixtures;
 
     protected function setUp(): void
     {
@@ -87,7 +93,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             ->post('/health-safety/lone-workers/sessions', [
                 'user_id' => $worker->id,
                 'shift_id' => $shift->id,
-                'expected_end_at' => now()->addHours(2)->toDateTimeString(),
+                'expected_end_at' => now()->addHours(2)->toISOString(),
             ])
             ->assertRedirect('/health-safety/lone-workers')
             ->assertSessionHasErrors('shift_id');
@@ -112,19 +118,20 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             ->post('/health-safety/lone-workers/sessions', [
                 'user_id' => $worker->id,
                 'shift_id' => $otherSiteShift->id,
-                'expected_end_at' => now()->addHours(2)->toDateTimeString(),
+                'expected_end_at' => now()->addHours(2)->toISOString(),
             ])
             ->assertForbidden();
 
         $this->assertDatabaseCount('lone_worker_sessions', 0);
     }
 
-    public function test_start_session_requires_a_non_null_shift_client_to_equal_the_selected_client_exactly(): void
+    public function test_start_session_derives_the_locked_shift_client_when_omitted_and_denies_explicit_conflict(): void
     {
         $site = Site::factory()->create();
         $coordinator = $this->hsLead();
         $worker = $this->siteScopedUser($site);
         $client = Client::factory()->create(['site_id' => $site->id]);
+        $conflictingClient = Client::factory()->create(['site_id' => $site->id]);
         $shiftWithClient = Shift::factory()->create([
             'site_id' => $site->id,
             'client_id' => $client->id,
@@ -133,18 +140,28 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $base = [
             'user_id' => $worker->id,
             'site_id' => $site->id,
-            'expected_end_at' => now()->addHours(2)->toDateTimeString(),
+            'shift_id' => $shiftWithClient->id,
+            'expected_end_at' => now()->addHours(2)->toISOString(),
         ];
-
-        $this->actingAs($coordinator)
-            ->from('/health-safety/lone-workers')
-            ->post('/health-safety/lone-workers/sessions', array_merge($base, [
-                'shift_id' => $shiftWithClient->id,
-            ]))
-            ->assertRedirect('/health-safety/lone-workers')
-            ->assertSessionHasErrors('client_id');
-
+        $this->actingAs($coordinator)->from('/health-safety/lone-workers')
+            ->post('/health-safety/lone-workers/sessions', [...$base, 'client_id' => $conflictingClient->id])
+            ->assertRedirect('/health-safety/lone-workers')->assertSessionHasErrors('client_id');
         $this->assertDatabaseCount('lone_worker_sessions', 0);
+        $this->assertDatabaseCount('lone_worker_command_receipts', 0);
+
+        $key = (string) Str::uuid();
+        $response = $this->post('/health-safety/lone-workers/sessions', [...$base, 'idempotency_key' => $key])->assertSessionHasNoErrors();
+        $source = LoneWorkerSession::sole();
+        $response->assertRedirect('/health-safety/lone-workers/sessions/'.$source->id)
+            ->assertSessionHas('lone_worker_confirmation', fn ($proof) => (int) $proof['id'] === (int) $source->id && (int) $proof['lock_version'] === 1 && $proof['idempotency_key'] === $key);
+        $this->assertSame($client->id, $source->client_id);
+        $this->assertSame($shiftWithClient->id, $source->shift_id);
+        $this->assertSame($site->id, $source->site_id);
+        $this->assertSame($worker->id, $source->user_id);
+        $this->assertNull($source->last_check_in_at);
+        $this->assertDatabaseCount('lone_worker_check_ins', 0);
+        $this->assertDatabaseCount('lone_worker_sessions', 1);
+        $this->assertDatabaseCount('lone_worker_command_receipts', 1);
     }
 
     public function test_worker_self_check_in_still_rejects_a_poisoned_session_tuple(): void
@@ -183,8 +200,14 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         ]);
 
         $request = Request::create("/health-safety/lone-workers/sessions/{$session->id}/end", 'POST');
+        $request->merge($this->reviewedLoneWorkerFixture($request->getRequestUri(), $request->all()));
         $request->setUserResolver(fn (): User => $coordinator);
-        app(LoneWorkerController::class)->endSession($request, $staleSession);
+        try {
+            app(LoneWorkerController::class)->endSession($request, $staleSession);
+            $this->fail('A newer emergency must reject end.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('status', $error->errors());
+        }
 
         $session->refresh();
         $this->assertSame('emergency', $session->status);
@@ -210,8 +233,14 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         ]);
 
         $request = Request::create("/health-safety/lone-workers/sessions/{$session->id}", 'DELETE');
+        $request->merge($this->reviewedLoneWorkerFixture($request->getRequestUri(), $request->all()));
         $request->setUserResolver(fn (): User => $coordinator);
-        app(LoneWorkerController::class)->destroy($request, $staleSession);
+        try {
+            app(LoneWorkerController::class)->destroy($request, $staleSession);
+            $this->fail('A newer emergency must reject removal.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('status', $error->errors());
+        }
 
         $this->assertNotSoftDeleted('lone_worker_sessions', ['id' => $session->id]);
         $this->assertSame('emergency', $session->fresh()->status);
@@ -291,12 +320,12 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         [$viewer, $session, $historical, $canonical] = $this->historicalAndCanonicalAlertFixture('open');
 
         $this->actingAs($viewer)
-            ->get("/health-safety/lone-workers?session={$session->id}&period=all")
+            ->get("/health-safety/lone-workers/sessions/{$session->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('detail.alerts', 1)
-                ->where('detail.alerts.0.id', 'cr_'.$canonical->id)
-                ->where('detail.alerts.0.source', 'control_room')
+                ->where('detail.alerts.0.id', $canonical->id)
+                ->where('detail.alerts.0.href', fn ($href): bool => is_string($href) && str_starts_with($href, '/control-room'))
                 ->has('detail.legacy_alert_history', 1)
                 ->where('detail.legacy_alert_history.0.id', 'legacy_'.$historical->id)
                 ->where('detail.legacy_alert_history.0.status', 'historical')
@@ -311,7 +340,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     {
         $localSite = Site::factory()->create(['name' => 'Verified local site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign secret site']);
-        $viewer = $this->hsLead(['hazards.view']);
+        $viewer = $this->hsLead(['hazards.view', 'controlRoom.alerts.view', 'controlRoom.alerts.manage', 'assets.telemetry.view']);
         $localWorker = $this->siteUser($localSite);
         $localWorker->update(['name' => 'Verified local worker']);
         $foreignWorker = $this->siteUser($foreignSite);
@@ -354,7 +383,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     public function test_alert_register_batches_session_security_hydration_for_a_full_page(): void
     {
         $site = Site::factory()->create();
-        $viewer = $this->hsLead(['hazards.view']);
+        $viewer = $this->hsLead(['hazards.view', 'controlRoom.alerts.view', 'controlRoom.alerts.manage', 'assets.telemetry.view']);
         $worker = $this->siteUser($site);
         $session = $this->makeSession($worker, $site);
 
@@ -380,7 +409,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             ->filter(fn (array $entry): bool => str_starts_with(
                 strtolower($entry['query']),
                 'select * from `lone_worker_sessions`',
-            ))
+            ) && str_contains(strtolower($entry['query']), 'where `id` in ('))
             ->values();
 
         $this->assertCount(
@@ -398,7 +427,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     {
         $site = Site::factory()->create();
         $otherSite = Site::factory()->create();
-        $viewer = $this->hsLead(['hazards.view']);
+        $viewer = $this->hsLead(['hazards.view', 'controlRoom.alerts.view', 'controlRoom.alerts.manage', 'assets.telemetry.view']);
         $worker = $this->siteUser($site);
         $session = $this->makeSession($worker, $site);
         $nonLoneWorker = ControlRoomAlert::factory()->create([
@@ -419,16 +448,16 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
 
         foreach ([$nonLoneWorker, $poisoned] as $alert) {
             $this->actingAs($viewer)
-                ->get("/health-safety/lone-workers?tab=alerts&period=all&alert=cr_{$alert->id}")
+                ->withHeader('Accept', 'application/json')->get("/health-safety/lone-workers?tab=alerts&period=all&alert=cr_{$alert->id}")
                 ->assertOk()
-                ->assertInertia(fn (Assert $page) => $page->where('detail', null));
+                ->assertJson(fn (AssertableJson $page) => $page->etc()->where('detail', null));
         }
     }
 
     public function test_alert_detail_uses_only_a_verified_relation_backed_incident_reference(): void
     {
         $site = Site::factory()->create();
-        $viewer = $this->hsLead(['hazards.view']);
+        $viewer = $this->hsLead(['hazards.view', 'controlRoom.alerts.view', 'controlRoom.alerts.manage', 'assets.telemetry.view']);
         $worker = $this->siteUser($site);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $session = $this->makeSession($worker, $site, ['client_id' => $client->id]);
@@ -438,12 +467,17 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             'site_id' => $site->id,
             'reported_by' => $viewer->id,
             'control_room_alert_id' => $alert->id,
+            'occurred_at' => $session->started_at->copy()->addMinute(),
         ]);
 
+        $this->actingAs($viewer)->withHeader('Accept', 'application/json')->get("/health-safety/lone-workers?tab=alerts&period=all&alert=cr_{$alert->id}")
+            ->assertOk()->assertJson(fn (AssertableJson $page) => $page->etc()->where('detail.incident_id', null));
+        $viewer->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'incidents.viewAny')->sole()->id => ['allowed' => true]]);
+
         $this->actingAs($viewer)
-            ->get("/health-safety/lone-workers?tab=alerts&period=all&alert=cr_{$alert->id}")
+            ->withHeader('Accept', 'application/json')->get("/health-safety/lone-workers?tab=alerts&period=all&alert=cr_{$alert->id}")
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
+            ->assertJson(fn (AssertableJson $page) => $page->etc()
                 ->where('detail.incident_id', $incident->id)
                 ->where('detail.session.id', $session->id));
     }
@@ -452,7 +486,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     {
         $site = Site::factory()->create();
         $otherSite = Site::factory()->create();
-        $viewer = $this->hsLead(['hazards.view']);
+        $viewer = $this->hsLead(['hazards.view', 'controlRoom.alerts.view', 'controlRoom.alerts.manage', 'assets.telemetry.view']);
         $worker = $this->siteUser($site);
         $session = $this->makeSession($worker, $site);
         $poisoned = $this->canonicalAlert($session, $otherSite, [
@@ -460,11 +494,11 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get("/health-safety/lone-workers?session={$session->id}&period=all")
+            ->get("/health-safety/lone-workers/sessions/{$session->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.alerts', fn ($alerts): bool => ! collect($alerts)
-                    ->contains('id', 'cr_'.$poisoned->id)));
+                    ->contains('id', $poisoned->id)));
     }
 
     public function test_session_history_uses_complete_client_shift_fallback_security_projection(): void
@@ -487,15 +521,19 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $valid = $this->canonicalAlert($session, $site, ['site_id' => $site->id]);
         $poisoned = $this->canonicalAlert($session, $site, ['site_id' => $otherSite->id]);
 
+        $this->actingAs($viewer)->get("/health-safety/lone-workers/sessions/{$session->id}")
+            ->assertOk()->assertInertia(fn (Assert $page) => $page->has('detail.alerts', 0));
+        $viewer->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'controlRoom.alerts.view')->sole()->id => ['allowed' => true]]);
+
         $this->actingAs($viewer)
-            ->get("/health-safety/lone-workers?session={$session->id}&period=all")
+            ->get("/health-safety/lone-workers/sessions/{$session->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.alerts', function ($alerts) use ($valid, $poisoned): bool {
                     $ids = collect($alerts)->pluck('id');
 
-                    return $ids->contains('cr_'.$valid->id)
-                        && ! $ids->contains('cr_'.$poisoned->id);
+                    return $ids->contains($valid->id)
+                        && ! $ids->contains($poisoned->id);
                 }));
     }
 
@@ -503,7 +541,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     {
         $site = Site::factory()->create();
         $otherSite = Site::factory()->create();
-        $viewer = $this->hsLead();
+        $viewer = $this->hsLead(['assets.telemetry.view', 'controlRoom.alerts.manage']);
         $worker = $this->siteUser($site);
         $session = $this->makeSession($worker, $site);
         $poisoned = $this->canonicalAlert($session, $otherSite, [
@@ -512,7 +550,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
 
         $this->actingAs($viewer)
             ->post("/health-safety/lone-workers/sessions/{$session->id}/acknowledge-panic")
-            ->assertRedirect();
+            ->assertForbidden();
 
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $poisoned->fresh()->status);
     }
@@ -530,9 +568,9 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         );
 
         $this->actingAs($viewer)
-            ->get("/health-safety/lone-workers?tab=alerts&period=all&alert=cr_{$alert->id}")
+            ->withHeader('Accept', 'application/json')->get("/health-safety/lone-workers?tab=alerts&period=all&alert=cr_{$alert->id}")
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
+            ->assertJson(fn (AssertableJson $page) => $page->etc()
                 ->where('detail', null)
                 ->where('alerts.data', function ($alerts) use ($alert): bool {
                     $row = collect($alerts)->firstWhere('id', 'cr_'.$alert->id);
@@ -556,11 +594,11 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         );
 
         $this->actingAs($viewer)
-            ->get("/health-safety/lone-workers?session={$session->id}&period=all")
+            ->get("/health-safety/lone-workers/sessions/{$session->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.alerts', fn ($alerts): bool => ! collect($alerts)
-                    ->contains('id', 'cr_'.$alert->id)));
+                    ->contains('id', $alert->id)));
 
         $this->assertSame('active', $session->fresh()->status);
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->fresh()->status);
@@ -577,7 +615,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
 
         $this->actingAs($actor)
             ->post("/health-safety/lone-workers/sessions/{$session->id}/acknowledge-panic")
-            ->assertRedirect();
+            ->assertForbidden();
 
         $this->assertSame('active', $session->fresh()->status);
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->fresh()->status);
@@ -619,7 +657,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $site = Site::factory()->create();
         $worker = $this->siteUser($site);
         $client = Client::factory()->create(['site_id' => $site->id]);
-        $viewer = $this->hsLead(['hazards.view']);
+        $viewer = $this->hsLead(['hazards.view', 'controlRoom.alerts.view', 'controlRoom.alerts.manage', 'assets.telemetry.view']);
         $session = $this->makeSession($worker, $site, ['client_id' => $client->id]);
         $native = $this->canonicalAlert($session, $site);
         $canonicalDecimal = $this->canonicalAlert($session, $site, [
@@ -631,9 +669,9 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
 
         foreach ([$native, $canonicalDecimal] as $alert) {
             $this->actingAs($viewer)
-                ->get("/health-safety/lone-workers?tab=alerts&period=all&alert=cr_{$alert->id}")
+                ->withHeader('Accept', 'application/json')->get("/health-safety/lone-workers?tab=alerts&period=all&alert=cr_{$alert->id}")
                 ->assertOk()
-                ->assertInertia(fn (Assert $page) => $page
+                ->assertJson(fn (AssertableJson $page) => $page->etc()
                     ->where('detail.session.id', $session->id)
                     ->where('alerts.data', fn ($alerts): bool => data_get(
                         collect($alerts)->firstWhere('id', 'cr_'.$alert->id),
@@ -660,8 +698,9 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $request = Request::create(
             "/health-safety/lone-workers/sessions/{$session->id}",
             'PATCH',
-            ['expected_end_at' => now()->addHours(5)->toDateTimeString()],
+            ['expected_end_at' => now()->addHours(5)->toISOString()],
         );
+        $request->merge($this->reviewedLoneWorkerFixture($request->getRequestUri(), $request->all()));
         $request->setUserResolver(fn (): User => $actor);
 
         $this->assertHttpForbidden(fn () => app(LoneWorkerController::class)
@@ -688,7 +727,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
 
         $this->actingAs($actor)
             ->patch("/health-safety/lone-workers/sessions/{$session->id}", [
-                'expected_end_at' => now()->addHours(5)->toDateTimeString(),
+                'expected_end_at' => now()->addHours(5)->toISOString(),
             ])
             ->assertForbidden();
 
@@ -710,6 +749,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             "/health-safety/lone-workers/sessions/{$session->id}/locate",
             'POST',
         );
+        $request->merge($this->reviewedLoneWorkerFixture($request->getRequestUri(), $request->all()));
         $request->setUserResolver(fn (): User => $actor);
 
         $this->assertHttpForbidden(fn () => app(LoneWorkerController::class)->locateNow(
@@ -725,7 +765,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     {
         $site = Site::factory()->create();
         $foreignSite = Site::factory()->create();
-        $actor = $this->hsLead();
+        $actor = $this->hsLead(['assets.telemetry.view']);
         $worker = $this->siteUser($site);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
@@ -741,6 +781,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             "/health-safety/lone-workers/sessions/{$session->id}/locate",
             'POST',
         );
+        $request->merge($this->reviewedLoneWorkerFixture($request->getRequestUri(), $request->all()));
         $request->setUserResolver(fn (): User => $actor);
 
         $this->assertHttpForbidden(fn () => app(LoneWorkerController::class)->locateNow(
@@ -755,7 +796,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     public function test_locate_now_rolls_back_the_queued_command_when_strict_audit_writing_fails(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->hsLead();
+        $actor = $this->hsLead(['assets.telemetry.view']);
         $worker = $this->siteUser($site);
         $session = $this->makeSession($worker, $site);
         $this->pairWorkerTracker($worker, '861106048630001');
@@ -770,7 +811,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     public function test_tracker_operations_stop_when_personal_tracking_collection_has_stopped(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
+        $actor = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage', 'assets.telemetry.view']);
         $worker = $this->siteUser($site);
         $session = $this->makeSession($worker, $site);
         $device = $this->pairWorkerTracker($worker, '861106048635001');
@@ -784,17 +825,17 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             ]);
 
         $this->actingAs($actor)
-            ->get("/health-safety/lone-workers?session={$session->id}")
+            ->get("/health-safety/lone-workers/sessions/{$session->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.tracker', null)
-                ->where('detail.tracker_state', 'not_assigned'));
+                ->where('detail.tracker_state', 'collection_stopped'));
 
         $this->actingAs($actor)
             ->from('/health-safety/lone-workers')
             ->post("/health-safety/lone-workers/sessions/{$session->id}/locate")
             ->assertRedirect('/health-safety/lone-workers')
-            ->assertSessionHas('error', 'This worker does not have a paired GPS tracker.');
+            ->assertSessionHasErrors('tracker');
 
         $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
@@ -802,7 +843,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     public function test_tracker_mutations_share_assignment_device_session_lock_order(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->hsLead();
+        $actor = $this->hsLead(['assets.telemetry.view', 'controlRoom.alerts.view', 'controlRoom.alerts.manage']);
         $worker = $this->siteUser($site);
         $session = $this->makeSession($worker, $site);
         $device = $this->pairWorkerTracker($worker, '861106048640001');
@@ -837,7 +878,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             [
                 'user_id' => $worker->id,
                 'site_id' => $site->id,
-                'expected_end_at' => now()->addHours(2)->toDateTimeString(),
+                'expected_end_at' => now()->addHours(2)->toISOString(),
             ],
         ));
         $this->assertSame('Simulated Lone Worker strict audit failure.', $caught?->getMessage());
@@ -847,7 +888,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $originalEnd = $update->expected_end_at->copy();
         $caught = $this->captureLoneWorkerAuditFailure(fn () => $this->patch(
             "/health-safety/lone-workers/sessions/{$update->id}",
-            ['expected_end_at' => now()->addHours(6)->toDateTimeString()],
+            ['expected_end_at' => now()->addHours(6)->toISOString()],
         ));
         $this->assertSame('Simulated Lone Worker strict audit failure.', $caught?->getMessage());
         $this->assertTrue($update->fresh()->expected_end_at->equalTo($originalEnd));
@@ -862,9 +903,6 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $this->assertTrue($checkIn->fresh()->last_check_in_at->equalTo($originalCheckIn));
         $this->assertDatabaseMissing('lone_worker_check_ins', ['lone_worker_session_id' => $checkIn->id]);
 
-        $this->mock(LoneWorkerSignalService::class, function ($mock): void {
-            $mock->shouldReceive('emitEmergency')->once();
-        });
         $emergency = $this->makeSession($worker, $site);
         $caught = $this->captureLoneWorkerAuditFailure(fn () => $this->post(
             "/health-safety/lone-workers/sessions/{$emergency->id}/emergency",
@@ -893,33 +931,24 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $this->assertNotSoftDeleted('lone_worker_sessions', ['id' => $destroy->id]);
     }
 
-    public function test_emergency_and_canonical_signal_creation_are_one_atomic_transaction(): void
+    public function test_accepted_emergency_intent_survives_canonical_signal_failure(): void
     {
         $site = Site::factory()->create();
         $actor = $this->hsLead();
-        $worker = $this->siteUser($site);
-        $session = $this->makeSession($worker, $site);
+        $session = $this->makeSession($this->siteUser($site), $site);
+        Queue::fake();
         $processor = $this->mock(SignalProcessingService::class);
-        $processor->shouldReceive('ingest')
-            ->once()
-            ->andThrow(new RuntimeException('Simulated canonical signal failure.'));
-        $caught = null;
-
-        $this->withoutExceptionHandling();
-        try {
-            $this->actingAs($actor)->post(
-                "/health-safety/lone-workers/sessions/{$session->id}/emergency",
-                ['emergency_notes' => 'Must roll back with canonical failure.'],
-            );
-        } catch (RuntimeException $exception) {
-            $caught = $exception;
-        } finally {
-            $this->withExceptionHandling();
-        }
-
+        $processor->shouldReceive('ingest')->once()->andThrow(new RuntimeException('Simulated canonical signal failure.'));
+        $this->actingAs($actor)->post("/health-safety/lone-workers/sessions/{$session->id}/emergency", ['emergency_notes' => 'Accepted request.'])->assertRedirect()->assertSessionHasNoErrors();
+        $episode = $session->emergencyEpisodes()->sole();
+        $caught = $this->captureRuntimeFailure(fn () => app(LoneWorkerEmergencyDeliveryService::class)->deliver($episode->id));
         $this->assertSame('Simulated canonical signal failure.', $caught?->getMessage());
-        $this->assertSame('active', $session->fresh()->status);
-        $this->assertNull($session->fresh()->emergency_triggered_at);
+        $this->assertSame('emergency', $session->fresh()->status);
+        $this->assertNotNull($session->fresh()->emergency_triggered_at);
+        $this->assertSame('failed', $episode->fresh()->status);
+        $this->assertSame('signal_delivery_failed', $episode->fresh()->failure_code);
+        $this->assertSame(1, LoneWorkerCommandReceipt::where('lone_worker_session_id', $session->id)->count());
+        $this->assertDatabaseCount('control_room_signals', 0);
         $this->assertDatabaseMissing('lone_worker_alerts', ['lone_worker_session_id' => $session->id]);
     }
 
@@ -973,7 +1002,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     {
         $site = Site::factory()->create();
         $client = Client::factory()->create(['site_id' => $site->id]);
-        $actor = $this->hsLead();
+        $actor = $this->hsLead(['controlRoom.alerts.manage', 'controlRoom.alerts.view']);
         $workerA = $this->siteScopedUser($site);
         $workerB = $this->siteScopedUser($site);
         $sessionA = $this->makeSession($workerA, $site, ['client_id' => $client->id]);
@@ -1027,6 +1056,8 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             ])
             ->assertRedirect();
 
+        app(LoneWorkerEmergencyDeliveryService::class)->deliver($sessionA->emergencyEpisodes()->sole()->id);
+
         $canonicalA = ControlRoomAlert::query()
             ->where('source', 'lone_worker')
             ->where('context->normalized_data->lone_worker_session_id', $sessionA->id)
@@ -1062,6 +1093,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             ])
             ->assertRedirect();
 
+        app(LoneWorkerEmergencyDeliveryService::class)->deliver($sessionB->emergencyEpisodes()->sole()->id);
         $canonicalA->refresh();
         $canonicalB = ControlRoomAlert::query()
             ->where('source', 'lone_worker')
@@ -1216,10 +1248,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
                 ]);
             }
 
-            $caught = $this->captureRuntimeFailure(fn () => $this->actingAs($actor)->post(
-                "/health-safety/lone-workers/sessions/{$session->id}/emergency",
-                ['emergency_notes' => 'Malformed canonical identity must fail closed.'],
-            ));
+            $caught = $this->captureRuntimeFailure(fn () => DB::transaction(fn () => app(LoneWorkerSignalService::class)->emitEmergency($session, 'Malformed canonical identity must fail closed.')));
         } finally {
             Carbon::setTestNow();
         }
@@ -1321,10 +1350,10 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
                 ],
             ]));
 
-        $caught = $this->captureRuntimeFailure(fn () => $this->actingAs($actor)->post(
-            "/health-safety/lone-workers/sessions/{$session->id}/emergency",
-            ['emergency_notes' => 'Wrong canonical correlation must abort.'],
-        ));
+        $caught = $this->captureRuntimeFailure(fn () => DB::transaction(function () use ($session) {
+            $session->forceFill(['status' => 'emergency', 'emergency_triggered_at' => now()])->saveQuietly();
+            app(LoneWorkerSignalService::class)->emitEmergency($session, 'Wrong canonical correlation must abort.');
+        }));
 
         $this->assertStringContainsString('does not match', (string) $caught?->getMessage());
         $this->assertSame('active', $session->fresh()->status);
@@ -1334,7 +1363,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $this->assertDatabaseCount('control_room_alerts', 0);
     }
 
-    public function test_signal_emission_requires_the_session_to_name_its_authoritative_site(): void
+    public function test_legacy_direct_signal_emission_requires_the_session_to_name_its_authoritative_site(): void
     {
         $site = Site::factory()->create();
         $actor = $this->hsLead();
@@ -1351,10 +1380,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             'shift_id' => $shift->id,
         ]);
 
-        $caught = $this->captureRuntimeFailure(fn () => $this->actingAs($actor)
-            ->post("/health-safety/lone-workers/sessions/{$session->id}/emergency", [
-                'emergency_notes' => 'Fallback site proof.',
-            ]));
+        $caught = $this->captureRuntimeFailure(fn () => app(LoneWorkerSignalService::class)->emitEmergency($session, 'Fallback site proof.'));
 
         $this->assertSame('Lone worker signal requires an authoritative session Site.', $caught?->getMessage());
         $this->assertSame('active', $session->fresh()->status);
@@ -1366,7 +1392,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     public function test_canonical_acknowledgement_aborts_when_multiple_operational_alerts_claim_one_emergency(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->hsLead();
+        $actor = $this->hsLead(['controlRoom.alerts.manage', 'controlRoom.alerts.view']);
         $session = $this->makeSession($this->siteUser($site), $site);
         $first = $this->canonicalAlert($session, $site);
         $second = $this->canonicalAlert($session, $site);
@@ -1382,7 +1408,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     public function test_canonical_resolution_aborts_for_a_wrong_operational_type(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->hsLead();
+        $actor = $this->hsLead(['controlRoom.alerts.manage', 'controlRoom.alerts.view']);
         $session = $this->makeSession($this->siteUser($site), $site);
         $canonical = $this->canonicalAlert($session, $site);
         $canonical->update(['alert_type' => 'Lone Worker Session Overrun']);
@@ -1410,6 +1436,9 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             'user_id' => $user->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subYear()->toDateString(),
+            'end_date' => null,
         ]);
 
         return $user;
@@ -1422,6 +1451,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             'role' => 'manager',
         ]);
         $keys = array_values(array_unique([
+            'hazards.view',
             'hazards.manage',
             'healthSafety.viewAllSites',
             ...$extraPermissions,
@@ -1430,6 +1460,8 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $lead->permissionOverrides()->sync(
             $permissions->mapWithKeys(fn ($id) => [$id => ['allowed' => true]]),
         );
+
+        HrEmployeeProfile::factory()->create(['user_id' => $lead->id, 'primary_site_id' => Site::query()->firstOrFail()->id, 'secondary_site_ids' => [], 'is_active' => true, 'start_date' => now()->subYear()->toDateString(), 'end_date' => null]);
 
         return $lead;
     }
@@ -1507,6 +1539,9 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             'user_id' => $worker->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subYear()->toDateString(),
+            'end_date' => null,
         ]);
         $client = $withClient
             ? Client::factory()->create([
@@ -1514,7 +1549,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
                 'site_id' => $site->id,
             ])
             : null;
-        $viewer = $this->hsLead(['hazards.view']);
+        $viewer = $this->hsLead(['hazards.view', 'controlRoom.alerts.view', 'controlRoom.alerts.manage', 'assets.telemetry.view']);
         $session = LoneWorkerSession::unguarded(fn (): LoneWorkerSession => $this->makeSession(
             $worker,
             $site,
@@ -1561,6 +1596,9 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
             'user_id' => $user->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subYear()->toDateString(),
+            'end_date' => null,
         ]);
 
         return $user;
@@ -1684,7 +1722,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     private function historicalAndCanonicalAlertFixture(string $canonicalStatus): array
     {
         $site = Site::factory()->create();
-        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
+        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage', 'controlRoom.alerts.view', 'controlRoom.alerts.manage']);
         $worker = $this->siteUser($site);
         $session = $this->makeSession($worker, $site);
         $historical = $session->alerts()->create([
@@ -1698,33 +1736,21 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     }
 
     /** @param array<string, mixed> $contextOverrides */
-    private function canonicalAlert(
-        LoneWorkerSession $session,
-        Site $alertSite,
-        array $contextOverrides = [],
-        string $status = 'open',
-    ): ControlRoomAlert {
-        return ControlRoomAlert::factory()->create([
-            'source' => 'lone_worker',
-            'alert_type' => 'Lone Worker Emergency',
-            'status' => $status,
-            'site_id' => $alertSite->id,
-            'client_id' => $session->client_id,
-            'triggered_at' => now(),
-            'context' => [
-                'signal_type_code' => LoneWorkerSignalService::TYPE_EMERGENCY,
-                'normalized_data' => array_merge([
-                    'source_module' => 'lone_worker',
-                    'signal_type' => LoneWorkerSignalService::TYPE_EMERGENCY,
-                    'lone_worker_session_id' => $session->id,
-                    'worker_user_id' => $session->user_id,
-                    'worker_name' => $session->user?->name,
-                    'site_id' => $session->site_id,
-                    'site_name' => $session->site?->name,
-                    'client_id' => $session->client_id,
-                    'location' => $session->location,
-                ], $contextOverrides),
-            ],
-        ]);
+    private function canonicalAlert(LoneWorkerSession $session, Site $alertSite, array $contextOverrides = [], string $status = 'open'): ControlRoomAlert
+    {
+        $siteId = $session->site_id ?? $session->client?->site_id ?? $session->shift?->site_id ?? $session->shift?->client?->site_id;
+        $normalized = ['source_module' => 'lone_worker', 'signal_type' => LoneWorkerSignalService::TYPE_EMERGENCY,
+            'lone_worker_session_id' => $session->id, 'worker_user_id' => $session->user_id,
+            'site_id' => $siteId, 'client_id' => $session->client_id, 'location' => $session->location];
+        $source = SignalSource::firstOrCreate(['slug' => 'lone_worker'], ['name' => 'Lone Worker Safety', 'vendor' => 'internal', 'status' => 'active', 'config' => [], 'capabilities' => ['manual_trigger']]);
+        $signal = Signal::create(['signal_source_id' => $source->id, 'signal_type_code' => LoneWorkerSignalService::TYPE_EMERGENCY,
+            'idempotency_key' => hash('sha256', 'canonical-regression:'.Str::uuid()), 'site_id' => $siteId, 'client_id' => $session->client_id,
+            'severity_hint' => 'critical', 'occurred_at' => now(), 'received_at' => now(), 'status' => 'processed', 'payload' => [], 'normalized_data' => $normalized]);
+        $alert = ControlRoomAlert::factory()->create(['source' => 'lone_worker', 'alert_type' => 'Lone Worker Emergency', 'status' => $status,
+            'site_id' => $alertSite->id, 'client_id' => $session->client_id, 'triggered_at' => now(), 'origin_signal_id' => $signal->id,
+            'context' => ['signal_id' => $signal->id, 'signal_type_code' => LoneWorkerSignalService::TYPE_EMERGENCY, 'normalized_data' => [...$normalized, ...$contextOverrides]]]);
+        $signal->forceFill(['alert_id' => $alert->id, 'processed_at' => now()])->save();
+
+        return $alert;
     }
 }

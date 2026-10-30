@@ -29,6 +29,10 @@ export default [
             'react/prop-types': 'off',
             'react/no-unescaped-entities': 'off',
 
+            // Pop-up kit (design_styles/POPUP_STYLE_GUIDE.md): no browser
+            // alert() / confirm() / prompt() — use the kit's Confirm or a Form.
+            'no-alert': 'error',
+
             // Pragmatic baseline for large mixed-quality pages while module work continues.
             '@typescript-eslint/no-explicit-any': 'off',
             '@typescript-eslint/no-unused-vars': 'off',
@@ -162,6 +166,9 @@ export default [
                         'no-restricted-syntax',
                     ),
                     'no-emoji-icon': builtinRules.get('no-restricted-syntax'),
+                    'no-oblivion-fallback': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
@@ -315,6 +322,38 @@ export default [
         },
     },
     {
+        // DESIGN.md "Oblivion identity on a client's site" (client demo
+        // website, 23 Oct 2026): the public website and the sign-in layout
+        // speak as the client. The provider's name comes from Settings ›
+        // Branding or Settings › Referrals and reads neutrally when unset —
+        // never an "Oblivion Care" string fallback or @oblivioncare
+        // placeholder. JSX text (the Powered by line's screen-reader text)
+        // isn't a Literal, so it stays allowed.
+        files: [
+            'resources/js/components/Header.tsx',
+            'resources/js/components/Footer.tsx',
+            'resources/js/components/public-site/**/*.{ts,tsx}',
+            'resources/js/layouts/marketing-layout.tsx',
+            'resources/js/layouts/auth/auth-journey-layout.tsx',
+            'resources/js/pages/public-provider/**/*.{ts,tsx}',
+            'resources/js/pages/public-referrals/**/*.{ts,tsx}',
+            'resources/js/pages/auth/login.tsx',
+            'resources/js/pages/portal/login.tsx',
+        ],
+        ignores: ['**/*.test.tsx', '**/*.test.ts'],
+        rules: {
+            'design/no-oblivion-fallback': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/oblivion ?care/i], TemplateElement[value.raw=/oblivion ?care/i])',
+                    message:
+                        'The public website and sign-in pages are the client’s: take the provider name from usePublicSite() / useCustomBrandName() and read neutrally when it is null, never "Oblivion Care". See DESIGN.md "Oblivion identity on a client’s site".',
+                },
+            ],
+        },
+    },
+    {
         // DESIGN.md "Band text": the floored dark bands (the .eh-header sky
         // and the PageHero band) carry --band-foreground, which is always
         // white. --primary-foreground follows the brand and turns ink for a
@@ -419,6 +458,52 @@ export default [
         },
     },
     {
+        // Security & Devices plain-language rule: keep system-design jargon out
+        // of user-facing copy while leaving backend payload keys and TypeScript
+        // identifiers untouched.
+        files: [
+            'resources/js/pages/security-devices/**/*.{ts,tsx}',
+            'resources/js/components/security-devices/**/*.{ts,tsx}',
+        ],
+        ignores: ['**/*.test.ts', '**/*.test.tsx', '**/*fixtures*.ts'],
+        plugins: {
+            'security-devices-copy': {
+                rules: {
+                    'no-jargon': builtinRules.get('no-restricted-syntax'),
+                },
+            },
+        },
+        rules: {
+            'security-devices-copy/no-jargon': [
+                'error',
+                {
+                    selector:
+                        'JSXText[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i]',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+                {
+                    selector:
+                        'JSXAttribute[name.name=/^(?:label|title|description|subline|caption|placeholder|aria-label|ariaLabel|empty|note|railTitle|railSub|blurb|text|confirmText)$/] :matches(Literal[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i], TemplateElement[value.raw=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i])',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+                {
+                    selector:
+                        'Property[key.name=/^(?:label|title|description|subline|caption|placeholder|empty|note|blurb|next|confirmText)$/] > :matches(Literal[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i], TemplateElement[value.raw=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i])',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+                {
+                    selector:
+                        'ArrayExpression > Literal:first-child[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i]',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+            ],
+        },
+    },
+    {
         // Node tooling (scripts/, tools/): run by node, not the browser bundle.
         files: ['**/*.{cjs,mjs}'],
         languageOptions: {
@@ -458,6 +543,7 @@ export default [
             // with several active worktrees. CI never has these.
             '.claude/worktrees/**',
             '.claude/**',
+            '.endpoint-tools/**',
         ],
     },
     prettier, // Turn off all rules that might conflict with Prettier

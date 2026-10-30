@@ -2,11 +2,12 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import HandoversIndex from './Index';
 import type { Catalogue, Handover } from './components/shared';
-const { get, patch, reload, detail } = vi.hoisted(() => ({
+const { get, patch, reload, detail, wizard } = vi.hoisted(() => ({
     get: vi.fn(),
     patch: vi.fn(),
     reload: vi.fn(),
     detail: vi.fn(),
+    wizard: vi.fn(),
 }));
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
@@ -39,7 +40,7 @@ vi.mock('@/layouts/app-layout', () => ({
 vi.mock('@/components/clients/add-client-dialog', () => ({
     AddClientDialog: () => null,
 }));
-vi.mock('./components/handover-wizard', () => ({ HandoverWizard: () => null }));
+vi.mock('./components/handover-wizard', () => ({ HandoverWizard: (props: unknown) => { wizard(props); return null; } }));
 vi.mock('./components/handover-detail-dialog', () => ({
     HandoverDetailDialog: (props: unknown) => {
         detail(props);
@@ -249,4 +250,25 @@ it('keeps medication detail entry conditional on its separate current capability
         />,
     );
     expect(detail.mock.calls.at(-1)?.[0].medicationSnapshotUrl).toBeUndefined();
+});
+
+it('keeps the existing writer until the server advertises the installed command protocol', () => {
+    render(<HandoversIndex {...props} />);
+    expect(wizard.mock.calls.at(-1)?.[0].checkedCommands).toBe(false);
+    const onSubmit = detail.mock.calls.at(-1)?.[0].onSubmit;
+    act(() => onSubmit({ id: 12 }));
+    expect(patch).toHaveBeenCalledWith('/operations/handovers/12/submit', {}, expect.any(Object));
+});
+
+it('uses submit-only review when installed and never downgrades a mounted command owner', () => {
+    const page = render(<HandoversIndex {...props} handoverCommandProtocol={1} />);
+    expect(wizard.mock.calls.at(-1)?.[0].checkedCommands).toBe(true);
+    act(() => detail.mock.calls.at(-1)?.[0].onSubmit({ id: 12 }));
+    expect(wizard.mock.calls.at(-1)?.[0]).toMatchObject({ open: true, checkedCommands: true, submitOnly: true });
+    expect(patch).not.toHaveBeenCalled();
+    page.rerender(<HandoversIndex {...props} handoverCommandProtocol={null} />);
+    expect(wizard.mock.calls.at(-1)?.[0].checkedCommands).toBe(true);
+    page.unmount();
+    render(<HandoversIndex {...props} handoverCommandProtocol={null} />);
+    expect(wizard.mock.calls.at(-1)?.[0].checkedCommands).toBe(false);
 });

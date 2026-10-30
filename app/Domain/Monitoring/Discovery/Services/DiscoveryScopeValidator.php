@@ -76,8 +76,9 @@ final class DiscoveryScopeValidator
         if ($scope->collector_id !== null) {
             $collector = MonitoringCollector::query()->find($scope->collector_id);
             if ($collector === null
-                || (int) $collector->site_id !== (int) $scope->site_id
-                || ! in_array(strtolower((string) $collector->status), ['online', 'offline', 'degraded', 'unavailable'], true)) {
+                || $collector->revoked_at !== null
+                || ! in_array((int) $scope->site_id, $collector->authorisedSiteIds(), true)
+                || ! in_array(strtolower((string) $collector->status), ['online', 'offline', 'degraded', 'unavailable', 'pending'], true)) {
                 return ['decision' => 'rejected', 'reason' => 'collector_scope_mismatch'];
             }
         }
@@ -111,11 +112,25 @@ final class DiscoveryScopeValidator
 
     private function validProtocols(mixed $protocols): bool
     {
-        if (! is_array($protocols) || ! array_is_list($protocols) || $protocols === [] || count($protocols) > 9) {
+        if (! is_array($protocols) || ! array_is_list($protocols) || $protocols === [] || count($protocols) > 16) {
             return false;
         }
 
-        $allowed = ['icmp', 'tcp', 'dns', 'http', 'tls', 'snmp', 'syslog', 'flow', 'provider'];
+        $allowed = [
+            'icmp',
+            'arp',
+            'tcp',
+            'dns',
+            'http',
+            'tls',
+            'snmp',
+            'mdns',
+            'ssdp',
+            'onvif',
+            'syslog',
+            'flow',
+            'provider',
+        ];
 
         return collect($protocols)->unique()->count() === count($protocols) && collect($protocols)->every(
             fn (mixed $protocol): bool => is_string($protocol) && in_array(strtolower($protocol), $allowed, true),
@@ -124,13 +139,26 @@ final class DiscoveryScopeValidator
 
     private function validPortBounds(mixed $bounds): bool
     {
-        if (! is_array($bounds) || count($bounds) > 9) {
+        if (! is_array($bounds) || count($bounds) > 16) {
             return false;
         }
+        $allowedKinds = [
+            'tcp',
+            'dns',
+            'http',
+            'tls',
+            'snmp',
+            'mdns',
+            'ssdp',
+            'onvif',
+            'syslog',
+            'flow',
+            'provider',
+        ];
         $ports = [];
         foreach ($bounds as $kind => $values) {
             if (! is_string($kind)
-                || ! in_array(strtolower($kind), ['tcp', 'dns', 'http', 'tls', 'snmp', 'syslog', 'flow', 'provider'], true)
+                || ! in_array(strtolower($kind), $allowedKinds, true)
                 || ! is_array($values)
                 || ! array_is_list($values)) {
                 return false;
@@ -154,6 +182,9 @@ final class DiscoveryScopeValidator
         );
         if (! $requiresSnmp) {
             return $reference === null || $reference === '';
+        }
+        if ($reference === null || $reference === '') {
+            return true;
         }
 
         return is_string($reference)

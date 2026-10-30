@@ -306,4 +306,91 @@ class Device extends Model
     {
         return DeviceDomain::tryFrom($this->domain);
     }
+
+    /**
+     * Truthful health state backed by monitoring evidence.
+     *
+     * Never reports "healthy" unless at least one enabled monitor is active
+     * and all enabled monitors have confirmed a healthy state. Critical and
+     * warning states are always preserved so real problems are never masked.
+     */
+    public function effectiveHealthState(): string
+    {
+        if ($this->health_status === HealthStatus::Critical) {
+            return HealthStatus::Critical->value;
+        }
+
+        if ($this->health_status === HealthStatus::Warning) {
+            return HealthStatus::Warning->value;
+        }
+
+        [$enabledCount, $failingCount, $uncertainCount] = $this->resolvedMonitorStateCounts();
+
+        if ($enabledCount === 0) {
+            return 'not_monitored';
+        }
+
+        if ($failingCount > 0) {
+            return HealthStatus::Warning->value;
+        }
+
+        if ($uncertainCount > 0) {
+            return HealthStatus::Unknown->value;
+        }
+
+        return HealthStatus::Healthy->value;
+    }
+
+    public function effectiveHealthLabel(): string
+    {
+        return match ($this->effectiveHealthState()) {
+            HealthStatus::Healthy->value => HealthStatus::Healthy->label(),
+            HealthStatus::Warning->value => HealthStatus::Warning->label(),
+            HealthStatus::Critical->value => HealthStatus::Critical->label(),
+            'not_monitored' => 'Not monitored',
+            default => HealthStatus::Unknown->label(),
+        };
+    }
+
+    public function rollupHealthStatus(): HealthStatus
+    {
+        return match ($this->effectiveHealthState()) {
+            HealthStatus::Healthy->value => HealthStatus::Healthy,
+            HealthStatus::Warning->value => HealthStatus::Warning,
+            HealthStatus::Critical->value => HealthStatus::Critical,
+            default => HealthStatus::Unknown,
+        };
+    }
+
+    /** @return array{int, int, int} */
+    private function resolvedMonitorStateCounts(): array
+    {
+        $attributes = $this->getAttributes();
+
+        if (
+            array_key_exists('enabled_monitors_count', $attributes)
+            && array_key_exists('failing_monitors_count', $attributes)
+            && array_key_exists('uncertain_monitors_count', $attributes)
+        ) {
+            return [
+                (int) $attributes['enabled_monitors_count'],
+                (int) $attributes['failing_monitors_count'],
+                (int) $attributes['uncertain_monitors_count'],
+            ];
+        }
+
+        $enabled = $this->relationLoaded('monitors')
+            ? $this->monitors->where('is_enabled', true)
+            : $this->monitors()->where('is_enabled', true)->get(['current_state']);
+
+        $enabledCount = $enabled->count();
+        $failingCount = $enabled->filter(
+            fn (Monitor $monitor): bool => in_array($monitor->current_state?->value, ['failed', 'degraded'], true),
+        )->count();
+        $uncertainCount = $enabled->filter(
+            fn (Monitor $monitor): bool => in_array($monitor->current_state?->value ?? 'unknown', ['unknown', 'stale', 'pending'], true),
+        )->count();
+
+        return [$enabledCount, $failingCount, $uncertainCount];
+    }
 }

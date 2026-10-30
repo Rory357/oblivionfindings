@@ -109,6 +109,8 @@ class ControlRoomMyTasksController extends Controller
             ->count();
 
         return Inertia::render('control-room/my-tasks', [
+            // Live counts on the Live response tabs (same rules as each tab).
+            'tabCounts' => fn () => app(\App\Services\ControlRoom\LiveResponseTabCounts::class)->for($user),
             'my_alerts' => $myAlerts,
             'my_followups' => $myFollowups,
             'my_shift' => $myShift,

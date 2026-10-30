@@ -99,6 +99,12 @@ class SensorIncidentBridgeService
             'device' => $alert->device?->name ?? $signal?->device?->name,
             'signal_type' => $signal?->signal_type_code,
             'payload' => $signal?->payload,
+            'canonical_device_id' => data_get($signal?->normalized_data, 'canonical_device_id'),
+            'integration_event_id' => data_get($signal?->normalized_data, 'integration_event_id'),
+            'provider' => data_get($signal?->normalized_data, 'provider'),
+            'source_event_id' => data_get($signal?->normalized_data, 'source_event_id'),
+            'source_received_at' => data_get($signal?->normalized_data, 'source_received_at'),
+            'evidence_hash' => data_get($signal?->normalized_data, 'evidence_hash'),
             'detected_at' => ($signal?->occurred_at ?? $alert->triggered_at)?->toISOString(),
         ], fn ($v) => $v !== null);
     }

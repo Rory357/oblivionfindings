@@ -8,6 +8,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
 use App\Services\HealthSafety\HsEventService;
@@ -85,6 +86,7 @@ class IncidentJourneyService
                 ->firstOrFail();
 
             $incident = $this->lockedIncidentForAlert($lockedAlert);
+            $submittedNow = $incident === null || $incident->status === 'draft';
 
             if ($incident === null) {
                 $attributes = $this->incidentAttributes($lockedAlert, null, $input, $actor);
@@ -117,6 +119,10 @@ class IncidentJourneyService
                 'incident_id' => $incident->id,
             ]);
 
+            if ($submittedNow) {
+                $this->stageSubmissionRouting($incident, $actor);
+            }
+
             return $this->freshJourney($incident, $lockedAlert, $hsEvent);
         }, self::TRANSACTION_ATTEMPTS);
     }
@@ -125,9 +131,10 @@ class IncidentJourneyService
      * Ensure a submitted incident has its canonical H&S event and, when high or
      * critical-equivalent, its one incident-backed alert.
      */
-    public function ensureForSubmittedIncident(ClientIncident $incident, ?User $actor = null): IncidentJourney
+    public function ensureForSubmittedIncident(ClientIncident $incident, ?User $actor = null, bool $newlySubmitted = false): IncidentJourney
     {
-        return DB::transaction(function () use ($incident, $actor): IncidentJourney {
+        $newlySubmitted = $newlySubmitted || $this->isNewSubmission($incident);
+        return DB::transaction(function () use ($incident, $actor, $newlySubmitted): IncidentJourney {
             $lockedIncident = $this->lockIncident($incident);
             $this->assertSubmitted($lockedIncident);
 
@@ -165,6 +172,10 @@ class IncidentJourneyService
                 $this->alertOperations->initialiseNewAlert($alert);
             }
 
+            if ($newlySubmitted) {
+                $this->stageSubmissionRouting($lockedIncident, $actor);
+            }
+
             return $this->freshJourney($lockedIncident, $alert, $hsEvent);
         }, self::TRANSACTION_ATTEMPTS);
     }
@@ -179,34 +190,37 @@ class IncidentJourneyService
         User $actor,
         ?string $reason = null,
         ?string $requestedSeverity = null,
+        ?IncidentResponseJourneyReadContext $responseSource = null,
     ): IncidentJourney {
-        return DB::transaction(function () use ($incident, $actor, $reason, $requestedSeverity): IncidentJourney {
-            $lockedIncident = $this->lockIncident($incident);
+        return DB::transaction(function () use ($incident, $actor, $reason, $requestedSeverity, $responseSource): IncidentJourney {
+            $responseSource?->assertFor($incident, $actor);
+            $lockedIncident = $this->lockIncident($incident, $responseSource);
             $this->assertSubmitted($lockedIncident);
-            $this->applyRequestedSeverityFloor($lockedIncident, $requestedSeverity);
+            $this->applyRequestedSeverityFloor($lockedIncident, $requestedSeverity, $responseSource);
 
-            $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor);
-            $this->assertHsTupleCanBeCanonicalised($lockedIncident, $hsEvent);
-            $alert = $this->lockedAlertForIncident($lockedIncident, $hsEvent);
+            $hsEvent = $this->lockedOrCreatedHsEvent($lockedIncident, $actor, $responseSource);
+            $this->assertHsTupleCanBeCanonicalised($lockedIncident, $hsEvent, $responseSource);
+            $alert = $this->lockedAlertForIncident($lockedIncident, $hsEvent, $responseSource);
             $alertWasCreated = $alert === null;
             $alert ??= $this->createIncidentAlert($lockedIncident, $actor, $reason);
 
-            $alertWasPromoted = $this->promoteAlertToIncidentFloor($lockedIncident, $alert);
+            $alertWasPromoted = $this->promoteAlertToIncidentFloor($lockedIncident, $alert, $responseSource);
             $this->adoptExplicitIncidentReason($alert, $reason);
-            $this->assertJourneyLinksDoNotConflict($lockedIncident, $alert, $hsEvent);
+            $this->assertJourneyLinksDoNotConflict($lockedIncident, $alert, $hsEvent, $responseSource);
             $this->linkJourney(
                 $lockedIncident,
                 $alert,
                 $hsEvent,
                 $actor,
                 $this->incidentAlertContext($lockedIncident, $reason),
+                $responseSource,
             );
 
             if ($alertWasCreated || $alertWasPromoted) {
                 $this->alertOperations->initialiseNewAlert($alert);
             }
 
-            return $this->freshJourney($lockedIncident, $alert, $hsEvent);
+            return $this->freshJourney($lockedIncident, $alert, $hsEvent, $responseSource);
         }, self::TRANSACTION_ATTEMPTS);
     }
 
@@ -221,8 +235,10 @@ class IncidentJourneyService
         ClientIncident $incident,
         ControlRoomAlert $alert,
         ?User $actor = null,
+        bool $newlySubmitted = false,
     ): IncidentJourney {
-        return DB::transaction(function () use ($incident, $alert, $actor): IncidentJourney {
+        $newlySubmitted = $newlySubmitted || $this->isNewSubmission($incident);
+        return DB::transaction(function () use ($incident, $alert, $actor, $newlySubmitted): IncidentJourney {
             $lockedAlert = ControlRoomAlert::query()
                 ->whereKey($alert->getKey())
                 ->lockForUpdate()
@@ -263,6 +279,10 @@ class IncidentJourneyService
 
             if ($alertWasPromoted) {
                 $this->alertOperations->initialiseNewAlert($lockedAlert);
+            }
+
+            if ($newlySubmitted) {
+                $this->stageSubmissionRouting($lockedIncident, $actor);
             }
 
             return $this->freshJourney($lockedIncident, $lockedAlert, $hsEvent);
@@ -393,15 +413,25 @@ class IncidentJourneyService
         ];
     }
 
+    /** Metadata-only current relational footprint; canonical IncidentAccess remains the body authority. */
+    public static function incidentReadOwnershipExpression(CurrentAuthorizationReads $reads): string
+    {
+        $reads->assertActive();
+        $review="(SELECT JSON_OBJECT('id', source_review.id, 'source_type', source_review.source_type, 'source_id', source_review.source_id, 'client_id', source_review.client_id, 'site_id', source_review.site_id) FROM hs_events source_review WHERE source_review.id=client_incidents.hs_event_id AND source_review.deleted_at IS NULL LIMIT 1 FOR SHARE NOWAIT)";
+        $shift="(SELECT JSON_OBJECT('id', source_shift.id, 'client_id', source_shift.client_id, 'site_id', source_shift.site_id) FROM shifts source_shift WHERE source_shift.id=client_incidents.shift_id LIMIT 1 FOR SHARE NOWAIT)";
+        $client="(SELECT JSON_OBJECT('id', source_client.id, 'site_id', source_client.site_id) FROM clients source_client WHERE source_client.id=client_incidents.client_id AND source_client.deleted_at IS NULL LIMIT 1 FOR SHARE NOWAIT)";
+        return "JSON_OBJECT('review', $review, 'shift', $shift, 'client', $client)";
+    }
+
     /**
      * Resolve canonical governance records for an uncapped alert collection in
-     * bounded queries while retaining the same fail-closed ownership checks as
-     * the single-alert resolver.
+     * bounded queries. Known ownership conflicts become an unavailable row;
+     * single-record resolution and canonical commands remain strict.
      *
      * @param  iterable<ControlRoomAlert>  $alerts
-     * @return Collection<int, array{incident: ?ClientIncident, hs_event: ?HsEvent}>
+     * @return Collection<int, array{incident: ?ClientIncident, hs_event: ?HsEvent, integrity?: string}>
      */
-    public function governanceRecordsForAlerts(iterable $alerts): Collection
+    public function governanceRecordsForAlerts(iterable $alerts, ?CurrentAuthorizationReads $reads = null): Collection
     {
         $alerts = collect($alerts)
             ->filter(fn ($alert): bool => $alert instanceof ControlRoomAlert)
@@ -410,32 +440,62 @@ class IncidentJourneyService
             return collect();
         }
 
+        $unavailable = ['incident' => null, 'hs_event' => null, 'integrity' => 'unavailable'];
+        // Collection reads isolate only these known canonical integrity failures.
+        // Unexpected domain failures and infrastructure errors still propagate.
+        $resolve = static function (callable $callback, array $fallback): array {
+            try {
+                return $callback();
+            } catch (\DomainException $exception) {
+                if (! in_array($exception->getMessage(), [
+                    'Incident journey conflict: the legacy incident already has a different direct alert.',
+                    'Incident journey conflict: the alert client does not match the incident client.',
+                    'Incident journey conflict: the alert context claims a different incident.',
+                    'Incident journey conflict: the canonical incident resolves to a different alert.',
+                    'Incident journey conflict: the alert and incident resolve to different H&S events.',
+                    'Incident journey conflict: the direct H&S event does not match the canonical incident tuple.',
+                    'Incident journey conflict: the H&S event has a different direct alert.',
+                    'Incident journey conflict: the direct H&S event client_id does not match the incident.',
+                    'Incident journey conflict: the direct H&S event site_id does not match the incident.',
+                    'H&S handover provenance conflict: the alert and H&S event do not share one Client/Site ownership tuple.',
+                ], true)) {
+                    throw $exception;
+                }
+
+                return $fallback;
+            }
+        };
+
         $alertIds = $alerts->keys()->map(fn ($id): int => (int) $id)->all();
-        $directEvents = HsEvent::query()
+        $read = function ($query) use ($reads) {
+            if ($reads === null) { return $query; }
+            // Current reads establish lifetime, not source body authority. Discovery contains metadata only.
+            $model = $query->getModel();
+            if ($model instanceof ClientIncident) {
+                $query->select(['id', 'reference_number', 'client_id', 'site_id', 'control_room_alert_id', 'hs_event_id', 'type', 'status',
+                    'created_at', 'submitted_at', 'reviewed_at', 'investigation_started_at', 'investigation_completed_at', 'reopened_at', 'closed_at', 'shift_id'])
+                    ->selectRaw(self::incidentReadOwnershipExpression($reads).' as _incident_source_ownership');
+            } elseif ($model instanceof HsEvent) {
+                $query->select(['id', 'reference_number', 'source_type', 'source_id', 'event_category', 'idempotency_key',
+                    'client_id', 'site_id', 'staff_id', 'asset_id', 'control_room_alert_id', 'status', 'handover_status',
+                    'created_at', 'accepted_at', 'worksafe_decided_at', 'worksafe_notified_at', 'worksafe_acknowledged_at', 'closed_at']);
+            } elseif ($model instanceof ControlRoomAlert) {
+                $query->select(['id', 'client_id', 'site_id', 'asset_id', 'fleet_signal_id', 'device_id', 'source', 'alert_type', 'status'])
+                    ->selectRaw("JSON_OBJECT('incident_id', JSON_EXTRACT(control_room_alerts.context, '$.incident_id')) as context");
+            }
+            return $reads->query($query);
+        };
+        $directEvents = $read(HsEvent::query()
             ->whereIn('control_room_alert_id', $alertIds)
-            ->orderBy('id')
+            ->orderBy('id'))
             ->get()
             ->groupBy(fn (HsEvent $event): int => (int) $event->control_room_alert_id);
-        foreach ($directEvents as $events) {
-            if ($events->count() > 1) {
-                throw new \DomainException(
-                    'Incident journey conflict: the alert is directly linked to multiple H&S events.',
-                );
-            }
-        }
 
-        $directIncidents = ClientIncident::query()
+        $directIncidents = $read(ClientIncident::query()
             ->whereIn('control_room_alert_id', $alertIds)
-            ->orderBy('id')
+            ->orderBy('id'))
             ->get()
             ->groupBy(fn (ClientIncident $incident): int => (int) $incident->control_room_alert_id);
-        foreach ($directIncidents as $incidents) {
-            if ($incidents->count() > 1) {
-                throw new \DomainException(
-                    'Incident journey conflict: the alert is directly linked to multiple incidents.',
-                );
-            }
-        }
 
         $legacyIncidentIds = $alerts
             ->reject(fn (ControlRoomAlert $alert): bool => $directIncidents->has((int) $alert->id))
@@ -446,42 +506,53 @@ class IncidentJourneyService
             ->values();
         $legacyIncidents = $legacyIncidentIds->isEmpty()
             ? collect()
-            : ClientIncident::query()
-                ->whereIn('id', $legacyIncidentIds)
+            : $read(ClientIncident::query()
+                ->whereIn('id', $legacyIncidentIds))
                 ->get()
                 ->keyBy(fn (ClientIncident $incident): int => (int) $incident->id);
         $records = $alerts->map(function (ControlRoomAlert $alert) use (
             $directEvents,
             $directIncidents,
             $legacyIncidents,
+            $resolve,
+            $unavailable,
         ): array {
-            $incident = $directIncidents->get((int) $alert->id)?->first();
-            if ($incident === null) {
-                $legacyIncidentId = data_get($alert->context, 'incident_id');
-                $incident = is_numeric($legacyIncidentId)
-                    ? $legacyIncidents->get((int) $legacyIncidentId)
-                    : null;
-                if ($incident?->control_room_alert_id !== null
-                    && (int) $incident->control_room_alert_id !== (int) $alert->id
-                ) {
-                    throw new \DomainException(
-                        'Incident journey conflict: the legacy incident already has a different direct alert.',
-                    );
+            $fallback = ['alert' => $alert, 'direct_event' => null] + $unavailable;
+            if (($directEvents->get((int) $alert->id)?->count() ?? 0) > 1
+                || ($directIncidents->get((int) $alert->id)?->count() ?? 0) > 1
+            ) {
+                return $fallback;
+            }
+
+            return $resolve(function () use ($alert, $directIncidents, $legacyIncidents, $directEvents): array {
+                $incident = $directIncidents->get((int) $alert->id)?->first();
+                if ($incident === null) {
+                    $legacyIncidentId = data_get($alert->context, 'incident_id');
+                    $incident = is_numeric($legacyIncidentId)
+                        ? $legacyIncidents->get((int) $legacyIncidentId)
+                        : null;
+                    if ($incident?->control_room_alert_id !== null
+                        && (int) $incident->control_room_alert_id !== (int) $alert->id
+                    ) {
+                        throw new \DomainException(
+                            'Incident journey conflict: the legacy incident already has a different direct alert.',
+                        );
+                    }
                 }
-            }
 
-            if ($incident !== null) {
-                $this->assertAlertMatchesIncident($incident, $alert);
-            }
+                if ($incident !== null) {
+                    $this->assertAlertMatchesIncident($incident, $alert);
+                }
 
-            $directEvent = $directEvents->get((int) $alert->id)?->first();
+                $directEvent = $directEvents->get((int) $alert->id)?->first();
 
-            return [
-                'alert' => $alert,
-                'incident' => $incident,
-                'direct_event' => $directEvent,
-                'hs_event' => null,
-            ];
+                return [
+                    'alert' => $alert,
+                    'incident' => $incident,
+                    'direct_event' => $directEvent,
+                    'hs_event' => null,
+                ];
+            }, $fallback);
         });
 
         /** @var EloquentCollection<int, ClientIncident> $journeyIncidents */
@@ -493,7 +564,8 @@ class IncidentJourneyService
                 ->values()
                 ->all(),
         );
-        $journeyIncidents->loadMissing('client:id,site_id');
+        if ($reads === null) { $journeyIncidents->loadMissing('client:id,site_id'); }
+        else { $journeyIncidents->loadMissing(['client' => fn ($client) => $reads->query($client->getQuery()->select(['clients.id', 'clients.site_id']))]); }
         $directHsIds = $journeyIncidents
             ->pluck('hs_event_id')
             ->filter(fn ($id): bool => is_numeric($id))
@@ -506,7 +578,7 @@ class IncidentJourneyService
             ->values();
         $journeyEvents = ($directHsIds->isEmpty() && $idempotencyKeys->isEmpty())
             ? collect()
-            : HsEvent::query()
+            : $read(HsEvent::query()
                 ->where(function ($query) use ($directHsIds, $idempotencyKeys): void {
                     if ($directHsIds->isNotEmpty()) {
                         $query->whereIn('id', $directHsIds);
@@ -516,17 +588,10 @@ class IncidentJourneyService
                         $query->{$method}('idempotency_key', $idempotencyKeys);
                     }
                 })
-                ->orderBy('id')
+                ->orderBy('id'))
                 ->get();
         $journeyEventsById = $journeyEvents->keyBy(fn (HsEvent $event): int => (int) $event->id);
         $journeyEventsByKey = $journeyEvents->groupBy('idempotency_key');
-        foreach ($journeyEventsByKey as $events) {
-            if ($events->count() > 1) {
-                throw new \DomainException(
-                    'Incident journey conflict: multiple H&S events own the canonical incident tuple.',
-                );
-            }
-        }
 
         $legacyJourneyIncidentIds = $journeyIncidents
             ->filter(function (ClientIncident $incident) use ($journeyEventsById, $journeyEventsByKey): bool {
@@ -545,9 +610,9 @@ class IncidentJourneyService
             ->values();
         $legacyJourneyAlerts = $legacyJourneyIncidentIds->isEmpty()
             ? collect()
-            : ControlRoomAlert::query()
+            : $read(ControlRoomAlert::query()
                 ->whereIn('context->incident_id', $legacyJourneyIncidentIds)
-                ->orderBy('id')
+                ->orderBy('id'))
                 ->get()
                 ->groupBy(fn (ControlRoomAlert $alert): int => (int) data_get($alert->context, 'incident_id'));
 
@@ -555,69 +620,84 @@ class IncidentJourneyService
             $journeyEventsById,
             $journeyEventsByKey,
             $legacyJourneyAlerts,
+            $resolve,
+            $unavailable,
         ): array {
-            /** @var ControlRoomAlert $alert */
-            $alert = $record['alert'];
-            /** @var ClientIncident|null $incident */
-            $incident = $record['incident'];
-            /** @var HsEvent|null $directEvent */
-            $directEvent = $record['direct_event'];
-            $journeyEvent = null;
+            if (($record['integrity'] ?? null) === 'unavailable') {
+                return $unavailable;
+            }
 
-            if ($incident !== null) {
-                $journeyEvent = $incident->hs_event_id === null
-                    ? null
-                    : $journeyEventsById->get((int) $incident->hs_event_id);
-                $journeyEvent ??= $journeyEventsByKey
-                    ->get($this->hsIdempotencyKey($incident))
-                    ?->first();
+            return $resolve(function () use ($record, $journeyEventsById, $journeyEventsByKey, $legacyJourneyAlerts, $unavailable): array {
+                /** @var ControlRoomAlert $alert */
+                $alert = $record['alert'];
+                /** @var ClientIncident|null $incident */
+                $incident = $record['incident'];
+                /** @var HsEvent|null $directEvent */
+                $directEvent = $record['direct_event'];
+                $journeyEvent = null;
+
+                if ($incident !== null) {
+                    if (($journeyEventsByKey->get($this->hsIdempotencyKey($incident))?->count() ?? 0) > 1
+                        || ($legacyJourneyAlerts->get((int) $incident->id)?->count() ?? 0) > 1
+                        || ($incident->hs_event_id !== null && ! $journeyEventsById->has((int) $incident->hs_event_id))
+                    ) {
+                        return $unavailable;
+                    }
+
+                    $journeyEvent = $incident->hs_event_id === null
+                        ? null
+                        : $journeyEventsById->get((int) $incident->hs_event_id);
+                    $journeyEvent ??= $journeyEventsByKey
+                        ->get($this->hsIdempotencyKey($incident))
+                        ?->first();
+                    if ($journeyEvent !== null) {
+                        $this->assertHsEventMatchesIncidentForRead(
+                            $incident,
+                            $journeyEvent,
+                        );
+                    }
+
+                    $canonicalAlertId = $incident->control_room_alert_id;
+                    $canonicalAlertId ??= $journeyEvent?->control_room_alert_id;
+                    $canonicalAlertId ??= $legacyJourneyAlerts
+                        ->get((int) $incident->id)
+                        ?->first()
+                        ?->id;
+                    if (! is_numeric($canonicalAlertId)
+                        || (int) $canonicalAlertId !== (int) $alert->id
+                    ) {
+                        throw new \DomainException(
+                            'Incident journey conflict: the canonical incident resolves to a different alert.',
+                        );
+                    }
+                }
+
+                if ($directEvent !== null) {
+                    $this->alertProvenance->assertHealthSafetyEventTuple(
+                        $alert,
+                        $directEvent,
+                    );
+                }
                 if ($journeyEvent !== null) {
-                    $this->assertHsEventMatchesIncidentForRead(
-                        $incident,
+                    $this->alertProvenance->assertHealthSafetyEventTuple(
+                        $alert,
                         $journeyEvent,
                     );
                 }
-
-                $canonicalAlertId = $incident->control_room_alert_id;
-                $canonicalAlertId ??= $journeyEvent?->control_room_alert_id;
-                $canonicalAlertId ??= $legacyJourneyAlerts
-                    ->get((int) $incident->id)
-                    ?->first()
-                    ?->id;
-                if (! is_numeric($canonicalAlertId)
-                    || (int) $canonicalAlertId !== (int) $alert->id
+                if ($directEvent !== null
+                    && $journeyEvent !== null
+                    && ! $directEvent->is($journeyEvent)
                 ) {
                     throw new \DomainException(
-                        'Incident journey conflict: the canonical incident resolves to a different alert.',
+                        'Incident journey conflict: the alert and incident resolve to different H&S events.',
                     );
                 }
-            }
 
-            if ($directEvent !== null) {
-                $this->alertProvenance->assertHealthSafetyEventTuple(
-                    $alert,
-                    $directEvent,
-                );
-            }
-            if ($journeyEvent !== null) {
-                $this->alertProvenance->assertHealthSafetyEventTuple(
-                    $alert,
-                    $journeyEvent,
-                );
-            }
-            if ($directEvent !== null
-                && $journeyEvent !== null
-                && ! $directEvent->is($journeyEvent)
-            ) {
-                throw new \DomainException(
-                    'Incident journey conflict: the alert and incident resolve to different H&S events.',
-                );
-            }
-
-            return [
-                'incident' => $incident,
-                'hs_event' => $journeyEvent ?? $directEvent,
-            ];
+                return [
+                    'incident' => $incident,
+                    'hs_event' => $journeyEvent ?? $directEvent,
+                ];
+            }, $unavailable);
         });
 
         /** @var EloquentCollection<int, HsEvent> $resolvedEvents */
@@ -629,7 +709,9 @@ class IncidentJourneyService
                 ->values()
                 ->all(),
         );
-        $resolvedEvents->loadMissing('correctiveActions');
+        if ($reads === null) { $resolvedEvents->loadMissing('correctiveActions'); }
+        else { $resolvedEvents->loadMissing(['correctiveActions' => fn ($actions) => $reads->query($actions->getQuery()
+            ->select(['id', 'hs_event_id', 'completed_at', 'verified_at', 'closed_at']))]); }
 
         return $resolved;
     }
@@ -710,8 +792,37 @@ class IncidentJourneyService
         ]);
     }
 
-    private function lockIncident(ClientIncident $incident): ClientIncident
+    private function isNewSubmission(ClientIncident $incident): bool
     {
+        return $incident->status === 'submitted' && ($incident->wasRecentlyCreated
+            || ($incident->wasChanged('status') && $incident->getOriginal('status') === 'draft'));
+    }
+
+    /** Keep the source intent atomic; configuration and assignment happen after the outer commit. */
+    private function stageSubmissionRouting(ClientIncident $incident, ?User $actor): void
+    {
+        $intentId = app(IncidentRoutingService::class)->stageForSubmitted((int) $incident->id, $actor);
+        if ($intentId === null) {
+            return;
+        }
+        DB::afterCommit(static function () use ($intentId): void {
+            try {
+                app(IncidentRoutingService::class)->consume($intentId);
+            } catch (\Throwable $exception) {
+                // The committed report and durable intent remain available for recovery.
+                report($exception);
+            }
+        });
+    }
+
+    private function lockIncident(ClientIncident $incident, ?IncidentResponseJourneyReadContext $responseSource = null): ClientIncident
+    {
+        if ($responseSource !== null) {
+            $responseSource->assertFor($incident);
+            $row = $responseSource->incidentQuery(ClientIncident::query()->whereKey($incident->id), true)->first();
+            abort_unless($row, 403, 'The original incident source changed before its body read.');
+            return $row;
+        }
         return ClientIncident::query()
             ->whereKey($incident->getKey())
             ->lockForUpdate()
@@ -900,9 +1011,14 @@ class IncidentJourneyService
             : 'control_room';
     }
 
-    private function ensureCanonicalIncidentSite(ClientIncident $incident): void
+    private function ensureCanonicalIncidentSite(ClientIncident $incident, ?IncidentResponseJourneyReadContext $responseSource = null): void
     {
         if ($incident->site_id !== null) {
+            return;
+        }
+
+        if ($responseSource !== null) {
+            $responseSource->recoverSite($incident, $responseSource->discoverHsMetadata());
             return;
         }
 
@@ -921,27 +1037,30 @@ class IncidentJourneyService
         $incident->site_id = (int) $client->site_id;
     }
 
-    private function lockedOrCreatedHsEvent(ClientIncident $incident, ?User $actor): HsEvent
+    private function lockedOrCreatedHsEvent(ClientIncident $incident, ?User $actor, ?IncidentResponseJourneyReadContext $responseSource = null): HsEvent
     {
-        $historicSourceEvent = $incident->site_id === null
-            ? $this->lockedExactSourceHsEventForSiteRecovery($incident)
-            : null;
-        if ($historicSourceEvent?->site_id !== null) {
+        $historicSourceEvent = $responseSource !== null
+            ? $responseSource->discoverHsMetadata()
+            : ($incident->site_id === null ? $this->lockedExactSourceHsEventForSiteRecovery($incident) : null);
+        if ($responseSource !== null && $incident->site_id === null) {
+            $responseSource->recoverSite($incident, $historicSourceEvent);
+        }
+        if ($responseSource === null && $historicSourceEvent?->site_id !== null) {
             // A source-owned H&S event is the surviving incident-time snapshot.
             // Restore it before any fallback can consult the client's current Site.
             $incident->forceFill(['site_id' => (int) $historicSourceEvent->site_id])->saveQuietly();
             $incident->site_id = (int) $historicSourceEvent->site_id;
         }
 
-        $this->ensureCanonicalIncidentSite($incident);
+        $this->ensureCanonicalIncidentSite($incident, $responseSource);
         if ($incident->isSubmitted()) {
             $this->assertSeriousIncidentHasImmediateAction($incident);
         }
 
-        $this->ensureOfficialIncidentReference($incident);
-        $hsEvent = null;
+        $this->ensureOfficialIncidentReference($incident, $responseSource);
+        $hsEvent = $responseSource?->existingEvent();
 
-        if ($incident->hs_event_id !== null) {
+        if ($responseSource === null && $incident->hs_event_id !== null) {
             $hsEvent = HsEvent::query()
                 ->whereKey($incident->hs_event_id)
                 ->lockForUpdate()
@@ -952,7 +1071,7 @@ class IncidentJourneyService
             }
         }
 
-        if ($hsEvent === null) {
+        if ($responseSource === null && $hsEvent === null) {
             $hsEvent = $historicSourceEvent ?? HsEvent::query()
                 ->where('idempotency_key', $this->hsIdempotencyKey($incident))
                 ->lockForUpdate()
@@ -974,23 +1093,25 @@ class IncidentJourneyService
                 'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
                 // Ownership starts only when an authorised H&S user accepts the handover.
                 'owner_user_id' => null,
-            ]);
+            ], $responseSource);
 
             if ($hsEvent === null) {
                 throw new \RuntimeException('The H&S event could not be recorded; the incident journey was rolled back.');
             }
 
-            $hsEvent = HsEvent::query()
+            $hsEvent = $responseSource !== null ? $responseSource->existingEvent() : HsEvent::query()
                 ->whereKey($hsEvent->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+            abort_unless($hsEvent, 403);
         }
 
-        $otherIncident = ClientIncident::query()
+        $otherIncidentQuery = ClientIncident::query()
             ->where('hs_event_id', $hsEvent->id)
             ->where('id', '!=', $incident->id)
-            ->lockForUpdate()
-            ->first();
+            ->lockForUpdate();
+        $otherIncident = $responseSource !== null
+            ? $responseSource->payloadQuery($otherIncidentQuery)->first(['id']) : $otherIncidentQuery->first();
 
         if ($otherIncident !== null) {
             throw new \DomainException('Incident journey conflict: the H&S event is directly linked to a different incident.');
@@ -1034,38 +1155,34 @@ class IncidentJourneyService
         return $event;
     }
 
-    private function ensureOfficialIncidentReference(ClientIncident $incident): void
+    private function ensureOfficialIncidentReference(ClientIncident $incident, ?IncidentResponseJourneyReadContext $responseSource = null): void
     {
         if (filled($incident->reference_number)) {
             return;
         }
 
-        $incident->forceFill([
-            'reference_number' => $this->references->next(ClientIncident::REFERENCE_PREFIX),
-        ])->saveQuietly();
+        $attributes = ['reference_number' => $this->references->next(ClientIncident::REFERENCE_PREFIX)];
+        if ($responseSource !== null) { $responseSource->persist($incident, $attributes); }
+        else { $incident->forceFill($attributes)->saveQuietly(); }
     }
 
-    private function lockedAlertForIncident(ClientIncident $incident, HsEvent $hsEvent): ?ControlRoomAlert
+    private function lockedAlertForIncident(ClientIncident $incident, HsEvent $hsEvent, ?IncidentResponseJourneyReadContext $responseSource = null): ?ControlRoomAlert
     {
         if ($incident->control_room_alert_id !== null) {
-            return ControlRoomAlert::query()
-                ->whereKey($incident->control_room_alert_id)
-                ->lockForUpdate()
-                ->first();
+            $query = ControlRoomAlert::query()->whereKey($incident->control_room_alert_id)->lockForUpdate();
+            return ($responseSource?->payloadQuery($query) ?? $query)->first();
         }
 
         if ($hsEvent->control_room_alert_id !== null) {
-            return ControlRoomAlert::query()
-                ->whereKey($hsEvent->control_room_alert_id)
-                ->lockForUpdate()
-                ->first();
+            $query = ControlRoomAlert::query()->whereKey($hsEvent->control_room_alert_id)->lockForUpdate();
+            return ($responseSource?->payloadQuery($query) ?? $query)->first();
         }
 
-        $legacyAlerts = ControlRoomAlert::query()
+        $legacyQuery = ControlRoomAlert::query()
             ->where('context->incident_id', $incident->id)
             ->orderBy('id')
-            ->lockForUpdate()
-            ->get();
+            ->lockForUpdate();
+        $legacyAlerts = ($responseSource?->payloadQuery($legacyQuery) ?? $legacyQuery)->get();
 
         if ($legacyAlerts->count() > 1) {
             throw new \DomainException('Incident journey conflict: multiple legacy alerts claim the same incident.');
@@ -1109,6 +1226,7 @@ class IncidentJourneyService
         ClientIncident $incident,
         ?ControlRoomAlert $alert,
         HsEvent $hsEvent,
+        ?IncidentResponseJourneyReadContext $responseSource = null,
     ): void {
         if ($alert !== null) {
             $this->assertAlertMatchesIncident($incident, $alert);
@@ -1137,21 +1255,21 @@ class IncidentJourneyService
         }
 
         if ($alert !== null) {
-            $otherIncident = ClientIncident::query()
+            $otherIncidentQuery = ClientIncident::query()
                 ->where('control_room_alert_id', $alert->id)
                 ->where('id', '!=', $incident->id)
-                ->lockForUpdate()
-                ->first();
+                ->lockForUpdate();
+            $otherIncident = $responseSource !== null ? $responseSource->payloadQuery($otherIncidentQuery)->first(['id']) : $otherIncidentQuery->first();
 
             if ($otherIncident !== null) {
                 throw new \DomainException('Incident journey conflict: the alert is directly linked to a different incident.');
             }
 
-            $otherHsEvent = HsEvent::query()
+            $otherHsQuery = HsEvent::query()
                 ->where('control_room_alert_id', $alert->id)
                 ->where('id', '!=', $hsEvent->id)
-                ->lockForUpdate()
-                ->first();
+                ->lockForUpdate();
+            $otherHsEvent = $responseSource !== null ? $responseSource->payloadQuery($otherHsQuery)->first(['id']) : $otherHsQuery->first();
 
             if ($otherHsEvent !== null) {
                 throw new \DomainException('Incident journey conflict: the alert is directly linked to a different H&S event.');
@@ -1240,6 +1358,7 @@ class IncidentJourneyService
     private function applyRequestedSeverityFloor(
         ClientIncident $incident,
         ?string $requestedSeverity,
+        ?IncidentResponseJourneyReadContext $responseSource = null,
     ): void {
         if ($requestedSeverity === null || trim($requestedSeverity) === '') {
             return;
@@ -1253,12 +1372,14 @@ class IncidentJourneyService
         );
         $metadata['journey'] = $journey;
 
-        $incident->forceFill(['metadata' => $metadata])->saveQuietly();
+        if ($responseSource !== null) { $responseSource->persist($incident, ['metadata' => $metadata]); }
+        else { $incident->forceFill(['metadata' => $metadata])->saveQuietly(); }
     }
 
     private function promoteAlertToIncidentFloor(
         ClientIncident $incident,
         ControlRoomAlert $alert,
+        ?IncidentResponseJourneyReadContext $responseSource = null,
     ): bool {
         $severity = $this->higherSeverity($alert->severity, $this->alertSeverity($incident));
         $wasPromoted = $severity !== $alert->severity;
@@ -1266,12 +1387,12 @@ class IncidentJourneyService
             $alert->forceFill(['severity' => $severity])->saveQuietly();
         }
 
-        $this->stampAlertProvenance($incident, $alert);
+        $this->stampAlertProvenance($incident, $alert, $responseSource);
 
         return $wasPromoted;
     }
 
-    private function stampAlertProvenance(ClientIncident $incident, ControlRoomAlert $alert): void
+    private function stampAlertProvenance(ClientIncident $incident, ControlRoomAlert $alert, ?IncidentResponseJourneyReadContext $responseSource = null): void
     {
         $metadata = is_array($incident->metadata) ? $incident->metadata : [];
         $journey = is_array($metadata['journey'] ?? null) ? $metadata['journey'] : [];
@@ -1287,7 +1408,8 @@ class IncidentJourneyService
         );
         $metadata['journey'] = $journey;
 
-        $incident->forceFill(['metadata' => $metadata])->saveQuietly();
+        if ($responseSource !== null) { $responseSource->persist($incident, ['metadata' => $metadata]); }
+        else { $incident->forceFill(['metadata' => $metadata])->saveQuietly(); }
     }
 
     /**
@@ -1299,6 +1421,7 @@ class IncidentJourneyService
         HsEvent $hsEvent,
         ?User $actor,
         array $alertContext,
+        ?IncidentResponseJourneyReadContext $responseSource = null,
     ): void {
         $mayAdoptIncidentWorksafe = $incident->hs_event_id === null
             || ! $this->hsTupleIsCanonical($incident, $hsEvent);
@@ -1312,7 +1435,8 @@ class IncidentJourneyService
         if ($alert !== null) {
             $incidentLinks['control_room_alert_id'] = $alert->id;
         }
-        $incident->forceFill($incidentLinks)->saveQuietly();
+        if ($responseSource !== null) { $responseSource->persistLinks($incident, $hsEvent, $alert); }
+        else { $incident->forceFill($incidentLinks)->saveQuietly(); }
 
         $this->synchroniseHsEvent(
             $hsEvent,
@@ -1320,6 +1444,7 @@ class IncidentJourneyService
             $alert,
             $actor,
             $mayAdoptIncidentWorksafe,
+            $responseSource,
         );
 
         if ($alert !== null) {
@@ -1336,6 +1461,7 @@ class IncidentJourneyService
         ?ControlRoomAlert $alert,
         ?User $actor,
         bool $mayAdoptIncidentWorksafe,
+        ?IncidentResponseJourneyReadContext $responseSource = null,
     ): void {
         $severity = $this->higherSeverity($hsEvent->severity, $this->hsSeverity($incident));
         $worksafe = $this->canonicalWorksafeValues(
@@ -1348,7 +1474,7 @@ class IncidentJourneyService
             : HsEvent::HANDOVER_AWAITING_ACCEPTANCE;
         $hsTuple = $this->canonicalHsTuple($incident);
 
-        $hsEvent->forceFill([
+        $attributes = [
             ...$hsTuple,
             'severity' => $severity,
             'site_id' => $this->incidentSiteId($incident),
@@ -1364,7 +1490,9 @@ class IncidentJourneyService
             'owner_user_id' => $handoverStatus === HsEvent::HANDOVER_ACCEPTED
                 ? $hsEvent->owner_user_id
                 : null,
-        ])->saveQuietly();
+        ];
+        if ($responseSource !== null) { $responseSource->persistEvent($hsEvent, $attributes); }
+        else { $hsEvent->forceFill($attributes)->saveQuietly(); }
     }
 
     /**
@@ -1473,7 +1601,7 @@ class IncidentJourneyService
         );
     }
 
-    private function assertHsTupleCanBeCanonicalised(ClientIncident $incident, HsEvent $hsEvent): void
+    private function assertHsTupleCanBeCanonicalised(ClientIncident $incident, HsEvent $hsEvent, ?IncidentResponseJourneyReadContext $responseSource = null): void
     {
         if ($this->hsTupleIsCanonical($incident, $hsEvent)) {
             return;
@@ -1488,7 +1616,7 @@ class IncidentJourneyService
             );
         }
 
-        $conflict = HsEvent::query()
+        $conflictQuery = HsEvent::query()
             ->where('id', '!=', $hsEvent->id)
             ->where(function ($query) use ($tuple): void {
                 $query->where('idempotency_key', $tuple['idempotency_key'])
@@ -1498,8 +1626,8 @@ class IncidentJourneyService
                             ->where('source_id', $tuple['source_id']);
                     });
             })
-            ->lockForUpdate()
-            ->first();
+            ->lockForUpdate();
+        $conflict = $responseSource !== null ? $responseSource->payloadQuery($conflictQuery)->first(['id']) : $conflictQuery->first();
 
         if ($conflict !== null) {
             throw new \DomainException(
@@ -1688,7 +1816,17 @@ class IncidentJourneyService
         ClientIncident $incident,
         ?ControlRoomAlert $alert,
         HsEvent $hsEvent,
+        ?IncidentResponseJourneyReadContext $responseSource = null,
     ): IncidentJourney {
+        if ($responseSource !== null) {
+            $row = $responseSource->incidentQuery(ClientIncident::query()->whereKey($incident->id))->first();
+            abort_unless($row, 403, 'The original incident source changed before the final body read.');
+            $event = $responseSource->existingEvent();
+            abort_unless($event, 403);
+            $currentAlert = $alert === null ? null : $responseSource->payloadQuery(ControlRoomAlert::query()->whereKey($alert->id))->first();
+            $responseSource->assertCurrent();
+            return new IncidentJourney($row, $currentAlert, $event);
+        }
         return new IncidentJourney(
             $incident->fresh(),
             $alert?->fresh(),

@@ -85,7 +85,7 @@ function disabledItemAria(idBase: string) {
 
 /** Remove falsy entries and collapse / trim separators. */
 export function compactMenu(
-    items: (MenuItem | false | null | undefined)[],
+    items: (MenuItem | false | null | undefined | '' | 0)[],
 ): MenuItem[] {
     const cleaned = items.filter(Boolean) as MenuItem[];
     const out: MenuItem[] = [];

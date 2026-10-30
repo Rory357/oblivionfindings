@@ -12,6 +12,7 @@ use App\Models\FleetServiceSchedule;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleOdometerObservation;
 use App\Models\FleetVehicleReminder;
+use App\Models\FleetWorkOrder;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
@@ -418,6 +419,57 @@ class Pkg02bVehicleWorkspaceTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('schedules', fn ($rows) => collect($rows)->pluck('id')->all() === [$local->id])
                 ->where('assets', fn ($rows) => count($rows) === 1)
+                ->etc());
+    }
+
+    public function test_fleet_health_counts_only_services_due_in_the_next_14_days_as_due_soon(): void
+    {
+        // Carbon 3's signed diffInDays() made every future service "due soon",
+        // so fleet health read 0% whenever schedules had future due dates.
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage']);
+        $vehicle = $this->vehicle($this->site);
+        FleetServiceSchedule::query()->create(['asset_id' => $vehicle->id, 'name' => 'Soon', 'interval_days' => 30, 'is_active' => true, 'next_due_at' => now()->addDays(5)]);
+        FleetServiceSchedule::query()->create(['asset_id' => $vehicle->id, 'name' => 'Later', 'interval_days' => 365, 'is_active' => true, 'next_due_at' => now()->addMonths(6)]);
+
+        $this->actingAs($manager)->get('/fleet-assets/maintenance/schedules')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('fleet_health_pct', 50)
+                ->etc());
+    }
+
+    public function test_maintenance_dashboard_counts_overdue_services_as_positive_days(): void
+    {
+        // Carbon 3's signed diffInDays() showed "-5d overdue".
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage']);
+        $late = FleetServiceSchedule::query()->create(['asset_id' => $this->vehicle($this->site)->id, 'name' => 'Late', 'interval_days' => 30, 'is_active' => true, 'next_due_at' => now()->subDays(5)]);
+
+        $this->actingAs($manager)->get('/fleet-assets/maintenance/dashboard')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overdue_services', fn ($rows) => collect($rows)->firstWhere('id', $late->id)['days_overdue'] === 5)
+                ->etc());
+    }
+
+    public function test_maintenance_dashboard_only_shows_the_viewers_sites(): void
+    {
+        // The dashboard read every Site; it now follows the work-order list's
+        // Site rule (MaintenanceAccessService).
+        $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+        $local = $this->vehicle($this->site);
+        $foreign = $this->vehicle($this->foreignSite);
+        $localLate = FleetServiceSchedule::query()->create(['asset_id' => $local->id, 'name' => 'Local late', 'interval_days' => 30, 'is_active' => true, 'next_due_at' => now()->subDays(3)]);
+        FleetServiceSchedule::query()->create(['asset_id' => $foreign->id, 'name' => 'Foreign late', 'interval_days' => 30, 'is_active' => true, 'next_due_at' => now()->subDays(3)]);
+        $localOrder = FleetWorkOrder::factory()->create(['asset_id' => $local->id, 'status' => 'open', 'actual_cost' => 100]);
+        FleetWorkOrder::factory()->create(['asset_id' => $foreign->id, 'status' => 'open', 'actual_cost' => 900]);
+
+        $this->actingAs($viewer)->get('/fleet-assets/maintenance/dashboard')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('overdue_services', fn ($rows) => collect($rows)->pluck('id')->all() === [$localLate->id])
+                ->where('recent_work_orders', fn ($rows) => collect($rows)->pluck('id')->all() === [$localOrder->id])
+                ->where('cost_by_vehicle', fn ($rows) => collect($rows)->pluck('asset_id')->all() === [$local->id])
+                ->where('hero.wo_open', 1)
+                ->where('hero.service_overdue', 1)
+                ->where('stats.total_spend', 100)
+                ->where('fleet_health_pct', 0)
                 ->etc());
     }
 

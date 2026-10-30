@@ -28,10 +28,13 @@ return [
     // Reviewed service catalogue: name, label, operations. Exact names and allowed operations; no command text.
     'services' => [],
     'software' => ['release_enabled' => (bool) env('ENDPOINT_SOFTWARE_RELEASE_ENABLED', false), 'package_directory' => storage_path('app/private/endpoint-software')],
+    // No production runtime is approved by contract fixtures. Deployment-reviewed
+    // original manifest digests map to exact architecture/version/wrapper identity.
+    'scripts' => ['release_enabled' => false, 'reviewed_runtimes' => []],
     'restart' => ['release_enabled' => (bool) env('ENDPOINT_RESTART_RELEASE_ENABLED', false)],
     'actions' => ['release_enabled' => (bool) env('ENDPOINT_SERVICE_ACTIONS_RELEASE_ENABLED', false)],
     'remote_support' => [
-        'enabled' => false,
+        'enabled' => (bool) env('ENDPOINT_REMOTE_SUPPORT_ENABLED', false),
         // One deployment-controlled TURN service; never derive destinations from request input.
         'relay_urls' => array_values(array_filter(array_map('trim', explode(',', (string) env('ENDPOINT_REMOTE_RELAY_URLS', ''))))),
         'relay_secret' => env('ENDPOINT_REMOTE_RELAY_SECRET'),

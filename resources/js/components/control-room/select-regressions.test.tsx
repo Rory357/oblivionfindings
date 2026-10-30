@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import { TaskAssigneeSelect } from './alert-workspace-dialog';
+import { TaskAssigneeSelect } from '@/components/control-room/alert-record/alert-sections';
 import { AlertClientSelect } from './new-alert-wizard';
 
 const people = [

@@ -34,7 +34,7 @@ test.describe('Security & Devices native monitor lifecycle', () => {
         ).toBeVisible();
 
         await page
-            .getByRole('button', { name: 'Create direct monitor' })
+            .getByRole('button', { name: 'Add check' })
             .click();
         const createDialog = page.getByRole('dialog', {
             name: 'Create native direct monitor',
@@ -53,7 +53,7 @@ test.describe('Security & Devices native monitor lifecycle', () => {
         await page.getByLabel('Monitor name').fill(createdName);
         await page.getByLabel('Approved target').fill(fixture.monitorTarget);
         await page
-            .getByRole('button', { name: 'Create direct monitor' })
+            .getByRole('button', { name: 'Add direct monitor' })
             .click();
 
         await expect(page.getByText(createdName).first()).toBeVisible({

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Respite;
 
 use App\Domain\Governance\Models\NotifiableIncident;
+use App\Domain\Referrals\Services\ReferralActivationGuard;
+use App\Domain\Referrals\Services\ReferralRespiteReview;
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -15,9 +17,11 @@ use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
 use App\Models\ServiceAgreement;
+use App\Services\HealthSafety\RestraintService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\References\ReferenceNumberGenerator;
 use App\Services\Respite\RespiteMedicalDisclosure;
+use App\Services\Respite\RespiteRestraintReadService;
 use App\Services\Respite\RespiteShiftSync;
 use App\Services\Respite\RespiteStateTransitionService;
 use App\Services\Respite\RespiteStayScope;
@@ -79,7 +83,8 @@ class RespiteStayController extends Controller
                     ...$validated,
                     'status' => 'admitted',
                     'created_by' => auth()->id(),
-                    'actual_start' => now(),
+                    // Governed (referral-originated) stays record actual start only at reviewed check-in.
+                    'actual_start' => $booking->client && app(ReferralActivationGuard::class)->governsRespite($booking->client, $booking) ? null : now(),
                 ]);
             },
         );
@@ -115,6 +120,9 @@ class RespiteStayController extends Controller
 
         return Inertia::render('respite/stays/show', [
             'stay' => $stay,
+            'serviceStartReviewUrl' => app(ReferralRespiteReview::class)->url(request()->user(), $stay->client, $stay->booking),
+            'supportPreparation' => app(ReferralRespiteReview::class)->preparation(request()->user(), $stay->client, $stay->booking),
+            'restraints' => app(RespiteRestraintReadService::class)->forStay(request()->user(), $stay),
         ]);
     }
 
@@ -136,12 +144,16 @@ class RespiteStayController extends Controller
                 $booking = $stay->booking;
                 $this->states->assertStayCheckIn($stay->status, $booking->status);
 
+                $governed = app(ReferralActivationGuard::class)->governsRespite($stay->client, $booking);
+                app(ReferralActivationGuard::class)->assertRespitePermitted($stay->client, $booking);
+
                 $this->guardAnaphylaxisAcknowledgement($stay, $validated);
                 $this->guardAdmissionMedicationReconciliation($stay, $validated['med_rec_override_reason'] ?? null);
 
                 $stay->update([
                     'status' => 'active',
-                    'actual_start' => $stay->actual_start ?? now(),
+                    // A governed stay's actual start is the reviewed check-in, never an admission timestamp.
+                    'actual_start' => $governed ? now() : ($stay->actual_start ?? now()),
                     'updated_by' => auth()->id(),
                 ]);
                 $booking->update([
@@ -190,6 +202,10 @@ class RespiteStayController extends Controller
                         'new_end' => 'The new end must be after the current respite stay end.',
                     ]);
                 }
+
+                $extendedBooking = clone $booking;
+                $extendedBooking->end_at = $newEnd;
+                app(ReferralActivationGuard::class)->assertRespitePermitted($stay->client, $extendedBooking);
 
                 $stay->update([
                     'status' => 'extended',
@@ -440,6 +456,39 @@ class RespiteStayController extends Controller
         ]));
 
         return back()->with('success', 'Restraint event recorded.');
+    }
+
+    /**
+     * The save behind the stay's own "record a restraint" page (the shared restraint form). It goes through the shared
+     * restraint command with a command key: the stay's own person, Site and stay, one receipt and one Respite event, so
+     * a lost response is recovered from its receipt instead of being sent twice. The Respite workspace's quick form
+     * keeps the direct save above.
+     */
+    public function recordRestraintFromPage(Request $request, RespiteStay $stay, RestraintService $commands): RedirectResponse
+    {
+        $accepted = DB::transaction(function () use ($request, $stay, $commands): array {
+            $currentStay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true);
+            $input = $request->except('_token', '_method', 'return_to', 'section', 'action');
+            if (! array_key_exists('client_id', $input)) {
+                $input['client_id'] = (int) $currentStay->client_id;
+            }
+            $result = $commands->createForStay($request->user(), $currentStay, $input);
+            $proof = $commands->confirmationForViewer($request->user(), $result);
+            abort_unless($proof && $proof['event_id'] === $result['event_id'] && $proof['idempotency_key'] === $result['idempotency_key']
+                && $proof['version'] === $result['version'] && $proof['command'] === 'create', 403);
+            $proof['replayed'] = $result['replayed'];
+
+            return ['confirmation' => $proof, 'stay_id' => (int) $currentStay->id, 'client_id' => (int) $currentStay->client_id];
+        });
+        if (! $accepted['confirmation']['replayed']) {
+            event(new RespiteEvent('respite.stay.restraint_recorded', [
+                'id' => $accepted['confirmation']['event_id'],
+                'stay_id' => $accepted['stay_id'],
+                'client_id' => $accepted['client_id'],
+            ]));
+        }
+
+        return back()->with('success', 'Restraint event recorded.')->with('restraint_confirmation', $accepted['confirmation']);
     }
 
     public function recordIncident(Request $request, RespiteStay $stay): RedirectResponse

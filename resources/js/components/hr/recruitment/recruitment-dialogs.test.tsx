@@ -9,9 +9,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BulkEmailDialog } from './bulk-email-dialog';
 import { TagManagerDialog } from './tag-manager-dialog';
 
-// Saving a template and removing a tag used browser prompt()/confirm(). Both
-// now open a dialog over the recruitment dialog, and only that dialog's
-// button sends the request.
+// Saving a template and removing a tag used browser prompt()/confirm(), and
+// deleting a saved template sent straight away. Each now opens a dialog over
+// the recruitment dialog, and only that dialog's button sends the request.
 
 type VisitOptions = {
     onStart?: () => void;
@@ -214,6 +214,97 @@ describe('Recruitment › Email candidates: save as template', () => {
         expect(templateDialog()).toHaveTextContent(
             'The name has already been taken.',
         );
+    });
+});
+
+describe('Recruitment › Email candidates: delete a saved template', () => {
+    const renderEmail = () =>
+        render(
+            <BulkEmailDialog
+                open
+                onClose={vi.fn()}
+                candidateIds={[1, 2]}
+                templates={[
+                    {
+                        id: 9,
+                        name: 'Interview invitation',
+                        subject: 'Your interview',
+                        body: 'See you soon',
+                    },
+                ]}
+                canManage
+            />,
+        );
+
+    const confirmDialog = () => screen.getByRole('alertdialog');
+
+    const openDelete = () => {
+        renderEmail();
+        fireEvent.change(screen.getByRole('combobox'), {
+            target: { value: '9' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Delete template' }),
+        );
+    };
+
+    it('asks before deleting a saved template and sends nothing yet', () => {
+        openDelete();
+
+        expect(router.delete).not.toHaveBeenCalled();
+        expect(
+            within(confirmDialog()).getByText('Delete this template?'),
+        ).toBeInTheDocument();
+        expect(confirmDialog()).toHaveTextContent(
+            '“Interview invitation” is deleted for everyone who emails candidates.',
+        );
+        expect(confirmDialog()).toHaveTextContent("This can't be undone.");
+    });
+
+    it('Cancel deletes nothing and keeps the email and its message', async () => {
+        openDelete();
+
+        fireEvent.click(
+            within(confirmDialog()).getByRole('button', { name: 'Cancel' }),
+        );
+
+        expect(router.delete).not.toHaveBeenCalled();
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+        expect(
+            screen.getByRole('dialog', { name: 'Email 2 candidates' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByPlaceholderText('e.g. An update on your application'),
+        ).toHaveValue('Your interview');
+    });
+
+    it('deletes the template with the same request once confirmed', async () => {
+        router.delete.mockImplementation(
+            (_url: string, options?: VisitOptions) => {
+                options?.onStart?.();
+                options?.onSuccess?.({ props: {} });
+                options?.onFinish?.();
+            },
+        );
+        openDelete();
+
+        fireEvent.click(
+            within(confirmDialog()).getByRole('button', {
+                name: 'Delete template',
+            }),
+        );
+
+        expect(router.delete).toHaveBeenCalledTimes(1);
+        expect(router.delete).toHaveBeenCalledWith(
+            '/hr/recruitment/email-templates/9',
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+        expect(screen.getByRole('combobox')).toHaveValue('');
     });
 });
 

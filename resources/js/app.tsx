@@ -15,6 +15,7 @@ import { initializeAppearance } from './hooks/use-appearance';
 import { resolveInertiaPage } from './inertia-pages';
 import { bootEmarOffline } from './lib/emar-offline';
 import { bootOfflineQueue, setOfflineQueueActor } from './lib/offline-queue';
+import { formatPageTitle } from './lib/page-title';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -42,7 +43,7 @@ function renderInertiaPage(
 }
 
 createInertiaApp({
-    title: (title) => (title ? `${title} - ${appName}` : appName),
+    title: (title) => formatPageTitle(title, appName),
     resolve: resolveInertiaPage,
     setup({ el, App, props }) {
         const initialPageProps = props.initialPage.props as {

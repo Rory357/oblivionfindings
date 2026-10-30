@@ -960,7 +960,7 @@ function HandoffBody({
                                     <p className="text-subtle">
                                         Saving keeps the operational alert
                                         unchanged. New work uses the existing IT
-                                        priority, SLA and routing rules. A
+                                        priority, response target and routing rules. A
                                         competing handoff is checked again
                                         before any write.
                                     </p>

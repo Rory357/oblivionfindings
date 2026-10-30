@@ -120,8 +120,8 @@ class SiteHazard extends Model
 
     public function scopeOverdue($query)
     {
-        return $query->where('due_date', '<', now()->toDateString())
-                     ->whereIn('status', ['open', 'in_progress']);
+        return $query->where('due_date', '<', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
+            ->whereIn('status', ['open', 'in_progress']);
     }
 
     public function scopeAssignedTo($query, int $userId)
@@ -133,7 +133,7 @@ class SiteHazard extends Model
     public function scopeDueSoon($query)
     {
         return $query->whereNotNull('due_date')
-            ->whereBetween('due_date', [now()->toDateString(), now()->addDays(7)->toDateString()])
+            ->whereBetween('due_date', [now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(), now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays(7)->toDateString()])
             ->whereIn('status', ['open', 'in_progress']);
     }
 
@@ -159,12 +159,12 @@ class SiteHazard extends Model
 
     public function isOverdue(): bool
     {
-        return $this->due_date && $this->due_date < now()->toDateString() && $this->isOpen();
+        return $this->due_date && $this->due_date->toDateString() < now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString() && $this->isOpen();
     }
 
     public function requiresAssignment(): bool
     {
-        return in_array($this->risk_rating, ['high', 'extreme']) && !$this->assigned_to_user_id;
+        return in_array($this->risk_rating, ['high', 'extreme']) && ! $this->assigned_to_user_id;
     }
 
     /** Due within the next 7 days while still open. */
@@ -174,7 +174,10 @@ class SiteHazard extends Model
             return false;
         }
 
-        return $this->due_date->betweenIncluded(now()->startOfDay(), now()->addDays(7)->endOfDay());
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'));
+
+        return $this->due_date->toDateString() >= $today->toDateString()
+            && $this->due_date->toDateString() <= $today->copy()->addDays(7)->toDateString();
     }
 
     /**

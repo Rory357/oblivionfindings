@@ -86,11 +86,12 @@ class HsGovernanceTest extends TestCase
         $this->assertEquals('critical', $summary['overall_status']);
     }
 
-    public function test_overall_status_good_when_clean(): void
+    public function test_overall_status_is_unknown_not_good_when_clean(): void
     {
         $summary = $this->governanceService->getBoardSummary(viewer: $this->applicationViewer);
 
-        $this->assertEquals('good', $summary['overall_status']);
+        // Codex's rule, kept: zeros in what one viewer can read never claim an organisation-wide all-clear.
+        $this->assertEquals('unknown', $summary['overall_status']);
     }
 
     public function test_effectiveness_rate_calculation(): void

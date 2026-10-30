@@ -127,6 +127,8 @@ class UsersControllerTest extends TestCase
         $created = User::query()->where('email', 'portal.resident@example.test')->sole();
 
         $this->assertNull($created->email_verified_at);
+        // Established portal behaviour: the organisation switch requiring a start review for everyone defaults off.
+        $this->assertDatabaseHas('clients', ['user_id' => $created->id, 'status' => 'active']);
         Notification::assertSentToTimes($created, VerifyEmail::class, 1);
     }
 

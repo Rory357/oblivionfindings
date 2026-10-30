@@ -1,10 +1,10 @@
 import { Badge } from '@/components/ui/badge';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import {
     SafetyEmpty,
     SafetyRegisterCard,
     SafetyRegisterHeader,
-    formatRegisterDate,
     registerLabel,
 } from './safety-register';
 
@@ -35,7 +35,7 @@ export function SiteProfileFirstAid({ data }: { data: SiteFirstAidData }) {
         <div className="space-y-5">
             <SafetyRegisterHeader
                 title="First-aid register"
-                description="Site treatments with ambulance escalation, incident linkage, outcomes, first aider ownership and open follow-up work."
+                description="Recorded treatment, ambulance calls, first-aider attribution and open follow-up work."
                 href={data.href}
                 actionLabel="Open first-aid register"
                 count={data.items.length}
@@ -47,7 +47,7 @@ export function SiteProfileFirstAid({ data }: { data: SiteFirstAidData }) {
                             <Link
                                 key={record.id}
                                 href={record.href}
-                                className="block p-4 transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                className="frontline-tap frontline-focus block p-4 transition-colors hover:bg-muted/40"
                             >
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
@@ -59,8 +59,9 @@ export function SiteProfileFirstAid({ data }: { data: SiteFirstAidData }) {
                                             {record.reference ??
                                                 `FA-${record.id}`}{' '}
                                             ·{' '}
-                                            {formatRegisterDate(
+                                            {formatDateTimeLong(
                                                 record.treatment_date,
+                                                'Treatment time not recorded',
                                             )}
                                         </div>
                                     </div>

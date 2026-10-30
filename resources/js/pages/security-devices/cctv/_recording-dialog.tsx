@@ -206,7 +206,7 @@ export function RecordingReferenceDialog({
                 onClose={() => {
                     if (!busy) onClose();
                 }}
-                title="Save recording reference"
+                title="Add recording reference"
                 description="Review the camera and requested time window. This saves a reference, not footage."
                 railIcon={Bookmark}
                 railTitle="Reference"

@@ -106,6 +106,52 @@ final class SafeOperationalData
             $safe['scope'] = $scope;
         }
 
+        if ($model instanceof \App\Models\SubstanceExposureRecord) {
+            // Codex's exposure audit contract: keep the bounded receipt evidence the exposure writer checks.
+            // Narratives, clinical snapshots, file paths and request details never enter the general audit log.
+            $safe = [...$safe, ...self::exposureAcceptanceMeta($meta)];
+        }
+
+        return $safe;
+    }
+
+    /** Scalar evidence only; source authorization and semantic proof remain the writer's responsibility. */
+    private static function exposureAcceptanceMeta(array $meta): array
+    {
+        $safe = [];
+        foreach (['actor_id', 'root_id', 'source_id'] as $key) {
+            if (is_int($meta[$key] ?? null) && $meta[$key] > 0) {
+                $safe[$key] = $meta[$key];
+            }
+        }
+        foreach (['expected_version', 'source_version_id'] as $key) {
+            if (array_key_exists($key, $meta) && ($meta[$key] === null
+                || (is_int($meta[$key]) && $meta[$key] >= ($key === 'source_version_id' ? 1 : 0)))) {
+                $safe[$key] = $meta[$key];
+            }
+        }
+        if (is_int($meta['version'] ?? null) && $meta['version'] >= 0) {
+            $safe['version'] = $meta['version'];
+        }
+        if (is_bool($meta['changed'] ?? null)) {
+            $safe['changed'] = $meta['changed'];
+        }
+        if (($meta['root_type'] ?? null) === 'exposure') {
+            $safe['root_type'] = 'exposure';
+        }
+        if (in_array($meta['source_type'] ?? null, ['exposure', 'review', 'followup', 'evidence'], true)) {
+            $safe['source_type'] = $meta['source_type'];
+        }
+        if (is_string($meta['idempotency_key'] ?? null) && \Illuminate\Support\Str::isUuid($meta['idempotency_key'])) {
+            $safe['idempotency_key'] = $meta['idempotency_key'];
+        }
+        foreach (['source_content_digest', 'source_tuple_digest'] as $key) {
+            if (array_key_exists($key, $meta) && ($meta[$key] === null
+                || (is_string($meta[$key]) && preg_match('/\A[a-f0-9]{64}\z/D', $meta[$key]) === 1))) {
+                $safe[$key] = $meta[$key];
+            }
+        }
+
         return $safe;
     }
 
@@ -211,9 +257,22 @@ final class SafeOperationalData
 
         $class = $model::class;
 
+        // Exposure H&S events are left out on purpose: their WorkSafe and closure audits keep main's full metadata.
         return $model instanceof HikvisionDiscoveryRequest
             || $model instanceof BoardPack
             || $model instanceof Device
+            || in_array($class, [
+                \App\Models\SubstanceExposureRecord::class,
+                \App\Models\ChemicalExposureReview::class,
+                \App\Models\ChemicalExposureFollowup::class,
+                \App\Models\ChemicalExposureEvidence::class,
+                \App\Models\ChemicalExposureSourceVersion::class,
+                \App\Models\ChemicalExposureCommandReceipt::class,
+                \App\Models\ChemicalExposureEvidenceStaging::class,
+                \App\Models\ChemicalExposureEvidenceCleanup::class,
+                \App\Models\ChemicalExposureSourceDelivery::class,
+                \App\Models\ChemicalExposureHsProjection::class,
+            ], true)
             || str_starts_with($class, 'App\\Models\\Integration\\')
             || str_starts_with($class, 'App\\Domain\\SecurityDevices\\Models\\');
     }

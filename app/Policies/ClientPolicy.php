@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Client;
 use App\Models\User;
+use App\Services\Clients\ClientFamilyCommunicationAccess;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\UserSiteAccessService;
@@ -191,6 +192,41 @@ class ClientPolicy
     {
         return ($user->canDo('sites.meals.view') || $user->canDo('clients.update'))
             && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS);
+    }
+
+    /**
+     * S13: staff surfaces under /operations/clients/{client} (the client
+     * calendar, the visit-request desk). `view` also lets a linked family
+     * portal account in, so these refuse portal accounts outright and then
+     * require the ordinary staff route to the person.
+     */
+    public function viewAsStaff(User $user, Client $client): bool
+    {
+        return ! $user->isPortalAccount()
+            && $this->viewDecision($user, $client);
+    }
+
+    /**
+     * Reading a person's family visit requests follows the profile's family
+     * portal section: family communication staff or a client editor.
+     */
+    public function viewVisitRequests(User $user, Client $client): bool
+    {
+        return $this->viewAsStaff($user, $client)
+            && (app(ClientFamilyCommunicationAccess::class)->canView($user, $client)
+                || $this->update($user, $client));
+    }
+
+    /**
+     * Approving or declining a visit is a family communication decision, so
+     * it follows the family-note rule (canManage) or client editing. Read-only
+     * family portal staff (e.g. auditors) see the requests but cannot decide.
+     */
+    public function reviewVisitRequests(User $user, Client $client): bool
+    {
+        return $this->viewAsStaff($user, $client)
+            && (app(ClientFamilyCommunicationAccess::class)->canManage($user, $client)
+                || $this->update($user, $client));
     }
 
     /** @param array<int, string> $bypassPermissions */

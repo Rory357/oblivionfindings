@@ -7,7 +7,6 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\EmergencyDrill;
-use App\Models\PpeInventory;
 use App\Models\Site;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteDocument;
@@ -42,9 +41,10 @@ class SiteProfileAttentionService
             $items = $items
                 ->concat($this->hazards($site))
                 ->concat($this->inspections($site))
-                ->concat($this->drills($site))
-                ->concat($this->ppe($site));
+                ->concat($this->drills($site));
         }
+        // PPE independently re-admits the current viewer; warmed outer permission evidence is not its grant.
+        $items = $items->concat($this->ppe($user, $site));
 
         if ($user->canDo('sites.viewAny')) {
             $items = $items->concat($this->documents($site));
@@ -296,47 +296,16 @@ class SiteProfileAttentionService
             });
     }
 
-    private function ppe(Site $site): Collection
+    private function ppe(User $viewer, Site $site): Collection
     {
-        $today = now()->toDateString();
-
-        return PpeInventory::query()
-            ->with('ppeType:id,name')
-            ->where('site_id', $site->id)
-            ->whereNotIn('status', ['disposed'])
-            ->where(function ($query) use ($today): void {
-                $query->whereDate('next_inspection_due', '<=', $today)
-                    ->orWhereDate('expiry_date', '<=', now()->addDays(30)->toDateString());
-            })
-            ->orderByRaw('LEAST(COALESCE(next_inspection_due, ?), COALESCE(expiry_date, ?))', [
-                '9999-12-31',
-                '9999-12-31',
-            ])
-            ->limit(12)
-            ->get([
-                'id',
-                'ppe_type_id',
-                'serial_number',
-                'next_inspection_due',
-                'expiry_date',
-            ])
-            ->map(function (PpeInventory $ppe) use ($site): array {
-                $dueDate = collect([
-                    $ppe->next_inspection_due?->toDateString(),
-                    $ppe->expiry_date?->toDateString(),
-                ])->filter()->sort()->first();
-
-                return $this->item(
-                    id: "ppe:{$ppe->id}",
-                    source: 'ppe',
-                    severity: 'warning',
-                    title: $ppe->ppeType?->name ?: 'PPE item',
-                    detail: 'PPE inspection or expiry action is due.',
-                    dueDate: $dueDate,
-                    tab: 'ppe',
-                    href: "/health-safety/ppe?site_id={$site->id}&item={$ppe->id}",
-                );
-            });
+        try {
+            return collect(app(\App\Services\HealthSafety\PpeSiteReadService::class)->attentionForSite($viewer, (int) $site->id));
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $denial) {
+            if (! in_array($denial->getStatusCode(), [403, 404], true)) { throw $denial; }
+            return collect();
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return collect();
+        }
     }
 
     private function checklists(Site $site): Collection

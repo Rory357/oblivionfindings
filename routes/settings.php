@@ -21,6 +21,7 @@ use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\PushSubscriptionController;
 use App\Http\Controllers\Settings\RolesController;
 use App\Http\Controllers\Settings\SecurityPolicyController;
+use App\Http\Controllers\Settings\ServerReadinessController;
 use App\Http\Controllers\Settings\ServiceContextController;
 use App\Http\Controllers\Settings\SsoConfigController;
 use App\Http\Controllers\Settings\SsoGroupController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
 use App\Http\Controllers\Settings\UiPreferenceController;
 use App\Http\Controllers\Settings\UserManagementRedirectController;
 use App\Http\Controllers\Settings\WitnessPinController;
+use App\Http\Controllers\Settings\WorkCalendarSettingsController;
 use App\Http\Controllers\System\UsersController;
 use Illuminate\Support\Facades\Route;
 
@@ -277,6 +279,11 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:settings.access.manage')
         ->name('settings.modules.update');
 
+    // Server readiness
+    Route::get('settings/server-readiness', [ServerReadinessController::class, 'index'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.server_readiness');
+
     // User Management
     Route::get('settings/users', [UserManagementRedirectController::class, 'index'])
         ->middleware('permission:settings.access.manage')
@@ -341,9 +348,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:integrations.manage_secrets')->group(function () {
         Route::get('settings/calendar-sync', [CalendarSyncSettingsController::class, 'index'])
             ->name('settings.calendar-sync');
-        Route::put('settings/calendar-sync/work-calendar', [\App\Http\Controllers\Settings\WorkCalendarSettingsController::class, 'update'])->name('settings.work-calendar.update');
-        Route::post('settings/calendar-sync/work-calendar/check', [\App\Http\Controllers\Settings\WorkCalendarSettingsController::class, 'check'])->middleware('throttle:10,1')->name('settings.work-calendar.check');
-        Route::post('settings/calendar-sync/work-calendar/sync', [\App\Http\Controllers\Settings\WorkCalendarSettingsController::class, 'sync'])->middleware('throttle:5,1')->name('settings.work-calendar.sync');
+        Route::put('settings/calendar-sync/work-calendar', [WorkCalendarSettingsController::class, 'update'])->name('settings.work-calendar.update');
+        Route::post('settings/calendar-sync/work-calendar/check', [WorkCalendarSettingsController::class, 'check'])->middleware('throttle:10,1')->name('settings.work-calendar.check');
+        Route::post('settings/calendar-sync/work-calendar/sync', [WorkCalendarSettingsController::class, 'sync'])->middleware('throttle:5,1')->name('settings.work-calendar.sync');
         Route::put('settings/calendar-sync/mapping', [CalendarSyncSettingsController::class, 'updateMapping'])
             ->name('settings.calendar-sync.mapping');
         Route::put('settings/calendar-sync/settings', [CalendarSyncSettingsController::class, 'updateGlobal'])

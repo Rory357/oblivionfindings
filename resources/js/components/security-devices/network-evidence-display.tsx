@@ -1,5 +1,4 @@
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import type { ConfigurationSnapshotRow } from './network-it-workspace';
 export function stateLabel(state: string | null | undefined): string {
     if (!state) return 'Unknown';
     const labels: Record<string, string> = {
@@ -18,7 +17,15 @@ export function stateLabel(state: string | null | undefined): string {
     );
 }
 
-export function snapshotDiffLabel(snapshot: ConfigurationSnapshotRow): string {
+export function snapshotDiffLabel(snapshot: {
+    previousSnapshotId: number | null;
+    diff: {
+        added: string[];
+        changed: string[];
+        removed: string[];
+        truncated: boolean;
+    };
+}): string {
     if (snapshot.previousSnapshotId === null) {
         return 'Initial retained baseline';
     }

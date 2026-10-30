@@ -21,6 +21,43 @@ the `--primary` hex, the entire UI retints automatically.
 | Destructive / danger actions | `bg-destructive`, `text-destructive-foreground` |
 | Borders / inputs | `border-border`, `border-input` |
 
+## Slate palette — target values (approved by Stephan 2026-10-20)
+
+The Slate look (DESIGN.md "The Slate look") replaces the grey-ground
+neutrals. **Rollout pending:** `app.css` still holds the old values until
+the token change lands; when it does, these are the values to set. Only
+neutrals, chrome and the default brand change — status pairs, tone chips,
+categories (still rotated from `--primary`), chart and calendar tokens
+keep their derivations.
+
+| Token | Light | Dark |
+|---|---|---|
+| `--background` | `oklch(0.984 0.003 248)` #F8FAFC | `oklch(0.208 0.040 266)` #0F172A |
+| `--card`, `--popover` | `oklch(1 0 0)` #FFFFFF | `oklch(0.279 0.037 260)` #1E293B |
+| `--muted`, `--secondary` | `oklch(0.968 0.007 248)` #F1F5F9 | `oklch(0.323 0.042 260)` #273449 |
+| `--border`, `--input` | `oklch(0.929 0.013 256)` #E2E8F0 | `oklch(0.372 0.039 257)` #334155 |
+| `--foreground`, `--card-foreground`, `--popover-foreground`, `--secondary-foreground` | `oklch(0.208 0.040 266)` #0F172A | `oklch(0.968 0.007 248)` #F1F5F9 |
+| `--muted-foreground` | `oklch(0.446 0.037 257)` #475569 | `oklch(0.711 0.035 257)` #94A3B8 |
+| `--accent` (brand tint) | `oklch(0.958 0.023 299)` #F3EEFF | `oklch(0.290 0.061 292)` #2C2547 |
+| `--primary` (default brand) | `oklch(0.517 0.215 292)` #7040D6 | same (fills clamp to L 0.50; `--primary-text` lifts to ≥ 0.70, ≈ #C3A8FF) |
+| `--sidebar` (sidebar **and** top bar) | `oklch(0.279 0.037 260)` #1E293B | same |
+| `--sidebar-foreground` | `oklch(0.711 0.035 257)` #94A3B8 | same |
+| `--sidebar-accent` / `-foreground` | `oklch(0.372 0.039 257)` #334155 / white | `oklch(0.323 0.042 260)` #273449 / white |
+| `--sidebar-border` | #334155 | #334155 |
+| header search input | `oklch(0.208 0.040 266)` #0F172A | same |
+
+Measured contrast (WCAG 2.1): text on ground 17.1:1 (light) / 16.3:1
+(dark); muted on `#F1F5F9` 6.9:1; muted on dark cards 5.7:1; sidebar text
+on `#1E293B` 5.7:1; selected nav item 10.4:1; brand `#7040D6` on
+`#F1F5F9` 5.65:1; white on the brand fill 6.2:1. Cards on the light ground
+are 1.05:1, so `--border` plus a soft shadow carries the lift; never drop
+the border on a card.
+
+The default brand moving from `#4F39F6` (hue 277) to the Journey purple
+`#7040D6` (hue 292) also shifts every category colour and the sign-in
+`--journey-*` tokens (which reproduce the brand sheet exactly at
+`#7040D6`). Re-check the eight category tints when the token change lands.
+
 ## Primary fills and foregrounds (added 2026-10-02)
 
 `--primary` does three jobs: the brand fill, brand-coloured text, and the
@@ -194,6 +231,7 @@ sources stay distinguishable. The module sets:
 | Sites / operations | `event`, `inspection`, `compliance`, `credential`, `checklist`, `hazard`, `vendor`, `asset`, `meal`, `damage`, `emergency`, `drill`, `respite`, `participation`, `ppe`, `medication` |
 | Governance | `meetings`, `decisions`, `obligations`, `policies` |
 | Finance | `invoice-due`, `bill-due`, `payment-run`, `gst-due`, `payroll`, `period-close` |
+| Referrals | `referral-follow-up`, `referral-appointment`, `referral-assessment`, `referral-funding` |
 | Shared | `external` (two-way sync busy — desaturated on purpose) |
 
 A source colour never signals urgency: an entry whose `status` is

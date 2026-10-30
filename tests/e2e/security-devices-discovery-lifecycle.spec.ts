@@ -38,9 +38,9 @@ test.describe('Security & Devices discovery and collector lifecycle', () => {
             }),
         ).toBeVisible();
 
-        await page.getByRole('button', { name: 'Create direct scope' }).click();
+        await page.getByRole('button', { name: 'Add direct scope' }).click();
         const createDialog = page.getByRole('dialog', {
-            name: 'Create direct discovery scope',
+            name: 'Add direct discovery scope',
         });
         await expect(createDialog).toBeVisible();
         if (
@@ -62,7 +62,7 @@ test.describe('Security & Devices discovery and collector lifecycle', () => {
                 response.url().endsWith('/security-devices/discovery/scopes') &&
                 response.request().method() === 'POST',
         );
-        await page.getByRole('button', { name: 'Create direct scope' }).click();
+        await page.getByRole('button', { name: 'Add direct scope' }).click();
         const created = await createdResponse;
         expect(created.status()).toBe(201);
         const scopeId = Number((await created.json()).scope.id);

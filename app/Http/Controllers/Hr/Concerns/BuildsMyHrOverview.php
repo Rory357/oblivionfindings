@@ -14,9 +14,11 @@ use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\ESignatureService;
 use App\Domain\Hr\Services\HrRecognitionReplies;
+use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -33,18 +35,25 @@ trait BuildsMyHrOverview
         $now = now();
         $weekStart = $now->copy()->startOfWeek();
         $weekEnd = $now->copy()->endOfWeek();
-
-        return [
+        $props = [
             'latestKudos' => $this->overviewLatestKudos($user),
             'shoutouts' => $this->myHrShoutouts($user, 'received', 12),
             'celebrations' => $this->overviewCelebrations($user, $now, $weekStart, $weekEnd),
             'whosOut' => $this->overviewWhosOut($user, $weekStart, $weekEnd),
             'leaveBalance' => $this->overviewLeaveBalance($user),
-            'todayShift' => $this->overviewTodayShift($user, $now),
-            'shiftColleagues' => $this->overviewShiftColleagues($user, $now),
             'streak' => $this->overviewClockStreak($user, $now),
             'attention' => $this->overviewAttention($user, $now),
         ];
+        $scheduleReader = $this->myHrScheduleReader($user);
+        $selectedShift = $this->overviewScheduledShift($now, $scheduleReader);
+        $todayShift = $this->overviewTodayShift($user, $selectedShift, $scheduleReader);
+        $shiftColleagues = $todayShift ? $this->overviewShiftColleagues($user, $selectedShift, $scheduleReader) : [];
+        // Uses retained related evidence and raw current predicates, without a
+        // new hydration that could invalidate the just-checked peer cohort.
+        $todayShift = $this->overviewTodayShift($user, $selectedShift, $scheduleReader);
+        return [...$props, 'todayShift' => $todayShift,
+            'shiftColleagues' => $todayShift ? $shiftColleagues : [],
+            'shiftColleaguesShiftId' => $todayShift ? $todayShift['id'] : null];
     }
 
     /**
@@ -423,81 +432,72 @@ trait BuildsMyHrOverview
     }
 
     /**
-     * Today's shift for the live "Your day" feature card — its window powers the
-     * timeline + "Now" marker. Distinct from the shell's `nextShift` (which only
-     * looks ahead and so misses an already-started shift). Returns null on a day
-     * off.
+     * Select one planned occurrence: a current overlap (including overnight),
+     * then the next unended start before worker-local midnight. No attendance
+     * state is inferred. The shell's nextShift remains future-only.
      *
-     * @return array<string, mixed>|null
+     * @return Shift|null
      */
-    private function overviewTodayShift(User $user, Carbon $now): ?array
+    private function overviewScheduledShift(Carbon $now, ?User $reader): ?Shift
     {
-        $shift = Shift::where('user_id', $user->id)
-            ->visibleToFrontline()
-            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
-            ->whereDate('starts_at', $now->toDateString())
-            ->orderBy('starts_at')
-            ->with('serviceContext:id,name')
-            ->first(['id', 'starts_at', 'ends_at', 'location', 'service_context_id', 'shift_type']);
+        if (! $reader) return null;
+        $at = $now->copy()->utc();
+        $dayEnd = $now->copy()->setTimezone((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))
+            ->startOfDay()->addDay()->utc();
+        $query = $this->myHrReadableScheduledShifts($reader)->where('user_id', $reader->id);
+        $current = (clone $query)->where('starts_at', '<=', $at)->where('ends_at', '>', $at)
+            ->orderBy('starts_at')->orderBy('id')->first();
+        return $current ?? $query->where('starts_at', '>=', $at)->where('starts_at', '<', $dayEnd)
+            ->orderBy('starts_at')->orderBy('id')->first();
+    }
 
-        if (! $shift || ! $shift->starts_at) {
-            return null;
-        }
+    private function overviewTodayShift(User $user, ?Shift $shift, ?User $reader): ?array
+    {
+        $payload = $this->myHrScheduledShiftPayload($user, $shift, $reader);
+        if (! $payload) return null;
 
         return [
-            'id' => $shift->id,
-            'starts_at' => $shift->starts_at->toIso8601String(),
-            'ends_at' => $shift->ends_at?->toIso8601String(),
-            'site' => $shift->serviceContext?->name ?? $shift->location ?? 'Shift',
-            'shift_type' => $shift->shift_type ?? 'standard',
+            'id' => $payload['id'],
+            'starts_at' => $payload['starts_at'],
+            'ends_at' => $payload['ends_at'],
+            'site' => $payload['service_context_name'] ?? $payload['location'] ?? 'Shift',
+            'shift_type' => $shift->shift_type ?? '',
         ];
     }
 
     /**
-     * Teammates sharing today's shift (same service context / site, overlapping
-     * window) — powers the "On with Mere & Tomas" line on the next-shift card.
-     * Returns [] whenever there's no shift today or no overlap.
+     * Current visible staff with valid overlapping planned windows at this
+     * exact occurrence's canonical Site and existing context/location group.
      *
      * @return list<array<string, mixed>>
      */
-    private function overviewShiftColleagues(User $user, Carbon $now): array
+    private function overviewShiftColleagues(User $user, ?Shift $shift, ?User $reader): array
     {
-        $shift = Shift::where('user_id', $user->id)
-            ->visibleToFrontline()
-            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
-            ->whereDate('starts_at', $now->toDateString())
-            ->orderBy('starts_at')
-            ->first(['id', 'service_context_id', 'location', 'starts_at', 'ends_at']);
-
-        if (! $shift || ! $shift->starts_at) {
-            return [];
-        }
-
-        $end = $shift->ends_at ?: $shift->starts_at->copy()->addHours(8);
-
-        $colleagueIds = Shift::where('user_id', '!=', $user->id)
-            ->visibleToFrontline()
-            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
-            ->when(
-                $shift->service_context_id,
-                fn ($q) => $q->where('service_context_id', $shift->service_context_id),
-                fn ($q) => $shift->location ? $q->where('location', $shift->location) : $q->whereRaw('1 = 0'),
-            )
-            ->where('starts_at', '<', $end)
-            ->where('ends_at', '>', $shift->starts_at)
-            ->pluck('user_id')
-            ->filter()
-            ->unique()
-            ->take(4)
-            ->all();
+        if (! $reader || ! $shift) return [];
+        $access = new UserSiteAccessService;
+        $siteId = $access->shiftSiteId($shift);
+        if (! $siteId) return [];
+        $context = $this->myHrScheduledContext($shift);
+        $cohort = $this->overviewColleagueCandidates($reader, $shift, $siteId, $context);
+        $colleagueIds = (clone $cohort)->reorder()->select('user_id')->distinct()->orderBy('user_id')->limit(4)->pluck('user_id')->all();
 
         if ($colleagueIds === []) {
             return [];
         }
 
-        return $this->currentStaff->currentUsersQuery()
+        $people = (new UserSiteAccessService)->applyStaffScope($this->currentStaff->currentUsersQuery(), $reader)
             ->whereIn('id', $colleagueIds)
-            ->get(['id', 'name'])
+            ->orderBy('name')->orderBy('id')
+            ->get(['id', 'name']);
+        $finalReader = $this->myHrScheduleReader($user);
+        $finalContext = $this->myHrScheduledContext($shift);
+        if (! $finalReader || ! $this->myHrScheduledShiftStillReadable($user, $shift, $finalReader)) return [];
+        // Rebuild date/current-staff predicates after all name/reader model
+        // callbacks; cloning the earlier query would retain its old day.
+        $currentIds = $this->overviewColleagueCandidates($finalReader, $shift, $siteId, $finalContext)
+            ->whereIn('user_id', $colleagueIds)->reorder()->select('user_id')
+            ->distinct()->pluck('user_id')->map(fn ($id) => (int) $id)->all();
+        return $people->filter(fn (User $person) => in_array((int) $person->id, $currentIds, true))
             ->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
@@ -506,6 +506,18 @@ trait BuildsMyHrOverview
             ])
             ->values()
             ->all();
+    }
+
+    private function overviewColleagueCandidates(User $reader, Shift $shift, int $siteId, ?ServiceContext $context): Builder
+    {
+        $visibleStaff = (new UserSiteAccessService)->applyStaffScope($this->currentStaff->currentUsersQuery()->select('users.id'), $reader);
+        $query = $this->myHrScheduledAtSite($this->myHrReadableScheduledShifts($reader), $siteId)
+            ->where('user_id', '!=', $reader->id)->whereIn('user_id', $visibleStaff)
+            ->where('starts_at', '<', $shift->ends_at)->where('ends_at', '>', $shift->starts_at);
+        if ($shift->service_context_id !== null) {
+            return $context ? $query->where('service_context_id', $context->id) : $query->whereRaw('1 = 0');
+        }
+        return $shift->location ? $query->where('location', $shift->location) : $query->whereRaw('1 = 0');
     }
 
     private function overviewClockStreak(User $user, Carbon $now): int

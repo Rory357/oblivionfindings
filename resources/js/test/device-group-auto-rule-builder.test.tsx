@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from '@testing-library/react';
 import axios from 'axios';
 import type React from 'react';
 import { useState } from 'react';
@@ -19,31 +26,40 @@ const inertiaMocks = vi.hoisted(() => ({
     get: vi.fn(),
 }));
 
-vi.mock('@inertiajs/react', () => ({
-    Head: () => null,
-    Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
-        <a href={href}>{children}</a>
-    ),
-    router: inertiaMocks,
-}));
+vi.mock('@inertiajs/react', async () => {
+    const actual =
+        await vi.importActual<typeof import('@inertiajs/react')>(
+            '@inertiajs/react',
+        );
+    return {
+        ...actual,
+        Head: () => null,
+        Link: ({
+            href,
+            children,
+        }: {
+            href: string;
+            children: React.ReactNode;
+        }) => <a href={href}>{children}</a>,
+        usePage: () => ({
+            props: {
+                auth: {
+                    user: { id: 7 },
+                    can: {
+                        securityDevices: {
+                            groupsManage: true,
+                            monitoringManage: true,
+                        },
+                    },
+                },
+            },
+        }),
+        router: { ...actual.router, ...inertiaMocks },
+    };
+});
 
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-vi.mock('@/components/page', () => ({
-    PageHero: ({
-        title,
-        actions,
-    }: {
-        title: React.ReactNode;
-        actions?: React.ReactNode;
-    }) => (
-        <header>
-            {title}
-            {actions}
-        </header>
-    ),
 }));
 
 function Harness({ initial = null }: { initial?: AutoRules | null }) {
@@ -62,7 +78,7 @@ beforeEach(() => {
 });
 
 describe('Device Group automatic membership builder', () => {
-    it('enables a plain-language condition and normalises comma-separated values', () => {
+    it('enables a plain-language condition, offers stored values and normalises comma-separated values', () => {
         render(<Harness />);
 
         fireEvent.click(
@@ -70,10 +86,14 @@ describe('Device Group automatic membership builder', () => {
         );
         fireEvent.click(screen.getByRole('button', { name: 'Add condition' }));
 
-        const valueInputs = screen.getAllByLabelText('Value');
-        fireEvent.change(valueInputs[1], {
-            target: { value: 'camera, nvr, camera' },
-        });
+        // Device types are picked from the stored values, not typed.
+        const many = screen.getByRole('group', { name: 'Value' });
+        expect(within(many).getByRole('combobox')).toHaveTextContent(
+            'Choose one or more values',
+        );
+        expect(
+            screen.queryByPlaceholderText('camera, nvr, door controller'),
+        ).not.toBeInTheDocument();
 
         expect(
             normaliseAutoRules({
@@ -144,6 +164,11 @@ describe('Device Group automatic membership builder', () => {
                     ],
                 },
             },
+            expect.objectContaining({
+                headers: { Accept: 'application/json' },
+                signal: expect.any(AbortSignal),
+                timeout: 30000,
+            }),
         );
     });
 
@@ -173,6 +198,9 @@ describe('Device Group automatic membership builder', () => {
 
         render(
             <DeviceGroupShow
+                actor_id={7}
+                as_of="2026-10-20T10:00:00Z"
+                can_preview_maintenance={false}
                 group={{
                     id: 14,
                     name: 'Security estate',
@@ -205,6 +233,9 @@ describe('Device Group automatic membership builder', () => {
         );
 
         fireEvent.click(
+            screen.getByRole('tab', { name: /Automatic membership/ }),
+        );
+        fireEvent.click(
             screen.getByRole('button', {
                 name: 'Review proposed membership',
             }),
@@ -214,7 +245,7 @@ describe('Device Group automatic membership builder', () => {
             expect(screen.getByText('Final total')).toBeInTheDocument();
         });
         expect(
-            screen.getByText(/Applying will remove 1 visible device/),
+            screen.getByText(/Applying will remove 1 approved device/),
         ).toBeInTheDocument();
 
         fireEvent.click(
@@ -227,13 +258,16 @@ describe('Device Group automatic membership builder', () => {
         );
     });
 
-    it('uses governed dialogs for group deletion and member removal', () => {
+    it('uses governed dialogs for group deletion and member removal', async () => {
         const browserConfirm = vi
             .spyOn(window, 'confirm')
             .mockReturnValue(false);
 
         render(
             <DeviceGroupShow
+                actor_id={7}
+                as_of="2026-10-20T10:00:00Z"
+                can_preview_maintenance={false}
                 group={{
                     id: 14,
                     name: 'Security estate',
@@ -270,19 +304,38 @@ describe('Device Group automatic membership builder', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Delete group' }));
         expect(
             screen.getByRole('heading', { name: 'Delete device group?' }),
         ).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Delete group' }));
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Delete group',
+            }),
+        );
         expect(inertiaMocks.delete).toHaveBeenCalledWith(
             '/security-devices/device-groups/14',
+            expect.objectContaining({
+                onError: expect.any(Function),
+                onFinish: expect.any(Function),
+            }),
+        );
+        act(() => inertiaMocks.delete.mock.calls[0][1].onFinish());
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Cancel',
+            }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
         );
 
+        fireEvent.keyDown(
+            screen.getByRole('button', { name: 'Actions for Lobby camera' }),
+            { key: 'ArrowDown' },
+        );
         fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Remove Lobby camera from group',
-            }),
+            await screen.findByRole('menuitem', { name: 'Remove from group' }),
         );
         expect(
             screen.getByRole('heading', { name: 'Remove device from group?' }),
@@ -290,7 +343,7 @@ describe('Device Group automatic membership builder', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Remove device' }));
         expect(inertiaMocks.delete).toHaveBeenCalledWith(
             '/security-devices/device-groups/14/members/9',
-            { preserveScroll: true },
+            expect.objectContaining({ preserveScroll: true }),
         );
         expect(browserConfirm).not.toHaveBeenCalled();
     });

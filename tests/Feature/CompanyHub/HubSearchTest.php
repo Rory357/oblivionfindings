@@ -29,7 +29,8 @@ test('global hub search includes visible people ideas and published services wit
     $service->update(['name' => 'Unpublished service title']);
     app(HubCommunity::class)->createIdea($this->reader, ['title' => 'Compass improvement', 'body' => 'Make equipment easier to find.', 'category' => 'Better ways of working']);
     $publisher = app(HubPublishing::class);
-    $page = $publisher->create($this->editor, 'news', 'Compass guide');
+    // The default story template starts with unfinished blocks; this search only needs a published title.
+    $page = $publisher->create($this->editor, 'news', 'Compass guide', 'blank');
     $publisher->publish($this->editor, $page, 1, null, null);
     $this->actingAs($this->reader)->get('/company-hub?view=home&search=Compass')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('company-hub/index')->where('search', 'Compass')->has('people', 1)->where('people.0.name', 'Compass Colleague')

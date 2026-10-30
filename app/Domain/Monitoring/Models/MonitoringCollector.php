@@ -92,4 +92,54 @@ class MonitoringCollector extends Model
     {
         return $this->hasMany(CollectorEnrollment::class, 'consumed_collector_id');
     }
+
+    /** @return list<int> */
+    public function coveredSiteIds(): array
+    {
+        $raw = is_array($this->config) ? ($this->config['covered_site_ids'] ?? []) : [];
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $homeSiteId = (int) $this->site_id;
+        $ids = [];
+        foreach ($raw as $candidate) {
+            if (is_int($candidate) || (is_string($candidate) && ctype_digit($candidate))) {
+                $id = (int) $candidate;
+                if ($id > 0 && $id !== $homeSiteId) {
+                    $ids[] = $id;
+                }
+            }
+        }
+        $ids = array_values(array_unique($ids));
+        sort($ids);
+
+        return $ids;
+    }
+
+    /** @return list<int> */
+    public function authorisedSiteIds(): array
+    {
+        $homeSiteId = (int) $this->site_id;
+
+        return $homeSiteId > 0
+            ? array_values(array_unique([$homeSiteId, ...$this->coveredSiteIds()]))
+            : $this->coveredSiteIds();
+    }
+
+    public function softwareVersion(): ?string
+    {
+        if (! is_array($this->runtime_status)) {
+            return null;
+        }
+
+        foreach (['version', 'collector_version', 'software_version'] as $key) {
+            $value = $this->runtime_status[$key] ?? null;
+            if (is_string($value) && trim($value) !== '' && strlen($value) <= 64) {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
 }

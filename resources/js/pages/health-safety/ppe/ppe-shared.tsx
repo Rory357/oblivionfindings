@@ -5,6 +5,7 @@
  * the design spec (docs/ppe-redesign/DESIGN_SPEC.md §3.3/§8). Semantic tokens only
  * — `info` → primary/accent in this token system.
  */
+import { humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import {
     AlertTriangle,
     Anchor,
@@ -106,7 +107,7 @@ export function catIcon(category?: string | null): LucideIcon {
     return CAT_ICON[category ?? 'other'] ?? Package;
 }
 export function catLabel(category?: string | null): string {
-    return CAT_LABEL[category ?? 'other'] ?? 'Other';
+    return category == null || category === '' ? 'Not recorded' : CAT_LABEL[category] ?? humaniseHsValue(category);
 }
 export function catTone(category?: string | null): PpeTone {
     return CAT_TONE[category ?? 'other'] ?? 'neutral';
@@ -144,7 +145,7 @@ export const CATEGORY_TILES: {
     {
         key: 'respiratory',
         label: 'Respiratory',
-        description: 'Masks, RPE',
+        description: 'Masks and other breathing protection (respiratory protective equipment, RPE)',
         icon: Wind,
     },
     { key: 'hand', label: 'Hand', description: 'Gloves', icon: Hand },
@@ -199,26 +200,33 @@ export function statusTone(status?: string | null): PpeTone {
     }
 }
 
-/** Title-cased condition label (new/good/fair/poor/condemned → "New" …). */
+/** Condition words people read (new/good/fair/poor/condemned); "condemned" says what it means. */
+export const CONDITION_LABELS: Record<string, string> = {
+    new: 'New',
+    good: 'Good',
+    fair: 'Fair',
+    poor: 'Poor',
+    condemned: 'Unsafe to use (condemned)',
+};
 export function condLabel(condition?: string | null): string {
     if (!condition) return '—';
-    return condition.charAt(0).toUpperCase() + condition.slice(1);
+    return CONDITION_LABELS[condition] ?? humaniseHsValue(condition);
 }
 
 export function statusLabel(status?: string | null): string {
     switch (status) {
         case 'available':
-            return 'Available';
+            return 'In stock';
         case 'allocated':
-            return 'Allocated';
+            return 'Issued';
         case 'maintenance':
-            return 'In repair';
+            return 'On hold';
         case 'condemned':
-            return 'Condemned';
+            return 'Taken out of use';
         case 'disposed':
-            return 'Disposed';
+            return 'Disposed of';
         default:
-            return titleCaseLocal(status ?? '—');
+            return status ? humaniseHsValue(status) : '—';
     }
 }
 
@@ -230,11 +238,11 @@ export const CONDITION_OPTIONS = [
     'condemned',
 ] as const;
 export const STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
-    { value: 'available', label: 'Available' },
-    { value: 'allocated', label: 'Allocated' },
-    { value: 'maintenance', label: 'In repair' },
-    { value: 'condemned', label: 'Condemned' },
-    { value: 'disposed', label: 'Disposed' },
+    { value: 'available', label: 'In stock' },
+    { value: 'allocated', label: 'Issued' },
+    { value: 'maintenance', label: 'On hold' },
+    { value: 'condemned', label: 'Taken out of use' },
+    { value: 'disposed', label: 'Disposed of' },
 ];
 
 export const INSPECTION_FREQUENCY_OPTIONS: { value: string; label: string }[] =
@@ -243,12 +251,8 @@ export const INSPECTION_FREQUENCY_OPTIONS: { value: string; label: string }[] =
         { value: 'weekly', label: 'Weekly' },
         { value: 'monthly', label: 'Monthly' },
         { value: 'quarterly', label: 'Quarterly' },
-        { value: 'annually', label: 'Annually' },
+        { value: 'annually', label: 'Yearly' },
     ];
-
-function titleCaseLocal(s: string): string {
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 // ───────────────────────── Date helpers (en-NZ) ─────────────────────────
 
@@ -492,6 +496,8 @@ export type HeroBlock = {
 };
 
 export type PpeAttachment = {
+    can_relocate?: boolean;
+    relocate_blocked_reason?: string | null;
     id: number;
     original_name: string;
     url: string;

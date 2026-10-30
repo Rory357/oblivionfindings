@@ -30,7 +30,28 @@ vi.mock('./live-viewer', () => ({
     },
 }));
 vi.mock('@/layouts/app-layout', () => ({
-    default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
+    default: ({
+        breadcrumbs = [],
+        children,
+    }: {
+        breadcrumbs?: { title: string; href?: string }[];
+        children: ReactNode;
+    }) => (
+        <main>
+            <nav aria-label="Breadcrumbs">
+                {breadcrumbs.map((crumb) =>
+                    crumb.href ? (
+                        <a key={crumb.title} href={crumb.href}>
+                            {crumb.title}
+                        </a>
+                    ) : (
+                        <span key={crumb.title}>{crumb.title}</span>
+                    ),
+                )}
+            </nav>
+            {children}
+        </main>
+    ),
 }));
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
@@ -71,6 +92,24 @@ function submit() {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start live view' }));
 }
+describe('CCTV live view placement', () => {
+    it('roots the trail at Home and follows the sidebar to All devices and the camera', () => {
+        render(<CctvLive {...props} />);
+        const trail = screen.getByRole('navigation', { name: 'Breadcrumbs' });
+        expect(
+            [...trail.children].map((crumb) => [
+                crumb.textContent,
+                crumb.getAttribute('href'),
+            ]),
+        ).toEqual([
+            ['Home', '/dashboard'],
+            ['Security & Devices', '/security-devices'],
+            ['All devices', '/security-devices/devices'],
+            ['Entrance', '/security-devices/devices/42'],
+            ['Live view', null],
+        ]);
+    });
+});
 describe('CCTV explicit viewing and uncertain start', () => {
     it('makes no connection on render and requires a recorded reason', async () => {
         mocks.json.mockResolvedValue(cameraReply(cameraSession()));

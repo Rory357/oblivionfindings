@@ -6,6 +6,7 @@ import { Loader2, Trash2 } from 'lucide-react';
 import { useId, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -142,12 +143,28 @@ export function BulkEmailDialog({
         );
     };
 
-    const deleteTemplate = (id: string) => {
+    // "Delete template" only opens a confirmation; the request is sent from
+    // its confirm button.
+    const [templateToDelete, setTemplateToDelete] =
+        useState<EmailTemplate | null>(null);
+    const [deletingTemplate, setDeletingTemplate] = useState(false);
+
+    const askDeleteTemplate = (id: string) =>
+        setTemplateToDelete(templates.find((t) => String(t.id) === id) ?? null);
+
+    const deleteTemplate = () => {
+        if (templateToDelete === null) return;
+        const id = String(templateToDelete.id);
         router.delete(`/hr/recruitment/email-templates/${id}`, {
             preserveScroll: true,
+            onStart: () => setDeletingTemplate(true),
             onSuccess: () => {
                 if (templateId === id) setTemplateId('');
                 toast.success('Template removed');
+            },
+            onFinish: () => {
+                setDeletingTemplate(false);
+                setTemplateToDelete(null);
             },
         });
     };
@@ -223,7 +240,7 @@ export function BulkEmailDialog({
                                     <button
                                         type="button"
                                         onClick={() =>
-                                            deleteTemplate(templateId)
+                                            askDeleteTemplate(templateId)
                                         }
                                         aria-label="Delete template"
                                         className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-border text-muted-foreground hover:bg-muted"
@@ -347,6 +364,29 @@ export function BulkEmailDialog({
                         </form>
                     </DialogContent>
                 </Dialog>
+
+                <ConfirmDialog
+                    open={templateToDelete !== null}
+                    onClose={() => {
+                        if (!deletingTemplate) setTemplateToDelete(null);
+                    }}
+                    onConfirm={deleteTemplate}
+                    title="Delete this template?"
+                    description={
+                        <>
+                            <span className="font-medium text-foreground">
+                                “{templateToDelete?.name}”
+                            </span>{' '}
+                            is deleted for everyone who emails candidates.
+                            Emails already sent aren&apos;t affected, and the
+                            subject and message in this form stay as they are.
+                            This can&apos;t be undone.
+                        </>
+                    }
+                    confirmText="Delete template"
+                    variant="destructive"
+                    processing={deletingTemplate}
+                />
             </DialogContent>
         </Dialog>
     );

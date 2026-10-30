@@ -7,7 +7,10 @@ import {
     allergyReviewCaption,
     type ClientSafety,
 } from '@/components/client-safety-ribbon';
+import type { ContactProfile } from '@/components/clients/contact-review-fields';
 import type { AbcEntryRow } from '@/components/clients/profile/abc-dialog';
+import { ProfileContactPreferencesCard } from '@/components/clients/profile/contact-preferences-card';
+import { ProfileCultureCard } from '@/components/clients/profile/culture-card';
 import {
     ProfileDialogs,
     type ProfileDialogState,
@@ -20,6 +23,10 @@ import {
     buildAboutTiles,
     OverviewDesignGrid,
 } from '@/components/clients/profile/overview-grid';
+import {
+    ProfileSupportContactsCard,
+    type SupportContact,
+} from '@/components/clients/profile/support-contacts-card';
 import { BehaviourAbcTab } from '@/components/clients/profile/tabs/behaviour-abc';
 import { type HealthSummary } from '@/components/clinical/health-summary-card';
 import { AllergyRecord } from '@/components/emar/record/allergy-record';
@@ -52,6 +59,7 @@ import {
     type GroupedProfileNavGroup,
 } from '@/components/page/grouped-profile-nav';
 import { ClientPrivacyPanel } from '@/components/privacy/client-privacy-panel';
+import { InternalSupportPreparation } from '@/components/referrals/internal-support-preparation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -385,6 +393,8 @@ type Props = {
         status: string;
         phone?: string | null;
         email?: string | null;
+        contact_profile?: ContactProfile;
+        support_contacts?: SupportContact[];
         address_line_1?: string | null;
         address_line_2?: string | null;
         suburb?: string | null;
@@ -394,6 +404,10 @@ type Props = {
         funding_notes?: string | null;
         // Identity & Culture
         ethnicity?: string | null;
+        iwi?: string | null;
+        hapu?: string | null;
+        marae?: string | null;
+        cultural_dietary_needs?: string | null;
         preferred_pronouns?: string | null;
         religion?: string | null;
         languages?: string[] | null;
@@ -560,6 +574,7 @@ type Props = {
         create_communication_note?: boolean;
         pin_handover?: boolean;
         manage_onboarding?: boolean;
+        prepare_support?: boolean;
         manage_onboarding_checklist?: boolean;
         create_onboarding_workflow?: boolean;
         manage_onboarding_workflow?: boolean;
@@ -2003,11 +2018,16 @@ export default function ClientShow({
     if (client.phone)
         moreItems.push({
             key: 'call',
-            label: 'Call',
+            label: 'Contact instructions',
             icon: Phone,
             detail: client.phone,
             onSelect: () => {
-                window.location.href = `tel:${client.phone}`;
+                handleTabChange('profile');
+                requestAnimationFrame(() =>
+                    document
+                        .getElementById('person-contact-details')
+                        ?.scrollIntoView({ block: 'center' }),
+                );
             },
         });
     if (can.navigate_family_portal)
@@ -2832,6 +2852,27 @@ export default function ClientShow({
                                         {/* Overview board — design composition (tabs-core OverviewTab).
                                     Legacy depth widgets (house coverage, health summary, …)
                                     continue below so nothing is lost. */}
+                                        <ProfileContactPreferencesCard
+                                            id={client.id}
+                                            profile={client.contact_profile}
+                                            canEdit={!!can.update_client}
+                                        />
+                                        <ProfileCultureCard
+                                            client={client}
+                                            onEdit={
+                                                can.update_client
+                                                    ? () =>
+                                                          openProfileDialog(
+                                                              'edit_profile',
+                                                          )
+                                                    : undefined
+                                            }
+                                        />
+                                        <ProfileSupportContactsCard
+                                            contacts={
+                                                client.support_contacts ?? []
+                                            }
+                                        />
                                         <OverviewDesignGrid
                                             preferredName={preferredName}
                                             aboutTiles={buildAboutTiles(
@@ -2969,6 +3010,11 @@ export default function ClientShow({
 
                         {tab === 'onboarding' && (
                             <div className="space-y-4">
+                                {can.prepare_support && (
+                                    <InternalSupportPreparation
+                                        personId={client.id}
+                                    />
+                                )}
                                 {/* Workflow Progress Header */}
                                 {onboarding?.workflow ? (
                                     <Card>
@@ -3145,7 +3191,14 @@ export default function ClientShow({
                                                 labels?.['client.singular'] ??
                                                 'client'
                                             ).toLowerCase()}{' '}
-                                            profile data
+                                            profile data. This shows saved
+                                            records; it does not approve a care
+                                            plan or authorise services to start.
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Referral funding evidence stays in
+                                            Referrals. Only documents saved to
+                                            this profile count here.
                                         </p>
                                     </CardHeader>
                                     <CardContent className="space-y-2">
@@ -3156,7 +3209,7 @@ export default function ClientShow({
                                         ).map((item: any) => (
                                             <div
                                                 key={item.key}
-                                                className="flex items-center justify-between rounded-md border p-2"
+                                                className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <div
@@ -3177,8 +3230,9 @@ export default function ClientShow({
                                                 </div>
                                                 {!item.has_data &&
                                                     can.manage_onboarding_checklist && (
-                                                        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                                                        <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-xs text-muted-foreground sm:min-h-9">
                                                             <Checkbox
+                                                                aria-label={`Mark ${item.label.toLowerCase()} as not applicable`}
                                                                 checked={
                                                                     item.override
                                                                 }
@@ -3372,6 +3426,7 @@ export default function ClientShow({
                                                                                         },
                                                                                     );
                                                                                 }}
+                                                                                aria-label={`Complete ${step.step_name}`}
                                                                             >
                                                                                 Complete
                                                                             </Button>
@@ -3390,6 +3445,7 @@ export default function ClientShow({
                                                                                         },
                                                                                     );
                                                                                 }}
+                                                                                aria-label={`Skip ${step.step_name}`}
                                                                             >
                                                                                 Skip
                                                                             </Button>
@@ -3433,10 +3489,17 @@ export default function ClientShow({
                                                                 );
                                                             }}
                                                         >
-                                                            Complete Onboarding
-                                                            — Set Status to
-                                                            Active
+                                                            Complete onboarding
                                                         </Button>
+                                                        <p className="text-subtle mt-2 text-muted-foreground">
+                                                            This completes
+                                                            preparation. Review
+                                                            start approval and
+                                                            record actual
+                                                            commencement
+                                                            separately through
+                                                            Prepare support.
+                                                        </p>
                                                     </div>
                                                 ) : null;
                                             })()}

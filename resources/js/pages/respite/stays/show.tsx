@@ -1,4 +1,12 @@
+import {
+    RestraintsBspSummary,
+    type RestraintSummary,
+} from '@/components/clients/profile/restraints-bsp-panel';
 import { PageHero, PageLayout } from '@/components/page';
+import {
+    RespiteCheckIn,
+    type RespitePreparation,
+} from '@/components/referrals/respite-check-in';
 import RespiteSubnav from '@/components/respite-subnav';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,10 +24,18 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
+import { ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
     stay: any;
+    serviceStartReviewUrl?: string | null;
+    supportPreparation?: RespitePreparation | null;
+    restraints?: {
+        can: { capture: boolean; view: boolean; review: boolean };
+        summary: RestraintSummary | null;
+        report_href: string | null;
+    };
 };
 
 const statusColor: Record<string, string> = {
@@ -45,7 +61,12 @@ const riskStatusColor: Record<string, string> = {
     completed: 'bg-status-success-bg text-status-success',
 };
 
-export default function RespiteStayShow({ stay }: Props) {
+export default function RespiteStayShow({
+    stay,
+    serviceStartReviewUrl,
+    supportPreparation,
+    restraints,
+}: Props) {
     const [extendOpen, setExtendOpen] = useState(false);
     const [dischargeOpen, setDischargeOpen] = useState(false);
     const [extendDate, setExtendDate] = useState('');
@@ -109,12 +130,40 @@ export default function RespiteStayShow({ stay }: Props) {
                                         Evidence Pack Linked
                                     </Badge>
                                 )}
+                                {restraints?.can.capture &&
+                                restraints.report_href ? (
+                                    <Button size="sm" asChild>
+                                        <Link href={restraints.report_href}>
+                                            <ShieldAlert className="h-3.5 w-3.5" />
+                                            Record a restraint
+                                        </Link>
+                                    </Button>
+                                ) : null}
                             </div>
                         }
                     />
                 }
             >
                 <RespiteSubnav />
+
+                {restraints?.can.view &&
+                restraints.summary &&
+                stay.client?.id ? (
+                    <section
+                        aria-label="Restraint and behaviour support history"
+                        className="space-y-2"
+                    >
+                        <p className="text-caption text-muted-foreground">
+                            This person’s history across the records you can
+                            see. Each restraint keeps its own stay.
+                        </p>
+                        <RestraintsBspSummary
+                            summary={restraints.summary}
+                            clientId={stay.client.id}
+                            origin={`/respite/stays/${stay.id}`}
+                        />
+                    </section>
+                ) : null}
 
                 <div className="grid gap-4 md:grid-cols-2">
                     {/* Stay Details */}
@@ -133,7 +182,7 @@ export default function RespiteStayShow({ stay }: Props) {
                                     {stay.status}
                                 </span>
                                 <span className="text-muted-foreground">
-                                    Admitted
+                                    Checked in
                                 </span>
                                 <span>
                                     {formatDateTimeLong(stay.actual_start) ||
@@ -390,24 +439,21 @@ export default function RespiteStayShow({ stay }: Props) {
                         </CardHeader>
                         <CardContent className="flex flex-wrap gap-2">
                             {stay.status === 'admitted' && (
+                                <RespiteCheckIn
+                                    stayId={stay.id}
+                                    reviewUrl={serviceStartReviewUrl}
+                                    preparation={supportPreparation}
+                                />
+                            )}
+                            {['active', 'extended'].includes(stay.status) && (
                                 <Button
                                     size="sm"
-                                    onClick={() =>
-                                        router.post(
-                                            `/respite/stays/${stay.id}/check-in`,
-                                        )
-                                    }
+                                    variant="outline"
+                                    onClick={() => setExtendOpen(true)}
                                 >
-                                    Check In
+                                    Extend
                                 </Button>
                             )}
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setExtendOpen(true)}
-                            >
-                                Extend
-                            </Button>
                             <Button
                                 size="sm"
                                 variant="destructive"

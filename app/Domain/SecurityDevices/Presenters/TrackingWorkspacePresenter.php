@@ -13,6 +13,7 @@ use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\LoneWorkerSession;
+use App\Models\Queclink\QueclinkDevice;
 use App\Models\User;
 use App\Services\ConsentValidationService;
 use App\Services\Integration\IntegrationEventHistoryService;
@@ -228,7 +229,14 @@ class TrackingWorkspacePresenter
                 ->unique('user_id')
                 ->keyBy('user_id');
 
-        return compact('clients', 'staff', 'staffProfileHrefs', 'assets', 'sessions');
+        $queclinkDevices = $viewer->canDo('securityDevices.integrations.manage') && $devices->isNotEmpty()
+            ? QueclinkDevice::query()
+                ->whereIn('device_id', $devices->pluck('id'))
+                ->get(['id', 'device_id', 'imei', 'status'])
+                ->keyBy('device_id')
+            : collect();
+
+        return compact('clients', 'staff', 'staffProfileHrefs', 'assets', 'sessions', 'queclinkDevices');
     }
 
     private function sessionAccessible(User $viewer, LoneWorkerSession $session): bool
@@ -344,7 +352,22 @@ class TrackingWorkspacePresenter
             'location' => $location,
             'canonicalHref' => $canonicalHref,
             'historyHref' => $privacy['locationAllowed'] ? $canonicalHref : null,
+            'queclinkHref' => $this->queclinkHref($context['queclinkDevices']->get($device->id)),
         ];
+    }
+
+    private function queclinkHref(?QueclinkDevice $queclinkDevice): ?string
+    {
+        if ($queclinkDevice === null) {
+            return null;
+        }
+
+        $imei = (string) ($queclinkDevice->imei ?? '');
+        if (strlen($imei) >= 4) {
+            return '/security-devices/integrations/queclink?device_search='.rawurlencode(substr($imei, -4));
+        }
+
+        return '/security-devices/integrations/queclink';
     }
 
     /** @param Collection<int, int|string> $staffIds @return Collection<int, string> */

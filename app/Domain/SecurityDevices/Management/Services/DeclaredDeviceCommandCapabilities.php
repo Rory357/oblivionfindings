@@ -2,7 +2,11 @@
 
 namespace App\Domain\SecurityDevices\Management\Services;
 
+use App\Domain\SecurityDevices\Drivers\Contracts\AlarmPanelDriver;
+use App\Domain\SecurityDevices\Drivers\Contracts\NetworkConfigBackupDriver;
+use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareAuthority;
 use App\Domain\SecurityDevices\Models\Device;
@@ -39,7 +43,27 @@ final class DeclaredDeviceCommandCapabilities
             $declared->push('tracking.location_refresh', 'configuration.refresh', 'configuration.apply', 'device.reboot');
         }
 
-        $declared = $declared->reject(fn (string $key): bool => in_array($key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install'], true));
+        // Gate driver-backed & endpoint-backed capabilities on real verified authorities/drivers.
+        $declared = $declared->reject(fn (string $key): bool => in_array($key, [
+            'network.config.backup',
+            'endpoint.service.manage',
+            'endpoint.computer.restart',
+            'endpoint.software.install',
+            'endpoint.script.run',
+        ], true));
+
+        $driverRegistry = app(DeviceDriverRegistry::class);
+        if ($this->hasDirectSshTarget($device)
+            && $driverRegistry->resolveNetworkConfigBackupDriver($device) instanceof NetworkConfigBackupDriver) {
+            $declared->push('network.config.backup');
+        }
+        if ($this->hasDirectAlarmApiTarget($device)
+            && $driverRegistry->resolveAlarmDriver($device) instanceof AlarmPanelDriver) {
+            $declared->push('alarm.arm', 'alarm.disarm');
+        }
+        if (app(EndpointScriptAuthority::class)->supports($device)) {
+            $declared->push('endpoint.script.run');
+        }
         if (app(EndpointServiceAuthority::class)->supports($device)) {
             $declared->push('endpoint.service.manage');
         }
@@ -83,5 +107,24 @@ final class DeclaredDeviceCommandCapabilities
                 $query->whereIn('imei', $identifiers->all());
             })
             ->exists();
+    }
+
+    private function hasDirectSshTarget(Device $device): bool
+    {
+        $host = trim((string) ($device->ip_address ?? data_get($device->config, 'ssh.host') ?? ''));
+
+        return $host !== '' && filter_var($host, FILTER_VALIDATE_IP) !== false;
+    }
+
+    private function hasDirectAlarmApiTarget(Device $device): bool
+    {
+        $host = trim((string) (
+            $device->ip_address
+            ?? data_get($device->config, 'alarm_api.host')
+            ?? data_get($device->config, 'endpoint.host')
+            ?? ''
+        ));
+
+        return $host !== '' && filter_var($host, FILTER_VALIDATE_IP) !== false;
     }
 }

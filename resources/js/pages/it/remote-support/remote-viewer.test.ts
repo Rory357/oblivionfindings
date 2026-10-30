@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { channelProtocol, type ScreenPainter } from './remote-protocol';
+import {
+    channelProtocol,
+    relayConfig,
+    type ScreenPainter,
+} from './remote-protocol';
 import {
     RemoteViewer,
     sessionReply,
@@ -98,22 +102,27 @@ function fixture(status = 'requested') {
                 };
             if (path.endsWith('/relay'))
                 return {
-                    type: 'remote_relay',
-                    version: 1,
-                    role: 'technician',
-                    agent_uuid: offer,
-                    session_uuid: sid,
-                    desktop_session: desktop,
-                    access_mode: 'control',
-                    issued_at: new Date(now).toISOString(),
-                    expires_at: new Date(now + 15000).toISOString(),
-                    credential_expires_at: new Date(now + 60000).toISOString(),
-                    username:
-                        (now + 60000) / 1000 +
-                        ':obli-technician-' +
-                        'a'.repeat(64),
-                    credential: 'A'.repeat(27) + '=',
-                    urls: ['turn:relay.example.test:3478'],
+                    status: 'allowed',
+                    relay: {
+                        type: 'remote_relay',
+                        version: 1,
+                        role: 'technician',
+                        agent_uuid: offer,
+                        session_uuid: sid,
+                        desktop_session: desktop,
+                        access_mode: 'control',
+                        issued_at: new Date(now).toISOString(),
+                        expires_at: new Date(now + 15000).toISOString(),
+                        credential_expires_at: new Date(
+                            now + 60000,
+                        ).toISOString(),
+                        username:
+                            (now + 60000) / 1000 +
+                            ':obli-technician-' +
+                            'a'.repeat(64),
+                        credential: 'A'.repeat(27) + '=',
+                        urls: ['turn:relay.example.test:3478'],
+                    },
                 };
             if (path.endsWith('/answer'))
                 return { status: 'allowed', ...(data as object) };
@@ -281,5 +290,63 @@ describe('remote viewer authority and lifetime', () => {
         expect(() => f.viewer.stop()).not.toThrow();
         expect(f.stop).toHaveBeenCalledOnce();
         expect(f.close).toHaveBeenCalledOnce();
+    });
+    it('unwraps technicianRelay status envelopes and rejects stopped or missing relay grants', () => {
+        const now = Math.floor(Date.now() / 1000) * 1000;
+        const inner = {
+            type: 'remote_relay',
+            version: 1,
+            role: 'technician',
+            agent_uuid: offer,
+            session_uuid: sid,
+            desktop_session: desktop,
+            access_mode: 'control',
+            issued_at: new Date(now).toISOString(),
+            expires_at: new Date(now + 15000).toISOString(),
+            credential_expires_at: new Date(now + 60000).toISOString(),
+            username:
+                (now + 60000) / 1000 + ':obli-technician-' + 'a'.repeat(64),
+            credential: 'A'.repeat(27) + '=',
+            urls: ['turns:turn.example.test:5349?transport=tcp'],
+        };
+        expect(
+            relayConfig(
+                { status: 'allowed', relay: inner },
+                sid,
+                desktop,
+                'control',
+            ),
+        ).toMatchObject({
+            iceTransportPolicy: 'relay',
+            iceServers: [
+                {
+                    urls: ['turns:turn.example.test:5349?transport=tcp'],
+                },
+            ],
+        });
+        expect(
+            relayConfig(
+                { status: 'active', relay: inner },
+                sid,
+                desktop,
+                'control',
+            ),
+        ).toMatchObject({ iceTransportPolicy: 'relay' });
+        expect(() =>
+            relayConfig(
+                { status: 'stopped', relay: null },
+                sid,
+                desktop,
+                'control',
+            ),
+        ).toThrow('Relay permission unavailable');
+        expect(() =>
+            relayConfig(
+                { status: 'requested', relay: inner },
+                sid,
+                desktop,
+                'control',
+            ),
+        ).toThrow('Relay permission unavailable');
     });
 });

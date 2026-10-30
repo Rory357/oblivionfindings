@@ -7,6 +7,7 @@ import {
     waitFor,
     within,
 } from '@testing-library/react';
+import { type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const inertia = vi.hoisted(() => ({
@@ -34,6 +35,7 @@ vi.mock('@inertiajs/react', async () => {
     const ReactModule = await import('react');
 
     return {
+        Head: () => null,
         usePage: () => ({ props: inertia.pageProps }),
         router: { visit: vi.fn() },
         useForm: <T extends Record<string, unknown>>(initial: T) => {
@@ -89,8 +91,13 @@ vi.mock('@inertiajs/react', async () => {
     };
 });
 
+vi.mock('@/layouts/app-layout', () => ({
+    default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
+}));
+
 import { ReportIncidentDialog } from '../../pages/health-safety/components/report-incident-dialog';
 import { ReportLauncher } from '../../pages/health-safety/components/report-launcher';
+import IncidentReportPage from '../../pages/incidents/report';
 import {
     IncidentReportDialog,
     type IncidentReportDefaults,
@@ -182,6 +189,17 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('IncidentReportDialog truthful incident intent', () => {
+    it('opens a persisted occurrence instant on its NZ date while preserving local draft defaults', () => {
+        renderDialog('incidents', {
+            defaults: { ...defaults, occurred_at: '2026-07-13T22:15:00Z' },
+        });
+        openStep(/What happened/);
+        expect(screen.getByLabelText('Incident date')).toHaveValue(
+            '2026-07-14',
+        );
+        expect(screen.getByLabelText('Incident time')).toHaveValue('10:15');
+    });
+
     it('closes an untouched report without pretending the default clock is draft content', () => {
         const onClose = vi.fn();
         inertia.pageProps = {
@@ -877,13 +895,166 @@ describe('IncidentReportDialog truthful incident intent', () => {
         ]);
     });
 
+    it('keeps a restored staff identity when its label is unavailable instead of calling it unassigned', () => {
+        renderDialog('incidents', {
+            canManageFollowups: true,
+            staff: [],
+            defaults: {
+                ...defaults,
+                followups: [
+                    {
+                        notes: 'Review retained work with the lead.',
+                        assigned_to_user_id: '81',
+                        due_at: '',
+                    },
+                ],
+            },
+        });
+        openReviewStep();
+        expect(screen.getByText('Staff selection unavailable')).toBeVisible();
+        expect(screen.queryByText('Unassigned')).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+        expect(postedPayload().followups).toEqual([
+            {
+                notes: 'Review retained work with the lead.',
+                assigned_to_user_id: 81,
+                due_at: null,
+            },
+        ]);
+    });
+
+    it('still calls a follow-up unassigned when no staff identity was recorded', () => {
+        renderDialog('incidents', {
+            canManageFollowups: true,
+            defaults: {
+                ...defaults,
+                followups: [
+                    {
+                        notes: 'Review the agreed plan.',
+                        assigned_to_user_id: '',
+                        due_at: '',
+                    },
+                ],
+            },
+        });
+        openReviewStep();
+        expect(screen.getByText('Unassigned')).toBeVisible();
+        expect(
+            screen.queryByText('Staff selection unavailable'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('lets a worker explicitly clear an unavailable saved selection while keeping task text', () => {
+        renderDialog('incidents', {
+            canManageFollowups: true,
+            staff: [],
+            defaults: {
+                ...defaults,
+                followups: [
+                    {
+                        notes: 'Keep this operational instruction.',
+                        assigned_to_user_id: '81',
+                        due_at: '',
+                    },
+                ],
+            },
+        });
+        openStep(/Follow-ups/);
+        expect(screen.getByRole('combobox')).toHaveTextContent(
+            'Staff selection unavailable',
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Clear assignment' }),
+        );
+        expect(screen.getByRole('combobox')).toHaveTextContent('Unassigned');
+        openReviewStep();
+        expect(
+            screen.getByText('Keep this operational instruction.'),
+        ).toBeVisible();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+        expect(postedPayload().followups).toEqual([
+            {
+                notes: 'Keep this operational instruction.',
+                assigned_to_user_id: null,
+                due_at: null,
+            },
+        ]);
+    });
+
+    it('keeps a deadline through an unconfirmed calendar choice and explicitly clears it without changing the task or assignee', async () => {
+        renderDialog('incidents', {
+            canManageFollowups: true,
+            staff: [{ id: 81, name: 'Moana Rangi' }],
+            defaults: {
+                ...defaults,
+                followups: [
+                    {
+                        notes: 'Review the agreed support plan.',
+                        assigned_to_user_id: '81',
+                        due_at: '2026-07-15',
+                    },
+                ],
+            },
+        });
+        openStep(/Follow-ups/);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Task 1 due: 15 Jul 2026' }),
+        );
+        const calendar = await screen.findByRole('dialog', {
+            name: 'Task 1 due picker',
+        });
+        fireEvent.click(
+            within(calendar).getByRole('button', { name: 'Thu 16 July 2026' }),
+        );
+        fireEvent.click(
+            within(calendar).getByRole('button', { name: 'Cancel' }),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Task 1 due: 15 Jul 2026' }),
+        ).toBeVisible();
+        expect(inertia.post).not.toHaveBeenCalled();
+        openReviewStep();
+        expect(screen.getByText('15 Jul 2026')).toBeVisible();
+        openStep(/Follow-ups/);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Task 1 due: 15 Jul 2026' }),
+        );
+        const reopened = await screen.findByRole('dialog', {
+            name: 'Task 1 due picker',
+        });
+        fireEvent.click(
+            within(reopened).getByRole('button', { name: 'Clear date' }),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Task 1 due: Choose date' }),
+        ).toBeVisible();
+        openReviewStep();
+        expect(screen.getByText('No due date')).toBeVisible();
+        expect(screen.getByText('Moana Rangi')).toBeVisible();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+        expect(postedPayload().followups).toEqual([
+            {
+                notes: 'Review the agreed support plan.',
+                assigned_to_user_id: 81,
+                due_at: null,
+            },
+        ]);
+    });
+
     it('promises only incident reporting from the H&S launcher tile', () => {
+        inertia.pageProps = { auth: { can: { incidents: { create: true } } } };
         render(
             <ReportLauncher open onClose={() => {}} onWorkflow={() => {}} />,
         );
 
         expect(
-            screen.getByRole('button', { name: /Report incident/i }),
+            screen.getByRole('button', { name: /Report an incident/i }),
         ).toBeInTheDocument();
         expect(
             screen.queryByText(/Report incident \/ near-miss/i),
@@ -1046,5 +1217,46 @@ describe('IncidentReportDialog truthful incident intent', () => {
         expect(status).toBeInTheDocument();
         expect(status.parentElement?.querySelector('svg')).not.toBeNull();
         expect(screen.queryByText('INC-42')).not.toBeInTheDocument();
+    });
+});
+
+describe('IncidentReportPage — standalone page for reporters without register access', () => {
+    it('lays the same wizard out as a page and offers no way into the incident', () => {
+        inertia.nextResult = {
+            result: 'submitted',
+            incident_reference: 'INC-2026-0042',
+            incident_url: '/incidents/42',
+        };
+        render(
+            <IncidentReportPage
+                mode="incident"
+                clients={clients}
+                sites={sites}
+                staff={[]}
+                canManageFollowups={false}
+                canOpenIncident={false}
+                defaults={defaults}
+                returnUrl="/my-day"
+            />,
+        );
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Close reporting' }),
+        ).toBeInTheDocument();
+        openReviewStep();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+
+        expect(
+            screen.getByRole('heading', { name: 'Incident submitted' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Open incident' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Back to My Day' }),
+        ).toBeInTheDocument();
     });
 });

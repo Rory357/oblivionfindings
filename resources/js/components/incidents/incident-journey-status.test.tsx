@@ -59,7 +59,7 @@ describe('IncidentJourneyStatus', () => {
         const status = screen.getByRole('status');
         expect(status).toHaveTextContent('Confirmed incident');
         expect(status).toHaveTextContent('Critical severity');
-        expect(status).toHaveTextContent('SLA breached');
+        expect(status).toHaveTextContent('Target missed');
         expect(status.querySelectorAll('svg')).toHaveLength(3);
     });
 });

@@ -450,13 +450,26 @@ class HsEventRegisterTest extends TestCase
 
         $this->assertTrue($event->source->is($incident));
 
+        // H&S officers read incidents (Stephan, 25 Oct), so the officer sees the originating incident link.
         $this->actingAs($officer)
             ->get('/health-safety/events?event='.$event->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.source.type', 'ClientIncident')
-                ->where('detail.source.url', null)
-                ->where('detail.source.unwired', false)
+                ->where('detail.source.url', "/incidents/{$event->source_id}")
+            );
+
+        // Without incident read the event still shows, with no incident link (Stephan, 25 Oct: event yes, incident no).
+        $withoutIncidentRead = $this->hsOfficer($site);
+        $withoutIncidentRead->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'incidents.viewAny')->sole()->id => ['allowed' => false],
+        ]);
+        $this->actingAs($withoutIncidentRead)
+            ->get('/health-safety/events?event='.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.source', null)
+                ->where('detail.linked_access.incident', 'restricted')
             );
 
         $admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);

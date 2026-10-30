@@ -471,6 +471,13 @@ class ServiceAgreementController extends Controller
                 403,
                 'Service agreements require independent approval (cannot be approved by the submitter).'
             );
+            // A draft made from a referral is created by a provider manager, who may also approve
+            // agreements: the approver must be a different person from its creator as well.
+            abort_if(
+                $agreement->source_referral_id !== null && (int) $agreement->created_by === (int) $auth->id,
+                403,
+                'A draft made from a referral must be approved by someone other than the person who created it.'
+            );
 
             $fromStatus = $agreement->status;
 
@@ -557,7 +564,7 @@ class ServiceAgreementController extends Controller
         $data = $request->validate([
             'description' => ['required', 'string', 'max:255'],
             'unit_price' => ['required', 'numeric', 'min:0'],
-            'unit' => ['required', 'string', 'in:hour,night,day,km,trip,flat'],
+            'unit' => ['required', 'string', 'in:hour,night,day,visit,km,trip,flat'],
             'quantity' => ['nullable', 'numeric', 'min:0'],
             'budget_allocated' => ['nullable', 'numeric', 'min:0'],
             'funding_contract_reference' => ['nullable', 'string', 'max:100'],
@@ -590,7 +597,7 @@ class ServiceAgreementController extends Controller
         $data = $request->validate([
             'description' => ['required', 'string', 'max:255'],
             'unit_price' => ['required', 'numeric', 'min:0'],
-            'unit' => ['required', 'string', 'in:hour,night,day,km,trip,flat'],
+            'unit' => ['required', 'string', 'in:hour,night,day,visit,km,trip,flat'],
             'quantity' => ['nullable', 'numeric', 'min:0'],
             'budget_allocated' => ['nullable', 'numeric', 'min:0'],
             'funding_contract_reference' => ['nullable', 'string', 'max:100'],

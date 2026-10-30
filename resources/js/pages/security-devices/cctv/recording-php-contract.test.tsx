@@ -69,7 +69,7 @@ describe('actual PHP recording-reference projections', () => {
             render(<RecordingReferencesPage {...f.page} />);
             expect(
                 screen.getByRole('button', {
-                    name: 'Save recording reference',
+                    name: 'Add recording reference',
                 }),
             ).toBeInTheDocument();
             cleanup();
@@ -96,7 +96,7 @@ describe('actual PHP recording-reference projections', () => {
             render(<RecordingReferencesPage {...page} />);
             expect(
                 screen.queryByRole('button', {
-                    name: 'Save recording reference',
+                    name: 'Add recording reference',
                 }),
             ).not.toBeInTheDocument();
             expect(

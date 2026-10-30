@@ -5,6 +5,7 @@ namespace App\Services\ControlRoom;
 use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,7 +31,7 @@ final class ControlRoomAlertAccessService
             || $user->canDo('controlRoom.alerts.manage');
     }
 
-    public function applyVisibleScope(Builder $query, User $user): Builder
+    public function applyVisibleScope(Builder $query, User $user, ?CurrentAuthorizationReads $reads = null): Builder
     {
         if (! $this->canList($user)) {
             return $query->whereRaw('1 = 0');
@@ -40,12 +41,14 @@ final class ControlRoomAlertAccessService
             $query,
             $user,
             self::BYPASS_PERMISSIONS,
+            $reads,
         );
 
-        return $this->applyControlledMedicationContentScope($query, $user);
+        // Within an H&S/governance read, the final alert query stays bound to the same current-authorization reads.
+        return $reads ? $reads->query($this->applyControlledMedicationContentScope($query, $user)) : $this->applyControlledMedicationContentScope($query, $user);
     }
 
-    public function applyReadableScope(Builder $query, User $user): Builder
+    public function applyReadableScope(Builder $query, User $user, ?CurrentAuthorizationReads $reads = null): Builder
     {
         if (! $this->canRead($user)) {
             return $query->whereRaw('1 = 0');
@@ -55,9 +58,11 @@ final class ControlRoomAlertAccessService
             $query,
             $user,
             self::BYPASS_PERMISSIONS,
+            $reads,
         );
 
-        return $this->applyControlledMedicationContentScope($query, $user);
+        // Within an H&S/governance read, the final alert query stays bound to the same current-authorization reads.
+        return $reads ? $reads->query($this->applyControlledMedicationContentScope($query, $user)) : $this->applyControlledMedicationContentScope($query, $user);
     }
 
     /**

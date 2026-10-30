@@ -49,6 +49,17 @@ class HsGovernanceService
         ?Carbon $periodEnd = null,
         ?User $viewer = null,
         ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
+    ): array {
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->getBoardSummarySnapshot($periodStart, $periodEnd, $viewer, $siteId, $context));
+    }
+
+    private function getBoardSummarySnapshot(
+        ?Carbon $periodStart = null,
+        ?Carbon $periodEnd = null,
+        ?User $viewer = null,
+        ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
     ): array {
         $start = $periodStart ?? now()->subMonth()->startOfMonth();
         $end = $periodEnd ?? now();
@@ -58,13 +69,13 @@ class HsGovernanceService
                 'start' => $start->toDateString(),
                 'end' => $end->toDateString(),
             ],
-            'event_summary' => $this->getEventSummary($start, $end, $viewer, $siteId),
-            'investigation_summary' => $this->getInvestigationSummary($viewer, $siteId),
-            'corrective_action_summary' => $this->getCorrectiveActionSummary($viewer, $siteId),
-            'risk_posture' => $this->getRiskPosture($viewer, $siteId),
-            'worksafe_status' => $this->getWorksafeStatus($start, $end, $viewer, $siteId),
-            'training_compliance' => $this->getTrainingComplianceSummary($viewer, $siteId),
-            'overall_status' => $this->calculateOverallStatus($viewer, $siteId),
+            'event_summary' => $this->getEventSummary($start, $end, $viewer, $siteId, $context),
+            'investigation_summary' => $this->getInvestigationSummary($viewer, $siteId, $context),
+            'corrective_action_summary' => $this->getCorrectiveActionSummary($viewer, $siteId, $context),
+            'risk_posture' => $this->getRiskPosture($viewer, $siteId, $context),
+            'worksafe_status' => $this->getWorksafeStatus($start, $end, $viewer, $siteId, $context),
+            'training_compliance' => $this->getTrainingComplianceSummary($viewer, $siteId, $context),
+            'overall_status' => $this->calculateOverallStatus($viewer, $siteId, $context),
         ];
     }
 
@@ -77,8 +88,19 @@ class HsGovernanceService
         Carbon $end,
         ?User $viewer = null,
         ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
     ): array {
-        $events = $this->eventQuery($viewer, $siteId);
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->getEventSummarySnapshot($start, $end, $viewer, $siteId, $context));
+    }
+
+    private function getEventSummarySnapshot(
+        Carbon $start,
+        Carbon $end,
+        ?User $viewer = null,
+        ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
+    ): array {
+        $events = $this->eventQuery($viewer, $siteId, $context);
         $periodEvents = (clone $events)->whereBetween('reported_at', [$start, $end]);
 
         return [
@@ -99,9 +121,14 @@ class HsGovernanceService
         ];
     }
 
-    public function getInvestigationSummary(?User $viewer = null, ?int $siteId = null): array
+    public function getInvestigationSummary(?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): array
     {
-        $investigations = $this->investigationQuery($viewer, $siteId);
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->getInvestigationSummarySnapshot($viewer, $siteId, $context));
+    }
+
+    private function getInvestigationSummarySnapshot(?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): array
+    {
+        $investigations = $this->investigationQuery($viewer, $siteId, $context);
 
         return [
             'active' => (clone $investigations)->active()->count(),
@@ -121,9 +148,14 @@ class HsGovernanceService
         ];
     }
 
-    public function getCorrectiveActionSummary(?User $viewer = null, ?int $siteId = null): array
+    public function getCorrectiveActionSummary(?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): array
     {
-        $actions = $this->correctiveActionQuery($viewer, $siteId);
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->getCorrectiveActionSummarySnapshot($viewer, $siteId, $context));
+    }
+
+    private function getCorrectiveActionSummarySnapshot(?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): array
+    {
+        $actions = $this->correctiveActionQuery($viewer, $siteId, $context);
 
         return [
             'open' => (clone $actions)->open()->count(),
@@ -141,9 +173,14 @@ class HsGovernanceService
         ];
     }
 
-    public function getRiskPosture(?User $viewer = null, ?int $siteId = null): array
+    public function getRiskPosture(?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): array
     {
-        $active = $this->riskAssessmentQuery($viewer, $siteId)->active();
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->getRiskPostureSnapshot($viewer, $siteId, $context));
+    }
+
+    private function getRiskPostureSnapshot(?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): array
+    {
+        $active = $this->riskAssessmentQuery($viewer, $siteId, $context)->active();
 
         return [
             'total_active' => (clone $active)->count(),
@@ -155,7 +192,7 @@ class HsGovernanceService
             'extreme_risks' => (clone $active)->where('risk_level', 'extreme')->count(),
             'high_risks' => (clone $active)->where('risk_level', 'high')->count(),
             'unacceptable_risks' => (clone $active)->where('risk_acceptable', false)->count(),
-            'due_for_review' => $this->riskAssessmentQuery($viewer, $siteId)->dueForReview()->count(),
+            'due_for_review' => $this->riskAssessmentQuery($viewer, $siteId, $context)->dueForReview()->count(),
         ];
     }
 
@@ -164,8 +201,19 @@ class HsGovernanceService
         Carbon $end,
         ?User $viewer = null,
         ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
     ): array {
-        $notifiable = $this->eventQuery($viewer, $siteId)
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->getWorksafeStatusSnapshot($start, $end, $viewer, $siteId, $context));
+    }
+
+    private function getWorksafeStatusSnapshot(
+        Carbon $start,
+        Carbon $end,
+        ?User $viewer = null,
+        ?int $siteId = null,
+        ?HealthSafetyReadContext $context = null,
+    ): array {
+        $notifiable = $this->eventQuery($viewer, $siteId, $context)
             ->where('worksafe_notifiable', true);
 
         return [
@@ -178,13 +226,13 @@ class HsGovernanceService
                 ->whereIn('worksafe_status', [HsEvent::WORKSAFE_NOTIFIED, HsEvent::WORKSAFE_ACKNOWLEDGED])
                 ->whereBetween('reported_at', [$start, $end])
                 ->count(),
-            'days_since_last_notifiable' => $this->daysSinceLastNotifiable($viewer, $siteId),
+            'days_since_last_notifiable' => $this->daysSinceLastNotifiable($viewer, $siteId, $context),
         ];
     }
 
-    public function getTrainingComplianceSummary(?User $viewer = null, ?int $siteId = null): array
+    public function getTrainingComplianceSummary(?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): array
     {
-        $requirements = $this->trainingRequirements($viewer, $siteId);
+        $requirements = $this->trainingRequirements($viewer, $siteId, $context);
 
         if ($requirements->isEmpty()) {
             return [
@@ -233,16 +281,21 @@ class HsGovernanceService
      * Compact widget data for governance dashboard snapshot.
      * This is the format consumed by DashboardAggregatorService.
      */
-    public function getWidgetData(array $range, ?User $viewer = null, ?int $siteId = null): array
+    public function getWidgetData(array $range, ?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): array
+    {
+        return $this->withSourceRead($viewer, $context, fn (?User $viewer, ?HealthSafetyReadContext $context) => $this->getWidgetDataSnapshot($range, $viewer, $siteId, $context));
+    }
+
+    private function getWidgetDataSnapshot(array $range, ?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): array
     {
         $start = Carbon::parse($range['start']);
         $end = Carbon::parse($range['end']);
 
-        $eventSummary = $this->getEventSummary($start, $end, $viewer, $siteId);
-        $investigations = $this->getInvestigationSummary($viewer, $siteId);
-        $actions = $this->getCorrectiveActionSummary($viewer, $siteId);
-        $riskPosture = $this->getRiskPosture($viewer, $siteId);
-        $worksafe = $this->getWorksafeStatus($start, $end, $viewer, $siteId);
+        $eventSummary = $this->getEventSummary($start, $end, $viewer, $siteId, $context);
+        $investigations = $this->getInvestigationSummary($viewer, $siteId, $context);
+        $actions = $this->getCorrectiveActionSummary($viewer, $siteId, $context);
+        $riskPosture = $this->getRiskPosture($viewer, $siteId, $context);
+        $worksafe = $this->getWorksafeStatus($start, $end, $viewer, $siteId, $context);
 
         return [
             'events_period' => $eventSummary['total_period'],
@@ -259,7 +312,7 @@ class HsGovernanceService
             'risk_reviews_due' => $riskPosture['due_for_review'],
             'worksafe_pending' => $worksafe['pending_notification'],
             'days_since_notifiable' => $worksafe['days_since_last_notifiable'],
-            'status' => $this->calculateOverallStatus($viewer, $siteId),
+            'status' => $this->calculateOverallStatus($viewer, $siteId, $context),
         ];
     }
 
@@ -267,13 +320,13 @@ class HsGovernanceService
     /*  Internal helpers */
     /* ------------------------------------------------------------------ */
 
-    private function calculateEffectivenessRate(Builder $actions): int
+    private function calculateEffectivenessRate(Builder $actions): ?int
     {
         $verified = (clone $actions)->where('status', HsCorrectiveAction::STATUS_VERIFIED);
         $total = (clone $verified)->count();
 
         if ($total === 0) {
-            return 100;
+            return null;
         }
 
         $effective = (clone $verified)->where('effectiveness_confirmed', true)->count();
@@ -281,9 +334,9 @@ class HsGovernanceService
         return (int) round(($effective / $total) * 100);
     }
 
-    private function daysSinceLastNotifiable(?User $viewer, ?int $siteId): ?int
+    private function daysSinceLastNotifiable(?User $viewer, ?int $siteId, ?HealthSafetyReadContext $context = null): ?int
     {
-        $last = $this->eventQuery($viewer, $siteId)
+        $last = $this->eventQuery($viewer, $siteId, $context)
             ->where('worksafe_notifiable', true)
             ->orderByDesc('reported_at')
             ->value('reported_at');
@@ -291,15 +344,15 @@ class HsGovernanceService
         return $last ? (int) Carbon::parse($last)->diffInDays(now()) : null;
     }
 
-    private function calculateOverallStatus(?User $viewer = null, ?int $siteId = null): string
+    private function calculateOverallStatus(?User $viewer = null, ?int $siteId = null, ?HealthSafetyReadContext $context = null): string
     {
-        $overdueActions = $this->correctiveActionQuery($viewer, $siteId)->overdue()->count();
-        $overdueInvestigations = $this->investigationQuery($viewer, $siteId)->overdue()->count();
-        $pendingWorksafe = $this->eventQuery($viewer, $siteId)
+        $overdueActions = $this->correctiveActionQuery($viewer, $siteId, $context)->overdue()->count();
+        $overdueInvestigations = $this->investigationQuery($viewer, $siteId, $context)->overdue()->count();
+        $pendingWorksafe = $this->eventQuery($viewer, $siteId, $context)
             ->where('worksafe_notifiable', true)
             ->where('worksafe_status', HsEvent::WORKSAFE_PENDING)
             ->count();
-        $extremeRisks = $this->riskAssessmentQuery($viewer, $siteId)
+        $extremeRisks = $this->riskAssessmentQuery($viewer, $siteId, $context)
             ->active()
             ->where('risk_level', 'extreme')
             ->count();
@@ -312,10 +365,11 @@ class HsGovernanceService
             return 'warning';
         }
 
-        return 'good';
+        // Readable zeros cannot establish an organisation-wide all-clear.
+        return 'unknown';
     }
 
-    private function riskAssessmentQuery(?User $viewer, ?int $siteId = null): Builder
+    private function riskAssessmentQuery(?User $viewer, ?int $siteId = null, ?HealthSafetyReadContext $context = null): Builder
     {
         $query = HsRiskAssessment::query();
 
@@ -327,18 +381,15 @@ class HsGovernanceService
 
         if ($siteId !== null) {
             $this->assertRequestedSite($viewer, $siteId);
-
-            return $this->siteAccess->applyHsRiskAssessmentSiteScopeForSiteIds($query, [$siteId]);
+            $this->siteAccess->applyHsRiskAssessmentSiteScopeForSiteIds($query, [$siteId]);
+        } else {
+            $this->siteAccess->applyHsRiskAssessmentScope($query, $viewer, self::SITE_BYPASS_PERMISSIONS);
         }
 
-        return $this->siteAccess->applyHsRiskAssessmentScope(
-            $query,
-            $viewer,
-            self::SITE_BYPASS_PERMISSIONS,
-        );
+        return $this->protectMaterialisation(app(HsEventAccessService::class)->applyFirstAidRiskSourceScope($query, $viewer, $context));
     }
 
-    private function eventQuery(?User $viewer, ?int $siteId = null): Builder
+    private function eventQuery(?User $viewer, ?int $siteId = null, ?HealthSafetyReadContext $context = null): Builder
     {
         $query = HsEvent::query();
         if (! $viewer) {
@@ -353,26 +404,34 @@ class HsGovernanceService
             $query->where('site_id', $siteId);
         }
 
-        return $query;
+        return $this->protectMaterialisation(app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $viewer, $context));
     }
 
-    private function investigationQuery(?User $viewer, ?int $siteId = null): Builder
+    private function investigationQuery(?User $viewer, ?int $siteId = null, ?HealthSafetyReadContext $context = null): Builder
     {
-        return HsInvestigation::query()->whereHas(
+        $query = HsInvestigation::query();
+        $children = (clone $query)->withoutEagerLoads()->select('hs_investigations.hs_event_id');
+        $candidates = HsEvent::query()->whereIn('hs_events.id', $children);
+
+        return $this->protectMaterialisation($query->whereHas(
             'hsEvent',
-            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId),
-        );
+            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId, $candidates, $context),
+        ));
     }
 
-    private function correctiveActionQuery(?User $viewer, ?int $siteId = null): Builder
+    private function correctiveActionQuery(?User $viewer, ?int $siteId = null, ?HealthSafetyReadContext $context = null): Builder
     {
-        return HsCorrectiveAction::query()->whereHas(
+        $query = HsCorrectiveAction::query();
+        $children = (clone $query)->withoutEagerLoads()->select('hs_corrective_actions.hs_event_id');
+        $candidates = HsEvent::query()->whereIn('hs_events.id', $children);
+
+        return $this->protectMaterialisation($query->whereHas(
             'hsEvent',
-            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId),
-        );
+            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId, $candidates, $context),
+        ));
     }
 
-    private function scopeEventBuilder(Builder $query, ?User $viewer, ?int $siteId): Builder
+    private function scopeEventBuilder(Builder $query, ?User $viewer, ?int $siteId, Builder $sourceCandidates, ?HealthSafetyReadContext $context = null): Builder
     {
         if (! $viewer) {
             abort_if($siteId !== null, 403, UserSiteAccessService::DEFAULT_MESSAGE);
@@ -381,12 +440,14 @@ class HsGovernanceService
         }
 
         $this->siteAccess->applyHsEventScope($query, $viewer, self::SITE_BYPASS_PERMISSIONS);
+        $this->siteAccess->applyHsEventScope($sourceCandidates, $viewer, self::SITE_BYPASS_PERMISSIONS);
         if ($siteId !== null) {
             $this->assertRequestedSite($viewer, $siteId);
             $query->where($query->qualifyColumn('site_id'), $siteId);
+            $sourceCandidates->where($sourceCandidates->qualifyColumn('site_id'), $siteId);
         }
 
-        return $query;
+        return $this->protectMaterialisation(app(HsEventAccessService::class)->applyFirstAidSourceScope($query, $viewer, $context, $sourceCandidates));
     }
 
     private function staffQuery(User $viewer, ?int $siteId): Builder
@@ -405,7 +466,7 @@ class HsGovernanceService
     }
 
     /** @return Collection<int, HsTrainingRequirement> */
-    private function trainingRequirements(?User $viewer, ?int $siteId): Collection
+    private function trainingRequirements(?User $viewer, ?int $siteId, ?HealthSafetyReadContext $context = null): Collection
     {
         $requirements = HsTrainingRequirement::active()->get();
         if (! $viewer) {
@@ -453,5 +514,40 @@ class HsGovernanceService
         );
 
         return $siteId;
+    }
+
+    /** All source decisions and their final SQL share the caller's original prepared evidence. */
+    private ?HealthSafetyReadMaterialisationProof $materialisationProof = null;
+
+    private function protectMaterialisation(Builder $query): Builder
+    {
+        return $this->materialisationProof?->protect($query) ?? $query;
+    }
+    private function withSourceRead(?User $viewer, ?HealthSafetyReadContext $context, callable $consumer): mixed
+    {
+        $project = static fn (mixed $result): mixed => is_array($result) && ! array_is_list($result)
+            ? [...$result, 'source_scope' => 'readable_subset', 'source_completeness' => 'unknown'] : $result;
+        if ($viewer === null) {
+            abort_unless($context === null, 403);
+
+            return DB::transaction(fn () => $project($consumer(null, null)));
+        }
+        $permissions = array_values(array_unique([...FirstAidAccessService::PERMISSIONS,
+            ...RestraintAccessService::PERMISSIONS, ...InjuryAccessService::PERMISSIONS]));
+        $consume = function (HealthSafetyReadContext $active) use ($viewer, $permissions, $consumer, $project): mixed {
+            $active->assertViewer($viewer);
+
+            return $active->consumeSourceViewer($permissions,
+                function (User $current) use ($active, $project, $consumer): mixed {
+                    return HealthSafetyReadMaterialisationProof::within($active, function (HealthSafetyReadMaterialisationProof $proof) use ($current, $active, $project, $consumer): mixed {
+                        $previous = $this->materialisationProof;
+                        $this->materialisationProof = $proof;
+                        try { return $project($consumer($current, $active)); }
+                        finally { $this->materialisationProof = $previous; }
+                    });
+                });
+        };
+
+        return $context !== null ? $consume($context) : HealthSafetyReadContext::within($viewer, $permissions, $consume);
     }
 }

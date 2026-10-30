@@ -96,8 +96,19 @@ class HsGovernanceReportController extends Controller
     {
         $siteId = $this->requestedSiteId($request);
 
+        $filters = $request->validate([
+            'tab' => ['sometimes', 'in:all,active,drafts,due,high,closed'],
+            'status' => ['nullable', 'in:draft,active,under_review,superseded,archived'],
+            'risk_level' => ['nullable', 'in:low,medium,high,extreme'],
+            'due_for_review' => ['nullable', 'in:true,false'],
+            'risk_acceptable' => ['nullable', 'in:0,1'],
+            'client_id' => ['nullable', 'integer', 'min:1'],
+            'hs_event_id' => ['nullable', 'integer', 'min:1'],
+            'search' => ['nullable', 'string', 'max:200'],
+        ]);
+
         return response()->json(
-            $this->complianceService->riskAssessmentRegister($request->user(), $siteId)
+            $this->complianceService->riskAssessmentRegister($request->user(), $siteId, $filters)
         );
     }
 

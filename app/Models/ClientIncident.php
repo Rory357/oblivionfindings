@@ -104,6 +104,7 @@ class ClientIncident extends Model implements EmitsToTimeline
     ];
 
     protected $casts = [
+        'owner_revision' => 'integer',
         'occurred_at' => 'datetime',
         'submitted_at' => 'datetime',
         'metadata' => 'array',
@@ -147,6 +148,16 @@ class ClientIncident extends Model implements EmitsToTimeline
     public function reporter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reported_by');
+    }
+
+    public function incidentOwner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'incident_owner_user_id');
+    }
+
+    public function ownerChanges(): HasMany
+    {
+        return $this->hasMany(IncidentOwnerChange::class, 'incident_id')->orderByDesc('revision');
     }
 
     public function shift(): BelongsTo

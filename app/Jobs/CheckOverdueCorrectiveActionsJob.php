@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\HsCorrectiveAction;
 use App\Services\HealthSafety\HsSignalService;
+use App\Support\HealthSafety\RetiredEventItems;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -26,6 +27,8 @@ class CheckOverdueCorrectiveActionsJob implements ShouldQueue
     {
         $overdueActions = HsCorrectiveAction::query()
             ->overdue()
+            // Not for work under a soft-deleted H&S event (see RetiredEventItems).
+            ->tap(fn ($items) => RetiredEventItems::exclude($items, 'hs_corrective_actions'))
             ->with([
                 'hsEvent:id,site_id,event_category,severity',
                 'assignedTo:id,name',

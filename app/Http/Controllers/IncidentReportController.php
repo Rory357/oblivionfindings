@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Services\Incidents\IncidentAccessService;
+use App\Support\Incidents\IncidentOccurrencePeriod;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -13,7 +14,8 @@ class IncidentReportController extends Controller
     {
         abort_unless($request->user()?->canDo('incidents.export') || $request->user()?->canDo('reports.viewAny'), 403);
 
-        $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+        $clients = app(IncidentAccessService::class)->peopleForFilters($request->user())
+            ->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
 
         return inertia('reports/incidents', [
             'clients' => $clients,
@@ -32,25 +34,25 @@ class IncidentReportController extends Controller
         abort_unless($request->user()?->canDo('incidents.export'), 403);
 
         $data = $request->validate([
-            'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date'],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
             'client_id' => ['nullable', 'integer'],
-            'severity' => ['nullable', 'in:low,medium,high'],
+            'severity' => ['nullable', 'in:low,medium,high,critical'],
             'reviewed' => ['nullable', 'in:yes,no'],
         ]);
 
         $q = ClientIncident::query()
+            ->tap(fn ($query) => app(IncidentAccessService::class)->apply($query, $request->user()))
             ->with(['client:id,first_name,last_name', 'reporter:id,name', 'shift:id,starts_at,ends_at'])
-            ->when(!empty($data['from']), fn($qq) => $qq->whereDate('occurred_at', '>=', $data['from']))
-            ->when(!empty($data['to']), fn($qq) => $qq->whereDate('occurred_at', '<=', $data['to']))
-            ->when(!empty($data['client_id']), fn($qq) => $qq->where('client_id', $data['client_id']))
-            ->when(!empty($data['severity']), fn($qq) => $qq->where('severity', $data['severity']))
-            ->when(($data['reviewed'] ?? null) === 'yes', fn($qq) => $qq->whereNotNull('reviewed_at'))
-            ->when(($data['reviewed'] ?? null) === 'no', fn($qq) => $qq->whereNull('reviewed_at'))
+            ->tap(fn ($query) => IncidentOccurrencePeriod::apply($query, $data['from'] ?? null, $data['to'] ?? null))
+            ->when(! empty($data['client_id']), fn ($qq) => $qq->where('client_id', $data['client_id']))
+            ->when(! empty($data['severity']), fn ($qq) => $qq->where('severity', $data['severity']))
+            ->when(($data['reviewed'] ?? null) === 'yes', fn ($qq) => $qq->whereNotNull('reviewed_at'))
+            ->when(($data['reviewed'] ?? null) === 'no', fn ($qq) => $qq->whereNull('reviewed_at'))
             ->orderByDesc('occurred_at')
             ->orderByDesc('id');
 
-        $filename = 'incident_report_' . now()->format('Ymd_His') . '.csv';
+        $filename = 'incident_report_'.now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
@@ -60,7 +62,7 @@ class IncidentReportController extends Controller
                 'Shift ID',
                 'Type',
                 'Severity',
-                'Occurred At',
+                'Occurred At (Pacific/Auckland)',
                 'Description',
                 'Requires Followup',
                 'Immediate Action Taken',
@@ -76,11 +78,11 @@ class IncidentReportController extends Controller
                 foreach ($rows as $i) {
                     $this->putCsv($out, [
                         $i->id,
-                        ($i->client?->first_name . ' ' . $i->client?->last_name),
+                        ($i->client?->first_name.' '.$i->client?->last_name),
                         $i->shift_id,
                         $i->type,
                         $i->severity,
-                        optional($i->occurred_at)->toDateTimeString(),
+                        $i->occurred_at?->copy()->setTimezone(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
                         $i->description,
                         $i->requires_followup ? 'yes' : 'no',
                         $i->immediate_action_taken,

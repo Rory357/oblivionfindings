@@ -134,10 +134,13 @@ final class MonitoringIssueEpisode
     {
         $episode = self::fromEvent($event, $siteId);
         $observationId = data_get($event->payload, 'observation_id');
+        $expectedToStates = in_array($event->event_type, self::FAILURE_TYPES, true)
+            ? ['failed', 'degraded']
+            : ['healthy'];
         if ($episode === null || ! is_int($observationId)
             || ! MonitorObservation::supportsProvenanceColumns()
             || ! in_array($event->event_type, self::EVENT_TYPES, true)
-            || data_get($event->payload, 'to_state') !== (in_array($event->event_type, self::FAILURE_TYPES, true) ? 'failed' : 'healthy')) {
+            || ! in_array(data_get($event->payload, 'to_state'), $expectedToStates, true)) {
             return false;
         }
         $monitor = Monitor::query()->whereKey($episode['monitor_id'])->where('device_id', $event->device_id)->first();

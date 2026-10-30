@@ -175,6 +175,7 @@ class DeviceProfileWorkspaceTest extends TestCase
                 'tickets',
                 'events',
                 'maintenance',
+                'history',
                 'documents',
                 'audit',
             ], collect($props['profile']['sections'])->pluck('key')->all());

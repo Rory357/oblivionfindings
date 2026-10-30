@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"oblivion.local/endpoint-agent/internal/agent"
 	"os"
 	"os/signal"
@@ -28,8 +29,12 @@ func main() {
 	}
 }
 func run(args []string) error {
+	return runWithOutput(args, os.Stdout)
+}
+
+func runWithOutput(args []string, stdout io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("use: oblivion-agent enrol|run|service|probe|version")
+		return errors.New("use: oblivion-agent enrol|run|service|probe|status|version")
 	}
 	if runtime.GOOS != "windows" {
 		return errors.New("computer agents support Windows only; use the site collector for Linux monitoring")
@@ -40,7 +45,7 @@ func run(args []string) error {
 		}
 		return runService(version)
 	}
-	if args[0] != "enrol" && args[0] != "run" && args[0] != "probe" {
+	if args[0] != "enrol" && args[0] != "run" && args[0] != "probe" && args[0] != "status" {
 		return errors.New("unknown agent command")
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -53,7 +58,7 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		return json.NewEncoder(os.Stdout).Encode(map[string]any{"platform": runtime.GOOS, "disks": len(heartbeat.Inventory.Disks), "software_count": len(heartbeat.Inventory.Software), "services_count": len(heartbeat.Inventory.Services), "software_complete": heartbeat.Inventory.SoftwareComplete, "services_complete": heartbeat.Inventory.ServicesComplete, "probe_errors": heartbeat.Inventory.ProbeErrors})
+		return json.NewEncoder(stdout).Encode(map[string]any{"platform": runtime.GOOS, "disks": len(heartbeat.Inventory.Disks), "software_count": len(heartbeat.Inventory.Software), "services_count": len(heartbeat.Inventory.Services), "software_complete": heartbeat.Inventory.SoftwareComplete, "services_complete": heartbeat.Inventory.ServicesComplete, "probe_errors": heartbeat.Inventory.ProbeErrors})
 	}
 	flags := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	defaultDir, err := defaultStateDirectory()
@@ -72,6 +77,13 @@ func run(args []string) error {
 	}
 	if flags.NArg() != 0 {
 		return errors.New("unexpected arguments")
+	}
+	if args[0] == "status" {
+		status, err := agent.InspectState(*dir)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(stdout).Encode(status)
 	}
 	if args[0] == "run" {
 		return agent.Run(ctx, *dir, version, nil, func(message string) { fmt.Fprintln(os.Stderr, message) })

@@ -934,6 +934,60 @@ describe('SecurityWorkspacePanels', () => {
             screen.queryByText('Credential lifecycle'),
         ).not.toBeInTheDocument();
     });
+
+    it('renders offline status filter banner, filtered devices on overview, and CCTV source readiness badge', () => {
+        render(
+            <SecurityWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'overview',
+                        label: 'Overview',
+                        statusFilter: {
+                            key: 'offline',
+                            label: 'Offline security devices',
+                        },
+                        devices: [
+                            {
+                                id: 55,
+                                name: 'Gate Dome Camera',
+                                category: 'cctv',
+                                subcategory: 'dome_camera',
+                                provider: 'unifi',
+                                status: 'offline',
+                                health: 'critical',
+                                lastSeenAt: '2026-07-19T03:00:00.000Z',
+                                deviceHref: '/security-devices/devices/55',
+                                site: {
+                                    id: 9,
+                                    name: 'Harbour House',
+                                    href: '/security-devices/sites/9',
+                                },
+                                assignment: null,
+                                monitoring: { state: 'configured', count: 1 },
+                                observed: {},
+                                maintenance: null,
+                                cctvSource: {
+                                    state: 'verified',
+                                    label: 'Live source verified',
+                                },
+                            },
+                        ],
+                    },
+                }}
+            />,
+        );
+
+        expect(screen.getByText(/Filtered to:/)).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: 'Clear status filter' }),
+        ).toHaveAttribute('href', '/security-devices/security?tab=overview');
+        expect(
+            screen.getByRole('link', { name: 'Gate Dome Camera' }),
+        ).toBeInTheDocument();
+        expect(screen.getByText('Live source verified')).toBeInTheDocument();
+    });
 });
 
 function expectFact(label: string, value: string) {

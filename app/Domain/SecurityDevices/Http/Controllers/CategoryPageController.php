@@ -246,7 +246,7 @@ class CategoryPageController extends Controller
                 ],
             ],
             'stats' => $stats,
-            'filters' => $request->only(['tab', 'device_id', 'subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction', 'history_kind', 'severity', 'event_type', 'source', 'attention']),
+            'filters' => $request->only(['tab', 'device_id', 'subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction', 'history_kind', 'severity', 'event_type', 'source', 'attention', 'flow']),
             'filterOptions' => [
                 'subcategories' => $subcategories,
                 'categories' => $categoryOptions,
@@ -275,14 +275,24 @@ class CategoryPageController extends Controller
                     $user,
                     clone $baseScope,
                     $activeTab,
-                    $request->only(['history_kind', 'device_id', 'severity', 'event_type', 'source']),
+                    $request->only(['history_kind', 'device_id', 'severity', 'event_type', 'source', 'attention']),
                 )
                 : null,
             'securityWorkspace' => $slug === 'security'
-                ? $this->securityWorkspacePresenter->present($user, clone $baseScope, $activeTab)
+                ? $this->securityWorkspacePresenter->present(
+                    $user,
+                    clone $baseScope,
+                    $activeTab,
+                    $request->only(['status']),
+                )
                 : null,
             'healthcareWorkspace' => $slug === 'healthcare'
-                ? $this->healthcareWorkspacePresenter->present($user, clone $baseScope, $activeTab)
+                ? $this->healthcareWorkspacePresenter->present(
+                    $user,
+                    clone $baseScope,
+                    $activeTab,
+                    $request->only(['flow']),
+                )
                 : null,
             'networkItWorkspace' => $networkWorkspace,
             'trackingWorkspace' => $slug === 'tracking'

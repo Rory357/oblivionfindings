@@ -380,7 +380,7 @@ function SuggestionRunPage({
             />
 
             <PageLayout hero={header}>
-                <div className="space-y-4" data-test="roster-suggestions-page">
+                <div className="space-y-5" data-test="roster-suggestions-page">
                     <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-4">
                         <div className="min-w-0 space-y-1 text-sm">
                             <p>

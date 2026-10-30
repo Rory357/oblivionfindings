@@ -276,7 +276,8 @@ class UsersController extends Controller
                     'last_name' => $data['client']['last_name'] ?? '',
                     'date_of_birth' => $data['client']['date_of_birth'] ?? null,
                     'email' => $data['email'],
-                    'status' => 'active',
+                    // Established portal behaviour, unless the organisation requires a commencement review for everyone.
+                    'status' => \App\Domain\Referrals\Services\ReferralActivationGuard::requiredForEveryone() ? 'onboarding' : 'active',
                 ]);
             } else {
                 NextOfKin::create([

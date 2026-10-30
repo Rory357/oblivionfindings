@@ -56,6 +56,7 @@ vi.mock('./_dialogs', () => ({
         open ? (
             <section aria-label="Create a Company Hub page">
                 <p>{initial?.kind ?? 'news'} setup</p>
+                {/* eslint-disable-next-line no-restricted-syntax -- test double for the mocked CreateHubPageDialog */}
                 <button onClick={close}>Cancel creation</button>
             </section>
         ) : null,

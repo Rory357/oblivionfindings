@@ -251,7 +251,7 @@ export function TimesheetPicker({
                                     onChange('');
                                     setOpen(false);
                                 }}
-                                className="min-h-11"
+                                className="frontline-hit"
                             >
                                 None selected
                             </CommandItem>
@@ -860,7 +860,7 @@ function TimesheetWizardBody(props: TimesheetWizardProps & {
                                     <Button
                                         asChild
                                         variant="outline"
-                                        className="mt-3 min-h-11"
+                                        className="mt-3 frontline-hit"
                                     >
                                         <a
                                             href={recoveryUrl}

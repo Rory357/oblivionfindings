@@ -14,6 +14,10 @@ namespace App\Http\Controllers;
 
 use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
 use App\Domain\Hr\Services\EmployeeIntakeService;
+use App\Domain\Referrals\Services\InternalSupportPreparation;
+use App\Domain\Referrals\Services\ReferralActivationGuard;
+use App\Domain\Referrals\Services\ReferralDocumentHandovers;
+use App\Domain\Referrals\Services\ReferralSupportContactHandovers;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Presenters\ClientProfileHealthcareDevicesPresenter;
 use App\Domain\SecurityDevices\Services\PersonalTrackingLocationExportService;
@@ -59,9 +63,7 @@ use App\Models\ConsentType;
 use App\Models\ControlRoomAlert;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
-use App\Models\FirstAidRecord;
 use App\Models\FleetIncident;
-use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetResidentTransport;
@@ -87,25 +89,32 @@ use App\Services\AuditLogger;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Client\ActionsAggregator;
 use App\Services\Client\BehaviourPatternsService;
+use App\Services\Clients\ClientContactPreferences;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
 use App\Services\Clients\ClientFormOptions;
 use App\Services\Clients\ClientOnboardingAccess;
 use App\Services\Clients\ClientPhotoMediaUrls;
 use App\Services\Clients\ClientPhotoStorage;
 use App\Services\Clients\ClientPortalMembershipService;
+use App\Services\Clients\ClientProfileChecklist;
 use App\Services\Clients\ClientProfileSectionAccess;
 use App\Services\Clients\ClientStaffPreparationProjection;
 use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ConsentValidationService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\Fleet\TransportRequestService;
+use App\Services\HealthSafety\FirstAidSourceProjectionService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\HealthSafetyReadMaterialisationProof;
 use App\Services\HealthSafety\HsModuleSummaryService;
+use App\Services\Incidents\IncidentHsEventSourceReadService;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\DoseSlots\ClientCalendarDoses;
 use App\Services\Medication\DoseSlots\DoseAwaySources;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationProfileAuditPrivacy;
 use App\Services\Medication\MedicationTimelineVisibilityService;
+use App\Services\Medication\Transit\ClientTransportMedicationLogs;
 use App\Services\NotificationService;
 use App\Services\Queclink\LocateNowService;
 use App\Services\Respite\ClientRespiteAllocationSummary;
@@ -122,6 +131,7 @@ use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Support\Medication\MedicationStockQuantity;
 use App\Support\SchemaCache;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -167,13 +177,7 @@ class ClientController extends Controller
                 'risks:id,client_id,label,severity,active',
             ])
             ->withCount([
-                'portalUsers',
-                'medications',
-                'conditions',
-                'emergencyContacts',
-                'assessments',
-                'documents',
-                'supportPlan',
+                ...ClientProfileChecklist::COUNTS,
                 'respiteBookings',
                 'respiteBookingRequests',
                 // Daily-style notes recorded in the last 7 days — shown on each card's footer.
@@ -322,42 +326,10 @@ class ClientController extends Controller
 
     private function buildOnboardingSummaryFromCounts(Client $client): array
     {
-        $overrides = $client->onboardingOverrides
-            ->keyBy('key')
-            ->map(fn ($o) => (bool) $o->value)
-            ->toArray();
+        $summary = app(ClientProfileChecklist::class)->build($client);
+        unset($summary['items']);
 
-        $hasProfile = (bool) ($client->first_name && $client->last_name)
-            && (bool) $client->date_of_birth
-            && (bool) ($client->phone || $client->email)
-            && (bool) ($client->address_line_1 || $client->city || $client->postcode);
-
-        $items = [
-            ['key' => 'profile', 'has_data' => $hasProfile, 'override' => (bool) ($overrides['profile'] ?? false)],
-            ['key' => 'next_of_kin', 'has_data' => (int) ($client->portal_users_count ?? 0) > 0, 'override' => (bool) ($overrides['next_of_kin'] ?? false)],
-            ['key' => 'medications', 'has_data' => (int) ($client->medications_count ?? 0) > 0, 'override' => (bool) ($overrides['medications'] ?? false)],
-            ['key' => 'conditions', 'has_data' => (int) ($client->conditions_count ?? 0) > 0, 'override' => (bool) ($overrides['conditions'] ?? false)],
-            ['key' => 'emergency_contacts', 'has_data' => (int) ($client->emergency_contacts_count ?? 0) > 0, 'override' => (bool) ($overrides['emergency_contacts'] ?? false)],
-            ['key' => 'history', 'has_data' => ((int) ($client->assessments_count ?? 0) > 0) || ((int) ($client->support_plan_count ?? 0) > 0), 'override' => (bool) ($overrides['history'] ?? false)],
-            ['key' => 'documents', 'has_data' => (int) ($client->documents_count ?? 0) > 0, 'override' => (bool) ($overrides['documents'] ?? false)],
-        ];
-
-        $total = count($items);
-        $completed = 0;
-        foreach ($items as $i) {
-            if (($i['has_data'] ?? false) || ($i['override'] ?? false)) {
-                $completed++;
-            }
-        }
-
-        $percent = $total > 0 ? (int) round(($completed / $total) * 100) : 0;
-
-        return [
-            'completed' => $completed,
-            'total' => $total,
-            'percent' => $percent,
-            'status' => $completed === $total ? 'complete' : 'incomplete',
-        ];
+        return $summary;
     }
 
     public function show(
@@ -601,10 +573,12 @@ class ClientController extends Controller
 
         $documents = $sectionAccess['documents']
             ? ClientDocument::query()
+                ->visibleReferralReleases($request->user())
                 ->where('client_id', $client->id)
                 ->orderByDesc('created_at')
-                ->get(['id', 'title', 'category', 'folder', 'version', 'effective_date', 'expiry_date', 'portal_visible', 'notes', 'original_name', 'mime_type', 'size_bytes', 'created_at'])
+                ->get(['id', 'client_id', 'source_referral_evidence_id', 'referral_release', 'title', 'category', 'folder', 'version', 'effective_date', 'expiry_date', 'portal_visible', 'notes', 'original_name', 'mime_type', 'size_bytes', 'created_at'])
             : collect();
+        app(ReferralDocumentHandovers::class)->project($documents);
 
         $eventsBase = $sectionAccess['timeline']
             ? TimelineEvent::query()->where('client_id', $client->id)
@@ -827,6 +801,8 @@ class ClientController extends Controller
                 'status' => $client->status,
                 'phone' => $client->phone,
                 'email' => $client->email,
+                'contact_profile' => app(ClientContactPreferences::class)->preview($client),
+                'support_contacts' => app(ReferralSupportContactHandovers::class)->present($request->user(), $client),
                 'address_line_1' => $client->address_line_1,
                 'address_line_2' => $client->address_line_2,
                 'suburb' => $client->suburb,
@@ -859,6 +835,10 @@ class ClientController extends Controller
                     : [],
                 // Identity & Culture
                 'ethnicity' => $client->ethnicity,
+                'iwi' => $client->iwi,
+                'hapu' => $client->hapu,
+                'marae' => $client->marae,
+                'cultural_dietary_needs' => $client->cultural_dietary_needs,
                 'preferred_pronouns' => $client->preferred_pronouns,
                 'religion' => $client->religion,
                 'languages' => $client->languages,
@@ -1347,38 +1327,36 @@ class ClientController extends Controller
 
             // Formal H&S risk assessments (polymorphic; distinct from the ClientRisk
             // care-risk list above — shown as a separate section in the same tab).
+            // One H&S read for the whole list (Codex's port): only risks this viewer may read are listed, so a risk
+            // copied from someone else's private treatment is left out instead of failing the whole profile.
             'hs_risk_assessments' => $sectionAccess['first_aid']
-                ? HsRiskAssessment::forAssessable(Client::class, $client->id)
-                    ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])
-                    ->withCount('attachments')
-                    ->orderByDesc('created_at')
-                    ->limit(100)
-                    ->get()
-                    ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra))
-                    ->values()
+                ? RiskAssessmentPresenter::materialise($request->user(), null, function ($current, $reads, $context) use ($client): array {
+                    $query = HsRiskAssessment::forAssessable(Client::class, $client->id)
+                        ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])->withCount('attachments');
+
+                    $original = RiskAssessmentPresenter::guardEagerQuery($query, $current, $context);
+
+                    return (clone $original)
+                        ->orderByDesc('created_at')->orderByDesc('id')->limit(100)->get()
+                        ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra, $current, $context, $original))->values()->all();
+                })
                 : [],
             'ra_pickers' => $sectionAccess['first_aid_manage']
                 ? RiskAssessmentPresenter::pickers()
                 : ['sites' => [], 'clients' => [], 'events' => []],
 
             // Recent incidents (last 5)
+            // Recent incidents (last 5) the viewer may read through the incident source rules: their Sites,
+            // assigned-only reach and HR-confidential privacy (Stephan, 26 Oct: "Yes, narrow them").
             'client_incidents' => $sectionAccess['incidents']
-                ? ClientIncident::where('client_id', $client->id)
-                    ->with(['reporter:id,name'])
-                    ->orderByDesc('occurred_at')
-                    ->limit(5)
-                    ->get()
+                ? $this->readableRecentIncidents($request->user(), (int) $client->id)
                 : null,
 
-            // First-aid treatments recorded for this client (read-only panel; gated on the
-            // first_aid_records.client_id FK added by the gold-standard rebuild).
+            // First-aid treatments recorded for this client (read-only panel), read through First Aid's own
+            // rules: the viewer's H&S Sites and the client's current Site, with links to the treatment pages.
             'first_aid_records' => $sectionAccess['first_aid']
                 && SchemaCache::hasTable('first_aid_records')
-                ? FirstAidRecord::where('client_id', $client->id)
-                    ->with(['site:id,name', 'firstAider:id,name'])
-                    ->orderByDesc('treatment_date')
-                    ->limit(10)
-                    ->get()
+                ? app(FirstAidSourceProjectionService::class)->forClient($request->user(), $client)
                 : [],
 
             'care_plans_summary' => $sectionAccess['care_plans'] ? [
@@ -1570,6 +1548,7 @@ class ClientController extends Controller
                 'create_communication_note' => $canCreateClientNote,
                 'pin_handover' => $request->user()?->canDo('timeline.pin') ?? false,
                 'manage_onboarding' => $onboardingAccess['manage_checklist'],
+                'prepare_support' => app(InternalSupportPreparation::class)->canPrepare($request->user(), $client),
                 'manage_onboarding_checklist' => $onboardingAccess['manage_checklist'],
                 'create_onboarding_workflow' => $onboardingAccess['create_workflow'],
                 'manage_family_notes' => $canManageFamilyNotes,
@@ -1720,7 +1699,8 @@ class ClientController extends Controller
             'transport' => $sectionAccess['transport']
                 ? Inertia::optional(fn () => $this->buildTransportData($client))
                 : null,
-            'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
+            // Read as the signed-in viewer: without one, events from incidents and treatment records are left out.
+            'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id, $request->user())),
             'safety' => ClientSafetyPayload::forClient(
                 $client,
                 includeMedical: $sectionAccess['medical'],
@@ -2391,84 +2371,9 @@ class ClientController extends Controller
 
     private function buildOnboardingChecklist(Client $client): array
     {
-        $overrides = $client->onboardingOverrides
-            ->keyBy('key')
-            ->map(fn ($o) => (bool) $o->value)
-            ->toArray();
+        $client->loadCount(ClientProfileChecklist::COUNTS);
 
-        $hasProfile = (bool) ($client->first_name && $client->last_name)
-            && (bool) $client->date_of_birth
-            && (bool) ($client->phone || $client->email)
-            && (bool) ($client->address_line_1 || $client->city || $client->postcode);
-
-        $items = [
-            [
-                'key' => 'profile',
-                'label' => 'Profile details',
-                'has_data' => $hasProfile,
-                'override' => (bool) ($overrides['profile'] ?? false),
-            ],
-            [
-                'key' => 'next_of_kin',
-                'label' => 'Next of kin / portal contacts',
-                'has_data' => $client->portalUsers->count() > 0,
-                'override' => (bool) ($overrides['next_of_kin'] ?? false),
-            ],
-            [
-                'key' => 'medications',
-                'label' => 'Medications',
-                'has_data' => $client->medications->count() > 0,
-                'override' => (bool) ($overrides['medications'] ?? false),
-            ],
-            [
-                'key' => 'conditions',
-                'label' => 'Medical conditions',
-                'has_data' => $client->conditions->count() > 0,
-                'override' => (bool) ($overrides['conditions'] ?? false),
-            ],
-            [
-                'key' => 'emergency_contacts',
-                'label' => 'Emergency contacts',
-                'has_data' => $client->emergencyContacts->count() > 0,
-                'override' => (bool) ($overrides['emergency_contacts'] ?? false),
-            ],
-            [
-                'key' => 'history',
-                'label' => 'History (assessments or support plan)',
-                'has_data' => ($client->assessments->count() > 0) || (bool) $client->supportPlan,
-                'override' => (bool) ($overrides['history'] ?? false),
-            ],
-            [
-                'key' => 'documents',
-                'label' => 'Documents',
-                'has_data' => $client->documents()->exists(),
-                'override' => (bool) ($overrides['documents'] ?? false),
-            ],
-            [
-                'key' => 'personal_assets',
-                'label' => 'Personal belongings registered',
-                'has_data' => $client->personalAssets()->exists(),
-                'override' => (bool) ($overrides['personal_assets'] ?? false),
-            ],
-        ];
-
-        $items = array_map(function ($i) {
-            $i['complete'] = (bool) ($i['has_data'] || $i['override']);
-
-            return $i;
-        }, $items);
-
-        $total = count($items);
-        $completed = count(array_filter($items, fn ($i) => $i['complete']));
-        $percent = $total > 0 ? (int) round(($completed / $total) * 100) : 0;
-
-        return [
-            'items' => $items,
-            'completed' => $completed,
-            'total' => $total,
-            'percent' => $percent,
-            'status' => $completed === $total ? 'complete' : 'incomplete',
-        ];
+        return app(ClientProfileChecklist::class)->build($client);
     }
 
     // public function show(Client $client)
@@ -2870,6 +2775,10 @@ class ClientController extends Controller
             'postcode' => $client->postcode ?? '',
             'create_client_portal_user' => false,
             'ethnicity' => $client->ethnicity ?? '',
+            'iwi' => $client->iwi ?? '',
+            'hapu' => $client->hapu ?? '',
+            'marae' => $client->marae ?? '',
+            'cultural_dietary_needs' => $client->cultural_dietary_needs ?? '',
             'languages' => $client->languages ?? [],
             'religion' => $client->religion ?? '',
             'mobility_needs' => $client->mobility_needs ?? '',
@@ -2943,6 +2852,15 @@ class ClientController extends Controller
         if ($request->hasAny(['medical', 'conditions', 'emergency_contacts'])) {
             $this->authorize('view', $client);
             $this->authorize('viewMedications', $client);
+        }
+
+        $submittedStart = $request->validated('service_start_date');
+        // Governed people (referral-originated, or everyone when the organisation requires it) record the date only through commencement.
+        if ($request->exists('service_start_date') && app(ReferralActivationGuard::class)->governsActivation($client)
+            && (filled($submittedStart) ? Carbon::parse($submittedStart)->toDateString() : null) !== $client->service_start_date?->toDateString()) {
+            throw ValidationException::withMessages([
+                'service_start_date' => 'The actual service-start date is recorded through the separate commencement review. It cannot be changed in the profile.',
+            ]);
         }
 
         try {
@@ -3028,7 +2946,7 @@ class ClientController extends Controller
             return redirect()
                 ->route('clients.index')
                 ->with('success', 'Client updated successfully.');
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             throw $e;
         } catch (\Throwable $e) {
             report($e);
@@ -3383,7 +3301,7 @@ class ClientController extends Controller
 
         // Medication transit logs: Medical section + controlled view (EA-022).
         $medicationLogs = $hasMedLogs
-            ? app(\App\Services\Medication\Transit\ClientTransportMedicationLogs::class)->forViewer($client, auth()->user())
+            ? app(ClientTransportMedicationLogs::class)->forViewer($client, auth()->user())
             : collect();
 
         // Client-scoped transport bookings (Book transport workflow)
@@ -3817,6 +3735,24 @@ class ClientController extends Controller
         }
 
         return back()->with('success', 'Panic acknowledged.');
+    }
+
+    /** The profile's recent incidents, read through the incident source rules (Codex's narrowing). */
+    private function readableRecentIncidents(User $viewer, int $clientId): array
+    {
+        return HealthSafetyReadContext::within($viewer, IncidentHsEventSourceReadService::PERMISSIONS,
+            fn (HealthSafetyReadContext $context): array => HealthSafetyReadMaterialisationProof::within($context,
+                function (HealthSafetyReadMaterialisationProof $proof) use ($context, $clientId): array {
+                    $query = $context->applyIncidentSourceScope(ClientIncident::query()->where('client_id', $clientId));
+                    $parent = (clone $query)->setEagerLoads([])->reorder()->select('client_incidents.reported_by');
+                    $query->with(['reporter' => function ($relation) use ($context, $parent, $proof): void {
+                        $relation->select(['users.id', 'users.name'])->whereIn('users.id', clone $parent);
+                        $context->reconsumeIncidentPredicate($relation->getQuery(), $parent);
+                        $proof->protect($relation->getQuery());
+                    }]);
+
+                    return $proof->protect($query)->orderByDesc('occurred_at')->orderByDesc('id')->limit(5)->get()->toArray();
+                }));
     }
 
     private function isTruthy(mixed $value): bool

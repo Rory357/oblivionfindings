@@ -21,11 +21,21 @@ use App\Services\Eligibility\AssignmentEligibilityDecision;
 use App\Services\Eligibility\EligibilityResult;
 use App\Services\ShiftReplacementService;
 use App\Services\ShiftStaffEligibilityService;
+use Illuminate\Database\Connection;
+use Illuminate\Database\DatabaseTransactionsManager;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 class JobBoardControllerTest extends TestCase
@@ -49,6 +59,7 @@ class JobBoardControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->prepareLegacyPhysicalRootFixture();
 
         config(['app.worker_timezone' => 'Pacific/Auckland']);
 
@@ -71,6 +82,311 @@ class JobBoardControllerTest extends TestCase
 
         $this->client = Client::factory()->create(['site_id' => $this->site->id]);
         $this->serviceContext = ServiceContext::factory()->create();
+        $this->activateLegacyPhysicalRootFixture();
+    }
+
+    public function test_posting_picker_is_scoped_and_redacts_searchable_private_fields_for_a_creator(): void
+    {
+        Queue::fake();
+        $creator = $this->userWithPermissions(['job_board.create'], ['role' => 'coordinator']);
+        $this->client->update(['first_name' => 'PrivateGiven', 'last_name' => 'PrivateFamily', 'suburb' => 'Public posting suburb']);
+        $shift = $this->shiftForSite();
+        $shift->update(['user_id' => null, 'location' => 'Private precise address']);
+        $foreign = $this->shiftForSite($this->foreignSite);
+        $before = $shift->fresh()->getRawOriginal();
+        $queue = Queue::pushedJobs();
+
+        $response = $this->actingAs($creator)->getJson(route('operations.job_board.postable_shifts', ['q' => 'Public posting suburb']))
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $shift->id)
+            ->assertJsonPath('data.0.can_post', true)->assertJsonPath('workerTimezone', 'Pacific/Auckland');
+        $this->assertStringNotContainsString('Private', $response->getContent());
+        $this->getJson(route('operations.job_board.postable_shifts', ['q' => 'PrivateGiven']))->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson(route('operations.job_board.postable_shifts', ['q' => $foreign->id]))->assertOk()->assertJsonCount(0, 'data');
+        $this->actingAs($this->manager)->getJson(route('operations.job_board.postable_shifts', ['q' => 'PrivateGiven', 'per_page' => 1]))
+            ->assertOk()->assertJsonPath('data.0.label', 'Support shift for PrivateGiven PrivateFamily');
+        $this->assertSame($before, $shift->fresh()->getRawOriginal());
+        $this->assertSame($queue, Queue::pushedJobs());
+        $this->assertDatabaseMissing('shift_open_positions', ['shift_id' => $shift->id]);
+    }
+
+    public function test_posting_picker_hidden_client_links_cannot_affect_search_or_pagination(): void
+    {
+        Queue::fake();
+        $reader = $this->userWithPermissions(['job_board.create', 'shifts.viewAny'], ['role' => 'coordinator']);
+        $this->client->update(['first_name' => 'LawfulPickerMatch', 'last_name' => 'Local']);
+        $lawful = $this->shiftForSite();
+        $lawful->update(['user_id' => null]);
+        $hidden = [];
+        for ($index = 0; $index < 2; $index++) {
+            $shift = $this->shiftForSite($this->foreignSite);
+            $shift->client->update(['first_name' => 'ForeignPickerSentinel', 'last_name' => 'Private']);
+            // Normal model writes retain safety/observers while arranging a malformed source.
+            $shift->update(['site_id' => $this->site->id, 'user_id' => null]);
+            $hidden[] = $shift;
+        }
+        $before = Shift::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $clientsBefore = Client::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $positionsBefore = ShiftOpenPosition::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $queue = Queue::pushedJobs();
+
+        $response = $this->actingAs($reader)->getJson(route('operations.job_board.postable_shifts', [
+            'q' => 'ForeignPickerSentinel', 'per_page' => 1,
+        ]))->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('has_more', false);
+        $this->assertStringNotContainsString('ForeignPickerSentinel', $response->getContent());
+        $this->getJson(route('operations.job_board.postable_shifts', [
+            'q' => 'LawfulPickerMatch', 'per_page' => 1,
+        ]))->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $lawful->id)
+            ->assertJsonPath('has_more', false);
+        $this->getJson(route('operations.job_board.postable_shifts', [
+            'q' => 'Picker', 'per_page' => 1,
+        ]))->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $lawful->id)
+            ->assertJsonPath('has_more', false);
+        $this->getJson(route('operations.job_board.postable_shifts', [
+            'q' => 'Picker', 'per_page' => 1, 'page' => 2,
+        ]))->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('has_more', false);
+        foreach ($hidden as $shift) {
+            $this->getJson(route('operations.job_board.postable_shifts', [
+                'q' => $shift->id, 'per_page' => 1,
+            ]))->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('has_more', false);
+        }
+        $this->assertSame($before, Shift::query()->orderBy('id')->get()->map->getRawOriginal()->all());
+        $this->assertSame($clientsBefore, Client::query()->orderBy('id')->get()->map->getRawOriginal()->all());
+        $this->assertSame($positionsBefore, ShiftOpenPosition::query()->orderBy('id')->get()->map->getRawOriginal()->all());
+        $this->assertSame($queue, Queue::pushedJobs());
+    }
+
+    public function test_posting_requires_matching_route_and_body_and_a_valid_optional_request_id(): void
+    {
+        Queue::fake();
+        $shift = $this->shiftForSite();
+        $queue = Queue::pushedJobs();
+        $this->actingAs($this->manager)->postJson(route('operations.job_board.create', $shift), ['shift_id' => $shift->id + 1])
+            ->assertUnprocessable()->assertJsonValidationErrors('shift_id');
+        $this->postJson(route('operations.job_board.create', $shift), ['shift_id' => $shift->id, 'request_id' => 'invalid'])
+            ->assertUnprocessable()->assertJsonValidationErrors('request_id');
+        $this->postJson(url('/operations/shifts/not-a-shift/open-position'), ['shift_id' => $shift->id])->assertNotFound();
+        $this->postJson(route('operations.job_board.create', $shift), ['shift_id' => $shift->id, 'request_id' => (string) Str::uuid()])
+            ->assertUnprocessable()->assertJsonValidationErrors('source_revision');
+        $revision = $this->getJson(route('operations.job_board.postable_shifts', ['q' => $shift->id]))
+            ->assertOk()->json('data.0.source_revision');
+        $this->assertMatchesRegularExpression('/\\A[0-9a-f]{64}\\z/', $revision);
+        $shift->update(['ends_at' => $shift->ends_at->copy()->addHour()]);
+        $before = $shift->fresh()->getRawOriginal();
+        $queue = Queue::pushedJobs();
+        $this->postJson(route('operations.job_board.create', $shift), [
+            'shift_id' => $shift->id, 'request_id' => (string) Str::uuid(), 'source_revision' => $revision,
+        ])->assertConflict()->assertSessionMissing('success');
+        $this->assertSame($before, $shift->fresh()->getRawOriginal());
+        $this->assertDatabaseMissing('shift_open_positions', ['shift_id' => $shift->id]);
+        $this->assertSame($queue, Queue::pushedJobs());
+    }
+
+    public function test_posting_rechecks_current_grant_instead_of_trusting_the_request_actor_cache(): void
+    {
+        Queue::fake();
+        $creator = $this->userWithPermissions(['job_board.create'], ['role' => 'coordinator']);
+        $shift = $this->shiftForSite();
+        $shift->update(['user_id' => null]);
+        $creator->load('roles.permissions', 'permissionOverrides');
+        $this->assertTrue($creator->canDo('job_board.create'));
+        $permission = Permission::where('key', 'job_board.create')->sole();
+        $creator->permissionOverrides()->updateExistingPivot($permission->id, ['allowed' => false]);
+        $this->assertTrue($creator->canDo('job_board.create'), 'The request actor still has its old loaded permission.');
+        $before = $shift->fresh()->getRawOriginal();
+        $queue = Queue::pushedJobs();
+        $this->actingAs($creator)->postJson(route('operations.job_board.create', $shift), ['shift_id' => $shift->id])->assertForbidden();
+        $missingId = (int) Shift::max('id') + 1;
+        $this->postJson(route('operations.job_board.create', ['shift' => $missingId]), ['shift_id' => $missingId])->assertForbidden();
+        $this->getJson(route('operations.job_board.postable_shifts'))->assertForbidden();
+        $this->assertSame($before, $shift->fresh()->getRawOriginal());
+        $this->assertDatabaseMissing('shift_open_positions', ['shift_id' => $shift->id]);
+        $this->assertSame($queue, Queue::pushedJobs());
+    }
+
+    public static function unavailablePostingStates(): array
+    {
+        return ['completed' => ['completed'], 'cancelled' => ['cancelled'], 'assigned without replacement' => ['scheduled']];
+    }
+
+    #[DataProvider('unavailablePostingStates')]
+    public function test_posting_refuses_terminal_or_assigned_duty_and_picker_explains_why(string $status): void
+    {
+        Queue::fake();
+        $shift = $this->shiftForSite(status: $status === 'completed' ? 'scheduled' : $status);
+        if ($status === 'completed') {
+            $shift->update(['actual_starts_at' => $shift->starts_at, 'status' => 'completed']);
+        }
+        $before = $shift->fresh()->getRawOriginal();
+        $queue = Queue::pushedJobs();
+        $this->actingAs($this->manager)->getJson(route('operations.job_board.postable_shifts', ['q' => $shift->id]))->assertOk()
+            ->assertJsonPath('data.0.can_post', false)
+            ->assertJsonPath('data.0.reason', $status === 'scheduled' ? 'request_cover_required' : 'terminal_shift');
+        $this->postJson(route('operations.job_board.create', $shift), ['shift_id' => $shift->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('shift_id');
+        $this->assertSame($before, $shift->fresh()->getRawOriginal());
+        $this->assertDatabaseMissing('shift_open_positions', ['shift_id' => $shift->id]);
+        $this->assertSame($queue, Queue::pushedJobs());
+    }
+
+    public static function expiredDuplicateStatuses(): array
+    {
+        return ['open' => ['open'], 'claimed' => ['claimed']];
+    }
+
+    #[DataProvider('expiredDuplicateStatuses')]
+    public function test_posting_picker_exposes_expired_active_duplicate_without_reposting(string $status): void
+    {
+        Queue::fake();
+        $shift = $this->shiftForSite();
+        $position = $this->positionForShift($shift, ['status' => $status, 'expires_at' => now()->subMinute(),
+            'claimed_by' => $status === 'claimed' ? $this->worker->id : null]);
+        $before = $position->fresh()->getRawOriginal();
+        $queue = Queue::pushedJobs();
+        $this->actingAs($this->manager)->getJson(route('operations.job_board.postable_shifts', ['q' => $shift->id]))->assertOk()
+            ->assertJsonPath('data.0.active_position.id', $position->id)->assertJsonPath('data.0.active_position.expired', true)
+            ->assertJsonPath('data.0.reason', 'duplicate');
+        $this->postJson(route('operations.job_board.create', $shift), ['shift_id' => $shift->id])->assertUnprocessable()
+            ->assertJsonPath('errors.shift_id.0', 'This shift already has an active open position.');
+        $this->assertSame($before, $position->fresh()->getRawOriginal());
+        $this->assertSame(1, ShiftOpenPosition::where('shift_id', $shift->id)->count());
+        $this->assertSame($queue, Queue::pushedJobs());
+    }
+
+    public static function supportedPostingSources(): array
+    {
+        return ['unassigned past remains supported' => [false], 'assigned active replacement remains supported' => [true]];
+    }
+
+    #[DataProvider('supportedPostingSources')]
+    public function test_posting_persists_exact_fields_but_nested_request_does_not_claim_commit(bool $assigned): void
+    {
+        Queue::fake();
+        $shift = $this->shiftForSite(startsAt: now()->subDays(2));
+        $replacement = null;
+        if ($assigned) {
+            $existing = $this->positionForShift($shift, ['status' => 'cancelled']);
+            $replacement = $existing->replacementRequest;
+            $replacement->update(['status' => ShiftReplacementService::REQUESTED, 'cancelled_by' => null, 'cancelled_at' => null]);
+        } else {
+            $shift->update(['user_id' => null]);
+        }
+        $shift->update(['coverage_roles' => ['driver']]);
+        $before = $shift->fresh()->getRawOriginal();
+        $replacementBefore = $replacement?->fresh()->getRawOriginal();
+        $queue = Queue::pushedJobs();
+        $expires = now()->addHour()->startOfSecond();
+        $revision = $this->actingAs($this->manager)->getJson(route('operations.job_board.postable_shifts', ['q' => $shift->id]))
+            ->assertOk()->json('data.0.source_revision');
+        $this->postJson(route('operations.job_board.create', $shift), ['shift_id' => $shift->id,
+            'request_id' => (string) Str::uuid(), 'source_revision' => $revision, 'required_skills' => ['Hoist', 'Hoist'],
+            'notes' => 'Exact posting intent', 'expires_at' => $expires->toISOString()])
+            ->assertStatus(202)->assertJsonPath('result', null)->assertSessionMissing('success');
+        $row = ShiftOpenPosition::where('shift_id', $shift->id)->where('status', 'open')->sole();
+        $this->assertSame($replacement?->id, $row->replacement_request_id);
+        $this->assertSame(['Hoist', 'Hoist'], $row->required_skills);
+        $this->assertSame(['driver'], $row->coverage_roles);
+        $this->assertSame('Exact posting intent', $row->notes);
+        $this->assertTrue($row->expires_at->equalTo($expires));
+        $this->assertSame($before, $shift->fresh()->getRawOriginal());
+        $this->assertSame($replacementBefore, $replacement?->fresh()->getRawOriginal());
+        $this->getJson(route('operations.job_board.postable_shifts', ['q' => $shift->id]))->assertOk()
+            ->assertJsonPath('data.0.active_position.id', $row->id)->assertJsonPath('data.0.reason', 'duplicate');
+        $this->assertSame($queue, Queue::pushedJobs());
+    }
+
+    public function test_posting_save_veto_and_changed_readback_are_not_reported_as_success(): void
+    {
+        Queue::fake();
+        $shift = $this->shiftForSite();
+        $shift->update(['user_id' => null]);
+        $before = $shift->fresh()->getRawOriginal();
+        $queue = Queue::pushedJobs();
+        $original = Model::getEventDispatcher();
+        foreach ([true, false] as $veto) {
+            $events = clone $original;
+            $events->listen('eloquent.saving: '.ShiftOpenPosition::class, function (ShiftOpenPosition $position) use ($veto) {
+                if ($veto) {
+                    return false;
+                }
+                $position->notes = 'Observer changed the request';
+            });
+            Model::setEventDispatcher($events);
+            try {
+                $this->actingAs($this->manager)->postJson(route('operations.job_board.create', $shift), ['shift_id' => $shift->id, 'notes' => 'Original intent'])
+                    ->assertUnprocessable()->assertJsonValidationErrors('shift_id')->assertSessionMissing('success');
+            } finally {
+                Model::setEventDispatcher($original);
+            }
+            $this->assertSame($before, $shift->fresh()->getRawOriginal());
+            $this->assertDatabaseMissing('shift_open_positions', ['shift_id' => $shift->id]);
+            $this->assertSame($queue, Queue::pushedJobs());
+        }
+    }
+
+    public function test_posting_propagates_a_real_storage_error_instead_of_calling_it_a_duplicate(): void
+    {
+        Queue::fake();
+        $shift = $this->shiftForSite();
+        $shift->update(['user_id' => null]);
+        $failure = new QueryException('mysql', 'INSERT INTO shift_open_positions', [], new \PDOException('Storage unavailable', 1205));
+        $original = Model::getEventDispatcher();
+        $events = clone $original;
+        $events->listen('eloquent.saving: '.ShiftOpenPosition::class, fn () => throw $failure);
+        $queue = Queue::pushedJobs();
+        Model::setEventDispatcher($events);
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->manager)->postJson(route('operations.job_board.create', $shift), ['shift_id' => $shift->id]);
+            $this->fail('The storage error must propagate.');
+        } catch (QueryException $actual) {
+            $this->assertSame($failure, $actual);
+        } finally {
+            Model::setEventDispatcher($original);
+        }
+        $this->assertDatabaseMissing('shift_open_positions', ['shift_id' => $shift->id]);
+        $this->assertSame($queue, Queue::pushedJobs());
+    }
+
+    #[DataProvider('claimCapabilityRoles')]
+    public function test_viewer_claim_capability_matches_existing_action_authority_without_hiding_eligible_cards(array $keys, bool $allowed): void
+    {
+        Queue::fake();
+        $viewer = $this->userWithPermissions($keys, ['role' => 'coordinator']);
+        $position = $this->positionForShift($this->shiftForSite());
+        $this->allowEligibility();
+        $state = static function (): array {
+            return collect(['shifts', 'shift_open_positions', 'shift_replacement_requests', 'coverage_reservations',
+                'timeline_events', 'audit_logs', 'notifications', 'workforce_eligibility_rechecks', 'workforce_eligibility_observations',
+                'shift_signals', 'shift_signal_outbox'])->mapWithKeys(static fn (string $table) => [
+                    $table => DB::table($table)->orderBy('id')->get()->map(static fn ($row) => (array) $row)->all(),
+                ])->all();
+        };
+        $before = $state();
+        $queue = collect(Queue::pushedJobs())->map(fn ($entries) => array_map(static fn ($entry) => [
+            'job' => serialize($entry['job']), 'queue' => $entry['queue'], 'data' => $entry['data'] ?? null,
+        ], $entries))->all();
+        $this->assertSame($allowed, $viewer->canDo('job_board.claim') || $viewer->canDo('shifts.viewAssigned') || $viewer->canDo('shifts.manageAny'));
+
+        $this->actingAs($viewer)->get(route('operations.job_board.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('operations/job-board/Index')->where('viewer.can_claim', $allowed)
+            ->where('jobs.data.0.id', $position->id)->where('jobs.data.0.viewer_eligibility.is_eligible', true));
+        if (! $allowed) {
+            $this->postJson(route('operations.job_board.claim', $position))->assertForbidden()->assertSessionMissing('success');
+        }
+        $this->assertSame($before, $state());
+        $this->assertSame($queue, collect(Queue::pushedJobs())->map(fn ($entries) => array_map(static fn ($entry) => [
+            'job' => serialize($entry['job']), 'queue' => $entry['queue'], 'data' => $entry['data'] ?? null,
+        ], $entries))->all());
+    }
+
+    public static function claimCapabilityRoles(): array
+    {
+        return ['Job Board read only' => [['job_board.viewAny'], false],
+            'Shift read only' => [['shifts.viewAny'], false],
+            'exact Job Board claim' => [['job_board.claim'], true],
+            'assigned Shift reader' => [['shifts.viewAssigned'], true],
+            'existing manager claim with board read' => [['job_board.viewAny', 'shifts.manageAny'], true],
+            'board read plus exact claim' => [['job_board.viewAny', 'job_board.claim'], true]];
     }
 
     public function test_index_returns_only_positions_at_an_accessible_site(): void
@@ -206,6 +522,24 @@ class JobBoardControllerTest extends TestCase
                 ->where('jobs.data.1.id', $later->id));
     }
 
+    public function test_index_card_date_and_times_use_the_worker_timezone(): void
+    {
+        config(['app.worker_timezone' => 'Pacific/Auckland']);
+        // 13:00–17:00 UTC on Saturday is 02:00–06:00 NZDT on Sunday.
+        $position = $this->positionForShift($this->shiftForSite(startsAt: Carbon::parse('2027-03-06T13:00:00Z')));
+
+        $this->allowEligibility();
+
+        $this->actingAs($this->manager)
+            ->get(route('operations.job_board.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('jobs.data.0.id', $position->id)
+                ->where('jobs.data.0.date', '2027-03-07')
+                ->where('jobs.data.0.start_time', '02:00')
+                ->where('jobs.data.0.end_time', '06:00'));
+    }
+
     public function test_index_includes_per_viewer_eligibility_for_each_open_card(): void
     {
         $position = $this->positionForShift($this->shiftForSite());
@@ -314,7 +648,7 @@ class JobBoardControllerTest extends TestCase
                 ->where('jobs.data.0.privacy.can_view_sensitive_details', false)
                 ->where('jobs.data.0.client.display_name', 'A. B.')
                 ->where('jobs.data.0.client.suburb', 'Kingsland')
-                ->where('jobs.data.0.replacement.reason', null)
+                ->missing('jobs.data.0.replacement.reason')
                 ->where('jobs.data.0.replacement.current_staff', null));
 
         $this->actingAs($this->manager)
@@ -323,8 +657,65 @@ class JobBoardControllerTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('jobs.data.0.privacy.can_view_sensitive_details', true)
                 ->where('jobs.data.0.client.display_name', 'Aroha Brown')
-                ->where('jobs.data.0.replacement.reason', 'Needs cover for readiness test')
+                ->missing('jobs.data.0.replacement.reason')
                 ->where('jobs.data.0.replacement.current_staff.name', $this->currentStaff->name));
+    }
+
+    public function test_replacement_cover_never_reveals_or_searches_the_absent_workers_reason(): void
+    {
+        $position = $this->positionForShift($this->shiftForSite());
+        $position->replacementRequest->forceFill(['reason' => 'Sick leave'])->save();
+        // Older replacement postings copied the reason into the posting notes.
+        $position->forceFill(['notes' => "Replacement needed\nReason: Sick leave"])->save();
+
+        $this->allowEligibility();
+
+        foreach ([$this->worker, $this->manager] as $viewer) {
+            $response = $this->actingAs($viewer)
+                ->get(route('operations.job_board.index', ['scope' => 'all']))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('jobs.data.0.id', $position->id)
+                    ->where('jobs.data.0.replacement.id', $position->replacement_request_id)
+                    ->missing('jobs.data.0.replacement.reason'));
+            $this->assertStringNotContainsString('Sick leave', $response->getContent());
+
+            // A search can't be used to find out why someone is away.
+            $this->actingAs($viewer)
+                ->get(route('operations.job_board.index', ['scope' => 'all', 'q' => 'Sick leave']))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('jobs.data', fn ($jobs) => collect($jobs)->pluck('id')->doesntContain($position->id)));
+        }
+    }
+
+    public function test_search_by_client_name_needs_the_same_access_as_seeing_the_name(): void
+    {
+        $this->client->update([
+            'first_name' => 'Aroha',
+            'last_name' => 'Brown',
+            'suburb' => 'Kingsland',
+        ]);
+        $position = $this->positionForShift($this->shiftForSite());
+
+        $this->allowEligibility();
+
+        $found = fn ($viewer, string $q) => $this->actingAs($viewer)
+            ->get(route('operations.job_board.index', ['scope' => 'all', 'q' => $q]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('jobs.data', fn ($jobs) => collect($jobs)->pluck('id')->contains($position->id)));
+        $notFound = fn ($viewer, string $q) => $this->actingAs($viewer)
+            ->get(route('operations.job_board.index', ['scope' => 'all', 'q' => $q]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('jobs.data', fn ($jobs) => collect($jobs)->pluck('id')->doesntContain($position->id)));
+
+        // A worker who sees "A. B." can't confirm who the shift is for by searching a name…
+        $notFound($this->worker, 'Brown');
+        $notFound($this->worker, 'Aroha');
+        // …but can still search the place shown on the card.
+        $found($this->worker, 'Kingsland');
+        // A manager who sees the full name can search it.
+        $found($this->manager, 'Brown');
     }
 
     public function test_create_position_refuses_a_shift_from_another_site(): void
@@ -1112,5 +1503,240 @@ class JobBoardControllerTest extends TestCase
             checked_rules: [],
             overrideable_warnings: [],
         );
+    }
+
+    // Only these retained success cases leave RefreshDatabase's outer wrapper.
+    private const LEGACY_ROOT_SUCCESS_METHODS = [
+        'test_claim_succeeds_for_an_eligible_worker_and_notifies_staff_and_managers',
+        'test_double_claim_attempts_leave_exactly_one_success_and_clear_feedback',
+        'test_approve_sets_assignee_fills_position_cancels_siblings_and_notifies',
+        // Its advisory-warning approval asserts the legacy success flash, which is
+        // only confirmed at a physical root (never inside the test's wrapper).
+        'test_approve_hard_block_is_422_and_warning_state_remains_advisory',
+        'test_approve_exception_is_safe_503_with_zero_side_effects_then_retry_and_replay_are_serialized',
+    ];
+
+    private const LEGACY_NESTED_METHOD = 'test_legacy_nested_warning_action_withholds_confirmation_until_outer_commit_or_rollback';
+
+    private ?Connection $legacyRootConnection = null;
+
+    private ?\PDO $legacyRootPdo = null;
+
+    private ?DatabaseTransactionsManager $legacyRootTestingManager = null;
+
+    private ?DatabaseTransactionsManager $legacyRootProductionManager = null;
+
+    private bool $legacyRootMayHaveCommitted = false;
+
+    protected function assertPreConditions(): void
+    {
+        parent::assertPreConditions();
+        if ($this->legacyRootProductionManager !== null) {
+            $this->assertLegacyRootIdle();
+        }
+    }
+
+    protected function assertPostConditions(): void
+    {
+        parent::assertPostConditions();
+        if ($this->legacyRootProductionManager === null) {
+            return;
+        }
+        $this->assertLegacyRootIdle();
+        if (in_array($this->name(), self::LEGACY_ROOT_SUCCESS_METHODS, true)) {
+            $this->assertLegacyRootCommittedTuples();
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        try {
+            if ($this->legacyRootMayHaveCommitted) {
+                $connection = $this->assertLegacyOwnedConnection();
+                DB::purge('job_board_legacy_root_observer');
+                while ($connection->transactionLevel() > 0) {
+                    $connection->rollBack();
+                }
+                $this->assertFalse($connection->getPdo()->inTransaction());
+                $this->assertNotNull($this->legacyRootTestingManager);
+                app()->instance('db.transactions', $this->legacyRootTestingManager);
+                $connection->setTransactionManager($this->legacyRootTestingManager);
+                // Let the existing RefreshDatabase callback close its own wrapper first.
+                $connection->beginTransaction();
+            }
+        } finally {
+            parent::tearDown();
+        }
+    }
+
+    private function prepareLegacyPhysicalRootFixture(): void
+    {
+        if (! in_array($this->name(), [...self::LEGACY_ROOT_SUCCESS_METHODS, self::LEGACY_NESTED_METHOD], true)) {
+            return;
+        }
+        $connection = $this->assertLegacyOwnedConnection();
+        $this->assertSame(1, $connection->transactionLevel());
+        $this->assertTrue($connection->getPdo()->inTransaction());
+        $this->assertInstanceOf(\Illuminate\Foundation\Testing\DatabaseTransactionsManager::class, app('db.transactions'));
+        $this->legacyRootConnection = $connection;
+        $this->legacyRootTestingManager = app('db.transactions');
+        $cleanup = CommittedFixtureCleanup::capture();
+        $this->beforeApplicationDestroyed(function () use ($cleanup): void {
+            // RefreshDatabase disconnects first; reconnect only the same owned schema.
+            $this->assertLegacyOwnedConnection();
+            $cleanup->restore();
+        });
+    }
+
+    private function activateLegacyPhysicalRootFixture(): void
+    {
+        if ($this->legacyRootConnection === null) {
+            return;
+        }
+        $connection = $this->assertLegacyOwnedConnection();
+        $this->assertSame($this->legacyRootConnection, $connection);
+        $this->assertSame(1, $connection->transactionLevel());
+        $this->assertTrue($connection->getPdo()->inTransaction());
+        // Commit can throw from a callback after SQL has committed: retain cleanup intent first.
+        $this->legacyRootMayHaveCommitted = true;
+        $connection->commit();
+        $this->legacyRootPdo = $connection->getPdo();
+        $this->legacyRootProductionManager = new DatabaseTransactionsManager;
+        app()->instance('db.transactions', $this->legacyRootProductionManager);
+        $connection->setTransactionManager($this->legacyRootProductionManager);
+        $this->assertLegacyRootIdle();
+    }
+
+    private function assertLegacyOwnedConnection(): Connection
+    {
+        $connection = DB::connection();
+        $this->assertTrue(app()->environment('testing'));
+        $this->assertSame('mysql', $connection->getDriverName());
+        $this->assertContains($connection->getConfig('host'), ['127.0.0.1', 'localhost']);
+        $this->assertSame(static::$isolatedMysqlDatabase, $connection->getDatabaseName());
+        $this->assertTrue(OwnedTestDatabase::isOwnedBy($connection->getDatabaseName(), getmypid()));
+        $connection->reconnectIfMissingConnection();
+        $this->assertSame($connection->getDatabaseName(), $connection->getPdo()->query('SELECT DATABASE()')->fetchColumn());
+        if ($this->legacyRootConnection !== null) {
+            $this->assertSame($this->legacyRootConnection, $connection);
+        }
+
+        return $connection;
+    }
+
+    private function assertLegacyRootIdle(): void
+    {
+        $connection = $this->assertLegacyOwnedConnection();
+        $this->assertSame($this->legacyRootPdo, $connection->getPdo());
+        $this->assertSame($this->legacyRootProductionManager, app('db.transactions'));
+        $this->assertSame(0, $connection->transactionLevel());
+        $this->assertFalse($connection->getPdo()->inTransaction());
+    }
+
+    private function legacyRootObserver(): Connection
+    {
+        $writer = $this->assertLegacyOwnedConnection();
+        $name = 'job_board_legacy_root_observer';
+        config(['database.connections.'.$name => [...$writer->getConfig(), 'name' => $name]]);
+        $observer = DB::connection($name);
+        $this->assertSame($name, $observer->getName());
+        $this->assertSame($writer->getDatabaseName(), $observer->getDatabaseName());
+        $this->assertTrue(OwnedTestDatabase::isOwnedBy($observer->getDatabaseName(), getmypid()));
+        $this->assertSame($observer->getDatabaseName(), $observer->getPdo()->query('SELECT DATABASE()')->fetchColumn());
+        $this->assertNotSame($writer->getPdo(), $observer->getPdo());
+        $this->assertSame(0, $observer->transactionLevel());
+        $this->assertFalse($observer->getPdo()->inTransaction());
+
+        return $observer;
+    }
+
+    private function assertLegacyRootCommittedTuples(): void
+    {
+        $approved = str_starts_with($this->name(), 'test_approve_');
+        $writer = $this->assertLegacyOwnedConnection();
+        $observer = $this->legacyRootObserver();
+        $shiftIds = $observer->table('shifts')->where('site_id', $this->site->id)->pluck('id');
+        $position = $observer->table('shift_open_positions')->whereIn('shift_id', $shiftIds)
+            ->where('status', $approved ? 'filled' : 'claimed')->where('claimed_by', $this->worker->id)->sole();
+        $shift = $observer->table('shifts')->where('id', $position->shift_id)->sole();
+        $replacement = $observer->table('shift_replacement_requests')->where('id', $position->replacement_request_id)->sole();
+        $this->assertSame((int) $this->site->id, (int) $shift->site_id);
+        $this->assertSame((int) $this->client->id, (int) $shift->client_id);
+        $this->assertSame((int) $this->worker->id, (int) $position->claimed_by);
+        $this->assertSame((int) $shift->id, (int) $replacement->shift_id);
+        $this->assertSame((int) $this->worker->id, (int) $replacement->replacement_user_id);
+        $this->assertSame($approved ? ShiftReplacementService::APPROVED : ShiftReplacementService::CLAIMED, $replacement->status);
+        $this->assertSame((int) ($approved ? $this->worker->id : $this->currentStaff->id), (int) $shift->user_id);
+        if ($approved) {
+            $this->assertSame((int) $this->manager->id, (int) $position->approved_by);
+            $this->assertSame((int) $this->manager->id, (int) $replacement->approved_by);
+        }
+        foreach (['shift_open_positions' => $position, 'shifts' => $shift, 'shift_replacement_requests' => $replacement] as $table => $row) {
+            // Complete stored tuples from a distinct, transaction-free physical PDO.
+            $this->assertSame((array) $row, (array) $writer->table($table)->where('id', $row->id)->sole());
+        }
+    }
+
+    #[DataProvider('legacyNestedActions')]
+    public function test_legacy_nested_warning_action_withholds_confirmation_until_outer_commit_or_rollback(string $action, bool $commit): void
+    {
+        Notification::fake();
+        $position = $this->positionForShift($this->shiftForSite(), $action === 'approve' ? [
+            'status' => 'claimed', 'claimed_by' => $this->worker->id, 'claimed_at' => now(),
+        ] : []);
+        // Existing Job Board warnings remain advisory: no new acknowledgement or reason.
+        $this->warnEligibility('Review the qualification warning before the duty.');
+        $writer = $this->assertLegacyOwnedConnection();
+        $observer = $this->legacyRootObserver();
+        $stored = static function (Connection $reader) use ($position): array {
+            return [
+                'position' => (array) $reader->table('shift_open_positions')->where('id', $position->id)->sole(),
+                'shift' => (array) $reader->table('shifts')->where('id', $position->shift_id)->sole(),
+                'replacement' => (array) $reader->table('shift_replacement_requests')->where('id', $position->replacement_request_id)->sole(),
+            ];
+        };
+        $before = $stored($observer);
+        $this->assertSame($before, $stored($writer));
+        $writer->beginTransaction();
+        $this->actingAs($action === 'claim' ? $this->worker : $this->manager)
+            ->from(route('operations.job_board.index'))
+            ->post(route('operations.job_board.'.$action, $position))
+            ->assertRedirect(route('operations.job_board.index'))
+            ->assertSessionMissing('success')
+            ->assertSessionMissing('job_board_claim_warnings')
+            ->assertSessionMissing('compliance_warnings');
+        $this->assertSame(1, $writer->transactionLevel());
+        $this->assertTrue($writer->getPdo()->inTransaction());
+        $this->assertSame($before, $stored($observer));
+        $this->assertNotSame($before, $stored($writer));
+        $this->assertSame($action === 'claim' ? 'claimed' : 'filled', $stored($writer)['position']['status']);
+        $commit ? $writer->commit() : $writer->rollBack();
+        $this->assertLegacyRootIdle();
+        $after = $stored($observer);
+        $this->assertSame($after, $stored($writer));
+        if ($commit) {
+            $this->assertNotSame($before, $after);
+            $this->assertSame($action === 'claim' ? 'claimed' : 'filled', $after['position']['status']);
+            $this->assertSame((int) $this->worker->id, (int) $after['position']['claimed_by']);
+            $this->assertSame($action === 'claim' ? ShiftReplacementService::CLAIMED : ShiftReplacementService::APPROVED, $after['replacement']['status']);
+            $this->assertSame((int) $this->worker->id, (int) $after['replacement']['replacement_user_id']);
+            $this->assertSame((int) ($action === 'claim' ? $this->currentStaff->id : $this->worker->id), (int) $after['shift']['user_id']);
+        } else {
+            $this->assertSame($before, $after);
+        }
+        // Completion of the enclosing owner never rewrites the prior HTTP response/session.
+        foreach (['success', 'job_board_claim_warnings', 'compliance_warnings'] as $key) {
+            $this->assertFalse(session()->has($key));
+        }
+    }
+
+    public static function legacyNestedActions(): array
+    {
+        return [
+            'claim outer commit' => ['claim', true],
+            'claim outer rollback' => ['claim', false],
+            'approve outer commit' => ['approve', true],
+            'approve outer rollback' => ['approve', false],
+        ];
     }
 }

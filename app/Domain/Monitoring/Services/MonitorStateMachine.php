@@ -67,23 +67,68 @@ final class MonitorStateMachine
     /** @return array{MonitorState, string, array<string, mixed>} */
     private function policyState(Monitor $monitor, ObservationInput $input): array
     {
-        $profile = $monitor->profile;
-        if ($input->value !== null && $profile->rising_threshold !== null) {
-            $value = (float) $input->value;
-            $rising = (float) $profile->rising_threshold;
-            $falling = $profile->falling_threshold === null ? $rising : (float) $profile->falling_threshold;
-            $evidence = ['value' => $value, 'rising_threshold' => $rising, 'falling_threshold' => $falling];
+        $threshold = $this->resolveThresholdPolicy($monitor);
+        $measured = $this->extractMetricValue($input, $threshold['metric_key']);
 
-            if ($value >= $rising) {
-                return [MonitorState::Failed, 'rising_threshold_exceeded', $evidence];
-            }
+        if ($measured !== null && ($threshold['critical_rising'] !== null || $threshold['warning_rising'] !== null)) {
+            $direction = $threshold['direction'];
+            $criticalRising = $threshold['critical_rising'];
+            $criticalFalling = $threshold['critical_falling'] ?? $criticalRising;
+            $warningRising = $threshold['warning_rising'];
+            $warningFalling = $threshold['warning_falling'] ?? $warningRising;
 
-            if ($monitor->current_state->isFailure() && $value > $falling) {
-                return [$monitor->current_state, 'hysteresis_hold', $evidence];
-            }
+            $evidence = array_filter([
+                'value' => $measured,
+                'metric_key' => $threshold['metric_key'],
+                'direction' => $direction,
+                'threshold_source' => $threshold['source'],
+                'threshold_rule_id' => $threshold['rule_id'],
+                'rising_threshold' => $criticalRising,
+                'falling_threshold' => $criticalFalling,
+                'warning_rising_threshold' => $warningRising,
+                'warning_falling_threshold' => $warningFalling,
+            ], fn (mixed $v): bool => $v !== null);
 
-            if ($monitor->current_state->isFailure() && $value <= $falling) {
-                return [MonitorState::Healthy, 'falling_threshold_cleared', $evidence];
+            if ($direction === 'below') {
+                if ($criticalRising !== null && $measured <= $criticalRising) {
+                    return [MonitorState::Failed, 'below_critical_threshold', $evidence];
+                }
+                if ($monitor->current_state === MonitorState::Failed
+                    && $criticalFalling !== null
+                    && $measured < $criticalFalling) {
+                    return [MonitorState::Failed, 'hysteresis_hold', $evidence];
+                }
+                if ($warningRising !== null && $measured <= $warningRising) {
+                    return [MonitorState::Degraded, 'below_warning_threshold', $evidence];
+                }
+                if ($monitor->current_state->isFailure()
+                    && $warningFalling !== null
+                    && $measured < $warningFalling) {
+                    return [MonitorState::Degraded, 'warning_hysteresis_hold', $evidence];
+                }
+                if ($monitor->current_state->isFailure()) {
+                    return [MonitorState::Healthy, 'falling_threshold_cleared', $evidence];
+                }
+            } else {
+                if ($criticalRising !== null && $measured >= $criticalRising) {
+                    return [MonitorState::Failed, 'rising_threshold_exceeded', $evidence];
+                }
+                if ($monitor->current_state === MonitorState::Failed
+                    && $criticalFalling !== null
+                    && $measured > $criticalFalling) {
+                    return [MonitorState::Failed, 'hysteresis_hold', $evidence];
+                }
+                if ($warningRising !== null && $measured >= $warningRising) {
+                    return [MonitorState::Degraded, 'warning_threshold_exceeded', $evidence];
+                }
+                if ($monitor->current_state->isFailure()
+                    && $warningFalling !== null
+                    && $measured > $warningFalling) {
+                    return [MonitorState::Degraded, 'warning_hysteresis_hold', $evidence];
+                }
+                if ($monitor->current_state->isFailure()) {
+                    return [MonitorState::Healthy, 'falling_threshold_cleared', $evidence];
+                }
             }
         }
 
@@ -93,6 +138,56 @@ final class MonitorStateMachine
         }
 
         return [$input->state, 'reported_state', []];
+    }
+
+    /**
+     * @return array{
+     *     source: string,
+     *     rule_id: ?int,
+     *     metric_key: ?string,
+     *     direction: string,
+     *     warning_rising: ?float,
+     *     warning_falling: ?float,
+     *     critical_rising: ?float,
+     *     critical_falling: ?float
+     * }
+     */
+    private function resolveThresholdPolicy(Monitor $monitor): array
+    {
+        if ($monitor->exists && Monitor::getConnectionResolver() !== null) {
+            return app(EffectiveMonitoringPolicyResolver::class)->resolveThreshold($monitor);
+        }
+
+        $profile = $monitor->profile;
+        $direction = in_array($profile?->threshold_direction ?? 'above', ['above', 'below'], true)
+            ? (string) ($profile?->threshold_direction ?? 'above')
+            : 'above';
+
+        return [
+            'source' => 'profile',
+            'rule_id' => $profile?->id ? (int) $profile->id : null,
+            'metric_key' => null,
+            'direction' => $direction,
+            'warning_rising' => $profile?->warning_rising_threshold === null ? null : (float) $profile->warning_rising_threshold,
+            'warning_falling' => $profile?->warning_falling_threshold === null ? null : (float) $profile->warning_falling_threshold,
+            'critical_rising' => $profile?->rising_threshold === null ? null : (float) $profile->rising_threshold,
+            'critical_falling' => $profile?->falling_threshold === null ? null : (float) $profile->falling_threshold,
+        ];
+    }
+
+    private function extractMetricValue(ObservationInput $input, ?string $metricKey): ?float
+    {
+        if ($metricKey === null || $metricKey === '' || $metricKey === 'value') {
+            return $input->value === null ? null : (float) $input->value;
+        }
+        if ($metricKey === 'latency_ms') {
+            return $input->latencyMs === null ? null : (float) $input->latencyMs;
+        }
+        $candidate = $input->metrics[$metricKey] ?? null;
+
+        return is_int($candidate) || is_float($candidate) || (is_string($candidate) && is_numeric($candidate))
+            ? (float) $candidate
+            : null;
     }
 
     /** @return null|array{MonitorState, string, array<string, mixed>} */

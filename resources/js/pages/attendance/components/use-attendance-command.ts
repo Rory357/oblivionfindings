@@ -113,7 +113,10 @@ export function attendanceReceipt(
     return { status: 'unknown', message: UNKNOWN };
 }
 
-export function attendanceTimesheetMessage(receipt: AttendanceResult): string {
+export function attendanceTimesheetMessage(
+    receipt: Pick<AttendanceResult, 'timesheet_sync_outcome' | 'timesheet_id' | 'timesheet_status'>,
+    recordLabel: 'Attendance' | 'Time entry' = 'Attendance',
+): string {
     switch (receipt.timesheet_sync_outcome) {
         case 'created':
             return (
@@ -130,7 +133,7 @@ export function attendanceTimesheetMessage(receipt: AttendanceResult): string {
                 ') for payroll review.'
             );
         case 'skipped_follow_up':
-            return 'Attendance was saved, but the timesheet was not changed. Ask a coordinator to review the payroll follow-up.';
+            return `${recordLabel} was saved, but the timesheet was not changed. Ask a coordinator to review the payroll follow-up.`;
         default:
             return 'No timesheet change was confirmed for this action.';
     }

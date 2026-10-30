@@ -5,6 +5,7 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\ClientAssignmentController;
 // Existing controllers (root namespace)
+use App\Http\Controllers\ClientContactPreferencesController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientDocumentController;
 use App\Http\Controllers\ClientIncidentController;
@@ -25,8 +26,8 @@ use App\Http\Controllers\Clinical\ClientSleepChartController;
 use App\Http\Controllers\CoverageGapController;
 use App\Http\Controllers\CoverageReservationController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
-use App\Http\Controllers\Operations\ActivityFeedController;
 // New Operations controllers
+use App\Http\Controllers\Operations\ActivityFeedController;
 use App\Http\Controllers\Operations\CareNoteTemplateController;
 use App\Http\Controllers\Operations\CarePlanController;
 use App\Http\Controllers\Operations\CarePlanGoalController;
@@ -52,6 +53,7 @@ use App\Http\Controllers\Operations\FamilyPortalController;
 use App\Http\Controllers\Operations\FundingClaimController;
 use App\Http\Controllers\Operations\FundingController;
 use App\Http\Controllers\Operations\GeofenceController;
+use App\Http\Controllers\Operations\HandoverCommandController;
 use App\Http\Controllers\Operations\HandoverController;
 use App\Http\Controllers\Operations\JobBoardController;
 use App\Http\Controllers\Operations\MessageController;
@@ -66,8 +68,8 @@ use App\Http\Controllers\Operations\RosterTemplateController;
 use App\Http\Controllers\Operations\ServiceAgreementController;
 use App\Http\Controllers\Operations\ShiftNoteController;
 use App\Http\Controllers\Operations\ShiftReportController;
-use App\Http\Controllers\Operations\WorkforceSettingsController;
 use App\Http\Controllers\Operations\WorkforceEligibilityRefreshController;
+use App\Http\Controllers\Operations\WorkforceSettingsController;
 use App\Http\Controllers\RosteringController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
@@ -293,6 +295,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::put('/clients/{client}', [ClientController::class, 'update'])
             ->whereNumber('client')
             ->name('operations.clients.update');
+        Route::put('/clients/{client}/contact-preferences', [ClientContactPreferencesController::class, 'update'])
+            ->whereNumber('client')->name('operations.clients.contact-preferences.update');
         Route::patch('/clients/{client}/quick-update', [ClientController::class, 'quickUpdate'])->name('operations.clients.quick_update');
 
         // Archive (soft-delete) / restore — drives the index "Archive client" action
@@ -915,6 +919,15 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Handovers (NEW)
     // -------------------------------------------------------------------------
 
+    // Operations checked commands: current action authority is owned by the command preflight.
+    Route::get('/shifts/{shift}/handover-command-source', [HandoverCommandController::class, 'source'])
+        ->middleware('permission:handovers.create|handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')->name('operations.handover_commands.source');
+    Route::post('/shifts/{shift}/handover-commands', [HandoverCommandController::class, 'create'])->name('operations.handover_commands.create');
+    Route::put('/shifts/{shift}/handovers/{handover}/command', [HandoverCommandController::class, 'update'])->name('operations.handover_commands.update');
+    Route::patch('/shifts/{shift}/handovers/{handover}/command/submit', [HandoverCommandController::class, 'submit'])->name('operations.handover_commands.submit');
+    Route::get('/shifts/{shift}/handover-attempts/{requestId}', [HandoverCommandController::class, 'lookup'])
+        ->middleware('permission:handovers.create|handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')->name('operations.handover_commands.lookup');
+
     Route::get('/handovers', [HandoverController::class, 'index'])
         ->middleware('permission:handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('operations.handovers.index');
@@ -1246,6 +1259,16 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::get('/job-board', [JobBoardController::class, 'index'])
         ->middleware('permission:job_board.viewAny|job_board.claim|shifts.viewAny|shifts.viewAssigned')
         ->name('operations.job_board.index');
+    Route::get('/job-board/alerts/preference', [JobBoardController::class, 'alertPreference'])
+        ->middleware('permission:job_board.viewAny|job_board.claim|shifts.viewAny|shifts.viewAssigned')
+        ->name('operations.job_board.alerts.preference');
+    Route::get('/job-board/{position}/action-source', [JobBoardController::class, 'actionSource'])
+        ->whereNumber('position')
+        ->middleware('permission:job_board.claim|shifts.viewAssigned|shifts.manageAny|job_board.approve')
+        ->name('operations.job_board.action_source');
+    Route::get('/job-board/postable-shifts', [JobBoardController::class, 'postingShifts'])
+        ->middleware('permission:job_board.create|shifts.manageAny')
+        ->name('operations.job_board.postable_shifts');
     Route::post('/job-board/alerts/toggle', [JobBoardController::class, 'toggleAlerts'])
         ->middleware('permission:job_board.viewAny|job_board.claim|shifts.viewAny|shifts.viewAssigned')
         ->name('operations.job_board.alerts.toggle');
@@ -1256,6 +1279,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:job_board.approve|shifts.manageAny')
         ->name('operations.job_board.approve');
     Route::post('/shifts/{shift}/open-position', [JobBoardController::class, 'createPosition'])
+        ->whereNumber('shift')
         ->middleware('permission:job_board.create|shifts.manageAny')
         ->name('operations.job_board.create');
 

@@ -8,12 +8,14 @@
  *
  * Submit chaining: a meeting always belongs to a committee. When the user picks
  * an EXISTING committee we POST straight to /committees/{id}/meetings. When they
- * choose to create a NEW committee we first POST /committees (which flashes
- * `created_committee_id` back on the redirect) and then, in onSuccess, read that
- * id off the fresh page props and POST the meeting against it — a two-request
- * chain. See `deviations` for the limitation this implies.
+ * choose a NEW committee we POST it with its first meeting to /committees.
+ * Database atomicity and notification delivery remain server responsibilities.
  *
  * NZ English, semantic design tokens only. */
+import {
+    ActualEventTimeField,
+    actualEventInstant,
+} from '@/components/clinical/actual-event-time-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -40,6 +42,11 @@ import {
     WP_BASE,
     fmtDateTime,
 } from '@/components/worker-participation/shared';
+import {
+    WORKER_TIMEZONE,
+    toDateInput,
+    workerTimeOffsets,
+} from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import {
     Building2,
@@ -96,6 +103,7 @@ type WizardState = {
     new_member_ids: number[];
     // meeting fields
     scheduled_at: string;
+    scheduled_offset: string;
     location: string;
     agenda_items: string[];
     attendee_ids: number[];
@@ -138,9 +146,10 @@ function initialState(): WizardState {
         new_name: '',
         new_site_id: '',
         new_frequency: 'quarterly',
-        new_established_at: new Date().toISOString().slice(0, 10),
+        new_established_at: toDateInput(new Date()),
         new_member_ids: [],
         scheduled_at: '',
+        scheduled_offset: '',
         location: '',
         agenda_items: [],
         attendee_ids: [],
@@ -170,6 +179,12 @@ function validateStep(key: StepKey, d: WizardState): Record<string, string> {
     if (key === 'schedule') {
         if (!d.scheduled_at)
             e.scheduled_at = 'A meeting date & time is required';
+        else if (!actualEventInstant(d.scheduled_at, d.scheduled_offset)) {
+            if (workerTimeOffsets(d.scheduled_at).length > 1)
+                e.scheduled_offset =
+                    'Choose which occurrence of this repeated time to use.';
+            else e.scheduled_at = 'Choose a valid New Zealand date and time.';
+        }
     }
     return e;
 }
@@ -187,6 +202,8 @@ const STEP_FOR_FIELD: Record<string, StepKey> = {
     established_at: 'committee',
     members: 'committee',
     scheduled_at: 'schedule',
+    scheduled_offset: 'schedule',
+    scheduled_timezone: 'schedule',
     location: 'schedule',
     agenda_items: 'schedule',
     attendees: 'attendees',
@@ -295,7 +312,7 @@ export function ScheduleMeetingWizard({
                 : !!data.new_name.trim(),
             data.mode === 'existing' || !!data.new_site_id,
             data.mode === 'existing' || data.new_member_ids.length > 0,
-            !!data.scheduled_at,
+            !!actualEventInstant(data.scheduled_at, data.scheduled_offset),
             !!data.location.trim(),
             data.agenda_items.length > 0,
             data.attendee_ids.length > 0,
@@ -311,6 +328,8 @@ export function ScheduleMeetingWizard({
             `${WP_BASE}/committees/${committeeId}/meetings`,
             {
                 scheduled_at: data.scheduled_at,
+                scheduled_timezone: WORKER_TIMEZONE,
+                scheduled_offset: data.scheduled_offset || null,
                 location: data.location || null,
                 agenda_items: data.agenda_items
                     .map((a) => a.trim())
@@ -354,7 +373,7 @@ export function ScheduleMeetingWizard({
             return;
         }
 
-        // New committee + its first meeting in ONE atomic request (storeCommittee
+        // New committee + its first meeting in one request (storeCommittee
         // accepts schedule_meeting) — avoids a fragile two-POST chain across an
         // Inertia redirect that could create the committee but drop the meeting.
         router.post(
@@ -367,6 +386,8 @@ export function ScheduleMeetingWizard({
                 members: data.new_member_ids,
                 schedule_meeting: true,
                 scheduled_at: data.scheduled_at,
+                scheduled_timezone: WORKER_TIMEZONE,
+                scheduled_offset: data.scheduled_offset || null,
                 location: data.location || null,
                 agenda_items: data.agenda_items
                     .map((a) => a.trim())
@@ -718,14 +739,17 @@ function StepSchedule({
                 blurb="Set the date, time and location, and outline the agenda so attendees know what to expect."
             />
             <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Date & time" required error={errors.scheduled_at}>
-                    <Input
-                        type="datetime-local"
-                        value={data.scheduled_at}
-                        onChange={(e) => set('scheduled_at', e.target.value)}
-                        aria-invalid={!!errors.scheduled_at}
-                    />
-                </Field>
+                <ActualEventTimeField
+                    id="meeting-schedule"
+                    label="Meeting date & time"
+                    value={data.scheduled_at}
+                    offset={data.scheduled_offset}
+                    error={errors.scheduled_at || errors.scheduled_offset}
+                    onChange={(value, offset) => {
+                        set('scheduled_at', value);
+                        set('scheduled_offset', offset);
+                    }}
+                />
                 <Field label="Location" hint="room, site or video link">
                     <div className="relative">
                         <MapPin className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -948,7 +972,12 @@ function StepReview({
                         {committeeName} · meeting
                     </div>
                     <div className="text-[13px] text-muted-foreground">
-                        {fmtDateTime(data.scheduled_at)}
+                        {fmtDateTime(
+                            actualEventInstant(
+                                data.scheduled_at,
+                                data.scheduled_offset,
+                            ),
+                        )}
                         {data.location ? ` · ${data.location}` : ''}
                     </div>
                 </div>
@@ -1006,7 +1035,12 @@ function StepReview({
                 >
                     <ReviewRow
                         label="Date & time"
-                        value={fmtDateTime(data.scheduled_at)}
+                        value={fmtDateTime(
+                            actualEventInstant(
+                                data.scheduled_at,
+                                data.scheduled_offset,
+                            ),
+                        )}
                     />
                     <ReviewRow label="Location" value={data.location} />
                     <ReviewRow

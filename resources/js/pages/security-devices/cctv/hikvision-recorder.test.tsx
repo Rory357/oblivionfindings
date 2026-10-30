@@ -26,8 +26,33 @@ vi.mock('./live-transport', () => ({
     cctvSourceJson: vi.fn(),
 }));
 vi.mock('@/layouts/app-layout', () => ({
-    default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
+    default: ({
+        breadcrumbs = [],
+        children,
+    }: {
+        breadcrumbs?: { title: string; href?: string }[];
+        children: ReactNode;
+    }) => (
+        <main>
+            <nav aria-label="Breadcrumbs">
+                {breadcrumbs.map((crumb) =>
+                    crumb.href ? (
+                        <a key={crumb.title} href={crumb.href}>
+                            {crumb.title}
+                        </a>
+                    ) : (
+                        <span key={crumb.title}>{crumb.title}</span>
+                    ),
+                )}
+            </nav>
+            {children}
+        </main>
+    ),
 }));
+const trail = () =>
+    [...screen.getByRole('navigation', { name: 'Breadcrumbs' }).children].map(
+        (crumb) => [crumb.textContent, crumb.getAttribute('href')],
+    );
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
     Link: ({ href, children }: { href: string; children: ReactNode }) => (
@@ -168,6 +193,25 @@ describe('closed recorder browser contracts', () => {
         expect(() =>
             recorderSetupReply(t, t.actor_id, t.recorder_id),
         ).toThrow();
+    });
+});
+describe('recorder information placement', () => {
+    it('roots the trail at Home and follows the sidebar to All devices and the recorder', () => {
+        const s = recorderFixture();
+        mocks.json.mockImplementation(
+            async (_d: number, _a: number, path: string) =>
+                path.includes('/setup')
+                    ? directory(s, path)
+                    : recorderResult(s),
+        );
+        render(<SourcePage {...s} />);
+        expect(trail()).toEqual([
+            ['Home', '/dashboard'],
+            ['Security & Devices', '/security-devices'],
+            ['All devices', '/security-devices/devices'],
+            ['Aurora recorder', '/security-devices/devices/42'],
+            ['Recorder information', null],
+        ]);
     });
 });
 describe('reviewed recorder information journey', () => {

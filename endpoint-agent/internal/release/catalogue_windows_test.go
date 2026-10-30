@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func TestCatalogueCannotPublishActualUnsignedWindowsInstaller(t *testing.T) {
+func TestCataloguePublishesUnsignedWindowsInstallerWithSignedManifestAndRejectsWrongArchitecture(t *testing.T) {
 	source, output, spec, key, packageKey := catalogueFixture(t)
 	filename, err := os.Executable()
 	if err != nil {
@@ -23,16 +23,29 @@ func TestCatalogueCannotPublishActualUnsignedWindowsInstaller(t *testing.T) {
 		t.Fatal(err)
 	}
 	hash := sha256.Sum256(bytes)
-	a := DownloadArtifact{"windows-computer-setup", "windows", runtime.GOARCH, []string{"computer"}, "1.2.3", 7, "oblivion-setup.exe", int64(len(bytes)), hex.EncodeToString(hash[:])}
-	spec.Artifacts = []DownloadArtifact{a}
-	if err = os.WriteFile(filepath.Join(source, a.Filename), bytes, 0600); err != nil {
+	other := "arm64"
+	if runtime.GOARCH == "arm64" {
+		other = "amd64"
+	}
+	wrongArch := DownloadArtifact{"windows-computer-setup", "windows", other, []string{"computer"}, "1.2.3", 7, "oblivion-setup.exe", int64(len(bytes)), hex.EncodeToString(hash[:])}
+	spec.Artifacts = []DownloadArtifact{wrongArch}
+	if err = os.WriteFile(filepath.Join(source, wrongArch.Filename), bytes, 0600); err != nil {
 		t.Fatal(err)
 	}
-	signer := &catalogueSigner{key: key}
-	if _, err = buildCatalogueFixture(context.Background(), source, output, spec, signer, key, packageKey); err == nil || signer.calls != 0 {
-		t.Fatal("unsigned PE was advertised as accepted", err)
+	mismatchSigner := &catalogueSigner{key: key}
+	if _, err = BuildCatalogue(context.Background(), source, output, spec, mismatchSigner, key.Public().(ed25519.PublicKey), packageKey.Public().(ed25519.PublicKey), time.Now()); err == nil || mismatchSigner.calls != 0 {
+		t.Fatal("wrong-architecture PE installer was advertised as accepted", err)
 	}
 	assertNoCatalogueOutput(t, output)
+
+	valid := wrongArch
+	valid.Architecture = runtime.GOARCH
+	spec.Artifacts = []DownloadArtifact{valid}
+	signer := &catalogueSigner{key: key}
+	result, err := BuildCatalogue(context.Background(), source, output, spec, signer, key.Public().(ed25519.PublicKey), packageKey.Public().(ed25519.PublicKey), time.Now())
+	if err != nil || signer.calls != 1 || result.CatalogueSHA256 == "" {
+		t.Fatal("unsigned PE installer failed signed catalogue build", err)
+	}
 }
 
 func TestCatalogueHoldsAllVerifiedArtifactsAgainstWritesUntilCommit(t *testing.T) {

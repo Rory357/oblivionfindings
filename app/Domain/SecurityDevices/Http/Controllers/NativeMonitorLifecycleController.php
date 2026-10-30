@@ -90,6 +90,7 @@ final class NativeMonitorLifecycleController extends Controller
             ...$this->identityRules(),
             'review_token' => $updating ? ['required_with:request_uuid', 'string', 'regex:/^[0-9a-f]{64}$/D'] : ['prohibited'],
             'device_id' => $updating ? ['prohibited'] : ['required', 'integer', 'min:1'],
+            'collector_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'profile_id' => [...$sometimes, 'integer', 'min:1'],
             'kind' => $updating
                 ? ['prohibited']

@@ -3,10 +3,12 @@
 namespace App\Domain\Monitoring\Services;
 
 use App\Domain\Monitoring\Contracts\CredentialLeaseProvider;
+use App\Domain\Monitoring\Data\CredentialLease;
 use App\Domain\Monitoring\Discovery\Services\DiscoveryRunner;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
@@ -54,33 +56,72 @@ final readonly class CollectorConfigurationService
                     512,
                 ))),
             );
-            foreach ($discoveryRuns as $run) {
+            foreach ($discoveryRuns as $index => $run) {
                 $cidrs = [...$cidrs, ...($run['cidrs'] ?? [])];
                 $protocols = [...$protocols, ...($run['protocols'] ?? [])];
+                $runDeviceId = 'discovery:'.strtolower((string) $run['id']);
+                $snmpReference = $run['snmp_credential_reference'] ?? null;
+                unset($discoveryRuns[$index]['snmp_credential_reference']);
+                if (is_string($snmpReference)
+                    && $snmpReference !== ''
+                    && is_string(($run['cidrs'] ?? [])[0] ?? null)) {
+                    $lease = $this->acquireDiscoverySnmpLease((int) $run['site_id'], $snmpReference);
+                    if ($lease !== null) {
+                        $discoveryRuns[$index]['snmp_lease'] = $this->credentialSealer->seal(
+                            $locked,
+                            $runDeviceId,
+                            'snmp',
+                            (string) $run['cidrs'][0],
+                            $lease,
+                            (int) $run['site_id'],
+                        );
+                    }
+                }
+
+                $unifiReference = $run['unifi_credential_reference'] ?? null;
+                unset($discoveryRuns[$index]['unifi_credential_reference']);
+                if (is_string($unifiReference)
+                    && $unifiReference !== ''
+                    && is_string(($run['cidrs'] ?? [])[0] ?? null)) {
+                    $lease = $this->acquireDiscoveryUnifiLease((int) $run['site_id'], $unifiReference);
+                    if ($lease !== null) {
+                        $discoveryRuns[$index]['unifi_lease'] = $this->credentialSealer->seal(
+                            $locked,
+                            $runDeviceId,
+                            'https',
+                            (string) $run['cidrs'][0],
+                            $lease,
+                            (int) $run['site_id'],
+                        );
+                    }
+                }
             }
+            $authorisedSiteIds = $locked->authorisedSiteIds();
+            $coveredSiteIds = $locked->coveredSiteIds();
             Monitor::query()
                 ->with(['profile:id,is_active,interval_seconds', 'device:id'])
                 ->where('collector_id', $locked->id)
                 ->where('is_enabled', true)
                 ->orderBy('id')
                 ->get()
-                ->each(function (Monitor $monitor) use ($locked, &$checks, &$devices, &$cidrs, &$protocols): void {
+                ->each(function (Monitor $monitor) use ($locked, $authorisedSiteIds, &$checks, &$devices, &$cidrs, &$protocols): void {
                     if ($monitor->profile === null || ! $monitor->profile->is_active) {
                         return;
                     }
                     try {
-                        if ($this->sites->resolve((int) $monitor->device_id) !== (int) $locked->site_id) {
+                        $monitorSiteId = $this->sites->resolve((int) $monitor->device_id);
+                        if (! in_array($monitorSiteId, $authorisedSiteIds, true)) {
                             return;
                         }
-                        $check = $this->check($locked, $monitor);
-                    } catch (RuntimeException) {
+                        $check = $this->check($locked, $monitor, $monitorSiteId);
+                    } catch (\Throwable) {
                         return;
                     }
                     if ($check === null) {
                         return;
                     }
                     $deviceId = (string) $monitor->device_id;
-                    $target = (string) $monitor->target;
+                    $target = (string) $check['target'];
                     $devices[$deviceId] ??= [];
                     $devices[$deviceId][] = $target;
                     $devices[$deviceId] = array_values(array_unique($devices[$deviceId]));
@@ -169,6 +210,7 @@ final readonly class CollectorConfigurationService
                             min(1000, (int) config('monitoring.collector.default_packets_per_second', 50)),
                         ),
                     ],
+                    ...($coveredSiteIds === [] ? [] : ['covered_site_ids' => $coveredSiteIds]),
                 ],
                 'checks' => $checks,
             ];
@@ -199,13 +241,21 @@ final readonly class CollectorConfigurationService
     }
 
     /** @return array<string, mixed>|null */
-    private function check(MonitoringCollector $collector, Monitor $monitor): ?array
+    private function check(MonitoringCollector $collector, Monitor $monitor, int $monitorSiteId): ?array
     {
-        $target = trim((string) $monitor->target);
+        $kind = $monitor->kind instanceof MonitorKind ? $monitor->kind : MonitorKind::tryFrom((string) $monitor->kind);
+        $rawTarget = trim((string) $monitor->target);
+        $target = $rawTarget;
+        if (filter_var($target, FILTER_VALIDATE_IP) === false
+            && in_array($kind, [MonitorKind::Http, MonitorKind::WinRmInventory], true)) {
+            $parsedHost = trim((string) parse_url($rawTarget, PHP_URL_HOST), '[]');
+            if ($parsedHost !== '') {
+                $target = $parsedHost;
+            }
+        }
         if (filter_var($target, FILTER_VALIDATE_IP) === false) {
             return null;
         }
-        $kind = $monitor->kind instanceof MonitorKind ? $monitor->kind : MonitorKind::tryFrom((string) $monitor->kind);
         $protocol = match ($kind) {
             MonitorKind::Icmp => 'icmp',
             MonitorKind::Tcp => 'tcp',
@@ -252,7 +302,7 @@ final readonly class CollectorConfigurationService
                 return null;
             }
             $lease = $this->credentials->acquire(
-                (int) $collector->site_id,
+                $monitorSiteId,
                 $reference,
                 ["monitoring.collector.{$protocol}.read"],
             );
@@ -262,10 +312,55 @@ final readonly class CollectorConfigurationService
                 $protocol,
                 $target,
                 $lease,
+                $monitorSiteId,
             );
         }
 
         return $check;
+    }
+
+    private function acquireDiscoverySnmpLease(int $siteId, string $reference): ?CredentialLease
+    {
+        foreach ([['monitoring.collector.snmp.read'], ['snmp:v3:auth_priv'], ['snmp:v2c:compatibility']] as $capabilities) {
+            try {
+                return $this->credentials->acquire($siteId, $reference, $capabilities);
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
+    }
+
+    private function acquireDiscoveryUnifiLease(int $siteId, string $reference): ?CredentialLease
+    {
+        $candidateSets = [
+            ['monitoring.collector.unifi.read'],
+            ['unifi.network.read'],
+            ['monitoring.collector.https.read'],
+            ['discovery.topology.read'],
+        ];
+
+        $storedCapabilities = CredentialReference::query()
+            ->where('site_id', $siteId)
+            ->where('reference_key', $reference)
+            ->value('capabilities');
+        if (is_array($storedCapabilities)) {
+            foreach ($storedCapabilities as $capability) {
+                if (is_string($capability)
+                    && preg_match('/\b(unlock|disarm|arm|write|delete|reboot|exec)\b/i', $capability) !== 1) {
+                    $candidateSets[] = [$capability];
+                }
+            }
+        }
+
+        foreach ($candidateSets as $capabilities) {
+            try {
+                return $this->credentials->acquire($siteId, $reference, $capabilities);
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed>|null $config */

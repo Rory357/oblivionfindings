@@ -37,7 +37,8 @@ beforeEach(function () {
     $this->other->roles()->attach(Role::where('name', 'support_worker')->sole());
     ensureCanonicalHrStaffProfile($this->other, $this->site);
     $this->publisher = app(HubPublishing::class);
-    $this->page = $this->publisher->create($this->editor, 'knowledge', 'A resource with corrections', 'guide');
+    // Starter templates begin with unfinished blocks that cannot publish; report tests depend only on the page kind.
+    $this->page = $this->publisher->create($this->editor, 'knowledge', 'A resource with corrections', 'blank');
     $this->release = $this->publisher->publish($this->editor, $this->page, 1, null, null);
     $this->snapshot = $this->release->fresh()->content;
     $this->url = '/company-hub/pages/'.$this->page->id.'/reports';
@@ -97,7 +98,7 @@ test('resource correction earlier releases remain tagged while stale accounts re
     $this->postJson($this->url, $this->input)->assertConflict();
     $this->postJson($this->url, [...$this->input, 'revision_id' => $current->id, 'actor_id' => $this->other->id])->assertConflict();
     $this->postJson($this->url, [...$this->input, 'revision_id' => $current->id])->assertOk()->assertJsonPath('report.current_revision', true);
-    $foreign = $this->publisher->create($this->editor, 'knowledge', 'A different private resource', 'guide');
+    $foreign = $this->publisher->create($this->editor, 'knowledge', 'A different private resource', 'blank');
     $foreignRelease = $this->publisher->publish($this->editor, $foreign, 1, null, null);
     $invalid = DB::table('hub_interactions')->insertGetId(['hub_page_id' => $this->page->id, 'user_id' => $this->reader->id, 'kind' => 'resource_report',
         'body' => json_encode(['issue' => 'Other', 'note' => 'An invalid release binding.', 'revision_id' => $foreignRelease->id, 'resolved' => false, 'response' => '', 'version' => 1, 'private_staff' => ['name' => $this->other->name]]),
@@ -145,7 +146,7 @@ test('resource correction reader responses never broaden the editor queue or com
     $this->actingAs($this->editor)->getJson('/company-hub/pages/'.$this->page->id.'/moderation?'.http_build_query(['actor_id' => $this->editor->id, 'revision_id' => $this->release->id]))->assertOk()->assertJsonPath('hidden_comments', []);
     $queue = collect(app(HubEditorial::class)->workspace($this->editor))->firstWhere('id', $this->page->id);
     expect($queue['reports'][0]['id'])->toBe($id)->and(app(HubParticipation::class)->read($this->reader, $this->page)['comments'])->toBe([]);
-    $news = $this->publisher->create($this->editor, 'news', 'A story is not a resource');
+    $news = $this->publisher->create($this->editor, 'news', 'A story is not a resource', 'blank');
     $this->publisher->publish($this->editor, $news, 1, null, null);
     $this->actingAs($this->reader)->getJson('/company-hub/pages/'.$news->id.'/reports')->assertNotFound();
     $this->postJson('/company-hub/pages/'.$news->id.'/reports', ['issue' => 'Other', 'note' => 'Wrong page type'])->assertUnprocessable();

@@ -51,6 +51,7 @@ export function MyHrShell({
         one: counts.onesToAck || undefined,
         documents: counts.docsToSign || undefined,
         policies: counts.policiesDue || undefined,
+        injuries: counts.openInjuries || undefined,
     };
 
     return (
@@ -67,7 +68,13 @@ export function MyHrShell({
                             }}
                         />
                     }
-                    tabs={<MyHrTabs active={active} badges={badges} />}
+                    tabs={
+                        <MyHrTabs
+                            active={active}
+                            badges={badges}
+                            showInjuries={(counts.injuries ?? 0) > 0}
+                        />
+                    }
                 >
                     {children}
                 </PageLayout>

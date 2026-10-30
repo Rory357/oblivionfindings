@@ -92,11 +92,29 @@ export default function AppLayout({
 
     return (
         <AppLayoutTemplate
-            breadcrumbs={breadcrumbs}
+            breadcrumbs={reachableCrumbs(breadcrumbs, auth)}
             header={header}
             contentClassName={contentClassName}
         >
             {children}
         </AppLayoutTemplate>
+    );
+}
+
+/**
+ * A crumb never links to a page that refuses the viewer: the H&S Overview needs hazards.view, so for anyone
+ * without it the "Health & safety" crumb shows as plain text (found in the 30 Oct user test: report-only staff
+ * and the provider manager landed on a 403 from it).
+ */
+function reachableCrumbs(
+    breadcrumbs: BreadcrumbItem[] | undefined,
+    auth: SharedData['auth'] | undefined,
+): BreadcrumbItem[] | undefined {
+    const canOpenSafetyOverview = !!(
+        auth?.can as { hazards?: { view?: boolean } } | undefined
+    )?.hazards?.view;
+    if (!breadcrumbs || canOpenSafetyOverview) return breadcrumbs;
+    return breadcrumbs.map((crumb) =>
+        crumb.href === '/health-safety' ? { ...crumb, href: undefined } : crumb,
     );
 }

@@ -17,6 +17,7 @@ import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { HandoverFollowUps } from './handover-follow-ups';
+import { isBroadcastUpdate } from '../lib/broadcast-updates';
 
 import type {
     MyDayHandover,
@@ -34,6 +35,7 @@ interface DigestPanelProps {
     /** Client incidents reported by this worker. */
     incidents: MyDayIncident[];
     notifications: MyDayNotification[];
+    broadcastUpdates?: BroadcastUpdatesState;
     onAckAlert?: (alert: MyDayTaskFollowup) => void;
     onSnoozeAlert?: (alert: MyDayTaskFollowup) => void;
     onConfirmHandoverRead?: () => void;
@@ -108,6 +110,7 @@ export function DigestPanel({
     alertTasks,
     incidents,
     notifications,
+    broadcastUpdates,
     onAckAlert,
     onSnoozeAlert,
     onConfirmHandoverRead,
@@ -167,14 +170,7 @@ export function DigestPanel({
                     />
                 </section>
             )}
-            {notifications.length > 0 && (
-                <details className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                    <summary className="frontline-focus frontline-tap cursor-pointer px-5 py-4 font-semibold">
-                        Team updates · {notifications.length}
-                    </summary>
-                    <NotifsPane notifications={notifications} />
-                </details>
-            )}
+            <TeamUpdates notifications={notifications} broadcastUpdates={broadcastUpdates} />
         </div>
     );
 }
@@ -441,6 +437,54 @@ function OpenItemRow({
     );
 }
 
+type BroadcastUpdatesState = {
+    items: MyDayNotification[] | null;
+    loading: boolean;
+    refresh: () => void;
+};
+
+/** One discovery block reused by Today and Handover; it never marks messages read. */
+export function TeamUpdates({ notifications, broadcastUpdates }: {
+    notifications: MyDayNotification[];
+    broadcastUpdates?: BroadcastUpdatesState;
+}) {
+    const admitted = new Set(broadcastUpdates?.items ?? []);
+    const visible = notifications.filter((item) => !isBroadcastUpdate(item) || admitted.has(item));
+    const unavailable = !!broadcastUpdates && broadcastUpdates.items === null;
+    if (!visible.length && !broadcastUpdates) return null;
+    return (
+        <section aria-label="Team updates" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-5">
+                <h2 className="text-section-title">Team updates</h2>
+                <Link href="/notifications" className="frontline-tap frontline-focus inline-flex items-center text-subtle text-primary hover:underline">
+                    View all updates
+                </Link>
+            </div>
+            {unavailable && (
+                <div className="px-5 py-3">
+                    <p role="status" className="text-subtle text-muted-foreground">
+                        {broadcastUpdates.loading ? 'Checking your staff messages…' : 'Check your current staff messages to show their previews here.'}
+                    </p>
+                    <Button type="button" variant="outline" className="frontline-tap mt-2"
+                        disabled={broadcastUpdates.loading} onClick={broadcastUpdates.refresh}>
+                        {broadcastUpdates.loading ? 'Checking messages…' : 'Check staff messages'}
+                    </Button>
+                </div>
+            )}
+            {visible.length > 0 ? (
+                <>
+                    <p className="px-5 pt-3 text-caption text-muted-foreground">
+                        {visible.length} {visible.length === 1 ? 'preview shown' : 'previews shown'} · Open the inbox for all updates.
+                    </p>
+                    <NotifsPane notifications={visible} />
+                </>
+            ) : !unavailable ? (
+                <p className="p-5 text-subtle text-muted-foreground">No updates in this preview. Open the inbox to see earlier messages.</p>
+            ) : null}
+        </section>
+    );
+}
+
 function NotifsPane({ notifications }: { notifications: MyDayNotification[] }) {
     const t = useMyDayLabels();
     if (notifications.length === 0) {
@@ -467,12 +511,17 @@ function NotifsPane({ notifications }: { notifications: MyDayNotification[] }) {
                         )}
                     />
                     <div className="min-w-0 flex-1">
-                        <div className="text-[12.5px] font-medium">
+                        <div className="break-words whitespace-pre-wrap text-subtle font-medium [overflow-wrap:anywhere]">
                             {n.title}
                         </div>
                         <div className="mt-0.5 text-[10.5px] text-muted-foreground">
                             {n.at}
                         </div>
+                        {n.broadcast && (
+                            <Link href={n.broadcast.href} className="frontline-tap frontline-focus mt-1 inline-flex items-center gap-1 text-subtle text-primary hover:underline">
+                                Read full message <ArrowRight aria-hidden className="size-4" />
+                            </Link>
+                        )}
                     </div>
                 </div>
             ))}

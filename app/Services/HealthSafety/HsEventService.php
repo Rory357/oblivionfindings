@@ -4,6 +4,7 @@ namespace App\Services\HealthSafety;
 
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Models\ClientIncident;
+use App\Services\Incidents\IncidentResponseJourneyReadContext;
 use App\Models\HsEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -63,8 +64,9 @@ class HsEventService
      *     owner_user_id?: int|null,
      * } $data
      */
-    public function recordEvent(array $data): ?HsEvent
+    public function recordEvent(array $data, ?IncidentResponseJourneyReadContext $responseSource = null): ?HsEvent
     {
+        $responseSource?->assertEventInput($data);
         $source = $data['source'];
         $category = $data['event_category'];
         $severity = self::normaliseSeverity($data['severity']);
@@ -118,7 +120,7 @@ class HsEventService
         );
 
         // ── Idempotency: return existing if already recorded ──
-        $existing = HsEvent::where('idempotency_key', $idempotencyKey)->first();
+        $existing = $responseSource !== null ? $responseSource->existingEvent() : HsEvent::where('idempotency_key', $idempotencyKey)->first();
 
         if ($existing) {
             return $existing;
@@ -139,7 +141,9 @@ class HsEventService
                 $source,
                 $sourceEffectiveDate,
                 $worksafeNotifiable,
+                $responseSource,
             ): HsEvent {
+                $responseSource?->assertCurrent();
                 $event = HsEvent::create([
                     'reference_number' => HsEvent::generateReferenceNumber(),
                     'source_type' => get_class($source),
@@ -175,6 +179,8 @@ class HsEventService
                     'created_by' => $data['created_by'] ?? auth()->id(),
                 ]);
 
+                $responseSource?->registerCreatedEvent($event);
+
                 if ($hasCompleteDecision) {
                     AuditLogger::logOrFail(
                         'healthSafety.event.worksafeDecisionRecorded',
@@ -202,8 +208,10 @@ class HsEventService
         } catch (\Throwable $e) {
             // Catch unique-constraint race condition (concurrent request created the same key)
             if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE')) {
-                return HsEvent::where('idempotency_key', $idempotencyKey)->first();
+                return $responseSource !== null ? $responseSource->existingEvent() : HsEvent::where('idempotency_key', $idempotencyKey)->first();
             }
+
+            if ($responseSource !== null) { $responseSource->assertActive(); throw $e; }
 
             Log::error('HsEventService: failed to create event', [
                 'source' => class_basename($source).':'.$source->getKey(),
