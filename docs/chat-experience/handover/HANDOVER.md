@@ -106,6 +106,18 @@ Also recorded in the spec and the plan.
   - The .com test server has `CHAT_SHARED_EXPERIENCE` ON.
   - Local `.test` has it OFF, so the sidebar's Chat opens the old `/operations/messages` page.
 
+## Known issue on main (found 30 Oct, after the hand-over)
+
+- **Chat's availability save locks the person's whole user record.**
+  - `PATCH /chat/api/availability` (`ChatCallController::preference`) takes `lockForUpdate()` on the person's `users` row inside a transaction.
+  - Chat saves this regularly while it is open.
+  - Many other modules read the viewer's `users` row with `FOR SHARE NOWAIT`. When the two overlap, those pages fail with SQLSTATE 3572.
+  - On 30 Oct this showed up as error pages on 3 H&S pages for the admin.
+- **The other modules are being patched on main.** They will try the read again a moment later, which only hides the clash.
+- **The real fix is in Chat:** lock a Chat-owned row instead of the `users` row, for example the person's `chat_preferences` row.
+  - The call-start path ("Call starts lock the same person before checking availability") must lock the same row, so an off-duty save still can't race a call invitation.
+  - Please include this when you take the Chat branches forward.
+
 ## Gotchas found so far
 
 - **Windows unit tests:**
