@@ -302,6 +302,7 @@ class HsDashboardService
                     'status' => $a->status,
                     'due_date' => optional($a->due_date)->toDateString(),
                     'days_overdue' => $a->due_date ? (int) abs($a->due_date->diffInDays(now())) : null,
+                    'completed_days_ago' => $a->daysSinceCompleted(),
                     'owner' => $a->assignedTo?->name,
                     'client_id' => $a->hsEvent?->client_id,
                     'staff_id' => $a->hsEvent?->staff_id,

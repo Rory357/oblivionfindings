@@ -56,6 +56,7 @@ class CheckOverdueCorrectiveActionsJob implements ShouldQueue
                     'event_category' => $action->hsEvent?->event_category,
                     'due_date' => $action->due_date->toDateString(),
                 ],
+                daysSinceCompleted: $action->daysSinceCompleted(),
             );
 
             $count++;

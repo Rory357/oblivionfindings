@@ -25,7 +25,28 @@ final class IncidentOwnerEligibility
             && $this->canManage($actor, $incident, $reads);
     }
 
+    /** @var \WeakMap<CurrentAuthorizationReads, array<string, bool>>|null answers per read lifetime (speed, 30 Oct) */
+    private static ?\WeakMap $answers = null;
+
+    /** Within one page-wide locked read (All Tasks, the Overview) the same question has the same answer: canAssign and
+     * the owner summary both asked it. Every other read decides afresh at each call. */
+    private function remember(?CurrentAuthorizationReads $reads, string $key, callable $decide): bool
+    {
+        if (! IncidentHsEventSourceReadService::isPageWide($reads)) { return $decide(); }
+        $reads->assertActive();
+        self::$answers ??= new \WeakMap;
+        $known = self::$answers[$reads] ?? [];
+        if (! array_key_exists($key, $known)) { $known[$key] = (bool) $decide(); self::$answers[$reads] = $known; }
+
+        return $known[$key];
+    }
+
     public function canManage(User $actor, ClientIncident $incident, ?CurrentAuthorizationReads $reads = null): bool
+    {
+        return $this->remember($reads, 'manage|'.$actor->id.'|'.$incident->id, fn (): bool => $this->decideCanManage($actor, $incident, $reads));
+    }
+
+    private function decideCanManage(User $actor, ClientIncident $incident, ?CurrentAuthorizationReads $reads): bool
     {
         return $actor->canDo('incidents.owner.assign')
             && $this->activeInternal($actor, $reads)
@@ -43,6 +64,11 @@ final class IncidentOwnerEligibility
     }
 
     public function activeInternal(User $user, ?CurrentAuthorizationReads $reads = null): bool
+    {
+        return $this->remember($reads, 'active|'.$user->id, fn (): bool => $this->decideActiveInternal($user, $reads));
+    }
+
+    private function decideActiveInternal(User $user, ?CurrentAuthorizationReads $reads): bool
     {
         $account = User::query()->staff()->whereKey($user->id)->whereNotNull('approved_at');
         if (! ($reads ? $reads->query($account) : $account)->exists()) {

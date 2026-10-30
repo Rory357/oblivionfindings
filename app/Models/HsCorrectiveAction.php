@@ -193,6 +193,20 @@ class HsCorrectiveAction extends Model
         return $query->whereNotIn('status', [self::STATUS_VERIFIED, self::STATUS_CLOSED]);
     }
 
+    /**
+     * Whole worker-calendar days since the owner marked the action completed (0 = today), while it waits for someone
+     * else to verify it; null for any other status.
+     */
+    public function daysSinceCompleted(): ?int
+    {
+        if ($this->status !== self::STATUS_COMPLETED || $this->completed_at === null) {
+            return null;
+        }
+        $timezone = self::workerTimezone();
+
+        return (int) abs($this->completed_at->copy()->setTimezone($timezone)->startOfDay()->diffInDays(now($timezone)->startOfDay()));
+    }
+
     /** The worker calendar; an empty setting falls back to the application timezone. */
     private static function workerTimezone(): string
     {

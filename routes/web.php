@@ -4,6 +4,7 @@ use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\Careers\ReferenceController;
 use App\Domain\Referrals\Http\Controllers\PublicProviderController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Middleware\RetryPageReadOnLockConflict;
 use App\Http\Controllers\It\ItAssistController;
 use App\Http\Controllers\It\ItCatalogController;
 use App\Http\Controllers\It\ItCatalogFieldOptionController;
@@ -466,10 +467,13 @@ require __DIR__.'/auth.php';
 require __DIR__.'/portal.php';
 require __DIR__.'/clients.php';
 require __DIR__.'/staff.php';
-require __DIR__.'/incidents.php';
-require __DIR__.'/tasks.php';
+// Page loads here retry when a save briefly holds a row their proof locks (RetryPageReadOnLockConflict).
+Route::middleware(RetryPageReadOnLockConflict::class)->group(function () {
+    require __DIR__.'/incidents.php';
+    require __DIR__.'/tasks.php';
+});
 require __DIR__.'/assets.php';
-require __DIR__.'/sites.php';
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/sites.php');
 require __DIR__.'/catering.php';
 require __DIR__.'/fleet.php';
 require __DIR__.'/fleet-assets.php';
@@ -509,7 +513,7 @@ require __DIR__.'/finance.php';
 require __DIR__.'/health-clinical.php';
 
 // Health & Safety module
-require __DIR__.'/health-safety.php';
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/health-safety.php');
 
 // API routes
 require __DIR__.'/api_medications.php';

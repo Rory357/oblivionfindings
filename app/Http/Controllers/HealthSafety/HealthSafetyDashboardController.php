@@ -29,6 +29,7 @@ use App\Services\HealthSafety\RestraintKpiService;
 use App\Services\Incidents\IncidentAccessService;
 use App\Services\UserSiteAccessService;
 use App\Support\Incidents\IncidentOccurrencePeriod;
+use App\Support\Inertia\SharedDeferredReload;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -76,9 +77,16 @@ class HealthSafetyDashboardController extends Controller
      */
     public function index(Request $request): Response
     {
-        $props = HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
-            fn (HealthSafetyReadContext $context): array => HealthSafetyReadMaterialisationProof::within($context,
-                fn (HealthSafetyReadMaterialisationProof $proof): array => $this->overviewProps($request, $context, $proof)));
+        // The header inbox's follow-up request only gets the inbox plus the always props below, so build just those:
+        // the same read, Site checks and values as the full page, without the rest of the page (Speed, 30 Oct).
+        if (SharedDeferredReload::only($request, 'health-safety/dashboard')) {
+            $props = HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
+                fn (HealthSafetyReadContext $context): array => $this->overviewProps($request, $context, null));
+        } else {
+            $props = HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
+                fn (HealthSafetyReadContext $context): array => HealthSafetyReadMaterialisationProof::within($context->provePageWideAnd(),
+                    fn (HealthSafetyReadMaterialisationProof $proof): array => $this->overviewProps($request, $context, $proof)));
+        }
 
         // These already materialised operands must refresh together even on an
         // auth-only partial response; identity alone cannot prove Site access.
@@ -87,6 +95,29 @@ class HealthSafetyDashboardController extends Controller
         }
 
         return Inertia::render('health-safety/dashboard', $props);
+    }
+
+    /**
+     * The Overview's Inertia::always props, built the same way for the full page and the inbox follow-up request.
+     *
+     * @param  array{from: string, to: string}  $incidentPeriod
+     * @return array{filters: array<string, mixed>, sites: array<int, array<string, mixed>>, worker_participation: mixed}
+     */
+    private function overviewAlwaysProps(User $user, HealthSafetyReadContext $context, ?int $siteId, int|array|null $siteScope, array $incidentPeriod, string $lens): array
+    {
+        $siteQuery = Site::query()->orderBy('name');
+        $this->siteAccess->applySiteScope($siteQuery, $user, self::HS_SITE_BYPASS_PERMISSIONS);
+
+        return [
+            'filters' => [
+                'from' => $incidentPeriod['from'],
+                'to' => $incidentPeriod['to'],
+                'site' => $siteId,
+                'lens' => $lens,
+            ],
+            'sites' => $siteQuery->get(['id', 'name'])->toArray(),
+            'worker_participation' => app(\App\Services\HealthSafety\WorkerParticipationMetricsReadService::class)->overview($user, $siteScope, $context),
+        ];
     }
 
     /** The Site comparison needs current staff with approved Sites. Without them the comparison is withheld (empty),
@@ -104,12 +135,11 @@ class HealthSafetyDashboardController extends Controller
         }
     }
 
-    private function overviewProps(Request $request, HealthSafetyReadContext $context, HealthSafetyReadMaterialisationProof $proof): array
+    /** Without a proof, only the always props (worker_participation, filters, sites) are built; see index(). */
+    private function overviewProps(Request $request, HealthSafetyReadContext $context, ?HealthSafetyReadMaterialisationProof $proof): array
     {
         $user = $context->consumeSourceViewer([], fn (User $current): User => $current);
         [$siteId, $siteIds] = $this->resolveSiteContext($request, 'site', $user);
-        $clientOptionsRead = app(DashboardClientOptionsReadService::class);
-        $clientOptionsRead->prepare($context, $siteId, $siteIds);
         $now = Carbon::now();
         $thirtyDaysAgo = $now->copy()->subDays(30);
         $startOfYear = $now->copy()->startOfYear();
@@ -135,6 +165,16 @@ class HealthSafetyDashboardController extends Controller
         ];
         validator($incidentPeriod, ['to' => ['after_or_equal:from']])->validate();
         $siteScope = $siteId ?? $siteIds;
+        // The start follows the person's role (approved drawing D1, 30 Oct) instead of a "Lens" switch; an explicit
+        // ?lens= from an old link still works.
+        $lens = in_array($request->input('lens'), ['governance', 'manager', 'frontline'], true)
+            ? $request->input('lens')
+            : self::startFor($user);
+        if ($proof === null) {
+            return $this->overviewAlwaysProps($user, $context, $siteId, $siteScope, $incidentPeriod, $lens);
+        }
+        $clientOptionsRead = app(DashboardClientOptionsReadService::class);
+        $clientOptionsRead->prepare($context, $siteId, $siteIds);
         $incidentFilters = [...$incidentPeriod, 'site_id' => $siteId];
         $incidentCategories = IncidentOccurrencePeriod::apply(ClientIncident::query(), $incidentPeriod['from'], $incidentPeriod['to'])
             ->where('type', '!=', 'near_miss');
@@ -143,11 +183,6 @@ class HealthSafetyDashboardController extends Controller
         }
         $incidentCategories = $proof->protect($context->applyIncidentSourceScope($incidentCategories));
         $hsSiteBypass = self::HS_SITE_BYPASS_PERMISSIONS;
-        // The start follows the person's role (approved drawing D1, 30 Oct) instead of a "Lens" switch; an explicit
-        // ?lens= from an old link still works.
-        $lens = in_array($request->input('lens'), ['governance', 'manager', 'frontline'], true)
-            ? $request->input('lens')
-            : self::startFor($user);
 
         // -- KPIs --
         $incidentSnapshot = $this->incidentOverviewSnapshot($user, $siteIds, $now, $context);
@@ -243,8 +278,6 @@ class HealthSafetyDashboardController extends Controller
             $user,
             $context,
         );
-        $siteQuery = Site::query()->orderBy('name');
-        $this->siteAccess->applySiteScope($siteQuery, $user, $hsSiteBypass);
         $clientOptions = $this->readableClientOptions($clientOptionsRead, $context, $siteId);
 
         $staffQuery = User::query()
@@ -254,6 +287,7 @@ class HealthSafetyDashboardController extends Controller
         $this->applyStaffSiteFilter($staffQuery, $siteId);
 
         $expiringProjection = $this->dashboardService->expiringFeedProjection($siteScope, viewer: $user, context: $context);
+        $always = $this->overviewAlwaysProps($user, $context, $siteId, $siteScope, $incidentPeriod, $lens);
 
         return [
             'kpis' => $kpis,
@@ -268,14 +302,9 @@ class HealthSafetyDashboardController extends Controller
             'backbone' => $backboneSummary,
 
             // ── Command-centre additions — period/site/lens-aware (G3/G4/G5/G6) ──
-            'filters' => [
-                'from' => $incidentPeriod['from'],
-                'to' => $incidentPeriod['to'],
-                'site' => $siteId,
-                'lens' => $lens,
-            ],
+            'filters' => $always['filters'],
             'lens' => $lens,
-            'sites' => $siteQuery->get(['id', 'name'])->toArray(),
+            'sites' => $always['sites'],
             // Org/brand name comes from Settings → Branding (AppSetting `branding.name`), the
             // same source the rest of the app reads — set it there, not on the organizations row.
             'org_name' => rescue(fn () => AppSetting::query()->where('key', 'branding.name')->value('value') ?? config('app.name'), null, false),
@@ -320,7 +349,7 @@ class HealthSafetyDashboardController extends Controller
                     'site' => $h->site?->name,
                 ])
                 ->all(), [], false),
-            'worker_participation' => app(\App\Services\HealthSafety\WorkerParticipationMetricsReadService::class)->overview($user, $siteScope, $context),
+            'worker_participation' => $always['worker_participation'],
 
             // First-aid activity (leading care-activity signal, trailing 30 days) — surfaced
             // on the Leading tab. First-aid-only treatment is NOT recordable / excluded from TRIFR.
@@ -362,7 +391,7 @@ class HealthSafetyDashboardController extends Controller
     public function analytics(Request $request): Response
     {
         $props = HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
-            fn (HealthSafetyReadContext $context): array => HealthSafetyReadMaterialisationProof::within($context,
+            fn (HealthSafetyReadContext $context): array => HealthSafetyReadMaterialisationProof::within($context->provePageWideAnd(),
                 fn (): array => $this->analyticsProps($request, $context)));
 
         // Retained percentages and deltas must not outlive the freshly read

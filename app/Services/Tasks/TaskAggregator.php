@@ -654,6 +654,8 @@ class TaskAggregator
         try {
             $consume = fn (HealthSafetyReadContext $context): array => $context->consumeSourceViewer($permissions,
                 function (User $current) use ($context, $viewer, $filters, $providers, $navigation): array {
+                    // Listing every H&S provider is a page-wide read (speed option B); a lookup by id stays bounded.
+                    if (! isset($filters['id'])) { $context->provePageWide(); }
                     $passes = [];
                     foreach ($providers as $provider) {
                         $pass = ['view' => false, 'items' => [], 'failed' => false];
