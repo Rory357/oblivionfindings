@@ -67,10 +67,24 @@ class OpsMessageVisibilityService
 
         // A staff conversation stays with its members (membership is checked by the caller): a
         // colleague moving Site keeps their name in it and nobody loses the chat (Stephan, 23 Oct
-        // 2026). A managed channel follows its Site, checked above. Who may be added is decided when
-        // people are added: new groups need everyone to see everyone, and an addition needs the adder
-        // and the new person to see each other (ChatInvitations::eligible()).
-        return true;
+        // 2026). A managed channel follows its Site, checked above. It still closes for everyone once
+        // a member is no longer current staff (left, or now a client or family sign-in): every member
+        // must be current staff, at any Site. Who may be added is decided when people are added: new
+        // groups need everyone to see everyone, and an addition needs the adder and the new person to
+        // see each other (ChatInvitations::eligible()).
+        $participantIds = $conversation->participants()
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($participantIds->isEmpty()) {
+            return false;
+        }
+
+        return $this->currentStaff->currentUsersQuery()
+            ->whereIn('users.id', $participantIds)
+            ->count() === $participantIds->count();
     }
 
     /**
@@ -208,10 +222,39 @@ class OpsMessageVisibilityService
             && (! $conversation->channel_site_id || in_array((int) $conversation->channel_site_id, $siteIds, true)));
 
         // Same as canViewConversation(): a current staff member keeps the staff conversations they
-        // belong to (the caller's query is by membership); a channel's Site is checked above.
-        if ($isCurrent) {
+        // belong to (the caller's query is by membership) while every member is current staff, at any
+        // Site; a channel's Site is checked above.
+        if ($isCurrent && $staff->isNotEmpty()) {
+            $participantsByConversation = DB::table('ops_conversation_participants')
+                ->whereIn('conversation_id', $staff->pluck('id'))
+                ->get(['conversation_id', 'user_id'])
+                ->groupBy('conversation_id');
+
+            $allParticipantIds = $participantsByConversation
+                ->flatten(1)
+                ->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $currentStaffIds = $allParticipantIds->isEmpty()
+                ? new Collection
+                : $this->currentStaff->currentUsersQuery()
+                    ->whereIn('users.id', $allParticipantIds)
+                    ->pluck('users.id')
+                    ->map(fn ($id) => (int) $id)
+                    ->flip();
+
             foreach ($staff as $conversation) {
-                $visible->push($conversation->id);
+                $participantIds = ($participantsByConversation->get($conversation->id) ?? new Collection)
+                    ->pluck('user_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique();
+
+                if ($participantIds->isNotEmpty()
+                    && $participantIds->every(fn (int $id) => $currentStaffIds->has($id))) {
+                    $visible->push($conversation->id);
+                }
             }
         }
 
