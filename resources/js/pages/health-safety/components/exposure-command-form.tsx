@@ -285,13 +285,14 @@ export function ExposureCommandForm({ action, actorId, detail: suppliedDetail, c
             {action !== 'capture' && <div className="mt-5 flex flex-wrap gap-3"><Button type="button" variant="outline" className="frontline-tap" onClick={onCancel}>Cancel</Button>{controls}</div>}
         </form>
         {reviewFailure && <p role="status" className="text-subtle text-status-warning">{reviewFailure}</p>}
-        {/* eslint-disable-next-line no-restricted-syntax -- the review panel sits inside the form's own layout (the form stays as it is). */}
-        {fresh?.detail.record && <div className="space-y-4 rounded-lg border border-border bg-card p-4"><h3 className="text-section-title">Current facts for review</h3>
+        {fresh?.detail.record && (
+            // eslint-disable-next-line no-restricted-syntax -- the review panel sits inside the form's own layout (the form stays as it is).
+            <div className="space-y-4 rounded-lg border border-border bg-card p-4"><h3 className="text-section-title">Current facts for review</h3>
             <p className="text-subtle">{fresh.detail.record.worker.name} · {fresh.detail.record.site.name} · Revision {fresh.detail.command_context?.expected_version}</p>
             <dl className="grid gap-3 sm:grid-cols-2">{Object.entries(fresh.detail.record).filter(([key]) => ['exposed_at', 'exposure_type', 'exposure_duration', 'circumstances', 'symptoms', 'first_aid_given', 'medical_attention_sought', 'medical_treatment', 'medical_outcome', 'incident_reported'].includes(key)).map(([key, value]) =>
                     <div key={key}><dt className="text-caption text-muted-foreground">{FIELD_LABELS[key] ?? label(key)}</dt><dd className="whitespace-pre-wrap break-words text-subtle">{EXPOSURE_REPORTED_FACTS.includes(key as ExposureReportedFact) ? exposureFactText(fresh.detail.record!, key as ExposureReportedFact) : key === 'exposed_at' ? formatDateTime(value as string | null) : typeof value === 'boolean' ? value ? 'Yes' : 'No' : text(value as string | null)}</dd></div>)}</dl>
             <p className="text-subtle">Your entered fields and selected file remain unchanged. Use this revision only after reviewing the current facts and your entries.</p>
             <Button type="button" className="frontline-tap" onClick={adopt}>Use reviewed revision and keep my entries</Button>
-        </div>}
+        </div>)}
     </section>);
 }

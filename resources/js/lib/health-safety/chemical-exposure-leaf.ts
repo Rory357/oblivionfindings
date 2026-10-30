@@ -3,18 +3,21 @@ export const CHEMICAL_EXPOSURES = '/health-safety/chemical-exposures';
 export const EXPOSURE_SECTIONS = ['overview', 'reviews', 'followups', 'evidence', 'history', 'connections'] as const;
 export const EXPOSURE_PAGES = ['history_page', 'reviews_page', 'followups_page', 'evidence_page'] as const;
 const origin = 'https://exposure-navigation.invalid';
+// Each pattern on its own line so the disable stays on it after Prettier rewraps the checks below.
+// eslint-disable-next-line no-control-regex -- refuses control characters and spaces in a return link on purpose (link safety).
+const UNSAFE_LINK_CHARACTER = /[\\#\u0000-\u0020\u007f]/;
+// eslint-disable-next-line no-control-regex -- refuses control characters in a query key or value on purpose (return-link safety).
+const UNSAFE_QUERY_CHARACTER = /[\\\u0000-\u001f\u007f]/;
 const single = (query: URLSearchParams, key: string) => query.getAll(key).length === 1 ? query.get(key) : null;
 export const positiveExposureIdentity = (value: string | null): number | null =>
     value && /^[1-9]\d*$/.test(value) && value.length <= 10 && Number(value) <= 2147483647 ? Number(value) : null;
 export function parseExposureNavigation(value: string | null | undefined): URL | null {
     if (!value || new TextEncoder().encode(value).length > 1500 || !value.startsWith('/') || value.startsWith('//')
-        // eslint-disable-next-line no-control-regex -- refuses control characters and spaces in a return link on purpose (link safety).
-        || /[\\#\u0000-\u0020\u007f]/.test(value) || /%(?![0-9a-f]{2})/i.test(value)) return null;
+        || UNSAFE_LINK_CHARACTER.test(value) || /%(?![0-9a-f]{2})/i.test(value)) return null;
     try {
         const target = new URL(value, origin);
         if (target.origin !== origin || target.pathname !== value.split('?')[0]) return null;
-        // eslint-disable-next-line no-control-regex -- refuses control characters in a query key or value on purpose (return-link safety).
-        for (const [key, item] of target.searchParams) if (/[[\]]/.test(key) || /[\\\u0000-\u001f\u007f]/.test(key + item)) return null;
+        for (const [key, item] of target.searchParams) if (/[[\]]/.test(key) || UNSAFE_QUERY_CHARACTER.test(key + item)) return null;
         return target;
     } catch { return null; }
 }
