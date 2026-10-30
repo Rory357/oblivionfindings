@@ -153,12 +153,18 @@ Two steps were dropped at Stephan's request on 30 Oct: reporting from his Ajax a
 - **Sensor relay (D21):** a house's hub relays its sensor readings to the central broker and keeps 24 hours of them if its link drops.
 - **Code-signing check:** restored behind an explicit unsigned-test switch (D1).
 - **Hub syslog/NetFlow and Protect client:** wired in, or deleted.
+- **Faster access checks (MASTER, 31 Oct; can also go as a small follow-up straight after the Phase A merge).**
+  - **The problem:** `SecurityDevicesAccessService::accessibleSiteIds()` asks the database whether `users.site_id` exists every time it runs. That's `Schema::hasColumn`, an `information_schema` query. Every asset check runs it through `accessibleAssets()`.
+  - **What it costs:** the Speed session profiled the sidebar task count for manager 51 on the .com (main `18034cafc`). One count made 91 asset checks × 4 queries = 364 queries, about 120 ms.
+  - **The fix:** answer the column question once per request, or from the migration state. Work out each person's Sites once per request too, with exactly the same answers as now.
+  - **Watch out:** the service isn't bound once per request, so a cache on the object alone won't help. The locked "current evidence" path (`forCurrentEvidence`) must keep reading fresh.
 - **Screens:** Setup › Hubs & networks › Hubs, the Add a hub wizard, and the Hubs and downloads pop-ups.
 - **Permissions:** `securityDevices.hubs.approve` and `securityDevices.savedLogins.manage`, each with its grant migration.
 
 **Tests**
 
 - Pest for hub approval, login scoping and wiping on revoke.
+- Pest for the faster access check: the same Sites and assets as before for each role, with a query count that stays flat as the number of assets grows.
 - Collector tests for routing through the hub.
 - Go tests and the installer build in CI (this PC has no Go).
 - vitest for the hub screens.
