@@ -908,6 +908,14 @@ function AlarmPanelProfileOverview({
         typeProfile.panelState === 'not_reported'
             ? 'No state reported yet'
             : humanise(typeProfile.panelState);
+    // Only actions the server offers get a button. A panel with neither is view only (Phase A, A1).
+    const controllable = Boolean(
+        typeProfile.armAction || typeProfile.disarmAction,
+    );
+    const unavailableAction = [
+        typeProfile.disarmAction,
+        typeProfile.armAction,
+    ].find((action) => action && !action.available);
 
     return (
         <div
@@ -920,12 +928,14 @@ function AlarmPanelProfileOverview({
                         <div className="space-y-1">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Siren className="h-4 w-4" />
-                                Alarm panel state &amp; controls
+                                {controllable
+                                    ? 'Alarm panel state & controls'
+                                    : 'Alarm panel state'}
                             </CardTitle>
                             <CardDescription>
-                                Arming and disarming always require permission,
-                                confirmation, an operational reason, and an
-                                audit record.
+                                {controllable
+                                    ? 'Arming and disarming always require permission, confirmation, an operational reason, and an audit record.'
+                                    : 'The state this panel last reported to Oblivion.'}
                             </CardDescription>
                         </div>
                         <StatusBadge
@@ -949,50 +959,73 @@ function AlarmPanelProfileOverview({
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={!typeProfile.armAction?.available}
-                            onClick={() =>
-                                typeProfile.armAction &&
-                                openActionDialog(typeProfile.armAction)
-                            }
+                    {!controllable && (
+                        <div
+                            data-testid="alarm-panel-view-only"
+                            className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/30 p-3 text-sm"
                         >
-                            <Lock className="mr-1.5 h-3.5 w-3.5" />
-                            Arm alarm
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            disabled={!typeProfile.disarmAction?.available}
-                            onClick={() =>
-                                typeProfile.disarmAction &&
-                                openActionDialog(typeProfile.disarmAction)
-                            }
-                        >
-                            <Unlock className="mr-1.5 h-3.5 w-3.5" />
-                            Disarm alarm
-                        </Button>
-                        {profile.management.visible && (
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onOpenSection('management')}
-                            >
-                                Open Management
-                            </Button>
-                        )}
-                    </div>
+                            <StatusBadge variant="neutral">
+                                View only
+                            </StatusBadge>
+                            <span className="text-caption">
+                                Oblivion can’t arm or disarm this panel. Use the
+                                keypad or the maker’s app.
+                            </span>
+                        </div>
+                    )}
 
-                    {(!typeProfile.armAction?.available ||
-                        !typeProfile.disarmAction?.available) && (
+                    {(controllable || profile.management.visible) && (
+                        <div className="flex flex-wrap gap-2">
+                            {typeProfile.armAction && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!typeProfile.armAction.available}
+                                    onClick={() =>
+                                        typeProfile.armAction &&
+                                        openActionDialog(typeProfile.armAction)
+                                    }
+                                >
+                                    <Lock className="mr-1.5 h-3.5 w-3.5" />
+                                    Arm alarm
+                                </Button>
+                            )}
+                            {typeProfile.disarmAction && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={
+                                        !typeProfile.disarmAction.available
+                                    }
+                                    onClick={() =>
+                                        typeProfile.disarmAction &&
+                                        openActionDialog(
+                                            typeProfile.disarmAction,
+                                        )
+                                    }
+                                >
+                                    <Unlock className="mr-1.5 h-3.5 w-3.5" />
+                                    Disarm alarm
+                                </Button>
+                            )}
+                            {profile.management.visible && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onOpenSection('management')}
+                                >
+                                    Open Management
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
+                    {unavailableAction && (
                         <p className="text-caption rounded-lg bg-muted/30 p-3">
-                            {typeProfile.disarmAction?.reason ??
-                                typeProfile.armAction?.reason ??
+                            {unavailableAction.reason ||
                                 'Alarm control requires security control permission, recent panel state, and an active alarm adapter.'}
                         </p>
                     )}

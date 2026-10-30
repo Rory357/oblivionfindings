@@ -153,6 +153,10 @@ describe('ObliRemoteSupportCard', () => {
         expect(
             screen.getByLabelText('Generated TURN shared secret'),
         ).toBeTruthy();
+        // Saved settings alone are not shown as working.
+        expect(screen.getByTestId('relay-tile-status')).toHaveTextContent(
+            'Saved (1), not tested',
+        );
 
         fireEvent.click(screen.getByRole('button', { name: 'Test relay' }));
 
@@ -164,6 +168,54 @@ describe('ObliRemoteSupportCard', () => {
             );
         });
 
-        expect(await screen.findByText('Relay answered')).toBeTruthy();
+        expect(
+            await screen.findByTestId('relay-test-result'),
+        ).toHaveTextContent('Relay answered');
+        expect(screen.getByTestId('relay-tile-status')).toHaveTextContent(
+            'Relay answered',
+        );
+    });
+
+    it('shows a relay that did not answer as No answer, never as ready', async () => {
+        vi.mocked(axios.post).mockResolvedValueOnce({
+            data: {
+                actor_id: 7,
+                verification: {
+                    ok: false,
+                    status: 'unreachable',
+                    message: 'No answer from turn:192.0.2.1:3478 (timed out).',
+                },
+            },
+        });
+
+        render(
+            <ObliRemoteSupportCard
+                actorId={7}
+                initial={{
+                    ...defaultRemoteSupport(true),
+                    version: 1,
+                    remote_support_enabled: true,
+                    effective_remote_support_enabled: true,
+                    relay_urls: ['turn:192.0.2.1:3478'],
+                    effective_relay_urls: ['turn:192.0.2.1:3478'],
+                    relay_ready: true,
+                    relay_secret_saved: true,
+                }}
+            />,
+        );
+
+        expect(screen.getByTestId('relay-tile-status')).toHaveTextContent(
+            'Saved (1), not tested',
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Test relay' }));
+
+        expect(
+            await screen.findByTestId('relay-test-result'),
+        ).toHaveTextContent('Needs attention');
+        expect(screen.getByTestId('relay-tile-status')).toHaveTextContent(
+            'No answer',
+        );
+        expect(screen.queryByText(/Ready \(/)).toBeNull();
     });
 });

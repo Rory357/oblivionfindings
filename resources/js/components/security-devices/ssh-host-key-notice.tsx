@@ -134,7 +134,12 @@ export function SshHostKeyNotice({
                         : 'Oblivion will send this device’s saved login only while it shows this key. If the key ever changes, backups stop until an IT admin checks it.'
                 }
                 context={{
-                    title: offered.fingerprint,
+                    // A key fingerprint has no spaces; break-all lets it wrap instead of widening the pop-up.
+                    title: (
+                        <span className="font-mono break-all">
+                            {offered.fingerprint}
+                        </span>
+                    ),
                     tag: 'SSH key',
                     icon: KeyRound,
                     note: 'The key the device showed when Oblivion last connected.',

@@ -514,6 +514,7 @@ export function ObliRemoteSupportCard({
                         <Alert>
                             <AlertDescription
                                 role="status"
+                                data-testid="relay-test-result"
                                 className="flex flex-wrap items-center gap-2"
                             >
                                 <StatusBadge
@@ -602,22 +603,30 @@ export function ObliRemoteSupportCard({
                                 <span className="text-sm font-medium">
                                     Attended remote support &amp; TURN relay
                                 </span>
+                                {/* Saved settings alone never show green: only a relay test that got an answer does (Phase A, A2). */}
                                 <StatusBadge
+                                    data-testid="relay-tile-status"
                                     variant={
-                                        saved.effective_remote_support_enabled &&
-                                        saved.relay_ready
-                                            ? 'success'
-                                            : saved.effective_remote_support_enabled
+                                        !saved.effective_remote_support_enabled
+                                            ? 'neutral'
+                                            : !saved.relay_ready
                                               ? 'warning'
-                                              : 'neutral'
+                                              : verification?.ok
+                                                ? 'success'
+                                                : verification
+                                                  ? 'warning'
+                                                  : 'neutral'
                                     }
                                 >
-                                    {saved.effective_remote_support_enabled &&
-                                    saved.relay_ready
-                                        ? `Ready (${saved.effective_relay_urls.length})`
-                                        : saved.effective_remote_support_enabled
+                                    {!saved.effective_remote_support_enabled
+                                        ? 'Off'
+                                        : !saved.relay_ready
                                           ? 'Relay needed'
-                                          : 'Off'}
+                                          : verification?.ok
+                                            ? 'Relay answered'
+                                            : verification
+                                              ? 'No answer'
+                                              : `Saved (${saved.effective_relay_urls.length}), not tested`}
                                 </StatusBadge>
                             </div>
                             <p className="text-caption mt-1">

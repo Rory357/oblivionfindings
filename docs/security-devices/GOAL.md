@@ -366,9 +366,9 @@ Each item is ticked with the commit that fixed it and how it was proved.
 | Broken: camera passwords over plain HTTP | A5 | Phase A | Real local TLS server: no password before trust, pinned key only, impostor refused before any byte; no Basic password ever sent |
 | Broken: SSH accepts any key | A6 | Phase A | Backup sends no login to an untrusted key; changed key refused until an IT admin replaces it; audit-logged |
 | Fake: hub syslog/NetFlow and Protect never called | B | | |
-| Fake: 7 label-only alarm brands show Arm/Disarm | A1 | Phase A | Driver honesty guard test; Arm/Disarm never taken from saved settings; Supported devices shows "View only" |
+| Fake: 7 label-only alarm brands show Arm/Disarm | A1 | Phase A | Driver honesty guard test; Arm/Disarm never taken from saved settings; Supported devices shows "View only"; the alarm device page draws no Arm/Disarm button for a panel with no real action (found on the local check, 30 Oct) |
 | Fake: UniFi PoE cycle and reboot "tested on hardware" | A1 | Phase A | Claims removed; port actions not offered (made-up controller path); guard test |
-| Fake: "Test relay" says Verified | A2 | Phase A | Real STUN check; "No relay set up" / "No answer from …"; never "Verified" |
+| Fake: "Test relay" says Verified | A2 | Phase A | Real STUN check; "No relay set up" / "No answer from …"; never "Verified"; the relay tile says "Saved, not tested" until a test answers (was a green "Ready") |
 | Fake: Milesight signature header | A8 | Phase A | Header dropped (not in Milesight docs); Site secret as Bearer, token header or Basic password; private network only (D23), public 404 incl. via the local proxy |
 | Fake: code-signing check deleted | B | | |
 | Fake: progress notes overclaim | A1 | Phase A | PROGRESS.md and SUPPORTED-DEVICES.md corrected; HARDWARE-WALKS.md + guard test |

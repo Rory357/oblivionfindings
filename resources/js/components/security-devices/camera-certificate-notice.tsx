@@ -143,7 +143,15 @@ export function CameraCertificateNotice({
                         : 'Oblivion will send this camera its password only while it shows this certificate. If it ever changes, Oblivion stops until an IT admin checks it. Every camera on this address uses the same trust.'
                 }
                 context={{
-                    title: offered.fingerprint,
+                    // A fingerprint has no spaces; break-all lets it wrap instead of widening the pop-up.
+                    title: (
+                        <span
+                            className="font-mono break-all"
+                            data-testid="camera-certificate-confirm-fingerprint"
+                        >
+                            {offered.fingerprint}
+                        </span>
+                    ),
                     tag: `${trust.host}:${trust.port}`,
                     icon: ShieldCheck,
                     note: offered.seen_at

@@ -64,6 +64,11 @@ describe('CameraCertificateNotice (Phase A, item A5)', () => {
         expect(dialog.textContent).toContain('Trust this camera?');
         expect(dialog.textContent).toContain(FINGERPRINT);
         expect(dialog.textContent).toContain('172.16.0.10:443');
+        // The 95-character fingerprint wraps inside the pop-up instead of widening it.
+        expect(
+            screen.getByTestId('camera-certificate-confirm-fingerprint')
+                .className,
+        ).toContain('break-all');
 
         fireEvent.click(
             screen
