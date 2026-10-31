@@ -109,7 +109,7 @@ final class HsCorrectiveActionWorkspace
                     ],
                     // Blocked for now, with the reason and who unblocks it; only for viewers who could otherwise start (IR3a).
                     'blocked' => $mayStart && $replacementNeeded
-                        ? ['start' => ['reason' => 'Choose a new owner first', 'unblock' => 'Someone who manages health and safety at this site chooses a new owner.']]
+                        ? ['start' => ['reason' => HsCorrectiveActionService::START_NEEDS_NEW_OWNER, 'unblock' => 'Someone who manages health and safety at this site chooses a new owner.']]
                         : [],
                     'next_step' => $replacementNeeded && $action->status !== HsCorrectiveAction::STATUS_CLOSED
                         ? ['key' => 'choose_owner', 'can' => (bool) ($ownership['can_assign'] ?? false)]

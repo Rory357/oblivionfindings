@@ -7,12 +7,13 @@ use App\Models\HsEvent;
 use App\Models\User;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\HsCorrectiveActionWorkspace;
+use InvalidArgumentException;
 
 /**
  * K1a (H&S UI/UX plan B1.5/B1.6): while an action's owner needs replacing, Start is off with the reason "Choose a new
  * owner first" for people who could otherwise start it, and the next step is "choose a new owner".
- * Read-only viewers get no blocked clutter (IR3b). (Whether the server also refuses such a start is open: exact retries
- * of a start are kept today, HsCorrectiveActionTest.)
+ * Read-only viewers get no blocked clutter (IR3b). D1 (Stephan, 31 Oct): the server refuses a new start too, with the
+ * same words; an exact retry of a start it already accepted still returns the first result.
  */
 class HsCorrectiveActionRecordAbilitiesTest extends RestraintEventCommandTestCase
 {
@@ -68,5 +69,40 @@ class HsCorrectiveActionRecordAbilitiesTest extends RestraintEventCommandTestCas
         $this->actingAs($manager);
         app(HsCorrectiveActionService::class)->start($action->fresh());
         $this->assertSame(HsCorrectiveAction::STATUS_IN_PROGRESS, $action->fresh()->status);
+    }
+
+    public function test_the_server_refuses_a_new_start_while_the_owner_needs_replacing(): void
+    {
+        $manager = $this->staff(['hazards.view', 'hazards.manage']);
+        $owner = $this->staff(['hazards.view', 'hazards.manage']);
+        $action = $this->action($owner);
+        $this->revoke($owner, 'hazards.manage');
+
+        $this->actingAs($manager);
+        try {
+            app(HsCorrectiveActionService::class)->start($action->fresh());
+            $this->fail('A new start must wait for a new owner.');
+        } catch (InvalidArgumentException $e) {
+            $this->assertSame(HsCorrectiveActionService::START_NEEDS_NEW_OWNER, $e->getMessage());
+        }
+        $this->assertSame(HsCorrectiveAction::STATUS_OPEN, $action->fresh()->status);
+    }
+
+    public function test_an_exact_retry_of_an_accepted_start_returns_the_first_result_after_the_owner_drifts(): void
+    {
+        $manager = $this->staff(['hazards.view', 'hazards.manage']);
+        $owner = $this->staff(['hazards.view', 'hazards.manage']);
+        $action = $this->action($owner);
+        $this->actingAs($manager);
+        $first = app(HsCorrectiveActionService::class)->start($action->fresh(), $owner->id);
+        $startedAt = $action->fresh()->updated_at;
+
+        $this->revoke($owner, 'hazards.manage');
+        $this->travel(1)->minutes();
+        $retry = app(HsCorrectiveActionService::class)->start($action->fresh(), $owner->id);
+
+        $this->assertSame($first->id, $retry->id);
+        $this->assertSame(HsCorrectiveAction::STATUS_IN_PROGRESS, $action->fresh()->status);
+        $this->assertEquals($startedAt, $action->fresh()->updated_at);
     }
 }
