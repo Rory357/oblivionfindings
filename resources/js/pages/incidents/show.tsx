@@ -141,7 +141,7 @@ const SOURCE_STORY: Record<string, string> = {
 
 const BREADCRUMB_ROOT = [
     { title: 'Home', href: '/dashboard' },
-    { title: 'Health & safety', href: '/health-safety' },
+    { title: 'Health and safety', href: '/health-safety' },
 ];
 
 /** Permanent record workspace; only bounded edits and decisions open a dialog. */

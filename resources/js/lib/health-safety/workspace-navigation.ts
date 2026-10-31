@@ -421,6 +421,27 @@ export const SAFETY_HUBS: SafetyHub[] = [
 export function visibleSafetyViews(hub: SafetyHub, can: Can): SafetyView[] {
     return hub.views.filter((view) => view.visible(can));
 }
+/**
+ * B5.1 (H&S UI/UX plan): the "Health and safety" and hub crumbs. The hub crumb opens the viewer's first tab in that
+ * hub (not the old registers card page); the "Health and safety" crumb links only for people who can open the
+ * Overview (HR with wellbeing access only gets plain text, not a link the server would refuse).
+ */
+export function safetyHubCrumbs(
+    hub: SafetyHubKey,
+    can: Can,
+): { title: string; href?: string }[] {
+    const overview = SAFETY_HUBS.find((item) => item.key === 'overview')!;
+    const group = SAFETY_HUBS.find((item) => item.key === hub)!;
+    const first = visibleSafetyViews(group, can).find((view) => !view.shortcut);
+    return [
+        visibleSafetyViews(overview, can).length
+            ? { title: 'Health and safety', href: '/health-safety' }
+            : { title: 'Health and safety' },
+        first
+            ? { title: group.label, href: first.href }
+            : { title: group.label },
+    ];
+}
 export function safetySidebar(can: Can) {
     return SAFETY_HUBS.flatMap((hub) => {
         const views = visibleSafetyViews(hub, can);

@@ -9,6 +9,8 @@
  * current source revision and its review — stays exactly as the records say it.
  */
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import {
     RecordIdentity,
@@ -173,6 +175,7 @@ export default function RestraintWorkspaceIndex({
     can,
 }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const origin = restraintReturn(url);
     const [search, setSearch] = useState(filters.q ?? '');
     useEffect(() => setSearch(filters.q ?? ''), [filters.q]);
@@ -241,8 +244,7 @@ export default function RestraintWorkspaceIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
+                ...safetyHubCrumbs('care', safetyCan),
                 { title: 'Restraints', href: RESTRAINT_REGISTER },
             ]}
         >

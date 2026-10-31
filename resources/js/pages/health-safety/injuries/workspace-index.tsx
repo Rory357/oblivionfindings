@@ -7,6 +7,8 @@
  * only says someone marked the injury notifiable.
  */
 import { severityLabel, statusLabel } from '@/components/health-safety/injury-constants';
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { InjuryRegisterList, type InjuryRegisterRow } from '@/components/health-safety/injury-register-list';
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderSearch, PageLayout } from '@/components/page';
@@ -35,6 +37,7 @@ function query(filters: Filters, tab: string) {
 }
 export default function InjuryRegister({ injuries, tab, tabCounts, filters, sites, options, medical_access, can }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const [search, setSearch] = useState(filters.q);
     const [extra, setExtra] = useState({ from: filters.from ?? '', to: filters.to ?? '', body_part: filters.body_part ?? '' });
     const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -50,7 +53,7 @@ export default function InjuryRegister({ injuries, tab, tabCounts, filters, site
     const filtered = !!filters.q || !!filters.site_id || !!filters.severity || (filters.period && filters.period !== 'all') || moreActive > 0;
     const currentQuery = query(filters, tab);
     const restricted = medical_access === 'restricted';
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' }, { title: 'Workplace injuries', href: INJURY_REGISTER }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('care', safetyCan), { title: 'Workplace injuries', href: INJURY_REGISTER }]}>
         <Head title="Workplace injuries" />
         <PageLayout hero={<PageHeader title="Workplace injuries" icon={HeartPulse} subline="Staff injuries, who is coordinating and the recovery work" actions={<>
             <PageHeaderSearch value={search} onChange={setSearch} onKeyDown={(event) => { if (event.key === 'Enter') visit({ q: search }); }} placeholder="Find an injury…" ariaLabel="Search workplace injuries" />

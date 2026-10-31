@@ -9,6 +9,7 @@
  * memory. Every command keeps its gate and opens the same inline form above the record.
  */
 import { PageHeader, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageHeaderStatusChip, PageLayout } from '@/components/page';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { PageHeaderStages, type PageHeaderNextStep, type PageHeaderStage } from '@/components/page/page-header-strip';
 import { dateTimeWithYear } from '@/components/incidents/incident-stages';
 import { Note, SideColumn, Surface } from '@/components/signature/blocks';
@@ -138,7 +139,7 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
         { ...SECTIONS[3], ...counted(detail.attachments.page?.total) }, { ...SECTIONS[4], ...counted(detail.history.page?.total) }, SECTIONS[5]] : [SECTIONS[0]];
     const stages = admitted ? exposureStages(detail) : null;
     const commandShown = !!action && !!retained[commandKey];
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('care', shared.auth.can),
         { title: 'Private exposures', href: CHEMICAL_EXPOSURES }, { title, href: exposureHref(detail.id) }]}>
         <Head title={title} /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" wrapTitle title={title} icon={LockKeyhole} backHref={returnTo}

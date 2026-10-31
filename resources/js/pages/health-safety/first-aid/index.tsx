@@ -7,6 +7,8 @@
  * aider share one cell. The Needs incident review line stays word for word.
  */
 import { FirstAidTreatmentWizard } from '@/components/health-safety/first-aid/treatment-wizard';
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import type {
     FirstAidPickers,
@@ -164,6 +166,7 @@ export default function FirstAidIndex({
     report = false,
 }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const returnTo = firstAidReturn(url);
     const drafts = useSafetyWorkspaceDrafts();
     const [search, setSearch] = useState(filters.q ?? '');
@@ -354,8 +357,7 @@ export default function FirstAidIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
+                ...safetyHubCrumbs('care', safetyCan),
                 { title: 'First aid', href: FIRST_AID_REGISTER },
             ]}
         >

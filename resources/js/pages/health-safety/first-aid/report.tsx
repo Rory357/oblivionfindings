@@ -4,6 +4,8 @@
  * one line. The wizard itself (its steps, fields, checks and wording) is
  * unchanged and still opens as the Record first aid pop-up.
  */
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     FIRST_AID_TREATMENT_STEPS,
     FirstAidTreatmentWizard,
@@ -40,6 +42,7 @@ export default function FirstAidReport({
     can: { create: boolean; view: boolean };
 }) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const query = new URL(url, 'https://first-aid.invalid').searchParams;
     const selectedReturn = firstAidReturn(query.get('return_to'));
     const returnTo =
@@ -71,11 +74,7 @@ export default function FirstAidReport({
                 { title: 'Home', href: '/dashboard' },
                 ...(can.view
                     ? [
-                          { title: 'Health & safety', href: '/health-safety' },
-                          {
-                              title: 'Injuries and care',
-                              href: '/health-safety/registers?view=care',
-                          },
+                          ...safetyHubCrumbs('care', safetyCan),
                           { title: 'First aid', href: FIRST_AID_REGISTER },
                       ]
                     : []),

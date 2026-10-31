@@ -6,6 +6,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
     SAFETY_HUBS,
+    safetyHubCrumbs,
     safetyHubForUrl,
     safetySearchEntries,
     safetySidebar,
@@ -184,5 +185,23 @@ describe('Health & Safety workspace navigation', () => {
         ).toBe(false);
         const care = SAFETY_HUBS.find((hub) => hub.key === 'care')!;
         expect(care.views.some((view) => view.href === href)).toBe(true);
+    });
+});
+
+describe('safetyHubCrumbs (B5.1)', () => {
+    it('opens the first tab of the hub and links "Health and safety" for Overview readers', () => {
+        expect(safetyHubCrumbs('care', manager)).toEqual([
+            { title: 'Health and safety', href: '/health-safety' },
+            { title: 'Injuries and care', href: '/health-safety/injuries' },
+        ]);
+        expect(safetyHubCrumbs('prevention', manager)[1].href).toBe(
+            '/compliance/hazards',
+        );
+    });
+
+    it('gives wellbeing-only HR no "Health and safety" link the server would refuse', () => {
+        const crumbs = safetyHubCrumbs('care', { hr: { wellbeing: { view: true } } });
+        expect(crumbs[0]).toEqual({ title: 'Health and safety' });
+        expect(crumbs[1].href).not.toContain('registers?view=');
     });
 });

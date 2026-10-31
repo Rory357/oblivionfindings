@@ -7,6 +7,8 @@
  * plans) and one card.
  */
 import { RestraintEventCommandForm } from '@/components/health-safety/restraints/event-command-form';
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { BehaviourSupportPlanCommandForm } from '@/components/health-safety/restraints/plan-command-form';
 import type { RestraintPickers } from '@/components/health-safety/restraints/types';
 import { PageHeader, PageHeaderRail, PageLayout } from '@/components/page';
@@ -46,6 +48,7 @@ export default function RestraintReport({
     capture_context,
 }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const query = new URLSearchParams(url.split('?')[1]);
     const path = url.split('?')[0];
     const kind = query.get('kind') === 'plan' ? 'plan' : 'event';
@@ -79,11 +82,7 @@ export default function RestraintReport({
                 { title: 'Home', href: '/dashboard' },
                 ...(fromRegister
                     ? [
-                          { title: 'Health & safety', href: '/health-safety' },
-                          {
-                              title: 'Injuries and care',
-                              href: '/health-safety/registers?view=care',
-                          },
+                          ...safetyHubCrumbs('care', safetyCan),
                           {
                               title: 'Restraints',
                               href: returnTo,

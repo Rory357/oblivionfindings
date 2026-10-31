@@ -586,7 +586,7 @@ export default function CorrectiveActionsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Health and safety', href: '/health-safety' },
                 {
                     title: 'Corrective actions',
                     href: '/health-safety/corrective-actions',

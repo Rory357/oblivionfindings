@@ -5,6 +5,7 @@
  * Both access lines and the confirmation keep the code's wording; reporting never grants reading the saved record.
  */
 import { PageHeader, PageHeaderGlassButton, PageLayout } from '@/components/page';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { PageHeaderStages, type PageHeaderStage } from '@/components/page/page-header-strip';
 import { Note } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ function CaptureWorkspace({ capture, return_to, chemical_exposure_confirmation, 
     const savedHref = confirmation && chemical_exposure_href === `${CHEMICAL_EXPOSURES}/${confirmation.root_id}` ? chemical_exposure_href : null;
     const finished = progress.saved || (!!confirmation && !withdrawn);
     const stages: PageHeaderStage[] = STEPS.map((label, index) => ({ label, state: finished || index < progress.step ? 'done' : index === progress.step ? 'now' : 'todo' }));
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('care', shared.auth.can),
         { title: 'Private exposures', href: CHEMICAL_EXPOSURES }, { title: 'Record an exposure', href: exposureCaptureHref(capture.substance.id, returnTo) }]}>
         <Head title="Record an exposure" /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" title="Record an exposure" icon={LockKeyhole} backHref={returnTo}

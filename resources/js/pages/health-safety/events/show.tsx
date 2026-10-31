@@ -71,7 +71,7 @@ export default function HsEventShow({ detail }: { detail: EventDetail }) {
     const returnTo = safetyReviewReturn(params.get('return_to'));
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Home', href: '/dashboard' },
-        { title: 'Health & safety', href: '/health-safety' },
+        { title: 'Health and safety', href: '/health-safety' },
         { title: 'Safety reviews', href: '/health-safety/events' },
         {
             title: safetyReviewTitle(detail),

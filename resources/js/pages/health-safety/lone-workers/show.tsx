@@ -7,6 +7,8 @@
  * acknowledged › resolved). The command forms and their submissions are
  * unchanged; they open in the main column as before.
  */
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     SESSION_COMMAND_LABELS,
     SESSION_COMMAND_SECTIONS,
@@ -121,6 +123,7 @@ export default function LoneWorkerShow({
 }) {
     const return_to = loneWorkerReturn(incomingReturnTo);
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const [section, setSection] = useState<SessionSection>(initial);
     const [command, setCommand] = useState<SessionCommand | null>(null);
     const drafts = useSafetyWorkspaceDrafts();
@@ -453,8 +456,7 @@ export default function LoneWorkerShow({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
+                ...safetyHubCrumbs('prevention', safetyCan),
                 { title: 'Lone-worker safety', href: LONE_WORKER_REGISTER },
                 {
                     title: worker

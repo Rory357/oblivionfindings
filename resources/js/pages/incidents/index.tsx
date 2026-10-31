@@ -269,7 +269,7 @@ export default function IncidentsIndex(props: Props) {
             <AppLayout
                 breadcrumbs={[
                     { title: 'Home', href: '/dashboard' },
-                    { title: 'Health & safety', href: '/health-safety' },
+                    { title: 'Health and safety', href: '/health-safety' },
                     { title: 'Incidents', href: '/incidents' },
                 ]}
             >
@@ -485,7 +485,7 @@ function CurrentActorIncidentsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Health and safety', href: '/health-safety' },
                 { title: 'Incidents', href: '/incidents' },
             ]}
         >
