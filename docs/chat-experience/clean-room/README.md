@@ -67,7 +67,7 @@ Copy into `provenance/<engine>.md`.
 |---|---|---|
 | Oblivion Live (live updates, typing, presence, call signalling) and the Oblivion signer | [specs/oblivion-live.md](specs/oblivion-live.md) | Spec written 23 Oct 2026; ready for a builder session |
 | Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Spec written 23 Oct 2026; ready for a builder session |
-| Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Built 23 Oct 2026 on `claude/eager-mahavira-c57cd4` ([provenance](provenance/voice-checker.md)). Checked 23 Oct 2026: no copied code. Rechecked the same day: the first four findings are fixed; sign-off is still held for two MP4 findings (time limit, memory), back to the builder |
+| Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Built 23 Oct 2026 on `claude/eager-mahavira-c57cd4` ([provenance](provenance/voice-checker.md)). Checked 23 Oct 2026: no copied code. Rechecked the same day: the first four findings were fixed, and two MP4 findings went back to the builder. **Signed off 31 Oct 2026** after a second recheck: both MP4 fixes hold and the tests pass. Real Safari recordings are still to come |
 | Oblivion Calls | to write after Oblivion Live (stage 5) | — |
 
 The session that wrote these specs opened the built files of livekit-client and pusher-js to read their licence headers, so it does not build those replacements itself.

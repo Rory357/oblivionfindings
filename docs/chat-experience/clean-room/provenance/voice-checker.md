@@ -152,7 +152,7 @@ These are cases where the spec left room or real files differed from it.
 
 The last run, through the heavy-lock with ffprobe 8.1.1 configured, passed 203 tests (680 assertions): the voice unit tests, `ChatVoiceInspectorTest`, `ChatServiceHealthTest` and `ChatUploadsTest`.
 
-- **Checker tests:** `ChatVoiceCheckerTest` has 124 cases, all passing:
+- **Checker tests:** `ChatVoiceCheckerTest` has 128 cases, all passing:
   - 11 browser recordings plus the Opus-in-MP4 refusal;
   - 14 generated shapes at 5 s and 119 s (WebM in three styles, Ogg Opus, and MP4 in three layouts);
   - 67 hand-built bad files, one per rule, each asserting the rule that failed (Vorbis included);
@@ -307,16 +307,133 @@ The recheck after `98ed39a95` confirmed F1–F4 and found two older MP4 problems
 
 - Without ffprobe: the voice unit tests, `ChatVoiceInspectorTest`, `ChatServiceHealthTest` and `ChatUploadsTest`. 180 passed and 27 skipped (the ffprobe comparisons).
 - With `CHAT_VOICE_PROBE_BINARY` set to ffprobe **9.0.2** (8.1.1 isn't installed on this PC): the voice unit tests and `ChatVoiceInspectorTest`. All 184 passed, so ffprobe 9.0.2 agrees with the checker on every good file.
-- The checker's recheck of F5 and F6, the similarity check and the REGISTER.md sign-off are still to do, by a session other than this one.
+- The checker's recheck of F5 and F6, the similarity check and the REGISTER.md sign-off are still to do, by a session other than this one. (Done 31 October 2026: see the next section.)
+
+## Checker second recheck (31 October 2026)
+
+By a checker session that did not build the checker. It worked on `claude/voice-checker-signoff-49310d`, with the builder's `73d29cdde` merged in; the F5/F6 fix itself is `68f707db4`. Since the first recheck, only `Mp4VoiceParser.php` and `ChatVoiceCheckerTest.php` have changed among the voice code, its tests and its fixtures.
+
+**Verdict: signed off.**
+
+- F5 and F6 are fixed, and F1 to F4 still hold.
+- No copied code was found.
+- Spec section 3 is met, except for the Safari recordings, which stay an open question.
+
+### F5 and F6: fixed
+
+The probes time `inspect()`, so reading the file counts.
+
+| Finding | Recheck |
+|---|---|
+| F5, the 2-second limit | The first checker's file (100,000 chunks in the last of 300,000 `mdat` boxes) is blocked in 0.45–0.52 s, measured three times. Before the fix it took 4.5–5.1 s. It now ends as `voice_too_long` (its chunks add up to 35 minutes), where it used to run out of time. |
+| F6, working memory | The first checker's file (900,000 empty `free` boxes in `moov`) is ready in 0.55–0.62 s. Its whole-process peak was 280 MiB and is now 42 MiB, most of which is the probe's own copies of the file. Measured on its own, the checker's working memory is 1.6 MiB beyond the file. |
+
+A wider sweep, with a new probe, looked for the slowest and largest MP4 files the parts limit allows:
+
+- **Plain files:** N chunks in the last of M `mdat` boxes, from 1,000 chunks in 998,000 boxes to 999,000 chunks in 900 boxes.
+  - The slowest stopped at 1.51 s, when the 1.5-second budget ran out.
+  - The most working memory was 16.6 MiB beyond the file, with 998,000 `mdat` boxes.
+- **Fragmented files:** up to 330,000 one-sample runs, checked at the end against up to 995,000 `mdat` boxes.
+  - The slowest took 1.34 s.
+  - The most working memory was again 16.6 MiB beyond the file.
+- **The `free`-box file at the parts limit** (999,000 boxes): 0.62 s, and 0.9 MiB beyond the file.
+
+Part of the sweep ran while another session's test suite was loading the PC, so these times are if anything high. The file (at most 20 MiB) plus the checker's working memory (16.6 MiB at most here; the tests allow 48) now fits inside PHP's default `memory_limit` of 128 MiB. The F6 question about the servers' limit is therefore closed.
+
+**The halving search, case by case.** Small hand-built files check where a chunk may sit.
+
+- **Accepted:**
+  - in each of three `mdat` boxes, also when the chunks are out of file order;
+  - on the first or last byte of an `mdat`;
+  - in an `mdat` of size 0 or one with a 64-bit size.
+- **Refused (`mp4_sample_data`):**
+  - in an `mdat` header;
+  - across two `mdat` boxes;
+  - inside `moov` or `ftyp`;
+  - past the end of the file;
+  - in a file with no `mdat`.
+- **Fragment runs:** they behave the same way, including a run that points back into its own `moof`.
+
+**One note, not a finding.** Fragment ranges are packed as 64-bit integers. Suppose a `tfhd` base offset sits within a few bytes of PHP's largest integer. Then the range end becomes a float, and packing turns it into a large negative number, which the halving search would accept.
+
+Every such file is still refused today. This was measured: the overflowed position always reaches an `int` parameter or return type in `run()` or `trackFragment()`, and `check()` catches the `TypeError`. The result is right, but it rests on the type declarations rather than an explicit rule. The next builder to touch the parser may want to require every position to lie inside the file.
+
+### F1 to F4: still fixed
+
+The first checker's probes were re-run on this code. The Vorbis and Opus inputs were made locally with ffmpeg 9.0.2 and are not committed.
+
+- **F1:** the understated 200 s and 600 s Vorbis files and an honest 600 s one are all blocked, by the checker alone and with ffprobe 9.0.2 configured.
+- **F2:** with ffprobe configured, nothing threw. A 10-minute libopus WebM is blocked as `voice_too_long`.
+- **F3:**
+  - The combined file (350,000 to 450,000 small blocks, then a bad 17–18 MiB padding packet) is blocked in 1.14–1.42 s.
+  - One 20 MiB padding packet on its own takes 0.01 s.
+- **MP4 timing, not a finding (as before):** an AAC file with every timing value divided by 8 fools the checker and ffprobe alike, at 25,003 and 25,006 ms.
+
+### Similarity
+
+Re-run with [../tools/token-similarity.mjs](../tools/token-similarity.mjs) on the two changed files. The comparison used the MP4 parsers from the first check's outside sources, at the same commits. These 14 files (51,034 lines) were fetched on 31 October 2026 into a scratch folder outside the repository:
+
+- FFmpeg `e914b1cb0c51`: `mov.c`, `isom.c`, `mpeg4audio.c`;
+- GPAC `7cda8f465456`: `box_code_base.c`, `box_funcs.c`, `isom_intern.c`, `isom_read.c`, `stbl_read.c`, `media.c`, `sample_descs.c`, `odf_code.c`;
+- music-metadata `bbd6e943c887`: its three MP4 files.
+
+**Result: clean.**
+
+- **`Mp4VoiceParser.php`.** Its best scores are all within the first check's 1.0–5.9 % band:
+  - structure 2.7 % (against `mov.c`), longest run 20 tokens;
+  - literal 2.1 %, longest 9;
+  - comments 1.0 %, longest 6.
+
+  The longest runs are ones the first check already reviewed: the descriptor length loop and the `stsc` run checks, both defined by the standards. The rest are common idioms such as counted loops.
+- **The lines `68f707db4` added**, scored on their own:
+  - structure 2.3 %, longest 12 (a closing brace followed by a null check);
+  - literal 0 %;
+  - comments 0 %.
+- **`ChatVoiceCheckerTest.php`:** 0.5 % structure. Its added lines score 0 % structure, and 1.0 % literal from box names.
+- **Unrelated Chat services** (`ChatUploads`, `ChatFileSafety`, `ChatServiceHealth`): 0–5.5 % against the same sources.
+- **Positive control:** a deliberate PHP port of FFmpeg's `stsc` reader, kept outside the repository and deleted after scoring.
+  - It scored 15.2 % literal (15-token runs) and 26.3 % comments.
+  - On structure it scored only 2.9 %, because PHP array access breaks up the structure runs. So the result rests on all three views and the by-eye comparison together, not on structure alone.
+  - The added lines are far below the port in every view.
+- **Compared by eye:**
+  - FFmpeg's two binary searches use a different form (an open interval with two separate tests) and do a different job: finding fragments by offset or time.
+  - Oblivion's is the textbook closed-interval search. None of the outside sources matches sample ranges to `mdat` boxes this way.
+  - The one-at-a-time box walk is a PHP generator. It is unlike FFmpeg's dispatch table and GPAC's child lists.
+
+### Spec section 3
+
+| Item | Result |
+|---|---|
+| Recordings from Chrome, Edge, Firefox and Safari, 5 s and 119 s | Unchanged since the first check. **Chrome, Edge and Firefox: met. Safari: still missing** (open question below). |
+| A hand-built file for each rule | Met. The fix added four more hostile files. |
+| 10,000 mutations: never throw, never over 2 s, never ready when broken | **Met.** The mutation test passes (10,000 cases in 88–90 s). The inputs it cannot reach were re-run above and now hold too: no throw (F2), under 2 s (F3, F5), small memory (F6). |
+| The same results as ffprobe within 20 ms | **Met with ffprobe 9.0.2** (8.1.1 is not on this PC). All 27 agreement tests pass, none skipped. |
+| Voice notes available without ffprobe; with it, both run and a disagreement blocks the file | Met, as at the first recheck. |
+
+The test evidence above matches the tests: eight hostile files, each held to under 2 s and 48 MiB of working memory. The case count for `ChatVoiceCheckerTest` there still said 124, from before the fix added four hostile files. It is 128 and has been corrected.
+
+The README's other checking steps do not apply to ffprobe:
+
+- it was never an installed package;
+- there is no FFmpeg licence copy or notice entry;
+- it stays as the optional second opinion, so no guard is needed.
+
+### Tests re-run
+
+Before each run, no other Pest process was running; the heavy-lock script is not on this PC. Both runs set `OPENSSL_CONF`.
+
+- **Without ffprobe:** the voice unit tests, `ChatVoiceInspectorTest`, `ChatServiceHealthTest` and `ChatUploadsTest`, in one call.
+  - 180 passed and 27 skipped (the ffprobe agreement tests), 549 assertions, 550 s.
+  - By file: `ChatVoiceCheckerTest` 128, `ChatVoiceMutationTest` 1, `ChatVoiceAgreementTest` 27 skipped, `ChatVoiceInspectorTest` 28, `ChatServiceHealthTest` 10, `ChatUploadsTest` 13.
+- **With `CHAT_VOICE_PROBE_BINARY` set to ffprobe 9.0.2:** the voice unit tests and `ChatVoiceInspectorTest`.
+  - 184 passed, none skipped, 523 assertions, 129 s.
+- These are the same counts as the builder's run on 31 October.
 
 ## Open questions
 
 - **Safari.** Real Safari recordings (5 s and 119 s) are still needed from a Mac or an iPhone. The MP4 parser has only seen Chrome's fragmented MP4 and generated files.
 - **Disagreement reporting.** Should a disagreement with ffprobe also show in Settings › Chat › Service health, or get its own error code? Today it is logged, and the person sees "could not be verified".
 - **Unused error code.** `voice_check_unavailable` is no longer produced. The browser still understands it, and it is harmless.
-- **Production memory limit (F6).** The PHP `memory_limit` on the servers is not recorded in the repository. F6 matters only if it is below about 300 MiB.
-- **Sign-off.** Once F5 is fixed, and F6 is fixed or the server limit is confirmed, a checker session:
-  - re-runs the voice tests with and without ffprobe;
-  - re-runs the review's probes: the understated Vorbis file, the long file with ffprobe configured, the padding file, and the many-`mdat` and many-`free` MP4 files;
-  - re-runs the similarity check on the files that change;
-  - then signs off REGISTER.md.
+- **Implementation status.** `docs/chat-experience/IMPLEMENTATION-STATUS.md` still describes ffprobe as the voice inspector. Update it when C2.5 merges.
+- **Production memory limit (F6): closed 31 October 2026.** Since the F6 fix, the check fits inside PHP's default 128 MiB, so the servers' limit no longer matters.
+- **Sign-off: done 31 October 2026** (the checker's second recheck, above).
