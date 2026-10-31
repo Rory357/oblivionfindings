@@ -6,6 +6,7 @@ import {
     formatDateLong,
     formatDurationMinutes,
     formatTime,
+    toDateInput,
 } from '@/lib/datetime';
 import {
     hsLabel,
@@ -463,21 +464,22 @@ export function fmtDateTime(iso: string | null | undefined): string {
     return `${fmtDate(iso)}, ${fmtTime(iso)}`;
 }
 
-/** Relative "when" phrasing for the events table — "Yesterday, 2:20 pm", "2 days ago, 9:05 am". */
+/**
+ * Relative "when" phrasing for the events table — "Yesterday, 2:20 pm",
+ * "2 days ago, 9:05 am". Days are NZ calendar days, whatever the browser's
+ * timezone.
+ */
 export function whenLabel(iso: string | null | undefined): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    const now = new Date();
-    const sameDay = d.toDateString() === now.toDateString();
-    const yest = new Date(now);
-    yest.setDate(now.getDate() - 1);
-    const isYest = d.toDateString() === yest.toDateString();
-    const days = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-    if (sameDay) return `Today, ${fmtTime(iso)}`;
-    if (isYest) return `Yesterday, ${fmtTime(iso)}`;
-    if (days >= 0 && days <= 6)
-        return `${days} day${days === 1 ? '' : 's'} ago, ${fmtTime(iso)}`;
-    return `${fmtDate(iso)}, ${fmtTime(iso)}`;
+    const day = iso ? toDateInput(iso) : '';
+    if (!day) return '—';
+    const days = Math.round(
+        (Date.parse(toDateInput(new Date())) - Date.parse(day)) / 86_400_000,
+    );
+    const time = fmtTime(iso);
+    if (days === 0) return `Today, ${time}`;
+    if (days === 1) return `Yesterday, ${time}`;
+    if (days >= 2 && days <= 6) return `${days} days ago, ${time}`;
+    return `${fmtDate(iso)}, ${time}`;
 }
 
 export function durationLabel(minutes: number | null | undefined): string {
