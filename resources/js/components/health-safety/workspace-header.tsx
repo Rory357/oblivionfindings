@@ -14,11 +14,15 @@ import {
     SAFETY_HUBS,
     visibleSafetyViews,
     type SafetyHubKey,
+    type SafetyNavigationPermissions,
 } from '@/lib/health-safety/workspace-navigation';
 import { type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
 import { CalendarDays } from 'lucide-react';
 import { useState } from 'react';
+
+/** B5.4: Site inspections stay a Sites page; Risks and prevention links there (↗, folded under More) for people who can open them. */
+const INSPECTIONS_LINK = 'inspections-link';
 
 /** Sibling destinations live on the header rail, status lenses in its filters. */
 export function SafetyWorkspaceRail({
@@ -42,16 +46,39 @@ export function SafetyWorkspaceRail({
     const views = visibleSafetyViews(group, can).filter(
         (view) => !view.shortcut,
     );
+    const inspections =
+        hub === 'prevention' &&
+        !!(can as SafetyNavigationPermissions | undefined)?.checklists?.view &&
+        !!(can as SafetyNavigationPermissions | undefined)?.sites?.viewAny;
     return (
         <PageHeaderRail
-            items={views.map((view) => ({
-                ...view,
-                count: counts?.[view.key] || undefined,
-            }))}
+            items={[
+                ...views.map((view) => ({
+                    ...view,
+                    count: counts?.[view.key] || undefined,
+                })),
+                ...(inspections
+                    ? [
+                          {
+                              key: INSPECTIONS_LINK,
+                              label: 'Inspections ↗',
+                              overflow: {
+                                  description:
+                                      'Opens Sites: each site keeps its own inspections',
+                              },
+                          },
+                      ]
+                    : []),
+            ]}
             value={current}
             ariaLabel={`${group.label} views`}
             showFind={views.length > 2}
+            maxVisible={inspections ? views.length : undefined}
             onSelect={(key) => {
+                if (key === INSPECTIONS_LINK) {
+                    router.visit('/sites');
+                    return;
+                }
                 if (onSelect?.(key)) return;
                 const view = views.find((view) => view.key === key);
                 if (view) router.visit(view.href);

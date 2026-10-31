@@ -10,6 +10,7 @@ import {
     safetyHubForUrl,
     safetySearchEntries,
     safetySidebar,
+    visibleSafetyViews,
     type SafetyNavigationPermissions,
 } from './workspace-navigation';
 
@@ -203,5 +204,27 @@ describe('safetyHubCrumbs (B5.1)', () => {
         const crumbs = safetyHubCrumbs('care', { hr: { wellbeing: { view: true } } });
         expect(crumbs[0]).toEqual({ title: 'Health and safety' });
         expect(crumbs[1].href).not.toContain('registers?view=');
+    });
+});
+
+describe('hub rails hold places, not filters or report forms (B5.3)', () => {
+    const concerns = SAFETY_HUBS.find((hub) => hub.key === 'concerns')!;
+    const rail = (can: SafetyNavigationPermissions) =>
+        visibleSafetyViews(concerns, can)
+            .filter((view) => !view.shortcut)
+            .map((view) => view.key);
+
+    it('keeps Fleet incidents out of a support worker rail (they open it from Fleet & Assets)', () => {
+        expect(rail({ incidents: { viewAny: true }, fleet: { viewAny: true }, safeguarding: { create: true } })).toEqual([
+            'incidents',
+        ]);
+        expect(rail(manager)).toContain('fleet-incidents');
+    });
+
+    it('leaves "Raise a safeguarding concern" and the status filters off the rail', () => {
+        const keys = rail({ ...manager, safeguarding: { create: true } });
+        expect(keys).not.toContain('report-safeguarding');
+        expect(keys).not.toContain('near-misses');
+        expect(keys).not.toContain('investigations');
     });
 });

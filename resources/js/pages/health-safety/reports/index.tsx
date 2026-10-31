@@ -2,6 +2,7 @@ import {
     AssuranceReport,
     type SafetyAssuranceReport,
 } from '@/components/health-safety/assurance-report';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import {
     filterSafetyDirectory,
     SafetyDirectory,
@@ -18,6 +19,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import {
     SAFETY_HUBS,
+    safetyHubCrumbs,
     visibleSafetyViews,
 } from '@/lib/health-safety/workspace-navigation';
 import { type SharedData } from '@/types';
@@ -57,10 +59,18 @@ export default function SafetyReports({
     const hub = SAFETY_HUBS.find((hub) => hub.key === 'reports')!;
     const views = visibleSafetyViews(hub, props.auth.can);
     const selected = views.find((item) => item.key === view);
+    // B5.3: WorkSafe notifications belongs to "Incidents and safety reviews"; it keeps that hub's crumbs and tabs here.
+    const concerns = SAFETY_HUBS.find((item) => item.key === 'concerns')!;
+    const notifications =
+        view === 'notifications'
+            ? visibleSafetyViews(concerns, props.auth.can).find(
+                  (item) => item.key === 'notifications',
+              )
+            : undefined;
     const period = report?.period;
     const from = period?.start ?? period?.from;
     const to = period?.end ?? period?.to;
-    const title = selected?.label ?? hub.label;
+    const title = selected?.label ?? notifications?.label ?? hub.label;
     const described = views.map((item) => ({
         ...item,
         description: REPORT_DESCRIPTIONS[item.key] ?? item.description,
@@ -81,12 +91,20 @@ export default function SafetyReports({
     };
     return (
         <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Health and safety', href: '/health-safety' },
-                { title: hub.label, href: '/health-safety/reports' },
-                ...(selected ? [{ title, href: selected.href }] : []),
-            ]}
+            breadcrumbs={
+                notifications
+                    ? [
+                          { title: 'Home', href: '/dashboard' },
+                          ...safetyHubCrumbs('concerns', props.auth.can),
+                          { title, href: notifications.href },
+                      ]
+                    : [
+                          { title: 'Home', href: '/dashboard' },
+                          { title: 'Health and safety', href: '/health-safety' },
+                          { title: hub.label, href: '/health-safety/reports' },
+                          ...(selected ? [{ title, href: selected.href }] : []),
+                      ]
+            }
         >
             <Head title={title} />
             <PageLayout
@@ -97,7 +115,7 @@ export default function SafetyReports({
                         wrapTitle
                         frontline
                         variant={report ? 'profile' : 'index'}
-                        backHref={report ? '/health-safety/reports' : undefined}
+                        backHref={report && !notifications ? '/health-safety/reports' : undefined}
                         subline={
                             report
                                 ? `Your sites${from || to ? ` · ${from ? formatDateOnly(from) : 'All earlier records'} – ${to ? formatDateOnly(to) : 'now'}` : ' · Current records'}${report.generated_at ? ` · Made ${formatDateTime(report.generated_at)}` : ''}`
@@ -118,7 +136,12 @@ export default function SafetyReports({
                             ) : undefined
                         }
                         rail={
-                            report ? (
+                            notifications ? (
+                                <SafetyWorkspaceRail
+                                    hub="concerns"
+                                    current="notifications"
+                                />
+                            ) : report ? (
                                 <PageHeaderRail
                                     items={views.map((item) => ({ key: item.key, label: item.label }))}
                                     value={selected?.key ?? ''}

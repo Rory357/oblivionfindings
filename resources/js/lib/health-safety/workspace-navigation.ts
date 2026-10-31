@@ -31,6 +31,8 @@ export interface SafetyNavigationPermissions {
     governance?: { view?: boolean };
     compliance?: { view?: boolean };
     privacy?: { viewRequests?: boolean };
+    checklists?: { view?: boolean };
+    sites?: { viewAny?: boolean };
 }
 type Can = SafetyNavigationPermissions | null | undefined;
 type Visibility = (can: Can) => boolean;
@@ -176,6 +178,8 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 visible: (can) =>
                     !!can?.safeguarding?.create && !can?.safeguarding?.viewAny,
                 keywords: ['Safeguarding'],
+                // B5.3: a way to report, not a list; it is already a choice in "Report something".
+                shortcut: true,
             },
             {
                 key: 'fleet-incidents',
@@ -184,7 +188,9 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 icon: Truck,
                 description:
                     'Follow up incidents involving vehicles and assets.',
+                // B5.3: in the H&S rail for H&S readers; everyone else reaches it from Fleet & Assets.
                 visible: (can) =>
+                    safetyReader(can) &&
                     !!(can?.fleet?.viewAny || can?.assets?.viewAny),
             },
         ],
