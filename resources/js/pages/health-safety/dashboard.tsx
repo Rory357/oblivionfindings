@@ -31,6 +31,7 @@ import {
     type HeroFilters,
     type HeroLeadingLagging,
 } from './components/command-centre-hero';
+import type { HeaderBoxes } from './components/overview-header-boxes';
 import { searchDashboardWorklists } from './components/dashboard-search';
 import {
     buildHsTabItems,
@@ -112,6 +113,8 @@ type Props = {
     };
     /** Where open incidents are up to, by stage (optional: hidden until the source sends it). */
     incident_stages?: IncidentStagesData | null;
+    /** G2: which four header boxes this person gets (the boxes themselves load as `header_boxes`). */
+    header_box_set?: HeaderBoxes['set'];
 
     // Background group "headline".
     kpis?: Kpis;
@@ -187,6 +190,7 @@ export default function HealthSafetyDashboard({
     procedures,
     worklists,
     incident_stages = null,
+    header_box_set,
 }: Props) {
     // A tab can be opened from a link (?tab=leading); unknown values fall back to the overview.
     const pageUrl = usePage().url;
@@ -357,6 +361,7 @@ export default function HealthSafetyDashboard({
                         onReport={() => setLauncherOpen(true)}
                         orgName={org_name}
                         search={{ value: search, onChange: setSearch }}
+                        boxSet={header_box_set}
                         rail={
                             <PageHeaderRail
                                 items={tabItems.map((item) => ({

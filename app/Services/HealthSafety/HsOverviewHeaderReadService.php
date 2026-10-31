@@ -76,10 +76,11 @@ final class HsOverviewHeaderReadService
             $events = fn (): Builder => $this->events($viewer, $siteIds, $context, $proof);
             $actions = fn (): Builder => $proof->protect(HsCorrectiveAction::query()
                 ->whereIn('hs_corrective_actions.hs_event_id', $events()->select('hs_events.id')));
-            $hrefSite = $siteIds !== null && count($siteIds) === 1 ? '&site='.$siteIds[0] : '';
+            // Each box opens its list, keeping a single chosen Site (the registers read site_id).
+            $link = fn (string $path, array $query = []): string => $path.(($query = [...$query, ...($siteIds !== null && count($siteIds) === 1 ? ['site_id' => $siteIds[0]] : [])]) === [] ? '' : '?'.http_build_query($query));
 
             $box = fn (string $key) => match ($key) {
-                'need_owner' => $this->box('need_owner', 'Need an owner', 'alert', '/health-safety/events?view=needs-owner'.$hrefSite,
+                'need_owner' => $this->box('need_owner', 'Need an owner', 'alert', $link('/health-safety/events', ['tab' => 'needs_owner']),
                     $events()->where('hs_events.handover_status', HsEvent::HANDOVER_AWAITING_ACCEPTANCE)->where('hs_events.status', '!=', HsEvent::STATUS_CLOSED)->count(),
                     $this->history($events(), $moments,
                         "hs_events.created_at <= {t} AND hs_events.handover_status IN ('".HsEvent::HANDOVER_AWAITING_ACCEPTANCE."', '".HsEvent::HANDOVER_ACCEPTED."')"
@@ -87,9 +88,9 @@ final class HsOverviewHeaderReadService
                         "hs_events.created_at <= {t} AND ((hs_events.handover_status = '".HsEvent::HANDOVER_ACCEPTED."' AND hs_events.accepted_at IS NULL)"
                         ." OR (hs_events.status = '".HsEvent::STATUS_CLOSED."' AND hs_events.closed_at IS NULL))"), $since),
                 // The WorkSafe flags and severity carry no dates, so this box never shows a trend.
-                'worksafe' => $this->box('worksafe', 'WorkSafe: decide or tell', 'alert', '/health-safety/events?view=worksafe'.$hrefSite,
+                'worksafe' => $this->box('worksafe', 'WorkSafe: decide or tell', 'alert', $link('/health-safety/events', ['tab' => 'decide_or_tell']),
                     $events()->worksafeDecideOrTell()->count(), null, $since),
-                'actions_overdue' => $this->box('actions_overdue', 'Actions overdue', 'alert', '/health-safety/corrective-actions?view=overdue'.$hrefSite,
+                'actions_overdue' => $this->box('actions_overdue', 'Actions overdue', 'alert', $link('/health-safety/corrective-actions', ['tab' => 'overdue']),
                     $actions()->overdue()->count(),
                     $this->history($actions(), $moments,
                         'hs_corrective_actions.created_at <= {t} AND hs_corrective_actions.due_date < DATE(CONVERT_TZ({t}, \'+00:00\', \''.$this->workerOffset($now).'\'))'
@@ -97,22 +98,22 @@ final class HsOverviewHeaderReadService
                         .' AND (hs_corrective_actions.closed_at IS NULL OR hs_corrective_actions.closed_at > {t})',
                         "hs_corrective_actions.created_at <= {t} AND hs_corrective_actions.status IN ('verified', 'closed')"
                         .' AND hs_corrective_actions.verified_at IS NULL AND hs_corrective_actions.closed_at IS NULL'), $since),
-                'actions_to_check' => $this->box('actions_to_check', 'Actions to check', null, '/health-safety/corrective-actions?view=to-check'.$hrefSite,
+                'actions_to_check' => $this->box('actions_to_check', 'Actions to check', null, $link('/health-safety/corrective-actions', ['tab' => 'awaiting_verification']),
                     $this->checkableBy($actions(), $viewer)->where('hs_corrective_actions.status', HsCorrectiveAction::STATUS_COMPLETED)->count(),
                     $this->history($this->checkableBy($actions(), $viewer), $moments,
                         'hs_corrective_actions.completed_at <= {t} AND (hs_corrective_actions.verified_at IS NULL OR hs_corrective_actions.verified_at > {t})'
                         .' AND (hs_corrective_actions.closed_at IS NULL OR hs_corrective_actions.closed_at > {t})',
                         // Returned for rework: when it went back isn't recorded.
                         "hs_corrective_actions.completed_at <= {t} AND hs_corrective_actions.status IN ('open', 'in_progress')"), $since),
-                'open_reviews' => $this->box('open_reviews', 'Open safety reviews', null, '/health-safety/events'.($hrefSite !== '' ? '?'.ltrim($hrefSite, '&') : ''),
+                'open_reviews' => $this->box('open_reviews', 'Open safety reviews', null, $link('/health-safety/events', ['tab' => 'not_closed']),
                     $events()->where('hs_events.status', '!=', HsEvent::STATUS_CLOSED)->count(),
                     $this->history($events(), $moments,
                         'hs_events.created_at <= {t} AND (hs_events.closed_at IS NULL OR hs_events.closed_at > {t})',
                         "hs_events.created_at <= {t} AND hs_events.status = '".HsEvent::STATUS_CLOSED."' AND hs_events.closed_at IS NULL"), $since),
-                'close_anyway' => $this->box('close_anyway', 'Close-anyway requests', 'alert', '/health-safety/events?view=close-anyway'.$hrefSite,
+                'close_anyway' => $this->box('close_anyway', 'Close-anyway requests', 'alert', $link('/health-safety/events', ['tab' => 'close_anyway']),
                     $proof->protect(HsClosureException::query()->whereIn('hs_closure_exceptions.hs_event_id', $events()->select('hs_events.id'))
                         ->where('hs_closure_exceptions.status', HsClosureException::STATUS_PENDING))->count(), null, $since),
-                'open_incidents' => $this->box('open_incidents', 'Open incidents', null, '/incidents?status=open'.$hrefSite,
+                'open_incidents' => $this->box('open_incidents', 'Open incidents', null, $link('/incidents', ['tab' => 'open']),
                     $this->incidents($siteIds, $context, $proof)->whereNotIn('client_incidents.status', ['draft', 'closed'])->count(),
                     $this->history($this->incidents($siteIds, $context, $proof), $moments,
                         'client_incidents.submitted_at <= {t} AND (client_incidents.closed_at IS NULL OR client_incidents.closed_at > {t})',
@@ -120,9 +121,9 @@ final class HsOverviewHeaderReadService
                         ." OR (client_incidents.status <> 'draft' AND client_incidents.submitted_at IS NULL AND client_incidents.created_at <= {t})"
                         ." OR (client_incidents.status = 'closed' AND client_incidents.closed_at IS NULL AND client_incidents.created_at <= {t})"), $since),
                 // Whether someone could own an incident on a past date isn't recorded, so no trend.
-                'incidents_need_owner' => $this->box('incidents_need_owner', 'Incidents need an owner', 'alert', '/incidents?owner=needs_owner'.$hrefSite,
+                'incidents_need_owner' => $this->box('incidents_need_owner', 'Incidents need an owner', 'alert', $link('/incidents', ['owner' => 'needs_owner']),
                     $this->incidentsNeedingOwner($siteIds, $context), null, $since),
-                'open_hazards' => $this->box('open_hazards', 'Open hazards', null, '/health-safety/hazards'.($hrefSite !== '' ? '?'.ltrim($hrefSite, '&') : ''),
+                'open_hazards' => $this->box('open_hazards', 'Open hazards', null, $link('/compliance/hazards', ['tab' => 'active']),
                     $this->hazards($siteIds)->whereIn('site_hazards.status', ['open', 'in_progress'])->count(),
                     $this->history($this->hazards($siteIds), $moments,
                         "site_hazards.created_at <= {t} AND site_hazards.status IN ('open', 'in_progress')",
@@ -130,8 +131,8 @@ final class HsOverviewHeaderReadService
                         'site_hazards.created_at <= {t} AND site_hazards.status_changed_at > {t}'
                         .' AND site_hazards.status_changed_at > DATE_ADD(site_hazards.created_at, INTERVAL 1 MINUTE)'), $since),
                 // Due dates on checks and drills move when they're done, so these never show a trend.
-                'checks_due' => $this->box('checks_due', 'Checks due', 'alert', '/health-safety/registers?view=checks'.$hrefSite, $checksDue, null, $since),
-                'drills_due' => $this->box('drills_due', 'Drills due', 'alert', '/health-safety/drills'.($hrefSite !== '' ? '?'.ltrim($hrefSite, '&') : ''), $drillsDue, null, $since),
+                'checks_due' => $this->box('checks_due', 'Checks due', 'alert', $link('/health-safety/registers'), $checksDue, null, $since),
+                'drills_due' => $this->box('drills_due', 'Drills due', 'alert', $link('/health-safety/drills'), $drillsDue, null, $since),
             };
 
             $keys = match ($set) {

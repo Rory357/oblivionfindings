@@ -134,7 +134,7 @@ class HealthSafetyDashboardController extends Controller
     public const OVERVIEW_ALWAYS = ['worker_participation', 'filters', 'sites'];
 
     /** Cheap and needed to draw the page: in the first response. */
-    public const OVERVIEW_FIRST_PAINT = ['lens', 'org_name', 'source_scope', 'source_completeness', 'clients', 'staff', 'procedures'];
+    public const OVERVIEW_FIRST_PAINT = ['lens', 'header_box_set', 'org_name', 'source_scope', 'source_completeness', 'clients', 'staff', 'procedures'];
 
     /** Loaded after the page shows, one background request per group. */
     public const OVERVIEW_DEFERRED = [
@@ -277,6 +277,8 @@ class HealthSafetyDashboardController extends Controller
             ...$partValues,
             ...$this->overviewAlwaysProps($user, $context, $siteId, $siteScope, $f['incidentPeriod'], $f['lens']),
             'lens' => $f['lens'],
+            // G2: which four header boxes this person gets, so the waiting state can name them (permissions only, no reads).
+            'header_box_set' => \App\Services\HealthSafety\HsOverviewHeaderReadService::setFor($user),
             'source_scope' => 'readable_subset',
             'source_completeness' => 'unknown',
             // Org/brand name comes from Settings → Branding (AppSetting `branding.name`), the

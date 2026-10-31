@@ -316,6 +316,11 @@ class HsEventController extends Controller
                 ->whereDoesntHave('investigations', fn (Builder $q) => $q->where('status', HsInvestigation::STATUS_COMPLETED)),
             'awaiting_verification' => $query->whereHas('correctiveActions', fn (Builder $q) => $q->where('status', HsCorrectiveAction::STATUS_COMPLETED)),
             'worksafe_pending' => $query->where('worksafe_notifiable', true)->where('worksafe_status', HsEvent::WORKSAFE_PENDING),
+            // G2: the lists behind the Overview's header boxes, with the boxes' own meaning (IR4: the number and the list agree).
+            'needs_owner' => $query->where('handover_status', HsEvent::HANDOVER_AWAITING_ACCEPTANCE)->where('status', '!=', HsEvent::STATUS_CLOSED),
+            'decide_or_tell' => $query->worksafeDecideOrTell(),
+            'not_closed' => $query->where('status', '!=', HsEvent::STATUS_CLOSED),
+            'close_anyway' => $query->whereHas('closureExceptions', fn (Builder $q) => $q->where('status', HsClosureException::STATUS_PENDING)),
             default => $query, // 'all'
         };
     }

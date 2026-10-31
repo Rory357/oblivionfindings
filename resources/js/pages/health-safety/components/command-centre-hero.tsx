@@ -36,6 +36,11 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import {
+    OverviewHeaderBoxes,
+    OverviewHeaderBoxesLoading,
+    type HeaderBoxes,
+} from './overview-header-boxes';
 import type { PpeExpiringState } from './worklists';
 
 export type HeroLeadingLagging = {
@@ -89,6 +94,10 @@ export type CommandCentreHeroProps = Partial<AttentionProps> & {
     orgName?: string | null;
     rail?: ReactNode;
     search?: { value: string; onChange: (value: string) => void };
+    /** G2: this person's four header boxes (Stephan's approved header), loaded in the background as `header_boxes`. */
+    boxSet?: HeaderBoxes['set'];
+    /** G2: the chart row under the boxes. */
+    charts?: ReactNode;
 };
 // One board-report list, linking the readable report pages (lib/health-safety/board-reports).
 const GOV_REPORTS = boardReportLinks();
@@ -128,6 +137,8 @@ export function CommandCentreHero({
     onReport,
     rail,
     search,
+    boxSet,
+    charts,
 }: CommandCentreHeroProps) {
     const canViewBoardReports =
         usePage<SharedData>().props.auth.can?.governance?.view ?? false;
@@ -355,7 +366,18 @@ export function CommandCentreHero({
             }
             strip={
                 // The frontline start keeps the header to the title and Report something (drawing D1).
-                filters.lens === 'frontline' ? undefined : leadingLagging ? (
+                filters.lens === 'frontline' ? undefined : boxSet ? (
+                    <div className="grid w-full gap-3">
+                        <DeferredPanel<{ header_boxes: HeaderBoxes }>
+                            data="header_boxes"
+                            label="Header numbers"
+                            fallback={<OverviewHeaderBoxesLoading set={boxSet} />}
+                        >
+                            {({ header_boxes }) => <OverviewHeaderBoxes data={header_boxes} />}
+                        </DeferredPanel>
+                        {charts}
+                    </div>
+                ) : leadingLagging ? (
                     numbers(headlineFor(leadingLagging))
                 ) : (
                     <DeferredPanel<{ leading_lagging: HeroLeadingLagging }>
