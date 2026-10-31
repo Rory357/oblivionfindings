@@ -1,0 +1,100 @@
+<section class="board" id="m1"><div class="wide">
+  <div class="board-head"><span class="tag">M1 · package B2</span><h3>Overview — health and safety officer ("Your queue")</h3></div>
+  <div class="board-notes">
+    <ul>
+      <li>Drawn as Dana Hall, health and safety officer. An admin sees the same page plus "Board reports", a "Close-anyway requests" block (M11) and the chemical exposure's own words.</li>
+      <li>The four boxes are counts now (the approved D1 boxes, the second widened to "decide or tell"); the period only drives the tallies and the trend. Every number is a link.</li>
+      <li>The queue keeps D1's blocks, WorkSafe first. A review from an incident that nobody has taken on shows "Take it on" first: the decision can't be recorded before that. A row appears once, in its first block.</li>
+    </ul>
+    <ul>
+      <li>Only steps Dana can do now are buttons. The dashed "Assign owner" on the restraint review waits on Q2 (today nobody can set its owner). The chemical exposure gets no button for Dana even under Q2's first option, because she can't read wellbeing records; the row says who takes it on.</li>
+      <li>"WorkSafe: decide" shows when a review has no signed decision and has the preliminary notifiable flag, severity High or Critical, or an injury rated Serious or Critical.</li>
+      <li>Zeros fold into one sentence; checks are grouped, most overdue first; no disclaimer sentence, no "Access restricted" tiles.</li>
+    </ul>
+  </div>
+  <div class="stage-frame" id="f-m1"><div class="scaler"><div class="m">
+    {{TOP DH}}
+    <div class="body">
+      {{SIDE full hs:Overview}}
+      <main class="main">
+        <div class="crumbs">Home {{I right}} <b>Health and safety</b></div>
+        <div class="sky">
+          <div class="idrow">
+            <div class="ring">{{I shield}}</div>
+            <div><div class="title">Health and safety</div><div class="subline">All sites · counts only records you can open</div></div>
+            <div class="cluster"><span class="glass search">{{I search}} Search health and safety</span><span class="white">{{I plus}} Report something</span></div>
+          </div>
+          <div class="nums">
+            <div class="num alert"><span class="v">4</span><div><div class="l">Need an owner</div><div class="c">Now · safety reviews</div></div></div>
+            <div class="num crit"><span class="v">3</span><div><div class="l">WorkSafe: decide or tell</div><div class="c">Now · first in your queue</div></div></div>
+            <div class="num alert"><span class="v">8</span><div><div class="l">Actions overdue</div><div class="c">Now · past their due date</div></div></div>
+            <div class="num"><span class="v">3</span><div><div class="l">Actions to check</div><div class="c">Now · done, check they worked</div></div></div>
+          </div>
+          <div class="filters"><span class="fchip">{{I cal}} Period: <b>last 30 days</b> {{I down}}</span><span class="fchip">All sites · 12 {{I down}}</span></div>
+          <div class="rail"><span class="tab on">Overview</span><span class="tab">Prevention <span class="cnt">7 due</span></span><span class="tab">Harm and injuries</span><span class="tab">Legal duties</span><span class="tab find">{{I search}} Find</span></div>
+        </div>
+
+        <div class="grid g-main">
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="surface lead">
+              <div class="sh"><h4>Your queue</h4><span class="s">9 things you can move on now</span><span class="r">All tasks {{I arrow}}</span></div>
+              <div class="sec-title" style="padding:4px 18px 6px;margin:0;border-top:1px solid var(--m-border)">{{I flag}} WorkSafe: decide or tell · 3</div>
+              <div class="row"><div class="when"><b>Today</b>7:40 am</div><div class="what"><b>Fall in the shower — Amelia Wilson</b><span>Nobody has taken it on yet · Harbour Respite · <span class="ref">HS-2026-0091</span></span></div><span style="display:flex;gap:6px"><span class="badge b-crit">High</span><span class="badge b-crit">WorkSafe: decide</span></span><span class="btn pri sm">Take it on</span><span class="kebab">{{I more}}</span></div>
+              <div class="row"><div class="when"><b>Today</b>8:20 am</div><div class="what"><b>Bruised wrist during a transfer — Sofia Brown</b><span>Hemi Walker took it on · Kauri House · <span class="ref">HS-2026-0095</span></span></div><span style="display:flex;gap:6px"><span class="badge b-crit">High</span><span class="badge b-crit">WorkSafe: decide</span></span><span class="btn pri sm">Record WorkSafe decision</span><span class="kebab">{{I more}}</span></div>
+              <div class="row"><div class="when"><b>30 Oct</b>decided</div><div class="what"><b>Burn from the kettle — Liam Davis</b><span>Notifiable, decided by Jordan Peri · Harbour Respite · <span class="ref">HS-2026-0096</span></span></div><span class="badge b-crit">Tell WorkSafe</span><span class="btn pri sm">Record that WorkSafe was told</span><span class="kebab">{{I more}}</span></div>
+              <div class="sec-title" style="padding:10px 18px 6px;margin:0;border-top:1px solid var(--m-border)">{{I userplus}} Need an owner · 3 more</div>
+              <div class="row"><div class="when"><b>30 Apr</b>6 months</div><div class="what"><b>Medication given twice — Oliver Chen</b><span>Waiting for Health and safety to take it on · Kauri House · <span class="ref">HS-2026-0023</span></span></div><span class="badge b-warn">Waiting 6 months</span><span class="btn pri sm">Take it on</span><span class="kebab">{{I more}}</span></div>
+              <div class="row"><div class="when"><b>21 Oct</b>10 days</div><div class="what"><b>Held arm to stop a fall — Aroha Kingi</b><span>Restraint review, no owner · Kauri House · <span class="ref">HS-2026-0087</span></span></div><span class="badge b-warn">No owner</span><span class="btn pri sm needs-q" data-q="Q2">Assign owner</span><span class="kebab">{{I more}}</span></div>
+              <div class="row"><div class="when"><b>2 Sep</b>2 months</div><div class="what"><b>Chemical exposure — Kauri House</b><span>No owner · nobody can take it on today · <span class="ref">HS-2026-0090</span></span></div><span class="badge b-warn">No owner</span><span class="small muted needs-q" data-q="Q2">An admin takes it on</span><span class="kebab">{{I more}}</span></div>
+              <div class="sec-title" style="padding:10px 18px 6px;margin:0;border-top:1px solid var(--m-border)">{{I check}} Actions to check · 3</div>
+              <div class="row"><div class="when"><b>6 Aug</b>done</div><div class="what"><b>Put out wet-floor signs after every mop</b><span>Done by Hemi Walker · Kauri House · <span class="ref">CA-2026-9008</span></span></div><span class="badge b-info">Done — waiting to be checked</span><span class="btn pri sm">Check it worked</span><span class="kebab">{{I more}}</span></div>
+              <div class="tally" style="padding:8px 18px">+ 2 more · Show all</div>
+              <div class="sec-title" style="padding:10px 18px 6px;margin:0;border-top:1px solid var(--m-border)">{{I clock}} Other things due · 2</div>
+              <div class="row"><div class="when"><b>8 Jun</b>overdue</div><div class="what"><b>Re-train staff on the medication double-check</b><span>Its owner has left · Aroha Respite · <span class="ref">CA-2026-9004</span></span></div><span class="badge b-crit">145 days overdue</span><span class="btn pri sm">Choose a new owner</span><span class="kebab">{{I more}}</span></div>
+              <div class="row"><div class="when"><b>14 Jun</b>yours</div><div class="what"><b>Replace the worn stair tread</b><span>Your action · not started · Kauri House · <span class="ref">CA-2026-9001</span></span></div><span class="badge b-crit">139 days overdue</span><span class="btn pri sm">Start action</span><span class="kebab">{{I more}}</span></div>
+              <div class="tally">{{I check}} Nothing waiting in lone-worker alerts or safety data sheets.</div>
+              <div class="tally" style="padding-top:0">{{I lock}} Hidden — you don't have access: chemical exposure follow-ups</div>
+            </section>
+
+            <section class="surface">
+              <div class="sh"><h4>Where safety reviews are up to</h4><span class="s">Open now · closed in the last 30 days · each number opens the list</span></div>
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-top:1px solid var(--m-border)">
+                <div style="padding:14px 18px;border-right:1px solid var(--m-border)"><div style="font-size:22px;font-weight:700">4</div><div class="small muted">Open</div></div>
+                <div style="padding:14px 18px;border-right:1px solid var(--m-border)"><div style="font-size:22px;font-weight:700">17</div><div class="small muted">Being investigated</div></div>
+                <div style="padding:14px 18px;border-right:1px solid var(--m-border)"><div style="font-size:22px;font-weight:700">6</div><div class="small muted">Actions under way</div></div>
+                <div style="padding:14px 18px;border-right:1px solid var(--m-border)"><div style="font-size:22px;font-weight:700">2</div><div class="small muted">Checking it worked</div></div>
+                <div style="padding:14px 18px"><div style="font-size:22px;font-weight:700">12</div><div class="small muted">Closed</div></div>
+              </div>
+            </section>
+          </div>
+
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="strip"><div style="font-size:28px;font-weight:700;line-height:1">17</div><div class="small"><b>days since a lost-time injury</b><br><span class="muted">All sites · rates on "Harm and injuries"</span></div><span class="kebab" style="margin-left:auto">{{I right}}</span></section>
+            <section class="surface">
+              <div class="sh"><h4>Checks due</h4><span class="s">Most overdue first · a due list, it doesn't confirm gear is fit to use</span></div>
+              <div class="row" style="grid-template-columns:minmax(0,1fr) auto 28px"><div class="what"><b>Emergency drills · 4 overdue</b><span>Fire evacuation, Tōtara House — overdue 9 months</span></div><span class="badge b-crit">Overdue</span><span class="kebab">{{I right}}</span></div>
+              <div class="row" style="grid-template-columns:minmax(0,1fr) auto 28px"><div class="what"><b>Protective gear · 2 expired</b><span>Half-face respirator RSP-6200-014 — inspection expired 5 months ago</span></div><span class="badge b-crit">Expired</span><span class="kebab">{{I right}}</span></div>
+              <div class="row" style="grid-template-columns:minmax(0,1fr) auto 28px"><div class="what"><b>Risk assessments · 1 overdue</b><span>Manual handling — hoist transfers</span></div><span class="badge b-warn">Review due</span><span class="kebab">{{I right}}</span></div>
+            </section>
+            <section class="surface">
+              <div class="sh"><h4>Sites</h4><span class="s">Open work now, most first</span><span class="r">All 12 {{I arrow}}</span></div>
+              <table class="t"><thead><tr><th>Site</th><th>Open reviews</th><th>Overdue actions</th></tr></thead><tbody>
+                <tr><td>Kauri House</td><td>8</td><td>3</td></tr><tr><td>Harbour Respite</td><td>6</td><td>1</td></tr><tr><td>Rimu House</td><td>5</td><td>2</td></tr><tr><td>Aroha Respite</td><td>3</td><td>2</td></tr></tbody></table>
+              <div class="tally">Fewer reports doesn't mean a safer site.</div>
+            </section>
+            <section class="surface">
+              <div class="sh"><h4>Incidents each month</h4></div>
+              <div style="display:flex;align-items:flex-end;gap:14px;height:86px;padding:0 18px 6px">
+                <div style="flex:1;text-align:center"><div style="height:58px;background:var(--m-primary);opacity:.8;border-radius:4px 4px 0 0"></div><div class="small muted">Aug · 23</div></div>
+                <div style="flex:1;text-align:center"><div style="height:30px;background:var(--m-primary);opacity:.8;border-radius:4px 4px 0 0"></div><div class="small muted">Sep · 12</div></div>
+                <div style="flex:1;text-align:center"><div style="height:10px;background:var(--m-primary);opacity:.8;border-radius:4px 4px 0 0"></div><div class="small muted">Oct · 4</div></div>
+              </div>
+              <div class="tally">4 so far in October, 8 fewer than in September.</div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div></div></div>
+  <div class="frame-tools"><button type="button" data-full="f-m1">Full size</button><span>Health and safety officer (Dana Hall) · light mode · 1440 px</span></div>
+</div></section>

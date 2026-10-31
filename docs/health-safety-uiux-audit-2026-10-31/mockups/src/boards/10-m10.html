@@ -1,0 +1,75 @@
+<section class="board" id="m10"><div class="wide">
+  <div class="board-head"><span class="tag">M10 · package B6</span><h3>My Day — support worker: report at the top, see what happened next</h3></div>
+  <div class="board-notes">
+    <ul>
+      <li>"Something happened?" sits first in the body, with one button that opens the approved "Report something" chooser, plus the two most common choices as shortcuts.</li>
+      <li>The duplicate "Report incident" leaves the Record care card; Observation stays there. The top bar is unchanged unless you choose Q6.</li>
+    </ul>
+    <ul>
+      <li>"What you reported" shows the person's own reports in one status set: Draft · Sent · Being followed up · Closed. Never safeguarding, restricted, HR-confidential or independently handled reports. It is drawn dashed because it needs decision Q3: today support workers read incidents by the clients they support, not by who reported them.</li>
+      <li>Inset: after sending, the success pane says who reads it and what happens next, then returns to My Day.</li>
+    </ul>
+  </div>
+  <div class="stage-frame" id="f-m10"><div class="scaler"><div class="m" style="position:relative">
+    {{TOP MT}}
+    <div class="body">
+      {{SIDE sw My Day}}
+      <main class="main">
+        <div class="crumbs">Home {{I right}} <b>My Day</b></div>
+        <div class="sky">
+          <div class="idrow">
+            <div class="ring">{{I cal}}</div>
+            <div><div class="title">My Day <span class="bandchip">Clocked in</span></div><div class="subline">Saturday 31 October 2026 · Kauri House · 7:00 am – 3:00 pm</div></div>
+            <div class="cluster"><span class="glass search">{{I search}} Find in today's work</span></div>
+          </div>
+          <div class="nums">
+            <div class="num alert"><span class="v">2</span><div><div class="l">Needs attention</div><div class="c">This shift</div></div></div>
+            <div class="num"><span class="v">3/8</span><div><div class="l">Today's tasks</div><div class="c">5 to go</div></div></div>
+            <div class="num"><span class="v">4/6</span><div><div class="l">Meds today</div><div class="c">Next at 12:00 pm</div></div></div>
+            <div class="num"><span class="v">3</span><div><div class="l">People today</div><div class="c">At Kauri House</div></div></div>
+          </div>
+          <div class="rail"><span class="tab on">Today</span><span class="tab">Handover</span><span class="tab">My shift</span><span class="tab find">{{I search}} Find</span></div>
+        </div>
+
+        <section class="strip sh2" style="margin-top:20px">
+          <span class="lens">{{I alert}}</span>
+          <div><b style="font-size:15px">Something happened?</b><div class="small muted">Someone hurt or nearly hurt, or you're worried about a person. Tell us and we'll take it from there.</div></div>
+          <span style="margin-left:auto;display:flex;gap:8px"><span class="btn out sm">Report an incident</span><span class="btn out sm">Raise a safeguarding concern</span><span class="btn pri">{{I plus}} Report something</span></span>
+        </section>
+
+        <div class="grid g-main">
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="surface lead">
+              <div class="sh"><h4>What needs to happen today</h4><span class="s">5 to go</span></div>
+              <div class="row"><div class="when"><b>9:00 am</b></div><div class="what"><b>Morning personal care — Aroha Kingi</b><span>Use the walker for every transfer</span></div><span class="badge b-warn">Due now</span><span class="btn pri sm">Record</span><span class="kebab">{{I more}}</span></div>
+              <div class="row"><div class="when"><b>10:00 am</b></div><div class="what"><b>Morning walk — Tane Wineera</b><span>Take the walker; check the path is dry</span></div><span class="badge b-neutral">Later</span><span class="btn out sm">Record</span><span class="kebab">{{I more}}</span></div>
+              <div class="row"><div class="when"><b>12:00 pm</b></div><div class="what"><b>Lunchtime medicines — 3 people</b><span>Meds today</span></div><span class="badge b-neutral">Later</span><span class="btn out sm">Open</span><span class="kebab">{{I more}}</span></div>
+            </section>
+          </div>
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="surface needs-q" data-q="Q3">
+              <div class="sh"><h4>What you reported</h4><span class="s">Your last 3</span></div>
+              <div class="row" style="grid-template-columns:62px minmax(0,1fr) auto"><div class="when"><b>27 Oct</b></div><div class="what"><b>Cut finger — you</b><span>Workplace injury</span></div><span class="badge b-info">Being followed up</span></div>
+              <div class="row" style="grid-template-columns:62px minmax(0,1fr) auto"><div class="when"><b>26 Oct</b></div><div class="what"><b>Fall in the lounge</b><span>Incident</span></div><span class="badge b-info">Being followed up</span></div>
+              <div class="row" style="grid-template-columns:62px minmax(0,1fr) auto"><div class="when"><b>22 Oct</b></div><div class="what"><b>Wardrobe door came off</b><span>Incident</span></div><span class="badge b-ok">Closed</span></div>
+            </section>
+            <section class="surface">
+              <div class="sh"><h4>Record care</h4><span class="s">Something you've already done or noticed</span></div>
+              <div style="padding:0 18px 16px"><div class="tile"><span style="color:var(--m-primary-fill)">{{I eye}}</span><div><b>Observation</b><span>What you noticed about a person today</span></div></div></div>
+            </section>
+            <section class="surface" style="border-style:dashed">
+              <div class="sh"><h4>Inset · after sending a report</h4></div>
+              <div style="padding:4px 18px 18px;display:grid;justify-items:center;text-align:center;gap:8px">
+                <span class="lens" style="background:var(--m-ok-bg);color:var(--m-ok)">{{I check}}</span>
+                <b>Thanks — your report is in</b>
+                <span class="small muted">It is now with the people who follow up incidents at Kauri House. You can see where it is up to under "What you reported".</span>
+                <span class="btn pri sm">Back to My Day</span>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div></div></div>
+  <div class="frame-tools"><button type="button" data-full="f-m10">Full size</button><span>Support worker (Mere Tane), clocked in at Kauri House</span></div>
+</div></section>

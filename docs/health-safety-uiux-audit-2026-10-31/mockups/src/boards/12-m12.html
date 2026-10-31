@@ -1,0 +1,47 @@
+<section class="board" id="m12"><div class="wide">
+  <div class="board-head"><span class="tag">M12 · packages B3 + B2</span><h3>Asking to close anyway, and recording the WorkSafe decision</h3></div>
+  <div class="board-notes">
+    <ul>
+      <li>"Ask to close anyway" (720) uses the server's rules: one request covers one open item, and closing needs every such item covered, so it is offered only when exactly one is left. The pop-up names that item. A reason of at least 20 characters; an evidence reference; the date the request lapses and a review date on or before it (each the end of that day, NZ time; the lapse date can be up to 29 days ahead, because the server refuses anything past 30 days from asking).</li>
+      <li>The owner, or someone who can close any review, can ask; with no owner, as here, anyone at the site who may ask can. The person who asks can't approve it. Approvers' names come from the server.</li>
+    </ul>
+    <ul>
+      <li>"Record the WorkSafe decision" (480) opens only after someone has taken the review on (the server refuses it before). The legal meaning stays word for word in its hint; the example reason uses the Act's own test.</li>
+      <li>"Yes" leads straight to "Record that WorkSafe was told" (M8).</li>
+    </ul>
+  </div>
+  <div class="stage-frame" id="f-m12"><div class="scaler"><div class="m" style="height:600px;background:oklch(0.86 0.004 277)">
+
+    <div class="popup w720" style="left:20px;top:20px">
+      <div class="ph"><span class="lens">{{I hand}}</span><div><h5>Ask to close anyway</h5><p>For one open item that can't be finished, or doesn't need to be.</p></div><span class="x">{{I x}}</span></div>
+      <div class="ctx">Worn hoist sling — Rimu House · <span class="ref">HS-2026-0083</span> · no owner</div>
+      <div class="pb">
+        <div class="field"><label>The open item this covers</label>
+          <div class="tile on" style="cursor:default"><span style="color:var(--m-primary-fill)">{{I list}}</span><div><b>The investigation isn't needed</b><span>It's the only item left that "close anyway" can cover</span></div></div>
+          <div class="hint">WorkSafe steps and record checks can never be skipped. Both are done here.</div></div>
+        <div class="field"><label>Why</label><div class="textarea">Found on the monthly hoist check, taken out of use at once and replaced that afternoon. Nobody used it after it was found.</div><div class="hint">At least 20 characters.</div></div>
+        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:12px">
+          <div class="field"><label>Evidence</label><div class="input">Hoist check 28 Oct and a photo of the new sling</div></div>
+          <div class="field"><label>Review on</label><div class="input">{{I cal}} Fri 20 Nov 2026</div><div class="hint">On or before the lapse date</div></div>
+          <div class="field"><label>Lapses on</label><div class="input">{{I cal}} Thu 26 Nov 2026</div><div class="hint">Up to 29 days ahead</div></div>
+        </div>
+      </div>
+      <div class="pf"><span class="left">Demo Admin or Priya Nair decides</span><span class="btn out">Cancel</span><span class="btn pri">{{I hand}} Send request</span></div>
+    </div>
+
+    <div class="popup w480" style="left:780px;top:20px">
+      <div class="ph"><span class="lens">{{I flag}}</span><div><h5>Record the WorkSafe decision</h5><p>Decide whether this is a notifiable event.</p></div><span class="x">{{I x}}</span></div>
+      <div class="ctx">Fall in the shower — Amelia Wilson · Harbour Respite · <span class="ref">HS-2026-0091</span> · you took it on today</div>
+      <div class="pb">
+        <div style="background:var(--m-muted);border-radius:10px;padding:10px 12px;font-size:12.5px;display:flex;gap:8px"><span style="color:var(--m-primary-fill)">{{I info}}</span><span><b>Notifiable event:</b> a death, or a serious injury, illness or incident that the Health and Safety at Work Act 2015 (sections 23–25) says we must tell WorkSafe about straight away.</span></div>
+        <div style="display:grid;gap:8px">
+          <div class="tile on"><span class="radio"></span><div><b>Yes, it's a notifiable event</b><span>Next: record that WorkSafe was told</span></div></div>
+          <div class="tile"><span class="radio"></span><div><b>No, it isn't notifiable</b><span>Say why below</span></div></div>
+        </div>
+        <div class="field"><label>Why did you decide this?</label><div class="textarea">Admitted to hospital for immediate treatment, so this is a notifiable injury.</div></div>
+      </div>
+      <div class="pf"><span class="btn out">Cancel</span><span class="btn pri">{{I flag}} Record decision</span></div>
+    </div>
+  </div></div></div>
+  <div class="frame-tools"><button type="button" data-full="f-m12">Full size</button><span>Drawn as Dana Hall, health and safety officer</span></div>
+</div></section>

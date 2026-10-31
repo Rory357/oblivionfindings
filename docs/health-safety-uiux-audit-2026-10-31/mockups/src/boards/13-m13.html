@@ -1,0 +1,85 @@
+<section class="board" id="m13"><div class="wide">
+  <div class="board-head"><span class="tag">M13 · package B1</span><h3>An action whose owner has left — the next step comes with its button</h3></div>
+  <div class="board-notes">
+    <ul>
+      <li>Fixes H2's own example (CA-2026-9004). Today the next step says "Choose a new owner" but the only button is "Start action". Here the next step and its button match, and Start says why it isn't available yet.</li>
+      <li>One strip in the header: the action's own steps. The safety review it came from is a link in the body.</li>
+    </ul>
+    <ul>
+      <li>"Choose a new owner" (480) lists only people allowed to own it, and says so. Inset: when nobody at the site can own it, the picker says why and who can help.</li>
+      <li>Drawn as Dana Hall, health and safety officer.</li>
+    </ul>
+  </div>
+  <div class="stage-frame" id="f-m13"><div class="scaler"><div class="m" style="position:relative;min-height:1080px">
+    {{TOP DH}}
+    <div class="body">
+      {{SIDE full hs:Incidents and safety reviews}}
+      <main class="main">
+        <div class="crumbs">Home {{I right}} Health and safety {{I right}} Incidents and safety reviews {{I right}} Actions {{I right}} <b>Re-train staff on the medication double-check</b></div>
+        <div class="sky">
+          <div class="idrow">
+            <span class="back">{{I left}}</span>
+            <div class="ring">{{I list}}</div>
+            <div><div class="title">Re-train staff on the medication double-check <span class="bandchip">To do</span></div><div class="subline">Aroha Respite · due Mon 8 Jun 2026 · <span style="opacity:.75">CA-2026-9004</span></div></div>
+            <div class="cluster"><span class="glass">More {{I down}}</span></div>
+          </div>
+          <div class="factchips">
+            <span class="fact"><span class="dot"></span><b>High</b> priority</span>
+            <span class="fact"><b>145 days</b> overdue</span>
+            <span class="fact">{{I user}} <b>No owner</b> the last one has left</span>
+          </div>
+          <div class="stagesband">
+            <div class="next"><span class="k">Next step</span><span class="t">Choose a new owner</span><span style="opacity:.8">— then they start the action</span></div>
+            <div class="stages" style="grid-template-columns:repeat(5,1fr)">
+              <div class="st cur"><b>To do</b><span>Needs an owner</span></div>
+              <div class="st"><b>In progress</b><span>&nbsp;</span></div>
+              <div class="st"><b>Done — waiting to be checked</b><span>&nbsp;</span></div>
+              <div class="st"><b>Checked</b><span>&nbsp;</span></div>
+              <div class="st"><b>Closed</b><span>&nbsp;</span></div>
+            </div>
+          </div>
+          <div class="rail"><span class="tab on">Overview</span><span class="tab">Files</span><span class="tab">History</span><span class="tab find">{{I search}} Find</span></div>
+        </div>
+        <div class="grid g-main">
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="surface lead">
+              <div class="sh"><h4>What happens next</h4></div>
+              <div style="padding:0 18px 16px;display:grid;gap:10px">
+                <p style="font-size:14.5px"><b>Choose a new owner.</b> The person who owned this action has left Aroha Respite. The new owner starts it and marks it done.</p>
+                <div style="display:flex;gap:10px;align-items:center"><span class="btn pri">{{I userplus}} Choose a new owner</span><span class="btn out dis">Start action</span><span class="small muted">Start opens once it has an owner.</span></div>
+              </div>
+            </section>
+            <section class="surface">
+              <div class="sh"><h4>What we agreed</h4></div>
+              <dl class="story"><dt>The action</dt><dd>Re-train the Aroha Respite team on the two-person check before every medicine round.</dd><dt>Kind</dt><dd>Stop it happening</dd></dl>
+            </section>
+          </div>
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="surface">
+              <div class="sh"><h4>Came from</h4><span class="r">Open {{I arrow}}</span></div>
+              <div class="row" style="grid-template-columns:minmax(0,1fr) auto"><div class="what"><b>Medication given late — Aroha Respite</b><span>Safety review · actions under way · <span class="ref">HS-2026-0067</span></span></div><span class="badge b-info">Actions under way</span></div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+    <div class="veil"></div>
+    <div class="popup w480" style="left:700px;top:190px">
+      <div class="ph"><span class="lens">{{I userplus}}</span><div><h5>Choose a new owner</h5><p>They'll start the action and mark it done.</p></div><span class="x">{{I x}}</span></div>
+      <div class="ctx">Re-train staff on the medication double-check · <span class="ref">CA-2026-9004</span> · Aroha Respite</div>
+      <div class="pb">
+        <div class="field"><label>New owner</label>
+          <div class="input focus">{{I search}} <span class="muted">Search people who can own it</span></div>
+          <div style="border:1px solid var(--m-border);border-radius:10px;margin-top:6px;padding:4px">
+            <div class="person on"><span class="ini">JP</span><div class="small"><b>Jordan Peri</b><br><span class="muted">Health and safety officer · all sites</span></div><span style="margin-left:auto;color:var(--m-primary-fill)">{{I check}}</span></div>
+            <div class="person"><span class="ini">DH</span><div class="small"><b>You — Dana Hall</b><br><span class="muted">Health and safety officer · all sites</span></div></div>
+            <div class="person"><span class="ini">DA</span><div class="small"><b>Demo Admin</b><br><span class="muted">Admin · all sites</span></div></div>
+          </div>
+          <div class="hint">Only people who manage health and safety at Aroha Respite are listed.</div></div>
+      </div>
+      <div class="pf"><span class="btn out">Cancel</span><span class="btn pri">{{I userplus}} Make Jordan Peri the owner</span></div>
+    </div>
+    <div style="position:absolute;z-index:9;left:700px;top:910px;width:480px;background:#fff;border:1px dashed oklch(0.72 0.16 60);border-radius:14px;padding:14px 16px;font-size:13px"><b>Inset · the same picker when nobody can own it</b><div style="display:grid;justify-items:center;text-align:center;gap:6px;padding:10px 0 2px"><span class="lens">{{I userplus}}</span><b>Nobody here can own this yet</b><span class="muted small">Owners need to manage health and safety at Aroha Respite. An admin can give someone that access.</span></div></div>
+  </div></div></div>
+  <div class="frame-tools"><button type="button" data-full="f-m13">Full size</button><span>Health and safety officer (Dana Hall)</span></div>
+</div></section>
