@@ -178,6 +178,7 @@ class OperationsPermissionsSeeder extends Seeder
         if ($adminRole) {
             $allPermissionIds = Permission::query()
                 ->whereNotIn('key', RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY)
+                ->where('key', 'not like', 'securityDevices.endpoints.script%')
                 ->pluck('id')
                 ->all();
             $adminRole->permissions()->sync($allPermissionIds);

@@ -1,7 +1,9 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Domain\SecurityDevices\Iot\Http\Controllers\MilesightGatewayWebhookController;
 use App\Http\Controllers\Api\WebhookReceiverController;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Integration Routes
@@ -10,7 +12,6 @@ use App\Http\Controllers\Api\WebhookReceiverController;
  * module (webhook receiver only today). UniFi provider config moved to
  * /security-devices/integrations/unifi — see routes/security-devices.php.
  */
-
 Route::middleware(['auth'])->group(function () {
     // UniFi legacy URL — permanent redirect into the module. Preserved so
     // any external bookmarks from the MVP era keep resolving.
@@ -23,8 +24,15 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
+// Milesight LoRaWAN Gateway (UG56/UG65/UG67) local HTTP(S) Push receiver (HMAC-SHA256 / Bearer, CSRF exempt)
+Route::post('/webhooks/milesight-gateway/{site}', MilesightGatewayWebhookController::class)
+    ->whereNumber('site')
+    ->middleware('throttle:120,1')
+    ->name('webhooks.milesight-gateway')
+    ->withoutMiddleware([PreventRequestForgery::class]);
+
 // Webhook receiver (no auth — uses API key header validation, CSRF exempt)
 Route::post('/webhooks/{provider}', [WebhookReceiverController::class, 'receive'])
     ->middleware('throttle:60,1')
     ->name('webhooks.receive')
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class]);
+    ->withoutMiddleware([PreventRequestForgery::class]);

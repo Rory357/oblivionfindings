@@ -94,6 +94,10 @@ class ExpireStaleOpenPositions extends Command
                         'include_assigned_workers' => false,
                         'include_entity_user' => false,
                         'target_user_ids' => $this->managerRecipientIds($position),
+                        // While a manager's nudge for this claim is unread, it
+                        // is refreshed (and moved to the top) rather than sent
+                        // again; once read, the next nudge is a new one.
+                        'refresh_unread_copy' => true,
                     ]);
 
                     $this->recordTimeline(

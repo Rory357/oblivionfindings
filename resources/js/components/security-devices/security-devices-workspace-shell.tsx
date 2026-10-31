@@ -303,7 +303,7 @@ export function SecurityDevicesWorkspaceShell({
                         <p className="text-xs text-muted-foreground">
                             {activeTab.state === 'restricted'
                                 ? 'No restricted event details or counts are shown.'
-                                : 'No metrics or controls are shown until a canonical data source is available.'}
+                                : 'No metrics or controls are shown until a supported data source is available.'}
                         </p>
                     </CardContent>
                 </Card>

@@ -32,9 +32,11 @@ use App\Domain\Monitoring\Contracts\TcpTransport;
 use App\Domain\Monitoring\Contracts\TimeSeriesStore;
 use App\Domain\Monitoring\Contracts\TlsTransport;
 use App\Domain\Monitoring\Discovery\Adapters\NetworkSeedDiscoveryAdapter;
+use App\Domain\Monitoring\Discovery\Adapters\SnmpInventoryDiscoveryAdapter;
 use App\Domain\Monitoring\Discovery\Contracts\DiscoveryAdapter;
 use App\Domain\Monitoring\Discovery\Contracts\DiscoveryThrottle;
 use App\Domain\Monitoring\Discovery\Services\NativeDiscoveryTokenBucket;
+use App\Domain\Monitoring\Discovery\Support\LocalLanDiscoveryScanner;
 use App\Domain\Monitoring\Enums\RuntimeMessageType;
 use App\Domain\Monitoring\Handlers\EventEnvelopeHandler;
 use App\Domain\Monitoring\Handlers\ObservationEnvelopeHandler;
@@ -66,15 +68,51 @@ use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerRestoreProbe;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerSecretStore;
+use App\Domain\SecurityDevices\Credentials\Services\EncryptedDatabaseSecretLeaseIssuer;
+use App\Domain\SecurityDevices\Credentials\Services\EncryptedDatabaseSecretStore;
 use App\Domain\SecurityDevices\Credentials\Services\GovernedCredentialLeaseBroker;
 use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultSecretStore;
 use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerSecretStore;
+use App\Domain\SecurityDevices\Drivers\Alarms\AjaxHubAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\ArrowheadEliteAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\BoschSolutionAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\DscPowerSeriesNeoDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\GallagherCommandCentreDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\IctProtegeAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\InnerRangeInceptionDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\InnerRangeIntegritiDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\ParadoxAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\SiaDc09AlarmReceiverDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\AxisOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\DahuaOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\HanwhaVisionOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\HikvisionOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\OnvifProfileCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\UniFiProtectCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\UniviewOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Endpoints\MicrosoftIntuneDriver;
+use App\Domain\SecurityDevices\Drivers\Endpoints\WindowsEndpointObliDriver;
+use App\Domain\SecurityDevices\Drivers\Network\ArubaAosConfigDriver;
+use App\Domain\SecurityDevices\Drivers\Network\CiscoIosConfigDriver;
+use App\Domain\SecurityDevices\Drivers\Network\FortinetFortiOsConfigDriver;
+use App\Domain\SecurityDevices\Drivers\Network\MikroTikRouterOsConfigDriver;
+use App\Domain\SecurityDevices\Drivers\Network\UbiquitiUnifiNetworkDriver;
+use App\Domain\SecurityDevices\Drivers\Sensors\MilesightCloudSensorDriver;
+use App\Domain\SecurityDevices\Drivers\Sensors\MilesightLorawanGatewaySensorDriver;
+use App\Domain\SecurityDevices\Drivers\Sensors\MqttGenericSensorDriver;
+use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
+use App\Domain\SecurityDevices\Drivers\Telemetry\HubNetflowTelemetryDriver;
+use App\Domain\SecurityDevices\Drivers\Telemetry\HubSyslogTelemetryDriver;
+use App\Domain\SecurityDevices\Drivers\Trackers\QueclinkTrackerDriver;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommandAdapter;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCommandAdapter;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommandAdapter;
+use App\Domain\SecurityDevices\Management\Adapters\AlarmPanelCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\DatabaseReleaseFixtureCommandRuntime;
+use App\Domain\SecurityDevices\Management\Adapters\NetworkDeviceCommandAdapter;
+use App\Domain\SecurityDevices\Management\Adapters\NetworkSshConfigBackupCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\QueclinkTrackingCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\ReleaseFixtureCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\ReleaseFixtureCommandRuntime;
@@ -85,6 +123,8 @@ use App\Domain\SecurityDevices\Management\Services\GovernedCommandDispatchServic
 use App\Domain\SecurityDevices\Management\Transports\NativeCommandHttpTransport;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Domain\SecurityDevices\NetworkConfig\Contracts\NetworkCliSshTransport;
+use App\Domain\SecurityDevices\NetworkConfig\Services\PhpseclibNetworkCliTransport;
 use App\Events\FleetSignalEmitted;
 use App\Events\FleetWanderingAlertTriggered;
 use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
@@ -180,6 +220,7 @@ use App\Observers\WorkplaceInjuryObserver;
 use App\Services\AuditLogger;
 use App\Services\Catering\DeliveryProviders\DeliveryProviderManager;
 use App\Services\Fleet\FleetRealtimeAuthorizationService;
+use App\Services\Integration\Adapters\IntuneAdapter;
 use App\Services\Integration\Adapters\MilesightAdapter;
 use App\Services\Integration\Adapters\QueclinkAdapter;
 use App\Services\Integration\Adapters\UnifiAdapter;
@@ -206,6 +247,7 @@ use App\Services\UserSiteAccessService;
 use App\Support\SchemaCache;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Database\Events\SchemaLoaded;
@@ -237,30 +279,87 @@ class AppServiceProvider extends ServiceProvider
             ),
         );
         $this->app->bind(CommandHttpTransport::class, NativeCommandHttpTransport::class);
+        $this->app->bind(NetworkCliSshTransport::class, PhpseclibNetworkCliTransport::class);
         $this->app->tag([
             UnifiAccessCommandAdapter::class,
             QueclinkTrackingCommandAdapter::class,
+            NetworkDeviceCommandAdapter::class,
+            NetworkSshConfigBackupCommandAdapter::class,
+            AlarmPanelCommandAdapter::class,
             ReleaseFixtureCommandAdapter::class,
             EndpointServiceCommandAdapter::class,
             EndpointRestartCommandAdapter::class,
             EndpointSoftwareCommandAdapter::class,
         ], 'device-command-adapters');
+        $this->app->tag([
+            UniFiProtectCameraDriver::class,
+            HikvisionOnvifCameraDriver::class,
+            DahuaOnvifCameraDriver::class,
+            UniviewOnvifCameraDriver::class,
+            AxisOnvifCameraDriver::class,
+            HanwhaVisionOnvifCameraDriver::class,
+            OnvifProfileCameraDriver::class,
+            GallagherCommandCentreDriver::class,
+            InnerRangeInceptionDriver::class,
+            SiaDc09AlarmReceiverDriver::class,
+            ArrowheadEliteAlarmDriver::class,
+            IctProtegeAlarmDriver::class,
+            InnerRangeIntegritiDriver::class,
+            BoschSolutionAlarmDriver::class,
+            AjaxHubAlarmDriver::class,
+            ParadoxAlarmDriver::class,
+            DscPowerSeriesNeoDriver::class,
+            MilesightLorawanGatewaySensorDriver::class,
+            MilesightCloudSensorDriver::class,
+            MqttGenericSensorDriver::class,
+            UbiquitiUnifiNetworkDriver::class,
+            MikroTikRouterOsConfigDriver::class,
+            CiscoIosConfigDriver::class,
+            ArubaAosConfigDriver::class,
+            FortinetFortiOsConfigDriver::class,
+            QueclinkTrackerDriver::class,
+            HubSyslogTelemetryDriver::class,
+            HubNetflowTelemetryDriver::class,
+            WindowsEndpointObliDriver::class,
+            MicrosoftIntuneDriver::class,
+        ], 'security-devices.drivers');
+        $this->app->singleton(
+            DeviceDriverRegistry::class,
+            fn ($app): DeviceDriverRegistry => new DeviceDriverRegistry(
+                $app->tagged('security-devices.drivers'),
+            ),
+        );
         $this->app->bind(ReleaseFixtureCommandRuntime::class, DatabaseReleaseFixtureCommandRuntime::class);
         $this->app->bind(CredentialLeaseProvider::class, GovernedCredentialLeaseBroker::class);
-        $this->app->singleton(SecretManagerLeaseIssuer::class, function ($app): SecretManagerLeaseIssuer {
-            return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
+        $this->app->bind(
+            EncryptedDatabaseSecretLeaseIssuer::class,
+            fn ($app): EncryptedDatabaseSecretLeaseIssuer => new EncryptedDatabaseSecretLeaseIssuer(
+                static fn (): Encrypter => $app->make(Encrypter::class),
+            ),
+        );
+        $this->app->bind(
+            EncryptedDatabaseSecretStore::class,
+            fn ($app): EncryptedDatabaseSecretStore => new EncryptedDatabaseSecretStore(
+                static fn (): Encrypter => $app->make(Encrypter::class),
+            ),
+        );
+        $this->app->bind(SecretManagerLeaseIssuer::class, function ($app): SecretManagerLeaseIssuer {
+            return match ((string) config('monitoring.credentials.driver', 'database')) {
+                'database' => $app->make(EncryptedDatabaseSecretLeaseIssuer::class),
                 'vault' => $app->make(HashicorpVaultLeaseIssuer::class),
                 default => $app->make(UnavailableSecretManagerLeaseIssuer::class),
             };
         });
-        $this->app->singleton(SecretManagerRestoreProbe::class, function ($app): SecretManagerRestoreProbe {
-            return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
+        $this->app->bind(SecretManagerRestoreProbe::class, function ($app): SecretManagerRestoreProbe {
+            return match ((string) config('monitoring.credentials.driver', 'database')) {
+                'database' => $app->make(EncryptedDatabaseSecretLeaseIssuer::class),
                 'vault' => $app->make(HashicorpVaultLeaseIssuer::class),
                 default => $app->make(UnavailableSecretManagerLeaseIssuer::class),
             };
         });
-        $this->app->singleton(SecretManagerSecretStore::class, function ($app): SecretManagerSecretStore {
-            return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
+        $this->app->bind(SecretManagerSecretStore::class, function ($app): SecretManagerSecretStore {
+            return match ((string) config('monitoring.credentials.driver', 'database')) {
+                'database' => $app->make(EncryptedDatabaseSecretStore::class),
                 'vault' => $app->make(HashicorpVaultSecretStore::class),
                 default => $app->make(UnavailableSecretManagerSecretStore::class),
             };
@@ -268,6 +367,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CollectorCertificateIssuer::class, OpenSslCollectorCertificateIssuer::class);
         $this->app->bind(DnsResolver::class, NativeDnsResolver::class);
         $this->app->bind(DnsTransport::class, NativeDnsTransport::class);
+        $this->app->bind(NetworkSeedDiscoveryAdapter::class, fn ($app): NetworkSeedDiscoveryAdapter => new NetworkSeedDiscoveryAdapter(
+            $app->make(CidrMatcher::class),
+            $app->make(EgressPolicy::class),
+            $app->make(IcmpProbeAdapter::class),
+            $app->make(TcpProbeAdapter::class),
+            $app->make(TlsProbeAdapter::class),
+            $app->make(SnmpInventoryDiscoveryAdapter::class),
+            $app->make(DiscoveryThrottle::class),
+            $app->make(LocalLanDiscoveryScanner::class),
+        ));
         $this->app->bind(DiscoveryAdapter::class, NetworkSeedDiscoveryAdapter::class);
         $this->app->bind(DiscoveryThrottle::class, NativeDiscoveryTokenBucket::class);
         $this->app->bind(EnvelopeSigner::class, SodiumEnvelopeSigner::class);
@@ -388,6 +497,27 @@ class AppServiceProvider extends ServiceProvider
                     sensitivityLabels: ['provider_credentials', 'device_identifiers', 'operational_observations', 'event_metadata'],
                     pageLimit: 100,
                     minimumIntervalSeconds: 300,
+                    backfillLimit: 1000,
+                ),
+            );
+            $registry->register(
+                IntuneAdapter::PROVIDER_SLUG,
+                IntuneAdapter::class,
+                new IntegrationCapabilityManifest(
+                    provider: IntuneAdapter::PROVIDER_SLUG,
+                    version: '1.0',
+                    capabilities: [
+                        ConnectionHealthCapability::class,
+                        InventoryDiscoveryCapability::class,
+                        DeviceSyncCapability::class,
+                    ],
+                    requiredPermissions: [
+                        'securityDevices.integrations.view',
+                        'securityDevices.integrations.manage',
+                    ],
+                    sensitivityLabels: ['provider_credentials', 'device_identifiers', 'operational_observations'],
+                    pageLimit: 100,
+                    minimumIntervalSeconds: 1800,
                     backfillLimit: 1000,
                 ),
             );

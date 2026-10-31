@@ -1,8 +1,11 @@
 import { ItModuleShell } from '@/components/it/it-module-shell';
 import {
     PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page/page-header';
@@ -13,7 +16,7 @@ import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Monitor, Package, Plus, Search, ShieldCheck } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import {
     softwareBase,
     softwareIndexReply,
@@ -79,8 +82,7 @@ export function SoftwareWorkspace(props: Props) {
             })
         );
     }
-    function searchCatalogue(event: FormEvent) {
-        event.preventDefault();
+    function searchCatalogue() {
         router.visit(url(props.query.status, search), { preserveScroll: true });
     }
     function changed(item: SoftwarePackage) {
@@ -108,8 +110,24 @@ export function SoftwareWorkspace(props: Props) {
                     icon={Package}
                     subline="Reviewed Windows installers and their approval history"
                     actions={
-                        <div className="flex flex-wrap gap-2">
-                            <Button variant="secondary" asChild>
+                        <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter')
+                                        searchCatalogue();
+                                }}
+                                ariaLabel="Search approved software"
+                                placeholder="Application or publisher…"
+                            />
+                            <PageHeaderGlassButton
+                                icon={Search}
+                                onClick={searchCatalogue}
+                            >
+                                Search
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton asChild icon={Monitor}>
                                 <Link
                                     href={
                                         props.query.device_id
@@ -118,19 +136,20 @@ export function SoftwareWorkspace(props: Props) {
                                             : '/it/remote-support'
                                     }
                                 >
-                                    <Monitor aria-hidden="true" />
                                     {props.query.device_id
                                         ? 'Computer support'
                                         : 'Choose a computer'}
                                 </Link>
-                            </Button>
+                            </PageHeaderGlassButton>
                             {valid && props.can_upload && (
-                                <Button onClick={() => setUpload(true)}>
-                                    <Plus aria-hidden="true" />
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={() => setUpload(true)}
+                                >
                                     Add release
-                                </Button>
+                                </PageHeaderPrimaryButton>
                             )}
-                        </div>
+                        </>
                     }
                     meters={
                         valid && props.summary ? (
@@ -157,20 +176,19 @@ export function SoftwareWorkspace(props: Props) {
                         ) : undefined
                     }
                     filters={
-                        <form
-                            onSubmit={searchCatalogue}
-                            className="flex flex-wrap items-center gap-2"
-                        >
-                            <PageHeaderSearch
-                                value={search}
-                                onChange={setSearch}
-                                placeholder="Application or publisher…"
-                            />
-                            <Button type="submit" variant="secondary">
-                                <Search aria-hidden="true" />
-                                Search
-                            </Button>
-                        </form>
+                        props.query.search ? (
+                            <PageHeaderFilterButton
+                                active
+                                onClick={() => {
+                                    setSearch('');
+                                    router.visit(url(props.query.status), {
+                                        preserveScroll: true,
+                                    });
+                                }}
+                            >
+                                Clear search: {props.query.search}
+                            </PageHeaderFilterButton>
+                        ) : undefined
                     }
                     rail={
                         <PageHeaderRail
@@ -188,7 +206,7 @@ export function SoftwareWorkspace(props: Props) {
                         />
                     }
                 />
-                <div className="space-y-4 pt-5">
+                <div className="space-y-5 pt-5">
                     {!valid ? (
                         <Alert>
                             <AlertDescription>

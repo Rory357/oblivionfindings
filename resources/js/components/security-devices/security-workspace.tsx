@@ -6,6 +6,7 @@ import {
 } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewRow } from '@/components/wizard/shell';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
@@ -72,6 +73,10 @@ type SecurityDevice = {
         state: 'available' | 'restricted' | 'not_configured';
         href?: string;
     };
+    cctvSource?: {
+        state: string;
+        label: string;
+    } | null;
 };
 
 type SecurityEvent = {
@@ -126,6 +131,7 @@ export type SecurityWorkspaceData = {
         label: string;
         description: string;
         restricted: boolean;
+        statusFilter?: { key: string; label: string } | null;
         inventoryTotal: number;
         inventoryShown: number;
         inventoryTruncated: boolean;
@@ -171,7 +177,7 @@ function plural(value: number, singular: string, pluralLabel?: string): string {
 
 function observedValue(value: unknown): string {
     if (typeof value === 'string') return headline(value);
-    if (typeof value === 'number') return value.toLocaleString();
+    if (typeof value === 'number') return value.toLocaleString('en-NZ');
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (value && typeof value === 'object') {
         return Object.entries(value)
@@ -216,11 +222,72 @@ function Metric({ children }: { children: ReactNode }) {
     return <ReviewRow label={label} value={fact ? fact[1] : children} />;
 }
 
+function cctvSourceVariant(state: string): StatusVariant {
+    if (state === 'verified') return 'success';
+    if (state === 'failed') return 'critical';
+    if (state === 'configured') return 'info';
+    if (state === 'disabled') return 'warning';
+    return 'neutral';
+}
+
+function StatusFilterBanner({
+    tabKey,
+    filter,
+}: {
+    tabKey: string;
+    filter: { key: string; label: string } | null | undefined;
+}) {
+    if (!filter) return null;
+
+    return (
+        <Card>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                <p>
+                    Filtered to:{' '}
+                    <span className="font-semibold">{filter.label}</span>
+                </p>
+                <Link
+                    href={`/security-devices/security?tab=${encodeURIComponent(tabKey)}`}
+                    className="frontline-focus inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium text-primary hover:underline"
+                >
+                    Clear status filter
+                </Link>
+            </CardContent>
+        </Card>
+    );
+}
+
 function SecurityOverview({ data }: { data: SecurityWorkspaceData }) {
     const { inventory, attention, requiredActions } = data.overview;
+    const { statusFilter, devices } = data.activeTab;
 
     return (
         <div className="space-y-4">
+            <StatusFilterBanner tabKey="overview" filter={statusFilter} />
+            {statusFilter ? (
+                <section className="space-y-3">
+                    <h2 className="text-lg font-semibold">
+                        {statusFilter.label}
+                    </h2>
+                    {devices.length > 0 ? (
+                        <div className="grid gap-3 xl:grid-cols-2">
+                            {devices.map((device) => (
+                                <DeviceEvidence
+                                    key={device.id}
+                                    device={device}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <Card>
+                            <CardContent className="p-5 text-sm text-muted-foreground">
+                                No security devices match the current status
+                                filter.
+                            </CardContent>
+                        </Card>
+                    )}
+                </section>
+            ) : null}
             <Card>
                 <CardHeader className="pb-3">
                     <SectionHeading
@@ -341,6 +408,13 @@ function DeviceEvidence({ device }: { device: SecurityDevice }) {
                 <div className="flex flex-wrap gap-2">
                     <OperationalStateBadge state={device.health ?? 'unknown'} />
                     <OperationalStateBadge state={device.monitoring.state} />
+                    {device.cctvSource ? (
+                        <StatusBadge
+                            variant={cctvSourceVariant(device.cctvSource.state)}
+                        >
+                            {device.cctvSource.label}
+                        </StatusBadge>
+                    ) : null}
                 </div>
             </div>
 
@@ -493,6 +567,10 @@ function SpecialistInventory({ data }: { data: SecurityWorkspaceData }) {
 
     return (
         <section aria-labelledby="specialist-inventory" className="space-y-3">
+            <StatusFilterBanner
+                tabKey={active.key}
+                filter={active.statusFilter}
+            />
             <SectionHeading
                 icon={icon}
                 title={`${active.label} operational evidence`}
@@ -530,8 +608,8 @@ function EventsPanel({ data }: { data: SecurityWorkspaceData }) {
             <Card>
                 <CardHeader>
                     <h2 className="flex items-center gap-2 text-base font-semibold">
-                        <RadioTower className="h-4 w-4 text-primary" />{' '}
-                        Canonical device events
+                        <RadioTower className="h-4 w-4 text-primary" /> Device
+                        events
                     </h2>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -576,7 +654,7 @@ function EventsPanel({ data }: { data: SecurityWorkspaceData }) {
                         ))
                     ) : (
                         <p className="text-sm text-muted-foreground">
-                            No canonical security-device events are recorded.
+                            No security-device events are recorded.
                         </p>
                     )}
                 </CardContent>

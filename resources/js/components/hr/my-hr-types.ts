@@ -1,4 +1,5 @@
 import type { MyHrActiveClock } from './my-hr-clock-card';
+import type { MyHrAttendance } from './my-hr-attendance';
 
 /** A teammate in the shell-hosted "Give recognition" wizard directory. */
 export type KudosTeammate = {
@@ -120,6 +121,7 @@ export type MyHrShellData = {
         avatar: string | null;
     };
     activeClock: MyHrActiveClock;
+    attendance?: MyHrAttendance;
     todayTotal: number;
     weekly: {
         total_hours: number;
@@ -139,6 +141,9 @@ export type MyHrShellData = {
         policiesDue: number;
         onesToAck: number;
         kudosThisMonth: number;
+        /** Own workplace injuries (any status); the Injuries tab shows only when > 0. */
+        injuries?: number;
+        openInjuries?: number;
     };
     /** Current-month feed for the hero footer calendar. Other months are
      *  fetched on demand from `GET /hr/my/calendar?month=YYYY-MM`. */

@@ -51,6 +51,9 @@ describe('MyDayHero audit fixes', () => {
 
         expect(screen.getByText('Today')).toBeVisible();
         expect(screen.queryByText(/–\s*·\s*8h/)).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: /Report incident/i }),
+        ).toHaveAttribute('href', '/incidents/create?return_to=%2Fmy-day');
     });
 
     it('links workers to their own availability editor when provided', () => {
@@ -128,5 +131,11 @@ describe('MyDayHero audit fixes', () => {
                     element.classList.contains('page-hero-tone-warning'),
                 ),
         ).toBe(true);
+        expect(
+            screen.getByRole('link', { name: /Report incident/i }),
+        ).toHaveAttribute(
+            'href',
+            '/incidents/create?shift_id=12&return_to=%2Fmy-day',
+        );
     });
 });

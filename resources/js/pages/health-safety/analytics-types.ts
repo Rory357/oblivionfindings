@@ -14,7 +14,7 @@ export type TrendPoint = {
     ltifr: number | null;
     trifr: number | null;
     incidents: number;
-    near_miss_ratio: number;
+    near_miss_ratio: number | null;
     hazards_opened: number;
     hazards_closed: number;
     hazards_open: number;
@@ -23,6 +23,11 @@ export type TrendPoint = {
     compliance_pct: number | null;
     worker_engagement: number | null;
     worker_consultation: number | null;
+    worker_participation_viewer_id?: number | null;
+    worker_participation_source_access?:
+        | 'readable'
+        | 'restricted'
+        | 'unavailable';
     worksafe_notified: number;
     worksafe_awaiting: number;
 };
@@ -40,6 +45,8 @@ export type ScorecardItem = {
     suffix: string;
     delta: number | null;
     dir: string;
+    source_access?: 'readable' | 'restricted' | 'unavailable';
+    viewer_id?: number | null;
 };
 
 export type SiteRow = {
@@ -47,11 +54,14 @@ export type SiteRow = {
     name: string;
     total_incidents: number;
     open_hazards: number;
-    lost_time_days: number;
+    lost_time_days: number | null;
+    injury_source_access?: 'readable' | 'restricted' | 'repair_required';
     ltifr: number | null;
     trifr: number | null;
     drill_status: string;
-    compliance_score: number;
+    compliance_score: number | null;
+    source_scope?: 'readable_subset';
+    source_completeness?: 'unknown';
 };
 
 export type RootCauseRow = {
@@ -75,20 +85,25 @@ export type AnalyticsFilters = {
 };
 
 export type AnalyticsProps = {
+    source_scope?: 'readable_subset';
+    source_completeness?: 'unknown';
     incident_data: TypeCount[];
     severity_data: SeverityCount[];
     root_cause_data: RootCauseRow[];
     injury_data: {
         by_type: TypeCount[];
         by_body_part: BodyPartCount[];
+        access?: 'readable' | 'restricted' | 'repair_required';
+        source_completeness?: 'unknown';
     };
     /**
      * First-aid breakdowns (leading care-activity signal; first-aid-only treatment is
-     * excluded from TRIFR). Optional — additive, and empty when the table is absent.
+     * excluded from TRIFR). Null means unavailable; an empty array is a readable empty period.
      */
     first_aid_data?: {
-        by_type: { type: string; count: number }[];
-        by_outcome: { outcome: string; count: number }[];
+        by_type: { type: string; count: number }[] | null;
+        by_outcome: { outcome: string; count: number }[] | null;
+        source_access?: 'readable' | 'restricted' | 'unavailable';
     };
     hazard_data: RiskCount[];
     /**
@@ -97,19 +112,22 @@ export type AnalyticsProps = {
      */
     restraint_analytics?: {
         summary: {
-            events_in_period: number;
-            out_of_plan: number;
-            with_injury: number;
-            critical: number;
-            unreviewed: number;
-            active_plans: number;
-            plans_review_due: number;
-            clients_no_active_bsp: number;
+            events_in_period: number | null;
+            out_of_plan: number | null;
+            with_injury: number | null;
+            critical: number | null;
+            unreviewed: number | null;
+            active_plans: number | null;
+            plans_review_due: number | null;
+            clients_no_active_bsp: number | null;
+            source_access?: 'readable' | 'restricted' | 'unavailable';
+            scope?: 'current_readable_sources';
         };
         breakdowns: {
-            by_type: { label: string; count: number }[];
-            by_severity: { label: string; count: number }[];
-            by_plan_status: { label: string; count: number }[];
+            by_type: { label: string; count: number }[] | null;
+            by_severity: { label: string; count: number }[] | null;
+            by_plan_status: { label: string; count: number }[] | null;
+            source_access?: 'readable' | 'restricted' | 'unavailable';
         };
     };
     site_comparison: SiteRow[];

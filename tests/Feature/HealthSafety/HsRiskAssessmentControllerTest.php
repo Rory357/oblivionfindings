@@ -8,6 +8,7 @@ use App\Models\HsRiskAssessmentAttachment;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\HealthSafety\RiskAssessmentReturn;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -122,6 +123,8 @@ class HsRiskAssessmentControllerTest extends TestCase
 
         $this->actingAs($this->hsOfficer())
             ->get("/health-safety/risk-assessments?assessment={$ra->id}")
+            ->assertRedirect(RiskAssessmentReturn::href($ra->id, '/health-safety/risk-assessments'));
+        $this->get('/health-safety/risk-assessments/'.$ra->id)
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.id', $ra->id)
                 ->has('detail.attachments')

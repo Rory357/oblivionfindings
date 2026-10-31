@@ -50,7 +50,8 @@ test('remote support lists only canonical computers in device scope and conceals
     $response->assertOk()->assertInertia(fn ($p) => $p->component('it/remote-support/index')
         ->has('computers.data', 1)->where('computers.data.0.id', $this->computer->id)
         ->where('selected.id', $this->computer->id)->missing('selected.config')
-        ->where('availability.remote_support', false)->where('availability.obli', false));
+        ->where('availability.remote_support', false)->where('availability.obli', false)
+        ->where('availability.script_execution', false));
     expect($response->headers->get('Cache-Control'))->toContain('no-store');
     $response->assertDontSee('never-project-this');
     $this->get('/it/remote-support?device='.$elsewhere->id)->assertNotFound();
@@ -81,7 +82,7 @@ test('ticket shortcut validates both current ticket access and the affected comp
 test('remote support search is bounded and flags cannot expose unfinished execution', function () {
     config()->set('endpoint_management.remote_support.enabled', true);
     $this->actingAs($this->actor)->get('/it/remote-support?q=does-not-exist')->assertOk()
-        ->assertInertia(fn ($p) => $p->has('computers.data', 0)->where('availability.remote_support', false)->where('availability.obli', false));
+        ->assertInertia(fn ($p) => $p->has('computers.data', 0)->where('availability.remote_support', false)->where('availability.obli', false)->where('availability.script_execution', false));
     $this->getJson('/it/remote-support?device=not-a-device')->assertUnprocessable();
     Http::assertNothingSent();
 });

@@ -13,6 +13,7 @@ class EndpointAgent extends Model
     protected $hidden = ['enrolment_hash', 'credential_hash', 'assignment_fingerprint', 'heartbeat_hash'];
 
     protected $casts = [
+        'script_actions' => 'array',
         'software_actions' => 'array', 'software_observations' => 'array',
         'restart_actions' => 'array', 'restart_observations' => 'array', 'inventory' => 'array', 'service_actions' => 'array', 'service_action_observations' => 'array', 'enrolment_expires_at' => 'immutable_datetime',
         'enrolled_at' => 'immutable_datetime', 'revoked_at' => 'immutable_datetime',

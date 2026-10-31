@@ -108,13 +108,13 @@ export function HeroComplianceBadges({
     const certificationStatus = resolved.certification_status;
     const coverageStatus = resolved.first_aid_coverage_status;
     const fireTone: BadgeTone =
-        drillsOverdue > 0 ? 'critical' : drillsDue > 0 ? 'warning' : 'success';
+        drillsOverdue > 0 ? 'critical' : drillsDue > 0 ? 'warning' : 'neutral';
     const fireLabel =
         drillsOverdue > 0
             ? `Fire · ${drillsOverdue} drill${drillsOverdue === 1 ? '' : 's'} overdue`
             : drillsDue > 0
               ? `Fire · ${drillsDue} drill${drillsDue === 1 ? '' : 's'} due`
-              : 'Fire · Drills current';
+              : 'Fire · No drill due alerts';
 
     const badges: HeroComplianceBadge[] = items ?? [
         {
@@ -125,11 +125,11 @@ export function HeroComplianceBadges({
         ngaPaerewaBadge(certificationStatus),
         {
             icon: sdsExpiring > 0 ? AlertTriangle : CheckCircle2,
-            tone: sdsExpiring > 0 ? 'warning' : 'success',
+            tone: sdsExpiring > 0 ? 'warning' : 'neutral',
             label:
                 sdsExpiring > 0
                     ? `Hazardous substances · ${sdsExpiring} SDS expiring`
-                    : 'Hazardous substances · SDS current',
+                    : 'Hazardous substances · No SDS expiry alerts',
         },
         { icon: Flame, tone: fireTone, label: fireLabel },
         {

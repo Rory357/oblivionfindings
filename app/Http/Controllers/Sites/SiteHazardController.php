@@ -10,12 +10,16 @@ use App\Models\SiteHazard;
 use App\Models\SiteHazardAction;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\AuthorizationEvidenceLockService;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\References\ReferenceNumberGenerator;
+use App\Services\Sites\HazardAssignmentService;
 use App\Services\Sites\SiteChecklistFailureRiskMapper;
 use App\Services\Sites\SiteHazardRiskCalculator;
+use App\Services\SiteTypeAccessService;
 use App\Services\UserSiteAccessService;
-use App\Support\HazardComplianceSnapshot;
 use App\Support\HazardDetailPresenter;
+use App\Support\Incidents\IncidentOccurrencePeriod;
 use App\Support\SiteRecommendedHazards;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -25,6 +29,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SiteHazardController extends Controller
@@ -32,7 +37,7 @@ class SiteHazardController extends Controller
     use ResolvesAllowedSiteTypes;
     use ServesPrivateAttachments;
 
-    private const TABS = ['all', 'open', 'in_progress', 'overdue', 'critical', 'closed'];
+    private const TABS = ['all', 'active', 'open', 'in_progress', 'overdue', 'critical', 'closed', 'due_soon', 'unassigned', 'mitigated', 'closed_only'];
 
     private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
 
@@ -48,7 +53,10 @@ class SiteHazardController extends Controller
     public function globalIndex(Request $request)
     {
         abort_unless($request->user()?->canDo('hazards.view'), 403);
-        $this->authorize('viewAny', Site::class);
+
+        if ($redirect = $this->legacyRecordRedirect($request)) {
+            return $redirect;
+        }
 
         return inertia('compliance/hazards/index', $this->registerProps($request, null));
     }
@@ -57,50 +65,54 @@ class SiteHazardController extends Controller
     public function export(Request $request)
     {
         abort_unless($request->user()?->canDo('hazards.view'), 403);
-        $this->authorize('viewAny', Site::class);
 
+        return $this->exportRegister($request, null);
+    }
+
+    public function exportSite(Request $request, Site $site)
+    {
+        abort_unless($request->user()?->canDo('hazards.view'), 403);
+        $this->authorizeHazardRead($request, $site);
+
+        return $this->exportRegister($request, $site);
+    }
+
+    private function exportRegister(Request $request, ?Site $site)
+    {
+        $this->validatePeriod($request);
         $allowedSiteTypes = $this->allowedSiteTypes($request);
-        $this->assertRequestedSiteAccess($request, null);
+        $this->assertRequestedSiteAccess($request, $site?->id);
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'all';
 
-        $query = $this->baseQuery($request, $allowedSiteTypes, null);
+        $query = $this->baseQuery($request, $allowedSiteTypes, $site?->id);
         $this->applyTab($query, $tab);
 
-        $rows = $query->with(['site:id,name,type', 'assignedTo:id,name'])
-            ->orderByDesc('created_at')
-            ->limit(5000)
-            ->get();
-
-        $handle = fopen('php://temp', 'r+');
-        $this->putCsv($handle, ['Reference', 'Site', 'Site type', 'Hazard', 'Severity', 'Likelihood', 'Risk', 'Status', 'Assigned to', 'Due', 'Logged']);
-        foreach ($rows as $h) {
-            $this->putCsv($handle, [
-                $h->reference_number,
-                $h->site?->name,
-                $h->site?->type,
-                HazardDetailPresenter::hazardLabel($h),
-                $h->severity,
-                $h->likelihood,
-                $h->risk_rating,
-                $h->status,
-                $h->assignedTo?->name,
-                $h->due_date?->toDateString(),
-                $h->created_at?->toDateString(),
-            ]);
-        }
-        rewind($handle);
-        $csv = stream_get_contents($handle);
-        fclose($handle);
-
-        return response($csv, 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="hazards-'.now()->format('Y-m-d').'.csv"',
-        ]);
+        return response()->streamDownload(function () use ($query): void {
+            $handle = fopen('php://output', 'w');
+            try {
+                $this->putCsv($handle, ['Reference', 'Site', 'Site type', 'Hazard', 'Severity', 'Likelihood', 'Risk', 'Status', 'Assigned to', 'Due', 'Logged']);
+                foreach ($query->with(['site:id,name,type', 'assignedTo:id,name'])->orderByDesc('created_at')->orderByDesc('id')->lazy(500) as $h) {
+                    $this->putCsv($handle, [
+                        $h->reference_number, $h->site?->name, $h->site?->type,
+                        HazardDetailPresenter::hazardLabel($h), $h->severity, $h->likelihood,
+                        $h->risk_rating, $h->status, $h->assignedTo?->name,
+                        $h->due_date?->toDateString(),
+                        $h->created_at?->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
+                    ]);
+                }
+            } finally {
+                fclose($handle);
+            }
+        }, 'hazards-'.now(config('app.worker_timezone', 'Pacific/Auckland'))->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
     }
 
     public function index(Request $request, Site $site)
     {
-        $this->authorize('view', $site);
+        $this->authorizeHazardRead($request, $site);
+
+        if ($redirect = $this->legacyRecordRedirect($request, $site)) {
+            return $redirect;
+        }
 
         return inertia('sites/hazards/index', [
             ...$this->registerProps($request, $site),
@@ -120,6 +132,7 @@ class SiteHazardController extends Controller
      */
     private function registerProps(Request $request, ?Site $site): array
     {
+        $this->validatePeriod($request);
         $allowedSiteTypes = $this->allowedSiteTypes($request);
         $siteId = $site?->id;
         $this->assertRequestedSiteAccess($request, $siteId);
@@ -131,11 +144,16 @@ class SiteHazardController extends Controller
 
         $tabCounts = [
             'all' => $base()->count(),
+            'active' => $base()->whereIn('status', ['open', 'in_progress'])->count(),
             'open' => $base()->where('status', 'open')->count(),
             'in_progress' => $base()->where('status', 'in_progress')->count(),
             'overdue' => $base()->overdue()->count(),
             'critical' => $base()->criticalOpen()->count(),
             'closed' => $base()->whereIn('status', ['mitigated', 'closed'])->count(),
+            'due_soon' => $base()->dueSoon()->count(),
+            'unassigned' => $base()->unassignedOpen()->count(),
+            'mitigated' => $base()->where('status', 'mitigated')->count(),
+            'closed_only' => $base()->where('status', 'closed')->count(),
         ];
 
         $hero = [
@@ -146,10 +164,10 @@ class SiteHazardController extends Controller
                 'critical' => $tabCounts['critical'],
             ],
             'attention' => [
-                'due_soon' => $base()->dueSoon()->count(),
-                'unassigned' => $base()->unassignedOpen()->count(),
-                'mitigated' => $base()->where('status', 'mitigated')->count(),
-                'closed_period' => $base()->where('status', 'closed')->count(),
+                'due_soon' => $tabCounts['due_soon'],
+                'unassigned' => $tabCounts['unassigned'],
+                'mitigated' => $tabCounts['mitigated'],
+                'closed_period' => $tabCounts['closed_only'],
             ],
         ];
 
@@ -189,7 +207,6 @@ class SiteHazardController extends Controller
             'tab' => $tab,
             'tabCounts' => $tabCounts,
             'hero' => $hero,
-            'nzBadges' => HazardComplianceSnapshot::badges(),
             'filters' => $request->only([
                 'q', 'site_id', 'site_type', 'severity', 'risk_rating',
                 'assignee_id', 'due_state', 'tab', 'from', 'to',
@@ -217,7 +234,7 @@ class SiteHazardController extends Controller
             self::SITE_BYPASS_PERMISSIONS,
         );
 
-        return SiteHazard::query()
+        $query = SiteHazard::query()
             ->whereIn('site_id', $accessibleSiteIds)
             ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
@@ -228,8 +245,6 @@ class SiteHazardController extends Controller
             ->when($request->filled('assignee_id'), fn ($q) => $q->where('assigned_to_user_id', $request->query('assignee_id')))
             ->when($request->query('due_state') === 'overdue', fn ($q) => $q->overdue())
             ->when($request->query('due_state') === 'due_soon', fn ($q) => $q->dueSoon())
-            ->when($request->filled('from'), fn ($q) => $q->whereDate('created_at', '>=', $request->query('from')))
-            ->when($request->filled('to'), fn ($q) => $q->whereDate('created_at', '<=', $request->query('to')))
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = '%'.$request->query('q').'%';
                 $q->where(function ($sub) use ($term) {
@@ -241,10 +256,33 @@ class SiteHazardController extends Controller
                         ->orWhereHas('site', fn ($s) => $s->where('name', 'like', $term));
                 });
             });
+
+        return IncidentOccurrencePeriod::apply($query, $request->query('from'), $request->query('to'), 'created_at');
+    }
+
+    private function validatePeriod(Request $request): void
+    {
+        $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
+            'site_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+    }
+
+    /** H&S read authority does not grant access to the wider Site profile. */
+    private function authorizeHazardRead(Request $request, ?Site $site): void
+    {
+        abort_unless($request->user()?->canDo('hazards.view'), 403);
+        abort_unless($site
+            && in_array($site->type, $this->allowedSiteTypes($request), true)
+            && in_array((int) $site->id, $this->siteAccess->accessibleSiteIds($request->user(), self::SITE_BYPASS_PERMISSIONS), true), 404);
     }
 
     private function assertRequestedSiteAccess(Request $request, ?int $boundSiteId): void
     {
+        if ($boundSiteId && $request->filled('site_id')) {
+            abort_unless((int) $request->query('site_id') === $boundSiteId, 403);
+        }
         if ($boundSiteId || ! $request->filled('site_id')) {
             return;
         }
@@ -259,11 +297,16 @@ class SiteHazardController extends Controller
     private function applyTab(Builder $query, string $tab): void
     {
         match ($tab) {
+            'active' => $query->whereIn('status', ['open', 'in_progress']),
             'open' => $query->where('status', 'open'),
             'in_progress' => $query->where('status', 'in_progress'),
             'overdue' => $query->overdue(),
             'critical' => $query->criticalOpen(),
             'closed' => $query->whereIn('status', ['mitigated', 'closed']),
+            'due_soon' => $query->dueSoon(),
+            'unassigned' => $query->unassignedOpen(),
+            'mitigated' => $query->where('status', 'mitigated'),
+            'closed_only' => $query->where('status', 'closed'),
             default => $query,
         };
     }
@@ -291,7 +334,7 @@ class SiteHazardController extends Controller
             'assigned_to_name' => $h->assignedTo?->name,
             'reported_by_name' => $h->reportedBy?->name,
             'due_date' => $h->due_date?->toDateString(),
-            'created_at' => $h->created_at?->toDateTimeString(),
+            'created_at' => $h->created_at?->toISOString(),
             'worksafe' => $h->isWorksafeNotifiable(),
             'open_action_count' => (int) ($h->open_action_count ?? 0),
             'flags' => [
@@ -348,32 +391,50 @@ class SiteHazardController extends Controller
         return redirect()->to("/sites/{$site->id}/hazards?action=add");
     }
 
-    public function show(SiteHazard $hazard)
+    private function legacyRecordRedirect(Request $request, ?Site $site = null)
     {
-        $this->authorize('view', $hazard->site);
+        if (! $request->filled('hazard')) {
+            return null;
+        }
+        $request->validate(['hazard' => 'integer|min:1']);
+        $this->validatePeriod($request);
+        $this->assertRequestedSiteAccess($request, $site?->id);
+        $detail = $this->resolveDetail($request, $this->allowedSiteTypes($request), $site?->id);
+        abort_unless($detail, 404);
+        $filters = array_filter($request->only(['q', 'tab', 'site_id', 'site_type', 'severity', 'risk_rating', 'assignee_id', 'due_state', 'from', 'to', 'page']), fn ($value) => is_scalar($value));
+        $returnTo = $site ? "/sites/{$site->id}/hazards" : '/compliance/hazards';
+        if ($filters) {
+            $returnTo .= '?'.http_build_query($filters);
+        }
+        $query = ['return_to' => $returnTo];
+        if (in_array($request->query('section'), ['overview', 'risk', 'actions', 'evidence', 'history', 'connections'], true)) {
+            $query['section'] = $request->query('section');
+        }
+        $requestedAction = $request->query('action');
+        $action = is_string($requestedAction) ? str_replace('_', '-', $requestedAction) : '';
+        if (in_array($action, ['assign', 'start', 'mitigate', 'add-action', 'review', 'close'], true)) {
+            $query['action'] = $action;
+        }
+
+        return redirect()->to('/hazards/'.$detail['id'].'?'.http_build_query($query));
+    }
+
+    public function show(Request $request, SiteHazard $hazard)
+    {
+        $this->authorizeHazardRead($request, $hazard->site);
 
         $hazard->load([
             'site:id,name,type',
             'reportedBy:id,name',
             'assignedTo:id,name',
+            'statusChangedBy:id,name',
+            'closedBy:id,name',
             'actions.assignedTo:id,name',
             'actions.completedBy:id,name',
         ]);
 
-        $users = User::query()
-            ->select(['id', 'name'])
-            ->orderBy('name');
-        $this->siteAccess->applyStaffScope(
-            $users,
-            auth()->user(),
-            self::SITE_BYPASS_PERMISSIONS,
-        );
-
         return inertia('sites/hazards/show', [
-            'hazard' => $hazard,
-            'users' => $users->get(),
-            'canAssign' => auth()->user()->canDo('hazards.assign'),
-            'canClose' => auth()->user()->canDo('hazards.close'),
+            'detail' => HazardDetailPresenter::make($hazard, $this->permissions($request)),
         ]);
     }
 
@@ -401,35 +462,36 @@ class SiteHazardController extends Controller
             'due_date' => 'nullable|date',
             'photos' => 'nullable|array',
             'photos.*' => 'file|image|max:10240',
-            'photo_paths' => 'nullable|array',
+            'photo_paths' => 'prohibited',
         ]);
 
-        // The observer fills reference_number, risk_rating, due_date, the H&S
-        // officer auto-assignment, the HsEvent and the Control-Room bridge.
-        $hazard = SiteHazard::create([
-            'site_id' => $site->id,
-            'reported_by_user_id' => $request->user()->id,
-            'hazard_type' => $validated['hazard_type'],
-            'custom_hazard_type' => $validated['custom_hazard_type'] ?? null,
-            'severity' => $validated['severity'],
-            'likelihood' => $validated['likelihood'],
-            'description' => $validated['description'],
-            'location' => $validated['location'] ?? null,
-            'witnesses' => $validated['witnesses'] ?? null,
-            'immediate_action_applied' => $request->boolean('immediate_action_applied'),
-            'immediate_action_taken' => $validated['immediate_action_taken'] ?? null,
-            'assigned_to_user_id' => $validated['assigned_to_user_id'] ?? null,
-            'due_date' => $validated['due_date'] ?? null,
-            'status' => 'open',
-        ]);
+        $hazard = DB::transaction(function () use ($request, $site, $validated): SiteHazard {
+            $site = $this->authorizeCurrentHazardCommand($request, (int) $site->id, ['hazards.create']);
+            $this->assertAssignableStaff($request, $validated['assigned_to_user_id'] ?? null);
+            $hazard = SiteHazard::create([
+                'site_id' => $site->id,
+                'reported_by_user_id' => $request->user()->id,
+                'hazard_type' => $validated['hazard_type'],
+                'custom_hazard_type' => $validated['custom_hazard_type'] ?? null,
+                'severity' => $validated['severity'],
+                'likelihood' => $validated['likelihood'],
+                'description' => $validated['description'],
+                'location' => $validated['location'] ?? null,
+                'witnesses' => $validated['witnesses'] ?? null,
+                'immediate_action_applied' => $request->boolean('immediate_action_applied'),
+                'immediate_action_taken' => $validated['immediate_action_taken'] ?? null,
+                'assigned_to_user_id' => $validated['assigned_to_user_id'] ?? null,
+                'due_date' => $validated['due_date'] ?? null,
+                'status' => 'open',
+            ]);
 
-        $paths = $this->storePaths($request->file('photos', []), $hazard->id, 'photos');
-        if (! $paths && ! empty($validated['photo_paths'])) {
-            $paths = array_values($validated['photo_paths']);
-        }
-        if ($paths) {
-            $hazard->forceFill(['photo_paths' => $paths])->saveQuietly();
-        }
+            $paths = $this->storePaths($request->file('photos', []), $hazard->id, 'photos');
+            if ($paths) {
+                $hazard->forceFill(['photo_paths' => $paths])->saveQuietly();
+            }
+
+            return $hazard;
+        }, attempts: 3);
 
         return back()->with('success', "Hazard {$hazard->reference_number} logged at {$site->name}.");
     }
@@ -447,8 +509,11 @@ class SiteHazardController extends Controller
             'witnesses' => 'nullable|string',
         ]);
 
-        // Observer recomputes risk_rating from severity/likelihood on update.
-        $hazard->update($validated);
+        DB::transaction(function () use ($request, $hazard, $validated): void {
+            $lockedHazard = $this->lockHazardForCommand($request, $hazard, ['hazards.manage', 'hazards.create']);
+            $this->assertHazardEditable($lockedHazard, 'description');
+            $lockedHazard->update($validated);
+        }, attempts: 3);
 
         return back()->with('success', 'Hazard updated.');
     }
@@ -460,25 +525,18 @@ class SiteHazardController extends Controller
     public function assign(Request $request, SiteHazard $hazard)
     {
         $this->authorize('view', $hazard->site);
-
         $validated = $request->validate([
-            'assigned_to_user_id' => 'required|exists:users,id',
-            'due_date' => 'nullable|date',
+            'assigned_to_user_id' => 'required|integer|exists:users,id',
+            'due_date' => 'nullable|date_format:Y-m-d',
+            'expected_assigned_to_user_id' => 'sometimes|nullable|integer',
+            'expected_due_date' => 'sometimes|nullable|date_format:Y-m-d',
         ]);
+        $result = app(HazardAssignmentService::class)->assign(
+            $request->user(), (int) $hazard->id, (int) $validated['assigned_to_user_id'],
+            array_diff_key($validated, ['assigned_to_user_id' => true]),
+        );
 
-        // Observer notifies the assignee + stamps assigned_at.
-        $hazard->update([
-            'assigned_to_user_id' => $validated['assigned_to_user_id'],
-            'due_date' => $validated['due_date'] ?? $hazard->due_date,
-        ]);
-
-        $assignee = User::find($validated['assigned_to_user_id']);
-        AuditLogger::log('hazard.assigned', $hazard, [
-            'assignee_id' => $validated['assigned_to_user_id'],
-            'assignee_name' => $assignee?->name,
-        ]);
-
-        return back()->with('success', 'Hazard assigned to '.($assignee?->name ?? 'owner').'.');
+        return back()->with('success', 'Hazard assigned to '.$result['assignee_name'].'.');
     }
 
     public function transition(Request $request, SiteHazard $hazard)
@@ -489,46 +547,44 @@ class SiteHazardController extends Controller
             'status' => 'required|in:in_progress,mitigated',
             'note' => 'nullable|string',
             'control_hierarchy' => 'nullable|array',
-            'control_hierarchy.*' => 'string',
+            'control_hierarchy.*' => 'string|in:elimination,substitution,isolation,engineering,administrative,ppe',
             'residual_severity' => 'nullable|in:'.implode(',', SiteHazardRiskCalculator::severities()),
             'residual_likelihood' => 'nullable|in:'.implode(',', SiteHazardRiskCalculator::likelihoods()),
         ]);
 
-        $from = $hazard->status;
-        $to = $validated['status'];
-
-        $valid = ($to === 'in_progress' && $from === 'open')
-            || ($to === 'mitigated' && $from === 'in_progress');
-
-        if (! $valid) {
-            return back()->with('error', "A {$from} hazard can't be moved to ".str_replace('_', ' ', $to).'.');
-        }
-
-        $patch = ['status' => $to];
-
-        if ($to === 'mitigated') {
-            if (empty($validated['control_hierarchy'])) {
-                return back()->with('error', 'Select at least one control from the hierarchy.');
+        $result = DB::transaction(function () use ($request, $hazard, $validated): array {
+            $lockedHazard = $this->lockHazardForCommand($request, $hazard);
+            $from = $lockedHazard->status;
+            $to = $validated['status'];
+            $valid = ($to === 'in_progress' && $from === 'open')
+                || ($to === 'mitigated' && $from === 'in_progress');
+            if (! $valid) {
+                return ['success' => false, 'message' => "A {$from} hazard can't be moved to ".str_replace('_', ' ', $to).'.'];
             }
-            if (empty($validated['residual_severity']) || empty($validated['residual_likelihood'])) {
-                return back()->with('error', 'Set the residual severity and likelihood.');
+            $patch = ['status' => $to];
+            if ($to === 'mitigated') {
+                if (empty($validated['control_hierarchy'])) {
+                    return ['success' => false, 'message' => 'Select at least one control from the hierarchy.'];
+                }
+                if (empty($validated['residual_severity']) || empty($validated['residual_likelihood'])) {
+                    return ['success' => false, 'message' => 'Set the residual severity and likelihood.'];
+                }
+                $patch['control_hierarchy'] = array_values(array_unique($validated['control_hierarchy']));
+                $patch['residual_severity'] = $validated['residual_severity'];
+                $patch['residual_likelihood'] = $validated['residual_likelihood'];
+                $patch['residual_risk_rating'] = $this->riskCalculator->calculate($validated['residual_severity'], $validated['residual_likelihood']);
+                $patch['control_review_date'] = now(config('app.worker_timezone', 'Pacific/Auckland'))->addMonths(3)->toDateString();
             }
-            $patch['control_hierarchy'] = array_values($validated['control_hierarchy']);
-            $patch['residual_severity'] = $validated['residual_severity'];
-            $patch['residual_likelihood'] = $validated['residual_likelihood'];
-            $patch['residual_risk_rating'] = $this->riskCalculator->calculate(
-                $validated['residual_severity'],
-                $validated['residual_likelihood']
-            );
-            $patch['control_review_date'] = now()->addMonths(3);
-        }
+            $lockedHazard->update($patch);
+            if (filled($validated['note'] ?? null)) {
+                AuditLogger::logOrFail('hazard.progress_note', $lockedHazard, ['note' => $validated['note'], 'status' => $to]);
+            }
+            $label = $to === 'mitigated' ? 'Mitigated · residual '.Str::title($patch['residual_risk_rating']) : 'In progress';
 
-        // Observer stamps status_changed_at / status_changed_by + audit log.
-        $hazard->update($patch);
+            return ['success' => true, 'message' => "Hazard moved to {$label}."];
+        }, attempts: 3);
 
-        $label = $to === 'mitigated' ? 'Mitigated · residual '.Str::title($patch['residual_risk_rating']) : 'In progress';
-
-        return back()->with('success', "Hazard moved to {$label}.");
+        return back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     public function review(Request $request, SiteHazard $hazard)
@@ -537,12 +593,13 @@ class SiteHazardController extends Controller
 
         $validated = $request->validate(['note' => 'required|string']);
 
-        $hazard->forceFill([
-            'review_date' => now(),
-            'control_review_date' => now(),
-        ])->saveQuietly();
-
-        AuditLogger::log('hazard.reviewed', $hazard, ['note' => $validated['note']]);
+        DB::transaction(function () use ($request, $hazard, $validated): void {
+            $lockedHazard = $this->lockHazardForCommand($request, $hazard);
+            $this->assertHazardEditable($lockedHazard, 'note');
+            $reviewDate = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+            $lockedHazard->forceFill(['review_date' => $reviewDate, 'control_review_date' => $reviewDate])->saveQuietly();
+            AuditLogger::logOrFail('hazard.reviewed', $lockedHazard, ['note' => $validated['note'], 'review_date' => $reviewDate]);
+        }, attempts: 3);
 
         return back()->with('success', 'Review recorded.');
     }
@@ -562,17 +619,7 @@ class SiteHazardController extends Controller
         ]);
 
         $result = DB::transaction(function () use ($request, $hazard, $validated): array {
-            $lockedHazard = SiteHazard::query()
-                ->with('site')
-                ->whereKey($hazard->getKey())
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            abort_unless(
-                $lockedHazard->site
-                    && Gate::forUser($request->user())->allows('view', $lockedHazard->site),
-                404,
-            );
+            $lockedHazard = $this->lockHazardForCommand($request, $hazard, ['hazards.close']);
 
             if ($lockedHazard->status === 'closed') {
                 return ['closed' => false, 'message' => 'This hazard is already closed.'];
@@ -592,7 +639,7 @@ class SiteHazardController extends Controller
             // the status → closed transition.
             $lockedHazard->update([
                 'resolution_summary' => $validated['resolution_summary'],
-                'resolution_evidence' => $evidence ?: ($lockedHazard->resolution_evidence ?? []),
+                'resolution_evidence' => array_values(array_merge(HazardDetailPresenter::normaliseFiles($lockedHazard->resolution_evidence ?? []), $evidence)),
                 'status' => 'closed',
             ]);
 
@@ -626,18 +673,15 @@ class SiteHazardController extends Controller
         ]);
 
         $action = DB::transaction(function () use ($request, $hazard, $validated): SiteHazardAction {
-            $lockedHazard = SiteHazard::query()
-                ->with('site')
-                ->whereKey($hazard->getKey())
-                ->lockForUpdate()
-                ->firstOrFail();
-            abort_unless(
-                $lockedHazard->site
-                    && Gate::forUser($request->user())->allows('view', $lockedHazard->site),
-                404,
-            );
+            $lockedHazard = $this->lockHazardForCommand($request, $hazard);
 
-            return SiteHazardAction::create([
+            $this->assertAssignableStaff($request, $validated['assigned_to_user_id'] ?? null);
+
+            if ($lockedHazard->status === 'closed') {
+                throw ValidationException::withMessages(['title' => 'This hazard is closed. No new corrective actions can be added.']);
+            }
+
+            $action = SiteHazardAction::create([
                 'hazard_id' => $lockedHazard->id,
                 'reference_number' => $this->nextActionReference(),
                 'action_description' => $validated['title'],
@@ -646,6 +690,14 @@ class SiteHazardController extends Controller
                 'assigned_to_user_id' => $validated['assigned_to_user_id'] ?? null,
                 'due_date' => $validated['due_date'] ?? null,
             ]);
+            AuditLogger::logOrFail('hazard.action_added', $lockedHazard, [
+                'action_id' => $action->id, 'reference_number' => $action->reference_number,
+                'action_description' => $action->action_description,
+                'assigned_to_user_id' => $action->assigned_to_user_id,
+                'due_date' => $action->due_date?->toDateString(),
+            ]);
+
+            return $action;
         }, attempts: 3);
 
         return back()->with('success', "Corrective action {$action->reference_number} added.");
@@ -669,16 +721,7 @@ class SiteHazardController extends Controller
                 ->value('hazard_id');
             abort_unless($hazardId, 404);
 
-            $lockedHazard = SiteHazard::query()
-                ->with('site')
-                ->whereKey($hazardId)
-                ->lockForUpdate()
-                ->firstOrFail();
-            abort_unless(
-                $lockedHazard->site
-                    && Gate::forUser($request->user())->allows('view', $lockedHazard->site),
-                404,
-            );
+            $lockedHazard = $this->lockHazardForCommand($request, SiteHazard::findOrFail($hazardId));
 
             $lockedAction = SiteHazardAction::query()
                 ->whereKey($action->getKey())
@@ -714,24 +757,23 @@ class SiteHazardController extends Controller
             'kind' => 'nullable|in:photo,document',
         ]);
 
-        $file = $request->file('file');
-        // The Evidence section's two uploaders post only `file`; infer the
-        // bucket from the mime type (image → photo, otherwise document), with
-        // an optional explicit `kind` override.
-        $isPhoto = $request->input('kind') === 'photo'
-            || ($request->input('kind') !== 'document' && str_starts_with((string) $file->getMimeType(), 'image/'));
-
-        if ($isPhoto) {
-            $paths = $this->storePaths([$file], $hazard->id, 'photos');
-            $hazard->forceFill([
-                'photo_paths' => array_values(array_merge($hazard->photo_paths ?? [], $paths)),
-            ])->saveQuietly();
-        } else {
-            $docs = $this->storeFilesWithMeta([$request->file('file')], $hazard->id, 'documents');
-            $hazard->forceFill([
-                'document_paths' => array_values(array_merge(HazardDetailPresenter::normaliseFiles($hazard->document_paths ?? []), $docs)),
-            ])->saveQuietly();
-        }
+        DB::transaction(function () use ($request, $hazard): void {
+            $lockedHazard = $this->lockHazardForCommand($request, $hazard);
+            $this->assertHazardEditable($lockedHazard, 'file');
+            $file = $request->file('file');
+            $isPhoto = $request->input('kind') === 'photo'
+                || ($request->input('kind') !== 'document' && str_starts_with((string) $file->getMimeType(), 'image/'));
+            if ($isPhoto) {
+                $paths = $this->storePaths([$file], $lockedHazard->id, 'photos');
+                $lockedHazard->forceFill(['photo_paths' => array_values(array_merge($lockedHazard->photo_paths ?? [], $paths))])->saveQuietly();
+            } else {
+                $docs = $this->storeFilesWithMeta([$file], $lockedHazard->id, 'documents');
+                $lockedHazard->forceFill(['document_paths' => array_values(array_merge(HazardDetailPresenter::normaliseFiles($lockedHazard->document_paths ?? []), $docs))])->saveQuietly();
+            }
+            AuditLogger::logOrFail('hazard.evidence_added', $lockedHazard, [
+                'kind' => $isPhoto ? 'photo' : 'document', 'names' => [$file->getClientOriginalName()], 'count' => 1,
+            ]);
+        }, attempts: 3);
 
         return back()->with('success', 'Evidence uploaded.');
     }
@@ -744,13 +786,63 @@ class SiteHazardController extends Controller
     private function permissions(Request $request): array
     {
         $user = $request->user();
+        // Commands retain the existing Site-profile gate as well as their
+        // own hazard permission; read-only H&S admission does not add writes.
+        $canUseSiteCommands = (bool) $user?->canDo('sites.viewAny');
 
         return [
-            'manage' => (bool) $user?->canDo('hazards.manage'),
-            'assign' => (bool) $user?->canDo('hazards.assign'),
-            'close' => (bool) $user?->canDo('hazards.close'),
-            'create' => (bool) $user?->canDo('hazards.create'),
+            'manage' => $canUseSiteCommands && (bool) $user?->canDo('hazards.manage'),
+            'assign' => $canUseSiteCommands && (bool) $user?->canDo('hazards.assign'),
+            'close' => $canUseSiteCommands && (bool) $user?->canDo('hazards.close'),
+            'create' => $canUseSiteCommands && (bool) $user?->canDo('hazards.create'),
         ];
+    }
+
+    /** Reload and authorize the canonical source while serializing competing writes. */
+    private function lockHazardForCommand(Request $request, SiteHazard $hazard, array $permissions = ['hazards.manage']): SiteHazard
+    {
+        $lockedHazard = SiteHazard::query()->whereKey($hazard->getKey())->lockForUpdate()->firstOrFail();
+        $lockedHazard->setRelation('site', $this->authorizeCurrentHazardCommand($request, (int) $lockedHazard->site_id, $permissions));
+
+        return $lockedHazard;
+    }
+
+    private function authorizeCurrentHazardCommand(Request $request, int $siteId, array $permissions): Site
+    {
+        return CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($request, $siteId, $permissions): Site {
+            $actor = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($request->user(), [
+                ...$permissions, 'sites.viewAny', 'sites.viewAll', 'sites.type.house.view', 'sites.type.facility.view', 'sites.type.head_office.view',
+            ]);
+            $site = $reads->query(Site::query())->find($siteId);
+            abort_unless($site && in_array($siteId, $this->siteAccess->accessibleSiteIds($actor, self::SITE_BYPASS_PERMISSIONS, $reads), true), 404);
+            abort_unless(in_array($site->type, app(SiteTypeAccessService::class)->allowedTypes($actor), true), 404);
+            Gate::forUser($actor)->authorize('view', $site);
+            abort_unless(collect($permissions)->contains(fn (string $permission) => $actor->canDo($permission)), 403);
+
+            return $site;
+        });
+    }
+
+    private function assertHazardEditable(SiteHazard $hazard, string $field): void
+    {
+        if ($hazard->status === 'closed') {
+            throw ValidationException::withMessages([$field => 'This hazard is closed. Its recorded details cannot be changed.']);
+        }
+    }
+
+    private function assertAssignableStaff(Request $request, ?int $staffId): void
+    {
+        if ($staffId === null) {
+            return;
+        }
+        $candidate = CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($request, $staffId): ?User {
+            $actor = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($request->user(), ['sites.viewAll']);
+
+            return app(HazardAssignmentService::class)->eligibleStaff($actor, $staffId, $reads);
+        });
+        if (! $candidate) {
+            throw ValidationException::withMessages(['assigned_to_user_id' => 'Choose current staff from your approved sites.']);
+        }
     }
 
     private function nextActionReference(): string
@@ -807,7 +899,7 @@ class SiteHazardController extends Controller
      */
     public function showMedia(SiteHazard $hazard, string $kind, int $index): StreamedResponse
     {
-        $this->authorize('view', $hazard->site);
+        $this->authorizeHazardRead(request(), $hazard->site);
 
         if ($kind === 'photo') {
             $path = array_values($hazard->photo_paths ?? [])[$index] ?? null;

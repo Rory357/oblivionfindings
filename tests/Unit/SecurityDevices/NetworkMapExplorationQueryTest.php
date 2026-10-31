@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Pagination\Cursor;
+use Illuminate\Pagination\CursorPaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\DateFactory;
 use Illuminate\Support\Facades\Facade;
 use PHPUnit\Framework\TestCase;
@@ -45,6 +47,9 @@ final class NetworkMapExplorationQueryTest extends TestCase
         Container::setInstance($container);
         Facade::setFacadeApplication($container);
         Facade::clearResolvedInstance('date');
+        Paginator::currentPathResolver(static fn (): string => '/');
+        Paginator::queryStringResolver(static fn (): array => []);
+        CursorPaginator::currentCursorResolver(static fn (): ?Cursor => null);
         $this->database = new Manager($container);
         $this->database->addConnection(['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
         $this->database->bootEloquent();

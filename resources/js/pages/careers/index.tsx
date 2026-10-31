@@ -1,49 +1,107 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+// Careers inside the public website (mockup v2, approved by Stephan 23 Oct
+// 2026): open roles, why work with us, and how applying works.
+import {
+    applyUrl,
+    employmentType,
+    hiringSteps,
+    JobFacts,
+    jobUrl,
+    type JobListing,
+} from '@/components/careers/careers-parts';
+import { demoPhotos } from '@/components/public-site/content';
+import {
+    Lens,
+    PageIntro,
+    Pathway,
+    SectionHeading,
+    SitePhoto,
+} from '@/components/public-site/primitives';
+import { siteLinks, usePublicSite } from '@/components/public-site/site';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
-import { employmentTypeLabels } from '@/lib/job-posting-constants';
-import { Head, Link, router } from '@inertiajs/react';
-import { Briefcase, Clock, MapPin, Search } from 'lucide-react';
-import { useState } from 'react';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import PublicSiteLayout from '@/layouts/marketing-layout';
+import { Link, router } from '@inertiajs/react';
+import {
+    ArrowRight,
+    Briefcase,
+    CalendarClock,
+    GraduationCap,
+    PhoneCall,
+    Search,
+    Users,
+} from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 
-type JobListing = {
-    id: number;
-    title: string;
-    slug: string;
+type Filters = {
+    search: string | null;
     position_role: string | null;
-    employment_type: string;
-    summary: string | null;
-    site: { id: number; name: string } | null;
-    published_at: string | null;
-    closing_at: string | null;
+    employment_type: string | null;
+    site: number | null;
 };
-
-type SiteOption = { id: number; name: string };
 
 type Props = {
     jobs: JobListing[];
     options: {
         position_roles: string[];
         employment_types: string[];
-        sites: SiteOption[];
+        sites: { id: number; name: string }[];
     };
-    filters: {
-        search: string | null;
-        position_role: string | null;
-        employment_type: string | null;
-        site: number | null;
-    };
+    filters: Filters;
 };
 
-export default function CareersIndex({ jobs, options, filters }: Props) {
-    const [searchValue, setSearchValue] = useState(filters.search || '');
+/** Filters only show once there are enough roles to need them. */
+const FILTER_FROM = 7;
+const ALL = 'all';
 
-    function submitFilters(next: Partial<Props['filters']>) {
+const reasons = [
+    [
+        GraduationCap,
+        'Paid training',
+        'A paid induction, shadow shifts and support to gain your Health and Wellbeing certificates.',
+    ],
+    [
+        CalendarClock,
+        'Rosters you can plan around',
+        'Rosters published ahead, with shifts that work around study and whānau.',
+    ],
+    [
+        PhoneCall,
+        'Never on your own',
+        'An on-call team leader, day and night, whenever you need a hand.',
+    ],
+    [
+        Users,
+        'A team that stays',
+        'Small, steady teams, so the people we support see familiar faces.',
+    ],
+] as const;
+
+const roleLabel = (role: string) => {
+    const label = role.replace(/_/g, ' ');
+    return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
+function RoleFilters({
+    options,
+    filters,
+}: {
+    options: Props['options'];
+    filters: Filters;
+}) {
+    const [search, setSearch] = useState(filters.search ?? '');
+    const apply = (next: Partial<Filters>) => {
         const merged = { ...filters, ...next };
         router.get(
-            '/careers',
+            siteLinks.careers,
             {
                 ...(merged.search ? { search: merged.search } : {}),
                 ...(merged.position_role
@@ -54,188 +112,331 @@ export default function CareersIndex({ jobs, options, filters }: Props) {
                     : {}),
                 ...(merged.site ? { site: merged.site } : {}),
             },
-            { preserveState: true, replace: true },
+            { preserveState: true, preserveScroll: true, replace: true },
         );
-    }
-
-    const siteCount = options.sites.length;
+    };
+    const onSearch = (event: FormEvent) => {
+        event.preventDefault();
+        apply({ search: search.trim() || null });
+    };
 
     return (
-        <>
-            <Head title="Careers" />
-            <div className="mx-auto max-w-5xl px-4 py-10">
-                <PageLayout
-                    padding="none"
-                    hero={
-                        <PageHero
-                            icon={Briefcase}
-                            title="Careers"
-                            description="Join our team and make a meaningful impact in the lives of the people we support."
-                            stats={[
-                                { label: 'Open roles', value: jobs.length },
-                                { label: 'Sites hiring', value: siteCount },
-                                {
-                                    label: 'Role types',
-                                    value: options.position_roles.length,
-                                },
-                            ]}
+        <form
+            role="search"
+            aria-label="Filter open roles"
+            onSubmit={onSearch}
+            className="grid gap-4 rounded-3xl border border-border bg-card p-5 sm:grid-cols-2 lg:grid-cols-4"
+        >
+            <div className="space-y-1.5">
+                <Label htmlFor="careers-search">Search roles</Label>
+                <div className="relative">
+                    <Search
+                        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden
+                    />
+                    <Input
+                        id="careers-search"
+                        type="search"
+                        className="frontline-tap pl-9"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Role title"
+                    />
+                </div>
+            </div>
+            <div className="space-y-1.5">
+                <Label htmlFor="careers-role">Role</Label>
+                <Select
+                    value={filters.position_role ?? ALL}
+                    onValueChange={(value) =>
+                        apply({ position_role: value === ALL ? null : value })
+                    }
+                >
+                    <SelectTrigger
+                        id="careers-role"
+                        className="frontline-tap w-full"
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={ALL}>All roles</SelectItem>
+                        {options.position_roles.map((role) => (
+                            <SelectItem key={role} value={role}>
+                                {roleLabel(role)}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-1.5">
+                <Label htmlFor="careers-site">Where</Label>
+                <Select
+                    value={filters.site ? String(filters.site) : ALL}
+                    onValueChange={(value) =>
+                        apply({ site: value === ALL ? null : Number(value) })
+                    }
+                >
+                    <SelectTrigger
+                        id="careers-site"
+                        className="frontline-tap w-full"
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={ALL}>Everywhere</SelectItem>
+                        {options.sites.map((site) => (
+                            <SelectItem key={site.id} value={String(site.id)}>
+                                {site.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-1.5">
+                <Label htmlFor="careers-type">Type</Label>
+                <Select
+                    value={filters.employment_type ?? ALL}
+                    onValueChange={(value) =>
+                        apply({
+                            employment_type: value === ALL ? null : value,
+                        })
+                    }
+                >
+                    <SelectTrigger
+                        id="careers-type"
+                        className="frontline-tap w-full"
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={ALL}>All types</SelectItem>
+                        {options.employment_types.map((type) => (
+                            <SelectItem key={type} value={type}>
+                                {employmentType(type)}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+        </form>
+    );
+}
+
+export default function CareersIndex({ jobs, options, filters }: Props) {
+    const { name, demo, provider } = usePublicSite();
+    const phone = provider.phone?.trim();
+    const filtered = Boolean(
+        filters.search ||
+        filters.position_role ||
+        filters.employment_type ||
+        filters.site,
+    );
+
+    return (
+        <PublicSiteLayout
+            title="Careers"
+            description="Join a local team that supports people to live the lives they choose. See our open roles and apply online."
+            current="careers"
+            intro={
+                <PageIntro
+                    eyebrow="Careers"
+                    title="Work that makes a real difference"
+                    lede={`Join a local team that supports people to live the lives they choose. ${
+                        name
+                            ? `${name} trains you, backs you and gives you`
+                            : 'We train you, back you and give you'
+                    } a team that’s always a call away.`}
+                    media={
+                        <SitePhoto
+                            photo={demo ? demoPhotos.careers : null}
+                            icon={Users}
+                            className="aspect-[4/3] shadow-2xl"
+                            eager
                         />
                     }
                 >
-                    <div className="grid gap-3 md:grid-cols-4">
-                        <div className="relative">
-                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                placeholder="Search positions..."
-                                value={searchValue}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter')
-                                        submitFilters({
-                                            search: searchValue || null,
-                                        });
-                                }}
-                                className="pl-9"
+                    <Button asChild size="lg" className="frontline-tap">
+                        <a href="#open-roles">
+                            See open roles
+                            <ArrowRight className="size-4" aria-hidden />
+                        </a>
+                    </Button>
+                </PageIntro>
+            }
+        >
+            <section
+                id="open-roles"
+                aria-labelledby="roles-heading"
+                className="journey-site-container journey-site-anchor space-y-8 py-16"
+            >
+                <SectionHeading
+                    id="roles-heading"
+                    kicker="Join the team"
+                    title="Open roles"
+                >
+                    No experience? Many of our best support workers started with
+                    us. We’ll train you.
+                </SectionHeading>
+                {(filtered || jobs.length >= FILTER_FROM) && (
+                    <RoleFilters options={options} filters={filters} />
+                )}
+                {jobs.length === 0 ? (
+                    <div className="rounded-3xl border border-border bg-card">
+                        {filtered ? (
+                            <EmptyState
+                                icon={Search}
+                                title="No roles match those filters"
+                                description="Try a different search, or see every open role."
+                                action={
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="frontline-tap"
+                                    >
+                                        <Link href={siteLinks.careers}>
+                                            See every open role
+                                        </Link>
+                                    </Button>
+                                }
                             />
-                        </div>
-                        <select
-                            className="h-10 rounded-md border bg-background px-3 text-sm"
-                            value={filters.position_role || ''}
-                            onChange={(e) =>
-                                submitFilters({
-                                    position_role: e.target.value || null,
-                                })
-                            }
-                        >
-                            <option value="">All roles</option>
-                            {options.position_roles.map((role) => (
-                                <option key={role} value={role}>
-                                    {role.replace(/_/g, ' ')}
-                                </option>
-                            ))}
-                        </select>
-                        <select
-                            className="h-10 rounded-md border bg-background px-3 text-sm"
-                            value={filters.site ?? ''}
-                            onChange={(e) =>
-                                submitFilters({
-                                    site: e.target.value
-                                        ? Number(e.target.value)
-                                        : null,
-                                })
-                            }
-                        >
-                            <option value="">All sites</option>
-                            {options.sites.map((site) => (
-                                <option key={site.id} value={site.id}>
-                                    {site.name}
-                                </option>
-                            ))}
-                        </select>
-                        <select
-                            className="h-10 rounded-md border bg-background px-3 text-sm"
-                            value={filters.employment_type || ''}
-                            onChange={(e) =>
-                                submitFilters({
-                                    employment_type: e.target.value || null,
-                                })
-                            }
-                        >
-                            <option value="">All types</option>
-                            {options.employment_types.map((type) => (
-                                <option key={type} value={type}>
-                                    {employmentTypeLabels[type] || type}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="grid gap-4">
-                        {jobs.map((job) => (
-                            <Card
-                                key={job.id}
-                                className="transition-colors hover:bg-accent/30"
-                            >
-                                <CardContent className="p-6">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="min-w-0 flex-1">
-                                            <Link
-                                                href={`/careers/jobs/${job.slug}/apply`}
-                                                className="text-lg font-semibold hover:underline"
-                                            >
-                                                {job.title}
-                                            </Link>
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge
-                                                    variant="secondary"
-                                                    className="text-xs"
-                                                >
-                                                    <Briefcase className="mr-1 h-3 w-3" />
-                                                    {employmentTypeLabels[
-                                                        job.employment_type
-                                                    ] || job.employment_type}
-                                                </Badge>
-                                                {job.position_role && (
-                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                        {job.position_role.replace(
-                                                            /_/g,
-                                                            ' ',
-                                                        )}
-                                                    </span>
-                                                )}
-                                                {job.site && (
-                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                        <MapPin className="h-3 w-3" />{' '}
-                                                        {job.site.name}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {job.summary && (
-                                                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                                                    {job.summary}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="flex shrink-0 flex-col items-end gap-2">
-                                            <Button asChild>
-                                                <Link
-                                                    href={`/careers/jobs/${job.slug}/apply`}
-                                                >
-                                                    Apply
-                                                </Link>
-                                            </Button>
-                                            <p className="text-xs text-muted-foreground">
-                                                {job.closing_at ? (
-                                                    <span className="flex items-center gap-1">
-                                                        <Clock className="h-3 w-3" />{' '}
-                                                        Closes {job.closing_at}
-                                                    </span>
-                                                ) : (
-                                                    'Open until filled'
-                                                )}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-
-                        {jobs.length === 0 && (
-                            <Card>
-                                <CardContent className="py-16 text-center">
-                                    <Briefcase className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
-                                    <p className="font-medium text-muted-foreground">
-                                        No open positions at this time
-                                    </p>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Check back soon for new opportunities.
-                                    </p>
-                                </CardContent>
-                            </Card>
+                        ) : (
+                            <EmptyState
+                                icon={Briefcase}
+                                title="No open roles right now"
+                                description="New roles appear here first. You can also send us a careers question."
+                                action={
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="frontline-tap"
+                                    >
+                                        <Link href={siteLinks.contact}>
+                                            Send us a careers question
+                                        </Link>
+                                    </Button>
+                                }
+                            />
                         )}
                     </div>
-                </PageLayout>
-            </div>
-        </>
+                ) : (
+                    <ul className="grid gap-4">
+                        {jobs.map((job) => (
+                            <li key={job.id}>
+                                <article
+                                    aria-labelledby={`job-${job.slug}`}
+                                    className="grid gap-5 rounded-3xl border border-border bg-card p-6 md:grid-cols-[1fr_auto] md:items-center md:p-8"
+                                >
+                                    <div className="space-y-3">
+                                        <h3
+                                            id={`job-${job.slug}`}
+                                            className="text-section-title"
+                                        >
+                                            <Link
+                                                href={jobUrl(job.slug)}
+                                                className="hover:underline"
+                                            >
+                                                {job.title}
+                                                {/* The space is outside the span so it
+                                                    stays in the link's accessible name. */}
+                                                {job.site && (
+                                                    <>
+                                                        {' '}
+                                                        <span className="font-normal text-muted-foreground">
+                                                            · {job.site.name}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </Link>
+                                        </h3>
+                                        {job.summary && (
+                                            <p className="text-muted-foreground">
+                                                {job.summary}
+                                            </p>
+                                        )}
+                                        <div className="text-muted-foreground">
+                                            <JobFacts job={job} />
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 md:flex-col">
+                                        <Button
+                                            asChild
+                                            className="frontline-tap"
+                                        >
+                                            <Link href={applyUrl(job.slug)}>
+                                                Apply{' '}
+                                                <span className="sr-only">
+                                                    for {job.title}
+                                                </span>
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            asChild
+                                            variant="outline"
+                                            className="frontline-tap"
+                                        >
+                                            <Link href={jobUrl(job.slug)}>
+                                                Read more{' '}
+                                                <span className="sr-only">
+                                                    about {job.title}
+                                                </span>
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                </article>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
+
+            <section
+                aria-labelledby="why-heading"
+                className="journey-site-lilac"
+            >
+                <div className="journey-site-container space-y-8 py-16">
+                    <SectionHeading
+                        id="why-heading"
+                        kicker="Why work with us"
+                        title="We look after the people who look after people"
+                    />
+                    <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {reasons.map(([icon, title, body]) => (
+                            <li
+                                key={title}
+                                className="flex flex-col gap-3 rounded-3xl border border-border bg-card p-6"
+                            >
+                                <Lens icon={icon} />
+                                <p className="font-semibold">{title}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {body}
+                                </p>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </section>
+
+            <section
+                aria-labelledby="hiring-heading"
+                className="journey-site-container space-y-10 py-16"
+            >
+                <SectionHeading
+                    id="hiring-heading"
+                    kicker="How applying works"
+                    title="From application to your first shift"
+                />
+                <Pathway steps={hiringSteps} />
+                <p className="text-sm text-muted-foreground">
+                    Questions about a role?{' '}
+                    <Link
+                        href={siteLinks.contact}
+                        className="font-semibold text-primary hover:underline"
+                    >
+                        Send us a careers question
+                    </Link>
+                    {phone ? ` or call ${phone}.` : '.'}
+                </p>
+            </section>
+        </PublicSiteLayout>
     );
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Endpoints\Http\Middleware;
 
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteSupportSettings;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,7 +13,7 @@ final class EndpointTransport
     {
         // JSON errors prevent credentials being flashed into a browser session.
         $request->headers->set('Accept', 'application/json');
-        abort_unless(config('endpoint_management.enabled'), 404);
+        abort_unless(app(EndpointRemoteSupportSettings::class)->endpointEnabled(), 404);
         abort_unless($request->isSecure(), 400, 'Endpoint management requires HTTPS.');
         abort_if(strlen($request->getContent()) > 1048576, 413);
         $response = $next($request);

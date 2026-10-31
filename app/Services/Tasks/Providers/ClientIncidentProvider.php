@@ -5,6 +5,18 @@ namespace App\Services\Tasks\Providers;
 use App\Models\ClientIncident;
 use App\Models\IncidentFollowup;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
+use App\Services\HealthSafety\EmergencyDrillAccessService;
+use App\Services\HealthSafety\FirstAidAccessService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\InjuryAccessService;
+use App\Services\HealthSafety\RestraintAccessService;
+use App\Services\HealthSafety\SafeWorkProcedureAccessService;
+use App\Services\Incidents\IncidentTaskReadService;
+use App\Services\Tasks\Contracts\ContextualHealthSafetyTaskProvider;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use App\Services\Incidents\IncidentAccessService;
+use App\Services\Incidents\IncidentOwnershipService;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\SplittableTaskProvider;
@@ -13,23 +25,18 @@ use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\Tasks\TaskSearch;
-use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * NOT assignable from the queue: `investigation_assigned_to` is a legacy
- * column no incidents-module endpoint writes any more (investigation
- * editing moved to the H&S register — see IncidentController::update()'s
- * Option B note), so there are no module assignment rules to mirror.
+ * Projects canonical incident ownership. Assignment opens the incident's
+ * governed command: the generic queue picker has no revision/reason contract.
  *
  * IS splittable: a queue row can be forked into an IncidentFollowup, mirroring
  * IncidentFollowupController::store() exactly (permission, columns, scoping).
  */
-class ClientIncidentProvider implements HasModelClass, SiteScopedTaskProvider, SplittableTaskProvider, TaskProvider
+class ClientIncidentProvider implements ContextualHealthSafetyTaskProvider, HasModelClass, SiteScopedTaskProvider, SplittableTaskProvider, TaskProvider
 {
-    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites', 'reports.viewAny'];
-
     public function sourceKey(): string
     {
         return 'incident';
@@ -53,11 +60,39 @@ class ClientIncidentProvider implements HasModelClass, SiteScopedTaskProvider, S
 
     public function authorizedTasks(User $user, array $filters = []): array
     {
-        $includeSearchContext = TaskSearch::hasQuery($filters);
+        try {
+            return HealthSafetyReadContext::within($user, array_unique([
+                ...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS, ...InjuryAccessService::PERMISSIONS,
+                ...SafeWorkProcedureAccessService::PERMISSIONS, ...EmergencyDrillAccessService::PERMISSIONS,
+            ]), fn (HealthSafetyReadContext $context): array => $this->authorizedTasksInContext($user, $filters, $context));
+        } catch (HttpException $denial) {
+            if (! in_array($denial->getStatusCode(), [403, 404], true)) { throw $denial; }
+            return [];
+        }
+    }
+
+    public function authorizedTasksInContext(User $viewer, array $filters, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+        return $context->consumeSourceViewer(IncidentTaskReadService::PERMISSIONS,
+            fn (User $current, CurrentAuthorizationReads $reads): array => $this->materialize($current, $filters, $context, $reads));
+    }
+
+    public function authorizedNavigationTasksInContext(User $viewer, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+        return $context->consumeSourceViewer(IncidentTaskReadService::PERMISSIONS,
+            fn (User $current, CurrentAuthorizationReads $reads): array => $this->materialize($current, [], $context, $reads, true));
+    }
+    private function materialize(User $user, array $filters, HealthSafetyReadContext $context, CurrentAuthorizationReads $reads, bool $navigation = false): array
+    {
+        $leaf = app(IncidentTaskReadService::class);
+        $includeSearchContext = ! $navigation && TaskSearch::hasQuery($filters);
         $with = [
             'client:id,first_name,last_name',
             'site:id,name',
-            'investigator:id,name',
+            'incidentOwner.roles.permissions',
+            'incidentOwner.permissionOverrides',
             $includeSearchContext
                 ? 'controlRoomAlert:id,reference_number,assigned_to_user_id'
                 : 'controlRoomAlert:id,reference_number',
@@ -82,16 +117,22 @@ class ClientIncidentProvider implements HasModelClass, SiteScopedTaskProvider, S
             );
         }
 
-        $query = ClientIncident::query()
-            ->with($with)
+        $parents = $leaf->incidentParents($user, $reads, $filters);
+        $query = (clone $parents)
+            ->with($leaf->relations($navigation ? [] : $with, $reads))
             ->when(
                 $includeSearchContext,
                 fn ($q) => TaskSearch::applyIncidentJourneyPredicate($q, $filters),
             )
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
+            // "Assigned to me" keeps only items whose assignee is the viewer, and an incident's assignee is its owner
+            // (incident_owner_user_id). Narrowing here, before the per-incident proofs, drops only rows the final
+            // filter would drop anyway (speed, 30 Oct: My Day's card proved every open incident then threw them away).
+            ->when(($filters['assigned'] ?? null) === 'me', fn ($q) => $q->where('client_incidents.incident_owner_user_id', $user->id))
             ->orderByDesc('occurred_at')
             ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 
+        if ($navigation) { $query->select([...\App\Services\Incidents\IncidentRoutingService::SOURCE_COLUMNS, 'created_at', 'occurred_at']); }
         if (empty($filters['include_done'])) {
             $query->whereNotIn('status', ['closed']);
         }
@@ -100,28 +141,26 @@ class ClientIncidentProvider implements HasModelClass, SiteScopedTaskProvider, S
             $user,
             $this->canView($user),
             $query,
-            function ($scoped, User $actor) {
-                app(UserSiteAccessService::class)->applyClientIncidentScope(
-                    $scoped,
-                    $actor,
-                    self::SITE_BYPASS_PERMISSIONS,
-                );
-
-                // viewAssigned-only staff see just their assigned clients'
-                // incidents, exactly as IncidentController::index does.
-                return $scoped->when(
-                    ! $actor->canDo('incidents.viewAny') && $actor->canDo('incidents.viewAssigned'),
-                    fn ($query) => $query->whereHas(
-                        'client.supportWorkers',
-                        fn ($clients) => $clients->whereKey($actor->id),
-                    ),
-                );
-            },
-            function (ClientIncident $incident) use ($includeSearchContext) {
+            fn ($scoped, User $actor) => $leaf->current($scoped, $reads),
+            function (ClientIncident $incident) use ($includeSearchContext, $user, $context, $reads, $parents, $leaf, $navigation) {
+                if (! $leaf->isStillIncident($incident, $parents, $reads)) { return null; }
+                $ownership = app(IncidentOwnershipService::class)->summaryFromProtectedSourceInCurrentReads($user, $incident, $reads, $parents);
+                if ($ownership === null) { return null; }
+                if ($navigation) {
+                    if (! $leaf->isStillIncident($incident, $parents, $reads)) { return null; }
+                    return new TaskItem(id: 'incident-'.$incident->id, source: $this->sourceKey(), sourceLabel: $this->label(), ref: null, title: '',
+                        status: (string) $incident->status, bucket: match ($incident->status) { 'closed' => TaskItem::BUCKET_DONE, 'submitted', 'reviewed' => TaskItem::BUCKET_IN_PROGRESS, default => TaskItem::BUCKET_OPEN },
+                        severity: 'info', assignee: in_array($ownership['state'], ['assigned', 'historical'], true) && $ownership['owner'] ? ['id' => $ownership['owner']['id'], 'name' => ''] : null);
+                }
                 $journey = IncidentJourneyTaskContext::make(
                     $incident,
+                    $user,
                     includeSearchContext: $includeSearchContext,
+                    readContext: $context,
                 );
+
+                $journey['incident_owner'] = $ownership;
+                if (! $leaf->isStillIncident($incident, $parents, $reads)) { return null; }
 
                 return new TaskItem(
                     id: 'incident-'.$incident->id,
@@ -137,19 +176,21 @@ class ClientIncidentProvider implements HasModelClass, SiteScopedTaskProvider, S
                         default => TaskItem::BUCKET_OPEN,
                     },
                     severity: TaskItem::normaliseSeverity($incident->severity),
-                    assignee: $incident->investigator
-                        ? ['id' => $incident->investigator->id, 'name' => $incident->investigator->name]
-                        : null,
+                    assignee: in_array($ownership['state'], ['assigned', 'historical'], true) ? $ownership['owner'] : null,
                     client: $journey['person'] ?? null,
                     site: $journey['site'] ?? null,
                     dueAt: null,
                     createdAt: optional($incident->created_at)->toIso8601String(),
-                    link: "/incidents?incident={$incident->id}",
+                    link: "/incidents/{$incident->id}",
                     type: 'Incident',
                     description: $incident->description ? str($incident->description)->limit(140)->toString() : null,
                     journey: $journey,
                     sourceContext: str_replace('_', ' ', (string) ($incident->source ?: 'incident report')),
-                    actionLabel: 'Review incident',
+                    actionLabel: match ($ownership['state']) {
+                        'unassigned' => 'Assign incident owner',
+                        'replacement_needed' => 'Replace incident owner',
+                        default => 'Open incident',
+                    },
                 );
             },
         );
@@ -184,15 +225,7 @@ class ClientIncidentProvider implements HasModelClass, SiteScopedTaskProvider, S
             // Lock the parent before checking lifecycle state or inserting work so
             // this writer serialises with incident closure.
             $incident = ClientIncident::query()
-                ->tap(fn ($query) => app(UserSiteAccessService::class)->applyClientIncidentScope(
-                    $query,
-                    $actor,
-                    self::SITE_BYPASS_PERMISSIONS,
-                ))
-                ->when(
-                    ! $actor->canDo('incidents.viewAny') && $actor->canDo('incidents.viewAssigned'),
-                    fn ($q) => $q->whereHas('client.supportWorkers', fn ($qq) => $qq->whereKey($actor->id)),
-                )
+                ->tap(fn ($query) => app(IncidentAccessService::class)->apply($query, $actor))
                 ->whereKey($id)
                 ->lockForUpdate()
                 ->first();
@@ -217,7 +250,7 @@ class ClientIncidentProvider implements HasModelClass, SiteScopedTaskProvider, S
                 'created_by' => $actor->id,
             ]);
 
-            return "/incidents?incident={$incident->id}";
+            return "/incidents/{$incident->id}?section=followups";
         }, 3);
 
         // The /tasks split controller sends the assignment FYI — do NOT fire

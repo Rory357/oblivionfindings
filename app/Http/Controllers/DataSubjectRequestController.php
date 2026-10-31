@@ -10,6 +10,7 @@ use App\Models\RespiteBookingRequest;
 use App\Models\RespiteReferral;
 use App\Models\RespiteStay;
 use App\Models\User;
+use App\Support\WorkerClock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -430,7 +431,7 @@ class DataSubjectRequestController extends Controller
                 'id' => $referral->id,
                 'status' => $referral->status,
                 'urgency' => $referral->urgency,
-                'received_at' => $referral->received_at?->format('Y-m-d'),
+                'received_at' => $referral->received_at ? WorkerClock::localDate($referral->received_at) : null,
                 'referrer_type' => $referral->referrer_type,
                 'referrer_name' => $referral->referrer_name,
                 'funding_source' => $referral->funding_source,
@@ -440,8 +441,8 @@ class DataSubjectRequestController extends Controller
                 'id' => $request->id,
                 'referral_id' => $request->referral_id,
                 'status' => $request->status,
-                'requested_start' => $request->requested_start?->format('Y-m-d'),
-                'requested_end' => $request->requested_end?->format('Y-m-d'),
+                'requested_start' => $request->requested_start ? WorkerClock::localDate($request->requested_start) : null,
+                'requested_end' => $request->requested_end ? WorkerClock::localDate($request->requested_end) : null,
                 'funding_source' => $request->funding_source,
                 'funding_reference' => $request->funding_reference,
                 'funding_status' => $request->funding_status,
@@ -450,8 +451,8 @@ class DataSubjectRequestController extends Controller
                 'id' => $booking->id,
                 'booking_request_id' => $booking->booking_request_id,
                 'status' => $booking->status,
-                'start_at' => $booking->start_at?->format('Y-m-d'),
-                'end_at' => $booking->end_at?->format('Y-m-d'),
+                'start_at' => $booking->start_at ? WorkerClock::localDate($booking->start_at) : null,
+                'end_at' => $booking->end_at ? WorkerClock::localDate($booking->end_at) : null,
                 'funding_source' => $booking->funding_source,
                 'funding_reference' => $booking->funding_reference,
                 'funding_status' => $booking->funding_status,
@@ -460,15 +461,15 @@ class DataSubjectRequestController extends Controller
                 'id' => $stay->id,
                 'booking_id' => $stay->booking_id,
                 'status' => $stay->status,
-                'actual_start' => $stay->actual_start?->format('Y-m-d'),
-                'actual_end' => $stay->actual_end?->format('Y-m-d'),
+                'actual_start' => $stay->actual_start ? WorkerClock::localDate($stay->actual_start) : null,
+                'actual_end' => $stay->actual_end ? WorkerClock::localDate($stay->actual_end) : null,
                 'discharge_summary' => $stay->discharge_summary,
             ])->toArray(),
             'handovers' => $stays->flatMap(fn (RespiteStay $stay) => $stay->handovers->map(fn ($handover) => [
                 'id' => $handover->id,
                 'stay_id' => $stay->id,
                 'type' => $handover->handover_type,
-                'created_at' => $handover->created_at?->format('Y-m-d'),
+                'created_at' => $handover->created_at ? WorkerClock::localDate($handover->created_at) : null,
                 'sensitive' => (bool) $handover->sensitive_flag,
             ]))->values()->toArray(),
             'communications' => $stays->flatMap(fn (RespiteStay $stay) => $stay->communications->map(fn ($communication) => [
@@ -476,7 +477,7 @@ class DataSubjectRequestController extends Controller
                 'stay_id' => $stay->id,
                 'channel' => $communication->channel,
                 'summary' => $communication->summary,
-                'occurred_at' => $communication->occurred_at?->format('Y-m-d'),
+                'occurred_at' => $communication->occurred_at ? WorkerClock::localDate($communication->occurred_at) : null,
             ]))->values()->toArray(),
         ];
     }

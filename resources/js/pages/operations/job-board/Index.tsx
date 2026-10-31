@@ -1,8 +1,8 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { Briefcase } from 'lucide-react';
-import { useMemo } from 'react';
-import { toast } from 'sonner';
+import { useMemo, useState } from 'react';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { JobBoardHero } from '@/components/job-board/job-board-hero';
 import { JobCard } from '@/components/job-board/job-card';
 import { ScopeTabs } from '@/components/job-board/scope-tabs';
@@ -14,10 +14,14 @@ import type {
     JobBoardWeek,
     JobPost,
 } from '@/components/job-board/types';
-import { Button } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { ListCaption } from '@/components/lists';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
+import { BoardActionDialog, PostPositionDialog } from './_dialogs';
+import { useAlertPreference, useBoardAction } from './_use-board-action';
+import { useLeaveGuard } from './_use-leave-guard';
+import { usePosting } from './_use-posting';
 import { useBoardFilters, type BoardFilters } from './use-board-filters';
 
 type PaginatedJobs = {
@@ -45,6 +49,14 @@ const SCOPE_VALUES: JobBoardScope[] = [
     'approvals',
 ];
 
+/** Re-read the current query's list, counts and viewer together after a
+ * confirmed (or unconfirmed-then-closed) result. It keeps the URL, filters,
+ * typed search and scroll position. */
+const REFRESH_PROPS = ['jobs', 'stats', 'viewer', 'provenance'];
+function refreshBoard() {
+    router.reload({ only: REFRESH_PROPS });
+}
+
 function resolveScope(raw: string | undefined): JobBoardScope {
     if (raw && (SCOPE_VALUES as string[]).includes(raw)) {
         return raw as JobBoardScope;
@@ -69,6 +81,42 @@ function strongMatchPredicate(job: JobPost): boolean {
     return true;
 }
 
+const EMPTY_COPY: Record<
+    JobBoardScope,
+    { title: string; description: string }
+> = {
+    'for-you': {
+        title: 'No shifts to show',
+        description:
+            'Open shifts and whether you are eligible for them appear here.',
+    },
+    all: {
+        title: 'No open shifts to show',
+        description: 'Open shifts at the sites you can see appear here.',
+    },
+    mine: {
+        title: 'No claims to show',
+        description:
+            'Shifts you have claimed, and ones recently filled for you, appear here.',
+    },
+    replacements: {
+        title: 'No replacement requests to show',
+        description: 'Shifts that need replacement cover appear here.',
+    },
+    approvals: {
+        title: 'No claims waiting for approval',
+        description: 'Claims on shifts at the sites you can see appear here.',
+    },
+};
+
+const SECTION_TITLE: Record<JobBoardScope, string> = {
+    'for-you': 'All matches',
+    all: 'All open shifts',
+    mine: 'My claims',
+    replacements: 'Replacement requests',
+    approvals: 'Claims awaiting your approval',
+};
+
 export default function JobBoardIndex({
     jobs = {
         data: [],
@@ -83,16 +131,21 @@ export default function JobBoardIndex({
     week,
     viewer,
 }: Props) {
-    const mobile = useIsMobile();
     const page = usePage().props as unknown as {
         auth?: { user?: { id?: number } | null };
     };
+    const actor = Number(page.auth?.user?.id ?? 0);
     const query = useBoardFilters(
         filters,
         String(page.auth?.user?.id ?? 'signed-out'),
     );
     const scope = resolveScope(filters.scope);
     const firstName = viewer?.first_name ?? 'there';
+    // Default-deny: a control appears only when its flag is exactly true.
+    const signedIn = Number.isSafeInteger(actor) && actor > 0;
+    const canClaim = signedIn && viewer?.can_claim === true;
+    const canApprove = signedIn && viewer?.can_approve === true;
+    const canPost = signedIn && viewer?.can_post_position === true;
     const effectiveStats: JobBoardStats = stats ?? {
         open: 0,
         claimed: 0,
@@ -133,6 +186,31 @@ export default function JobBoardIndex({
         };
     }, [week]);
 
+    // One page-level owner for every write on this page. The dialogs stay
+    // mounted and read these, so closing one never loses an unconfirmed result.
+    const [postingOpen, setPostingOpen] = useState(false);
+    const posting = usePosting({
+        open: postingOpen,
+        actor,
+        allowed: canPost,
+        week: fallbackWeek.start,
+        onConfirmed: refreshBoard,
+    });
+    const action = useBoardAction({
+        actor,
+        onConfirmed: refreshBoard,
+        onSettled: refreshBoard,
+    });
+    const alerts = useAlertPreference({ actor, onSettled: refreshBoard });
+    const postingUnconfirmed = posting.outcome?.status === 'unknown';
+    const sending = posting.pending || action.pending || alerts.pending;
+    const guard = useLeaveGuard(
+        sending ||
+            postingUnconfirmed ||
+            action.unresolved ||
+            (postingOpen && posting.dirty),
+    );
+
     const handleScopeChange = (nextScope: JobBoardScope) => {
         query.change({ scope: nextScope });
     };
@@ -146,68 +224,10 @@ export default function JobBoardIndex({
         else query.change({ [key]: value ?? undefined });
     };
 
-    const handleClaim = (job: JobPost) => {
-        router.post(
-            `/operations/job-board/${job.id}/claim`,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('Claim submitted', {
-                        description: `${job.title} — awaiting coordinator approval`,
-                    });
-                },
-                onError: () => {
-                    toast.error('Could not claim this shift', {
-                        description:
-                            'It may have been claimed by another worker.',
-                    });
-                },
-            },
-        );
-    };
-
-    const handleAlertMe = () => {
-        router.post(
-            '/operations/job-board/alerts/toggle',
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: (page) => {
-                    const nowEnabled = !!(
-                        page.props.viewer as JobBoardViewer | undefined
-                    )?.alerts_enabled;
-                    toast.success(
-                        nowEnabled ? 'Alerts enabled' : 'Alerts disabled',
-                        {
-                            description: nowEnabled
-                                ? "We'll notify you when matching shifts open."
-                                : "You won't get notified about new shifts.",
-                        },
-                    );
-                },
-                onError: () => {
-                    toast.error("Couldn't update alert preference");
-                },
-            },
-        );
-    };
-
-    const handleApprove = (job: JobPost) => {
-        router.post(
-            `/operations/job-board/${job.id}/approve`,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('Approved', {
-                        description: `${job.claimed_by?.name ?? 'Worker'} confirmed for ${job.title}`,
-                    });
-                },
-            },
-        );
-    };
+    const startClaim = (job: JobPost) =>
+        action.start({ action: 'claim', positionId: job.id });
+    const startApprove = (job: JobPost) =>
+        action.start({ action: 'approve', positionId: job.id });
 
     const counts: Record<JobBoardScope, number> = {
         'for-you': effectiveStats.eligible_for_you ?? 0,
@@ -218,74 +238,34 @@ export default function JobBoardIndex({
     };
 
     const visibleJobs = jobs.data;
-
-    const emptyCopy: Record<
-        JobBoardScope,
-        { title: string; description: string }
-    > = {
-        'for-you': {
-            title: 'No shifts to show',
-            description:
-                'Open shifts and their recorded eligibility appear here. The selected filters limit this list.',
-        },
-        all: {
-            title: 'No open positions to show',
-            description:
-                'Open positions from sites you can access appear here.',
-        },
-        mine: {
-            title: 'No claims to show',
-            description:
-                'Your current claims and recently filled positions appear here.',
-        },
-        replacements: {
-            title: 'No replacement requests to show',
-            description: 'Positions requesting replacement cover appear here.',
-        },
-        approvals: {
-            title: 'No claims awaiting approval',
-            description:
-                'Claimed positions from sites you can access appear here.',
-        },
-    };
+    const total = jobs.total ?? visibleJobs.length;
 
     const recommended = useMemo(
         () => visibleJobs.filter(strongMatchPredicate).slice(0, 3),
         [visibleJobs],
     );
 
-    const sectionTitle =
-        scope === 'for-you'
-            ? 'All matches'
-            : scope === 'mine'
-              ? 'My claims'
-              : scope === 'replacements'
-                ? 'Replacement requests'
-                : scope === 'approvals'
-                  ? 'Claims awaiting your approval'
-                  : 'All open positions';
-
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Workforce', href: '/operations/job-board' },
-                { title: 'Job Board', href: '/operations/job-board' },
+                { title: 'Available shifts', href: '/operations/job-board' },
             ]}
         >
-            <Head title="Job Board" />
-            <div className="space-y-5">
+            <Head title="Available shifts" />
+            <div className="flex flex-col gap-5">
                 <JobBoardHero
                     rail={
                         <ScopeTabs
                             scope={scope}
                             counts={counts}
                             onScopeChange={handleScopeChange}
-                            showApprovals={!!viewer?.can_approve}
+                            showApprovals={canApprove}
                         />
                     }
                     onScopeChange={handleScopeChange}
-                    canApprove={!!viewer?.can_approve}
+                    canApprove={canApprove}
                     firstName={firstName}
                     week={fallbackWeek}
                     stats={effectiveStats}
@@ -304,14 +284,21 @@ export default function JobBoardIndex({
                             : (query.error ??
                               ((query.draft.q ?? '') !== (filters.q ?? '') &&
                               !query.loading
-                                  ? 'Search changed. Select Search to refresh the positions.'
+                                  ? 'Search changed. Select Search to refresh the shifts.'
                                   : null))
                     }
                     onFilterChange={handleFilterChange}
                     onWeekChange={handleWeekChange}
-                    onAlertMe={handleAlertMe}
+                    onAlertMe={
+                        signedIn
+                            ? () =>
+                                  void alerts.setAlerts(!viewer?.alerts_enabled)
+                            : undefined
+                    }
                     alertsEnabled={!!viewer?.alerts_enabled}
-                    canPostPosition={!!viewer?.can_post_position}
+                    alertsBusy={alerts.pending}
+                    canPostPosition={canPost}
+                    onPostPosition={() => setPostingOpen(true)}
                     sitesCount={effectiveStats.sites}
                     sitesWorkedThisWeek={effectiveStats.sites_worked_this_week}
                 />
@@ -320,81 +307,75 @@ export default function JobBoardIndex({
                     <SmartMatchesStrip
                         jobs={recommended}
                         totalMatches={effectiveStats.eligible_for_you}
-                        onQuickClaim={handleClaim}
+                        onQuickClaim={canClaim ? startClaim : undefined}
                     />
                 ) : null}
 
-                <section aria-busy={query.loading}>
-                    <header className="mb-3 flex items-center justify-between">
-                        <h2 className="inline-flex items-center gap-2 text-[15px] font-bold tracking-tight">
-                            {sectionTitle}
-                            <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-[var(--brand-deep,var(--primary))]">
-                                {jobs.total ?? visibleJobs.length}
-                            </span>
-                        </h2>
-                    </header>
+                <section
+                    aria-busy={query.loading}
+                    className="flex flex-col gap-5"
+                >
+                    <ListCaption
+                        title={SECTION_TITLE[scope]}
+                        caption={`${visibleJobs.length} of ${total} shown`}
+                    />
 
-                    <div className="grid grid-cols-1 gap-4 md:[grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
-                        {visibleJobs.length === 0 ? (
-                            <GuardrailCard
-                                unstyled
-                                className="col-span-full rounded-xl border border-dashed border-border bg-card px-5 py-10 text-center text-muted-foreground md:p-14"
-                            >
-                                <Briefcase className="mx-auto mb-3 h-8 w-8 opacity-40" />
-                                <h3 className="text-section-title m-0 mb-1 text-foreground">
-                                    {emptyCopy[scope].title}
-                                </h3>
-                                <p className="m-0 text-sm">
-                                    {emptyCopy[scope].description} Try clearing
-                                    search or other filters if you expected a
-                                    position here.
-                                </p>
-                            </GuardrailCard>
-                        ) : (
-                            visibleJobs.map((job) => (
+                    {visibleJobs.length === 0 ? (
+                        <EmptyState
+                            icon={Briefcase}
+                            title={EMPTY_COPY[scope].title}
+                            description={`${EMPTY_COPY[scope].description} If you expected a shift here, try clearing the search or filters.`}
+                            className="bg-card"
+                        />
+                    ) : (
+                        <div className="grid grid-cols-1 gap-5 md:[grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
+                            {visibleJobs.map((job) => (
                                 <JobCard
                                     key={job.id}
                                     job={job}
-                                    onClaim={handleClaim}
-                                    onApprove={handleApprove}
-                                />
-                            ))
-                        )}
-                    </div>
-
-                    {(jobs.last_page ?? 1) > 1 ? (
-                        <nav
-                            aria-label="Job Board pages"
-                            className="mt-4 flex flex-wrap items-center justify-center gap-2 md:gap-1"
-                        >
-                            {(jobs.links ?? []).map((link, idx) => (
-                                <Button
-                                    key={idx}
-                                    size="sm"
-                                    variant={
-                                        link.active ? 'default' : 'outline'
+                                    onClaim={canClaim ? startClaim : undefined}
+                                    onApprove={
+                                        canApprove ? startApprove : undefined
                                     }
-                                    className={
-                                        mobile
-                                            ? 'frontline-tap px-2 text-xs'
-                                            : 'h-7 min-w-[28px] px-2 text-xs'
-                                    }
-                                    aria-current={
-                                        link.active ? 'page' : undefined
-                                    }
-                                    disabled={!link.url || query.loading}
-                                    onClick={() =>
-                                        link.url && query.goPage(link.url)
-                                    }
-                                    dangerouslySetInnerHTML={{
-                                        __html: link.label,
-                                    }}
                                 />
                             ))}
-                        </nav>
-                    ) : null}
+                        </div>
+                    )}
+
+                    <LaravelPagination
+                        links={jobs.links ?? []}
+                        lastPage={jobs.last_page}
+                        disabled={query.loading}
+                        onPage={(next) =>
+                            query.goPage(`/operations/job-board?page=${next}`)
+                        }
+                    />
                 </section>
             </div>
+
+            <PostPositionDialog
+                open={postingOpen && canPost}
+                onClose={() => setPostingOpen(false)}
+                form={posting}
+                week={fallbackWeek.start}
+            />
+            <BoardActionDialog action={action} />
+            <ConfirmDialog
+                open={guard.asking}
+                variant="default"
+                title="Leave this page?"
+                description={
+                    sending
+                        ? "A request is still being sent. Leaving won't stop or undo it, and you won't see whether it saved."
+                        : postingUnconfirmed || action.unresolved
+                          ? "We couldn't confirm your last request. If you leave, this page forgets it. Leaving doesn't undo anything that saved."
+                          : "Your posting entries haven't been posted yet and will be lost."
+                }
+                cancelText="Stay here"
+                confirmText="Leave page"
+                onClose={guard.stay}
+                onConfirm={guard.leave}
+            />
         </AppLayout>
     );
 }

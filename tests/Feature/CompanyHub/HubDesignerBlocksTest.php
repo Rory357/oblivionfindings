@@ -119,7 +119,10 @@ test('Home and page dynamic blocks use current authorised services team spaces a
     }
     foreach (['public', 'draft', 'outside', 'expired'] as $status) {
         $space = $this->publisher->create($this->editor, 'department', $status.' learning space', 'team');
-        $space = $this->publisher->save($this->editor, $space, [...$space->draft, 'team_ids' => [$this->team->id], 'audience' => $status === 'outside' ? ['type' => 'sites', 'ids' => [$outsideSite->id]] : ['type' => 'all', 'ids' => []]], 1);
+        // The team template starts with an empty introduction, which cannot be published.
+        $draft = $space->draft;
+        $draft['sections'][0]['blocks'][0]['body'] = 'What this team is learning together.';
+        $space = $this->publisher->save($this->editor, $space, [...$draft, 'team_ids' => [$this->team->id], 'audience' => $status === 'outside' ? ['type' => 'sites', 'ids' => [$outsideSite->id]] : ['type' => 'all', 'ids' => []]], 1);
         if ($status !== 'draft') {
             $this->publisher->publish($this->editor, $space, 2, null, $status === 'expired' ? now()->addMinute()->toISOString() : null);
         }

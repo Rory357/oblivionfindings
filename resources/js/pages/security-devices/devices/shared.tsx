@@ -87,16 +87,85 @@ export function healthVariant(
     }
 }
 
+/** Stored device domains, named as the Security & Devices sidebar names them. */
+export const DEVICE_DOMAIN_LABELS: Record<string, string> = {
+    it_infrastructure: 'Network & IT',
+    security: 'Security',
+    iot_healthcare: 'Healthcare',
+    tracking: 'Tracking',
+    facilities: 'Facilities & IoT',
+};
+
 export function domainLabel(domain: string): string {
-    const map: Record<string, string> = {
-        security: 'Security',
-        tracking: 'Tracking',
-        iot_healthcare: 'IoT / Healthcare',
-        it_infrastructure: 'IT Infrastructure',
-        facilities: 'Facilities',
-    };
-    return map[domain] ?? domain;
+    return DEVICE_DOMAIN_LABELS[domain] ?? taxonomyWords(domain);
 }
+
+// Short forms that keep their capitals when a stored key is put into words.
+const TAXONOMY_ACRONYMS: Record<string, string> = {
+    '5g': '5G',
+    can: 'CAN',
+    cctv: 'CCTV',
+    co: 'CO',
+    dvr: 'DVR',
+    gps: 'GPS',
+    hvac: 'HVAC',
+    it: 'IT',
+    iot: 'IoT',
+    lora: 'LoRa',
+    lpg: 'LPG',
+    lte: 'LTE',
+    mfp: 'MFP',
+    nas: 'NAS',
+    nvr: 'NVR',
+    obd: 'OBD',
+    pbx: 'PBX',
+    pdu: 'PDU',
+    pir: 'PIR',
+    ptz: 'PTZ',
+    san: 'SAN',
+    sip: 'SIP',
+    sos: 'SOS',
+    ups: 'UPS',
+};
+
+/**
+ * Puts a stored taxonomy key (`access_control`, `pir_motion`) into sentence
+ * case words ("Access control", "PIR motion"). Stored values never change.
+ */
+export function taxonomyWords(value: string | null | undefined): string {
+    const words = (value ?? '').split(/[_\s-]+/).filter(Boolean);
+    if (words.length === 0) return 'Not recorded';
+    return words
+        .map((word, index) => {
+            const known = TAXONOMY_ACRONYMS[word.toLowerCase()];
+            if (known) return known;
+            const lower = word.toLowerCase();
+            return index === 0
+                ? lower.charAt(0).toUpperCase() + lower.slice(1)
+                : lower;
+        })
+        .join(' ');
+}
+
+/**
+ * Sentence case for a Title Case taxonomy label from the server ("PIR Motion
+ * Sensor" → "PIR motion sensor"). Words with a capital after their first
+ * letter (NVR, LoRa) keep their capitals.
+ */
+export function sentenceCaseLabel(label: string): string {
+    return label
+        .split(' ')
+        .map((word, index) =>
+            index === 0 || /[A-Z]/.test(word.slice(1))
+                ? word
+                : word.toLowerCase(),
+        )
+        .join(' ');
+}
+
+/** The device's equipment category in words, e.g. "Access control". */
+export const deviceCategoryLabel = (category: string | null | undefined) =>
+    taxonomyWords(category);
 
 export function formatTimeSince(iso: string | null): string {
     return formatRelative(iso, Date.now(), 'Never');
@@ -142,7 +211,7 @@ export function StatCard({
                     className={`rounded-lg p-2 ${variant === 'warning' && value > 0 ? 'bg-status-warning-bg' : 'bg-muted'}`}
                 >
                     <Icon
-                        className={`h-5 w-5 ${variant === 'warning' && value > 0 ? 'text-status-warning dark:text-status-warning' : 'text-muted-foreground'}`}
+                        className={`h-5 w-5 ${variant === 'warning' && value > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
                     />
                 </div>
                 <div>
@@ -189,19 +258,39 @@ export function deviceHealthMeridian(device: DeviceListItem): EntityMeridian {
     if (device.health_status === 'critical') return 'critical';
     if (
         device.health_status === 'warning' ||
-        ['attention', 'unmonitored'].includes(device.monitoring_state ?? '')
+        device.monitoring_state === 'attention'
     )
         return 'warning';
-    if (device.health_status === 'healthy') return 'success';
+    if (
+        device.health_status === 'healthy' &&
+        device.monitoring_state !== 'unmonitored' &&
+        device.monitoring_state !== 'not_monitored' &&
+        device.monitoring_state !== 'unknown'
+    )
+        return 'success';
     return 'neutral';
 }
 
 export function deviceMonitoringVariant(state: string): StatusVariant {
     if (state === 'healthy') return 'success';
-    if (state === 'attention' || state === 'unmonitored') return 'warning';
+    if (state === 'attention') return 'warning';
     return 'neutral';
 }
+
+export function deviceMonitoringLabel(state: string): string {
+    if (state === 'unmonitored' || state === 'not_monitored') {
+        return 'Not monitored';
+    }
+    if (state === 'attention') {
+        return 'Needs attention';
+    }
+    return state.replaceAll('_', ' ');
+}
+
 function signalLabel(state: string) {
+    if (state === 'not_monitored' || state === 'unmonitored') {
+        return 'Not monitored';
+    }
     return state.replaceAll('_', ' ');
 }
 
@@ -240,11 +329,11 @@ export function DeviceCard({
                         <StatusBadge status={device.status} />
                         <EntityChip>{domainLabel(device.domain)}</EntityChip>
                         <EntityChip>
-                            {device.category.replaceAll('_', ' ')}
+                            {deviceCategoryLabel(device.category)}
                         </EntityChip>
                         {device.subcategory ? (
                             <EntityChip>
-                                {device.subcategory.replaceAll('_', ' ')}
+                                {taxonomyWords(device.subcategory)}
                             </EntityChip>
                         ) : null}
                         {device.provider ? (
@@ -268,21 +357,39 @@ export function DeviceCard({
                         : undefined
                 }
                 alerts={
-                    <>
-                        <StatusBadge
-                            status={device.health_status}
-                            label={`Health: ${signalLabel(device.health_status)}`}
-                        />
-                        {device.monitoring_state ? (
+                    device.monitoring_state === 'unmonitored' ||
+                    device.health_status === 'not_monitored' ? (
+                        <>
+                            {(device.health_status === 'critical' ||
+                                device.health_status === 'warning') && (
+                                <StatusBadge
+                                    status={device.health_status}
+                                    label={`Health: ${signalLabel(device.health_status)}`}
+                                />
+                            )}
                             <StatusBadge
-                                variant={deviceMonitoringVariant(
-                                    device.monitoring_state,
-                                )}
-                                label={`Monitoring: ${signalLabel(device.monitoring_state)}`}
-                                status={device.monitoring_state}
+                                variant="neutral"
+                                status="not_monitored"
+                                label="Not monitored"
                             />
-                        ) : null}
-                    </>
+                        </>
+                    ) : (
+                        <>
+                            <StatusBadge
+                                status={device.health_status}
+                                label={`Health: ${signalLabel(device.health_status)}`}
+                            />
+                            {device.monitoring_state ? (
+                                <StatusBadge
+                                    variant={deviceMonitoringVariant(
+                                        device.monitoring_state,
+                                    )}
+                                    label={`Monitoring: ${deviceMonitoringLabel(device.monitoring_state)}`}
+                                    status={device.monitoring_state}
+                                />
+                            ) : null}
+                        </>
+                    )
                 }
                 footer={{
                     personIcon:

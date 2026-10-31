@@ -195,6 +195,7 @@ export default function QualificationCheckShift({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Workforce', href: '/operations/rostering' },
+                { title: 'Rostering', href: '/operations/rostering' },
                 { title: 'Shifts', href: '/operations/shifts' },
                 {
                     title: `Shift #${shift.id}`,
@@ -214,7 +215,7 @@ export default function QualificationCheckShift({
                     recorded worker and duty. House coverage and other safety
                     checks are assessed separately when assigning or publishing.
                 </p>
-                <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+                <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Shift</CardTitle>
@@ -315,7 +316,7 @@ export default function QualificationCheckShift({
                                                 </p>
                                                 <Badge
                                                     variant="outline"
-                                                    className="h-5 text-[10px]"
+                                                    className="h-5 text-xs"
                                                 >
                                                     {result.is_mandatory
                                                         ? 'Mandatory'

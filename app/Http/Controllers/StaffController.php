@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Controllers\Concerns\LimitsStaffRecordsToViewerSites;
 use App\Models\FleetDriverSession;
 use App\Models\FleetDrivingMetric;
 use App\Models\FleetIncident;
@@ -22,16 +23,19 @@ use Inertia\Inertia;
 
 class StaffController extends Controller
 {
+    use LimitsStaffRecordsToViewerSites;
+
     public function index(Request $request)
     {
         $auth = $request->user();
 
-        // Only users with staff.viewAny can list everyone.
+        // staff.viewAny lists the staff in the viewer's own Sites (everyone
+        // with sites.viewAll), always with the viewer's own row.
         abort_unless($auth && $auth->canDo('staff.viewAny'), 403);
 
         $search = trim((string) $request->query('q', ''));
 
-        $users = User::staff()
+        $users = $this->limitStaffListToViewerSites(User::staff(), $auth)
             ->when($search !== '', fn ($q) => $q->where(fn ($subQuery) => $subQuery
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
@@ -65,10 +69,12 @@ class StaffController extends Controller
         // Portal users should never appear in the staff module.
         abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
 
-        // Staff can view themselves; managers/admins can view any staff.
+        // Staff can view themselves; managers/admins can view staff in their
+        // own Sites (every Site with sites.viewAll).
         if ($auth->id !== $user->id) {
             abort_unless($auth->canDo('staff.viewAny'), 403);
         }
+        $this->abortUnlessStaffInViewerSites($auth, $user);
 
         $user->load(['roles:id,name,label']);
         $staffProfile = $this->staffProfileMap([$user->id])[$user->id] ?? null;
@@ -231,6 +237,7 @@ class StaffController extends Controller
 
         // Portal users should never appear in the staff module.
         abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
+        $this->abortUnlessStaffInViewerSites($auth, $user);
 
         $user->load(['roles:id,name,label']);
         $staffProfile = $this->staffProfileMap([$user->id])[$user->id] ?? null;
@@ -250,6 +257,7 @@ class StaffController extends Controller
 
         // Portal users should never be editable from the staff module.
         abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
+        $this->abortUnlessStaffInViewerSites($auth, $user);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -300,6 +308,7 @@ class StaffController extends Controller
                     || in_array($lockedUser->role, ['client', 'next_of_kin'], true),
                 404,
             );
+            $this->abortUnlessStaffInViewerSites($lockedActor, $lockedUser);
             $lockedUser->update([
                 'name' => $data['name'],
                 'email' => $data['email'],

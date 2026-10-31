@@ -8,9 +8,20 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 )
+
+type LocalStatus struct {
+	Platform            string `json:"platform"`
+	Configured          bool   `json:"configured"`
+	Enrolled            bool   `json:"enrolled"`
+	AgentUUID           string `json:"agent_uuid,omitempty"`
+	ServerURL           string `json:"server_url,omitempty"`
+	Sequence            uint64 `json:"sequence"`
+	HasPendingHeartbeat bool   `json:"has_pending_heartbeat"`
+}
 
 // State is private to this installation. It must never be logged or returned by diagnostics.
 type State struct {
@@ -26,6 +37,7 @@ type State struct {
 }
 
 type Store struct {
+	scriptJournalGate         sync.Mutex
 	mutationGate              sync.Mutex
 	softwareReady             func() bool
 	softwareObservations      func(string, string) []SoftwareObservation
@@ -157,4 +169,56 @@ func rejectLink(path string) error {
 		return errors.New("unsafe state file")
 	}
 	return nil
+}
+
+// InspectState reports non-sensitive installation readiness without acquiring agent.lock or creating directories.
+func InspectState(dir string) (LocalStatus, error) {
+	if !filepath.IsAbs(dir) {
+		return LocalStatus{}, errors.New("state directory must be absolute")
+	}
+	dir = filepath.Clean(dir)
+	info, err := os.Lstat(dir)
+	if os.IsNotExist(err) {
+		return LocalStatus{Platform: runtime.GOOS, Configured: false, Enrolled: false}, nil
+	}
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return LocalStatus{}, errors.New("invalid state directory")
+	}
+	statePath := filepath.Join(dir, "state.json")
+	if err = rejectLink(statePath); err != nil {
+		return LocalStatus{}, err
+	}
+	f, err := os.Open(statePath)
+	if os.IsNotExist(err) {
+		return LocalStatus{Platform: runtime.GOOS, Configured: false, Enrolled: false}, nil
+	}
+	if err != nil {
+		return LocalStatus{}, errors.New("cannot read agent state")
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, 2*1024*1024+1))
+	if err != nil || len(data) > 2*1024*1024 {
+		return LocalStatus{}, errors.New("agent state exceeds its bound")
+	}
+	var state State
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	var trailing any
+	if err = decoder.Decode(&state); err != nil || decoder.Decode(&trailing) != io.EOF {
+		return LocalStatus{}, errors.New("agent state is invalid; approved recovery is required")
+	}
+	if state.Version != 1 || !hexCredential(state.Credential) || state.Sequence > 9007199254740991 ||
+		(state.ExpectedAgentUUID != "" && !uuidPattern.MatchString(state.ExpectedAgentUUID)) ||
+		(state.AgentUUID != "" && !uuidPattern.MatchString(state.AgentUUID)) {
+		return LocalStatus{}, errors.New("unsupported or invalid agent state")
+	}
+	return LocalStatus{
+		Platform:            runtime.GOOS,
+		Configured:          true,
+		Enrolled:            state.AgentUUID != "",
+		AgentUUID:           state.AgentUUID,
+		ServerURL:           state.ServerURL,
+		Sequence:            state.Sequence,
+		HasPendingHeartbeat: len(state.PendingHeartbeat) > 0,
+	}, nil
 }

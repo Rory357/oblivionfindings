@@ -64,6 +64,28 @@ function matchesIdentity(value: unknown, original: HandoverCommandIdentity): boo
     return identityKeys.every((key) => value[key] === original[key]);
 }
 
+/** Only an explicit, identity-bound pre-writer refusal permits editing again.
+ * A generic validation/status/redirect response never proves no write. */
+export function refusedHandoverCommand(value: unknown, original: HandoverCommandIdentity,
+    httpStatus: number): Readonly<Record<string, string>> | null {
+    const result = object(value);
+    if (![409, 422].includes(httpStatus) || !result ||
+        !exactKeys(result, ['version', 'scope', 'identity', 'saved', 'outcome', 'errors']) ||
+        result.version !== 1 || result.scope !== 'operations_handover_command' ||
+        result.outcome !== 'refused' || result.saved !== null || !matchesIdentity(result.identity, original)) return null;
+    const errors = object(result.errors);
+    const allowed = new Set(['handover', 'handover_notes', 'client_mood', 'incoming_shift_id', 'incoming_staff_id',
+        'medications_due_text', 'incidents_to_note_text', 'follow_up_items_text', 'tasks_pending_text',
+        'cd_result', 'cd_witness_id', 'cd_witness_credential', 'cd_notes']);
+    if (!errors || Object.keys(errors).length === 0 || Object.keys(errors).length > allowed.size) return null;
+    const retained: Record<string, string> = {};
+    for (const [field, message] of Object.entries(errors)) {
+        if (!allowed.has(field) || typeof message !== 'string' || message.length === 0 || message.length > 300) return null;
+        retained[field] = message;
+    }
+    return Object.freeze(retained);
+}
+
 /** Call only with the original immutable identity and a currently admitted
  * owner lease. A caller must recheck that lease after this returns. */
 export function confirmedHandoverCommand(

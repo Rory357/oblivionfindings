@@ -478,16 +478,20 @@ class ComplianceMatrixService
                 $check = $user->staffBackgroundChecks()
                     ->where('check_type', 'police_check')
                     ->whereIn('status', ['clear', 'cleared'])
-                    ->orderByDesc('completed_at')
+                    // The check's result date: when it was issued, else when it
+                    // was done (the table has no completed_at column).
+                    ->orderByRaw('COALESCE(issue_date, check_date) DESC')
+                    ->orderByDesc('id')
                     ->first();
 
                 if ($check) {
+                    $completedOn = $check->issue_date ?? $check->check_date;
                     $result['evidence_type'] = 'background_check';
                     $result['evidence_id'] = $check->id;
-                    $result['valid_from'] = $check->completed_at?->toDateString();
+                    $result['valid_from'] = $completedOn?->toDateString();
 
-                    if ($requirement->validity_months && $check->completed_at) {
-                        $expiresAt = $check->completed_at->addMonths($requirement->validity_months);
+                    if ($requirement->validity_months && $completedOn) {
+                        $expiresAt = $completedOn->copy()->addMonths($requirement->validity_months);
                         $result['expires_at'] = $expiresAt->toDateString();
 
                         if ($expiresAt->isPast()) {

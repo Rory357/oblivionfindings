@@ -28,6 +28,7 @@ import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
 
@@ -325,7 +326,7 @@ function ShiftChip({
                     <Repeat className="h-[11px] w-[11px] shrink-0 text-muted-foreground" />
                 ) : null}
             </span>
-            <span className="flex min-w-0 items-center gap-1 pl-3 text-[10.5px] text-muted-foreground">
+            <span className="flex min-w-0 items-center gap-1 pl-3 text-xs text-muted-foreground">
                 <span className="font-semibold tabular-nums">{s.start}</span>
                 <span className="opacity-50">·</span>
                 <span className="truncate">
@@ -338,24 +339,25 @@ function ShiftChip({
                 s.conflict) && (
                 <span className="flex flex-wrap gap-1 pl-3">
                     {s.status === 'open' ? (
-                        <span className="rounded bg-status-critical-bg px-1 text-[8.5px] font-extrabold tracking-wider text-status-critical">
-                            OPEN
-                        </span>
+                        <StatusBadge variant="critical" size="sm">
+                            Open
+                        </StatusBadge>
                     ) : null}
                     {s.replacement ? (
-                        <span className="rounded bg-status-warning-bg px-1 text-[8.5px] font-extrabold tracking-wider text-status-warning">
-                            REPL
-                        </span>
+                        <StatusBadge variant="warning" size="sm">
+                            Replacing
+                        </StatusBadge>
                     ) : null}
                     {s.incidents > 0 ? (
-                        <span className="rounded bg-status-critical-bg px-1 text-[8.5px] font-extrabold tracking-wider text-status-critical">
-                            {s.incidents} INC
-                        </span>
+                        <StatusBadge variant="critical" size="sm">
+                            {s.incidents}{' '}
+                            {s.incidents === 1 ? 'incident' : 'incidents'}
+                        </StatusBadge>
                     ) : null}
                     {s.conflict ? (
-                        <span className="rounded bg-status-critical-bg px-1 text-[8.5px] font-extrabold tracking-wider text-status-critical">
-                            CLASH
-                        </span>
+                        <StatusBadge variant="critical" size="sm">
+                            Clash
+                        </StatusBadge>
                     ) : null}
                 </span>
             )}
@@ -434,7 +436,7 @@ function DayCell({
             <div className="flex min-h-[22px] items-center justify-between px-0.5">
                 <span
                     className={cn(
-                        'inline-flex h-6 w-6 items-center justify-center rounded-lg text-[13px] font-semibold',
+                        'inline-flex h-6 w-6 items-center justify-center rounded-lg text-sm font-semibold',
                         isToday &&
                             'bg-primary-fill font-bold text-primary-fill-foreground',
                         !inMonth && !isToday && 'text-muted-foreground/50',
@@ -445,7 +447,7 @@ function DayCell({
                 <span className="flex items-center gap-1">
                     {hasGap ? (
                         <span
-                            className="rounded-md bg-status-warning-bg px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide text-status-warning uppercase"
+                            className="rounded-md bg-status-warning-bg px-1.5 py-0.5 text-xs font-bold tracking-wide text-status-warning uppercase"
                             title="Site coverage gap in this day"
                         >
                             Gap
@@ -453,7 +455,7 @@ function DayCell({
                     ) : null}
                     {open > 0 ? (
                         <span
-                            className="rounded-md bg-status-critical-bg px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide text-status-critical uppercase"
+                            className="rounded-md bg-status-critical-bg px-1.5 py-0.5 text-xs font-bold tracking-wide text-status-critical uppercase"
                             title={`${open} open shift${open > 1 ? 's' : ''}`}
                         >
                             {open} open
@@ -469,7 +471,7 @@ function DayCell({
                                 e.stopPropagation();
                                 onQuickAdd(key);
                             }}
-                            className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-[7px] bg-accent text-primary opacity-0 transition-all group-hover/cell:opacity-100 hover:bg-primary-fill hover:text-primary-fill-foreground focus-visible:opacity-100"
+                            className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-[7px] bg-primary-fill/10 text-primary opacity-0 transition-all group-hover/cell:opacity-100 hover:bg-primary-fill hover:text-primary-fill-foreground focus-visible:opacity-100"
                         >
                             <Plus className="h-[13px] w-[13px]" />
                         </button>
@@ -497,7 +499,7 @@ function DayCell({
                             e.stopPropagation();
                             onOpen(key);
                         }}
-                        className="self-start rounded-md px-1 py-0.5 text-[11px] font-semibold text-muted-foreground hover:bg-accent hover:text-primary"
+                        className="self-start rounded-md px-1 py-0.5 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-primary"
                     >
                         +{more} more
                     </button>
@@ -612,7 +614,7 @@ function PeekPopover({
             <div className="min-w-0 flex-1 p-4">
                 <div className="mb-3 flex items-start justify-between gap-2.5">
                     <div className="min-w-0">
-                        <div className="truncate text-[15.5px] font-bold tracking-tight">
+                        <div className="truncate text-lg font-bold tracking-tight">
                             {s.client ?? 'Shift'}
                         </div>
                         <div className="mt-px truncate text-xs text-muted-foreground">
@@ -622,7 +624,7 @@ function PeekPopover({
                         </div>
                     </div>
                     <span
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-bold whitespace-nowrap"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-xs font-bold whitespace-nowrap"
                         style={{ background: m.tint, color: m.accent }}
                     >
                         {m.live ? (
@@ -742,13 +744,13 @@ function PeekCell({
 }) {
     return (
         <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 {icon}
                 {k}
             </span>
             <span
                 className={cn(
-                    'truncate text-[13px] font-semibold text-foreground',
+                    'truncate text-sm font-semibold text-foreground',
                     capitalize && 'capitalize',
                 )}
             >
@@ -881,7 +883,7 @@ function MiniCalendar({
                                 setYearMode(false);
                             }}
                             className={cn(
-                                'rounded-[9px] py-2.5 text-[13px] font-semibold transition-colors hover:bg-accent hover:text-primary',
+                                'rounded-[9px] py-2.5 text-sm font-semibold transition-colors hover:bg-accent hover:text-primary',
                                 y === today.getFullYear() &&
                                     'text-primary shadow-[inset_0_0_0_1.5px_var(--primary)]',
                                 y === vm.getFullYear() &&
@@ -898,7 +900,7 @@ function MiniCalendar({
                         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
                             <span
                                 key={i}
-                                className="text-center text-[10px] font-bold tracking-wider text-muted-foreground"
+                                className="text-center text-xs font-bold tracking-wider text-muted-foreground"
                             >
                                 {d}
                             </span>
@@ -919,7 +921,7 @@ function MiniCalendar({
                                     type="button"
                                     onClick={() => onPick(date)}
                                     className={cn(
-                                        'relative flex aspect-square items-center justify-center rounded-[9px] text-[12.5px] font-semibold transition-colors hover:bg-accent hover:text-primary',
+                                        'relative flex aspect-square items-center justify-center rounded-[9px] text-sm font-semibold transition-colors hover:bg-accent hover:text-primary',
                                         out && 'text-muted-foreground/45',
                                         k === todayKey &&
                                             'text-primary shadow-[inset_0_0_0_1.5px_var(--primary)]',
@@ -947,7 +949,7 @@ function MiniCalendar({
                 <button
                     type="button"
                     onClick={() => onPick(new Date(today))}
-                    className="rounded-lg px-2.5 py-1 text-[12.5px] font-bold text-primary hover:bg-accent"
+                    className="rounded-lg px-2.5 py-1 text-sm font-bold text-primary hover:bg-accent"
                 >
                     Jump to today
                 </button>
@@ -1421,7 +1423,7 @@ export function CalendarPane(props: CalendarPaneProps) {
                                     ),
                                 );
                             }}
-                            className="h-[30px] rounded-lg px-3.5 text-[12.5px] font-semibold transition-colors hover:bg-card hover:shadow-xs"
+                            className="h-[30px] rounded-lg px-3.5 text-sm font-semibold transition-colors hover:bg-card hover:shadow-xs"
                         >
                             Today
                         </button>
@@ -1446,7 +1448,7 @@ export function CalendarPane(props: CalendarPaneProps) {
                                 setLegendOpen(false);
                                 setPickerOpen((o) => !o);
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-[10px] border border-transparent px-2 py-1 text-[22px] font-semibold tracking-tight transition-colors hover:border-border hover:bg-secondary"
+                            className="inline-flex items-center gap-1.5 rounded-[10px] border border-transparent px-2 py-1 text-2xl font-semibold tracking-tight transition-colors hover:border-border hover:bg-secondary"
                         >
                             {CAL_MONTHS[cursor.getMonth()]}{' '}
                             <span className="font-medium text-muted-foreground">
@@ -1492,7 +1494,7 @@ export function CalendarPane(props: CalendarPaneProps) {
                                 {LEGEND.map((l) => (
                                     <div
                                         key={l.label}
-                                        className="flex items-center gap-2 text-[12.5px]"
+                                        className="flex items-center gap-2 text-sm"
                                     >
                                         <span
                                             className="h-2.5 w-2.5 shrink-0 rounded"
@@ -1544,11 +1546,11 @@ export function CalendarPane(props: CalendarPaneProps) {
                             assessed && t.alarm && 'bg-status-critical-bg/40',
                         )}
                     >
-                        <span className="text-[10.5px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+                        <span className="text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase">
                             {t.k}
                         </span>
                         <span
-                            className="text-[22px] leading-none font-bold tracking-tight tabular-nums"
+                            className="text-2xl leading-none font-bold tracking-tight tabular-nums"
                             style={
                                 assessed && t.accent
                                     ? { color: t.accent }
@@ -1590,7 +1592,7 @@ export function CalendarPane(props: CalendarPaneProps) {
                         <div
                             key={d}
                             className={cn(
-                                'px-2 pb-1.5 text-[11px] font-bold tracking-[0.08em] text-muted-foreground uppercase',
+                                'px-2 pb-1.5 text-xs font-bold tracking-[0.08em] text-muted-foreground uppercase',
                                 (d === 'Sat' || d === 'Sun') &&
                                     'text-muted-foreground/65',
                             )}

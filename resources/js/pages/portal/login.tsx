@@ -158,6 +158,7 @@ export default function PortalLogin({
             title="Family portal sign in"
             lede="See how your family member is doing and keep in touch with their support team, wherever you are."
             signing={form.processing && mode === 'password'}
+            backToWebsite
             brandFooter={
                 <ul
                     aria-label="In the family portal"

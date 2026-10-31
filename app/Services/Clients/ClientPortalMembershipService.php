@@ -22,6 +22,15 @@ class ClientPortalMembershipService
         ]);
     }
 
+    /**
+     * The portal rule: anyone with an HR profile, current or archived, isn't treated as a portal member, so no
+     * linked client is listed for them (Stephan, 26 Oct, for the sidebar list: "Yes, apply it").
+     */
+    public function treatsAsPortalMember(User $user): bool
+    {
+        return $this->currentStaff->historicalProfileFor($user) === null;
+    }
+
     public function assertLinkable(User $user): void
     {
         if ($this->currentStaff->historicalProfileFor($user)) {

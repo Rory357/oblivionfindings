@@ -142,6 +142,32 @@ it('accepts a current marked coverage gap and a canonical numeric-string shift w
     expect(view.result.current.events).toHaveLength(2);
 });
 
+it('drops the server range assessment row instead of failing the whole feed', async () => {
+    const view = harness();
+    const marker = {
+        id: 'roster-calendar-assessment',
+        title: '',
+        start: null,
+        end: null,
+        extendedProps: { event_type: 'calendar_assessment', schema_version: 1 },
+    };
+    await complete(0, [event, marker]);
+    expect(view.result.current.assessed).toBe(true);
+    expect(view.result.current.error).toBeNull();
+    expect(view.result.current.events).toEqual([event]);
+    act(() => view.result.current.retry());
+    await complete(1, [marker]);
+    expect(view.result.current.assessed).toBe(true);
+    expect(view.result.current.events).toEqual([]);
+});
+
+it('still rejects a dateless row that only borrows the assessment id', async () => {
+    const view = harness();
+    await complete(0, [event, { ...event, id: 'roster-calendar-assessment', start: null }]);
+    expect(view.result.current.assessed).toBe(false);
+    expect(view.result.current.error).toMatch(/Could not load/);
+});
+
 it('only applies optimistic updates to a successfully assessed current range', async () => {
     const view = harness();
     const update = vi.fn((rows) =>

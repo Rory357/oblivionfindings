@@ -155,7 +155,7 @@ class ControlRoomMapController extends Controller
                 'position_access' => $tracking['position_access'],
                 'title' => 'Location access follows purpose',
                 'description' => $tracking['position_access']
-                    ? 'Positions come from the canonical Tracking workspace. Current Site access, source permissions, purpose, consent and collection state must all agree.'
+                    ? 'Positions come from Tracking. A position only shows when site access, permission, purpose and consent all allow it.'
                     : 'Control Room access does not grant Security & Devices identity or exact tracker position. Ask an authorised manager if this operational view is required.',
                 'canonical_url' => $tracking['position_access'] ? '/security-devices/tracking' : null,
             ],

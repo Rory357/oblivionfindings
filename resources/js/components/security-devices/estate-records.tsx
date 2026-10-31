@@ -7,6 +7,10 @@ import {
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewRow } from '@/components/wizard/shell';
 import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
+import {
+    deviceCategoryLabel,
+    domainLabel,
+} from '@/pages/security-devices/devices/shared';
 import { Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -527,8 +531,8 @@ export function estateRecords(
                   ['Device', device(row.id, row.name, permission.devices)],
                   ['Device record ID', row.id],
                   ['Device ID', row.device_uid],
-                  ['Domain', maintenanceLabel(row.domain)],
-                  ['Category', maintenanceLabel(row.category)],
+                  ['Domain', domainLabel(row.domain)],
+                  ['Category', deviceCategoryLabel(row.category)],
                   ['Recorded status', maintenanceLabel(row.status)],
                   ['Recorded health', maintenanceLabel(row.health_status)],
                   [
@@ -702,7 +706,7 @@ export function estateDistributions(
     return [
         ...data.domainSummary.map<EstateRecord>((row) => ({
             key: 'domain-' + row.domain,
-            name: maintenanceLabel(row.domain),
+            name: domainLabel(row.domain),
             subline:
                 count(row.count) + (row.count === 1 ? ' device' : ' devices'),
             icon: Cpu,
@@ -712,8 +716,7 @@ export function estateDistributions(
             openLabel: 'Open workspace',
             reason: 'Device access required.',
             facts: [
-                ['Domain', maintenanceLabel(row.domain)],
-                ['Name', row.label],
+                ['Domain', domainLabel(row.domain)],
                 ['Devices', count(row.count)],
             ] as Fact[],
         })),

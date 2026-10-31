@@ -15,7 +15,7 @@ final readonly class ScopeGuard
     private const array CREDENTIALED_PROTOCOLS = ['snmp', 'ssh', 'winrm'];
 
     private const array DISCOVERY_PROTOCOLS = [
-        'icmp', 'tcp', 'dns', 'http', 'tls', 'snmp', 'syslog', 'flow', 'provider',
+        'icmp', 'arp', 'tcp', 'dns', 'http', 'tls', 'snmp', 'mdns', 'ssdp', 'onvif', 'syslog', 'flow', 'provider',
     ];
 
     public function __construct(private CollectorConfig $config) {}
@@ -82,7 +82,7 @@ final readonly class ScopeGuard
         if (! is_string($command['command_uuid']) || preg_match($uuid, $command['command_uuid']) !== 1
             || ! is_string($command['attempt_uuid']) || preg_match($uuid, $command['attempt_uuid']) !== 1
             || ! is_int($command['attempt_number']) || $command['attempt_number'] < 1
-            || $command['site_id'] !== $this->config->siteId
+            || ! is_int($command['site_id']) || ! in_array($command['site_id'], $this->config->allowedSiteIds(), true)
             || ! is_string($command['device_id']) || preg_match('/\A[1-9][0-9]{0,18}\z/', $command['device_id']) !== 1
             || $command['capability'] !== 'access.door.unlock_timed'
             || $command['provider'] !== 'unifi'
@@ -154,7 +154,8 @@ final readonly class ScopeGuard
             throw new ScopeViolation('Discovery run is not present exactly in the signed configuration.');
         }
         if ($this->config->revoked || $this->config->expiresAt <= $at
-            || ($run['site_id'] ?? null) !== $this->config->siteId) {
+            || ! is_int($run['site_id'] ?? null)
+            || ! in_array($run['site_id'], $this->config->allowedSiteIds(), true)) {
             throw new ScopeViolation('Signed collector discovery configuration is expired revoked or Site-mismatched.');
         }
         $this->rejectExecutableFields($run);
@@ -179,6 +180,34 @@ final readonly class ScopeGuard
                 throw new ScopeViolation('Discovery network is outside the signed scope.');
             }
             $this->contains($cidr, explode('/', $cidr, 2)[0]);
+        }
+        if (array_key_exists('snmp_lease', $run) && $run['snmp_lease'] !== null) {
+            if (! in_array('snmp', $protocols, true) || ! is_array($run['snmp_lease'])) {
+                throw new ScopeViolation('Discovery SNMP credential lease is invalid for this run.');
+            }
+            $this->assertCredentialLease(
+                $run['snmp_lease'],
+                [
+                    'device_id' => 'discovery:'.$run['id'],
+                    'protocol' => 'snmp',
+                    'target' => (string) ($cidrs[0] ?? ''),
+                ],
+                $at,
+            );
+        }
+        if (array_key_exists('unifi_lease', $run) && $run['unifi_lease'] !== null) {
+            if (array_intersect(['provider', 'http', 'tls'], $protocols) === [] || ! is_array($run['unifi_lease'])) {
+                throw new ScopeViolation('Discovery UniFi credential lease is invalid for this run.');
+            }
+            $this->assertCredentialLease(
+                $run['unifi_lease'],
+                [
+                    'device_id' => 'discovery:'.$run['id'],
+                    'protocol' => 'https',
+                    'target' => (string) ($cidrs[0] ?? ''),
+                ],
+                $at,
+            );
         }
         $seen = [];
         foreach ($targets as $target) {
@@ -252,6 +281,39 @@ final readonly class ScopeGuard
         $this->assertScopedTarget($deviceId, $target);
     }
 
+    public function assertAddressInCidrs(string $address, DateTimeImmutable $at): void
+    {
+        if ($this->config->revoked || $this->config->expiresAt <= $at) {
+            throw new ScopeViolation('Signed collector configuration is expired or revoked.');
+        }
+
+        if (filter_var($address, FILTER_VALIDATE_IP) === false) {
+            throw new ScopeViolation('Target must be a pinned numeric address.');
+        }
+
+        foreach ($this->config->scope['cidrs'] as $cidr) {
+            if ($this->contains($cidr, $address)) {
+                return;
+            }
+        }
+
+        throw new ScopeViolation('Target is outside the signed network scope.');
+    }
+
+    public function assertInboundTelemetrySender(string $protocol, string $senderIp, DateTimeImmutable $at): void
+    {
+        if ($this->config->revoked || $this->config->expiresAt <= $at) {
+            throw new ScopeViolation('Signed collector configuration is expired or revoked.');
+        }
+
+        if (! in_array($protocol, ['syslog', 'flow'], true)
+            || ! in_array($protocol, $this->config->scope['protocols'], true)) {
+            throw new ScopeViolation('Inbound telemetry protocol is outside the signed scope.');
+        }
+
+        $this->assertAddressInCidrs($senderIp, $at);
+    }
+
     private function assertScopedTarget(string $deviceId, string $target): void
     {
         if (filter_var($target, FILTER_VALIDATE_IP) === false) {
@@ -280,7 +342,6 @@ final readonly class ScopeGuard
     {
         $expected = [
             'collector_id' => $this->config->collectorId,
-            'site_id' => $this->config->siteId,
             'device_id' => $check['device_id'],
             'protocol' => $check['protocol'],
             'target' => $check['target'],
@@ -289,6 +350,9 @@ final readonly class ScopeGuard
             if (($lease[$field] ?? null) !== $value) {
                 throw new ScopeViolation('Credential lease scope does not match the signed check.');
             }
+        }
+        if (! is_int($lease['site_id'] ?? null) || ! in_array($lease['site_id'], $this->config->allowedSiteIds(), true)) {
+            throw new ScopeViolation('Credential lease scope does not match the signed check.');
         }
 
         $expiresAt = $lease['expires_at'] ?? null;

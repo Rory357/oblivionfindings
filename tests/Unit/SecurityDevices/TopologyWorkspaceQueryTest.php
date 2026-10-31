@@ -12,6 +12,8 @@ use Illuminate\Database\Capsule\Manager;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Pagination\Cursor;
+use Illuminate\Pagination\CursorPaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use PHPUnit\Framework\TestCase;
 
@@ -31,6 +33,9 @@ final class TopologyWorkspaceQueryTest extends TestCase
         $container = new Container;
         $container->instance('config', new Repository(['monitoring' => ['runtime' => ['site_topology_stale_seconds' => 3600]]]));
         Container::setInstance($container);
+        Paginator::currentPathResolver(static fn (): string => '/');
+        Paginator::queryStringResolver(static fn (): array => []);
+        CursorPaginator::currentCursorResolver(static fn (): ?Cursor => null);
         $this->database = new Manager($container);
         $this->database->addConnection(['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
         $this->database->bootEloquent();

@@ -68,7 +68,7 @@ it('refuses text, several emoji or an empty reaction', function () {
     [, $message, $sender] = chatReactionsFixture();
 
     // Laravel trims input, so " 👍" arrives as a valid "👍"; a space between two emoji stays.
-    foreach (['ok', '👍👍', '👍 👍', 'a'] as $value) {
+    foreach (['ok', '👍👍', '❤️❤️', '👍🏽👍', '👍 👍', 'a'] as $value) {
         chatReact($message, $sender, $value)->assertUnprocessable()->assertJsonValidationErrors('emoji');
     }
     test()->actingAs($sender)->withHeader('X-Chat-Actor', (string) $sender->id)

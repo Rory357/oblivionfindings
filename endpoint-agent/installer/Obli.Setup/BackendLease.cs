@@ -12,7 +12,21 @@ internal sealed class BackendLease:IDisposable {
  BackendLease(string path){PathName=path;}
  public static BackendLease Open() {
   string expected=typeof(BackendLease).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().Single(a=>a.Key=="OblivionSetupBackendSHA256").Value??"";
-  return OpenAt(Path.Combine(AppContext.BaseDirectory,"oblivion-setup-core.exe"),expected);
+  string companion=Path.Combine(AppContext.BaseDirectory,"oblivion-setup-core.exe");
+  if(!File.Exists(companion)&&System.Text.RegularExpressions.Regex.IsMatch(expected,"^[a-fA-F0-9]{64}$")) {
+   using var embedded=typeof(BackendLease).Assembly.GetManifestResourceStream("oblivion-setup-core.exe");
+   if(embedded!=null) {
+    string cacheDir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Oblivion","Setup",expected.ToLowerInvariant());
+    Directory.CreateDirectory(cacheDir);
+    companion=Path.Combine(cacheDir,"oblivion-setup-core.exe");
+    if(!File.Exists(companion)) {
+     string temp=Path.Combine(cacheDir,"oblivion-setup-core-"+Guid.NewGuid().ToString("N")+".tmp");
+     using(var outStream=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){embedded.CopyTo(outStream);outStream.Flush(true);}
+     try{File.Move(temp,companion,false);}catch(IOException)when(File.Exists(companion)){File.Delete(temp);}
+    }
+   }
+  }
+  return OpenAt(companion,expected);
  }
  internal static BackendLease OpenAt(string filename,string expected) {
   if(!System.Text.RegularExpressions.Regex.IsMatch(expected,"^[a-fA-F0-9]{64}$"))throw new InvalidOperationException("This development installer has no approved installation engine.");

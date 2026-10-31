@@ -5,9 +5,11 @@ namespace App\Http\Controllers\HealthSafety;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HealthSafety\RecordHsWorksafeDecisionRequest;
 use App\Models\HsEvent;
+use App\Services\HealthSafety\HsEventAccessService;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 
 class HsWorksafeDecisionController extends Controller
 {
@@ -20,13 +22,16 @@ class HsWorksafeDecisionController extends Controller
         RecordHsWorksafeDecisionRequest $request,
         int $hsEvent,
     ): RedirectResponse {
-        $query = HsEvent::query();
-        $this->siteAccess->applyHsEventScope(
-            $query,
-            $request->user(),
-            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
-        );
-        $event = $query->findOrFail($hsEvent);
+        return DB::transaction(fn () => $this->decideWithinSourceAuthority($request, $hsEvent));
+    }
+
+    private function decideWithinSourceAuthority(
+        RecordHsWorksafeDecisionRequest $request,
+        int $hsEvent,
+    ): RedirectResponse {
+        // The event page's H&S source read (incident-linked events need incident read); it stays locked until commit.
+        $event = app(HsEventAccessService::class)->readableEventForCommand($request->user(), $hsEvent,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
         $data = $request->validated();
 
         try {

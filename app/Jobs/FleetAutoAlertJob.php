@@ -8,6 +8,7 @@ use App\Models\FleetVehicleStateSnapshot;
 use App\Models\User;
 use App\Notifications\Fleet\FleetComplianceDueNotification;
 use App\Notifications\Fleet\FleetVehicleOverdueNotification;
+use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\Fleet\FleetSignalService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -68,6 +69,8 @@ class FleetAutoAlertJob implements ShouldQueue
                     'booking_id' => $booking->id,
                     'ends_at' => $booking->ends_at->toISOString(),
                     'hours_overdue' => $hoursOverdue,
+                    // One open alert per overdue booking, refreshed daily.
+                    SignalProcessingService::CONDITION_KEY => SignalProcessingService::conditionKey('fleet_vehicle_overdue', 'booking', $booking->id),
                 ],
             ]);
 
@@ -122,9 +125,13 @@ class FleetAutoAlertJob implements ShouldQueue
                 'signal_type' => 'wof_expired',
                 'severity_hint' => 'high', // PR7: expired WoF is compliance issue, not life-safety
                 'occurred_at' => now(),
+                // A re-run on the same day is the same signal.
+                'idempotency_key' => hash('sha256', "wof_expired|{$asset->id}|".$asset->wof_expires_at->toDateString().'|'.$today->toDateString()),
                 'payload' => [
                     'expired_at' => $asset->wof_expires_at->toDateString(),
                     'days_overdue' => (int) Carbon::parse($asset->wof_expires_at->toDateString(), $expiryTimezone)->diffInDays($today),
+                    // One open alert per vehicle while its WoF stays expired.
+                    SignalProcessingService::CONDITION_KEY => SignalProcessingService::conditionKey('fleet_wof_expired', 'asset', $asset->id),
                 ],
             ]);
 
@@ -174,16 +181,23 @@ class FleetAutoAlertJob implements ShouldQueue
             ->where('status', 'active')
             ->get(['id', 'name', 'maintenance_due_at']);
 
+        $today = Carbon::now((string) config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+
         foreach ($overdue as $asset) {
             $signalService->emit([
                 'asset_id' => $asset->id,
                 'signal_type' => 'maintenance_overdue',
                 'severity_hint' => 'high',
                 'occurred_at' => now(),
+                // A re-run on the same day is the same signal.
+                'idempotency_key' => hash('sha256', "maintenance_overdue|{$asset->id}|".$asset->maintenance_due_at->toDateString()."|{$today}"),
                 'payload' => [
                     'due_at' => $asset->maintenance_due_at->toDateString(),
                     // Whole days: Carbon 3's diffInDays() is a float.
                     'days_overdue' => (int) $asset->maintenance_due_at->diffInDays(now()),
+                    // One open alert per vehicle while its maintenance stays
+                    // overdue; each day's check refreshes it.
+                    SignalProcessingService::CONDITION_KEY => SignalProcessingService::conditionKey('fleet_maintenance_overdue', 'asset', $asset->id),
                 ],
             ]);
 
@@ -266,6 +280,8 @@ class FleetAutoAlertJob implements ShouldQueue
                 'occurred_at' => now(),
                 'payload' => [
                     'battery_pct' => $state->battery_pct,
+                    // One open alert per vehicle while its battery stays low.
+                    SignalProcessingService::CONDITION_KEY => SignalProcessingService::conditionKey('fleet_low_battery', 'asset', $state->asset_id),
                 ],
             ]);
         }

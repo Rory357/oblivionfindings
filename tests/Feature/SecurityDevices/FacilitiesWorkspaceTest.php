@@ -404,4 +404,64 @@ class FacilitiesWorkspaceTest extends TestCase
             ->all();
         $user->permissionOverrides()->syncWithoutDetaching($overrides);
     }
+
+    public function test_attention_query_filters_matching_facility_devices_and_active_events_while_keeping_overview_totals_unscoped(): void
+    {
+        $site = Site::factory()->create(['name' => 'Kauri Lodge']);
+        $healthySensor = $this->facilityDevice('Healthy Fridge Sensor', 'cold_chain', 'fridge_sensor');
+        $this->assignToSite($healthySensor, $site);
+        $healthyMonitor = $this->monitor($healthySensor, 'Fridge check', MonitorState::Healthy);
+        $this->observe($healthyMonitor, 3.8, 'C');
+
+        $offlineSensor = Device::factory()->facilities()->offline()->create([
+            'category' => 'environmental',
+            'subcategory' => 'leak_sensor',
+            'name' => 'Offline Basement Leak Sensor',
+        ]);
+        $this->assignToSite($offlineSensor, $site);
+
+        DeviceEvent::create([
+            'device_id' => $offlineSensor->id,
+            'event_type' => 'water_leak_detected',
+            'severity' => 'critical',
+            'source' => 'native',
+            'occurred_at' => now()->subMinutes(10),
+            'processed_at' => null,
+        ]);
+        DeviceEvent::create([
+            'device_id' => $healthySensor->id,
+            'event_type' => 'periodic_checkin',
+            'severity' => 'info',
+            'source' => 'native',
+            'occurred_at' => now()->subMinutes(5),
+            'processed_at' => now()->subMinutes(4),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/facilities-iot?tab=overview&attention=device-attention')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($offlineSensor): void {
+                $workspace = $page->toArray()['props']['facilitiesWorkspace'];
+
+                $this->assertSame(2, $workspace['overview']['inventory']['devices']);
+                $this->assertSame('device-attention', $workspace['activeTab']['attentionFilter']['key']);
+                $this->assertSame(
+                    [$offlineSensor->id],
+                    collect($workspace['activeTab']['devices'])->pluck('id')->all(),
+                );
+            });
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/facilities-iot?tab=history&attention=active-events')
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $workspace = $page->toArray()['props']['facilitiesWorkspace'];
+
+                $this->assertSame('active-events', $workspace['activeTab']['attentionFilter']['key']);
+                $this->assertSame(
+                    ['water_leak_detected'],
+                    collect($workspace['activeTab']['history']['events'])->pluck('type')->all(),
+                );
+            });
+    }
 }

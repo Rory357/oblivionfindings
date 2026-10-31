@@ -109,7 +109,7 @@ export function CctvSourceDialog({
         ? 'Set up camera connection'
         : mode === 'enable-stream'
           ? 'Enable camera stream'
-          : 'Turn off viewing in Oblivion';
+          : 'Turn off camera viewing';
     const verb = configuring
         ? 'Verify and save connection'
         : mode === 'enable-stream'
@@ -270,10 +270,10 @@ export function CctvSourceDialog({
     }
     const effect =
         mode === 'disable'
-            ? 'Current live sessions will stop and this camera will become unavailable for viewing in Oblivion. Vendor recordings remain managed in UniFi Protect.'
+            ? 'Current live sessions will stop and this camera will become unavailable for viewing here. Vendor recordings remain managed in UniFi Protect.'
             : mode === 'enable-stream'
-              ? 'This enables the low-quality camera stream in UniFi Protect. Oblivion will check the stream after the change. Site collector readiness and viewing permission are still required.'
-              : 'Oblivion checks the camera and recorder identities before saving. Changing the source ends any current live sessions.';
+              ? 'This enables the low-quality camera stream in UniFi Protect and checks the stream after the change. Site collector readiness and viewing permission are still required.'
+              : 'Camera and recorder identities are checked before saving. Changing the source ends any current live sessions.';
     function field(key: keyof Connection, label: string, help?: string) {
         return (
             <div className="space-y-2" key={key}>
@@ -385,6 +385,9 @@ export function CctvSourceDialog({
                     ) : (
                         <Button
                             type="button"
+                            variant={
+                                mode === 'disable' ? 'destructive' : 'default'
+                            }
                             disabled={busy}
                             onClick={() => void submit()}
                         >
@@ -404,7 +407,7 @@ export function CctvSourceDialog({
                             }
                             blurb={
                                 mode === 'disable'
-                                    ? 'This source is no longer available for live viewing in Oblivion.'
+                                    ? 'This source is no longer available for live viewing here.'
                                     : saved.stream_state === 'verified'
                                       ? 'The vendor stream is verified. Open live view to check the picture with your current viewing permission.'
                                       : 'The connection is saved. The vendor stream still needs to be enabled and verified.'

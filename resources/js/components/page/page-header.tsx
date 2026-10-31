@@ -111,6 +111,17 @@ export interface PageHeaderProps {
     /** Top row, right: scoped search + glass secondaries + exactly ONE primary. */
     actions?: ReactNode;
     /**
+     * Record facts under the identity row — <PageHeaderFacts>: a few
+     * value + label chips (severity, owner, due date). Optional.
+     */
+    facts?: ReactNode;
+    /**
+     * One full-width strip in place of the meter row — <PageHeaderNumbers>
+     * (up to four number boxes) or <PageHeaderStages> (a record's stage
+     * line with its next step). Pass either `meters` or `strip`, not both.
+     */
+    strip?: ReactNode;
+    /**
      * The full-width meter row: 4–6 <PageHeaderMeterBlock> links. Every
      * block navigates to the view where its number lives; a block whose
      * data source doesn't exist yet is dropped, never faked (DESIGN.md
@@ -141,6 +152,8 @@ export function PageHeader({
     titleChip,
     subline,
     actions,
+    facts,
+    strip,
     meters,
     filters,
     mobileSummary,
@@ -278,6 +291,23 @@ export function PageHeader({
                                 )}
                             >
                                 {expandedContent}
+                                {facts ? (
+                                    <div
+                                        data-slot="page-header-facts"
+                                        className="mt-3 flex flex-wrap items-center gap-2"
+                                    >
+                                        {facts}
+                                    </div>
+                                ) : null}
+                                {/* one strip: number boxes or a record's stage line */}
+                                {strip ? (
+                                    <div
+                                        data-slot="page-header-strip"
+                                        className="mt-[13px]"
+                                    >
+                                        {strip}
+                                    </div>
+                                ) : null}
                                 {/* the meter row — full width, every block a link */}
                                 {meters ? (
                                     <div

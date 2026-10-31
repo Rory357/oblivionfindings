@@ -9,6 +9,8 @@ use Illuminate\Database\Capsule\Manager;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Pagination\Cursor;
+use Illuminate\Pagination\CursorPaginator;
+use Illuminate\Pagination\Paginator;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -28,6 +30,9 @@ final class NetworkMapInventoryQueryTest extends TestCase
         $this->previousResolver = Model::getConnectionResolver();
         $container = new Container;
         Container::setInstance($container);
+        Paginator::currentPathResolver(static fn (): string => '/');
+        Paginator::queryStringResolver(static fn (): array => []);
+        CursorPaginator::currentCursorResolver(static fn (): ?Cursor => null);
         $this->database = new Manager($container);
         $this->database->addConnection(['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
         $this->database->bootEloquent();

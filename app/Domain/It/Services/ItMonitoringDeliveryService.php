@@ -33,7 +33,11 @@ final class ItMonitoringDeliveryService extends ItTechnicalDeliveryService
             }
             $device = Device::query()->find($event->device_id);
             $suppressed = $signal->status === 'suppressed';
-            $eligible = ! $suppressed && $device?->domain === 'it_infrastructure' && in_array($event->event_type, MonitoringIssueEpisode::EVENT_TYPES, true);
+            $ticketDisabledByRoute = data_get($signal->normalized_data, 'it_work_routing.open_it_ticket') === false;
+            $eligible = ! $suppressed
+                && ! $ticketDisabledByRoute
+                && $device?->domain === 'it_infrastructure'
+                && in_array($event->event_type, MonitoringIssueEpisode::EVENT_TYPES, true);
             $outbox->forceFill([
                 'it_status' => $eligible ? 'pending' : 'ignored',
                 'it_signal_id' => $signal->id,
@@ -46,7 +50,9 @@ final class ItMonitoringDeliveryService extends ItTechnicalDeliveryService
                     'correlated_alert_id' => $signal->correlated_alert_id === null ? null : (int) $signal->correlated_alert_id,
                     'work_routing' => data_get($signal->normalized_data, 'it_work_routing'),
                 ],
-                'it_outcome_code' => $eligible ? null : ($suppressed ? 'source_suppressed' : 'unsupported_event'),
+                'it_outcome_code' => $eligible
+                    ? null
+                    : ($suppressed ? 'source_suppressed' : ($ticketDisabledByRoute ? 'suppressed_by_alert_route' : 'unsupported_event')),
                 'it_completed_at' => $eligible ? null : now(),
             ])->save();
         }, 3);

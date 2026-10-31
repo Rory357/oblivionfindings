@@ -3,348 +3,256 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Domain\Governance\Models\NotifiableIncident;
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
-use App\Models\Permission;
 use App\Models\ReturnToWorkPlan;
-use App\Models\Role;
 use App\Models\Site;
-use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Models\WorkplaceInjuryAttachment;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
 use App\Services\HealthSafety\WorkplaceInjuryJourneyService;
-use Database\Seeders\RbacSeeder;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Tests\TestCase;
 
 /**
- * Injuries & RTW redesign — controller + observer coverage (the module had zero
- * HTTP tests before the rebuild). Hero/tabs/detail/can, store with derived ACC +
- * incident link, WorkSafe NotifiableIncident seam, lifecycle transitions, RTW /
- * capacity / modified-duty sub-modals, premium attachments (IDOR guard).
+ * Injuries & RTW — the old register cases that the workspace suites do not
+ * already cover, rewritten against the keyed injury commands (UUID
+ * idempotency_key, expected_version, current staff at the Site): Site
+ * isolation over HTTP, the WorkSafe NotifiableIncident seam, the required
+ * H&S event / Control Room journey and its rollback, lifecycle refusal and
+ * the scriptable-upload guard. Every other old case maps to a newer test;
+ * see docs/health-safety-build/PLAN.md.
  */
-class InjuriesControllerTest extends TestCase
+class InjuriesControllerTest extends WorkplaceInjurySourceTestCase
 {
-    use RefreshDatabase;
-
-    private User $admin;
-
-    private Site $site;
-
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(RbacSeeder::class);
-        $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
-        $this->admin->roles()->attach(Role::where('name', 'admin')->first());
-        $this->site = Site::factory()->create();
-    }
-
-    private function injury(array $overrides = []): WorkplaceInjury
-    {
-        $site = Site::query()->find($overrides['site_id'] ?? $this->site->id) ?? $this->site;
-        $overrides['user_id'] ??= $this->staffAtSite($site)->id;
-
-        $injury = WorkplaceInjury::factory()->create(array_merge([
-            'site_id' => $site->id,
-            'status' => 'reported',
-            'created_by' => $this->admin->id,
-        ], $overrides));
-
-        app(WorkplaceInjuryJourneyService::class)->synchronize($injury);
-
-        return $injury;
-    }
-
-    private function staffAtSite(Site $site): User
-    {
-        $staff = User::factory()->create([
-            'role' => 'support_worker',
-            'approved_at' => now(),
-        ]);
-        HrEmployeeProfile::factory()->create([
-            'user_id' => $staff->id,
-            'primary_site_id' => $site->id,
-            'secondary_site_ids' => [],
-            'is_active' => true,
-        ]);
-
-        return $staff;
-    }
-
-    private function incidentAtSite(Site $site): ClientIncident
-    {
-        $client = Client::factory()->create(['site_id' => $site->id]);
-
-        return ClientIncident::factory()->create([
-            'client_id' => $client->id,
-            'site_id' => $site->id,
-        ]);
-    }
-
-    /** @param list<string> $permissions */
-    private function siteViewer(Site $site, array $permissions): User
-    {
-        $viewer = $this->staffAtSite($site);
-        $role = Role::query()->create([
-            'name' => 'injury_site_'.str()->uuid(),
-            'label' => 'Injury Site test role',
-            'level' => 50,
-            'type' => 'custom',
-        ]);
-        $role->permissions()->sync(
-            Permission::query()->whereIn('key', $permissions)->pluck('id'),
-        );
-        $viewer->roles()->attach($role);
-
-        return $viewer;
+        Queue::fake();
+        Storage::fake('private');
     }
 
     /** @return array<string, mixed> */
-    private function validInjuryPayload(Site $site, User $worker, array $overrides = []): array
+    private function notifiableOverrides(array $overrides = []): array
     {
         return array_merge([
-            'user_id' => $worker->id,
-            'site_id' => $site->id,
-            'injury_date' => now()->toDateString(),
-            'injury_type' => 'manual_handling',
-            'body_part_affected' => 'Lower back',
-            'severity' => 'moderate',
-            'description' => 'Strained back during a supported transfer.',
-            'medical_treatment_type' => 'gp_visit',
+            'injury_type' => 'fracture',
+            'body_part_affected' => 'Right wrist',
+            'severity' => 'serious',
+            'description' => 'Fall from a ladder; wrist fracture requiring hospitalisation.',
+            'medical_treatment_type' => 'hospitalisation',
+            'worksafe_notifiable' => true,
         ], $overrides);
     }
 
-    public function test_index_renders_hero_tabcounts_and_can(): void
+    private function legacyInjury(Site $site, int $workerId, array $overrides = []): WorkplaceInjury
     {
-        $this->injury(['status' => 'reported']);
-        $this->injury(['status' => 'under_treatment']);
+        return WorkplaceInjury::withoutEvents(fn () => WorkplaceInjury::factory()->create(array_merge([
+            'site_id' => $site->id,
+            'user_id' => $workerId,
+            'severity' => 'moderate',
+            'status' => 'reported',
+            'lost_time_days' => 0,
+        ], $overrides)));
+    }
 
-        $this->actingAs($this->admin)
-            ->get('/health-safety/injuries')
-            ->assertOk()
-            ->assertInertia(fn (Assert $p) => $p
-                ->component('health-safety/injuries/index')
-                ->where('tab', 'all')
-                ->where('tabCounts.all', 2)
-                ->where('tabCounts.reported', 1)
-                ->where('can.manage', true)
-                ->has('hero.live')
-                ->has('hero.attention')
-                ->has('hero.badges')
-                ->has('staff')
-                ->has('incidents')
-                ->where('detail', null));
+    private function incidentAtSite(Site $site, ?Site $clientSite = null): ClientIncident
+    {
+        $client = Client::factory()->create(['site_id' => ($clientSite ?? $site)->id]);
+
+        return ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]));
+    }
+
+    private function eventFor(WorkplaceInjury $injury): HsEvent
+    {
+        return HsEvent::query()
+            ->where('source_type', WorkplaceInjury::class)
+            ->where('source_id', $injury->id)
+            ->firstOrFail();
     }
 
     public function test_register_counts_pickers_and_detail_are_scoped_to_canonical_site_access(): void
     {
-        $hiddenSite = Site::factory()->create();
-        $viewer = $this->siteViewer($this->site, ['hazards.view', 'hazards.manage', 'hazards.create']);
-        $visibleWorker = $this->staffAtSite($this->site);
-        $hiddenWorker = $this->staffAtSite($hiddenSite);
-        $visibleIncident = $this->incidentAtSite($this->site);
-        $hiddenIncident = $this->incidentAtSite($hiddenSite);
-        $visible = $this->injury(['user_id' => $visibleWorker->id]);
-        $hidden = $this->injury(['site_id' => $hiddenSite->id, 'user_id' => $hiddenWorker->id]);
-        $missingSite = WorkplaceInjury::withoutEvents(fn () => WorkplaceInjury::factory()->create([
-            'site_id' => null,
-            'user_id' => $visibleWorker->id,
-        ]));
+        $hiddenSite = Site::factory()->create(['is_active' => true]);
+        $viewer = $this->staff(['hazards.view', 'hazards.manage', 'hazards.create']);
+        $hiddenWorker = $this->staff([], $hiddenSite);
+        $visible = $this->injury();
+        $hidden = $this->legacyInjury($hiddenSite, $hiddenWorker->id, ['reference_number' => 'WI-HIDDEN-SITE']);
+        $missingSite = $this->legacyInjury($this->site, $this->worker->id, ['site_id' => null]);
 
         $this->actingAs($viewer)
             ->get('/health-safety/injuries')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
+                ->component('health-safety/injuries/workspace-index')
                 ->where('tabCounts.all', 1)
                 ->has('injuries.data', 1)
                 ->where('injuries.data.0.id', $visible->id)
-                ->where('sites', fn ($sites) => collect($sites)->pluck('id')->all() === [$this->site->id])
-                ->where('staff', fn ($staff) => collect($staff)->pluck('id')->contains($visibleWorker->id)
-                    && ! collect($staff)->pluck('id')->contains($hiddenWorker->id))
-                ->where('incidents', fn ($incidents) => collect($incidents)->pluck('id')->contains($visibleIncident->id)
-                    && ! collect($incidents)->pluck('id')->contains($hiddenIncident->id)));
+                ->where('sites', fn ($sites) => collect($sites)->pluck('id')->all() === [$this->site->id]));
 
-        $this->actingAs($viewer)
-            ->get('/health-safety/injuries?injury='.$hidden->id)
-            ->assertNotFound();
-        $this->actingAs($viewer)
-            ->get('/health-safety/injuries?injury='.$missingSite->id)
-            ->assertNotFound();
-        $this->actingAs($viewer)
-            ->get('/health-safety/injuries?site_id='.$hiddenSite->id)
-            ->assertForbidden();
-        $this->actingAs($viewer)
-            ->get('/health-safety/injuries/export?site_id='.$hiddenSite->id)
-            ->assertForbidden();
+        // Old in-register detail bookmarks and the permanent record both conceal other Sites.
+        $this->actingAs($viewer)->get('/health-safety/injuries?injury='.$hidden->id)->assertNotFound();
+        $this->actingAs($viewer)->get('/health-safety/injuries?injury='.$missingSite->id)->assertNotFound();
+        $this->actingAs($viewer)->getJson('/health-safety/injuries/'.$hidden->id)->assertNotFound();
+        $this->actingAs($viewer)->getJson('/health-safety/injuries/'.$missingSite->id)->assertNotFound();
+        $this->actingAs($viewer)->get('/health-safety/injuries?site_id='.$hiddenSite->id)->assertNotFound();
+        $this->actingAs($viewer)->get('/health-safety/injuries/export?site_id='.$hiddenSite->id)->assertNotFound();
+
+        $csv = $this->actingAs($viewer)->get('/health-safety/injuries/export')->assertOk()->streamedContent();
+        $this->assertStringContainsString($visible->reference_number, $csv);
+        $this->assertStringNotContainsString('WI-HIDDEN-SITE', $csv);
     }
 
     public function test_cross_site_injury_and_nested_direct_actions_are_denied(): void
     {
-        Storage::fake('private');
-        $hiddenSite = Site::factory()->create();
-        $viewer = $this->siteViewer($this->site, ['hazards.view', 'hazards.manage', 'hazards.create']);
-        $hiddenWorker = $this->staffAtSite($hiddenSite);
-        $injury = $this->injury(['site_id' => $hiddenSite->id, 'user_id' => $hiddenWorker->id]);
-        $plan = ReturnToWorkPlan::factory()->create([
+        $hiddenSite = Site::factory()->create(['is_active' => true]);
+        // Medical/recovery authority is held, so every refusal below is the Site rule, not the medical gate.
+        $viewer = $this->staff(['hazards.view', 'hazards.manage', 'hazards.create', 'hr.wellbeing.view']);
+        $hiddenWorker = $this->staff([], $hiddenSite);
+        $injury = $this->legacyInjury($hiddenSite, $hiddenWorker->id, ['lost_time_days' => 0]);
+        $plan = ReturnToWorkPlan::withoutEvents(fn () => ReturnToWorkPlan::factory()->create([
             'workplace_injury_id' => $injury->id,
             'worker_id' => $hiddenWorker->id,
-        ]);
+            'status' => 'active',
+        ]));
         $attachment = WorkplaceInjuryAttachment::factory()->create([
             'workplace_injury_id' => $injury->id,
             'disk' => 'private',
+            'path' => 'workplace_injury_attachments/'.$injury->id.'/hidden.pdf',
         ]);
+        Storage::disk('private')->put($attachment->path, 'hidden medical evidence');
 
-        $this->actingAs($viewer)->get('/health-safety/injuries/'.$injury->id)->assertNotFound();
-        $this->actingAs($viewer)->put('/health-safety/injuries/'.$injury->id, ['lost_time_days' => 2])->assertNotFound();
-        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/status', ['status' => 'closed'])->assertNotFound();
-        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/rtw-plans', [])->assertNotFound();
-        $this->actingAs($viewer)->put('/health-safety/injuries/rtw-plans/'.$plan->id, ['status' => 'completed'])->assertNotFound();
-        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/capacity-assessments', [])->assertNotFound();
-        $this->actingAs($viewer)->post('/health-safety/injuries/rtw-plans/'.$plan->id.'/modified-duties', [])->assertNotFound();
-        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/attachments', [])->assertNotFound();
+        $this->actingAs($viewer)->getJson('/health-safety/injuries/'.$injury->id)->assertNotFound();
+        $this->actingAs($viewer)->putJson('/health-safety/injuries/'.$injury->id, $this->command($injury, ['lost_time_days' => 2]))->assertNotFound();
+        $this->actingAs($viewer)->postJson('/health-safety/injuries/'.$injury->id.'/status',
+            $this->command($injury, ['status' => 'closed', 'reason' => 'Cross-Site closure attempt']))->assertNotFound();
+        $this->actingAs($viewer)->postJson('/health-safety/injuries/'.$injury->id.'/rtw-plans', $this->planPayload($injury))->assertNotFound();
+        $this->actingAs($viewer)->putJson('/health-safety/injuries/rtw-plans/'.$plan->id,
+            $this->command($injury, ['status' => 'completed']))->assertNotFound();
+        $this->actingAs($viewer)->postJson('/health-safety/injuries/'.$injury->id.'/capacity-assessments', $this->capacityPayload($injury))->assertNotFound();
+        $this->actingAs($viewer)->postJson('/health-safety/injuries/rtw-plans/'.$plan->id.'/modified-duties', $this->command($injury,
+            ['start_date' => '2026-10-12', 'modified_duties_description' => 'Cross-Site duty', 'hours_per_day' => 4]))->assertNotFound();
+        $this->actingAs($viewer)->postJson('/health-safety/injuries/'.$injury->id.'/attachments',
+            [...$this->command($injury, ['kind' => 'medical_cert']), 'file' => UploadedFile::fake()->create('certificate.pdf', 10, 'application/pdf')])
+            ->assertNotFound();
         $this->actingAs($viewer)
             ->get('/health-safety/injuries/'.$injury->id.'/attachments/'.$attachment->id.'/download')
             ->assertNotFound();
         $this->actingAs($viewer)
-            ->delete('/health-safety/injuries/'.$injury->id.'/attachments/'.$attachment->id)
+            ->deleteJson('/health-safety/injuries/'.$injury->id.'/attachments/'.$attachment->id, $this->command($injury, ['reason' => 'Cross-Site removal attempt']))
             ->assertNotFound();
+
+        $injury->refresh();
+        $this->assertSame(0, (int) $injury->lost_time_days);
+        $this->assertSame('reported', $injury->status);
+        $this->assertSame(0, (int) $injury->source_revision);
+        $this->assertSame('active', $plan->fresh()->status);
+        $this->assertNull($attachment->fresh()->deleted_at);
+        $this->assertDatabaseCount('modified_duties', 0);
+        $this->assertDatabaseCount('work_capacity_assessments', 0);
+        $this->assertDatabaseCount('workplace_injury_command_receipts', 0);
     }
 
     public function test_store_rejects_cross_site_staff_incident_and_conflicting_client_provenance(): void
     {
-        $hiddenSite = Site::factory()->create();
-        $viewer = $this->siteViewer($this->site, ['hazards.view', 'hazards.manage', 'hazards.create']);
-        $visibleWorker = $this->staffAtSite($this->site);
-        $hiddenWorker = $this->staffAtSite($hiddenSite);
+        $hiddenSite = Site::factory()->create(['is_active' => true]);
+        $viewer = $this->staff(['hazards.view', 'hazards.manage', 'hazards.create', 'incidents.viewAny', 'clients.viewAny']);
+        $hiddenWorker = $this->staff([], $hiddenSite);
         $hiddenIncident = $this->incidentAtSite($hiddenSite);
-        $conflictingClient = Client::factory()->create(['site_id' => $hiddenSite->id]);
-        $conflictingIncident = ClientIncident::factory()->create([
-            'client_id' => $conflictingClient->id,
-            'site_id' => $this->site->id,
-        ]);
+        $conflictingIncident = $this->incidentAtSite($this->site, $hiddenSite);
 
         $before = WorkplaceInjury::query()->count();
 
         $this->actingAs($viewer)
-            ->post('/health-safety/injuries', $this->validInjuryPayload($hiddenSite, $hiddenWorker))
+            ->postJson('/health-safety/injuries', $this->createPayload(['user_id' => $hiddenWorker->id, 'site_id' => $hiddenSite->id]))
+            ->assertNotFound();
+        $this->actingAs($viewer)
+            ->postJson('/health-safety/injuries', $this->createPayload(['user_id' => $hiddenWorker->id]))
             ->assertForbidden();
         $this->actingAs($viewer)
-            ->post('/health-safety/injuries', $this->validInjuryPayload($this->site, $hiddenWorker))
-            ->assertForbidden();
-        $this->actingAs($viewer)
-            ->post('/health-safety/injuries', $this->validInjuryPayload($this->site, $visibleWorker, [
-                'related_incident_id' => $hiddenIncident->id,
-            ]))
-            ->assertForbidden();
-        $this->actingAs($viewer)
-            ->post('/health-safety/injuries', $this->validInjuryPayload($this->site, $visibleWorker, [
-                'related_incident_id' => $conflictingIncident->id,
-            ]))
-            ->assertForbidden();
+            ->postJson('/health-safety/injuries', $this->createPayload(['related_incident_id' => $hiddenIncident->id]))
+            ->assertNotFound();
+
+        // An incident whose own Site and Client Site disagree fails closed; nothing is linked or saved.
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($viewer)
+                ->postJson('/health-safety/injuries', $this->createPayload(['related_incident_id' => $conflictingIncident->id]));
+            self::fail('Conflicting Client incident provenance must refuse the injury capture.');
+        } catch (\LogicException $exception) {
+            $this->assertSame('Client incident provenance does not converge on one Site.', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
+        }
 
         $this->assertSame($before, WorkplaceInjury::query()->count());
+        $this->assertDatabaseCount('workplace_injury_command_receipts', 0);
     }
 
     public function test_update_rejects_cross_site_staff_site_and_incident_provenance(): void
     {
-        $hiddenSite = Site::factory()->create();
-        $viewer = $this->siteViewer($this->site, ['hazards.view', 'hazards.manage']);
-        $visibleWorker = $this->staffAtSite($this->site);
-        $hiddenWorker = $this->staffAtSite($hiddenSite);
+        $hiddenSite = Site::factory()->create(['is_active' => true]);
+        $viewer = $this->staff(['hazards.view', 'hazards.manage', 'incidents.viewAny', 'clients.viewAny']);
+        $hiddenWorker = $this->staff([], $hiddenSite);
         $hiddenIncident = $this->incidentAtSite($hiddenSite);
-        $injury = $this->injury([
-            'user_id' => $visibleWorker->id,
-            'severity' => 'moderate',
-        ]);
+        $injury = $this->injury(['severity' => 'moderate']);
 
         $this->actingAs($viewer)
-            ->put('/health-safety/injuries/'.$injury->id, ['user_id' => $hiddenWorker->id])
+            ->putJson('/health-safety/injuries/'.$injury->id, $this->command($injury, ['user_id' => $hiddenWorker->id]))
             ->assertForbidden();
         $this->actingAs($viewer)
-            ->put('/health-safety/injuries/'.$injury->id, ['site_id' => $hiddenSite->id])
-            ->assertForbidden();
+            ->putJson('/health-safety/injuries/'.$injury->id, $this->command($injury, ['site_id' => $hiddenSite->id]))
+            ->assertNotFound();
         $this->actingAs($viewer)
-            ->put('/health-safety/injuries/'.$injury->id, ['related_incident_id' => $hiddenIncident->id])
-            ->assertForbidden();
+            ->putJson('/health-safety/injuries/'.$injury->id, $this->command($injury, ['related_incident_id' => $hiddenIncident->id]))
+            ->assertNotFound();
 
         $injury->refresh();
-        $this->assertSame($visibleWorker->id, $injury->user_id);
-        $this->assertSame($this->site->id, $injury->site_id);
+        $this->assertSame($this->worker->id, (int) $injury->user_id);
+        $this->assertSame($this->site->id, (int) $injury->site_id);
         $this->assertNull($injury->related_incident_id);
-    }
-
-    public function test_detail_loads_only_with_injury_param(): void
-    {
-        $inj = $this->injury();
-
-        $this->actingAs($this->admin)
-            ->get('/health-safety/injuries?injury='.$inj->id)
-            ->assertInertia(fn (Assert $p) => $p
-                ->where('detail.id', $inj->id)
-                ->where('detail.reference', $inj->reference_number)
-                ->has('detail.rtw_plans')
-                ->has('detail.attachments')
-                ->where('detail.can.manage', true));
+        $this->assertSame(1, (int) $injury->source_revision);
     }
 
     public function test_store_creates_injury_with_derived_acc_and_incident_link(): void
     {
-        $worker = $this->staffAtSite($this->site);
+        $recorder = $this->staff(['hazards.view', 'hazards.create', 'hazards.manage', 'hr.wellbeing.view', 'incidents.viewAny', 'clients.viewAny']);
         $incident = $this->incidentAtSite($this->site);
 
-        $this->actingAs($this->admin)
-            ->from('/health-safety/injuries')
-            ->post('/health-safety/injuries', [
-                'user_id' => $worker->id,
-                'site_id' => $this->site->id,
+        $response = $this->actingAs($recorder)
+            ->postJson('/health-safety/injuries', $this->createPayload([
                 'related_incident_id' => $incident->id,
-                'injury_date' => now()->toDateString(),
                 'injury_type' => 'manual_handling',
                 'body_part_affected' => 'Lower back',
                 'severity' => 'moderate',
                 'description' => 'Strained back during a transfer.',
-                'medical_treatment_type' => 'gp_visit',
                 'acc_claim_number' => '26/123456',
-            ])
-            ->assertRedirect()
-            ->assertSessionHasNoErrors();
+            ]))
+            ->assertOk();
 
         $inj = WorkplaceInjury::latest('id')->first();
         $this->assertSame('reported', $inj->status);
         $this->assertSame(0, (int) $inj->lost_time_days);
         $this->assertTrue((bool) $inj->acc_claim_lodged, 'ACC lodged should derive from a captured claim number');
         $this->assertSame($incident->id, $inj->related_incident_id);
-        $this->assertEquals($inj->id, session('created_injury_id'));
+        $this->assertSame($inj->id, $response->json('injury_confirmation.injury_id'));
     }
 
     public function test_store_worksafe_notifiable_creates_notifiable_incident(): void
     {
-        $worker = $this->staffAtSite($this->site);
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/injuries', [
-                'user_id' => $worker->id,
-                'site_id' => $this->site->id,
-                'injury_date' => now()->toDateString(),
-                'injury_type' => 'fracture',
-                'body_part_affected' => 'Right wrist',
-                'severity' => 'serious',
-                'description' => 'Fall from a ladder; wrist fracture requiring hospitalisation.',
-                'medical_treatment_type' => 'hospitalisation',
-                'worksafe_notifiable' => true,
-            ])
-            ->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)
+            ->postJson('/health-safety/injuries', $this->createPayload($this->notifiableOverrides()))
+            ->assertOk();
 
         $inj = WorkplaceInjury::latest('id')->first();
         $notifiable = NotifiableIncident::where('workplace_injury_id', $inj->id)->first();
@@ -356,21 +264,9 @@ class InjuriesControllerTest extends TestCase
 
     public function test_create_only_reporter_escalates_without_signing_the_canonical_worksafe_decision(): void
     {
-        $reporter = $this->siteViewer($this->site, ['hazards.create']);
-        $worker = $this->staffAtSite($this->site);
-
-        $this->actingAs($reporter)
-            ->post('/health-safety/injuries', $this->validInjuryPayload(
-                $this->site,
-                $worker,
-                [
-                    'injury_type' => 'fracture',
-                    'severity' => 'serious',
-                    'medical_treatment_type' => 'hospitalisation',
-                    'worksafe_notifiable' => true,
-                ],
-            ))
-            ->assertSessionHasNoErrors();
+        $this->actingAs($this->capturer)
+            ->postJson('/health-safety/injuries', $this->createPayload($this->notifiableOverrides()))
+            ->assertOk();
 
         $injury = WorkplaceInjury::query()->latest('id')->firstOrFail();
         $event = HsEvent::query()
@@ -390,7 +286,6 @@ class InjuriesControllerTest extends TestCase
 
     public function test_store_rolls_back_injury_and_hs_event_when_required_control_room_projection_fails(): void
     {
-        $worker = $this->staffAtSite($this->site);
         $bridge = $this->mock(ComprehensiveAlertBridgeService::class);
         $bridge->shouldReceive('bridgeOperationalAlert')
             ->once()
@@ -398,16 +293,7 @@ class InjuriesControllerTest extends TestCase
 
         $this->withoutExceptionHandling();
         try {
-            $this->actingAs($this->admin)->post('/health-safety/injuries', $this->validInjuryPayload(
-                $this->site,
-                $worker,
-                [
-                    'injury_type' => 'fracture',
-                    'severity' => 'serious',
-                    'medical_treatment_type' => 'hospitalisation',
-                    'worksafe_notifiable' => true,
-                ],
-            ));
+            $this->actingAs($this->manager)->postJson('/health-safety/injuries', $this->createPayload($this->notifiableOverrides()));
             self::fail('The required Control Room projection failure should surface.');
         } catch (\RuntimeException $exception) {
             $this->assertSame('Control Room unavailable', $exception->getMessage());
@@ -419,15 +305,13 @@ class InjuriesControllerTest extends TestCase
         $this->assertDatabaseCount('hs_events', 0);
         $this->assertDatabaseCount('notifiable_incidents', 0);
         $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('workplace_injury_command_receipts', 0);
     }
 
     public function test_update_rolls_back_source_and_hs_event_when_escalation_projection_fails(): void
     {
         $injury = $this->injury(['severity' => 'moderate', 'worksafe_notifiable' => false]);
-        $event = HsEvent::query()
-            ->where('source_type', WorkplaceInjury::class)
-            ->where('source_id', $injury->id)
-            ->firstOrFail();
+        $event = $this->eventFor($injury);
 
         $bridge = $this->mock(ComprehensiveAlertBridgeService::class);
         $bridge->shouldReceive('bridgeOperationalAlert')
@@ -436,8 +320,8 @@ class InjuriesControllerTest extends TestCase
 
         $this->withoutExceptionHandling();
         try {
-            $this->actingAs($this->admin)
-                ->put('/health-safety/injuries/'.$injury->id, ['severity' => 'serious']);
+            $this->actingAs($this->manager)
+                ->putJson('/health-safety/injuries/'.$injury->id, $this->command($injury, ['severity' => 'serious']));
             self::fail('The required escalation projection failure should surface.');
         } catch (\RuntimeException $exception) {
             $this->assertSame('Control Room unavailable', $exception->getMessage());
@@ -446,22 +330,16 @@ class InjuriesControllerTest extends TestCase
         }
 
         $this->assertSame('moderate', $injury->fresh()->severity);
+        $this->assertSame(1, (int) $injury->fresh()->source_revision);
         $this->assertSame('medium', $event->fresh()->severity);
         $this->assertDatabaseCount('control_room_alerts', 0);
     }
 
     public function test_required_injury_journey_is_idempotent_and_site_linked(): void
     {
-        $worker = $this->staffAtSite($this->site);
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/injuries', $this->validInjuryPayload($this->site, $worker, [
-                'injury_type' => 'fracture',
-                'severity' => 'serious',
-                'medical_treatment_type' => 'hospitalisation',
-                'worksafe_notifiable' => true,
-            ]))
-            ->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)
+            ->postJson('/health-safety/injuries', $this->createPayload($this->notifiableOverrides()))
+            ->assertOk();
 
         $injury = WorkplaceInjury::query()->latest('id')->firstOrFail();
         $journey = app(WorkplaceInjuryJourneyService::class);
@@ -480,7 +358,7 @@ class InjuriesControllerTest extends TestCase
 
         $this->assertCount(1, $events);
         $this->assertSame($this->site->id, (int) $events->first()->site_id);
-        $this->assertSame($worker->id, (int) $events->first()->staff_id);
+        $this->assertSame($this->worker->id, (int) $events->first()->staff_id);
         $this->assertCount(1, $alerts);
         $this->assertSame($alerts->first()->id, $events->first()->control_room_alert_id);
         $this->assertSame(1, NotifiableIncident::query()->where('workplace_injury_id', $injury->id)->count());
@@ -488,11 +366,8 @@ class InjuriesControllerTest extends TestCase
 
     public function test_downgrade_retracts_pending_worksafe_and_resolves_active_alert_without_deleting_history(): void
     {
-        $injury = $this->injury(['severity' => 'serious', 'worksafe_notifiable' => true]);
-        $event = HsEvent::query()
-            ->where('source_type', WorkplaceInjury::class)
-            ->where('source_id', $injury->id)
-            ->firstOrFail();
+        $injury = $this->injury($this->notifiableOverrides());
+        $event = $this->eventFor($injury);
         $alert = ControlRoomAlert::query()->findOrFail($event->control_room_alert_id);
         $notifiable = NotifiableIncident::query()
             ->where('workplace_injury_id', $injury->id)
@@ -502,12 +377,12 @@ class InjuriesControllerTest extends TestCase
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->status);
         $this->assertSame('pending', $notifiable->status);
 
-        $this->actingAs($this->admin)
-            ->put('/health-safety/injuries/'.$injury->id, [
+        $this->actingAs($this->manager)
+            ->putJson('/health-safety/injuries/'.$injury->id, $this->command($injury, [
                 'severity' => 'moderate',
                 'worksafe_notifiable' => false,
-            ])
-            ->assertSessionHasNoErrors();
+            ]))
+            ->assertOk();
 
         $this->assertSame('moderate', $injury->fresh()->severity);
         $this->assertFalse($injury->fresh()->worksafe_notifiable);
@@ -525,7 +400,7 @@ class InjuriesControllerTest extends TestCase
             $notifiable->outcome,
         );
         $this->assertNotNull($notifiable->closed_at);
-        $this->assertSame($this->admin->id, (int) $notifiable->closed_by);
+        $this->assertSame($this->manager->id, (int) $notifiable->closed_by);
 
         $alert->refresh();
         $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->status);
@@ -540,19 +415,16 @@ class InjuriesControllerTest extends TestCase
 
     public function test_worksafe_retraction_keeps_serious_injury_alert_active_but_downgrades_it(): void
     {
-        $injury = $this->injury(['severity' => 'serious', 'worksafe_notifiable' => true]);
-        $event = HsEvent::query()
-            ->where('source_type', WorkplaceInjury::class)
-            ->where('source_id', $injury->id)
-            ->firstOrFail();
+        $injury = $this->injury($this->notifiableOverrides());
+        $event = $this->eventFor($injury);
         $alert = ControlRoomAlert::query()->findOrFail($event->control_room_alert_id);
         $notifiable = NotifiableIncident::query()
             ->where('workplace_injury_id', $injury->id)
             ->firstOrFail();
 
-        $this->actingAs($this->admin)
-            ->put('/health-safety/injuries/'.$injury->id, ['worksafe_notifiable' => false])
-            ->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)
+            ->putJson('/health-safety/injuries/'.$injury->id, $this->command($injury, ['worksafe_notifiable' => false]))
+            ->assertOk();
 
         $alert->refresh();
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->status);
@@ -564,29 +436,26 @@ class InjuriesControllerTest extends TestCase
 
     public function test_re_escalation_preserves_resolved_history_and_creates_a_new_active_alert(): void
     {
-        $injury = $this->injury(['severity' => 'serious', 'worksafe_notifiable' => true]);
-        $event = HsEvent::query()
-            ->where('source_type', WorkplaceInjury::class)
-            ->where('source_id', $injury->id)
-            ->firstOrFail();
+        $injury = $this->injury($this->notifiableOverrides());
+        $event = $this->eventFor($injury);
         $firstAlertId = (int) $event->control_room_alert_id;
         $notifiableId = NotifiableIncident::query()
             ->where('workplace_injury_id', $injury->id)
             ->value('id');
 
-        $this->actingAs($this->admin)
-            ->put('/health-safety/injuries/'.$injury->id, [
+        $this->actingAs($this->manager)
+            ->putJson('/health-safety/injuries/'.$injury->id, $this->command($injury, [
                 'severity' => 'moderate',
                 'worksafe_notifiable' => false,
-            ])
-            ->assertSessionHasNoErrors();
+            ]))
+            ->assertOk();
 
-        $this->actingAs($this->admin)
-            ->put('/health-safety/injuries/'.$injury->id, [
+        $this->actingAs($this->manager)
+            ->putJson('/health-safety/injuries/'.$injury->id, $this->command($injury, [
                 'severity' => 'serious',
                 'worksafe_notifiable' => true,
-            ])
-            ->assertSessionHasNoErrors();
+            ]))
+            ->assertOk();
 
         $alerts = ControlRoomAlert::query()
             ->where('source', 'operations')
@@ -611,11 +480,8 @@ class InjuriesControllerTest extends TestCase
     public function test_update_fails_closed_and_rolls_back_when_linked_control_room_alert_tuple_is_poisoned(
         string $surface,
     ): void {
-        $injury = $this->injury(['severity' => 'serious', 'worksafe_notifiable' => true]);
-        $event = HsEvent::query()
-            ->where('source_type', WorkplaceInjury::class)
-            ->where('source_id', $injury->id)
-            ->firstOrFail();
+        $injury = $this->injury($this->notifiableOverrides());
+        $event = $this->eventFor($injury);
         $alert = ControlRoomAlert::query()->findOrFail($event->control_room_alert_id);
         $notifiable = NotifiableIncident::query()
             ->where('workplace_injury_id', $injury->id)
@@ -635,13 +501,14 @@ class InjuriesControllerTest extends TestCase
             ])->save(),
         };
 
+        $input = $this->command($injury, [
+            'severity' => 'moderate',
+            'worksafe_notifiable' => false,
+        ]);
         $this->withoutExceptionHandling();
         try {
-            $this->actingAs($this->admin)
-                ->put('/health-safety/injuries/'.$injury->id, [
-                    'severity' => 'moderate',
-                    'worksafe_notifiable' => false,
-                ]);
+            $this->actingAs($this->manager)
+                ->putJson('/health-safety/injuries/'.$injury->id, $input);
             self::fail('A poisoned Control Room alert tuple must fail the injury update.');
         } catch (\RuntimeException $exception) {
             $this->assertSame(
@@ -654,11 +521,13 @@ class InjuriesControllerTest extends TestCase
 
         $this->assertSame('serious', $injury->fresh()->severity);
         $this->assertTrue($injury->fresh()->worksafe_notifiable);
+        $this->assertSame(1, (int) $injury->fresh()->source_revision);
         $this->assertSame('high', $event->fresh()->severity);
         $this->assertTrue($event->fresh()->worksafe_notifiable);
         $this->assertSame('pending', $notifiable->fresh()->status);
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->fresh()->status);
         $this->assertSame('critical', $alert->fresh()->severity);
+        $this->assertDatabaseMissing('workplace_injury_command_receipts', ['idempotency_key' => $input['idempotency_key']]);
     }
 
     /** @return array<string, array{string}> */
@@ -673,171 +542,53 @@ class InjuriesControllerTest extends TestCase
         ];
     }
 
-    public function test_update_edits_injury_fields(): void
-    {
-        $inj = $this->injury(['lost_time_days' => 0]);
-
-        $this->actingAs($this->admin)
-            ->put('/health-safety/injuries/'.$inj->id, [
-                'lost_time_days' => 5,
-                'body_part_affected' => 'Left shoulder',
-            ])
-            ->assertSessionHasNoErrors();
-
-        $inj->refresh();
-        $this->assertSame(5, (int) $inj->lost_time_days);
-        $this->assertSame('Left shoulder', $inj->body_part_affected);
-    }
-
-    public function test_transition_status_advances_and_sets_return_date(): void
-    {
-        $inj = $this->injury(['status' => 'under_treatment', 'actual_return_date' => null]);
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/injuries/'.$inj->id.'/status', ['status' => 'recovered'])
-            ->assertSessionHasNoErrors();
-
-        $inj->refresh();
-        $this->assertSame('recovered', $inj->status);
-        $this->assertNotNull($inj->actual_return_date, 'Recovered should stamp actual_return_date');
-    }
-
     public function test_transition_status_rejects_illegal_jump(): void
     {
-        $inj = $this->injury(['status' => 'reported']);
+        $inj = $this->injury();
 
-        $this->actingAs($this->admin)
-            ->from('/health-safety/injuries')
-            ->post('/health-safety/injuries/'.$inj->id.'/status', ['status' => 'recovered'])
-            ->assertSessionHas('error');
+        $this->actingAs($this->manager)
+            ->postJson('/health-safety/injuries/'.$inj->id.'/status', $this->command($inj, [
+                'status' => 'recovered',
+                'reason' => 'Attempted lifecycle skip',
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
 
         $this->assertSame('reported', $inj->fresh()->status);
-    }
-
-    public function test_store_rtw_plan(): void
-    {
-        $inj = $this->injury();
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/injuries/'.$inj->id.'/rtw-plans', [
-                'plan_start_date' => now()->toDateString(),
-                'goals' => ['Return to full duties'],
-                'stages' => [[
-                    'name' => 'Graduated return',
-                    'start_date' => now()->toDateString(),
-                    'hours_per_week' => 20,
-                ]],
-            ])
-            ->assertSessionHasNoErrors();
-
-        $plan = ReturnToWorkPlan::where('workplace_injury_id', $inj->id)->first();
-        $this->assertNotNull($plan);
-        $this->assertSame('active', $plan->status);
-        $this->assertSame($inj->user_id, $plan->worker_id);
-    }
-
-    public function test_store_capacity_assessment(): void
-    {
-        $inj = $this->injury();
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/injuries/'.$inj->id.'/capacity-assessments', [
-                'assessment_date' => now()->toDateString(),
-                'assessor_type' => 'gp',
-                'capacity_status' => 'fit_for_modified_duties',
-                'restrictions' => 'No lifting over 10 kg.',
-            ])
-            ->assertSessionHasNoErrors();
-
-        $this->assertDatabaseHas('work_capacity_assessments', [
-            'workplace_injury_id' => $inj->id,
-            'capacity_status' => 'fit_for_modified_duties',
-        ]);
-    }
-
-    public function test_store_modified_duty_keyed_by_plan(): void
-    {
-        $inj = $this->injury();
-        $plan = ReturnToWorkPlan::factory()->create(['workplace_injury_id' => $inj->id, 'worker_id' => $inj->user_id]);
-
-        $this->actingAs($this->admin)
-            ->post('/health-safety/injuries/rtw-plans/'.$plan->id.'/modified-duties', [
-                'start_date' => now()->toDateString(),
-                'modified_duties_description' => 'Desk duties only.',
-                'hours_per_day' => 6,
-            ])
-            ->assertSessionHasNoErrors();
-
-        $this->assertDatabaseHas('modified_duties', [
-            'return_to_work_plan_id' => $plan->id,
-            'modified_duties_description' => 'Desk duties only.',
-        ]);
-    }
-
-    public function test_upload_download_destroy_attachment_with_idor_guard(): void
-    {
-        Storage::fake('private');
-        $inj = $this->injury();
-        $other = $this->injury();
-
-        // Upload (real fake image so it passes the mimes allowlist)
-        $this->actingAs($this->admin)
-            ->post('/health-safety/injuries/'.$inj->id.'/attachments', [
-                'file' => UploadedFile::fake()->image('injury-evidence.jpg'),
-                'kind' => 'medical_cert',
-            ])
-            ->assertSessionHasNoErrors();
-
-        $att = WorkplaceInjuryAttachment::where('workplace_injury_id', $inj->id)->first();
-        $this->assertNotNull($att);
-        $this->assertSame('medical_cert', $att->kind);
-        // Stored on the PRIVATE disk now — never world-readable under /storage.
-        Storage::disk('private')->assertExists($att->path);
-        $this->assertSame('private', $att->disk);
-
-        // IDOR guard: the attachment belongs to $inj, not $other → 404 under $other.
-        $this->actingAs($this->admin)
-            ->get('/health-safety/injuries/'.$other->id.'/attachments/'.$att->id.'/download')
-            ->assertNotFound();
-
-        // Correct parent downloads fine — streamed from the private disk with the
-        // hardened CSP-sandbox header from ServesPrivateAttachments (nosniff +
-        // X-Frame-Options come from the edge layer, not the app).
-        $this->actingAs($this->admin)
-            ->get('/health-safety/injuries/'.$inj->id.'/attachments/'.$att->id.'/download')
-            ->assertOk()
-            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
-
-        // Destroy
-        $this->actingAs($this->admin)
-            ->delete('/health-safety/injuries/'.$inj->id.'/attachments/'.$att->id)
-            ->assertSessionHasNoErrors();
-        $this->assertSoftDeleted('workplace_injury_attachments', ['id' => $att->id]);
+        $this->assertSame(1, (int) $inj->fresh()->source_revision);
     }
 
     public function test_attachment_rejects_scriptable_type(): void
     {
-        Storage::fake('private');
         $inj = $this->injury();
 
-        $this->actingAs($this->admin)
-            ->from('/health-safety/injuries?injury='.$inj->id)
-            ->post('/health-safety/injuries/'.$inj->id.'/attachments', [
+        $this->actingAs($this->manager)
+            ->postJson('/health-safety/injuries/'.$inj->id.'/attachments', [
+                ...$this->command($inj, ['kind' => 'photo']),
                 'file' => UploadedFile::fake()->create('evil.svg', 5, 'image/svg+xml'),
             ])
-            ->assertSessionHasErrors('file');
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('file');
 
         $this->assertDatabaseCount('workplace_injury_attachments', 0);
+        $this->assertSame([], Storage::disk('private')->allFiles());
+        $this->assertSame(1, (int) $inj->fresh()->source_revision);
     }
 
     public function test_worksafe_flip_on_null_created_by_still_registers_notifiable(): void
     {
         // Seeded/imported injury with no created_by, later flagged via the edit wizard.
-        $inj = $this->injury(['created_by' => null, 'worksafe_notifiable' => false]);
+        $inj = WorkplaceInjury::factory()->create([
+            'site_id' => $this->site->id,
+            'user_id' => $this->worker->id,
+            'created_by' => null,
+            'severity' => 'minor',
+            'worksafe_notifiable' => false,
+        ]);
 
-        $this->actingAs($this->admin)
-            ->put('/health-safety/injuries/'.$inj->id, ['worksafe_notifiable' => true])
-            ->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)
+            ->putJson('/health-safety/injuries/'.$inj->id, $this->command($inj, ['worksafe_notifiable' => true]))
+            ->assertOk();
 
         $this->assertDatabaseHas('notifiable_incidents', [
             'workplace_injury_id' => $inj->id,
@@ -889,43 +640,11 @@ class InjuriesControllerTest extends TestCase
         DB::table('notifiable_incidents')->insert(array_merge($row, ['title' => 'Duplicate']));
     }
 
-    public function test_update_does_not_change_status(): void
-    {
-        $inj = $this->injury(['status' => 'reported']);
-
-        $this->actingAs($this->admin)
-            ->put('/health-safety/injuries/'.$inj->id, ['status' => 'recovered', 'lost_time_days' => 3])
-            ->assertSessionHasNoErrors();
-
-        $inj->refresh();
-        $this->assertSame('reported', $inj->status, 'status must not be settable via update() — only via transitionStatus()');
-        $this->assertSame(3, (int) $inj->lost_time_days);
-    }
-
     public function test_client_incident_reverse_relation(): void
     {
         $incident = ClientIncident::factory()->create();
-        $inj = $this->injury(['related_incident_id' => $incident->id]);
+        $inj = WorkplaceInjury::withoutEvents(fn () => WorkplaceInjury::factory()->create(['related_incident_id' => $incident->id]));
 
         $this->assertTrue($incident->workplaceInjuries()->where('id', $inj->id)->exists());
-    }
-
-    public function test_export_streams_filtered_csv(): void
-    {
-        $inj = $this->injury(['injury_type' => 'fracture']);
-
-        $res = $this->actingAs($this->admin)->get('/health-safety/injuries/export');
-        $res->assertOk();
-        $this->assertStringContainsString('text/csv', (string) $res->headers->get('Content-Type'));
-        $this->assertStringContainsString($inj->reference_number, $res->streamedContent());
-    }
-
-    public function test_show_redirects_to_register_modal(): void
-    {
-        $inj = $this->injury();
-
-        $this->actingAs($this->admin)
-            ->get('/health-safety/injuries/'.$inj->id)
-            ->assertRedirect('/health-safety/injuries?injury='.$inj->id);
     }
 }

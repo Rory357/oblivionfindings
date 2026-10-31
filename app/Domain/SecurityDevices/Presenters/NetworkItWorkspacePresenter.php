@@ -6,10 +6,16 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\Monitoring\Services\ConfigurationSnapshotService;
 use App\Domain\SecurityDevices\Data\NetworkMapFilters;
+use App\Domain\SecurityDevices\Endpoints\Models\EndpointAgent;
+use App\Domain\SecurityDevices\Endpoints\Presenters\EndpointDevicePosturePresenter;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
+use App\Domain\SecurityDevices\Management\Services\CommandExecutionRouteResolver;
+use App\Domain\SecurityDevices\Management\Services\DeclaredDeviceCommandCapabilities;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
@@ -24,6 +30,7 @@ use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -31,7 +38,13 @@ class NetworkItWorkspacePresenter
 {
     private const DEVICE_LIMIT = 100;
 
-    public function __construct(private readonly CanonicalDeviceSiteResolver $siteResolver, private readonly TopologyWorkspacePresenter $topologyPresenter) {}
+    public function __construct(
+        private readonly CanonicalDeviceSiteResolver $siteResolver,
+        private readonly TopologyWorkspacePresenter $topologyPresenter,
+        private readonly ?ConfigurationSnapshotService $snapshots = null,
+        private readonly ?DeclaredDeviceCommandCapabilities $declaredCapabilities = null,
+        private readonly ?CommandExecutionRouteResolver $executionRoutes = null,
+    ) {}
 
     /** @return array<string, mixed> */
     public function present(User $viewer, Builder $networkScope, array $activeTab, ?Cursor $topologyCursor = null, ?NetworkMapFilters $mapFilters = null, ?Collection $mapSites = null): array
@@ -87,8 +100,35 @@ class NetworkItWorkspacePresenter
         $monitorIds = $devices->flatMap->monitors->pluck('id');
         $latestObservations = $this->latestObservations($viewer, $monitorIds);
         $siteContext = $this->siteContext($devices);
+        $maintenanceWindows = $this->maintenanceWindows($canonicalSiteIds->filter()->unique()->values());
+        $computerIds = $devices
+            ->filter(fn (Device $device): bool => EndpointDevicePosturePresenter::isComputer($device))
+            ->pluck('id');
+        $endpointAgents = $computerIds->isNotEmpty() && Schema::hasTable('endpoint_agents')
+            ? EndpointAgent::query()
+                ->whereIn('device_id', $computerIds)
+                ->get([
+                    'id',
+                    'device_id',
+                    'site_id',
+                    'assignment_fingerprint',
+                    'enrolled_at',
+                    'enrolment_expires_at',
+                    'revoked_at',
+                    'last_seen_at',
+                    'observed_at',
+                    'agent_version',
+                ])
+                ->keyBy('device_id')
+            : collect();
         $mappedDevices = $devices
-            ->map(fn (Device $device): array => $this->mapDevice($device, $siteContext))
+            ->map(fn (Device $device): array => $this->mapDevice(
+                $device,
+                $siteContext,
+                $maintenanceWindows,
+                $canonicalSiteIds->get($device->id),
+                $endpointAgents->get($device->id),
+            ))
             ->values();
         $relationships = $exploration !== null ? ($exploration->runtime ? collect() : DeviceRelationship::query()->active()->whereKey($exploration->edgeIds)->whereIn('parent_device_id', $deviceIds)->whereIn('child_device_id', $deviceIds)->orderBy('id')->get()) : $this->relationships($deviceIds);
         $topologySiteIds = $canonicalSiteIds;
@@ -120,8 +160,8 @@ class NetworkItWorkspacePresenter
                 $topology['label'] = 'Showing topology evidence for a limited device view';
             }
         }
-        $interfaces = $this->interfaces($devices, $latestObservations);
-        $services = $this->services($devices, $relationships);
+        $interfaces = $this->interfaces($devices, $latestObservations, $viewer, $canonicalSiteIds);
+        $services = $this->services($devices, $relationships, $maintenanceWindows, $canonicalSiteIds);
         $traffic = $interfaces
             ->filter(fn (array $row): bool => $row['observedAt'] !== null
                 && collect([
@@ -195,7 +235,7 @@ class NetworkItWorkspacePresenter
                 'title' => 'Native monitoring, honest evidence',
                 'description' => 'Oblivion Findings presents canonical devices, retained native observations, and known relationship evidence without depending on a provider-shaped runtime or navigation model.',
                 'collectionNote' => 'Missing discovery, protocol, interface, capacity, configuration, or firmware collection stays visible as not collected, not observed, partial, or unsupported.',
-                'managementNote' => 'Configuration and firmware are read-only until governed command, approval, execution, and reconciliation workflows are enabled.',
+                'managementNote' => 'Configuration and firmware evidence here is read-only. Changes are requested from the Management tab, where each one is approved before it runs and then checked against fresh evidence.',
             ],
             'overview' => $overview,
             'activeTab' => [
@@ -282,8 +322,13 @@ class NetworkItWorkspacePresenter
     }
 
     /** @param array<string, Collection> $context @return array<string, mixed> */
-    private function mapDevice(Device $device, array $context): array
-    {
+    private function mapDevice(
+        Device $device,
+        array $context,
+        Collection $maintenanceWindows = new Collection,
+        ?int $canonicalSiteId = null,
+        ?EndpointAgent $endpointAgent = null,
+    ): array {
         $site = $this->siteForDevice($device, $context);
         $enabledMonitors = $device->monitors->where('is_enabled', true);
 
@@ -319,6 +364,10 @@ class NetworkItWorkspacePresenter
                     MonitorState::Pending,
                 ])->count(),
             ],
+            'maintenance' => $this->maintenanceFor($maintenanceWindows, $canonicalSiteId, (int) $device->id, null),
+            'endpointAgent' => EndpointDevicePosturePresenter::isComputer($device)
+                ? EndpointDevicePosturePresenter::agentBadge($endpointAgent, $canonicalSiteId, null, true)
+                : null,
             'wanPath' => $this->isWanDevice($device),
         ];
     }
@@ -414,24 +463,56 @@ class NetworkItWorkspacePresenter
     }
 
     /** @param Collection<int, Device> $devices @param Collection<int, MonitorObservation> $observations */
-    private function interfaces(Collection $devices, Collection $observations): Collection
-    {
-        return $devices->flatMap(function (Device $device) use ($observations): Collection {
+    private function interfaces(
+        Collection $devices,
+        Collection $observations,
+        User $viewer,
+        Collection $canonicalSiteIds,
+    ): Collection {
+        $canManageCommands = $viewer->canDo('securityDevices.commands.manage');
+        $canControlCommands = $viewer->canDo('securityDevices.commands.control');
+        $declared = $this->declaredCapabilities ?? app(DeclaredDeviceCommandCapabilities::class);
+        $routes = $this->executionRoutes ?? app(CommandExecutionRouteResolver::class);
+
+        return $devices->flatMap(function (Device $device) use (
+            $observations,
+            $canonicalSiteIds,
+            $canManageCommands,
+            $canControlCommands,
+            $declared,
+            $routes,
+        ): Collection {
+            $siteId = $canonicalSiteIds->get($device->id);
+            $supportsBounce = $canManageCommands
+                && $siteId !== null
+                && $declared->supports($device, 'network.port.bounce')
+                && $routes->resolve($device, (int) $siteId, 'network.port.bounce')->available;
+            $supportsEnable = $canManageCommands
+                && $siteId !== null
+                && $declared->supports($device, 'network.port.enable')
+                && $routes->resolve($device, (int) $siteId, 'network.port.enable')->available;
+            $supportsDisable = $canControlCommands
+                && $siteId !== null
+                && $declared->supports($device, 'network.port.disable')
+                && $routes->resolve($device, (int) $siteId, 'network.port.disable')->available;
+
             return $device->monitors
                 ->where('kind', MonitorKind::SnmpInterface)
-                ->map(function (Monitor $monitor) use ($device, $observations): array {
+                ->map(function (Monitor $monitor) use ($device, $observations, $supportsBounce, $supportsEnable, $supportsDisable): array {
                     $observation = $observations->get($monitor->id);
                     $metrics = $observation?->metrics ?? [];
                     $inUtilisation = $this->floatMetric($metrics, ['in_utilization_pct', 'in_utilisation_pct']);
                     $outUtilisation = $this->floatMetric($metrics, ['out_utilization_pct', 'out_utilisation_pct']);
                     $maximum = collect([$inUtilisation, $outUtilisation])->filter(fn ($value) => $value !== null)->max();
+                    $interfaceName = $this->stringMetric($metrics, ['interface_name', 'if_name']) ?: $monitor->name;
+                    $encodedInterface = rawurlencode($interfaceName);
 
                     return [
                         'monitorId' => $monitor->id,
                         'deviceId' => $device->id,
                         'deviceName' => $device->name,
                         'deviceHref' => "/security-devices/devices/{$device->id}",
-                        'name' => $this->stringMetric($metrics, ['interface_name', 'if_name']) ?: $monitor->name,
+                        'name' => $interfaceName,
                         'index' => $this->intMetric($metrics, ['if_index', 'interface_index']),
                         'state' => $monitor->current_state?->value,
                         'enabled' => (bool) $monitor->is_enabled,
@@ -448,17 +529,33 @@ class NetworkItWorkspacePresenter
                             ? 'not_collected'
                             : ($maximum >= 90 ? 'critical' : ($maximum >= 80 ? 'warning' : 'normal')),
                         'observedAt' => $observation?->observed_at?->toISOString(),
+                        'portActions' => ($supportsBounce || $supportsEnable || $supportsDisable) ? [
+                            'bounceHref' => $supportsBounce
+                                ? "/security-devices/devices/{$device->id}?section=management&action=network.port.bounce&command_interface={$encodedInterface}"
+                                : null,
+                            'enableHref' => $supportsEnable
+                                ? "/security-devices/devices/{$device->id}?section=management&action=network.port.enable&command_interface={$encodedInterface}"
+                                : null,
+                            'disableHref' => $supportsDisable
+                                ? "/security-devices/devices/{$device->id}?section=management&action=network.port.disable&command_interface={$encodedInterface}"
+                                : null,
+                        ] : null,
                     ];
                 });
         })->values();
     }
 
     /** @param Collection<int, Device> $devices @param Collection<int, DeviceRelationship> $relationships */
-    private function services(Collection $devices, Collection $relationships): Collection
-    {
-        return $devices->flatMap(function (Device $device) use ($relationships): Collection {
+    private function services(
+        Collection $devices,
+        Collection $relationships,
+        Collection $maintenanceWindows,
+        Collection $canonicalSiteIds,
+    ): Collection {
+        return $devices->flatMap(function (Device $device) use ($relationships, $maintenanceWindows, $canonicalSiteIds): Collection {
             $dependants = $relationships->filter(fn (DeviceRelationship $relationship): bool => (int) $relationship->parent_device_id === (int) $device->id
                 || (int) $relationship->child_device_id === (int) $device->id)->count();
+            $siteId = $canonicalSiteIds->get($device->id);
 
             return $device->monitors
                 ->reject(fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::SnmpInterface)
@@ -475,6 +572,7 @@ class NetworkItWorkspacePresenter
                     'affectsAvailability' => (bool) $monitor->affects_availability,
                     'lastObservationAt' => $monitor->last_observation_at?->toISOString(),
                     'dependentCount' => $dependants,
+                    'maintenance' => $this->maintenanceFor($maintenanceWindows, $siteId, (int) $device->id, (int) $monitor->id),
                     'collector' => $monitor->collector ? [
                         'name' => $monitor->collector->name,
                         'status' => $monitor->collector->status,
@@ -559,14 +657,19 @@ class NetworkItWorkspacePresenter
                 ->filter(fn (ConfigurationSnapshot $snapshot): bool => (int) $snapshot->site_id === (int) $latestSnapshot->site_id)
                 ->take(11)
                 ->values();
+        $snapshotService = $this->snapshots ?? app(ConfigurationSnapshotService::class);
+        $canViewSnapshots = $snapshotService->canViewSnapshots($viewer);
+
         $snapshotHistory = $snapshotHistory
-            ->map(fn (ConfigurationSnapshot $snapshot): array => $this->configurationSnapshot($device, $snapshot, $viewer))
+            ->map(fn (ConfigurationSnapshot $snapshot): array => $this->configurationSnapshot($device, $snapshot, $canViewSnapshots))
             ->values();
 
         return [
             'deviceId' => $device->id,
             'deviceName' => $device->name,
             'deviceHref' => "/security-devices/devices/{$device->id}",
+            'canViewSnapshots' => $canViewSnapshots,
+            'backupActionHref' => null,
             'configuration' => [
                 'state' => $configurationState,
                 'observedHash' => $observedHash,
@@ -586,14 +689,13 @@ class NetworkItWorkspacePresenter
     }
 
     /** @return array<string, mixed> */
-    private function configurationSnapshot(Device $device, ConfigurationSnapshot $snapshot, User $viewer): array
+    private function configurationSnapshot(Device $device, ConfigurationSnapshot $snapshot, bool $canViewSnapshots): array
     {
         $diff = is_array($snapshot->diff_summary) ? $snapshot->diff_summary : [];
         $added = collect($diff['added'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
         $removed = collect($diff['removed'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
         $changed = collect($diff['changed'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
-        $canDownload = $snapshot->storage_state === 'available'
-            && ($snapshot->source_kind !== 'provider' || $viewer->canDo('securityDevices.integrations.view'));
+        $canAccessPayload = $snapshot->storage_state === 'available' && $canViewSnapshots;
 
         return [
             'id' => $snapshot->id,
@@ -614,9 +716,72 @@ class NetworkItWorkspacePresenter
                 'count' => $added->count() + $removed->count() + $changed->count(),
                 'truncated' => (bool) ($diff['truncated'] ?? false),
             ],
-            'downloadHref' => $canDownload
+            'downloadHref' => $canAccessPayload
                 ? "/security-devices/devices/{$device->id}/configuration-snapshots/{$snapshot->id}"
                 : null,
+            'compareHref' => $canAccessPayload
+                ? "/security-devices/devices/{$device->id}/configuration-snapshots/{$snapshot->id}/compare"
+                : null,
+        ];
+    }
+
+    /** @param Collection<int, int> $siteIds @return Collection<int, MonitoringMaintenanceWindow> */
+    private function maintenanceWindows(Collection $siteIds): Collection
+    {
+        if ($siteIds->isEmpty()) {
+            return collect();
+        }
+
+        return MonitoringMaintenanceWindow::query()
+            ->where('status', 'active')
+            ->whereIn('site_id', $siteIds)
+            ->where('ends_at', '>', now())
+            ->where('starts_at', '<=', now()->addDays(7))
+            ->orderBy('starts_at')
+            ->limit(150)
+            ->get();
+    }
+
+    /** @return array{activeWindow: array<string, mixed>|null, upcomingWindow: array<string, mixed>|null} */
+    private function maintenanceFor(
+        Collection $windows,
+        ?int $siteId,
+        int $deviceId,
+        ?int $monitorId,
+    ): array {
+        if ($siteId === null || $windows->isEmpty()) {
+            return ['activeWindow' => null, 'upcomingWindow' => null];
+        }
+
+        $now = now();
+        $matching = $windows->filter(function (MonitoringMaintenanceWindow $window) use ($siteId, $deviceId, $monitorId): bool {
+            if ((int) $window->site_id !== $siteId) {
+                return false;
+            }
+            if ($window->monitor_id !== null) {
+                return $monitorId !== null && (int) $window->monitor_id === $monitorId;
+            }
+            if ($window->device_id !== null) {
+                return (int) $window->device_id === $deviceId;
+            }
+
+            return true;
+        });
+
+        $active = $matching->first(fn (MonitoringMaintenanceWindow $w): bool => $w->starts_at !== null && $w->starts_at->lte($now));
+        $upcoming = $matching->first(fn (MonitoringMaintenanceWindow $w): bool => $w->starts_at !== null && $w->starts_at->gt($now));
+
+        $format = static fn (?MonitoringMaintenanceWindow $w): ?array => $w === null ? null : [
+            'id' => $w->id,
+            'name' => $w->name,
+            'scopeType' => $w->monitor_id !== null ? 'monitor' : ($w->device_id !== null ? 'device' : 'site'),
+            'startsAt' => $w->starts_at?->toISOString(),
+            'endsAt' => $w->ends_at?->toISOString(),
+        ];
+
+        return [
+            'activeWindow' => $format($active),
+            'upcomingWindow' => $format($upcoming),
         ];
     }
 

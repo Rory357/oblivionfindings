@@ -7,12 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class EmergencyDrill extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
 
     protected $fillable = [
@@ -42,9 +43,18 @@ class EmergencyDrill extends Model
         'conducted_by',
         'created_by',
         'updated_by',
+        'lock_version',
+        'creation_key',
+        'creation_fingerprint',
+        'previous_drill_id',
+        'cancelled_at',
+        'cancelled_by',
+        'cancellation_reason',
     ];
 
     protected $casts = [
+        'lock_version' => 'integer',
+        'cancelled_at' => 'datetime',
         'scheduled_at' => 'datetime',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
@@ -59,8 +69,23 @@ class EmergencyDrill extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
+
+    public function previousDrill(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'previous_drill_id');
+    }
+
+    public function nextDrills(): HasMany
+    {
+        return $this->hasMany(self::class, 'previous_drill_id');
+    }
+
+    public function failureDelivery(): HasOne
+    {
+        return $this->hasOne(EmergencyDrillFailureDelivery::class);
+    }
 
     public function site(): BelongsTo
     {
@@ -98,7 +123,7 @@ class EmergencyDrill extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeScheduled($query)

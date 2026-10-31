@@ -78,7 +78,7 @@ export function ShiftContextMenu({ x, y, items, onClose }: Props) {
                     return (
                         <div
                             key={`hdr-${i}`}
-                            className="px-3 py-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase"
+                            className="px-3 py-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase"
                         >
                             {it.label}
                         </div>
@@ -114,7 +114,7 @@ export function ShiftContextMenu({ x, y, items, onClose }: Props) {
                         )}
                         <span className="min-w-0 flex-1">{action.label}</span>
                         {action.shortcut ? (
-                            <span className="text-[11px] text-muted-foreground tabular-nums">
+                            <span className="text-xs text-muted-foreground tabular-nums">
                                 {action.shortcut}
                             </span>
                         ) : null}

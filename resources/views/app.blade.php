@@ -94,7 +94,9 @@ if ($_userReduceMotion) {
     </style>
     @endif
 
-    <title inertia>{{ config('app.name', 'Laravel') }}</title>
+    {{-- The provider's name from Settings › Branding (falls back to the app name), so the
+         first title in the HTML is the client's, before the page script sets the full one. --}}
+    <title inertia>{{ $page['props']['branding']['name'] ?? config('app.name', 'Laravel') }}</title>
 
     <link rel="icon" href="/favicon.ico?v=oblivion-ring-1" sizes="16x16 32x32 48x48" type="image/x-icon">
     <link rel="icon" href="/favicon.svg?v=oblivion-ring-1" sizes="any" type="image/svg+xml">

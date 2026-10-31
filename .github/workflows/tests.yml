@@ -26,8 +26,8 @@ jobs:
             shard_index: 0
             shard_count: 1
             batch_size: 30
-          # Run the complete medication gate files even when a broad feature
-          # shard stops earlier on an unrelated module's failing batch.
+          # Run the complete medication gate files as one named gate, apart
+          # from the broad feature shards and their unrelated failures.
           - suite: emar-release
             shard_index: 0
             shard_count: 1
@@ -116,6 +116,9 @@ jobs:
 
       - name: Check medication desktop types and workflows
         if: matrix.suite == 'foundation'
+        # Full-project typechecking needs more than Node's default ~4 GB heap.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: |
           npx tsc --noEmit
           npx vitest run resources/js/pages/emar resources/js/lib/emar-navigation.test.ts resources/js/pages/settings/profile.test.tsx
@@ -189,7 +192,7 @@ jobs:
           tests/Feature/Emar/ActualAbsenceLifecycleTest.php
           tests/Feature/Emar/AwayDosesTest.php
           tests/Unit/Support/MedicationWorkflowDefaultsTest.php
-          tests/Feature/Emar/GuidedRoundOfflineReplayTest.php
+          tests/Feature/Emar/MedicationScopeAuthorizationTest.php
           tests/Feature/Emar/P01RecordingContractTest.php
           tests/Feature/Medication/ControlledDrugStockTruthTest.php
           tests/Unit/MedicationPaperRecoveryMigrationTest.php

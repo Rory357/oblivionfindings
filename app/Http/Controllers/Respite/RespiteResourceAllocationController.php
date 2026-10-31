@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\RespiteResourceAllocation;
 use App\Events\Respite\RespiteEvent;
+use App\Support\Respite\RespiteWallClock;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -43,6 +44,7 @@ class RespiteResourceAllocationController extends Controller
             'start_at' => 'required|date',
             'end_at' => 'required|date|after:start_at',
         ]);
+        $validated = RespiteWallClock::inputsToUtc($validated, ['start_at', 'end_at']);
 
         $validated['created_by'] = auth()->id();
 

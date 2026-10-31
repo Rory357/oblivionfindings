@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
 use App\Models\IncidentTemplate;
+use App\Services\Incidents\IncidentAccessService;
 use App\Services\NotificationService;
 use App\Support\WorkerClock;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class ClientIncidentController extends Controller
         $user = $request->user();
 
         $incidents = ClientIncident::query()
+            ->tap(fn ($query) => app(IncidentAccessService::class)->apply($query, $user))
             ->where('client_id', $client->id)
             ->when(
                 ! $user?->canDo('hr.cases.view'),

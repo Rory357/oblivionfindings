@@ -21,6 +21,12 @@ final class ChatReactionEmoji
             return false;
         }
 
+        // Two pictographs are one emoji only when a zero-width joiner links them (TR29 GB11). PCRE
+        // before 10.43 also joins them without one, so "👍👍" would pass as one character on CI.
+        if (preg_match('/\p{Extended_Pictographic}{2}/u', preg_replace('/[^\p{Extended_Pictographic}\x{200D}]/u', '', $value)) === 1) {
+            return false;
+        }
+
         return preg_match('/\p{Extended_Pictographic}/u', $value) === 1
             || preg_match('/^\p{Regional_Indicator}{2}$/u', $value) === 1
             || preg_match('/^[0-9#*]\x{FE0F}?\x{20E3}$/u', $value) === 1;

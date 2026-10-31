@@ -1,4 +1,7 @@
-import { PageHeader } from '@/components/page/page-header';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -227,33 +230,28 @@ export function CameraLiveWorkspace({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Security & Devices',
-                    href: '/security-devices/security?tab=cctv',
-                },
+                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
                 {
                     title: camera.name,
                     href: '/security-devices/devices/' + camera.id,
                 },
-                {
-                    title: 'Live view',
-                    href: '/security-devices/devices/' + camera.id + '/live',
-                },
+                { title: 'Live view' },
             ]}
         >
             <Head title={camera.name + ' · Live view'} />
-            <div className="space-y-5">
+            <div className="flex flex-col gap-5">
                 <PageHeader
                     variant="profile"
+                    frontline
                     icon={Camera}
                     title={camera.name}
                     wrapTitle
                     backHref={'/security-devices/devices/' + camera.id}
                     subline={camera.site.name + ' · Live camera view'}
                     actions={
-                        <Button
+                        <PageHeaderGlassButton
                             asChild
-                            variant="secondary"
                             className="frontline-focus frontline-tap"
                         >
                             <Link
@@ -261,7 +259,7 @@ export function CameraLiveWorkspace({
                             >
                                 Camera details
                             </Link>
-                        </Button>
+                        </PageHeaderGlassButton>
                     }
                 />
                 <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">

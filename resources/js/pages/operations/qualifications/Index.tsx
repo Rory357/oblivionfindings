@@ -1,4 +1,11 @@
-import { ListCaption } from '@/components/lists';
+import {
+    EntityContextMenu,
+    EntityKebab,
+    ListCaption,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
 import {
     PageHeaderFilterSelect,
     PageHeaderMeterBig,
@@ -17,11 +24,12 @@ import {
     type QualificationOption,
 } from '@/components/rostering/qualification-requirement-fields';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     Award,
@@ -97,6 +105,7 @@ export default function QualificationsIndex({
     const [removing, setRemoving] = useState<QualificationRequirement | null>(
         null,
     );
+    const rowMenu = useEntityContextMenu<QualificationRequirement>();
     const [notice, setNotice] = useState('');
     const clientSingular: string = labels?.['client.singular'] ?? 'Client';
     const clientPlural: string = labels?.['client.plural'] ?? 'Clients';
@@ -279,11 +288,33 @@ export default function QualificationsIndex({
         />
     );
 
+    // One item set for each requirement's ⋯ menu and right-click menu.
+    const requirementActions = (req: QualificationRequirement): MenuItem[] =>
+        compactMenu([
+            can.edit
+                ? {
+                      label: 'Edit requirement',
+                      icon: Pencil,
+                      onClick: () => setEditor(req),
+                  }
+                : null,
+            can.delete ? { separator: true } : null,
+            can.delete
+                ? {
+                      label: 'Remove requirement',
+                      icon: Trash2,
+                      danger: true,
+                      onClick: () => setRemoving(req),
+                  }
+                : null,
+        ]);
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Workforce', href: '/operations/rostering' },
+                { title: 'Rostering', href: '/operations/rostering' },
                 {
                     title: 'Qualifications',
                     href: '/operations/qualifications',
@@ -322,20 +353,50 @@ export default function QualificationsIndex({
                             requirements.data.map((req) => (
                                 <Card
                                     key={req.id}
-                                    className="transition-all hover:border-border hover:shadow-sm"
+                                    role={can.edit ? 'button' : undefined}
+                                    tabIndex={can.edit ? 0 : undefined}
+                                    aria-label={
+                                        can.edit
+                                            ? `Edit ${req.qualification_name}`
+                                            : undefined
+                                    }
+                                    onClick={
+                                        can.edit
+                                            ? () => setEditor(req)
+                                            : undefined
+                                    }
+                                    onKeyDown={(e) => {
+                                        if (
+                                            can.edit &&
+                                            e.target === e.currentTarget &&
+                                            (e.key === 'Enter' || e.key === ' ')
+                                        ) {
+                                            e.preventDefault();
+                                            setEditor(req);
+                                        }
+                                    }}
+                                    onContextMenu={(e) =>
+                                        requirementActions(req).length > 0 &&
+                                        rowMenu.open(e, req)
+                                    }
+                                    className={cn(
+                                        'transition-all hover:border-border hover:shadow-sm',
+                                        can.edit &&
+                                            'cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                    )}
                                 >
                                     <CardContent className="flex flex-wrap items-start gap-4 p-4">
                                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                             <ShieldCheck className="h-5 w-5" />
                                         </div>
-                                        <div className="min-w-0 flex-1">
+                                        <div className="min-w-0 flex-1 break-words">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <span className="text-sm font-semibold">
                                                     {req.qualification_name}
                                                 </span>
                                                 <Badge
                                                     variant="outline"
-                                                    className="h-4 px-1.5 text-[9px]"
+                                                    className="text-caption"
                                                 >
                                                     {req.is_mandatory
                                                         ? 'Mandatory'
@@ -354,7 +415,7 @@ export default function QualificationsIndex({
                                                       'Recorded service context unavailable')
                                                     : 'All service contexts for this Client'}
                                             </p>
-                                            <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                            <div className="text-caption mt-0.5 flex flex-wrap items-center gap-3 text-muted-foreground">
                                                 {req.client && (
                                                     <span>
                                                         {req.client.first_name}{' '}
@@ -363,72 +424,33 @@ export default function QualificationsIndex({
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {can.edit ? (
-                                                <Button
-                                                    variant="outline"
-                                                    className="min-h-11"
-                                                    onClick={() =>
-                                                        setEditor(req)
-                                                    }
-                                                >
-                                                    <Pencil className="mr-2 size-4" />
-                                                    Edit
-                                                    <span className="sr-only">
-                                                        {' '}
-                                                        {req.qualification_name}
-                                                    </span>
-                                                </Button>
-                                            ) : null}
-                                            {can.delete ? (
-                                                <Button
-                                                    variant="ghost"
-                                                    className="min-h-11 text-status-critical"
-                                                    onClick={() =>
-                                                        setRemoving(req)
-                                                    }
-                                                >
-                                                    <Trash2 className="mr-2 size-4" />
-                                                    Remove
-                                                    <span className="sr-only">
-                                                        {' '}
-                                                        {req.qualification_name}
-                                                    </span>
-                                                </Button>
-                                            ) : null}
-                                        </div>
+                                        <EntityKebab
+                                            label={`Actions for ${req.qualification_name}`}
+                                            actions={requirementActions(req)}
+                                        />
                                     </CardContent>
                                 </Card>
                             ))
                         )}
                     </div>
 
-                    {(requirements.last_page ?? 1) > 1 && (
-                        <div className="flex items-center justify-center gap-1">
-                            {(requirements.links ?? []).map((link, i) => (
-                                <Button
-                                    key={i}
-                                    size="sm"
-                                    variant={
-                                        link.active ? 'default' : 'outline'
-                                    }
-                                    className="h-7 min-w-[28px] px-2 text-xs"
-                                    disabled={!link.url}
-                                    onClick={() =>
-                                        link.url &&
-                                        router.get(
-                                            link.url,
-                                            {},
-                                            { preserveState: true },
-                                        )
-                                    }
-                                    dangerouslySetInnerHTML={{
-                                        __html: link.label,
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    )}
+                    {rowMenu.ctx ? (
+                        <EntityContextMenu
+                            x={rowMenu.ctx.x}
+                            y={rowMenu.ctx.y}
+                            icon={ShieldCheck}
+                            title={rowMenu.ctx.record.qualification_name}
+                            items={requirementActions(rowMenu.ctx.record)}
+                            onClose={rowMenu.close}
+                        />
+                    ) : null}
+
+                    <LaravelPagination
+                        links={requirements.links ?? []}
+                        lastPage={requirements.last_page}
+                        className="flex-wrap gap-y-4 py-2"
+                        preserveState
+                    />
                 </div>
             </PageLayout>
             {editor !== undefined ? (

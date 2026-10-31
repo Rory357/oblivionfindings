@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"errors"
 	"os"
 	"runtime"
@@ -10,25 +12,31 @@ import (
 	"oblivion.local/endpoint-agent/internal/setup"
 )
 
-func installOnPlatform(ctx context.Context, pack *release.Package, profiles setup.Profiles, confirmedServer, confirmedCollector string) (setup.Journal, error) {
+func verifySetupExecutable(pack *release.Package) error {
+	key, err := base64.StdEncoding.Strict().DecodeString(publisherPublicKey)
+	if err != nil || len(key) != ed25519.PublicKeySize || pack == nil {
+		return errors.New("this development build has no trusted release publisher configured")
+	}
 	executable, err := os.Executable()
 	if err != nil {
-		return setup.Journal{}, errors.New("cannot verify the setup executable")
+		return errors.New("cannot verify the setup executable")
 	}
-	// Even with a publisher key compiled in, an unsigned setup cannot activate.
 	if err = release.VerifyExecutable(executable, runtime.GOARCH); err != nil {
-		return setup.Journal{}, errors.New("the setup executable's Windows signature could not be verified")
+		return errors.New("the setup executable format or architecture could not be verified")
+	}
+	return nil
+}
+
+func installOnPlatform(ctx context.Context, pack *release.Package, profiles setup.Profiles, confirmedServer, confirmedCollector string) (setup.Journal, error) {
+	if err := verifySetupExecutable(pack); err != nil {
+		return setup.Journal{}, err
 	}
 	return setup.Install(ctx, pack, profiles, confirmedServer, confirmedCollector)
 }
 
 func repairOnPlatform(ctx context.Context, pack *release.Package, server, collector, role string, confirmation ...string) (setup.RepairReceipt, error) {
-	executable, err := os.Executable()
-	if err != nil {
-		return setup.RepairReceipt{}, errors.New("cannot verify the setup executable")
-	}
-	if err = release.VerifyExecutable(executable, runtime.GOARCH); err != nil {
-		return setup.RepairReceipt{}, errors.New("the setup executable's Windows signature could not be verified")
+	if err := verifySetupExecutable(pack); err != nil {
+		return setup.RepairReceipt{}, err
 	}
 	if len(confirmation) == 0 {
 		return setup.RepairServices(ctx, pack, server, collector, role)
@@ -40,12 +48,8 @@ func repairOnPlatform(ctx context.Context, pack *release.Package, server, collec
 }
 
 func reviewRepairOnPlatform(ctx context.Context, pack *release.Package) (setup.RepairReview, error) {
-	executable, err := os.Executable()
-	if err != nil {
-		return setup.RepairReview{}, errors.New("cannot verify setup executable")
-	}
-	if err = release.VerifyExecutable(executable, runtime.GOARCH); err != nil {
-		return setup.RepairReview{}, errors.New("the setup executable's Windows signature could not be verified")
+	if err := verifySetupExecutable(pack); err != nil {
+		return setup.RepairReview{}, err
 	}
 	return setup.ReviewServiceRepair(ctx, pack)
 }

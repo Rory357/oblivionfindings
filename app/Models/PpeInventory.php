@@ -40,6 +40,8 @@ class PpeInventory extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
         'purchase_date' => 'date',
         'expiry_date' => 'date',
         'last_inspected_at' => 'date',
@@ -123,5 +125,11 @@ class PpeInventory extends Model
     public function isInspectionDue(): bool
     {
         return $this->next_inspection_due && $this->next_inspection_due->isPast();
+    }
+
+    /** Governed facts remain distinct from legacy rows and current authority. */
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PpeSourceVersion::class, 'source_id')->where('source_type', 'inventory');
     }
 }

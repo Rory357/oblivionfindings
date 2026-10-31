@@ -6,6 +6,7 @@ use App\Enums\AlertSeverity;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
+use App\Models\LoneWorkerEmergencyEpisode;
 use App\Models\LoneWorkerSession;
 use App\Models\Site;
 use App\Services\ControlRoom\SignalProcessingService;
@@ -149,8 +150,7 @@ class LoneWorkerSignalService
                     : null,
                 // Session context
                 'location' => $session->location,
-                'location_lat' => $session->location_lat,
-                'location_lng' => $session->location_lng,
+                // Legacy source coordinates have no reliable observation provenance.
                 'activity_description' => $session->activity_description,
                 'started_at' => $session->started_at?->toIso8601String(),
                 'expected_end_at' => $session->expected_end_at?->toIso8601String(),
@@ -204,6 +204,48 @@ class LoneWorkerSignalService
             'session_id' => $session->id,
             'worker' => $session->user?->name,
         ]);
+    }
+
+    /** Process one retained emergency episode using the canonical pipeline and immutable origin. */
+    public function emitEmergencyEpisode(LoneWorkerSession $session, LoneWorkerEmergencyEpisode $episode): array
+    {
+        return DB::transaction(function () use ($session, $episode): array {
+            $session->load(['user:id,name,approved_at', 'site:id,name,is_active,archived,archived_at', 'client:id,first_name,last_name,site_id', 'shift:id,site_id,client_id,user_id', 'shift.client:id,site_id']);
+            [$siteId] = $this->canonicalSessionSite($session);
+            if ((int) $episode->lone_worker_session_id !== (int) $session->id || (int) $episode->episode_number !== (int) $session->emergency_episode_number
+                || ! hash_equals(hash('sha256', 'lone_worker:emergency:'.$session->id.':'.$episode->episode_number), $episode->signal_key)) {
+                throw new \DomainException('Emergency episode correlation conflicts with its source.');
+            }
+            $source = $this->getSignalSource();
+            $signal = $this->signalProcessor->ingest([
+                'signal_source_id' => $source->id, 'signal_type_code' => self::TYPE_EMERGENCY,
+                'idempotency_key' => $episode->signal_key, 'site_id' => $siteId, 'client_id' => $session->client_id,
+                'severity_hint' => AlertSeverity::CRITICAL, 'occurred_at' => $episode->occurred_at, 'payload' => [],
+                'normalized_data' => ['title' => 'Lone worker emergency request', 'description' => 'Open the canonical worker session to review the recorded request.',
+                    'source_module' => 'lone_worker', 'signal_type' => self::TYPE_EMERGENCY, 'lone_worker_session_id' => $session->id,
+                    'lone_worker_emergency_episode_id' => $episode->id, 'emergency_episode_number' => $episode->episode_number,
+                    'monitor_correlation_key' => $episode->signal_key, 'worker_user_id' => $session->user_id, 'site_id' => $siteId,
+                    'client_id' => $session->client_id, 'emergency_triggered_at' => $episode->occurred_at->toIso8601String()],
+            ]);
+            if (! $this->canonicalSignalMatchesSession($signal, $source, self::TYPE_EMERGENCY, $episode->signal_key, $session, $siteId)
+                || (int) data_get($signal->normalized_data, 'lone_worker_emergency_episode_id') !== (int) $episode->id
+                || data_get($signal->normalized_data, 'monitor_correlation_key') !== $episode->signal_key) {
+                throw new \DomainException('Emergency signal correlation conflicts with its episode.');
+            }
+            $alert = $this->signalProcessor->process($signal);
+            $signal->refresh();
+            if ($signal->status === 'suppressed' && ! $alert) {
+                return ['status' => 'suppressed', 'signal_id' => $signal->id, 'control_room_alert_id' => null];
+            }
+            if (! $alert || ! $this->canonicalAlertMatchesSession($alert, $signal, self::TYPE_EMERGENCY, $session, $siteId)
+                || (int) $alert->origin_signal_id !== (int) $signal->id
+                || (int) data_get($alert->context, 'normalized_data.lone_worker_emergency_episode_id') !== (int) $episode->id
+                || data_get($alert->context, 'normalized_data.monitor_correlation_key') !== $episode->signal_key) {
+                throw new \DomainException('Emergency response correlation conflicts with its episode.');
+            }
+
+            return ['status' => 'delivered', 'signal_id' => $signal->id, 'control_room_alert_id' => $alert->id];
+        }, 3);
     }
 
     public static function canonicalAlertType(string $signalType): ?string

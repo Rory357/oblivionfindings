@@ -40,6 +40,7 @@ class RbacSeeder extends Seeder
      */
     public const RESTRICTED_INDEPENDENT_AUTHORITY = [
         ...\App\Domain\Referrals\ReferralPermissions::INDEPENDENT,
+        'restraints.approve',
         'healthSafety.events.close',
         'healthSafety.events.closeAny',
         'healthSafety.closureExceptions.request',
@@ -59,6 +60,14 @@ class RbacSeeder extends Seeder
         // Private staff chat inspection: named investigators only. Grant migration:
         // 2026_10_20_101000_register_chat_investigation_permission (no role grants).
         'chat.investigate',
+        // Approved Windows scripts: named people only. Registration migration:
+        // 2026_10_22_090000_register_endpoint_script_permissions (no role grants).
+        'securityDevices.endpoints.scriptUpload',
+        'securityDevices.endpoints.scriptReview',
+        'securityDevices.endpoints.scriptPolicyManage',
+        'securityDevices.endpoints.scriptRun',
+        'securityDevices.endpoints.scriptUnattended',
+        'securityDevices.endpoints.scriptOutputView',
     ];
 
     public function run(): void
@@ -370,13 +379,17 @@ class RbacSeeder extends Seeder
             ['key' => 'clinical.accessAllSites', 'description' => 'Apply granted clinical permissions across all Sites', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
             // Incidents
-            ['key' => 'incidents.viewAny', 'description' => 'View all incidents', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.viewAny', 'description' => 'View incidents for all supported people within approved Sites', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.viewAssigned', 'description' => 'View incidents for assigned clients', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.create', 'description' => 'Create incident reports', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.update', 'description' => 'Update incident reports', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.submit', 'description' => 'Submit standalone incident reports', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.approve', 'description' => 'Review/close incidents', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.reopen', 'description' => 'Reopen closed incidents', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.owner.assign', 'description' => 'Assign an accountable owner within incident access and conflict boundaries', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.owner.hold', 'description' => 'Hold accountable ownership of an eligible incident', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.owner.holdRestricted', 'description' => 'Hold ownership of restricted incidents when separately authorized to read them', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.owner.request', 'description' => 'Request a change of ownership for an owned incident', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.export', 'description' => 'Export incidents', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.templates.manage', 'description' => 'Manage incident templates', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.portal.manage', 'description' => 'Control portal visibility for incidents', 'group' => 'incidents', 'module' => 'Compliance'],
@@ -564,12 +577,18 @@ class RbacSeeder extends Seeder
             ['key' => 'healthSafety.events.closeAny', 'description' => 'Close an H&S event owned by another H&S lead', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'healthSafety.closureExceptions.request', 'description' => 'Request a narrow H&S closure exception', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'healthSafety.closureExceptions.approve', 'description' => 'Independently decide or revoke H&S closure exceptions', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.settings.manage', 'description' => 'Configure the organisation approval workflow with an attributable change history', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Restraints & Behaviour Support
             ['key' => 'restraints.view', 'description' => 'View the restraint register & behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
             ['key' => 'restraints.create', 'description' => 'Record restraint events & create behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
             ['key' => 'restraints.manage', 'description' => 'Manage restraint events & behaviour support plan lifecycle', 'group' => 'restraints', 'module' => 'Compliance'],
             ['key' => 'restraints.review', 'description' => 'Review restraint events & sign off plan reviews', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'restraints.approve', 'description' => 'Explicitly designated behaviour support plan approval authority, subject to current source access and policy', 'group' => 'restraints', 'module' => 'Compliance'],
+            // Create-only reporting (MASTER for Stephan, 30 Oct): open the report form and save it. No register, no
+            // evidence afterwards, no plans, no review or approval.
+            ['key' => 'restraints.report', 'description' => 'Report a restraint (create only; no register, review or plans)', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'injuries.report', 'description' => 'Report a workplace injury (create only; no register or recovery work)', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Safe Work Procedures (controlled SWMS document library)
             ['key' => 'procedures.view', 'description' => 'View safe work procedures', 'group' => 'procedures', 'module' => 'Compliance'],
@@ -667,6 +686,7 @@ class RbacSeeder extends Seeder
         $admin?->permissions()->sync(
             Permission::query()
                 ->whereNotIn('key', self::RESTRICTED_INDEPENDENT_AUTHORITY)
+                ->where('key', 'not like', 'securityDevices.endpoints.script%')
                 ->pluck('id'),
         );
 
@@ -690,6 +710,9 @@ class RbacSeeder extends Seeder
             // Own-site operations dashboard; OperationsPermissionsSeeder creates the key
             // and grants it on a fresh install, this keeps it on a reseed (20 Oct 2026).
             'operations.dashboard.view',
+            // Read the H&S Overview and Safety reviews for their own Sites (Stephan, 30 Oct, option A). Reading only;
+            // Site scope still applies. Grant migration: 2026_10_30_120000_grant_provider_manager_hazards_view.
+            'hazards.view',
             'fleet.viewAny', 'fleet.manage', 'fleet.driverSessions.manage', 'fleet.signals.view', 'fleet.trips.manage',
             'fleet.fuel.manage', 'fleet.reports.view', 'fleet.bookings.approve', 'fleet.incidents.manage',
             'fleet.maintenance.manage', 'fleet.medication.manage', 'fleet.mileage.approve', 'fleet.outings.manage',
@@ -710,6 +733,7 @@ class RbacSeeder extends Seeder
             'medications.audit.view', 'medications.reports.export', 'medications.breakglass', 'medications.emergency_policy.manage',
             'incidents.viewAny', 'incidents.create', 'incidents.update', 'incidents.submit',
             'incidents.approve', 'incidents.reopen', 'incidents.followups.manage', 'incidents.export',
+            'incidents.owner.assign', 'incidents.owner.hold', 'incidents.owner.holdRestricted', 'incidents.owner.request',
             'incidents.portal.manage', 'incidents.view.portal', 'incidents.attachments.view.portal',
             'respite.viewAny', 'respite.create', 'respite.update', 'respite.bookings.manage',
             'respite.stays.manage', 'respite.resources.manage', 'respite.procedures.manage',
@@ -769,6 +793,7 @@ class RbacSeeder extends Seeder
             'medications.audit.view', 'medications.reports.export',
             'incidents.viewAny', 'incidents.create', 'incidents.update', 'incidents.approve',
             'incidents.reopen', 'incidents.followups.manage',
+            'incidents.owner.assign', 'incidents.owner.hold', 'incidents.owner.request',
             'respite.viewAny', 'respite.create', 'respite.update', 'respite.bookings.manage',
             'respite.stays.manage', 'respite.resources.manage', 'respite.procedures.manage',
             'respite.procedures.run', 'respite.tasks.view', 'respite.tasks.manage', 'respite.tasks.approve',
@@ -821,6 +846,8 @@ class RbacSeeder extends Seeder
 
         // Support Worker
         $syncPermissions($supportWorker, [
+            // Create-only reporting of restraints and workplace injuries (MASTER for Stephan, 30 Oct).
+            'restraints.report', 'injuries.report',
             'clients.viewAssigned', 'medications.view', 'timeline.create',
             'progress_notes.viewAny', 'progress_notes.create',
             'shifts.viewAssigned', 'shifts.tasks.updateSelf', 'shifts.tasks.createSelf',
@@ -940,6 +967,11 @@ class RbacSeeder extends Seeder
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
             'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign',
+            // Raise a safeguarding concern (create only; MASTER for Stephan, 30 Oct).
+            'safeguarding.create',
+            // Report incidents (Stephan, 30 Oct): read the clients at their sites, report from /incidents/report.
+            // No incident register. Grant migration: 2026_10_30_110000_grant_team_lead_incident_reporting.
+            'incidents.create', 'clients.viewAny',
             'healthSafety.events.close', 'healthSafety.closureExceptions.request',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.schedule',
@@ -981,7 +1013,10 @@ class RbacSeeder extends Seeder
             'calendar.view', 'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign', 'hazards.close',
             'healthSafety.viewAllSites', 'healthSafety.events.close', 'healthSafety.events.closeAny',
             'healthSafety.closureExceptions.request',
-            'incidents.create',
+            // Stephan 25 Oct 2026: H&S officers read incidents (Site and privacy rules still apply).
+            'incidents.create', 'incidents.viewAny',
+            // Raise a safeguarding concern (create only; MASTER for Stephan, 30 Oct).
+            'safeguarding.create',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.manage_templates',
             'vendors.view', 'credentials.view', 'reports.sites.view',
@@ -1103,6 +1138,11 @@ class RbacSeeder extends Seeder
             Permission::firstOrCreate(['key' => $definition['key']], ['description' => $definition['description'], 'group' => 'service_agreements', 'module' => 'Operations']);
         }
         foreach (\App\Domain\Referrals\Services\ReferralServiceAgreements::ROLE_GRANTS as $roleName => $keys) {
+            Role::where('name', $roleName)->first()?->permissions()
+                ->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id')->all());
+        }
+        // Finance reads agreements (Stephan, 23 Oct 2026). Mirrors 2026_10_23_090000_grant_finance_service_agreement_view.
+        foreach (\App\Domain\Referrals\Services\ReferralServiceAgreements::READ_ONLY_ROLE_GRANTS as $roleName => $keys) {
             Role::where('name', $roleName)->first()?->permissions()
                 ->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id')->all());
         }

@@ -70,7 +70,11 @@ function OverrideConfirmationBody({
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
-                className="frontline-dialog flex max-h-[88dvh] min-w-0 flex-col overflow-hidden p-0 sm:max-w-md"
+                className="frontline-dialog flex max-h-[88dvh] min-w-0 flex-col overflow-hidden p-0"
+                style={{
+                    maxWidth: 'min(92vw, 480px)',
+                    width: 'min(92vw, 480px)',
+                }}
                 showCloseButton={!processing}
                 onEscapeKeyDown={(event) =>
                     processing && event.preventDefault()
@@ -82,7 +86,7 @@ function OverrideConfirmationBody({
                 <DialogHeader className="shrink-0 border-b p-5 pr-12 text-left">
                     <DialogTitle className="flex items-center gap-2">
                         <ShieldCheck className="size-5 shrink-0 text-status-warning" />
-                        Override Eligibility Warnings
+                        Override eligibility warnings?
                     </DialogTitle>
                     <DialogDescription>
                         {staffName
@@ -93,14 +97,14 @@ function OverrideConfirmationBody({
 
                 <div className="min-h-0 space-y-3 overflow-y-auto p-5 [overflow-wrap:anywhere]">
                     {/* Warning list */}
-                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30">
+                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3">
                         <ul className="space-y-1.5">
                             {warnings.map((w, i) => (
                                 <li
                                     key={i}
-                                    className="flex items-start gap-2 text-sm text-status-warning dark:text-status-warning"
+                                    className="flex items-start gap-2 text-sm text-status-warning"
                                 >
-                                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-warning dark:text-status-warning" />
+                                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-warning" />
                                     <span>{w.message}</span>
                                 </li>
                             ))}

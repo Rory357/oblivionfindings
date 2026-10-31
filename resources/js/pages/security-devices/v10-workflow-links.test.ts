@@ -11,12 +11,24 @@ describe('Security & Devices canonical workflow links', () => {
         const dashboard = source(
             'resources/js/pages/security-devices/dashboard.tsx',
         );
+        // The dashboard's domain records are built by the shared estate
+        // records module, which owns the canonical domain destinations.
+        const estateRecords = source(
+            'resources/js/components/security-devices/estate-records.tsx',
+        );
 
-        expect(dashboard).toContain('securityDevicesDomainHref(');
-        expect(dashboard).not.toContain("tracking: '/tracking'");
-        expect(dashboard).not.toContain("iot_healthcare: '/healthcare'");
-        expect(dashboard).not.toContain("it_infrastructure: '/network-it'");
-        expect(dashboard).not.toContain("facilities: '/facilities-iot'");
+        expect(dashboard).toContain(
+            "from '@/components/security-devices/estate-records'",
+        );
+        expect(estateRecords).toContain(
+            'destination: securityDevicesDomainHref(row.domain)',
+        );
+        for (const file of [dashboard, estateRecords]) {
+            expect(file).not.toContain("tracking: '/tracking'");
+            expect(file).not.toContain("iot_healthcare: '/healthcare'");
+            expect(file).not.toContain("it_infrastructure: '/network-it'");
+            expect(file).not.toContain("facilities: '/facilities-iot'");
+        }
     });
 
     it('connects Site technology and IT ticket context to the canonical Site profile', () => {
@@ -25,8 +37,10 @@ describe('Security & Devices canonical workflow links', () => {
         );
         const ticket = source('resources/js/pages/it/tickets/show.tsx');
 
-        expect(siteTechnology).toContain('<SiteProfileDestination');
-        expect(siteTechnology).toContain('canView={can.view_site_profile}');
+        expect(siteTechnology).toContain('{can.view_site_profile ? (');
+        expect(siteTechnology).toContain("'?tab=technology'");
+        expect(siteTechnology).toContain('Open Site profile');
+        expect(siteTechnology).toContain('<SiteProfileAccessRequired');
         expect(ticket).toContain('href={ticket.site.href}');
         expect(ticket).toContain('v={ticket.site.name}');
     });
@@ -63,7 +77,13 @@ describe('Security & Devices canonical workflow links', () => {
             'resources/js/pages/security-devices/device-groups/auto-rule-builder.tsx',
         );
 
-        expect(discovery).toContain('href={path.site.href}');
+        // Collection paths keep their Site; the shared detail view links it
+        // only when the server sent the canonical Security & Devices Site URL.
+        expect(discovery).toContain('site: path.site,');
+        expect(discovery).toContain(
+            "site && site.href === '/security-devices/sites/' + site.id",
+        );
+        expect(discovery).toContain('<Link href={safeSiteHref(entry.site)!}>');
         expect(commandBatch).toContain('target.site.href');
         expect(groupShow).toContain(
             'href={`/security-devices/devices/${device.id}`}',
@@ -77,12 +97,20 @@ describe('Security & Devices canonical workflow links', () => {
         const discovery = source(
             'resources/js/pages/security-devices/discovery.tsx',
         );
+        const presenter = source(
+            'app/Domain/SecurityDevices/Presenters/DiscoveryOperationsPresenter.php',
+        );
 
-        expect(discovery).toContain('Collector-free configuration');
-        expect(discovery).toContain('workspace.summary.runs_truncated');
-        expect(discovery).toContain('workspace.summary.candidates_truncated');
-        expect(discovery).toContain('.unsupported_state,');
-        expect(discovery).toContain('workspace.limitations.unsupported_note');
+        // The coverage label now comes from the server so every reader uses
+        // the same wording.
+        expect(presenter).toContain(
+            "'path_label' => 'Collector-free monitor configuration'",
+        );
+        expect(discovery).toContain('title={w.direct_coverage.path_label}');
+        expect(discovery).toContain('w.summary.runs_truncated');
+        expect(discovery).toContain('w.summary.candidates_truncated');
+        expect(discovery).toContain('plain(w.limitations.unsupported_state)');
+        expect(discovery).toContain('w.limitations.unsupported_note');
         expect(discovery).not.toContain('Not assessed');
         expect(discovery).not.toContain('result drill-down');
     });
@@ -93,7 +121,10 @@ describe('Security & Devices canonical workflow links', () => {
         );
 
         expect(dashboard).toContain(
-            'Current operational queues from the latest available',
+            'Counts and queues from the existing device, monitoring and work records.',
+        );
+        expect(dashboard).toContain(
+            'These are stored changes, not a live feed.',
         );
         expect(dashboard).not.toContain('Live operational queues');
     });
@@ -143,16 +174,22 @@ describe('Security & Devices canonical workflow links', () => {
         const dashboard = source(
             'resources/js/pages/security-devices/dashboard.tsx',
         );
+        const estateRecords = source(
+            'resources/js/components/security-devices/estate-records.tsx',
+        );
 
         expect(presenter).toContain('/it?tab=tickets&view=all_open');
         expect(presenter).not.toContain('/it?view=open');
         expect(presenter).toContain("'restriction_reason'");
-        expect(dashboard).toContain('item.restriction_reason');
-        expect(dashboard).toContain('can.view_devices');
-        expect(dashboard).toContain('can.view_events');
-        expect(dashboard).toContain('can.view_maintenance');
-        expect(dashboard).toContain(
-            'Device inventory access is required to open Site',
+        expect(estateRecords).toContain('row.restriction_reason ||');
+        expect(estateRecords).toContain(
+            'destination: allowed ? row.href : null',
+        );
+        expect(dashboard).toContain('data.can.view_devices');
+        expect(dashboard).toContain('data.can.view_events');
+        expect(dashboard).toContain('data.can.view_maintenance');
+        expect(estateRecords).toContain(
+            'Device access is required to open this Site.',
         );
     });
 
@@ -173,6 +210,10 @@ describe('Security & Devices canonical workflow links', () => {
         const deviceProfile = source(
             'resources/js/pages/security-devices/devices/show.tsx',
         );
+        // History rows are rendered by the shared device profile records.
+        const profileRecords = source(
+            'resources/js/pages/security-devices/devices/device-profile-records.tsx',
+        );
 
         expect(deviceProfile).toContain(
             'Reason for removing this relationship',
@@ -181,11 +222,12 @@ describe('Security & Devices canonical workflow links', () => {
         expect(deviceProfile).toContain(
             'the relationship is retained as history',
         );
-        expect(deviceProfile).toContain('Relationship history (');
-        expect(deviceProfile).toContain('relationshipHistory.parents.map');
-        expect(deviceProfile).toContain('relationshipHistory.children.map');
-        expect(deviceProfile).toContain('relationship.unlink_reason');
-        expect(deviceProfile).toContain('this device');
+        expect(deviceProfile).toContain('rows={relationshipHistory}');
+        expect(profileRecords).toContain('title="Relationship history"');
+        expect(profileRecords).toContain('...rows.parents.map(');
+        expect(profileRecords).toContain('...rows.children.map(');
+        expect(profileRecords).toContain("unlink_reason: 'Removal reason'");
+        expect(profileRecords).toContain('this device');
     });
 
     it('renders nested command evidence in plain language instead of raw JSON', () => {
