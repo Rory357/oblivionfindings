@@ -1,18 +1,14 @@
-import { formatDateTime } from '@/lib/datetime';
+import { Log, Ring, Surface } from '@/components/signature/blocks';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { formatDate, formatDateTime, formatTime } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
-import {
-    Download,
-    FileText,
-    ListChecks,
-    MessageSquareText,
-    RadioTower,
-    StickyNote,
-} from 'lucide-react';
+import { Download } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export type LinkedOperationalEvidenceData = {
     label: string;
     read_only: boolean;
+    access?: 'readable' | 'restricted';
     source: {
         id: number;
         reference: string | null;
@@ -28,7 +24,7 @@ export type LinkedOperationalEvidenceData = {
         closed_at?: string | null;
         created_at: string | null;
         updated_at: string | null;
-    };
+    } | null;
     notes: Array<{
         id: number;
         type: string;
@@ -85,153 +81,150 @@ export type LinkedOperationalEvidenceData = {
     }>;
 };
 
+/**
+ * The linked Control Room record, read-only (drawing pg-hsn-2c: "Control room
+ * notes" as a log, "Control room tasks" as rows), with its evidence packs and
+ * communication summaries. `showSource={false}` drops the source facts surface
+ * on pages that already list the alert among their linked records.
+ */
 export function LinkedOperationalEvidence({
     evidence,
+    showSource = true,
 }: {
     evidence: LinkedOperationalEvidenceData | null;
+    showSource?: boolean;
 }) {
     if (!evidence) return null;
 
+    if (evidence.access === 'restricted' || !evidence.source) {
+        return (
+            <Surface
+                title="From the Control room"
+                aria-label="Linked Control Room evidence"
+            >
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>
+                        This incident has a linked Control Room record. Your
+                        access does not include its notes or files.
+                    </span>
+                </p>
+            </Surface>
+        );
+    }
+
+    const source = evidence.source;
     const empty =
         evidence.notes.length === 0 &&
         evidence.tasks.length === 0 &&
         evidence.evidence_packs.length === 0 &&
         evidence.communications.length === 0;
-    const headingId = `linked-control-room-evidence-${evidence.source.id}`;
 
     return (
-        <section
-            aria-labelledby={headingId}
-            className="rounded-xl border border-border bg-card/70 p-4"
-        >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-2.5">
-                    <RadioTower className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <div className="min-w-0">
-                        <h2
-                            id={headingId}
-                            className="text-sm font-bold text-foreground"
-                        >
-                            {evidence.label}
-                        </h2>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            Canonical Control Room records remain linked here;
-                            they are not copied into the incident.
-                        </p>
+        <div className="grid min-w-0 gap-5">
+            {showSource ? (
+                <Surface
+                    title={evidence.label}
+                    sub="Notes, response tasks and files from the linked Control Room record."
+                >
+                    <div className="px-[18px] pt-2.5">
+                        <StatusBadge variant="neutral">
+                            Read-only operational record
+                        </StatusBadge>
                     </div>
-                </div>
-                <span className="rounded-full bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                    Read-only operational record
-                </span>
-            </div>
-
-            <dl className="mt-4 grid gap-2 rounded-lg border border-border bg-background/70 p-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-                <SourceValue label="Control Room alert">
-                    {evidence.source.href ? (
-                        <Link
-                            href={evidence.source.href}
-                            className="font-semibold text-primary hover:underline"
-                        >
-                            {evidence.source.reference ??
-                                'Reference unavailable'}
-                        </Link>
-                    ) : (
-                        (evidence.source.reference ?? 'Reference unavailable')
-                    )}
-                </SourceValue>
-                <SourceValue label="Site">
-                    {evidence.source.site?.name ?? 'No site recorded'}
-                </SourceValue>
-                <SourceValue label="Client">
-                    {evidence.source.client?.name ?? 'No client recorded'}
-                </SourceValue>
-                <SourceValue label="Alert type">
-                    {titleCase(evidence.source.alert_type)}
-                </SourceValue>
-                <SourceValue label="Alert state">
-                    {titleCase(evidence.source.status)} ·{' '}
-                    {titleCase(evidence.source.severity)}
-                </SourceValue>
-                <SourceValue label="Alert raised">
-                    {formatOptionalDate(evidence.source.triggered_at)}
-                </SourceValue>
-                <SourceValue label="Source created">
-                    {formatOptionalDate(evidence.source.created_at)}
-                </SourceValue>
-                <SourceValue label="Source updated">
-                    {formatOptionalDate(evidence.source.updated_at)}
-                </SourceValue>
-            </dl>
+                    <dl className="sg-kv">
+                        <dt>Control Room alert</dt>
+                        <dd>
+                            {source.href ? (
+                                <Link
+                                    href={source.href}
+                                    className="frontline-focus rounded-sm font-semibold text-primary underline-offset-4 hover:underline"
+                                >
+                                    {source.reference ?? 'Reference unavailable'}
+                                </Link>
+                            ) : (
+                                (source.reference ?? 'Reference unavailable')
+                            )}
+                        </dd>
+                        <dt>Site</dt>
+                        <dd>{source.site?.name ?? 'No site recorded'}</dd>
+                        <dt>Client</dt>
+                        <dd>{source.client?.name ?? 'No client recorded'}</dd>
+                        <dt>Alert type</dt>
+                        <dd>{titleCase(source.alert_type)}</dd>
+                        <dt>Alert state</dt>
+                        <dd>
+                            {titleCase(source.status)} ·{' '}
+                            {titleCase(source.severity)}
+                        </dd>
+                        <dt>Alert raised</dt>
+                        <dd>{formatOptionalDate(source.triggered_at)}</dd>
+                        <dt>Source created</dt>
+                        <dd>{formatOptionalDate(source.created_at)}</dd>
+                        <dt>Source updated</dt>
+                        <dd>{formatOptionalDate(source.updated_at)}</dd>
+                    </dl>
+                </Surface>
+            ) : null}
 
             {empty ? (
-                <p className="mt-4 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-                    No operator notes, operational tasks, evidence packs, or
-                    communications were recorded for this alert.
-                </p>
-            ) : (
-                <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                    {evidence.notes.length ? (
-                        <EvidenceGroup
-                            icon={StickyNote}
-                            title="Operational notes"
-                        >
-                            {evidence.notes.map((note) => (
-                                <article
-                                    key={note.id}
-                                    className="border-b border-border py-2.5 last:border-0"
-                                >
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                                            {note.purpose_label}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground">
-                                            {note.author?.name ??
-                                                'Unknown operator'}
-                                            {note.created_at
-                                                ? ` · ${formatDateTime(note.created_at)}`
-                                                : ''}
-                                        </span>
-                                    </div>
-                                    <p className="mt-2 text-sm whitespace-pre-wrap text-foreground">
-                                        {note.content}
-                                    </p>
-                                </article>
-                            ))}
-                        </EvidenceGroup>
-                    ) : null}
+                <Surface title="From the Control room">
+                    <p className="sg-quiet">
+                        <Ring tone="none" />
+                        <span>
+                            No operator notes, operational tasks, evidence
+                            packs, or communications were recorded for this
+                            alert.
+                        </span>
+                    </p>
+                </Surface>
+            ) : null}
 
-                    {evidence.tasks.length ? (
-                        <EvidenceGroup icon={ListChecks} title="Source tasks">
-                            {evidence.tasks.map((task) => (
-                                <article
-                                    key={task.id}
-                                    className="border-b border-border py-2.5 last:border-0"
-                                >
-                                    <div className="flex flex-wrap items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-semibold text-foreground">
-                                                {task.title}
-                                            </p>
-                                            {task.description ? (
-                                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                                    {task.description}
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                                            {titleCase(task.status)} ·{' '}
-                                            {titleCase(task.priority)}
+            {evidence.notes.length ? (
+                <Log
+                    title="Control room notes"
+                    limit={evidence.notes.length}
+                    items={evidence.notes.map((note) => ({
+                        time: note.created_at ? shortStamp(note.created_at) : '',
+                        title: note.purpose_label,
+                        sub: (
+                            <>
+                                <span>
+                                    {note.author?.name ?? 'Unknown operator'}
+                                </span>
+                                {' · '}
+                                <span className="whitespace-pre-wrap">
+                                    {note.content}
+                                </span>
+                            </>
+                        ),
+                    }))}
+                />
+            ) : null}
+
+            {evidence.tasks.length ? (
+                <Surface title="Control room tasks">
+                    <ul className="sg-list mt-2">
+                        {evidence.tasks.map((task) => (
+                            <li key={task.id} className="sg-li">
+                                <span className="sg-li-t">
+                                    <b>
+                                        {task.title}
+                                    </b>
+                                    {task.description ? (
+                                        <span className="text-caption block">
+                                            {task.description}
                                         </span>
-                                    </div>
+                                    ) : null}
                                     {task.transfer.state === 'transferred' ? (
-                                        <p className="mt-2 text-xs font-semibold text-primary">
+                                        <span className="text-caption block font-semibold text-primary">
                                             Transferred to{' '}
                                             {task.transfer
                                                 .corrective_action_reference ??
                                                 'an H&S corrective action'}
-                                        </p>
+                                        </span>
                                     ) : (
-                                        <p className="mt-2 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+                                        <span className="text-caption flex flex-wrap items-center gap-x-1">
                                             <span>
                                                 {task.owner?.name ??
                                                     'Unassigned'}
@@ -242,171 +235,121 @@ export function LinkedOperationalEvidence({
                                                     dateTime={task.due_at}
                                                     className={
                                                         task.overdue
-                                                            ? 'font-semibold text-status-critical'
+                                                            ? 'font-semibold text-status-critical-foreground'
                                                             : undefined
                                                     }
                                                 >
-                                                    {formatDateTime(
-                                                        task.due_at,
-                                                    )}
+                                                    {formatDateTime(task.due_at)}
                                                     {task.overdue
                                                         ? ' · overdue'
                                                         : ''}
                                                 </time>
                                             ) : null}
-                                        </p>
+                                        </span>
                                     )}
-                                </article>
-                            ))}
-                        </EvidenceGroup>
-                    ) : null}
+                                </span>
+                                <StatusBadge variant="neutral">
+                                    {titleCase(task.status)} ·{' '}
+                                    {titleCase(task.priority)}
+                                </StatusBadge>
+                            </li>
+                        ))}
+                    </ul>
+                </Surface>
+            ) : null}
 
-                    {evidence.evidence_packs.length ? (
-                        <EvidenceGroup icon={FileText} title="Evidence packs">
-                            {evidence.evidence_packs.map((pack) => (
-                                <article
-                                    key={pack.id}
-                                    className="border-b border-border py-2.5 last:border-0"
-                                >
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <p className="text-sm font-semibold text-foreground">
-                                            {pack.title}
-                                        </p>
-                                        <span className="text-xs text-muted-foreground">
-                                            {titleCase(pack.status)} ·{' '}
-                                            {pack.item_count}{' '}
-                                            {pack.item_count === 1
-                                                ? 'item'
-                                                : 'items'}
+            {evidence.evidence_packs.map((pack) => (
+                <Surface
+                    key={pack.id}
+                    title={pack.title}
+                    sub={
+                        <>
+                            Evidence pack · {titleCase(pack.status)} ·{' '}
+                            {pack.item_count}{' '}
+                            {pack.item_count === 1 ? 'item' : 'items'}
+                        </>
+                    }
+                >
+                    <ul className="sg-list mt-2">
+                        {pack.items.map((item) => (
+                            <li key={item.id} className="sg-li">
+                                <span className="sg-li-t">
+                                    <b>
+                                        {item.title}
+                                    </b>
+                                    {item.description ? (
+                                        <span className="text-caption block">
+                                            {item.description}
                                         </span>
-                                    </div>
-                                    <div className="mt-2 flex flex-col gap-2">
-                                        {pack.items.map((item) => (
-                                            <div
-                                                key={item.id}
-                                                className="rounded-md bg-muted/40 p-2.5"
-                                            >
-                                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-foreground">
-                                                            {item.title}
-                                                        </p>
-                                                        {item.description ? (
-                                                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                                                {
-                                                                    item.description
-                                                                }
-                                                            </p>
-                                                        ) : null}
-                                                        <p className="mt-1 text-xs text-muted-foreground">
-                                                            {item.captured_by
-                                                                ?.name ??
-                                                                'Capture owner unavailable'}
-                                                            {item.captured_at
-                                                                ? ` · ${formatDateTime(item.captured_at)}`
-                                                                : ''}
-                                                            {item.file_size
-                                                                ? ` · ${formatSize(item.file_size)}`
-                                                                : ''}
-                                                        </p>
-                                                    </div>
-                                                    {item.download_url ? (
-                                                        <a
-                                                            href={
-                                                                item.download_url
-                                                            }
-                                                            aria-label={`Download ${item.title}`}
-                                                            className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-primary hover:bg-muted"
-                                                        >
-                                                            <Download className="h-3.5 w-3.5" />
-                                                            Download
-                                                        </a>
-                                                    ) : null}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </article>
-                            ))}
-                        </EvidenceGroup>
-                    ) : null}
-
-                    {evidence.communications.length ? (
-                        <EvidenceGroup
-                            icon={MessageSquareText}
-                            title="Communication summaries"
-                        >
-                            {evidence.communications.map((communication) => (
-                                <article
-                                    key={communication.id}
-                                    className="border-b border-border py-2.5 last:border-0"
-                                >
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <p className="text-sm font-semibold text-foreground">
-                                            {communication.subject ??
-                                                communication.purpose ??
-                                                'Operational update'}
-                                        </p>
-                                        <span className="text-xs text-muted-foreground">
-                                            {titleCase(communication.direction)}{' '}
-                                            · {titleCase(communication.channel)}{' '}
-                                            · {titleCase(communication.status)}
-                                        </span>
-                                    </div>
-                                    {communication.content ? (
-                                        <p className="mt-1 text-sm whitespace-pre-wrap text-foreground">
-                                            {communication.content}
-                                        </p>
                                     ) : null}
-                                    <p className="mt-1 text-xs text-muted-foreground">
+                                    <span className="text-caption block">
+                                        {item.captured_by?.name ??
+                                            'Capture owner unavailable'}
+                                        {item.captured_at
+                                            ? ` · ${formatDateTime(item.captured_at)}`
+                                            : ''}
+                                        {item.file_size
+                                            ? ` · ${formatSize(item.file_size)}`
+                                            : ''}
+                                    </span>
+                                </span>
+                                {item.download_url ? (
+                                    <a
+                                        href={item.download_url}
+                                        aria-label={`Download ${item.title}`}
+                                        className="frontline-hit frontline-focus inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-muted"
+                                    >
+                                        <Download className="size-3.5" />
+                                        Download
+                                    </a>
+                                ) : null}
+                            </li>
+                        ))}
+                    </ul>
+                </Surface>
+            ))}
+
+            {evidence.communications.length ? (
+                <Surface title="Communication summaries">
+                    <ul className="sg-list mt-2">
+                        {evidence.communications.map((communication) => (
+                            <li key={communication.id} className="sg-li">
+                                <span className="sg-li-t">
+                                    <b>
+                                        {communication.subject ??
+                                            communication.purpose ??
+                                            'Operational update'}
+                                    </b>
+                                    {communication.content ? (
+                                        <span className="block text-sm whitespace-pre-wrap text-foreground">
+                                            {communication.content}
+                                        </span>
+                                    ) : null}
+                                    <span className="text-caption block">
                                         {formatOptionalDate(
                                             communication.sent_at ??
                                                 communication.created_at,
                                         )}
-                                    </p>
-                                </article>
-                            ))}
-                        </EvidenceGroup>
-                    ) : null}
-                </div>
-            )}
-        </section>
-    );
-}
-
-function SourceValue({
-    label,
-    children,
-}: {
-    label: string;
-    children: ReactNode;
-}) {
-    return (
-        <div>
-            <dt className="font-semibold text-muted-foreground">{label}</dt>
-            <dd className="mt-0.5 text-foreground">{children}</dd>
+                                    </span>
+                                </span>
+                                <span className="text-caption shrink-0">
+                                    {titleCase(communication.direction)} ·{' '}
+                                    {titleCase(communication.channel)} ·{' '}
+                                    {titleCase(communication.status)}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </Surface>
+            ) : null}
         </div>
     );
 }
 
-function EvidenceGroup({
-    icon: Icon,
-    title,
-    children,
-}: {
-    icon: typeof StickyNote;
-    title: string;
-    children: ReactNode;
-}) {
-    return (
-        <section className="rounded-lg border border-border bg-background/60 p-3">
-            <h3 className="flex items-center gap-2 text-sm font-bold text-foreground">
-                <Icon className="h-4 w-4 text-primary" />
-                {title}
-            </h3>
-            <div className="mt-1">{children}</div>
-        </section>
-    );
+/** "Mon 7:55 pm" — short enough for the log's time column. */
+function shortStamp(value: string): ReactNode {
+    const weekday = formatDate(value).split(' ')[0];
+    return `${weekday} ${formatTime(value)}`;
 }
 
 function titleCase(value: string): string {

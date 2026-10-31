@@ -98,11 +98,15 @@ class CheckLoneWorkerOverdueJobIntegrityTest extends TestCase
     {
         $worker = User::factory()->create([
             'approved_at' => now(),
+            'role' => 'support_worker',
         ]);
         HrEmployeeProfile::factory()->create([
             'user_id' => $worker->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subYear()->toDateString(),
+            'end_date' => null,
         ]);
 
         return $worker;

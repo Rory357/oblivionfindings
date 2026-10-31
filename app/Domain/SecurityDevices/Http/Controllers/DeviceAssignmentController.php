@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Services\ConsentValidationService;
 use Illuminate\Http\Request;
@@ -45,12 +46,12 @@ class DeviceAssignmentController extends Controller
         );
 
         try {
-            $this->enforceConsentForClientTracker(
+            $consentId = $this->enforceConsentForClientTracker(
                 $device,
                 $validated['assignable_type'],
                 (int) $validated['assignable_id'],
                 isset($validated['consent_id']) ? (int) $validated['consent_id'] : null,
-            );
+            ) ?? (isset($validated['consent_id']) ? (int) $validated['consent_id'] : null);
 
             $this->service->assign(
                 device: $device,
@@ -59,7 +60,7 @@ class DeviceAssignmentController extends Controller
                 assignedByUserId: $user->id,
                 assignmentType: AssignmentType::tryFrom($validated['assignment_type'] ?? 'permanent') ?? AssignmentType::Permanent,
                 expectedReturnAt: isset($validated['expected_return_at']) ? new \DateTime($validated['expected_return_at']) : null,
-                consentId: $validated['consent_id'] ?? null,
+                consentId: $consentId,
                 notes: $validated['notes'] ?? null,
                 authorizeLockedDevice: function (Device $lockedDevice) use ($user, $validated): void {
                     $this->access->assertCanViewDevice($user, $lockedDevice);
@@ -89,21 +90,35 @@ class DeviceAssignmentController extends Controller
      * Enforced at controller level (not in the model) to avoid breaking unit
      * tests that build fixtures via DeviceAssignment::create() directly.
      */
+    /**
+     * A tracking device needs the client's active location-tracking consent.
+     * When none is chosen, the latest active one is used (the same rule as
+     * Queclink tracker pairing); the device page doesn't offer a consent
+     * picker, so without this a client tracker could never be assigned.
+     *
+     * @return int|null the consent the assignment records, or null when none is needed
+     */
     private function enforceConsentForClientTracker(
         Device $device,
         string $assignableType,
         int $assignableId,
         ?int $consentId,
-    ): void {
+    ): ?int {
         if ($assignableType !== DeviceAssignment::TARGET_CLIENT) {
-            return;
+            return null;
         }
 
         if ($device->domain !== 'tracking') {
-            return;
+            return null;
         }
 
         if (! $consentId) {
+            $client = Client::query()->find($assignableId);
+            $latest = $client ? ConsentValidationService::latestValidTrackingConsentForClient($client) : null;
+            if ($latest) {
+                return (int) $latest->id;
+            }
+
             throw new \InvalidArgumentException(
                 'Assigning a tracking device to a client requires a valid consent. '
                 .'Request consent via the family portal or record it in person before assigning.'
@@ -122,6 +137,8 @@ class DeviceAssignmentController extends Controller
                 .'(missing, withdrawn, superseded, expired, or recorded for another purpose).'
             );
         }
+
+        return (int) $consent->id;
     }
 
     /**

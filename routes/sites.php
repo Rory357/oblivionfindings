@@ -127,6 +127,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
 
         // Hazards
+        // Export of the Site's hazards (Codex). The Site group's sites.viewAny check is kept: Codex also
+        // removed it here and on the list so hazards.view alone would open them, which is held for Stephan.
+        Route::get('/hazards/export', [SiteHazardController::class, 'exportSite'])
+            ->name('sites.hazards.export')
+            ->middleware('permission:hazards.view');
         Route::get('/hazards', [SiteHazardController::class, 'index'])
             ->name('sites.hazards.index')
             ->middleware('permission:hazards.view');

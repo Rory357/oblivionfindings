@@ -53,7 +53,12 @@ export function ReopenForCorrectionDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 480px)',
+                    width: 'min(92vw, 480px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <RefreshCcw className="h-5 w-5 text-status-warning" />

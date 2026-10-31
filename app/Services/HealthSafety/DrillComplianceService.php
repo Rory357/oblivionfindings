@@ -142,7 +142,7 @@ class DrillComplianceService
 
         $openFindings = EmergencyDrill::query()
             ->where('site_id', $siteId)
-            ->withCount(['findings as open_findings_count' => fn ($q) => $q->whereNotIn('status', ['resolved', 'closed'])])
+            ->withCount(['findings as open_findings_count' => fn ($q) => $q->whereNotIn('status', ['resolved', 'closed', 'accepted'])])
             ->get()
             ->sum('open_findings_count');
 

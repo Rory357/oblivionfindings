@@ -34,12 +34,29 @@ final class MonitoringPolicyRules
         'collector_health' => MonitorKind::Collector,
     ];
 
+    /** @var list<string> */
+    public const array ALLOWED_METRIC_KEYS = [
+        'value',
+        'latency_ms',
+        'in_utilization_pct',
+        'out_utilization_pct',
+        'in_bps',
+        'out_bps',
+        'errors',
+        'discards',
+    ];
+
     /** @param array<string, mixed> $attributes
      * @return array<string, mixed>
      */
     public function profile(array $attributes): array
     {
-        $values = Validator::make($attributes, [
+        $values = Validator::make([
+            'threshold_direction' => 'above',
+            'warning_rising_threshold' => null,
+            'warning_falling_threshold' => null,
+            ...$attributes,
+        ], [
             'name' => ['required', 'string', 'min:3', 'max:128'],
             'description' => ['nullable', 'string', 'max:2000'],
             'interval_seconds' => ['required', 'integer', 'between:30,86400'],
@@ -48,6 +65,9 @@ final class MonitoringPolicyRules
             'recovery_confirmations' => ['required', 'integer', 'between:1,20'],
             'recovery_duration_seconds' => ['required', 'integer', 'between:0,86400'],
             'stale_after_seconds' => ['required', 'integer', 'between:30,604800'],
+            'threshold_direction' => ['required', Rule::in(['above', 'below'])],
+            'warning_rising_threshold' => ['nullable', 'numeric'],
+            'warning_falling_threshold' => ['nullable', 'numeric'],
             'rising_threshold' => ['nullable', 'numeric'],
             'falling_threshold' => ['nullable', 'numeric'],
             'baseline_window_seconds' => ['required', 'integer', 'between:60,604800'],
@@ -63,13 +83,15 @@ final class MonitoringPolicyRules
         if ((int) $values['stale_after_seconds'] < (int) $values['interval_seconds']) {
             $this->fail('stale_after_seconds', 'Stale time must be at least the monitoring interval.');
         }
-        if ($values['falling_threshold'] !== null && $values['rising_threshold'] === null) {
-            $this->fail('falling_threshold', 'A falling threshold requires a rising threshold.');
-        }
-        if ($values['falling_threshold'] !== null
-            && (float) $values['falling_threshold'] > (float) $values['rising_threshold']) {
-            $this->fail('falling_threshold', 'The falling threshold cannot exceed the rising threshold.');
-        }
+        $this->validateThresholdBand(
+            direction: (string) $values['threshold_direction'],
+            warningRising: $values['warning_rising_threshold'],
+            warningFalling: $values['warning_falling_threshold'],
+            criticalRising: $values['rising_threshold'],
+            criticalFalling: $values['falling_threshold'],
+            criticalRisingField: 'rising_threshold',
+            criticalFallingField: 'falling_threshold',
+        );
         if ($values['baseline_deviation_multiplier'] !== null
             && (int) $values['baseline_window_seconds'] < (int) $values['interval_seconds'] * 2) {
             $this->fail('baseline_window_seconds', 'A baseline window must cover at least two monitoring intervals.');
@@ -83,6 +105,182 @@ final class MonitoringPolicyRules
         }
 
         return $values;
+    }
+
+    /** @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    public function thresholdRule(array $attributes): array
+    {
+        $domains = array_map(fn (DeviceDomain $domain): string => $domain->value, DeviceDomain::cases());
+        $monitorKinds = array_map(fn (MonitorKind $kind): string => $kind->value, MonitorKind::cases());
+
+        $values = Validator::make([
+            'site_id' => null,
+            'device_id' => null,
+            'monitor_id' => null,
+            'device_domain' => null,
+            'device_category' => null,
+            'monitor_kind' => null,
+            'metric_key' => null,
+            'threshold_direction' => 'above',
+            'warning_rising_threshold' => null,
+            'warning_falling_threshold' => null,
+            'critical_rising_threshold' => null,
+            'critical_falling_threshold' => null,
+            ...$attributes,
+        ], [
+            'name' => ['required', 'string', 'min:3', 'max:128'],
+            'scope_kind' => ['required', Rule::in(['application', 'site', 'device', 'monitor'])],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'device_id' => ['nullable', 'integer', 'exists:devices,id'],
+            'monitor_id' => ['nullable', 'integer', 'exists:monitors,id'],
+            'device_domain' => ['nullable', Rule::in($domains)],
+            'device_category' => ['nullable', 'string', 'max:64'],
+            'monitor_kind' => ['nullable', Rule::in($monitorKinds)],
+            'metric_key' => ['nullable', Rule::in(self::ALLOWED_METRIC_KEYS)],
+            'threshold_direction' => ['required', Rule::in(['above', 'below'])],
+            'warning_rising_threshold' => ['nullable', 'numeric'],
+            'warning_falling_threshold' => ['nullable', 'numeric'],
+            'critical_rising_threshold' => ['nullable', 'numeric'],
+            'critical_falling_threshold' => ['nullable', 'numeric'],
+        ])->validate();
+
+        $this->assertScopedTargetShape(
+            scope: (string) $values['scope_kind'],
+            siteId: $values['site_id'],
+            deviceId: $values['device_id'],
+            monitorId: $values['monitor_id'],
+        );
+
+        $domain = isset($values['device_domain']) && $values['device_domain'] !== ''
+            ? (string) $values['device_domain']
+            : null;
+        $category = isset($values['device_category']) && trim((string) $values['device_category']) !== ''
+            ? strtolower(trim((string) $values['device_category']))
+            : null;
+        if ($category !== null && $domain === null) {
+            $this->fail('device_category', 'Choose a device domain before filtering by device category.');
+        }
+        if ($category !== null && $domain !== null && ! array_key_exists($category, DeviceTaxonomy::categoriesFor($domain))) {
+            $this->fail('device_category', 'The device category does not belong to the selected domain.');
+        }
+
+        if ($values['warning_rising_threshold'] === null && $values['critical_rising_threshold'] === null) {
+            $this->fail('critical_rising_threshold', 'Set at least a warning or critical threshold.');
+        }
+
+        $this->validateThresholdBand(
+            direction: (string) $values['threshold_direction'],
+            warningRising: $values['warning_rising_threshold'],
+            warningFalling: $values['warning_falling_threshold'],
+            criticalRising: $values['critical_rising_threshold'],
+            criticalFalling: $values['critical_falling_threshold'],
+            criticalRisingField: 'critical_rising_threshold',
+            criticalFallingField: 'critical_falling_threshold',
+        );
+
+        return [
+            'name' => trim((string) $values['name']),
+            'scope_kind' => (string) $values['scope_kind'],
+            'site_id' => isset($values['site_id']) ? (int) $values['site_id'] : null,
+            'device_id' => isset($values['device_id']) ? (int) $values['device_id'] : null,
+            'monitor_id' => isset($values['monitor_id']) ? (int) $values['monitor_id'] : null,
+            'device_domain' => $domain,
+            'device_category' => $category,
+            'monitor_kind' => isset($values['monitor_kind']) && $values['monitor_kind'] !== '' ? (string) $values['monitor_kind'] : null,
+            'metric_key' => isset($values['metric_key']) && $values['metric_key'] !== '' ? (string) $values['metric_key'] : null,
+            'threshold_direction' => (string) $values['threshold_direction'],
+            'warning_rising_threshold' => $values['warning_rising_threshold'],
+            'warning_falling_threshold' => $values['warning_falling_threshold'],
+            'critical_rising_threshold' => $values['critical_rising_threshold'],
+            'critical_falling_threshold' => $values['critical_falling_threshold'],
+        ];
+    }
+
+    /** @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    public function alertRoute(array $attributes): array
+    {
+        if (isset($attributes['device_domain'])
+            && $attributes['device_domain'] !== ''
+            && $attributes['device_domain'] !== DeviceDomain::ItInfrastructure->value) {
+            $this->fail(
+                'device_domain',
+                'Life-safety, security, and healthcare checks are locked to Control Room and cannot be rerouted or muted.',
+            );
+        }
+
+        $monitorKinds = array_map(fn (MonitorKind $kind): string => $kind->value, MonitorKind::cases());
+        $values = Validator::make([
+            'site_id' => null,
+            'device_id' => null,
+            'monitor_id' => null,
+            'device_category' => null,
+            'monitor_kind' => null,
+            'warning_notify_in_app' => true,
+            'warning_notify_email' => false,
+            'warning_open_it_ticket' => false,
+            'critical_notify_in_app' => true,
+            'critical_notify_email' => true,
+            'critical_open_it_ticket' => true,
+            'critical_escalate_control_room' => false,
+            'recipient_role' => null,
+            ...$attributes,
+        ], [
+            'name' => ['required', 'string', 'min:3', 'max:128'],
+            'scope_kind' => ['required', Rule::in(['application', 'site', 'device', 'monitor'])],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'device_id' => ['nullable', 'integer', 'exists:devices,id'],
+            'monitor_id' => ['nullable', 'integer', 'exists:monitors,id'],
+            'device_category' => ['nullable', 'string', 'max:64'],
+            'monitor_kind' => ['nullable', Rule::in($monitorKinds)],
+            'warning_notify_in_app' => ['required', 'boolean'],
+            'warning_notify_email' => ['required', 'boolean'],
+            'warning_open_it_ticket' => ['required', 'boolean'],
+            'critical_notify_in_app' => ['required', 'boolean'],
+            'critical_notify_email' => ['required', 'boolean'],
+            'critical_open_it_ticket' => ['required', 'boolean'],
+            'critical_escalate_control_room' => ['required', 'boolean'],
+            'recipient_role' => ['nullable', 'string', 'max:64', 'regex:/^[a-z0-9_-]+$/'],
+        ])->validate();
+
+        $this->assertScopedTargetShape(
+            scope: (string) $values['scope_kind'],
+            siteId: $values['site_id'],
+            deviceId: $values['device_id'],
+            monitorId: $values['monitor_id'],
+        );
+
+        $category = isset($values['device_category']) && trim((string) $values['device_category']) !== ''
+            ? strtolower(trim((string) $values['device_category']))
+            : null;
+        if ($category !== null
+            && ! array_key_exists($category, DeviceTaxonomy::categoriesFor(DeviceDomain::ItInfrastructure->value))) {
+            $this->fail('device_category', 'Alert routes only apply to IT infrastructure categories.');
+        }
+
+        return [
+            'name' => trim((string) $values['name']),
+            'scope_kind' => (string) $values['scope_kind'],
+            'site_id' => isset($values['site_id']) ? (int) $values['site_id'] : null,
+            'device_id' => isset($values['device_id']) ? (int) $values['device_id'] : null,
+            'monitor_id' => isset($values['monitor_id']) ? (int) $values['monitor_id'] : null,
+            'device_domain' => DeviceDomain::ItInfrastructure->value,
+            'device_category' => $category,
+            'monitor_kind' => isset($values['monitor_kind']) && $values['monitor_kind'] !== '' ? (string) $values['monitor_kind'] : null,
+            'warning_notify_in_app' => (bool) $values['warning_notify_in_app'],
+            'warning_notify_email' => (bool) $values['warning_notify_email'],
+            'warning_open_it_ticket' => (bool) $values['warning_open_it_ticket'],
+            'critical_notify_in_app' => (bool) $values['critical_notify_in_app'],
+            'critical_notify_email' => (bool) $values['critical_notify_email'],
+            'critical_open_it_ticket' => (bool) $values['critical_open_it_ticket'],
+            'critical_escalate_control_room' => (bool) $values['critical_escalate_control_room'],
+            'recipient_role' => isset($values['recipient_role']) && trim((string) $values['recipient_role']) !== ''
+                ? trim((string) $values['recipient_role'])
+                : null,
+        ];
     }
 
     /** @param array<string, mixed> $attributes
@@ -313,6 +511,67 @@ final class MonitoringPolicyRules
         }
 
         return $this->operationalReason($reason);
+    }
+
+    private function assertScopedTargetShape(
+        string $scope,
+        mixed $siteId,
+        mixed $deviceId,
+        mixed $monitorId,
+    ): void {
+        if ($scope === 'application' && ($siteId !== null || $deviceId !== null || $monitorId !== null)) {
+            $this->fail('scope_kind', 'Application-wide rules must not specify a Site, device, or monitor.');
+        }
+        if ($scope === 'site' && ($siteId === null || $deviceId !== null || $monitorId !== null)) {
+            $this->fail('site_id', 'Site rules require a Site and must not specify a device or monitor.');
+        }
+        if ($scope === 'device' && ($deviceId === null || $monitorId !== null)) {
+            $this->fail('device_id', 'Device rules require a device and must not specify a monitor.');
+        }
+        if ($scope === 'monitor' && $monitorId === null) {
+            $this->fail('monitor_id', 'Monitor rules require a monitor.');
+        }
+    }
+
+    private function validateThresholdBand(
+        string $direction,
+        mixed $warningRising,
+        mixed $warningFalling,
+        mixed $criticalRising,
+        mixed $criticalFalling,
+        string $criticalRisingField,
+        string $criticalFallingField,
+    ): void {
+        if ($warningFalling !== null && $warningRising === null) {
+            $this->fail('warning_falling_threshold', 'A warning recovery threshold requires a warning trigger threshold.');
+        }
+        if ($criticalFalling !== null && $criticalRising === null) {
+            $this->fail($criticalFallingField, 'A falling threshold requires a rising threshold.');
+        }
+
+        if ($direction === 'below') {
+            if ($warningFalling !== null && (float) $warningFalling < (float) $warningRising) {
+                $this->fail('warning_falling_threshold', 'When alerting below a threshold, the warning recovery threshold must be at least the warning trigger threshold.');
+            }
+            if ($criticalFalling !== null && (float) $criticalFalling < (float) $criticalRising) {
+                $this->fail($criticalFallingField, 'When alerting below a threshold, the recovery threshold must be at least the trigger threshold.');
+            }
+            if ($warningRising !== null && $criticalRising !== null && (float) $warningRising <= (float) $criticalRising) {
+                $this->fail('warning_rising_threshold', 'The warning threshold must be higher than the critical threshold when alerting on falling values.');
+            }
+
+            return;
+        }
+
+        if ($warningFalling !== null && (float) $warningFalling > (float) $warningRising) {
+            $this->fail('warning_falling_threshold', 'The warning falling threshold cannot exceed the warning rising threshold.');
+        }
+        if ($criticalFalling !== null && (float) $criticalFalling > (float) $criticalRising) {
+            $this->fail($criticalFallingField, 'The falling threshold cannot exceed the rising threshold.');
+        }
+        if ($warningRising !== null && $criticalRising !== null && (float) $warningRising >= (float) $criticalRising) {
+            $this->fail('warning_rising_threshold', 'The warning threshold must be lower than the critical threshold when evaluating rising values.');
+        }
     }
 
     private function fail(string $field, string $message): never

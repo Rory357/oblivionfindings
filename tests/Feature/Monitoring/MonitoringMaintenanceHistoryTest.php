@@ -54,6 +54,7 @@ final class MonitoringMaintenanceHistoryTest extends TestCase
         $this->assignment = DeviceAssignment::query()->create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $this->site->id, 'assignment_type' => 'permanent', 'assigned_at' => now()->subHour()]);
         $this->monitor = Monitor::factory()->create(['device_id' => $device->id, 'current_state' => MonitorState::Healthy, 'effective_state' => MonitorState::Healthy]);
         $this->monitor->profile->forceFill(['failure_confirmations' => 1, 'failure_duration_seconds' => 0])->save();
+        DB::table('monitoring_policy_history_epochs')->updateOrInsert(['owner' => 'maintenance'], ['started_at' => '2026-10-12 00:00:00.000000']);
     }
 
     protected function tearDown(): void

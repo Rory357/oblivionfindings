@@ -62,8 +62,11 @@ it('keeps legacy Queclink command history read only and removes the raw command 
     $controller = file_get_contents(
         $root.'/app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php',
     );
+    // Command history moved from the hub page into the shared settings view.
     $workspace = file_get_contents(
         $root.'/resources/js/pages/security-devices/integrations/queclink-hub.tsx',
+    ).file_get_contents(
+        $root.'/resources/js/pages/security-devices/integrations/_queclink-settings.tsx',
     );
 
     expect($routes)->not->toContain(
@@ -77,9 +80,9 @@ it('keeps legacy Queclink command history read only and removes the raw command 
         "'event_type' => 'retry'",
     );
     expect($workspace)->toContain(
-        'Legacy provider-console history · read only · content protected',
-        'New or repeated',
-        'actions must start from Device Management.',
+        'Older Queclink console history · read only · details protected',
+        'new or repeated actions start from Device Management',
+        'New device actions start from Device Management.',
         'Open Device Management',
-    )->not->toContain('commands/${command.id}/retry');
+    )->not->toContain('commands/${command.id}/retry', '/retry`');
 });

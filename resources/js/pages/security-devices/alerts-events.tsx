@@ -1,3 +1,4 @@
+import { LeaveCalendarRange } from '@/components/hr/leave-calendar-range';
 import {
     EntityChip,
     type EntityTableColumn,
@@ -18,18 +19,25 @@ import {
     PageHeaderViewToggle,
 } from '@/components/page';
 import { ControlRoomAlertAccessRequired } from '@/components/security-devices/permission-destinations';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { Button } from '@/components/ui/button';
 import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ReviewRow } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime, formatRelative } from '@/lib/datetime';
+import { readableKey } from '@/lib/security-devices-labels';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     Bell,
+    CalendarDays,
     CheckCircle2,
     Clock3,
     Eye,
@@ -79,10 +87,10 @@ export type EventsProps = {
     };
 };
 type EventView = 'history' | 'all' | 'critical' | 'warning' | 'unprocessed';
-const words = (value: string | null) =>
-    value ? value.replaceAll('_', ' ').replaceAll('.', ' · ') : 'Not recorded';
+/** "fall.detected" → "Fall detected"; keys stay unchanged for filtering. */
+const eventTitle = (value: string | null) => readableKey(value);
 const eventName = (event: EventItem) =>
-    `Event #${event.id}: ${words(event.event_type)}`;
+    `Event #${event.id}: ${eventTitle(event.event_type)}`;
 const deviceHref = (event: EventItem) =>
     event.device_access?.state === 'available' &&
     event.device_access.metadata_state === 'available' &&
@@ -104,7 +112,7 @@ function Severity({ event }: { event: EventItem }) {
             label={
                 event.severity === 'info'
                     ? 'Information'
-                    : words(event.severity)
+                    : readableKey(event.severity)
             }
         />
     );
@@ -183,6 +191,16 @@ function EventStream({
     const title = pageMeta?.title ?? 'Alerts & events';
     const pageUrl = pageMeta?.href ?? '/security-devices/alerts-events';
     const [search, setSearch] = useState(filters.search ?? '');
+    // Calendar days are New Zealand dates (YYYY-MM-DD); the server turns
+    // each day's bounds into UTC instants for the stored event times.
+    const [rangeFrom, setRangeFrom] = useState<string | null>(
+        filters.from || null,
+    );
+    const [rangeTo, setRangeTo] = useState<string | null>(filters.to || null);
+    const datesApplied = Boolean(filters.from || filters.to);
+    const domainLabel = (value: string) =>
+        filterOptions.domains.find((option) => option.value === value)?.label ??
+        readableKey(value);
     const hasFilters = Object.values(filters).some(
         (value) => value && value !== 'all',
     );
@@ -313,7 +331,10 @@ function EventStream({
             cell: (event) => (
                 <div className="space-y-1">
                     <ReviewRow label="Event reference" value={`#${event.id}`} />
-                    <ReviewRow label="Event type" value={event.event_type} />
+                    <ReviewRow
+                        label="Event type"
+                        value={eventTitle(event.event_type)}
+                    />
                     <ReviewRow
                         label="Severity"
                         value={<Severity event={event} />}
@@ -362,7 +383,7 @@ function EventStream({
                         label="Device area"
                         value={
                             event.device_domain
-                                ? words(event.device_domain)
+                                ? domainLabel(event.device_domain)
                                 : 'Not available'
                         }
                     />
@@ -372,7 +393,7 @@ function EventStream({
                             deviceHref(event) ? (
                                 <Link
                                     href={deviceHref(event)!}
-                                    className="frontline-focus rounded-sm text-primary hover:underline"
+                                    className="frontline-focus rounded-sm text-primary underline underline-offset-2"
                                 >
                                     Open device profile
                                 </Link>
@@ -493,7 +514,7 @@ function EventStream({
                                     options={filterOptions.eventTypes.map(
                                         (value) => ({
                                             value,
-                                            label: words(value),
+                                            label: eventTitle(value),
                                         }),
                                     )}
                                 />
@@ -523,16 +544,79 @@ function EventStream({
                                     { value: 'no', label: 'Not processed' },
                                 ]}
                             />
-                            <PageHeaderFilterButton
-                                active={
-                                    datesOpen ||
-                                    Boolean(filters.from || filters.to)
-                                }
-                                onClick={() => setDatesOpen(!datesOpen)}
+                            <Popover
+                                open={datesOpen}
+                                onOpenChange={setDatesOpen}
                             >
-                                Date range
-                                {filters.from || filters.to ? ' applied' : ''}
-                            </PageHeaderFilterButton>
+                                <PopoverTrigger asChild>
+                                    <PageHeaderFilterButton
+                                        icon={CalendarDays}
+                                        active={datesApplied}
+                                    >
+                                        {datesApplied
+                                            ? `${formatDateOnly(filters.from, 'Any date')} – ${formatDateOnly(filters.to, 'Any date')}`
+                                            : 'Date range'}
+                                    </PageHeaderFilterButton>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="end"
+                                    aria-label="Event date range"
+                                    className="w-auto max-w-[90vw]"
+                                >
+                                    <p className="text-subtle mb-3">
+                                        Choose New Zealand calendar days. Event
+                                        times show in New Zealand time.
+                                    </p>
+                                    <LeaveCalendarRange
+                                        start={rangeFrom}
+                                        end={rangeTo}
+                                        onChange={(start, end) => {
+                                            setRangeFrom(start);
+                                            setRangeTo(end);
+                                        }}
+                                        required
+                                    />
+                                    <p className="text-caption mt-3">
+                                        {rangeFrom && rangeTo
+                                            ? rangeFrom === rangeTo
+                                                ? formatDateOnly(rangeFrom)
+                                                : `${formatDateOnly(rangeFrom)} – ${formatDateOnly(rangeTo)}`
+                                            : rangeFrom
+                                              ? 'Choose the end date. Choose the same day again for one day.'
+                                              : 'Choose a start and end day.'}
+                                    </p>
+                                    <div className="mt-3 flex gap-2">
+                                        {datesApplied ? (
+                                            <Button
+                                                variant="outline"
+                                                className="flex-1"
+                                                onClick={() => {
+                                                    setDatesOpen(false);
+                                                    apply({ from: '', to: '' });
+                                                }}
+                                            >
+                                                Clear dates
+                                            </Button>
+                                        ) : null}
+                                        <Button
+                                            className="flex-1"
+                                            disabled={!rangeFrom || !rangeTo}
+                                            onClick={() => {
+                                                if (!rangeFrom || !rangeTo)
+                                                    return;
+                                                setDatesOpen(false);
+                                                apply({
+                                                    from: rangeFrom,
+                                                    to: rangeTo,
+                                                    window: '',
+                                                });
+                                            }}
+                                        >
+                                            Apply dates
+                                        </Button>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                             {hasFilters || search ? (
                                 <PageHeaderFilterButton onClick={clear}>
                                     Clear filters
@@ -573,61 +657,10 @@ function EventStream({
                         />
                     }
                 />
-                {datesOpen && (
-                    <section
-                        aria-label="Event date range"
-                        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
-                    >
-                        <div>
-                            <label
-                                htmlFor="event-date-from"
-                                className="mb-1 block text-sm font-medium"
-                            >
-                                From date (UTC)
-                            </label>
-                            <Input
-                                id="event-date-from"
-                                type="date"
-                                value={filters.from || ''}
-                                onChange={(event) =>
-                                    apply({
-                                        from: event.target.value,
-                                        window: '',
-                                    })
-                                }
-                            />
-                        </div>
-                        <div>
-                            <label
-                                htmlFor="event-date-to"
-                                className="mb-1 block text-sm font-medium"
-                            >
-                                To date (UTC)
-                            </label>
-                            <Input
-                                id="event-date-to"
-                                type="date"
-                                value={filters.to || ''}
-                                onChange={(event) =>
-                                    apply({
-                                        to: event.target.value,
-                                        window: '',
-                                    })
-                                }
-                            />
-                        </div>
-                        <Button
-                            variant="outline"
-                            onClick={() => setDatesOpen(false)}
-                        >
-                            Close date range
-                        </Button>
-                        <p className="text-caption w-full">
-                            Date filters use the event register's UTC
-                            boundaries. Event times display in New Zealand time.
-                        </p>
-                    </section>
-                )}
+                <SecurityDevicesSectionTabs
+                    section="alerts-upkeep"
+                    activeTab="alerts-events"
+                />
                 <section
                     aria-label="Permitted device event records"
                     className="space-y-3"
@@ -667,14 +700,14 @@ function EventStream({
                             rowKey={(event) => event.id}
                             identity={(event) => ({
                                 icon: Activity,
-                                name: words(event.event_type),
+                                name: eventTitle(event.event_type),
                                 subline: `Event #${event.id} · ${event.device_name || event.device_access?.label || 'Current device unavailable'}`,
                             })}
                             articleLabel={eventName}
                             actionsFor={actionsFor}
                             cardFor={(event) => ({
                                 icon: Activity,
-                                name: words(event.event_type),
+                                name: eventTitle(event.event_type),
                                 subline: `Event #${event.id} · ${event.device_name || event.device_access?.label || 'Current device unavailable'}`,
                                 meridian:
                                     event.severity === 'critical'
@@ -688,7 +721,9 @@ function EventStream({
                                         <Processing event={event} />
                                         {event.device_domain && (
                                             <EntityChip>
-                                                {words(event.device_domain)}
+                                                {domainLabel(
+                                                    event.device_domain,
+                                                )}
                                             </EntityChip>
                                         )}
                                     </>

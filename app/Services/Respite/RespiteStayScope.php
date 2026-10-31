@@ -14,7 +14,10 @@ use App\Models\RestraintEvent;
 use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\User;
+use App\Policies\ClientPolicy;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\UserSiteAccessService;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -309,6 +312,7 @@ class RespiteStayScope
         Request $request,
         int $stayId,
         bool $lock = false,
+        ?CurrentAuthorizationReads $reads = null,
     ): RespiteStay {
         return $this->resolveAuthorizedStayWithScope(
             $request,
@@ -316,6 +320,7 @@ class RespiteStayScope
             $lock,
             self::CLIENT_SITE_BYPASS_PERMISSIONS,
             true,
+            $reads,
         );
     }
 
@@ -323,6 +328,7 @@ class RespiteStayScope
         Request $request,
         int $stayId,
         bool $lock = false,
+        ?CurrentAuthorizationReads $reads = null,
     ): RespiteStay {
         return $this->resolveAuthorizedStayWithScope(
             $request,
@@ -330,7 +336,22 @@ class RespiteStayScope
             $lock,
             UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
             false,
+            $reads,
         );
+    }
+
+    /** Internal live-source read: the same canonical resolver, without supporting private bodies. */
+    public function resolveAuthorizedHealthSafetyStayMetadata(
+        Request $request,
+        int $stayId,
+        CurrentAuthorizationReads $reads,
+        Closure $originalSourceApplicator,
+    ): RespiteStay {
+        $reads->assertActive();
+
+        return $this->resolveAuthorizedStayWithScope($request, $stayId, false,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, false, $reads,
+            true, $originalSourceApplicator);
     }
 
     /**
@@ -344,52 +365,69 @@ class RespiteStayScope
         bool $lock,
         array $siteBypassPermissions,
         bool $requireClientPermission,
+        ?CurrentAuthorizationReads $reads = null,
+        bool $metadataOnly = false,
+        ?Closure $originalSourceApplicator = null,
     ): RespiteStay {
+        $reads?->assertActive();
         $user = $request->user();
         abort_unless($user, 404);
 
-        $candidate = $this->applyStayScope(
+        $protect = function (Builder $query) use ($metadataOnly, $originalSourceApplicator, $reads, $user): Builder {
+            if (! $metadataOnly) { return $query; }
+            if ($reads === null || $originalSourceApplicator === null) {
+                throw new \LogicException('Metadata stay resolution requires its original live source.');
+            }
+            $reads->assertActive();
+            return $originalSourceApplicator($query, $user, $reads);
+        };
+        $stayColumns = $metadataOnly ? ['id', 'client_id', 'booking_id', 'deleted_at'] : ['*'];
+        $bookingColumns = $metadataOnly ? ['id', 'client_id', 'location_id', 'booking_request_id', 'deleted_at'] : ['*'];
+
+        $candidate = $protect($this->applyStayScope(
             RespiteStay::query(),
             $user,
             $siteBypassPermissions,
             $requireClientPermission,
-        )->findOrFail($stayId);
+            $reads,
+        ))->findOrFail($stayId, $stayColumns);
 
-        $clientQuery = Client::query();
+        $clientQuery = $reads ? $reads->query(Client::query()) : Client::query();
         if ($lock) {
             $clientQuery->lockForUpdate();
         }
-        $client = $clientQuery->find($candidate->client_id);
+        $client = $protect($clientQuery)->find($candidate->client_id, $metadataOnly ? ['id', 'site_id', 'deleted_at'] : ['*']);
 
-        $bookingCandidate = RespiteBooking::query()
+        $bookingCandidate = $protect(($reads ? $reads->query(RespiteBooking::query()) : RespiteBooking::query())
             ->whereKey($candidate->booking_id)
-            ->where('client_id', $candidate->client_id)
-            ->first();
-        $this->assertCanonicalSitesAvailable($client, $bookingCandidate?->location_id, $lock);
+            ->where('client_id', $candidate->client_id))
+            ->first($bookingColumns);
+        $this->assertCanonicalSitesAvailable($client, $bookingCandidate?->location_id, $lock, $reads);
         $sourceRequest = null;
         if ($bookingCandidate?->booking_request_id) {
-            $sourceRequestQuery = RespiteBookingRequest::withTrashed()
+            $sourceRequestQuery = ($reads ? $reads->query(RespiteBookingRequest::withTrashed()) : RespiteBookingRequest::withTrashed())
                 ->whereKey($bookingCandidate->booking_request_id)
                 ->where('client_id', $candidate->client_id);
             if ($lock) {
                 $sourceRequestQuery->lockForUpdate();
             }
-            $sourceRequest = $sourceRequestQuery->first();
+            $sourceRequest = $protect($sourceRequestQuery)->first($metadataOnly ? ['id', 'client_id', 'deleted_at'] : ['*']);
         }
 
-        $bookingQuery = RespiteBooking::query()
+        $bookingQuery = ($reads ? $reads->query(RespiteBooking::query()) : RespiteBooking::query())
             ->whereKey($candidate->booking_id)
             ->where('client_id', $candidate->client_id);
         if ($lock) {
             $bookingQuery->lockForUpdate();
         }
-        $booking = $bookingQuery->first();
+        $booking = $protect($bookingQuery)->first($bookingColumns);
 
         $stayQuery = $this->applyStayScope(
             RespiteStay::query(),
             $user,
             $siteBypassPermissions,
             $requireClientPermission,
+            $reads,
         )
             ->whereKey($candidate->id)
             ->where('booking_id', $candidate->booking_id)
@@ -397,7 +435,7 @@ class RespiteStayScope
         if ($lock) {
             $stayQuery->lockForUpdate();
         }
-        $stay = $stayQuery->firstOrFail();
+        $stay = $protect($stayQuery)->firstOrFail($stayColumns);
 
         abort_unless(
             $booking
@@ -411,7 +449,7 @@ class RespiteStayScope
         );
 
         $siteId = $booking->location_id ?: $client->site_id;
-        $allowedSiteIds = $this->siteAccess->accessibleSiteIds($user, $siteBypassPermissions);
+        $allowedSiteIds = $this->siteAccess->accessibleSiteIds($user, $siteBypassPermissions, $reads);
         abort_unless(
             $siteId
                 && $client->site_id
@@ -420,7 +458,7 @@ class RespiteStayScope
             404,
         );
         if ($requireClientPermission) {
-            abort_unless(Gate::forUser($user)->allows('view', $client), 404);
+            abort_unless($reads ? app(ClientPolicy::class)->viewFromCurrentEvidence($user, $client, $reads) : Gate::forUser($user)->allows('view', $client), 404);
         }
 
         $stay->setRelation('booking', $booking);
@@ -436,7 +474,9 @@ class RespiteStayScope
         ?Client $client,
         mixed $locationId,
         bool $lock,
+        ?CurrentAuthorizationReads $reads = null,
     ): void {
+        $reads?->assertActive();
         abort_unless($client?->site_id, 404);
 
         $siteIds = collect([$client->site_id, $locationId])
@@ -445,7 +485,7 @@ class RespiteStayScope
             ->unique()
             ->sort()
             ->values();
-        $query = Site::query()
+        $query = ($reads ? $reads->query(Site::query()) : Site::query())
             ->active()
             ->notArchived()
             ->whereNull('archived_at')
@@ -816,8 +856,12 @@ class RespiteStayScope
         ?User $user,
         array $siteBypassPermissions,
         bool $requireClientPermission,
+        ?CurrentAuthorizationReads $reads = null,
     ): Builder {
-        $siteIds = $this->siteAccess->accessibleSiteIds($user, $siteBypassPermissions);
+        if ($reads) {
+            $query = $reads->query($query);
+        }
+        $siteIds = $this->siteAccess->accessibleSiteIds($user, $siteBypassPermissions, $reads);
         if (! $user || $siteIds === []) {
             return $query->whereRaw('1 = 0');
         }

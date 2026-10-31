@@ -68,7 +68,8 @@ final class ReferralReports
     public function query(User $actor, array $filters, ?CarbonImmutable $cutoff = null): Builder
     {
         $cutoff ??= CarbonImmutable::now('UTC');
-        $query = $this->access->query($actor);
+        // General enquiries are not referrals: every metric, group, trend and export leaves them out.
+        $query = $this->access->query($actor)->exceptGeneralEnquiries();
         if (! empty($filters['classification'])) {
             ReferralReportClassification::filter($query, $filters['classification']);
         }

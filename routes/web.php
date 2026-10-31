@@ -4,6 +4,7 @@ use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\Careers\ReferenceController;
 use App\Domain\Referrals\Http\Controllers\PublicProviderController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Middleware\RetryPageReadOnLockConflict;
 use App\Http\Controllers\It\ItAssistController;
 use App\Http\Controllers\It\ItCatalogController;
 use App\Http\Controllers\It\ItCatalogFieldOptionController;
@@ -69,6 +70,7 @@ use App\Http\Controllers\It\ItWorkTaskHistoryController;
 use App\Http\Controllers\LegacyRouteRedirectController;
 use App\Http\Controllers\MyCalendarController;
 use App\Http\Controllers\MyDayActionsController;
+use App\Http\Controllers\MyDayMeetingInvitationController;
 use App\Http\Controllers\MyDayTaskController;
 use App\Http\Controllers\MyDayTaskDraftController;
 use App\Http\Controllers\MyTasksController;
@@ -114,7 +116,8 @@ Route::get('/terms', [PublicProviderController::class, 'show'])->defaults('provi
 Route::get('/accessibility', [PublicProviderController::class, 'show'])->defaults('provider_page', 'accessibility')->name('provider.accessibility');
 Route::redirect('/smart-monitoring', '/services', 301)->name('smart-monitoring');
 Route::get('/contact', [PublicProviderController::class, 'show'])->defaults('provider_page', 'contact')->name('contact');
-Route::post('/contact', [PublicProviderController::class, 'retiredContact'])->middleware('throttle:10,1');
+// Contact us → a general enquiry in referral intake (an old cached form without a token is still retired).
+Route::post('/contact', [App\Domain\Referrals\Http\Controllers\PublicContactController::class, 'store'])->middleware('throttle:6,1')->name('contact.store');
 // Career Portal — public surface lives on the requisition-backed Careers
 // controller. The legacy posting-backed job-detail page has been retired; only
 // the candidate application-status tracker (`applicationStatus`) remains on the
@@ -124,6 +127,7 @@ Route::get('/careers', [CareerPortalController::class, 'index'])->name('careers.
 Route::get('/careers/application/{token}', [App\Http\Controllers\CareerPortalController::class, 'applicationStatus'])->middleware('throttle:30,1')->name('careers.application.status');
 Route::get('/careers/offers/{token}', [CareerPortalController::class, 'showOffer'])->middleware('throttle:30,1')->name('careers.offer.show');
 Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondToOffer'])->middleware('throttle:10,1')->name('careers.offer.respond');
+Route::get('/careers/jobs/{job:slug}', [CareerPortalController::class, 'show'])->name('careers.job');
 Route::get('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'showApply'])->name('careers.apply');
 Route::post('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'submitApplication'])->name('careers.apply.store');
 // Public token-guarded reference questionnaire — must precede the /careers/{slug} catch-all.
@@ -167,6 +171,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::get('/my-day', MyTasksController::class)
     ->middleware(['auth'])
     ->name('my-day');
+
+Route::get('/my-day/safety/meetings/{id}', [MyDayMeetingInvitationController::class, 'show'])
+    ->middleware(['auth'])
+    ->whereNumber('id')
+    ->name('my-day.safety.meetings.show');
 
 Route::get('/my-roster', [RosterController::class, 'index'])
     ->middleware(['auth'])
@@ -458,10 +467,13 @@ require __DIR__.'/auth.php';
 require __DIR__.'/portal.php';
 require __DIR__.'/clients.php';
 require __DIR__.'/staff.php';
-require __DIR__.'/incidents.php';
-require __DIR__.'/tasks.php';
+// Page loads here retry when a save briefly holds a row their proof locks (RetryPageReadOnLockConflict).
+Route::middleware(RetryPageReadOnLockConflict::class)->group(function () {
+    require __DIR__.'/incidents.php';
+    require __DIR__.'/tasks.php';
+});
 require __DIR__.'/assets.php';
-require __DIR__.'/sites.php';
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/sites.php');
 require __DIR__.'/catering.php';
 require __DIR__.'/fleet.php';
 require __DIR__.'/fleet-assets.php';
@@ -501,7 +513,7 @@ require __DIR__.'/finance.php';
 require __DIR__.'/health-clinical.php';
 
 // Health & Safety module
-require __DIR__.'/health-safety.php';
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/health-safety.php');
 
 // API routes
 require __DIR__.'/api_medications.php';

@@ -259,6 +259,12 @@ class HsEvent extends Model
         return $this->hasMany(HsInvestigation::class, 'hs_event_id');
     }
 
+    /** Source changes a person must review (a correction after a signed WorkSafe decision, escalation after close). */
+    public function reviewFlags(): HasMany
+    {
+        return $this->hasMany(HsEventReviewFlag::class, 'hs_event_id');
+    }
+
     /**
      * The latest/primary investigation — most recent by creation.
      */

@@ -40,11 +40,14 @@ final class Mp4VoiceParser
 
     private bool $wideOffsets = false;
 
-    /** @var list<array{int, int}> */
-    private array $mdat = [];
+    /**
+     * Where each 'mdat' box's contents start and end, in file order, packed as two 64-bit numbers
+     * per box (16 bytes), so even a million boxes take 16 MiB.
+     */
+    private string $mdatIndex = '';
 
-    /** @var list<array{int, int}> byte ranges that sample data must occupy */
-    private array $ranges = [];
+    /** Fragment sample ranges waiting to be checked once every 'mdat' is known, packed the same way. */
+    private string $pendingRanges = '';
 
     private int $tableSamples = 0;
 
@@ -77,7 +80,7 @@ final class Mp4VoiceParser
             match ($type) {
                 'ftyp' => $this->b->need($start, 8, $end),
                 'moov' => $this->movie($start, $end),
-                'mdat' => $this->mdat[] = [$start, $end],
+                'mdat' => $this->mdatIndex .= pack('J2', $start, $end),
                 'moof' => $this->fragment($p, $start, $end),
                 default => null, // free space, metadata and other boxes carry no audio
             };
@@ -89,16 +92,10 @@ final class Mp4VoiceParser
         if ($this->tableSamples + $this->fragmentSamples === 0) {
             throw new VoiceFormatException('mp4_no_audio');
         }
-        foreach ($this->ranges as [$from, $to]) {
+        for ($offset = 0, $length = strlen($this->pendingRanges); $offset < $length; $offset += 16) {
             $this->b->count();
-            $inside = false;
-            foreach ($this->mdat as [$dataStart, $dataEnd]) {
-                if ($from >= $dataStart && $to <= $dataEnd) {
-                    $inside = true;
-                    break;
-                }
-            }
-            if (! $inside) {
+            [, $from, $to] = unpack('J2', $this->pendingRanges, $offset);
+            if (! $this->insideMdat($from, $to)) {
                 throw new VoiceFormatException('mp4_sample_data');
             }
         }
@@ -137,16 +134,40 @@ final class Mp4VoiceParser
         return [$type, $p + $header, $p + $size];
     }
 
-    /** @return list<array{string, int, int}> */
-    private function children(int $start, int $end): array
+    /**
+     * Whether [$from, $to) lies inside one 'mdat'. Top-level boxes follow each other without overlapping,
+     * so the starts are in rising order and the candidate is found by halving the list.
+     */
+    private function insideMdat(int $from, int $to): bool
     {
-        $boxes = [];
-        for ($p = $start; $p < $end; $p = $boxEnd) {
-            [$type, $boxStart, $boxEnd] = $this->box($p, $end);
-            $boxes[] = [$type, $boxStart, $boxEnd];
+        $low = 0;
+        $high = intdiv(strlen($this->mdatIndex), 16) - 1;
+        $found = -1;
+        while ($low <= $high) {
+            $middle = ($low + $high) >> 1;
+            if (unpack('J', $this->mdatIndex, 16 * $middle)[1] <= $from) {
+                $found = $middle;
+                $low = $middle + 1;
+            } else {
+                $high = $middle - 1;
+            }
         }
 
-        return $boxes;
+        return $found >= 0 && $to <= unpack('J', $this->mdatIndex, 16 * $found + 8)[1];
+    }
+
+    /**
+     * Child boxes one at a time as [type, content start, end], so a container holding very many
+     * children never builds a list of them.
+     *
+     * @return \Generator<int, array{string, int, int}>
+     */
+    private function children(int $start, int $end): \Generator
+    {
+        for ($p = $start; $p < $end; $p = $boxEnd) {
+            [$type, $boxStart, $boxEnd] = $this->box($p, $end);
+            yield [$type, $boxStart, $boxEnd];
+        }
     }
 
     /** Returns [version, flags] of a full box and checks the content after them is present. */
@@ -288,7 +309,7 @@ final class Mp4VoiceParser
                         $references++;
                         $this->full($cs, $ce, 4);
                         $entries = $this->b->u32be($cs + 4, $ce);
-                        if ($entries < 1 || count($this->children($cs + 8, $ce)) !== $entries) {
+                        if ($entries < 1 || iterator_count($this->children($cs + 8, $ce)) !== $entries) {
                             throw new VoiceFormatException('mp4_data_reference');
                         }
                     }
@@ -549,7 +570,10 @@ final class Mp4VoiceParser
                     ? $this->b->uintBe($chunkStart + 8 * ($chunk - 1), 8, $this->b->length)
                     : unpack('N', $data, $chunkStart + 4 * ($chunk - 1))[1];
                 $bytes = $this->sizes($stszStart, $sample, $perChunk);
-                $this->ranges[] = [$offset, $offset + $bytes];
+                // Every 'mdat' is known by now (the tables are read after the whole file), so check at once.
+                if (! $this->insideMdat($offset, $offset + $bytes)) {
+                    throw new VoiceFormatException('mp4_sample_data');
+                }
                 $sample += $perChunk;
             }
         }
@@ -629,11 +653,54 @@ final class Mp4VoiceParser
     /** Returns where this track fragment's data ends, which is where the next one's starts by default. */
     private function trackFragment(int $moofStart, int $base, int $start, int $end): int
     {
-        $boxes = $this->children($start, $end);
-        if ($boxes === [] || $boxes[0][0] !== 'tfhd') {
+        $header = null;
+        $decode = null;
+        $position = $base;
+        $ticks = 0;
+        foreach ($this->children($start, $end) as [$type, $bs, $be]) {
+            if ($header === null) {
+                // 'tfhd' comes first: it names the track and the defaults the runs after it use.
+                if ($type !== 'tfhd') {
+                    throw new VoiceFormatException('mp4_fragment_header');
+                }
+                $header = $this->fragmentHeader($moofStart, $base, $bs, $be);
+                $position = $header['base'];
+
+                continue;
+            }
+            if ($type === 'tfhd') {
+                throw new VoiceFormatException('mp4_duplicate_tfhd');
+            }
+            if ($type === 'senc') {
+                throw new VoiceFormatException('mp4_protected');
+            }
+            if ($type === 'tfdt') {
+                if ($decode !== null) {
+                    throw new VoiceFormatException('mp4_duplicate_tfdt');
+                }
+                [$version] = $this->full($bs, $be, 4);
+                $decode = $version === 1 ? $this->b->uintBe($bs + 4, 8, $be) : $this->b->u32be($bs + 4, $be);
+            } elseif ($type === 'trun') {
+                [$position, $runTicks] = $this->run($bs, $be, $header['base'], $position, $header['duration'], $header['size']);
+                $ticks = self::add($ticks, $runTicks);
+            }
+        }
+        if ($header === null) {
             throw new VoiceFormatException('mp4_fragment_header');
         }
-        [, $s, $e] = $boxes[0];
+        $decode ??= $this->runningDecode;
+        $decodeEnd = self::add($decode, $ticks);
+        $this->firstDecode = min($this->firstDecode ?? $decode, $decode);
+        $this->lastDecodeEnd = max($this->lastDecodeEnd, $decodeEnd);
+        $this->runningDecode = $decodeEnd;
+        $this->fragmentTicks = self::add($this->fragmentTicks, $ticks);
+
+        return $position;
+    }
+
+    /** The 'tfhd' box: our track, then optional base offset, sample entry and sample defaults. */
+    private function fragmentHeader(int $moofStart, int $base, int $s, int $e): array
+    {
         [, $flags] = $this->full($s, $e, 4);
         if ($this->b->u32be($s + 4, $e) !== $this->trackId) {
             throw new VoiceFormatException('mp4_fragment_track');
@@ -665,35 +732,8 @@ final class Mp4VoiceParser
             $q += 4;
         }
         $this->fills($q, 0, $e);
-        $decode = null;
-        $position = $base;
-        $ticks = 0;
-        foreach (array_slice($boxes, 1) as [$type, $bs, $be]) {
-            if ($type === 'tfhd') {
-                throw new VoiceFormatException('mp4_duplicate_tfhd');
-            }
-            if ($type === 'senc') {
-                throw new VoiceFormatException('mp4_protected');
-            }
-            if ($type === 'tfdt') {
-                if ($decode !== null) {
-                    throw new VoiceFormatException('mp4_duplicate_tfdt');
-                }
-                [$version] = $this->full($bs, $be, 4);
-                $decode = $version === 1 ? $this->b->uintBe($bs + 4, 8, $be) : $this->b->u32be($bs + 4, $be);
-            } elseif ($type === 'trun') {
-                [$position, $runTicks] = $this->run($bs, $be, $base, $position, $duration, $size);
-                $ticks = self::add($ticks, $runTicks);
-            }
-        }
-        $decode ??= $this->runningDecode;
-        $decodeEnd = self::add($decode, $ticks);
-        $this->firstDecode = min($this->firstDecode ?? $decode, $decode);
-        $this->lastDecodeEnd = max($this->lastDecodeEnd, $decodeEnd);
-        $this->runningDecode = $decodeEnd;
-        $this->fragmentTicks = self::add($this->fragmentTicks, $ticks);
 
-        return $position;
+        return ['base' => $base, 'duration' => $duration, 'size' => $size];
     }
 
     /** Adds two non-negative tick counts, holding at PHP_INT_MAX instead of overflowing. */
@@ -752,7 +792,8 @@ final class Mp4VoiceParser
         }
         $this->fragmentSamples += $count;
         if ($count > 0) {
-            $this->ranges[] = [$position, $position + $bytes];
+            // A fragment's 'mdat' usually follows it, so the range is checked once the whole file is read.
+            $this->pendingRanges .= pack('J2', $position, $position + $bytes);
         }
 
         return [$position + $bytes, $ticks];

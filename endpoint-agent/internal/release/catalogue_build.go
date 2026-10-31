@@ -140,7 +140,7 @@ func buildCatalogue(ctx context.Context, source, output string, spec CatalogueSp
 					return result, errors.New("catalogue identity, roles or validity do not match the signed Windows package")
 				}
 			} else if err = verify(filename, artifact.Architecture); err != nil {
-				return result, errors.New("a Windows installer failed architecture or Authenticode verification")
+				return result, errors.New("a Windows installer failed executable or architecture verification")
 			}
 		}
 	}

@@ -3,6 +3,7 @@
 namespace Tests\Unit\SecurityDevices;
 
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Database\MySqlConnection;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,7 @@ final class HikvisionSourceRollbackTest extends TestCase
 {
     public function test_rollback_retains_direct_camera_evidence_and_refuses_any_ddl_before_data_loss(): void
     {
+        $previousContainer = Container::getInstance();
         $previous = Facade::getFacadeApplication();
         $app = new Application;
         $app->instance('config', new Repository);
@@ -55,6 +57,7 @@ final class HikvisionSourceRollbackTest extends TestCase
             self::assertStringContainsString(chr(96).'recorder_device_id'.chr(96).' is null', $connection->reads[0]['query']);
             self::assertSame(['unifi'], $connection->reads[0]['bindings']);
         } finally {
+            Container::setInstance($previousContainer);
             Facade::setFacadeApplication($previous);
             Facade::clearResolvedInstances();
         }

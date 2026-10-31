@@ -1,36 +1,43 @@
-import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
-import { PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { plainLabel } from '@/components/control-room/alert-record/alert-labels';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { TabsRoot as Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import AppLayout from '@/layouts/app-layout';
-import { formatRelative } from '@/lib/datetime';
-import { Head, Link, router } from '@inertiajs/react';
+    ControlRoomRowActions,
+    type ControlRoomRowAction,
+} from '@/components/control-room/control-room-row-actions';
+import { applyLiveResponseFilters } from '@/components/control-room/live-response/live-response-filters';
+import {
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+} from '@/components/page';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { Link, router } from '@inertiajs/react';
 import {
     Activity,
-    Camera,
-    Cctv,
+    ArrowUpRight,
+    Building2,
+    Copy,
     Cpu,
-    DoorOpen,
     Link2,
-    Locate,
-    LockKeyhole,
-    MonitorSmartphone,
-    Network,
     Radio,
-    Shield,
+    RefreshCw,
     ShieldCheck,
-    Thermometer,
-    Unlink,
 } from 'lucide-react';
+import { useState } from 'react';
 
 interface DeviceItem {
     id: number;
@@ -63,6 +70,11 @@ interface Props {
     devices: {
         data: DeviceItem[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
+        current_page?: number;
+        last_page?: number;
+        total?: number;
+        from?: number | null;
+        to?: number | null;
     };
     stats: {
         signal_sources: number;
@@ -82,143 +94,49 @@ interface Props {
     canonicalIndexUrl: string | null;
 }
 
-const typeIcons: Record<string, React.ReactNode> = {
-    camera: <Camera className="h-4 w-4" />,
-    door: <DoorOpen className="h-4 w-4" />,
-    sensor: <Radio className="h-4 w-4" />,
-    alarm_panel: <Shield className="h-4 w-4" />,
-    bed_sensor: <Activity className="h-4 w-4" />,
-    personal_tracker: <Locate className="h-4 w-4" />,
-    vehicle_tracker: <MonitorSmartphone className="h-4 w-4" />,
-    environmental: <Thermometer className="h-4 w-4" />,
-    network: <Network className="h-4 w-4" />,
+const BASE_PATH = '/control-room/devices';
+
+/** Security & Devices health → the verified status pairs. */
+const HEALTH_TONE: Record<string, StatusVariant> = {
+    healthy: 'success',
+    ok: 'success',
+    active: 'success',
+    degraded: 'warning',
+    warning: 'warning',
+    maintenance: 'warning',
+    critical: 'critical',
+    failed: 'critical',
+    offline: 'critical',
+    unknown: 'neutral',
 };
 
-const typeBadgeColors: Record<string, string> = {
-    camera: 'bg-status-info-bg text-status-info border-status-info/30',
-    door: 'bg-primary/10 text-primary border-primary',
-    sensor: 'bg-status-info-bg text-status-info border-status-info/30',
-    alarm_panel:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
-    bed_sensor:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
-    personal_tracker:
-        'bg-status-success-bg text-status-success border-status-success/30',
-    vehicle_tracker:
-        'bg-status-warning-bg text-status-warning border-status-warning/30',
-    environmental: 'bg-status-info-bg text-status-info border-status-info/30',
-    network: 'bg-muted text-foreground border-border',
-};
-
-function humanise(value: string | null): string {
-    return value ? value.replaceAll('_', ' ') : 'Unknown';
+function healthBadge(device: DeviceItem) {
+    const value = device.canonical_health_status ?? device.canonical_status;
+    return {
+        label: value ? plainLabel(value) : 'Not reported',
+        tone: (value ? HEALTH_TONE[value] : undefined) ?? 'neutral',
+    };
 }
 
-function DeviceCard({ device }: { device: DeviceItem }) {
-    const activityClass =
-        device.signal_activity.tone === 'success'
-            ? 'border-status-success/30 bg-status-success-bg text-status-success'
-            : 'border-border bg-muted text-muted-foreground';
-
-    return (
-        <Link
-            href={`/control-room/devices/${device.id}`}
-            className="frontline-focus block rounded-xl"
-        >
-            <Card className="h-full cursor-pointer transition-all hover:shadow-md">
-                <CardContent className="pt-4 pb-4">
-                    <div className="mb-3 flex items-start justify-between gap-2">
-                        <div className="flex min-w-0 flex-1 items-center gap-2">
-                            <h3 className="truncate text-sm font-medium">
-                                {device.name || device.device_uid}
-                            </h3>
-                        </div>
-                        <Badge
-                            variant="outline"
-                            className={`flex flex-shrink-0 items-center gap-1 text-[10px] ${typeBadgeColors[device.type] ?? ''}`}
-                        >
-                            {typeIcons[device.type]}
-                            {device.type_label}
-                        </Badge>
-                    </div>
-
-                    {device.name && (
-                        <p className="mb-2 truncate font-mono text-xs text-muted-foreground">
-                            {device.device_uid}
-                        </p>
-                    )}
-
-                    {(device.vendor || device.model) && (
-                        <p className="mb-2 truncate text-xs text-muted-foreground">
-                            {[device.vendor, device.model]
-                                .filter(Boolean)
-                                .join(' ')}
-                        </p>
-                    )}
-
-                    <div className="mb-3 space-y-2">
-                        {device.identity_source === 'canonical' ? (
-                            <div className="space-y-1">
-                                <span className="inline-flex items-center gap-1 text-xs font-medium text-status-success">
-                                    <ShieldCheck
-                                        className="h-3.5 w-3.5"
-                                        aria-hidden="true"
-                                    />
-                                    Linked managed Device
-                                </span>
-                                <p className="text-xs text-muted-foreground capitalize">
-                                    Device health:{' '}
-                                    {humanise(
-                                        device.canonical_health_status ??
-                                            device.canonical_status,
-                                    )}
-                                </p>
-                            </div>
-                        ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-status-warning">
-                                <Radio
-                                    className="h-3.5 w-3.5"
-                                    aria-hidden="true"
-                                />
-                                Needs Device reconciliation
-                            </span>
-                        )}
-                        <Badge
-                            variant="outline"
-                            className={`inline-flex items-center gap-1.5 ${activityClass}`}
-                        >
-                            <Activity
-                                className="h-3.5 w-3.5"
-                                aria-hidden="true"
-                            />
-                            {device.signal_activity.label}
-                        </Badge>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                            <Radio className="h-3 w-3" aria-hidden="true" />
-                            Last signal {formatRelative(device.last_signal_at)}
-                        </span>
-                        {device.signal_source_name && (
-                            <span className="flex items-center gap-1">
-                                <Cpu className="h-3 w-3" />
-                                {device.signal_source_name}
-                            </span>
-                        )}
-                    </div>
-
-                    {device.site_name && (
-                        <p className="mt-1.5 truncate text-xs text-muted-foreground">
-                            Signal Site: {device.site_name}
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
-        </Link>
-    );
+/** Device types arrive in Title Case ("Vehicle Tracker"); the UI is sentence case. */
+function sentenceCase(label: string): string {
+    return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
 }
 
+function query(params: Record<string, string | undefined>) {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+        if (value) search.set(key, value);
+    }
+    const value = search.toString();
+    return value ? `${BASE_PATH}?${value}` : BASE_PATH;
+}
+
+/**
+ * Monitoring › Signals — what each connected source last reported. Device
+ * setup, health and management stay in Security & Devices; this list only
+ * shows the Control Room signal side and whether it is matched to a device.
+ */
 export default function DevicesIndex({
     devices,
     stats,
@@ -228,321 +146,315 @@ export default function DevicesIndex({
     can,
     canonicalIndexUrl,
 }: Props) {
-    const typeTabs = [
-        { value: 'all', label: 'All' },
-        ...Object.entries(deviceTypes).map(([value, label]) => ({
-            value,
-            label,
-        })),
-    ];
-    const applyFilter = (key: string, value: string) => {
-        const newFilters: Record<string, string | undefined> = {
-            ...filters,
-            [key]: value || undefined,
-        };
-        // Reset to page 1 on filter change
-        router.get(
-            '/control-room/devices',
-            newFilters as Record<string, string>,
-            {
-                preserveState: true,
-                preserveScroll: true,
-            },
-        );
+    const [refreshing, setRefreshing] = useState(false);
+    const canSeeDevices = can.view_canonical_devices;
+
+    const apply = (next: Partial<Props['filters']>) =>
+        applyLiveResponseFilters(BASE_PATH, { ...filters, ...next });
+    const fromAll = (value: string) => (value === 'all' ? '' : value);
+
+    const refresh = () => {
+        setRefreshing(true);
+        router.reload({
+            only: ['devices', 'stats'],
+            onFinish: () => setRefreshing(false),
+        });
     };
 
+    const site = filters.site_id || undefined;
+    const total = devices.total ?? devices.data.length;
+
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'Device signals', href: '/control-room/devices' },
-            ]}
-        >
-            <Head title="Device signals" />
-
-            <PageLayout>
-                <CommandCentrePage
-                    variant="compact"
-                    current="/control-room/devices"
-                    icon={Cctv}
-                    title="Device signals"
-                    description="Review Control Room signal activity and reconcile each source with the canonical Security & Devices registry. Device health and management remain in Security & Devices."
-                    status="Control Room signal projection"
-                    freshness={`${stats.active_24h} active in the last 24 hours`}
-                    actions={
-                        <div className="flex flex-wrap items-center gap-2">
-                            {canonicalIndexUrl ? (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    asChild
-                                    className="frontline-tap border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Link href={canonicalIndexUrl}>
-                                        <ShieldCheck
-                                            className="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                        Open Device registry
-                                    </Link>
-                                </Button>
-                            ) : null}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                asChild
-                                className="frontline-tap border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Link href="/control-room/map">
-                                    Open live map
-                                </Link>
-                            </Button>
-                        </div>
-                    }
-                >
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                        <Card>
-                            <CardContent className="pt-4 pb-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                            Signal sources
-                                        </p>
-                                        <p className="text-2xl font-bold">
-                                            {stats.signal_sources}
-                                        </p>
-                                    </div>
-                                    <Cpu className="h-8 w-8 text-muted-foreground/30" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-status-success/50">
-                            <CardContent className="pt-4 pb-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-xs font-medium tracking-wider text-status-success uppercase">
-                                            Active in 24h
-                                        </p>
-                                        <p className="text-2xl font-bold text-status-success">
-                                            {stats.active_24h}
-                                        </p>
-                                    </div>
-                                    <Activity className="h-8 w-8 text-status-success" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-4 pb-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                            Linked Devices
-                                        </p>
-                                        {stats.canonical_linked === null ? (
-                                            <p className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground">
-                                                <LockKeyhole
-                                                    className="h-4 w-4"
-                                                    aria-hidden="true"
-                                                />
-                                                Restricted
-                                            </p>
-                                        ) : (
-                                            <p className="text-2xl font-bold">
-                                                {stats.canonical_linked}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <Link2 className="h-8 w-8 text-muted-foreground/30" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-status-warning/50">
-                            <CardContent className="pt-4 pb-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-xs font-medium tracking-wider text-status-warning uppercase">
-                                            Needs reconciliation
-                                        </p>
-                                        {stats.reconciliation_needed ===
-                                        null ? (
-                                            <p className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground">
-                                                <LockKeyhole
-                                                    className="h-4 w-4"
-                                                    aria-hidden="true"
-                                                />
-                                                Restricted
-                                            </p>
-                                        ) : (
-                                            <p className="text-2xl font-bold text-status-warning">
-                                                {stats.reconciliation_needed}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <Unlink className="h-8 w-8 text-status-warning" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Type Tabs */}
-                    <Tabs
-                        defaultValue={filters.type || 'all'}
-                        onValueChange={(v) =>
-                            applyFilter('type', v === 'all' ? '' : v)
-                        }
-                        className="w-full"
-                    >
-                        <TabsList className="flex h-auto flex-wrap gap-1">
-                            {typeTabs.map((tab) => (
-                                <TabsTrigger
-                                    key={tab.value}
-                                    value={tab.value}
-                                    className="text-xs"
-                                >
-                                    {tab.label}
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
-                    </Tabs>
-
-                    {/* Filters Row */}
-                    <div className="flex flex-wrap items-center gap-3">
-                        <Select
-                            value={filters.activity || 'all'}
-                            onValueChange={(v) =>
-                                applyFilter('activity', v === 'all' ? '' : v)
-                            }
-                        >
-                            <SelectTrigger
-                                className="w-52"
-                                aria-label="Signal activity"
-                            >
-                                <SelectValue placeholder="Signal activity" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All signal activity
-                                </SelectItem>
-                                <SelectItem value="recent">
-                                    Active in last 24 hours
-                                </SelectItem>
-                                <SelectItem value="quiet">
-                                    No signal in last 24 hours
-                                </SelectItem>
-                                <SelectItem value="never">
-                                    No signal recorded
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Select
-                            value={filters.site_id || 'all'}
-                            onValueChange={(v) =>
-                                applyFilter('site_id', v === 'all' ? '' : v)
-                            }
-                        >
-                            <SelectTrigger
-                                className="w-48"
-                                aria-label="Signal Site"
-                            >
-                                <SelectValue placeholder="Site" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Sites</SelectItem>
-                                {sites.map((site) => (
-                                    <SelectItem
-                                        key={site.id}
-                                        value={String(site.id)}
-                                    >
-                                        {site.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {can.view_canonical_devices ? (
-                            <Select
-                                value={filters.linkage || 'all'}
-                                onValueChange={(v) =>
-                                    applyFilter('linkage', v === 'all' ? '' : v)
-                                }
-                            >
-                                <SelectTrigger
-                                    className="w-52"
-                                    aria-label="Device reconciliation"
-                                >
-                                    <SelectValue placeholder="Device reconciliation" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All reconciliation states
-                                    </SelectItem>
-                                    <SelectItem value="linked">
-                                        Linked managed Devices
-                                    </SelectItem>
-                                    <SelectItem value="unlinked">
-                                        Needs reconciliation
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
+        <ControlRoomPage
+            headTitle="Signals"
+            header={{
+                subline:
+                    'What each connected source last reported · Device setup stays in Security & Devices',
+                actions: (
+                    <>
+                        {canonicalIndexUrl ? (
+                            <PageHeaderGlassButton icon={ShieldCheck} asChild>
+                                <Link href={canonicalIndexUrl}>Open Device registry</Link>
+                            </PageHeaderGlassButton>
                         ) : null}
+                        <PageHeaderGlassButton
+                            icon={RefreshCw}
+                            onClick={refresh}
+                            disabled={refreshing}
+                        >
+                            {refreshing ? 'Refreshing…' : 'Refresh'}
+                        </PageHeaderGlassButton>
+                    </>
+                ),
+                meters: (
+                    <>
+                        <PageHeaderMeterBlock
+                            label="Signal sources"
+                            href={query({ site_id: site })}
+                            ariaLabel="Show every signal source"
+                        >
+                            <PageHeaderMeterBig>{stats.signal_sources}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>connected to Control Room</PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Active in 24 hours"
+                            tone={stats.active_24h > 0 ? 'success' : 'brand'}
+                            href={query({ site_id: site, activity: 'recent' })}
+                            ariaLabel="Show sources with a signal in the last 24 hours"
+                        >
+                            <PageHeaderMeterBig>{stats.active_24h}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>signals received</PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        {canSeeDevices && stats.canonical_linked !== null ? (
+                            <PageHeaderMeterBlock
+                                label="Matched to a device"
+                                href={query({ site_id: site, linkage: 'linked' })}
+                                ariaLabel="Show sources matched to a device record"
+                            >
+                                <PageHeaderMeterBig>{stats.canonical_linked}</PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>device record in Security & Devices</PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        ) : null}
+                        {canSeeDevices && stats.reconciliation_needed !== null ? (
+                            <PageHeaderMeterBlock
+                                label="Needs matching"
+                                tone={stats.reconciliation_needed > 0 ? 'warning' : 'brand'}
+                                href={query({ site_id: site, linkage: 'unlinked' })}
+                                ariaLabel="Show sources with no device record"
+                            >
+                                <PageHeaderMeterBig>{stats.reconciliation_needed}</PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>no device record yet</PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        ) : null}
+                    </>
+                ),
+                filters: (
+                    <>
+                        <PageHeaderFilterSelect
+                            icon={Cpu}
+                            label="All types"
+                            value={filters.type || 'all'}
+                            onChange={(value) => apply({ type: fromAll(value) })}
+                            options={[
+                                { value: 'all', label: 'All types' },
+                                ...Object.entries(deviceTypes).map(([value, label]) => ({
+                                    value,
+                                    label: sentenceCase(label),
+                                })),
+                            ]}
+                        />
+                        <PageHeaderFilterSelect
+                            icon={Activity}
+                            label="All signal activity"
+                            value={filters.activity || 'all'}
+                            onChange={(value) => apply({ activity: fromAll(value) })}
+                            options={[
+                                { value: 'all', label: 'All signal activity' },
+                                { value: 'recent', label: 'Active in the last 24 hours' },
+                                { value: 'quiet', label: 'No signal in the last 24 hours' },
+                                { value: 'never', label: 'No signal recorded' },
+                            ]}
+                        />
+                        {sites.length > 1 || filters.site_id ? (
+                            <PageHeaderFilterSelect
+                                icon={Building2}
+                                label="All sites"
+                                value={filters.site_id || 'all'}
+                                onChange={(value) => apply({ site_id: fromAll(value) })}
+                                options={[
+                                    { value: 'all', label: 'All sites' },
+                                    ...sites.map((s) => ({ value: String(s.id), label: s.name })),
+                                ]}
+                            />
+                        ) : null}
+                        {canSeeDevices ? (
+                            <PageHeaderFilterSelect
+                                icon={Link2}
+                                label="Any device match"
+                                value={filters.linkage || 'all'}
+                                onChange={(value) => apply({ linkage: fromAll(value) })}
+                                options={[
+                                    { value: 'all', label: 'Any device match' },
+                                    { value: 'linked', label: 'Matched to a device' },
+                                    { value: 'unlinked', label: 'Needs matching' },
+                                ]}
+                            />
+                        ) : null}
+                    </>
+                ),
+            }}
+        >
+            <Card className="min-w-0 gap-0 overflow-hidden py-0">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+                    <div className="min-w-0">
+                        <h2 className="text-section-title">Signal sources</h2>
+                        <p className="text-subtle mt-0.5">
+                            {canSeeDevices
+                                ? 'The last report from each source, and whether it is matched to a device record.'
+                                : 'The last report from each source. Device matching and health show only to people with Security & Devices access.'}
+                        </p>
                     </div>
+                    <StatusBadge variant="neutral" className="tabular-nums">
+                        {total} {total === 1 ? 'source' : 'sources'}
+                    </StatusBadge>
+                </div>
 
-                    {/* Device Grid */}
-                    {devices.data.length === 0 ? (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="py-12 text-center text-sm text-muted-foreground">
-                                    <Cpu className="mx-auto mb-3 h-12 w-12 opacity-40" />
-                                    <p>
-                                        No signal sources match these filters.
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {devices.data.length === 0 ? (
+                    <div className="px-5 py-10">
+                        <EmptyState
+                            icon={Radio}
+                            title="No signal sources match these filters"
+                            description="Clear a filter, or choose another type or site."
+                        />
+                    </div>
+                ) : (
+                    // Table owns its overflow-x-auto container.
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="pl-5">Source</TableHead>
+                                <TableHead>Last signal and site</TableHead>
+                                {canSeeDevices ? <TableHead>Device record</TableHead> : null}
+                                {canSeeDevices ? <TableHead>Device health</TableHead> : null}
+                                <TableHead className="w-12 pr-5">
+                                    <span className="sr-only">Actions</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {devices.data.map((device) => (
-                                <DeviceCard key={device.id} device={device} />
+                                <SignalSourceRow
+                                    key={device.id}
+                                    device={device}
+                                    canSeeDevices={canSeeDevices}
+                                />
                             ))}
-                        </div>
-                    )}
+                        </TableBody>
+                    </Table>
+                )}
 
-                    {/* Pagination */}
-                    {devices.links?.length > 3 && (
-                        <div className="flex flex-wrap justify-center gap-1">
-                            {devices.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={
-                                        link.active ? 'default' : 'outline'
-                                    }
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() =>
-                                        link.url &&
-                                        router.get(
-                                            link.url,
-                                            {},
-                                            {
-                                                preserveState: true,
-                                                preserveScroll: true,
-                                            },
-                                        )
-                                    }
-                                >
-                                    <span
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
-                                </Button>
-                            ))}
+                {(devices.last_page ?? 1) > 1 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+                        <p className="text-caption">
+                            Showing {devices.from ?? 0}–{devices.to ?? 0} of {total}
+                        </p>
+                        <div className="max-w-full min-w-0 overflow-x-auto scrollbar-pretty">
+                            <div className="w-max">
+                                <LaravelPagination
+                                    links={devices.links}
+                                    lastPage={devices.last_page}
+                                    preserveScroll
+                                />
+                            </div>
                         </div>
-                    )}
-                </CommandCentrePage>
-            </PageLayout>
-        </AppLayout>
+                    </div>
+                ) : null}
+            </Card>
+        </ControlRoomPage>
+    );
+}
+
+function SignalSourceRow({
+    device,
+    canSeeDevices,
+}: {
+    device: DeviceItem;
+    canSeeDevices: boolean;
+}) {
+    const href = `${BASE_PATH}/${device.id}`;
+    const name = device.name || device.device_uid;
+    const maker = [device.vendor, device.model].filter(Boolean).join(' ');
+    const linked = device.identity_source === 'canonical';
+    const health = healthBadge(device);
+    const items: ControlRoomRowAction[] = [
+        {
+            key: 'open',
+            label: 'Open signal record',
+            icon: ArrowUpRight,
+            onSelect: () => router.visit(href),
+        },
+    ];
+    if (device.canonical_detail_url)
+        items.push({
+            key: 'device',
+            label: 'Open in Security & Devices',
+            icon: ShieldCheck,
+            onSelect: () => router.visit(device.canonical_detail_url!),
+        });
+    items.push({
+        key: 'copy',
+        label: 'Copy source ID',
+        icon: Copy,
+        onSelect: () => void navigator.clipboard?.writeText(device.device_uid),
+    });
+
+    return (
+        <ControlRoomRowActions label={`Actions for ${name}`} items={items}>
+            {({ rowProps, overflowButton }) => (
+                <TableRow
+                    onContextMenu={rowProps.onContextMenu}
+                    onClick={(event) => {
+                        if ((event.target as HTMLElement).closest('a,button')) return;
+                        router.visit(href);
+                    }}
+                    className="cursor-pointer"
+                >
+                    <TableCell className="pl-5 whitespace-normal">
+                        <Link
+                            href={href}
+                            className="font-semibold text-foreground underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            {name}
+                        </Link>
+                        <span className="text-caption block">
+                            {[sentenceCase(device.type_label), maker].filter(Boolean).join(' · ')}
+                        </span>
+                        {device.name ? (
+                            <span className="text-caption block font-mono">{device.device_uid}</span>
+                        ) : null}
+                    </TableCell>
+                    <TableCell className="whitespace-normal">
+                        <span className="block" title={formatDateTime(device.last_signal_at)}>
+                            {device.last_signal_at
+                                ? `Last signal ${formatRelative(device.last_signal_at)}`
+                                : 'No signal recorded'}
+                        </span>
+                        <StatusBadge
+                            variant={device.signal_activity.tone === 'success' ? 'success' : 'neutral'}
+                            size="sm"
+                            className="mt-1"
+                        >
+                            {device.signal_activity.label}
+                        </StatusBadge>
+                        {device.site_name || device.signal_source_name ? (
+                            <span className="text-caption mt-1 block">
+                                {[device.site_name, device.signal_source_name]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                            </span>
+                        ) : null}
+                    </TableCell>
+                    {canSeeDevices ? (
+                        <TableCell>
+                            <StatusBadge variant={linked ? 'success' : 'warning'} size="sm">
+                                {linked ? 'Matched' : 'Needs matching'}
+                            </StatusBadge>
+                        </TableCell>
+                    ) : null}
+                    {canSeeDevices ? (
+                        <TableCell>
+                            {linked ? (
+                                <StatusBadge variant={health.tone} size="sm">
+                                    {health.label}
+                                </StatusBadge>
+                            ) : (
+                                <span className="text-caption">No device record</span>
+                            )}
+                        </TableCell>
+                    ) : null}
+                    <TableCell className="pr-5 text-right">{overflowButton}</TableCell>
+                </TableRow>
+            )}
+        </ControlRoomRowActions>
     );
 }

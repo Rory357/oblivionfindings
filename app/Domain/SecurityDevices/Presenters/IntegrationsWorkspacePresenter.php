@@ -40,6 +40,7 @@ class IntegrationsWorkspacePresenter
         ['slug' => 'unifi', 'name' => 'UniFi', 'vendor' => 'Ubiquiti', 'summary' => 'Network, CCTV, and access infrastructure.', 'device_scope' => ['cameras', 'doors', 'access points', 'switches', 'gateways']],
         ['slug' => 'queclink', 'name' => 'Queclink', 'vendor' => 'Queclink Wireless', 'summary' => 'Cellular GPS trackers for vehicles, assets, and personal safety.', 'device_scope' => ['vehicle trackers', 'personal trackers', 'asset trackers']],
         ['slug' => 'milesight', 'name' => 'Milesight', 'vendor' => 'Milesight IoT', 'summary' => 'OAuth inventory import for LoRaWAN gateways and environmental or support sensors.', 'device_scope' => ['bed sensors', 'fall sensors', 'door contacts', 'environment sensors', 'gateways']],
+        ['slug' => 'intune', 'name' => 'Microsoft Intune', 'vendor' => 'Microsoft', 'summary' => 'Read-only discovery, bulk Site import, and compliance posture for Windows computers.', 'device_scope' => ['Windows 10 / 11 PCs', 'Windows Servers']],
     ];
 
     public function __construct(

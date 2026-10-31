@@ -60,7 +60,9 @@ class SafeguardingCrossModuleTest extends TestCase
     public function test_incident_detail_surfaces_spawned_concern(): void
     {
         $user = $this->makeUser(['incidents.viewAny', 'safeguarding.viewAny']);
-        $incident = ClientIncident::factory()->create();
+        // The incident register reads within the viewer's current Site assignment.
+        $site = ensureCanonicalHrStaffProfile($user);
+        $incident = ClientIncident::factory()->atSite($site)->create();
         $concern = SafeguardingConcern::factory()->create(['related_incident_id' => $incident->id]);
 
         $this->actingAs($user)
@@ -165,7 +167,9 @@ class SafeguardingCrossModuleTest extends TestCase
             );
             $this->fail('H&S closure must require a signed WorkSafe decision.');
         } catch (\DomainException $exception) {
-            $this->assertSame(
+            // The canonical closure gate lists the notifiability decision first,
+            // then any other requirement the missing signed decision blocks.
+            $this->assertStringStartsWith(
                 'Record the WorkSafe notifiability decision before closing this event.',
                 $exception->getMessage(),
             );

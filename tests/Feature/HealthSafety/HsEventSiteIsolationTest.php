@@ -421,6 +421,9 @@ class HsEventSiteIsolationTest extends TestCase
         $siteA = Site::factory()->create();
         $siteB = Site::factory()->create();
         $globalUser = $this->userWithPermissions(['hazards.view', 'healthSafety.viewAllSites']);
+        // H&S data needs current staff (Stephan, 25 Oct): a current HR profile with no home Site, like the demo officers.
+        HrEmployeeProfile::factory()->create(['user_id' => $globalUser->id, 'primary_site_id' => null, 'secondary_site_ids' => [],
+            'start_date' => now()->subMonth()->toDateString(), 'end_date' => null, 'is_active' => true]);
         HsEvent::factory()->create(['site_id' => $siteA->id]);
         $target = HsEvent::factory()->create(['site_id' => $siteB->id]);
 

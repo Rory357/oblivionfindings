@@ -14,7 +14,9 @@ use App\Services\Sites\Profile\SiteProfileAdminPresenter;
 use App\Services\Sites\Profile\SiteProfileOperationsPresenter;
 use App\Services\Sites\Profile\SiteProfilePeoplePresenter;
 use App\Services\Sites\Profile\SiteProfileSafetyPresenter;
+use App\Models\SiteContact;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class SiteProfileData
 {
@@ -35,13 +37,8 @@ class SiteProfileData
         $this->primeViewerPermissions($user);
         $this->primeReadinessCounts($site);
 
-        $site->loadMissing([
-            'primaryContact:id,name',
-            'managerContact:id,site_id,name,role,phone,email,is_primary',
-            'siteLeadContact:id,site_id,name,role,phone,email,is_primary',
-            'afterHoursContact:id,site_id,name,role,phone,email,is_primary',
-            'primarySiteContact:id,site_id,name,role,phone,email,is_primary',
-        ]);
+        $site->loadMissing(['primaryContact:id,name']);
+        $contacts = $this->primeNamedContacts($site);
 
         $permissions = $this->permissions($user, $site);
         $readiness = $this->readiness->evaluate($site);
@@ -53,7 +50,7 @@ class SiteProfileData
             'hero' => $this->hero($user, $site, $permissions, $readiness, $attention, $occupancy),
             'permissions' => $permissions,
             'attention' => $attention,
-            'overview' => $this->overview($user, $site),
+            'overview' => $this->overview($user, $site, $contacts),
             'readiness' => $readiness,
             'uiPreferences' => [
                 'pinned_tabs' => $this->pinnedTabs($user),
@@ -339,14 +336,15 @@ class SiteProfileData
     }
 
     /** @return array<string, mixed> */
-    private function overview(User $user, Site $site): array
+    private function overview(User $user, Site $site, Collection $siteContacts): array
     {
-        $contacts = $site->contacts()
-            ->orderByDesc('is_primary')
-            ->orderByRaw("FIELD(type, 'site_lead', 'manager', 'emergency', 'maintenance')")
-            ->orderBy('id')
-            ->limit(6)
-            ->get(['id', 'type', 'name', 'role', 'phone', 'email', 'is_primary'])
+        // Primary first, then site lead, manager, emergency, maintenance (any other
+        // type before those, as SQL FIELD() ranks it 0), then oldest; six at most.
+        $rank = ['site_lead' => 1, 'manager' => 2, 'emergency' => 3, 'maintenance' => 4];
+        $typeRank = fn (SiteContact $contact): int => $rank[strtolower(rtrim((string) $contact->type))] ?? 0;
+        $contacts = $siteContacts
+            ->sort(fn (SiteContact $a, SiteContact $b): int => [(int) $b->is_primary, $typeRank($a), $a->id] <=> [(int) $a->is_primary, $typeRank($b), $b->id])
+            ->take(6)
             ->map(fn ($contact) => [
                 'id' => $contact->id,
                 'type' => $contact->type,
@@ -500,6 +498,34 @@ class SiteProfileData
     private function primeViewerPermissions(User $user): void
     {
         $user->loadMissing(['roles.permissions', 'permissionOverrides']);
+    }
+
+    /**
+     * One read of the Site's contacts fills its four named contacts and the overview list
+     * (five reads before 31 Oct 2026). Each named contact is the one the Site model's
+     * relation picks: of that type, the primary one first, then the oldest.
+     *
+     * @return Collection<int, SiteContact>
+     */
+    private function primeNamedContacts(Site $site): Collection
+    {
+        $contacts = $site->contacts()
+            ->orderByDesc('is_primary')
+            ->orderBy('id')
+            ->get(['id', 'site_id', 'type', 'name', 'role', 'phone', 'email', 'is_primary']);
+        $ofType = fn (string $type): ?SiteContact => $contacts
+            ->first(fn (SiteContact $contact): bool => strcasecmp(rtrim((string) $contact->type), $type) === 0);
+
+        foreach (['managerContact' => 'manager', 'siteLeadContact' => 'site_lead', 'afterHoursContact' => 'emergency'] as $relation => $type) {
+            if (! $site->relationLoaded($relation)) {
+                $site->setRelation($relation, $ofType($type));
+            }
+        }
+        if (! $site->relationLoaded('primarySiteContact')) {
+            $site->setRelation('primarySiteContact', $contacts->first(fn (SiteContact $contact): bool => (bool) $contact->is_primary));
+        }
+
+        return $contacts;
     }
 
     private function primeReadinessCounts(Site $site): void

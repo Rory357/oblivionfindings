@@ -1,4 +1,8 @@
-import { PageHeader } from '@/components/page/page-header';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -93,19 +97,14 @@ export function RecordingReferencesWorkspace({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Security & Devices',
-                    href: '/security-devices/security?tab=cctv',
-                },
+                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
                 { title: camera.name, href: base },
-                {
-                    title: 'Recording references',
-                    href: recordingBase(camera.id),
-                },
+                { title: 'Recording references' },
             ]}
         >
             <Head title={camera.name + ' · Recording references'} />
-            <div className="space-y-5">
+            <div className="flex flex-col gap-5">
                 <PageHeader
                     variant="profile"
                     title={camera.name}
@@ -115,14 +114,16 @@ export function RecordingReferencesWorkspace({
                     subline={camera.site.name + ' · Recording references'}
                     actions={
                         <>
-                            <Button variant="secondary" asChild>
+                            <PageHeaderGlassButton asChild>
                                 <Link href={base}>Camera details</Link>
-                            </Button>
+                            </PageHeaderGlassButton>
                             {canCreate && (
-                                <Button onClick={() => setOpen(true)}>
-                                    <Plus aria-hidden="true" />
-                                    Save recording reference
-                                </Button>
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={() => setOpen(true)}
+                                >
+                                    Add recording reference
+                                </PageHeaderPrimaryButton>
                             )}
                         </>
                     }
@@ -167,111 +168,71 @@ export function RecordingReferencesWorkspace({
                                 description="Save a reviewed camera and time window when you need to check an incident."
                             />
                         ) : (
-                            <>
-                                <div className="hidden md:block">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>
-                                                    Requested window
-                                                </TableHead>
-                                                <TableHead>Recorder</TableHead>
-                                                <TableHead>Saved</TableHead>
-                                                <TableHead>
-                                                    <span className="sr-only">
-                                                        Open reference
-                                                    </span>
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {page.references.items.map(
-                                                (item) => (
-                                                    <TableRow
-                                                        key={
-                                                            item.reference_uuid
-                                                        }
-                                                    >
-                                                        <TableCell>
-                                                            <RequestedWindow
-                                                                start={
-                                                                    item.requested_start_at
-                                                                }
-                                                                end={
-                                                                    item.requested_end_at
-                                                                }
-                                                                serverNow={
-                                                                    page.server_now
-                                                                }
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {item.recorder.name}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="space-y-2">
-                                                                <p>
-                                                                    {recordingTime(
-                                                                        item.created_at,
-                                                                    )}
-                                                                </p>
-                                                                <ReferenceLabel />
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                asChild
-                                                            >
-                                                                <Link
-                                                                    href={
-                                                                        item.reader_href
-                                                                    }
-                                                                >
-                                                                    Open
-                                                                    reference
-                                                                </Link>
-                                                            </Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ),
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <ul className="space-y-3 md:hidden">
-                                    {page.references.items.map((item) => (
-                                        <li
-                                            key={item.reference_uuid}
-                                            className="space-y-3 rounded-lg border border-border p-4"
-                                        >
-                                            <ReferenceLabel />
-                                            <RequestedWindow
-                                                start={item.requested_start_at}
-                                                end={item.requested_end_at}
-                                                serverNow={page.server_now}
-                                            />
-                                            <p className="text-sm">
-                                                {item.recorder.name}
-                                            </p>
-                                            <p className="text-caption text-muted-foreground">
-                                                Saved{' '}
-                                                {recordingTime(item.created_at)}
-                                            </p>
-                                            <Button
-                                                variant="outline"
-                                                className="frontline-hit w-full"
-                                                asChild
-                                            >
-                                                <Link href={item.reader_href}>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>
+                                                Requested window
+                                            </TableHead>
+                                            <TableHead>Recorder</TableHead>
+                                            <TableHead>Saved</TableHead>
+                                            <TableHead>
+                                                <span className="sr-only">
                                                     Open reference
-                                                </Link>
-                                            </Button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </>
+                                                </span>
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {page.references.items.map((item) => (
+                                            <TableRow key={item.reference_uuid}>
+                                                <TableCell>
+                                                    <RequestedWindow
+                                                        start={
+                                                            item.requested_start_at
+                                                        }
+                                                        end={
+                                                            item.requested_end_at
+                                                        }
+                                                        serverNow={
+                                                            page.server_now
+                                                        }
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    {item.recorder.name}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="space-y-2">
+                                                        <p>
+                                                            {recordingTime(
+                                                                item.created_at,
+                                                            )}
+                                                        </p>
+                                                        <ReferenceLabel />
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={
+                                                                item.reader_href
+                                                            }
+                                                        >
+                                                            Open reference
+                                                        </Link>
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         )}
                         {(page.references.previous_href ||
                             page.references.next_href) && (

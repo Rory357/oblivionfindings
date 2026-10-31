@@ -39,7 +39,8 @@ beforeEach(function () {
     $this->publisher = app(HubPublishing::class);
     $this->page = $this->publisher->create($this->editor, 'news', 'A company story');
     $draft = $this->page->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'A complete company story for focused publication contracts.';
+    // The story template also starts an image and a second text block; these tests need one complete text block.
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'A complete company story for focused publication contracts.']];
     $this->page->update(['draft' => $draft]);
 });
 
@@ -253,7 +254,7 @@ test('thread replies cannot target another page and removing a parent hides its 
     $service = app(HubParticipation::class);
     $service->write($this->editor, $this->page, ['kind' => 'comment', 'body' => 'Original']);
     $parent = DB::table('hub_interactions')->where('hub_page_id', $this->page->id)->value('id');
-    $other = $this->publisher->create($this->editor, 'news', 'Other story');
+    $other = $this->publisher->create($this->editor, 'news', 'Other story', 'blank');
     $this->publisher->publish($this->editor, $other, 1, null, null);
     $reply = ['kind' => 'comment', 'body' => 'A reply', 'parent_id' => $parent];
     $this->actingAs($this->reader)->postJson('/company-hub/pages/'.$other->id.'/interactions', $reply)->assertUnprocessable();
@@ -442,7 +443,7 @@ test('restoring a revision creates a draft without replacing the current live st
 test('a revision belonging to another page cannot be restored using a forged identifier', function () {
     $other = $this->publisher->create($this->editor, 'news', 'Other page');
     $draft = $other->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'A complete published page for direct-object denial.';
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'A complete published page for direct-object denial.']];
     $other->update(['draft' => $draft]);
     $revision = $this->publisher->publish($this->editor, $other, 1, null, null);
     $this->actingAs($this->editor)->post('/company-hub/manage/'.$this->page->id.'/revisions/'.$revision->id.'/restore', ['version' => 1])->assertNotFound();
@@ -588,16 +589,16 @@ test('visual settings reject unsafe fields while incomplete hero actions save bu
 
 test('hero summary is stable during search and excludes private unpublished and expired pages', function () {
     $this->publisher->publish($this->editor, $this->page, 1, null, null);
-    $guide = $this->publisher->create($this->editor, 'knowledge', 'Staff guide');
+    $guide = $this->publisher->create($this->editor, 'knowledge', 'Staff guide', 'blank');
     $this->publisher->publish($this->editor, $guide, 1, null, null);
     $this->publisher->create($this->editor, 'news', 'Private draft');
-    $private = $this->publisher->create($this->editor, 'news', 'Other site story');
+    $private = $this->publisher->create($this->editor, 'news', 'Other site story', 'blank');
     $otherSite = Site::factory()->create(['is_active' => true, 'archived' => false]);
     ensureCanonicalHrStaffProfile($this->editor, $this->site, ['secondary_site_ids' => [$otherSite->id]]);
     $this->editor = $this->editor->fresh();
     $private = $this->publisher->save($this->editor, $private, [...$private->draft, 'audience' => ['type' => 'sites', 'ids' => [$otherSite->id]]], 1);
     $this->publisher->publish($this->editor, $private, 2, null, null);
-    $expiring = $this->publisher->create($this->editor, 'news', 'Expiring story');
+    $expiring = $this->publisher->create($this->editor, 'news', 'Expiring story', 'blank');
     $this->publisher->publish($this->editor, $expiring, 1, null, now()->addHour()->toIso8601String());
     $this->travel(2)->hours();
     $summary = app(HubFeed::class)->forUser($this->reader)['heroSummary'];
@@ -873,7 +874,7 @@ test('registration direct objects capacity and calendar download obey calendar a
 });
 
 test('resource reports remain private to editors and resolution checks the current version', function () {
-    $page = $this->publisher->create($this->editor, 'knowledge', 'Team guide');
+    $page = $this->publisher->create($this->editor, 'knowledge', 'Team guide', 'blank');
     $url = '/company-hub/pages/'.$page->id.'/reports';
     $data = ['issue' => 'Out of date', 'note' => 'The room name has changed.'];
     $this->actingAs($this->reader)->postJson($url, $data)->assertNotFound();

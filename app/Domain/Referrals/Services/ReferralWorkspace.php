@@ -22,9 +22,12 @@ use Illuminate\Validation\Rule;
  */
 final class ReferralWorkspace
 {
-    public const VIEWS = ['referrals', 'funding', 'follow_ups'];
+    public const VIEWS = ['referrals', 'enquiries', 'funding', 'follow_ups'];
 
     public const REFERRAL_QUEUES = ['open', 'all', 'mine', 'unassigned', 'overdue', 'due_today', 'awaiting_contact', 'waiting', 'capacity_waitlist', 'ready_for_handover', 'funding_help', 'central'];
+
+    /** General enquiries (Contact us and general questions) have their own queue, never counted as referrals. */
+    public const ENQUIRY_QUEUES = ['open', 'all', 'mine', 'unassigned', 'overdue'];
 
     public const FUNDING_QUEUES = ['open', 'mine', 'unassigned', 'overdue'];
 
@@ -83,7 +86,7 @@ final class ReferralWorkspace
         ])->validate();
         $data['view'] ??= 'referrals';
         $queues = match ($data['view']) {
-            'funding' => self::FUNDING_QUEUES, 'follow_ups' => self::FOLLOW_UP_QUEUES, default => self::REFERRAL_QUEUES,
+            'funding' => self::FUNDING_QUEUES, 'follow_ups' => self::FOLLOW_UP_QUEUES, 'enquiries' => self::ENQUIRY_QUEUES, default => self::REFERRAL_QUEUES,
         };
         $data['queue'] = in_array($data['queue'] ?? 'open', $queues, true) ? ($data['queue'] ?? 'open') : 'open';
         $layout = $data['layout'] ?? 'table';
@@ -96,10 +99,10 @@ final class ReferralWorkspace
         return array_filter($data, fn ($value) => $value !== null && $value !== '');
     }
 
-    /** Header meters: always the viewer's whole scope, so each number matches the view it links to. */
+    /** Header meters: always the viewer's whole referral scope, so each number matches the view it links to. */
     public function stats(User $actor): array
     {
-        $base = $this->access->query($actor);
+        $base = $this->access->query($actor)->exceptGeneralEnquiries();
 
         return [
             'open' => $this->applyQueue(clone $base, $actor, 'open')->count(),
@@ -113,7 +116,7 @@ final class ReferralWorkspace
     /** @return list<array{key: string, label: string, count: int}> */
     public function savedViews(User $actor, array $stats): array
     {
-        $base = $this->access->query($actor);
+        $base = $this->access->query($actor)->exceptGeneralEnquiries();
         $known = ['unassigned' => $stats['unassigned'], 'overdue' => $stats['overdue'], 'ready_for_handover' => $stats['ready_for_handover']];
         $views = [];
         foreach (self::SAVED_VIEWS as $key => $label) {
@@ -123,11 +126,12 @@ final class ReferralWorkspace
         return $views;
     }
 
-    /** Rail counters: open referrals, open funding cases (when permitted) and open follow-ups. */
+    /** Rail counters: open referrals, open general enquiries, open funding cases (when permitted) and open follow-ups. */
     public function railCounts(User $actor, array $stats): array
     {
         return [
             'referrals' => $stats['open'],
+            'enquiries' => $this->applyQueue($this->access->query($actor)->generalEnquiries(), $actor, 'open')->count(),
             'funding' => $this->access->can($actor, 'funding.view') ? $this->fundingQuery($actor, ['queue' => 'open'])->count() : null,
             'follow_ups' => DB::query()->fromSub($this->followUpUnion($actor, []), 'follow_ups')->count(),
         ];
@@ -136,6 +140,12 @@ final class ReferralWorkspace
     public function referrals(User $actor, array $filters): Builder
     {
         $query = $this->scope($actor, $filters);
+        // General enquiries only ever appear in their own queue.
+        if (($filters['view'] ?? 'referrals') === 'enquiries') {
+            $query->generalEnquiries();
+        } else {
+            $query->exceptGeneralEnquiries();
+        }
         $this->applyQueue($query, $actor, $filters['queue'] ?? 'open');
         if (isset($filters['stage'])) {
             $query->where('care_referrals.stage', $filters['stage']);
@@ -430,7 +440,7 @@ final class ReferralWorkspace
     {
         $summary = $this->presenter->summary($referral);
 
-        return ['reference' => $referral->reference, 'name' => $summary['name'], 'preferred_name' => $summary['preferred_name'],
+        return ['reference' => $referral->reference, 'enquiry_reference' => $summary['enquiry_reference'], 'name' => $summary['name'], 'preferred_name' => $summary['preferred_name'],
             'site_name' => $summary['site_name'], 'stage' => $referral->stage, 'restricted' => $referral->restricted];
     }
 

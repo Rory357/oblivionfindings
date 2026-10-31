@@ -9,11 +9,11 @@ import {
     within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { estateFixture } from './estate-test-fixtures';
 import Dashboard from './dashboard';
+import { estateFixture } from './estate-test-fixtures';
 const mocks = vi.hoisted(() => ({
     actor: 7,
-    can: {} as Record<string, boolean>,
+    can: {} as Record<string, Record<string, boolean>>,
     visit: vi.fn(),
     reload: vi.fn(),
 }));
@@ -67,11 +67,13 @@ vi.mock('@/components/security-devices/add-device-dialog', async () => {
 beforeEach(() => {
     mocks.actor = 7;
     mocks.can = {
-        'securityDevices.viewAny': true,
-        'securityDevices.devices.view': true,
-        'securityDevices.events.view': true,
-        'securityDevices.maintenance.view': true,
-        'securityDevices.devices.create': true,
+        securityDevices: {
+            viewAny: true,
+            devicesView: true,
+            eventsView: true,
+            maintenanceView: true,
+            devicesCreate: true,
+        },
     };
     mocks.visit.mockReset();
     mocks.reload.mockReset();
@@ -104,6 +106,21 @@ function invalid(status: number, path = '/security-devices') {
     return event;
 }
 describe('Estate shared records and authority', () => {
+    it('withholds retained estate records after current nested view authority is withdrawn', () => {
+        const data = estateFixture();
+        const ui = render(<Dashboard {...data} />);
+        expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
+        mocks.can.securityDevices.viewAny = false;
+        ui.rerender(<Dashboard {...data} />);
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Register device' }),
+        ).not.toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Estate records are restricted',
+        );
+    });
+
     it('preserves work queue destinations, restricted IT and neutral zero-item states', async () => {
         const data = estateFixture();
         data.operations.action_queue[0].count = 0;
@@ -206,12 +223,14 @@ describe('Estate shared records and authority', () => {
     it('retains attention identity/domain/category/battery/dates and domain/health distributions', async () => {
         render(<Dashboard {...estateFixture()} />);
         fireEvent.click(screen.getByRole('tab', { name: 'Devices & domains' }));
-        expect(card('IoT healthcare')).toBeInTheDocument();
+        // Domains use the sidebar's workspace names.
+        expect(card('Healthcare')).toBeInTheDocument();
+        expect(card('Network & IT')).toBeInTheDocument();
         expect(card('Recorded health: Unknown')).toBeInTheDocument();
         const dialog = await details('Synthetic pump');
         for (const value of [
             'DEV-2',
-            'IoT healthcare',
+            'Healthcare',
             'Medical device',
             'Offline',
             'Critical',
@@ -301,7 +320,7 @@ describe('Estate shared records and authority', () => {
         render(<Dashboard {...data} />);
         expect(screen.getAllByText(/Not measured/).length).toBeGreaterThan(0);
         cleanup();
-        mocks.can['securityDevices.events.view'] = false;
+        mocks.can.securityDevices.eventsView = false;
         render(<Dashboard {...data} />);
         expect(
             screen.getByText('Monitoring access required'),
@@ -324,7 +343,7 @@ describe('Estate shared records and authority', () => {
             }),
         ).toBeInTheDocument();
         expect(mocks.visit).not.toHaveBeenCalled();
-        mocks.can['securityDevices.devices.create'] = false;
+        mocks.can.securityDevices.devicesCreate = false;
         ui.rerender(<Dashboard {...data} />);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(
@@ -370,5 +389,165 @@ describe('Estate shared records and authority', () => {
         expect(
             screen.queryByText('Private backend details'),
         ).not.toBeInTheDocument();
+    });
+});
+
+describe('dashboard received DTO ownership', () => {
+    it('quarantines retained private DTOs after paired actor metadata changes', async () => {
+        const original = estateFixture();
+        const { rerender } = render(<Dashboard {...original} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'Affected Sites' }));
+        await details('Kauri House');
+        mocks.actor = 8;
+        // Same-page partial update: actor metadata changes, all private DTOs remain from actor 7.
+        rerender(
+            <Dashboard
+                {...original}
+                actor_id={8}
+                as_of="2026-10-13T02:00:00Z"
+            />,
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        expect(screen.queryByText('Synthetic pump')).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Add device' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.visit).toHaveBeenCalledWith(
+            '/security-devices',
+            expect.objectContaining({
+                method: 'get',
+                preserveState: false,
+                preserveScroll: true,
+            }),
+        );
+        expect(mocks.visit.mock.calls.at(-1)![1]).not.toHaveProperty('only');
+        expect(mocks.reload).not.toHaveBeenCalled();
+    });
+});
+
+describe('dashboard same-account reads', () => {
+    it('keeps the existing same-account refresh projection and owner', () => {
+        const original = estateFixture();
+        const { rerender } = render(<Dashboard {...original} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.reload).toHaveBeenCalledTimes(1);
+        expect(mocks.reload.mock.calls[0][0].only).toEqual(
+            expect.arrayContaining(['actor_id', 'as_of', 'auth']),
+        );
+        expect(mocks.visit).not.toHaveBeenCalled();
+        rerender(<Dashboard {...original} as_of="2026-10-13T02:00:00Z" />);
+        expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
+    });
+});
+
+describe('dashboard number owners', () => {
+    it('opens Monitoring, IT and Maintenance for numbers this page does not own', () => {
+        mocks.can.it = { view: true };
+        render(<Dashboard {...estateFixture()} />);
+        expect(
+            screen.getByRole('link', { name: 'Open monitoring coverage' }),
+        ).toHaveAttribute('href', '/security-devices/monitoring?tab=coverage');
+        expect(
+            screen.getByRole('link', { name: 'Open the IT open work queue' }),
+        ).toHaveAttribute('href', '/it?tab=tickets&view=all_open');
+        fireEvent.click(screen.getByRole('tab', { name: /Recent findings/ }));
+        expect(
+            screen.getByRole('link', { name: 'View all findings' }),
+        ).toHaveAttribute('href', '/security-devices/monitoring?tab=findings');
+        fireEvent.click(screen.getByRole('tab', { name: /Overdue work/ }));
+        expect(
+            screen.getByRole('link', {
+                name: 'View due or overdue maintenance',
+            }),
+        ).toHaveAttribute('href', '/security-devices/maintenance?tab=due');
+    });
+
+    it('keeps a restricted owner on the in-page overview instead of a link', () => {
+        render(<Dashboard {...estateFixture()} />);
+        expect(
+            screen.queryByRole('link', { name: 'Open the IT open work queue' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getAllByRole('button', { name: 'Open overview view' })
+                .length,
+        ).toBeGreaterThan(0);
+    });
+});
+
+describe('dashboard first-run checklist', () => {
+    it('renders incomplete first-run steps on Overview, hides when complete, and withholds when restricted', () => {
+        const incomplete = {
+            ...estateFixture(),
+            first_run_checklist: {
+                completed: 1,
+                total: 4,
+                all_complete: false,
+                steps: [
+                    {
+                        key: 'server_readiness',
+                        title: 'Check server readiness',
+                        summary:
+                            'Open Server readiness to check background workers, keys, and ping access.',
+                        done: false,
+                        href: '/settings/server-readiness',
+                        action_label: 'Open Server readiness',
+                    },
+                    {
+                        key: 'sites',
+                        title: 'Confirm your Sites',
+                        summary: '1 active Site is ready for devices.',
+                        done: true,
+                        href: '/security-devices/sites',
+                        action_label: 'View Sites',
+                    },
+                    {
+                        key: 'devices',
+                        title: 'Add or discover devices',
+                        summary:
+                            'Register a device manually or scan a network from Setup.',
+                        done: false,
+                        href: '/security-devices/discovery',
+                        action_label: 'Open Setup',
+                    },
+                    {
+                        key: 'monitoring',
+                        title: 'Turn on device checks',
+                        summary:
+                            'Assign checks so Oblivion can watch device reachability and alert you when something goes offline.',
+                        done: false,
+                        href: '/security-devices/monitoring',
+                        action_label: 'Open Alerts & upkeep',
+                    },
+                ],
+            },
+        };
+
+        const ui = render(<Dashboard {...incomplete} />);
+        expect(screen.getByText('First-run setup')).toBeInTheDocument();
+        expect(screen.getByText('1 of 4 done')).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: /Open Server readiness/i }),
+        ).toHaveAttribute('href', '/settings/server-readiness');
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Affected Sites' }));
+        expect(screen.queryByText('First-run setup')).not.toBeInTheDocument();
+
+        ui.rerender(
+            <Dashboard
+                {...incomplete}
+                first_run_checklist={{
+                    ...incomplete.first_run_checklist,
+                    completed: 4,
+                    all_complete: true,
+                }}
+            />,
+        );
+        expect(screen.queryByText('First-run setup')).not.toBeInTheDocument();
+
+        mocks.can.securityDevices.viewAny = false;
+        ui.rerender(<Dashboard {...incomplete} />);
+        expect(screen.queryByText('First-run setup')).not.toBeInTheDocument();
     });
 });

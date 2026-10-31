@@ -8,6 +8,7 @@ use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Endpoints\Models\EndpointAgent;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointAgentIdentity;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointCommandSigner;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteSupportSettings;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\ItTicket;
 use App\Models\ItTicketCommandReceipt;
@@ -27,7 +28,7 @@ final readonly class ObliComputerContexts
 
     public function ready(): bool
     {
-        if (! config('endpoint_management.enabled') || ! Schema::hasTable('obli_computer_contexts') || ! Schema::hasTable('endpoint_agents') || ! Schema::hasTable('devices') || ! Schema::hasTable('device_assignments')) {
+        if (! app(EndpointRemoteSupportSettings::class)->endpointEnabled() || ! Schema::hasTable('obli_computer_contexts') || ! Schema::hasTable('endpoint_agents') || ! Schema::hasTable('devices') || ! Schema::hasTable('device_assignments')) {
             return false;
         }
         try {

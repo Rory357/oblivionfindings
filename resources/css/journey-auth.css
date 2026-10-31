@@ -184,6 +184,82 @@
     color: var(--journey-lavender);
 }
 
+/* ── Brand half over the client's own photo or brand colour ──────────────
+ * Stephan, 21 Oct 2026 (mockup v2): with client branding, the brand half
+ * shows the client's hero photo from Settings › Branding, or a plain
+ * brand-colour panel when there is no photo. The islands art is only
+ * Oblivion's own default (no client branding at all).
+ * Two scrims keep AA on any photo: a top band behind "Back to website" and
+ * the logo (≥ 72 % ink), and one that travels with the welcome block
+ * (≥ 90 % ink behind every line of text), so taller content (the family
+ * chips) never slides onto bare photo. */
+.journey-brand--photo,
+.journey-brand--panel {
+    color: var(--journey-paper);
+    background: var(--journey-ink); /* while the photo loads */
+}
+/* Floored like the page hero band (L ≤ 0.38 → 0.30): paper text stays AA. */
+.journey-brand--panel {
+    background: linear-gradient(
+        160deg,
+        oklch(from var(--primary) min(l, 0.38) c h),
+        oklch(from var(--primary) min(l, 0.3) c h)
+    );
+}
+.journey-brand-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.journey-brand-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--journey-ink) 86%, transparent) 0,
+        color-mix(in oklab, var(--journey-ink) 72%, transparent) 160px,
+        /* Holds to the bottom. Don't repeat this stop at 100 %: the
+           minifier merges identical stops into an invalid "300px100%". */
+        color-mix(in oklab, var(--journey-ink) 25%, transparent) 300px
+    );
+}
+.journey-brand-welcome {
+    position: relative;
+    z-index: 0;
+}
+.journey-brand--photo .journey-brand-welcome::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: -140px;
+    right: -56px;
+    bottom: -36px;
+    left: -56px;
+    background: linear-gradient(
+        180deg,
+        transparent 0,
+        color-mix(in oklab, var(--journey-ink) 90%, transparent) 140px,
+        color-mix(in oklab, var(--journey-ink) 95%, transparent) 100%
+    );
+}
+/* Over a photo or panel the family chips wrap in a row, so the welcome
+   block (and its scrim) stays short and more of the photo shows. */
+:is(.journey-brand--photo, .journey-brand--panel) .journey-brand-welcome > ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-width: 520px;
+}
+/* Family chips on the photo or panel take their dark-mode look in both modes. */
+:is(.journey-brand--photo, .journey-brand--panel) .journey-chip {
+    background: color-mix(in oklab, var(--journey-paper) 8%, transparent);
+    border-color: color-mix(in oklab, var(--journey-lavender) 35%, transparent);
+}
+:is(.journey-brand--photo, .journey-brand--panel) .journey-chip svg {
+    color: var(--journey-lavender);
+}
+
 /* ── Form half ──────────────────────────────────────────────────────────── */
 .journey-form-half {
     flex: 1 1 520px;

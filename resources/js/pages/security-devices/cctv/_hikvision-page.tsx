@@ -73,10 +73,8 @@ export default function HikvisionSourcePage(props: HikSetup) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Security & Devices',
-                    href: '/security-devices/security?tab=cctv',
-                },
+                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
             ]}
         >
             <Alert>
@@ -133,16 +131,14 @@ function Workspace({ setup }: { setup: HikSetup }) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Security & Devices',
-                    href: '/security-devices/security?tab=cctv',
-                },
+                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
                 { title: current.camera.name, href: base },
-                { title: 'Camera setup', href: base + '/live/source' },
+                { title: 'Camera setup' },
             ]}
         >
             <Head title={current.camera.name + ' · Camera setup'} />
-            <div className="space-y-5">
+            <div className="flex flex-col gap-5">
                 <PageHeader
                     variant="profile"
                     title={current.camera.name}
@@ -158,6 +154,7 @@ function Workspace({ setup }: { setup: HikSetup }) {
                                 <Link href={base}>Camera details</Link>
                             </PageHeaderGlassButton>
                             <PageHeaderPrimaryButton
+                                icon={Settings2}
                                 disabled={
                                     busy ||
                                     !!notice ||
@@ -165,7 +162,6 @@ function Workspace({ setup }: { setup: HikSetup }) {
                                 }
                                 onClick={() => setMode('configure')}
                             >
-                                <Settings2 aria-hidden="true" />
                                 {source
                                     ? 'Check connection'
                                     : 'Set up connection'}
@@ -198,7 +194,9 @@ function Workspace({ setup }: { setup: HikSetup }) {
                 )}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Camera connection</CardTitle>
+                        <CardTitle className="text-section-title">
+                            Camera connection
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <dl className="grid gap-3 sm:grid-cols-2">

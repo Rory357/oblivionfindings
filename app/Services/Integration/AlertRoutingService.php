@@ -2,11 +2,15 @@
 
 namespace App\Services\Integration;
 
+use App\Enums\AlertSeverity;
 use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Support\SafeOperationalData;
+use App\Support\WorkerClock;
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -49,8 +53,10 @@ class AlertRoutingService
             return null;
         }
 
-        // Step 2: Apply quiet hours suppression for non-critical events
-        if ($event->severity !== IntegrationEvent::SEVERITY_CRITICAL) {
+        // Step 2: Apply quiet hours suppression for non-critical events. Use the
+        // canonical severity, so a fall or panic a device reports as "info" is
+        // still critical and is never muted by quiet hours.
+        if ($this->normaliser->resolveSeverity($event) !== AlertSeverity::CRITICAL) {
             if ($this->isQuietHours($event->provider)) {
                 Log::info('AlertRoutingService: event suppressed during quiet hours', SafeOperationalData::logContext([
                     'integration_event_id' => $event->id,
@@ -125,17 +131,47 @@ class AlertRoutingService
         $quietStart = $connection->config['quiet_hours_start'] ?? null;
         $quietEnd = $connection->config['quiet_hours_end'] ?? null;
 
-        if (! $quietStart || ! $quietEnd) {
+        return self::withinQuietHours(
+            is_string($quietStart) ? $quietStart : null,
+            is_string($quietEnd) ? $quietEnd : null,
+            now(),
+            WorkerClock::timezone(),
+        );
+    }
+
+    /**
+     * Whether an instant falls inside quiet hours.
+     *
+     * Quiet hours are entered as New Zealand wall-clock times ("22:00" to
+     * "06:00"), so they are compared with the local time in the organisation's
+     * timezone (Pacific/Auckland by default), never with UTC. Comparing the
+     * local time on the day handles NZST and NZDT alike. A start later than
+     * the end crosses midnight; the end time itself is outside quiet hours.
+     * Missing, malformed or identical ends mean no quiet hours, so alerts are
+     * never muted by a half-set configuration.
+     */
+    public static function withinQuietHours(
+        ?string $start,
+        ?string $end,
+        DateTimeInterface $at,
+        string $timezone,
+    ): bool {
+        if (! self::isClockTime($start) || ! self::isClockTime($end) || $start === $end) {
             return false;
         }
 
-        $now = now()->format('H:i');
+        $local = CarbonImmutable::instance($at)->setTimezone($timezone)->format('H:i');
 
-        // Handle overnight quiet hours (e.g., 22:00 - 06:00)
-        if ($quietStart > $quietEnd) {
-            return $now >= $quietStart || $now < $quietEnd;
+        if ($start > $end) {
+            return $local >= $start || $local < $end;
         }
 
-        return $now >= $quietStart && $now < $quietEnd;
+        return $local >= $start && $local < $end;
+    }
+
+    /** @phpstan-assert-if-true string $value */
+    private static function isClockTime(?string $value): bool
+    {
+        return is_string($value) && preg_match('/\A([01]\d|2[0-3]):[0-5]\d\z/', $value) === 1;
     }
 }

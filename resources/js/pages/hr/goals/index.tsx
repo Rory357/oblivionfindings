@@ -218,6 +218,11 @@ export default function GoalsHub({
     const [objectiveToDelete, setObjectiveToDelete] =
         useState<Objective | null>(null);
     const [deletingObjective, setDeletingObjective] = useState(false);
+    const [objectiveToArchive, setObjectiveToArchive] =
+        useState<Objective | null>(null);
+    // The selection is captured when the bulk confirmation opens.
+    const [bulkArchiveIds, setBulkArchiveIds] = useState<number[] | null>(null);
+    const [archiving, setArchiving] = useState(false);
 
     /* ---- context menu + toast ---- */
     const [ctx, setCtx] = useState<{
@@ -327,9 +332,45 @@ export default function GoalsHub({
                     show(
                         status === 'completed'
                             ? 'Objective completed 🎉'
-                            : 'Objective archived',
-                        status === 'cancelled' ? 'warn' : 'ok',
+                            : 'Objective updated',
                     ),
+            },
+        );
+    };
+    // Archive (row menu and bulk bar) only opens a confirmation; the request
+    // is sent from its confirm button.
+    const confirmArchive = () => {
+        if (objectiveToArchive === null) return;
+        router.put(
+            `/hr/goals/${objectiveToArchive.id}`,
+            { status: 'cancelled' },
+            {
+                preserveScroll: true,
+                onStart: () => setArchiving(true),
+                onSuccess: () => show('Objective archived', 'warn'),
+                onFinish: () => {
+                    setArchiving(false);
+                    setObjectiveToArchive(null);
+                },
+            },
+        );
+    };
+    const confirmBulkArchive = () => {
+        if (bulkArchiveIds === null) return;
+        router.post(
+            '/hr/goals/bulk',
+            { action: 'archive', ids: bulkArchiveIds },
+            {
+                preserveScroll: true,
+                onStart: () => setArchiving(true),
+                onSuccess: () => {
+                    setSelected({});
+                    show('Bulk action applied');
+                },
+                onFinish: () => {
+                    setArchiving(false);
+                    setBulkArchiveIds(null);
+                },
             },
         );
     };
@@ -443,7 +484,7 @@ export default function GoalsHub({
                       label: 'Archive',
                       icon: Trash2,
                       danger: true,
-                      onClick: () => markStatus(o, 'cancelled'),
+                      onClick: () => setObjectiveToArchive(o),
                   },
                   {
                       label: 'Delete',
@@ -765,6 +806,7 @@ export default function GoalsHub({
                         onMenu={(e, o) => openCtx(e, o.title, objMenu(o))}
                         onAddKr={(o) => openObjective(o.id)}
                         onBulk={bulk}
+                        onBulkArchive={() => setBulkArchiveIds(selectedIds)}
                         onNew={() =>
                             setObjWizard({
                                 open: true,
@@ -1013,6 +1055,51 @@ export default function GoalsHub({
                 variant="destructive"
                 processing={deletingObjective}
             />
+            <ConfirmDialog
+                open={objectiveToArchive !== null}
+                onClose={() => {
+                    if (!archiving) setObjectiveToArchive(null);
+                }}
+                onConfirm={confirmArchive}
+                title="Archive this objective?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            “{objectiveToArchive?.title}”
+                        </span>{' '}
+                        is marked cancelled. Its key results and check-in
+                        history are kept. To make it active again, edit the
+                        objective and save it.
+                    </>
+                }
+                confirmText="Archive objective"
+                variant="destructive"
+                processing={archiving}
+            />
+            <ConfirmDialog
+                open={bulkArchiveIds !== null}
+                onClose={() => {
+                    if (!archiving) setBulkArchiveIds(null);
+                }}
+                onConfirm={confirmBulkArchive}
+                title={
+                    bulkArchiveIds?.length === 1
+                        ? 'Archive 1 objective?'
+                        : `Archive ${bulkArchiveIds?.length ?? 0} objectives?`
+                }
+                description={
+                    bulkArchiveIds?.length === 1
+                        ? 'The selected objective is marked cancelled. Its key results and check-in history are kept. To make it active again, edit the objective and save it.'
+                        : `The ${bulkArchiveIds?.length ?? 0} selected objectives are marked cancelled. Their key results and check-in history are kept. To make one active again, edit it and save it.`
+                }
+                confirmText={
+                    bulkArchiveIds?.length === 1
+                        ? 'Archive objective'
+                        : 'Archive objectives'
+                }
+                variant="destructive"
+                processing={archiving}
+            />
         </AppLayout>
     );
 }
@@ -1055,6 +1142,7 @@ function ObjectivesTab(props: {
     onMenu: (e: React.MouseEvent, o: Objective) => void;
     onAddKr: (o: Objective) => void;
     onBulk: (action: string, extra?: Record<string, unknown>) => void;
+    onBulkArchive: () => void;
     onNew: () => void;
 }) {
     const {
@@ -1205,9 +1293,7 @@ function ObjectivesTab(props: {
                     <BulkBtn onClick={() => props.onBulk('request_checkin')}>
                         Request check-in
                     </BulkBtn>
-                    <BulkBtn onClick={() => props.onBulk('archive')}>
-                        Archive
-                    </BulkBtn>
+                    <BulkBtn onClick={props.onBulkArchive}>Archive</BulkBtn>
                     <div className="flex-1" />
                     <button
                         type="button"

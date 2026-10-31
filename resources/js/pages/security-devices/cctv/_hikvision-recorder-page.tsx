@@ -89,10 +89,8 @@ function Unavailable() {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Security & Devices',
-                    href: '/security-devices/security?tab=cctv',
-                },
+                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
             ]}
         >
             <Alert>
@@ -183,16 +181,14 @@ function Workspace({ initial }: { initial: RecorderSetup }) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Security & Devices',
-                    href: '/security-devices/security?tab=cctv',
-                },
+                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
                 { title: d.name, href: base },
-                { title: 'Recorder information', href: base + '/live/source' },
+                { title: 'Recorder information' },
             ]}
         >
             <Head title={d.name + ' · Recorder information'} />
-            <div className="space-y-5">
+            <div className="flex flex-col gap-5">
                 <PageHeader
                     variant="profile"
                     frontline
@@ -258,7 +254,9 @@ function Workspace({ initial }: { initial: RecorderSetup }) {
                 )}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Recent recorder checks</CardTitle>
+                        <CardTitle className="text-section-title">
+                            Recent recorder checks
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <Button
@@ -284,8 +282,18 @@ function Workspace({ initial }: { initial: RecorderSetup }) {
                                         key={r.request_uuid}
                                         className="flex flex-wrap items-center justify-between gap-3 py-3"
                                     >
-                                        <div>
-                                            <p>{statusText(r.status)}</p>
+                                        <div className="space-y-1">
+                                            <StatusBadge
+                                                status={
+                                                    r.status === 'observed'
+                                                        ? 'info'
+                                                        : waiting(r.status)
+                                                          ? 'pending'
+                                                          : 'warning'
+                                                }
+                                            >
+                                                {statusText(r.status)}
+                                            </StatusBadge>
                                             <p className="text-caption text-muted-foreground">
                                                 Requested{' '}
                                                 {formatDateTime(r.created_at)}
@@ -329,7 +337,9 @@ function Observation({ value }: { value: RecorderDiscovery }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Reported recorder information</CardTitle>
+                <CardTitle className="text-section-title">
+                    Reported recorder information
+                </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
                 <StatusBadge
@@ -454,11 +464,21 @@ function Observation({ value }: { value: RecorderDiscovery }) {
                                                     : c.fps100 / 100 +
                                                       ' frames per second'}
                                             </p>
-                                            <p className="text-subtle">
-                                                {c.enabled && c.video_enabled
-                                                    ? 'Channel enabled as reported'
-                                                    : 'Channel disabled as reported'}
-                                            </p>
+                                            <div className="mt-2">
+                                                <StatusBadge
+                                                    status={
+                                                        c.enabled &&
+                                                        c.video_enabled
+                                                            ? 'info'
+                                                            : 'neutral'
+                                                    }
+                                                >
+                                                    {c.enabled &&
+                                                    c.video_enabled
+                                                        ? 'Channel enabled as reported'
+                                                        : 'Channel disabled as reported'}
+                                                </StatusBadge>
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
@@ -765,7 +785,7 @@ function RecorderCheck({
             >
                 {step === 0 && (
                     <WizardStepPane>
-                        <h2 className="text-base font-semibold">
+                        <h2 className="text-section-title">
                             Choose approved equipment
                         </h2>
                         <p className="mb-4 text-sm text-muted-foreground">
@@ -806,7 +826,7 @@ function RecorderCheck({
                 )}
                 {step === 1 && (
                     <WizardStepPane>
-                        <h2 className="text-base font-semibold">
+                        <h2 className="text-section-title">
                             Review the recorder connection
                         </h2>
                         <p className="mb-4 text-sm text-muted-foreground">
@@ -855,7 +875,7 @@ function RecorderCheck({
                 )}
                 {step === 2 && (
                     <WizardStepPane>
-                        <h2 className="text-base font-semibold">
+                        <h2 className="text-section-title">
                             Review and request
                         </h2>
                         <p className="mb-4 text-sm text-muted-foreground">

@@ -27,11 +27,15 @@ beforeEach(function () {
     ensureCanonicalHrStaffProfile($this->reader, $this->site, ['department_id' => $this->team->id]);
     $this->publisher = app(HubPublishing::class);
     $this->campaign = $this->publisher->create($this->editor, 'campaign', 'Working together', 'campaign');
+    // The campaign template starts with an empty callout, which cannot be published.
+    $draft = $this->campaign->draft;
+    $draft['sections'][0]['blocks'][0]['body'] = 'Why we are working together.';
+    $this->campaign->update(['draft' => $draft]);
     $this->settings = ['ends_on' => today()->addMonth()->toDateString(), 'steps' => [['id' => 'join', 'title' => 'Join a conversation']],
         'milestones' => [['id' => 'guide', 'title' => 'Support guide shared', 'status' => 'done'], ['id' => 'coffee', 'title' => 'Coffee and conversations', 'status' => 'active'], ['id' => 'reflect', 'title' => 'Reflect and share', 'status' => 'next']],
         'story_ids' => [], 'resource_ids' => [], 'event_keys' => []];
     $this->publishItem = function (string $kind, string $title, array $extra = []) {
-        $item = $this->publisher->create($this->editor, $kind, $title);
+        $item = $this->publisher->create($this->editor, $kind, $title, 'blank');
         $item = $this->publisher->save($this->editor, $item, [...$item->draft, ...$extra], 1);
         $this->publisher->publish($this->editor, $item, 2, null, null);
 

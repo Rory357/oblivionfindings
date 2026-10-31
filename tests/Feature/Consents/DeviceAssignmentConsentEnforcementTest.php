@@ -84,6 +84,45 @@ class DeviceAssignmentConsentEnforcementTest extends TestCase
         ]);
     }
 
+    public function test_client_tracker_assignment_without_a_chosen_consent_records_the_latest_active_one(): void
+    {
+        // The device page has no consent picker: the server uses the client's
+        // latest active tracking consent, the same rule as Queclink pairing.
+        $consent = $this->givenConsentFor($this->client);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/devices/{$this->tracker->id}/assign", [
+                'assignable_type' => 'client',
+                'assignable_id' => $this->client->id,
+                'assignment_type' => 'permanent',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('device_assignments', [
+            'device_id' => $this->tracker->id,
+            'assignable_type' => 'client',
+            'assignable_id' => $this->client->id,
+            'consent_id' => $consent->id,
+        ]);
+    }
+
+    public function test_client_tracker_assignment_without_a_chosen_consent_is_refused_when_only_expired_consent_exists(): void
+    {
+        $this->givenConsentFor($this->client, expiresAt: now()->subDay());
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/devices/{$this->tracker->id}/assign", [
+                'assignable_type' => 'client',
+                'assignable_id' => $this->client->id,
+                'assignment_type' => 'permanent',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('assignable_type');
+
+        $this->assertDatabaseCount('device_assignments', 0);
+    }
+
     public function test_client_tracker_assignment_with_expired_consent_is_rejected(): void
     {
         $consent = $this->givenConsentFor($this->client, expiresAt: now()->subDay());

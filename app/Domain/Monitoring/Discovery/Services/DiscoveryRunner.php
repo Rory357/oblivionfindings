@@ -18,6 +18,10 @@ use App\Domain\Monitoring\Exceptions\RuntimeSiteScopeViolation;
 use App\Domain\Monitoring\Jobs\CompleteDiscoveryRun;
 use App\Domain\Monitoring\Jobs\RunDiscoveryScope;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Credentials\Enums\CredentialReferenceStatus;
+use App\Domain\SecurityDevices\Credentials\Enums\CredentialRotationStatus;
+use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
+use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -148,6 +152,7 @@ final class DiscoveryRunner
             throw new UnexpectedValueException('Collector discovery workload limit is invalid.');
         }
 
+        $authorisedSiteIds = $collector->authorisedSiteIds();
         $remaining = $maximumTargets;
         $work = [];
         $runs = DiscoveryRun::query()
@@ -155,7 +160,7 @@ final class DiscoveryRunner
             ->where('status', 'running')
             ->whereHas('scope', fn ($query) => $query
                 ->where('collector_id', $collector->id)
-                ->where('site_id', $collector->site_id)
+                ->whereIn('site_id', $authorisedSiteIds)
                 ->where('status', 'active'))
             ->orderBy('id')
             ->limit(16)
@@ -168,7 +173,7 @@ final class DiscoveryRunner
             $scope = $this->scopeFromSnapshot($run);
             $this->assertScope($scope);
             if ((int) $scope->collector_id !== (int) $collector->id
-                || (int) $scope->site_id !== (int) $collector->site_id) {
+                || ! in_array((int) $scope->site_id, $authorisedSiteIds, true)) {
                 continue;
             }
 
@@ -201,7 +206,7 @@ final class DiscoveryRunner
                 continue;
             }
 
-            $work[] = [
+            $item = [
                 'id' => (string) $run->run_uuid,
                 'site_id' => (int) $scope->site_id,
                 'cidrs' => array_values($scope->cidrs ?? []),
@@ -211,6 +216,28 @@ final class DiscoveryRunner
                 'packets_per_second' => (int) $scope->packets_per_second,
                 'targets' => $targets,
             ];
+            if (in_array('snmp', $scope->protocols ?? [], true)
+                && is_string($scope->snmp_credential_reference)
+                && trim($scope->snmp_credential_reference) !== '') {
+                $item['snmp_credential_reference'] = trim($scope->snmp_credential_reference);
+            }
+            if (array_intersect(['provider', 'http', 'tls'], $scope->protocols ?? []) !== []) {
+                $unifiReference = CredentialReference::query()
+                    ->where('site_id', (int) $scope->site_id)
+                    ->where('provider', 'unifi')
+                    ->whereIn('purpose', ['monitoring', 'discovery', 'device_management'])
+                    ->where('status', CredentialReferenceStatus::Active->value)
+                    ->whereNotIn('rotation_status', [
+                        CredentialRotationStatus::Overdue->value,
+                        CredentialRotationStatus::Failed->value,
+                    ])
+                    ->orderByDesc('id')
+                    ->value('reference_key');
+                if (is_string($unifiReference) && trim($unifiReference) !== '') {
+                    $item['unifi_credential_reference'] = trim($unifiReference);
+                }
+            }
+            $work[] = $item;
         }
 
         return $work;
@@ -243,7 +270,7 @@ final class DiscoveryRunner
         }
 
         $run = DiscoveryRun::query()->with('scope')->where('run_uuid', $runUuid)->firstOrFail();
-        if ((int) data_get($run->scope_snapshot, 'site_id') !== (int) $collector->site_id) {
+        if (! in_array((int) data_get($run->scope_snapshot, 'site_id'), $collector->authorisedSiteIds(), true)) {
             throw new RuntimeSiteScopeViolation('Collector discovery Site does not match its enrolled Site.');
         }
         if ((int) data_get($run->scope_snapshot, 'collector_id') !== (int) $collector->id
@@ -288,7 +315,8 @@ final class DiscoveryRunner
 
     public function complete(int $runId): DiscoveryRun
     {
-        return DB::transaction(function () use ($runId): DiscoveryRun {
+        $justCompleted = false;
+        $completed = DB::transaction(function () use ($runId, &$justCompleted): DiscoveryRun {
             $run = DiscoveryRun::query()->lockForUpdate()->findOrFail($runId);
             if (in_array($run->status, self::TERMINAL_STATUSES, true)) {
                 return $run;
@@ -313,9 +341,25 @@ final class DiscoveryRunner
                 'completed_at' => now(),
                 'failure_summary' => $this->failureSummary($run),
             ])->save();
+            $justCompleted = true;
 
             return $run->fresh();
         }, 3);
+
+        if ($justCompleted) {
+            $siteId = (int) data_get($completed->scope_snapshot, 'site_id', 0);
+            if ($siteId > 0) {
+                $actorId = preg_match('/^manual:user:(\d+)$/', (string) $completed->trigger, $m) === 1
+                    ? (int) $m[1]
+                    : null;
+                try {
+                    app(SiteTopologyMapService::class)->reconcileSite($siteId, $actorId);
+                } catch (Throwable) {
+                }
+            }
+        }
+
+        return $completed;
     }
 
     public function cancel(int $runId, string $reason): DiscoveryRun
@@ -575,7 +619,7 @@ final class DiscoveryRunner
         }
 
         $identity = $payload['identity'] ?? null;
-        $allowed = ['mac_addresses', 'certificate_fingerprint', 'hostname', 'addresses', 'fingerprint'];
+        $allowed = ['mac_addresses', 'certificate_fingerprint', 'hostname', 'addresses', 'fingerprint', 'signals'];
         if (! is_array($identity) || array_is_list($identity)
             || array_diff(array_keys($identity), $allowed) !== []) {
             throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');
@@ -594,6 +638,10 @@ final class DiscoveryRunner
                 throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');
             }
         }
+        $signals = $identity['signals'] ?? [];
+        if (! is_array($signals) || ($signals !== [] && array_is_list($signals)) || count($signals) > 48) {
+            throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');
+        }
         try {
             $discovered = new DiscoveredIdentity(
                 provider: null,
@@ -605,6 +653,7 @@ final class DiscoveryRunner
                 hostname: $identity['hostname'] ?? null,
                 addresses: array_values($identity['addresses'] ?? []),
                 fingerprint: $identity['fingerprint'] ?? null,
+                signals: $signals,
             );
         } catch (Throwable) {
             throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');

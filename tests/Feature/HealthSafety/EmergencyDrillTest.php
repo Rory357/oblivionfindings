@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\EmergencyDrill;
 use App\Models\EmergencyDrillAttachment;
+use App\Models\EmergencyDrillFailureDelivery;
 use App\Models\EmergencyDrillFinding;
 use App\Models\HsEvent;
 use App\Models\Role;
@@ -11,12 +13,15 @@ use App\Models\Site;
 use App\Models\User;
 use App\Observers\EmergencyDrillObserver;
 use App\Services\HealthSafety\DrillComplianceService;
+use App\Services\HealthSafety\EmergencyDrillFailureDeliveryService;
 use App\Services\Sites\Calendar\Providers\DrillObligationProvider;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -27,12 +32,15 @@ use Tests\TestCase;
  */
 class EmergencyDrillTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
+        Queue::fake();
     }
 
     protected function officer(): User
@@ -41,6 +49,8 @@ class EmergencyDrillTest extends TestCase
         if ($role = Role::where('name', 'health_safety_officer')->first()) {
             $user->roles()->attach($role);
         }
+
+        $this->currentStaffProfile($user, Site::query()->first() ?? Site::factory()->create(['is_active' => true]));
 
         return $user;
     }
@@ -52,7 +62,19 @@ class EmergencyDrillTest extends TestCase
             $user->roles()->attach($role);
         }
 
+        $this->currentStaffProfile($user, Site::query()->first() ?? Site::factory()->create(['is_active' => true]));
+
         return $user;
+    }
+
+    private function currentStaffProfile(User $user, Site $site): void
+    {
+        HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [], 'is_active' => true, 'start_date' => '2020-01-01', 'end_date' => null]);
+    }
+
+    private function guard(EmergencyDrill $drill, array $data = []): array
+    {
+        return ['expected_version' => $drill->fresh()->lock_version, 'idempotency_key' => (string) Str::uuid(), ...$data];
     }
 
     /* ---- Register ---- */
@@ -83,14 +105,10 @@ class EmergencyDrillTest extends TestCase
 
         $this->actingAs($this->officer())
             ->get('/health-safety/drills?drill='.$drill->id)
-            ->assertOk()
-            ->assertInertia(fn (Assert $p) => $p
-                ->where('detail.id', $drill->id)
-                ->where('detail.reference', 'DR-'.$drill->id)
-                ->has('detail.participants')
-                ->has('detail.findings')
-                ->has('detail.attachments')
-                ->has('detail.timeline'));
+            ->assertRedirect('/health-safety/drills/'.$drill->id.'?return_to=%2Fhealth-safety%2Fdrills');
+        $this->get('/health-safety/drills/'.$drill->id)->assertOk()->assertInertia(fn (Assert $p) => $p
+            ->where('detail.id', $drill->id)->where('detail.reference', 'DR-'.$drill->id)
+            ->has('detail.participants')->has('detail.findings')->has('detail.attachments')->has('detail.history'));
     }
 
     public function test_requires_permission(): void
@@ -104,14 +122,18 @@ class EmergencyDrillTest extends TestCase
     {
         $site = Site::factory()->create();
         $coordinator = User::factory()->create();
-        $warden = User::factory()->create();
+        $warden = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $coordinator->update(['role' => 'support_worker', 'approved_at' => now()]);
+        $this->currentStaffProfile($coordinator, $site);
+        $this->currentStaffProfile($warden, $site);
 
         $this->actingAs($this->officer())
             ->post('/health-safety/drills', [
                 'site_id' => $site->id,
                 'drill_type' => 'fire_evacuation',
                 'title' => 'Q2 fire evacuation',
-                'scheduled_at' => now()->addWeek()->toDateTimeString(),
+                'scheduled_at' => now()->addWeek()->toISOString(),
+                'idempotency_key' => (string) Str::uuid(),
                 'conducted_by' => $coordinator->id,
                 'warden_ids' => [$warden->id],
                 'is_unannounced' => true,
@@ -147,6 +169,7 @@ class EmergencyDrillTest extends TestCase
 
         $this->actingAs($actor)
             ->post("/health-safety/drills/{$drill->id}/findings", [
+                ...$this->guard($drill),
                 'finding_type' => 'non_conformance',
                 'description' => 'Room 4 not swept',
                 'severity' => 'high',
@@ -165,8 +188,11 @@ class EmergencyDrillTest extends TestCase
         $drill = EmergencyDrill::factory()->create();
         $finding = EmergencyDrillFinding::factory()->create(['emergency_drill_id' => $drill->id, 'status' => 'open']);
 
+        Storage::fake('private');
+        Storage::disk('private')->put('drill-support.pdf', 'Recorded inspection');
+        $evidence = EmergencyDrillAttachment::create(['emergency_drill_id' => $drill->id, 'disk' => 'private', 'path' => 'drill-support.pdf', 'original_name' => 'drill-support.pdf', 'mime' => 'application/pdf', 'size' => 20]);
         $this->actingAs($this->officer())
-            ->post("/health-safety/drills/{$drill->id}/findings/{$finding->id}/resolve", ['resolution_notes' => 'Fixed'])
+            ->post("/health-safety/drills/{$drill->id}/findings/{$finding->id}/resolve", $this->guard($drill, ['resolution_notes' => 'Fixed', 'resolution_evidence_ids' => [$evidence->id]]))
             ->assertRedirect();
 
         $finding->refresh();
@@ -181,7 +207,7 @@ class EmergencyDrillTest extends TestCase
     {
         $drill = EmergencyDrill::factory()->create(['status' => 'scheduled']);
 
-        $this->actingAs($this->officer())->post("/health-safety/drills/{$drill->id}/start")->assertRedirect();
+        $this->actingAs($this->officer())->post("/health-safety/drills/{$drill->id}/start", $this->guard($drill))->assertRedirect();
 
         $drill->refresh();
         $this->assertSame('in_progress', $drill->status);
@@ -194,7 +220,8 @@ class EmergencyDrillTest extends TestCase
 
         $this->actingAs($this->officer())
             ->post("/health-safety/drills/{$drill->id}/complete", [
-                'completed_at' => now()->toDateTimeString(),
+                ...$this->guard($drill),
+                'completed_at' => now()->toISOString(),
                 'outcome' => 'passed_actions',
                 'duration_minutes' => 12,
                 'evacuation_time_seconds' => 180,
@@ -222,6 +249,9 @@ class EmergencyDrillTest extends TestCase
         $drill->update(['status' => 'completed', 'outcome' => 'failed', 'completed_at' => now()]);
 
         app(EmergencyDrillObserver::class)->updated($drill);
+        $intent = EmergencyDrillFailureDelivery::where('emergency_drill_id', $drill->id)->firstOrFail();
+        app(EmergencyDrillFailureDeliveryService::class)->deliver($intent->id);
+        $this->assertSame('delivered', $intent->fresh()->event_status);
 
         $this->assertTrue(
             HsEvent::where('source_type', EmergencyDrill::class)->where('source_id', $drill->id)->exists(),
@@ -247,7 +277,7 @@ class EmergencyDrillTest extends TestCase
         $drill = EmergencyDrill::factory()->create(['status' => 'scheduled']);
 
         $this->actingAs($this->officer())
-            ->post("/health-safety/drills/{$drill->id}/cancel", ['reason' => 'Site closed'])
+            ->post("/health-safety/drills/{$drill->id}/cancel", $this->guard($drill, ['reason' => 'Site closed']))
             ->assertRedirect();
 
         $this->assertSame('cancelled', $drill->fresh()->status);
@@ -262,6 +292,7 @@ class EmergencyDrillTest extends TestCase
 
         $this->actingAs($this->officer())
             ->post("/health-safety/drills/{$drill->id}/attachments", [
+                ...$this->guard($drill),
                 'file' => UploadedFile::fake()->create('signin-sheet.pdf', 120, 'application/pdf'),
                 'notes' => 'Roll-call sheet',
             ])
@@ -273,11 +304,11 @@ class EmergencyDrillTest extends TestCase
         Storage::disk('private')->assertExists($attachment->path);
 
         $this->actingAs($this->officer())
-            ->delete("/health-safety/drills/{$drill->id}/attachments/{$attachment->id}")
+            ->delete("/health-safety/drills/{$drill->id}/attachments/{$attachment->id}", $this->guard($drill))
             ->assertRedirect();
 
         $this->assertSoftDeleted('emergency_drill_attachments', ['id' => $attachment->id]);
-        Storage::disk('private')->assertMissing($attachment->path);
+        Storage::disk('private')->assertExists($attachment->path);
     }
 
     /* ---- Compliance single source of truth ---- */
@@ -313,7 +344,7 @@ class EmergencyDrillTest extends TestCase
         $expected = app(DrillComplianceService::class)->compliancePct();
 
         $this->actingAs($this->officer())
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $p) => $p->where('kpis.drill_compliance_pct', $expected));
     }
@@ -327,12 +358,12 @@ class EmergencyDrillTest extends TestCase
         EmergencyDrill::factory()->create(['site_id' => $site->id, 'status' => 'scheduled', 'scheduled_at' => Carbon::now()->addMonths(6)]); // out of range
         EmergencyDrill::factory()->completed()->create(['site_id' => $site->id]); // not scheduled
 
-        $items = (new DrillObligationProvider)->obligations([$site->id], Carbon::now(), Carbon::now()->addMonth());
+        $items = (new DrillObligationProvider)->obligationsForViewer([$site->id], Carbon::now(), Carbon::now()->addMonth(), $this->officer());
 
         $this->assertCount(1, $items);
         $arr = $items[0]->toArray();
         $this->assertSame('drill', $arr['source']);
         $this->assertSame('DR-'.$inRange->id, $arr['ref']);
-        $this->assertSame("/health-safety/drills?drill={$inRange->id}", $arr['link']);
+        $this->assertSame("/health-safety/drills/{$inRange->id}?return_to=%2Fsites%2F{$site->id}%2Fcalendar", $arr['link']);
     }
 }

@@ -19,6 +19,15 @@ class HsCorrectiveActionActivityLabels
         $returnedForRework = false;
         $history = [];
 
+        // Walk ownership backwards before replaying activity forwards. A later
+        // handover must not relabel who owned an earlier submission.
+        foreach ($logs->sortByDesc('id') as $log) {
+            $before = data_get($log->meta, 'before', []);
+            if ($log->action === 'hscorrectiveaction.update' && array_key_exists('assigned_to_user_id', $before)) {
+                $ownerId = $before['assigned_to_user_id'] !== null ? (int) $before['assigned_to_user_id'] : null;
+            }
+        }
+
         foreach ($logs->sortBy('id') as $log) {
             $label = null;
             $detail = null;
@@ -26,6 +35,10 @@ class HsCorrectiveActionActivityLabels
             if ($log->action === 'hscorrectiveaction.create') {
                 $label = 'Action created';
             } elseif ($log->action === 'hscorrectiveaction.update') {
+                $afterValues = data_get($log->meta, 'after', []);
+                if (array_key_exists('assigned_to_user_id', $afterValues)) {
+                    $ownerId = $afterValues['assigned_to_user_id'] !== null ? (int) $afterValues['assigned_to_user_id'] : null;
+                }
                 $before = data_get($log->meta, 'before.status');
                 $after = data_get($log->meta, 'after.status');
 

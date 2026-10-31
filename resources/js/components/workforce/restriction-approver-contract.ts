@@ -38,8 +38,16 @@ const revision = (value: unknown): value is string =>
     typeof value === 'string' && value.length === 64 && /^[a-f0-9]{64}$/.test(value);
 const positiveId = (value: unknown): value is number =>
     typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
-const asciiTrim = (value: string): string =>
-    value.replace(/^[\x00\x09\x0a\x0b\x0d\x20]+|[\x00\x09\x0a\x0b\x0d\x20]+$/g, '');
+// NUL, tab, line feed, vertical tab, carriage return and space: the characters
+// PHP's trim() removes by default, so the browser and the server agree.
+const asciiTrimmed = new Set(['\0', '\t', '\n', '\v', '\r', ' ']);
+const asciiTrim = (value: string): string => {
+    let start = 0;
+    let end = value.length;
+    while (start < end && asciiTrimmed.has(value[start])) start++;
+    while (end > start && asciiTrimmed.has(value[end - 1])) end--;
+    return value.slice(start, end);
+};
 const wellFormedText = (value: string): boolean =>
     !/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value);
 const personName = (value: unknown): value is string =>

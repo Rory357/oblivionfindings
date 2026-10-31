@@ -20,6 +20,7 @@ use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\IntegrationSecretManager;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use App\Support\SafeOperationalData;
+use App\Support\UnifiActionOutcome;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,7 @@ class UnifiController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $asOf = now()->toImmutable();
         abort_unless($this->userCanManage($user), 403);
 
         $siteIds = $this->access->accessibleSiteIds($user);
@@ -176,25 +178,28 @@ class UnifiController extends Controller
                 'items_updated' => $log->items_updated,
                 'items_errored' => $log->items_errored,
                 'failure_category' => $log->status === IntegrationSyncLog::STATUS_FAILED ? 'provider_failure' : null,
-                'started_at' => $log->started_at?->toDateTimeString(),
-                'completed_at' => $log->completed_at?->toDateTimeString(),
+                'started_at' => $log->started_at?->toISOString(),
+                'completed_at' => $log->completed_at?->toISOString(),
             ])
             ->values()
             ->all();
 
         return Inertia::render('security-devices/integrations/unifi', [
+            'actor_id' => (int) $user->id,
+            'actionOutcome' => UnifiActionOutcome::forActor($request),
+            'as_of' => $asOf->toISOString(),
             'providerConnection' => $providerConnection ? [
                 'status' => $providerConnection->status,
                 'secret_last4' => $providerConnection->secret_last4,
-                'last_tested_at' => $providerConnection->last_tested_at?->toDateTimeString(),
-                'last_synced_at' => $providerConnection->last_synced_at?->toDateTimeString(),
+                'last_tested_at' => $providerConnection->last_tested_at?->toISOString(),
+                'last_synced_at' => $providerConnection->last_synced_at?->toISOString(),
                 'sites_synced_at' => $connectionConfig['sites_synced_at'] ?? null,
-                'disabled_at' => $providerConnection->disabled_at?->toDateTimeString(),
+                'disabled_at' => $providerConnection->disabled_at?->toISOString(),
                 'disabled_reason' => in_array($providerConnection->disabled_reason, self::DISABLE_REASONS, true)
                     ? $providerConnection->disabled_reason
                     : null,
                 'requires_credential_replacement' => (bool) $providerConnection->requires_credential_replacement,
-                'recovery_credentials_replaced_at' => $providerConnection->recovery_credentials_replaced_at?->toDateTimeString(),
+                'recovery_credentials_replaced_at' => $providerConnection->recovery_credentials_replaced_at?->toISOString(),
                 'defaults' => collect($connectionConfig)->only([
                     'refresh_interval_minutes', 'alert_motion_events', 'alert_device_offline',
                     'quiet_hours_start', 'quiet_hours_end',
@@ -303,6 +308,8 @@ class UnifiController extends Controller
                 );
             }
         });
+
+        UnifiActionOutcome::flashSaved($request);
 
         return redirect()->back()->with(
             'success',
@@ -447,6 +454,8 @@ class UnifiController extends Controller
             }
         });
 
+        UnifiActionOutcome::flashSaved($request);
+
         return redirect()->back()->with(
             'success',
             $isRecovery
@@ -511,6 +520,14 @@ class UnifiController extends Controller
 
         $connection = IntegrationProviderConnection::query()->forProvider(self::PROVIDER)->firstOrFail();
         $this->secrets->revokeApplication($connection, IntegrationSecretManager::PURPOSE_PRIMARY);
+
+        // Report what actually happened: an already-disabled connection is
+        // acknowledged as unchanged, not as a fresh save.
+        if ($changed) {
+            UnifiActionOutcome::flashSaved($request);
+        } else {
+            UnifiActionOutcome::flashUnchanged($request);
+        }
 
         return redirect()->back()->with(
             $changed ? 'success' : 'info',
@@ -634,7 +651,13 @@ class UnifiController extends Controller
                     (string) $request->input('mapping_token'),
                 );
             });
-        abort_unless(is_array($discoveredSite), 422, 'The selected provider location is no longer available. Sync locations and try again.');
+        if (! is_array($discoveredSite)) {
+            // A validation error (not a bare HTTP 422) so the page can show
+            // this message and keep the draft.
+            throw ValidationException::withMessages([
+                'mapping_token' => 'This UniFi location is no longer available. Sync UniFi locations, then try again.',
+            ]);
+        }
 
         try {
             IntegrationSiteConfig::updateOrCreate(
@@ -658,6 +681,8 @@ class UnifiController extends Controller
                 'mapping_token' => 'This provider location was mapped to another Site. Refresh the mappings and try again.',
             ]);
         }
+
+        UnifiActionOutcome::flashSaved($request);
 
         return redirect()->back()->with('success', 'Site mapping saved.');
     }
@@ -688,6 +713,8 @@ class UnifiController extends Controller
         $this->access->assertCanViewSite($user, (int) $siteConfig->site_id);
 
         $siteConfig->delete();
+
+        UnifiActionOutcome::flashSaved($request);
 
         return redirect()->back()->with('success', 'Site mapping removed.');
     }
@@ -827,6 +854,8 @@ class UnifiController extends Controller
 
         $runtime->syncRoomAssignment($device, $room ?? null, $user?->id, null);
 
+        UnifiActionOutcome::flashSaved($request);
+
         return redirect()->back()->with('success', 'Device room assignment updated.');
     }
 
@@ -838,13 +867,22 @@ class UnifiController extends Controller
         $user = $request->user();
         abort_unless($this->userCanManage($user), 403);
 
+        // Quiet hours are New Zealand wall-clock times (see
+        // AlertRoutingService::withinQuietHours). One end on its own would be
+        // silently ignored, so both are required together or neither.
         $request->validate([
             'config' => ['nullable', 'array'],
             'config.refresh_interval_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
             'config.alert_motion_events' => ['nullable', 'boolean'],
             'config.alert_device_offline' => ['nullable', 'boolean'],
-            'config.quiet_hours_start' => ['nullable', 'date_format:H:i'],
-            'config.quiet_hours_end' => ['nullable', 'date_format:H:i'],
+            'config.quiet_hours_start' => ['nullable', 'date_format:H:i', 'required_with:config.quiet_hours_end', 'different:config.quiet_hours_end'],
+            'config.quiet_hours_end' => ['nullable', 'date_format:H:i', 'required_with:config.quiet_hours_start'],
+        ], [
+            'config.quiet_hours_start.required_with' => 'Set a start time as well as an end time, or clear both to turn quiet hours off.',
+            'config.quiet_hours_end.required_with' => 'Set an end time as well as a start time, or clear both to turn quiet hours off.',
+            'config.quiet_hours_start.different' => 'Quiet hours must start and end at different times.',
+            'config.quiet_hours_start.date_format' => 'Enter the quiet hours start as a 24-hour time, such as 22:00.',
+            'config.quiet_hours_end.date_format' => 'Enter the quiet hours end as a 24-hour time, such as 06:00.',
         ]);
 
         $connection = IntegrationProviderConnection::query()
@@ -857,6 +895,8 @@ class UnifiController extends Controller
                 $request->input('config', [])
             ),
         ]);
+
+        UnifiActionOutcome::flashSaved($request);
 
         return redirect()->back()->with('success', 'Default settings updated.');
     }

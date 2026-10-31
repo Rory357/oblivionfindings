@@ -288,7 +288,7 @@ export function NewAlertWizard({
                         <StepHead
                             icon={Bell}
                             title="What's the alert?"
-                            blurb="Pick the closest type and how urgent it is — severity drives queues and SLA clocks."
+                            blurb="Pick the closest type and how urgent it is — severity sets its queue and response targets."
                         />
                         <Field
                             label="Alert type"
@@ -395,7 +395,7 @@ export function NewAlertWizard({
                         </Field>
                         <Field
                             label="Desk priority"
-                            hint="Optional — orders the worklist"
+                            hint="Optional — sets where it sits in the list"
                             error={form.errors.priority}
                         >
                             <SelectInput

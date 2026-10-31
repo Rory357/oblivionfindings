@@ -24,8 +24,12 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import {
+    useSafetyDraftState,
+    useSafetyForm,
+} from '@/hooks/use-safety-workspace-drafts';
 import { cn } from '@/lib/utils';
-import { router, useForm } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import {
     Archive,
     Check,
@@ -96,7 +100,7 @@ const MULTI_STEPS: readonly WizardStep[] = [
     },
     {
         key: 'ownership',
-        label: 'Review & ownership',
+        label: 'Review schedule',
         blurb: 'Cadence & review date',
         icon: Clock,
     },
@@ -169,10 +173,10 @@ type RaForm = {
     consequence: number;
     existing_controls: string;
     additional_controls: string;
-    residual_likelihood: number;
-    residual_consequence: number;
-    risk_acceptable: boolean;
-    review_frequency_days: number;
+    residual_likelihood: number | null;
+    residual_consequence: number | null;
+    risk_acceptable: boolean | null;
+    review_frequency_days: number | null;
     review_due_at: string;
     approver_note: string;
     review_note: string;
@@ -204,10 +208,10 @@ function initialForm(
         consequence: f?.consequence ?? 3,
         existing_controls: f?.existing_controls ?? '',
         additional_controls: f?.additional_controls ?? '',
-        residual_likelihood: f?.residual_likelihood ?? 2,
-        residual_consequence: f?.residual_consequence ?? 2,
-        risk_acceptable: f?.risk_acceptable ?? true,
-        review_frequency_days: f?.review_frequency_days ?? 90,
+        residual_likelihood: f?.residual_likelihood ?? null,
+        residual_consequence: f?.residual_consequence ?? null,
+        risk_acceptable: f?.risk_acceptable ?? null,
+        review_frequency_days: f ? f.review_frequency_days : 90,
         review_due_at: f?.review_due_at ?? '',
         approver_note: '',
         review_note: '',
@@ -259,12 +263,18 @@ export function RaWizardDialog({
     const [newId, setNewId] = useState<number | null>(null);
     const [staged, setStaged] = useState<StagedFile[]>([]);
     const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [savedAssessment, setSavedAssessment] = useState<{
+        id: number;
+        addAnother: boolean;
+    } | null>(null);
 
-    const form = useForm<RaForm>(
+    const form = useSafetyForm<RaForm>(
         initialForm(kind, detail, lockedAssessable, initialAttach),
     );
     const { data, setData, processing } = form;
     const busy = processing || uploading;
+    useSafetyDraftState({ dirty: staged.length > 0, busy: uploading });
 
     const cur = steps[stepIndex];
     const err = (name: string) =>
@@ -294,11 +304,11 @@ export function RaWizardDialog({
             return;
         }
         setUploading(true);
+        setUploadError(null);
         const queue = [...staged];
         const next = (i: number) => {
             if (i >= queue.length) {
                 setUploading(false);
-                setStaged([]);
                 finish();
                 return;
             }
@@ -313,7 +323,33 @@ export function RaWizardDialog({
                 {
                     preserveScroll: true,
                     preserveState: true,
-                    onFinish: () => next(i + 1),
+                    onSuccess: (page) => {
+                        const flash = page.props.flash as
+                            | { error?: string }
+                            | undefined;
+                        if (flash?.error) {
+                            setUploadError(flash.error);
+                            setUploading(false);
+                            return;
+                        }
+                        setStaged((current) =>
+                            current.filter((item) => item.id !== it.id),
+                        );
+                        next(i + 1);
+                    },
+                    onError: (errors) => {
+                        setUploadError(
+                            Object.values(errors).join(' ') ||
+                                'This file could not be uploaded. Your remaining files are still here.',
+                        );
+                        setUploading(false);
+                    },
+                    onCancel: () => {
+                        setUploadError(
+                            'Upload interrupted. Check the assessment’s evidence before retrying. Your remaining files are still here.',
+                        );
+                        setUploading(false);
+                    },
                 },
             );
         };
@@ -398,10 +434,10 @@ export function RaWizardDialog({
             consequence: Number(d.consequence),
             existing_controls: d.existing_controls || null,
             additional_controls: d.additional_controls || null,
-            residual_likelihood: Number(d.residual_likelihood),
-            residual_consequence: Number(d.residual_consequence),
+            residual_likelihood: d.residual_likelihood,
+            residual_consequence: d.residual_consequence,
             risk_acceptable: d.risk_acceptable,
-            review_frequency_days: Number(d.review_frequency_days),
+            review_frequency_days: d.review_frequency_days,
             review_due_at: d.review_due_at || null,
         };
         if (kind === 'edit') base._method = 'put';
@@ -416,9 +452,29 @@ export function RaWizardDialog({
         setStepIndex(0);
         setDone(false);
         setNewId(null);
+        setSavedAssessment(null);
+        setUploadError(null);
     };
 
+    const finishSaved = (createdId: number | null, addAnother: boolean) => {
+        setSavedAssessment(null);
+        if (addAnother && kind === 'new') {
+            resetForAnother();
+            return;
+        }
+        if (kind === 'new' || kind === 'supersede') {
+            setNewId(createdId);
+            setDone(true);
+        } else onClose();
+    };
     const submit = (addAnother = false) => {
+        if (busy) return;
+        if (savedAssessment) {
+            uploadStaged(savedAssessment.id, () =>
+                finishSaved(savedAssessment.id, savedAssessment.addAnother),
+            );
+            return;
+        }
         if (isMulti) {
             const all: Record<string, string> = {};
             for (const s of steps)
@@ -442,22 +498,16 @@ export function RaWizardDialog({
                         };
                     }
                 ).flash;
-                if (flash?.error) return;
+                if (flash?.error) {
+                    setUploadError(flash.error);
+                    return;
+                }
                 const createdId =
                     flash?.created_risk_assessment_id ?? detail?.id ?? null;
-                const finish = () => {
-                    if (addAnother && kind === 'new') {
-                        resetForAnother();
-                        return;
-                    }
-                    if (kind === 'new' || kind === 'supersede') {
-                        setNewId(createdId);
-                        setDone(true);
-                    } else {
-                        onClose();
-                    }
-                };
+                form.setDefaults();
+                const finish = () => finishSaved(createdId, addAnother);
                 if (isMulti && staged.length && createdId) {
+                    setSavedAssessment({ id: createdId, addAnother });
                     uploadStaged(createdId, finish);
                 } else {
                     finish();
@@ -488,7 +538,7 @@ export function RaWizardDialog({
 
     /* -------- titles -------- */
     const TITLES: Record<RaModalKind, [string, string]> = {
-        new: ['New risk assessment', 'ISO 31000 / SafePlus 5×5'],
+        new: ['New risk assessment', 'Risk, controls and review schedule'],
         edit: [
             'Edit draft',
             detail ? `${detail.reference_number} · update fields` : '',
@@ -506,7 +556,7 @@ export function RaWizardDialog({
             detail ? `${detail.reference_number} · active → under review` : '',
         ],
         residual: [
-            'Record review / residual',
+            'Record residual risk',
             detail ? `${detail.reference_number}` : '',
         ],
         archive: [
@@ -518,16 +568,17 @@ export function RaWizardDialog({
 
     /* -------- footer -------- */
     const isReview = cur.key === 'review';
-    const createLabel =
-        kind === 'supersede'
-            ? 'Create successor'
-            : kind === 'edit'
-              ? 'Save draft'
-              : 'Create assessment';
+    const createLabel = savedAssessment
+        ? 'Retry remaining uploads'
+        : kind === 'supersede'
+          ? 'Create successor'
+          : kind === 'edit'
+            ? 'Save draft'
+            : 'Create assessment';
     const singleLabel = {
         approve: 'Approve & activate',
         review: 'Mark for review',
-        residual: 'Save review',
+        residual: 'Save residual risk',
         archive: 'Archive assessment',
     }[kind as Exclude<RaModalKind, 'new' | 'edit' | 'supersede'>];
 
@@ -598,9 +649,8 @@ export function RaWizardDialog({
             }
             blurb={
                 <>
-                    Created in <strong>draft</strong> — the service forces this
-                    status. Approve &amp; activate it to put the assessment in
-                    force.{staged.length === 0 ? '' : ' Evidence uploaded.'}
+                    Saved as a <strong>draft</strong>. Review the assessment,
+                    then approve &amp; activate it when it is ready to use.
                 </>
             }
             actions={
@@ -647,6 +697,36 @@ export function RaWizardDialog({
             maxHeight="min(92vh, 860px)"
         >
             <WizardStepPane>
+                {uploadError && (
+                    <div
+                        role="alert"
+                        className="mb-4 space-y-2 rounded-lg border border-border p-4 text-sm"
+                    >
+                        <p className="text-status-critical">{uploadError}</p>
+                        {savedAssessment && (
+                            <>
+                                <p>
+                                    The assessment is saved. Retry the remaining
+                                    evidence without creating another
+                                    assessment.
+                                </p>
+                                <Button
+                                    type="button"
+                                    className="frontline-tap"
+                                    disabled={busy}
+                                    onClick={() => submit()}
+                                >
+                                    Retry remaining uploads
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                )}
+                {savedAssessment && (
+                    <p className="text-subtle mb-4">
+                        Assessment saved. Evidence uploads are still pending.
+                    </p>
+                )}
                 <StepHead icon={cur.icon} title={cur.label} blurb={cur.blurb} />
 
                 {/* ---- CONTEXT ---- */}
@@ -753,7 +833,7 @@ export function RaWizardDialog({
                             setData('likelihood', l);
                             setData('consequence', c);
                         }}
-                        caption="Click a cell — likelihood (rows) × consequence (columns). The score and level update exactly as the server calculates them."
+                        caption="Choose a cell: likelihood in rows and consequence in columns. The score describes the risk before controls."
                     />
                 ) : null}
 
@@ -799,11 +879,8 @@ export function RaWizardDialog({
                     >
                         <AcceptableToggle
                             value={data.risk_acceptable}
-                            onToggle={() =>
-                                setData(
-                                    'risk_acceptable',
-                                    !data.risk_acceptable,
-                                )
+                            onChange={(value) =>
+                                setData('risk_acceptable', value)
                             }
                         />
                     </MatrixStep>
@@ -822,11 +899,8 @@ export function RaWizardDialog({
                     >
                         <AcceptableToggle
                             value={data.risk_acceptable}
-                            onToggle={() =>
-                                setData(
-                                    'risk_acceptable',
-                                    !data.risk_acceptable,
-                                )
+                            onChange={(value) =>
+                                setData('risk_acceptable', value)
                             }
                         />
                         <Field label="Review notes">
@@ -903,14 +977,24 @@ export function RaWizardDialog({
                                 Review frequency
                             </div>
                             <Segmented<string>
-                                value={String(data.review_frequency_days)}
-                                onChange={(v) =>
-                                    setData('review_frequency_days', Number(v))
+                                value={
+                                    data.review_frequency_days == null
+                                        ? ''
+                                        : String(data.review_frequency_days)
                                 }
-                                options={FREQ_OPTIONS.map((o) => ({
-                                    value: String(o.value),
-                                    label: o.label,
-                                }))}
+                                onChange={(v) =>
+                                    setData(
+                                        'review_frequency_days',
+                                        v ? Number(v) : null,
+                                    )
+                                }
+                                options={[
+                                    { value: '', label: 'Not set' },
+                                    ...FREQ_OPTIONS.map((o) => ({
+                                        value: String(o.value),
+                                        label: o.label,
+                                    })),
+                                ]}
                             />
                         </div>
                         <Field label="Next review due" hint="(optional)">
@@ -924,9 +1008,9 @@ export function RaWizardDialog({
                             />
                         </Field>
                         <InfoCard icon={Info}>
-                            Left blank, the review date is scheduled from the
-                            cadence when you approve &amp; activate. The
-                            CheckRiskAssessmentReviewsJob flags it when due.
+                            On activation, a review date is scheduled from the
+                            frequency if no date is entered. Leaving both blank
+                            means no review is scheduled.
                         </InfoCard>
                     </div>
                 ) : null}
@@ -948,8 +1032,8 @@ export function RaWizardDialog({
                             {kind === 'approve'
                                 ? 'Approving records you as the approver, stamps the approval time, and moves the assessment from draft to active. If no review date is set, one is scheduled from the review cadence.'
                                 : kind === 'review'
-                                  ? 'This flags the assessment as under review so it surfaces in the “Due for review” worklist. The residual scoring and controls can then be updated.'
-                                  : 'Archiving removes this assessment from the active register. It stays in the audit history and can be reopened by an administrator. This does not delete any records.'}
+                                  ? 'This flags the assessment as under review. Record the remaining risk, then complete the review with findings and a new due date. Changes to approved controls need a new version.'
+                                  : 'Archiving removes this assessment from the active register and preserves its history. Linked reviews and actions keep their own status.'}
                         </p>
                         {kind === 'approve' ? (
                             <Field label="Approver note" hint="(optional)">
@@ -987,22 +1071,32 @@ function MatrixStep({
     caption,
     children,
 }: {
-    likelihood: number;
-    consequence: number;
+    likelihood: number | null;
+    consequence: number | null;
     onSelect: (l: number, c: number) => void;
     caption: string;
     children?: ReactNode;
 }) {
-    const score = likelihood * consequence;
-    const level = scoreLevel(score);
-    const tone = levelTone(level);
+    const score =
+        likelihood != null && consequence != null
+            ? likelihood * consequence
+            : null;
+    const level = score == null ? null : scoreLevel(score);
+    const tone = level ? levelTone(level) : 'neutral';
     return (
         <div className="flex flex-wrap items-start gap-7">
-            <RaMatrix
-                likelihood={likelihood}
-                consequence={consequence}
-                onSelect={onSelect}
-            />
+            <div
+                role="region"
+                aria-label="Choose risk score"
+                tabIndex={0}
+                className="frontline-focus max-w-full overflow-x-auto p-2"
+            >
+                <RaMatrix
+                    likelihood={likelihood}
+                    consequence={consequence}
+                    onSelect={onSelect}
+                />
+            </div>
             <div className="flex min-w-[220px] flex-1 flex-col gap-4">
                 <div className="flex items-center gap-3">
                     <span
@@ -1011,13 +1105,15 @@ function MatrixStep({
                             RA_TONE_CHIP[tone],
                         )}
                     >
-                        {score}
+                        {score ?? '—'}
                     </span>
                     <div>
                         <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                             Calculated level
                         </div>
-                        <div className="text-lg font-bold">{cap(level)}</div>
+                        <div className="text-lg font-bold">
+                            {level ? cap(level) : 'Not recorded'}
+                        </div>
                     </div>
                 </div>
                 <p className="text-[13px] leading-relaxed text-muted-foreground">
@@ -1031,10 +1127,10 @@ function MatrixStep({
 
 function AcceptableToggle({
     value,
-    onToggle,
+    onChange,
 }: {
-    value: boolean;
-    onToggle: () => void;
+    value: boolean | null;
+    onChange: (value: boolean | null) => void;
 }) {
     return (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3.5">
@@ -1046,24 +1142,19 @@ function AcceptableToggle({
                     Tolerable with these controls in place?
                 </div>
             </div>
-            <button
-                type="button"
-                role="switch"
-                aria-checked={value}
-                aria-label="Residual risk acceptable"
-                onClick={onToggle}
-                className={cn(
-                    'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-                    value ? 'bg-primary' : 'bg-muted-foreground/50',
-                )}
-            >
-                <span
-                    className={cn(
-                        'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all',
-                        value ? 'left-[22px]' : 'left-0.5',
-                    )}
-                />
-            </button>
+            <SelectInput
+                frontline
+                value={value == null ? 'unknown' : value ? '1' : '0'}
+                onChange={(choice) =>
+                    onChange(choice === 'unknown' ? null : choice === '1')
+                }
+                placeholder="Not recorded"
+                options={[
+                    { value: 'unknown', label: 'Not recorded' },
+                    { value: '1', label: 'Yes' },
+                    { value: '0', label: 'No' },
+                ]}
+            />
         </div>
     );
 }
@@ -1080,9 +1171,12 @@ function ReviewStep({
     onJump: (i: number) => void;
 }) {
     const inh = data.likelihood * data.consequence;
-    const res = data.residual_likelihood * data.residual_consequence;
+    const res =
+        data.residual_likelihood != null && data.residual_consequence != null
+            ? data.residual_likelihood * data.residual_consequence
+            : null;
     const inhLv = scoreLevel(inh);
-    const resLv = scoreLevel(res);
+    const resLv = res == null ? null : scoreLevel(res);
     const attachName =
         data.attach_type === 'standalone'
             ? 'Standalone'
@@ -1155,12 +1249,27 @@ function ReviewStep({
                 >
                     <ReviewRow
                         label="Likelihood × consequence"
-                        value={`${data.residual_likelihood} × ${data.residual_consequence}`}
+                        value={
+                            res == null
+                                ? 'Not recorded'
+                                : `${data.residual_likelihood} × ${data.residual_consequence}`
+                        }
                     />
-                    <ReviewRow label="Score" value={`${res} · ${cap(resLv)}`} />
+                    <ReviewRow
+                        label="Score"
+                        value={
+                            resLv ? `${res} · ${cap(resLv)}` : 'Not recorded'
+                        }
+                    />
                     <ReviewRow
                         label="Acceptable"
-                        value={data.risk_acceptable ? 'Yes' : 'No'}
+                        value={
+                            data.risk_acceptable == null
+                                ? 'Not recorded'
+                                : data.risk_acceptable
+                                  ? 'Yes'
+                                  : 'No'
+                        }
                     />
                 </ReviewCard>
                 <ReviewCard
@@ -1179,19 +1288,24 @@ function ReviewStep({
                 </ReviewCard>
                 <ReviewCard
                     icon={Clock}
-                    title="Review & ownership"
+                    title="Review schedule"
                     onEdit={() => onJump(5)}
                 >
                     <ReviewRow label="Cadence" value={freq} />
                     <ReviewRow
                         label="Next review due"
-                        value={data.review_due_at || 'Set on approval'}
+                        value={
+                            data.review_due_at ||
+                            (data.review_frequency_days
+                                ? 'Scheduled on activation'
+                                : 'Not scheduled')
+                        }
                     />
                 </ReviewCard>
             </div>
             <p className="mt-3.5 px-0.5 text-[12.5px] text-muted-foreground">
-                Validated per step, mirroring the server request — submit jumps
-                to the first failing step. Created in <strong>draft</strong>.
+                The assessment is saved as a <strong>draft</strong> for
+                approval.
             </p>
         </div>
     );

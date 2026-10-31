@@ -8,6 +8,7 @@ use App\Services\Incidents\IncidentJourneyService;
 use App\Services\NotificationService;
 use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -51,7 +52,7 @@ class ShiftIncidentController extends Controller
                 'severity' => $data['severity'],
                 'status' => 'submitted',
                 'submitted_at' => now(),
-                'occurred_at' => $data['occurred_at'] ?? now(),
+                'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
                 'description' => $data['description'] ?? null,
                 'requires_followup' => (bool) ($data['requires_followup'] ?? false),
                 'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)

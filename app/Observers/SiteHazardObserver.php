@@ -4,14 +4,20 @@ namespace App\Observers;
 
 use App\Models\HsEvent;
 use App\Models\SiteHazard;
+use App\Models\User;
 use App\Notifications\Sites\HazardAssignedNotification;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
 use App\Services\HealthSafety\HsEventService;
-use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
+use App\Services\References\ReferenceNumberGenerator;
+use App\Services\Sites\SiteHazardRiskCalculator;
+use App\Services\SiteTypeAccessService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
-class SiteHazardObserver implements ShouldHandleEventsAfterCommit
+class SiteHazardObserver
 {
     public function __construct(
         private readonly ComprehensiveAlertBridgeService $bridge,
@@ -27,100 +33,132 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
 
         // Calculate risk rating
         if ($hazard->severity && $hazard->likelihood) {
-            $calculator = new \App\Services\Sites\SiteHazardRiskCalculator();
+            $calculator = new SiteHazardRiskCalculator;
             $hazard->risk_rating = $calculator->calculate($hazard->severity, $hazard->likelihood);
         }
 
         // Set due date based on risk rating
         if (empty($hazard->due_date) && $hazard->risk_rating) {
-            $calculator = new \App\Services\Sites\SiteHazardRiskCalculator();
-            $hazard->due_date = now()->addDays($calculator->suggestedDueDays($hazard->risk_rating));
+            $calculator = new SiteHazardRiskCalculator;
+            $hazard->due_date = now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays($calculator->suggestedDueDays($hazard->risk_rating))->toDateString();
+        }
+        if (in_array($hazard->risk_rating, ['high', 'extreme'])) {
+            $this->autoAssignHealthSafetyOfficer($hazard);
+        }
+        if ($hazard->assigned_to_user_id && ! $hazard->assigned_at) {
+            $hazard->assigned_at = now();
         }
     }
 
     public function created(SiteHazard $hazard): void
     {
-        // Auto-assign H&S officer if high/extreme risk
-        if (in_array($hazard->risk_rating, ['high', 'extreme'])) {
-            $this->autoAssignHealthSafetyOfficer($hazard);
+        AuditLogger::logOrFail('hazard.created', $hazard);
+        if ($hazard->assigned_to_user_id) {
+            $this->recordAssignment($hazard, 'initial');
         }
 
-        AuditLogger::log('hazard.created', $hazard);
-
-        // Record HsEvent for all hazards
-        $this->recordHsEvent($hazard);
-
-        // Bridge high/extreme hazards to Control Room
-        if (in_array($hazard->risk_rating, ['high', 'extreme'])) {
-            $this->dispatchBridge($hazard);
-        }
+        // Capture the saved values before another save changes this model.
+        // External notifications and bridge calls remain after commit.
+        $snapshot = clone $hazard;
+        DB::afterCommit(function () use ($snapshot): void {
+            $this->recordHsEvent($snapshot);
+            if ($snapshot->assigned_to_user_id) {
+                $this->notifyAssignee($snapshot);
+            }
+            if (in_array($snapshot->risk_rating, ['high', 'extreme'])) {
+                $this->dispatchBridge($snapshot);
+            }
+        });
     }
 
     public function updating(SiteHazard $hazard): void
     {
-        // Recalculate risk if severity/likelihood changed
         if ($hazard->isDirty(['severity', 'likelihood'])) {
-            $calculator = new \App\Services\Sites\SiteHazardRiskCalculator();
+            $calculator = new SiteHazardRiskCalculator;
             $hazard->risk_rating = $calculator->calculate($hazard->severity, $hazard->likelihood);
+        }
+        if ($hazard->isDirty('status')) {
+            $hazard->status_changed_at = now();
+            $hazard->status_changed_by_user_id = auth()->id();
+            if ($hazard->status === 'closed') {
+                $hazard->closed_at = now();
+                $hazard->closed_by_user_id = auth()->id();
+            }
+        }
+        if ($hazard->isDirty('assigned_to_user_id')) {
+            $hazard->assigned_at = $hazard->assigned_to_user_id ? now() : null;
         }
     }
 
     public function updated(SiteHazard $hazard): void
     {
-        $updates = [];
-
-        // Log status changes
         if ($hazard->wasChanged('status')) {
-            AuditLogger::log('hazard.status_changed', $hazard, [
-                'from' => $hazard->getOriginal('status'),
-                'to' => $hazard->status,
+            AuditLogger::logOrFail('hazard.status_changed', $hazard, [
+                'from' => $hazard->getOriginal('status'), 'to' => $hazard->status,
+                'control_hierarchy' => $hazard->control_hierarchy ?? [],
+                'residual_severity' => $hazard->residual_severity,
+                'residual_likelihood' => $hazard->residual_likelihood,
+                'residual_risk_rating' => $hazard->residual_risk_rating,
+                'control_review_date' => $hazard->control_review_date?->toDateString(),
+                'resolution_summary' => $hazard->resolution_summary,
             ]);
-
-            // Update timestamps
-            $updates['status_changed_at'] = now();
-            $updates['status_changed_by_user_id'] = auth()->id();
-
-            // Closure timestamps record terminal closure only. `mitigated` is an
-            // active "awaiting closure" state, so it must NOT be stamped as
-            // closed (doing so corrupts closed-by-month analytics).
-            if ($hazard->status === 'closed') {
-                $updates['closed_at'] = now();
-                $updates['closed_by_user_id'] = auth()->id();
-            }
         }
-
-        // Notify on assignment
-        if ($hazard->wasChanged('assigned_to_user_id') && $hazard->assigned_to_user_id) {
-            if ($hazard->assignedTo) {
-                $hazard->assignedTo->notify(new HazardAssignedNotification($hazard));
-            }
-            $updates['assigned_at'] = now();
+        $assignmentChanged = $hazard->wasChanged('assigned_to_user_id');
+        if ($assignmentChanged) {
+            $this->recordAssignment($hazard, 'manual');
         }
-
-        // Log risk changes and bridge if escalated to high/extreme
-        if ($hazard->wasChanged('risk_rating')) {
-            AuditLogger::log('hazard.risk_changed', $hazard, [
-                'from' => $hazard->getOriginal('risk_rating'),
-                'to' => $hazard->risk_rating,
+        if ($hazard->wasChanged('due_date')) {
+            AuditLogger::logOrFail('hazard.due_date_changed', $hazard, [
+                'from' => $hazard->getOriginal('due_date')?->toDateString(),
+                'to' => $hazard->due_date?->toDateString(),
             ]);
-
-            // Sync HsEvent severity
-            $this->syncHsEventSeverity($hazard);
-
-            if (in_array($hazard->risk_rating, ['high', 'extreme'])
-                && ! in_array($hazard->getOriginal('risk_rating'), ['high', 'extreme'])
-            ) {
-                $this->dispatchBridge($hazard, escalation: true);
-            }
         }
+        $riskChanged = $hazard->wasChanged('risk_rating');
+        $riskEscalated = $riskChanged && in_array($hazard->risk_rating, ['high', 'extreme'])
+            && ! in_array($hazard->getOriginal('risk_rating'), ['high', 'extreme']);
+        if ($riskChanged) {
+            AuditLogger::logOrFail('hazard.risk_changed', $hazard, [
+                'from' => $hazard->getOriginal('risk_rating'), 'to' => $hazard->risk_rating,
+            ]);
+        }
+        $snapshot = clone $hazard;
+        DB::afterCommit(function () use ($snapshot, $assignmentChanged, $riskChanged, $riskEscalated): void {
+            if ($assignmentChanged && $snapshot->assigned_to_user_id) {
+                $this->notifyAssignee($snapshot);
+            }
+            if ($riskChanged) {
+                $this->syncHsEventSeverity($snapshot);
+            }
+            if ($riskEscalated) {
+                $this->dispatchBridge($snapshot, escalation: true);
+            }
+        });
+    }
 
-        if ($updates !== []) {
-            $hazard->forceFill($updates)->saveQuietly();
+    private function recordAssignment(SiteHazard $hazard, string $source): void
+    {
+        AuditLogger::logOrFail('hazard.assigned', $hazard, [
+            'previous_assignee_id' => $source === 'initial' ? null : $hazard->getOriginal('assigned_to_user_id'),
+            'assignee_id' => $hazard->assigned_to_user_id,
+            'assignee_name' => User::find($hazard->assigned_to_user_id)?->name,
+            'previous_due_date' => $source === 'initial' ? null : $hazard->getOriginal('due_date')?->toDateString(),
+            'due_date' => $hazard->due_date?->toDateString(),
+            'previous_assigned_at' => $source === 'initial' ? null : $hazard->getOriginal('assigned_at')?->toISOString(),
+            'assignment_source' => $source,
+        ]);
+    }
+
+    private function notifyAssignee(SiteHazard $hazard): void
+    {
+        try {
+            User::find($hazard->assigned_to_user_id)?->notify(new HazardAssignedNotification($hazard));
+        } catch (Throwable $error) {
+            Log::warning('Hazard assignment notification failed after commit', ['hazard_id' => $hazard->id, 'error_class' => $error::class]);
         }
     }
 
     /* ------------------------------------------------------------------ */
-    /*  HsEvent wiring                                                     */
+    /*  HsEvent wiring */
     /* ------------------------------------------------------------------ */
 
     private function recordHsEvent(SiteHazard $hazard): void
@@ -138,7 +176,7 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
                 'staff_id' => $hazard->reported_by_user_id,
                 'created_by' => $hazard->reported_by_user_id,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('SiteHazardObserver: HsEvent creation failed', [
                 'site_hazard_id' => $hazard->id,
                 'error' => $e->getMessage(),
@@ -155,7 +193,7 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
             if ($hsEvent) {
                 $this->hsEventService->syncSeverity($hsEvent, $hazard->risk_rating ?? 'low');
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('SiteHazardObserver: HsEvent severity sync failed', [
                 'site_hazard_id' => $hazard->id,
                 'error' => $e->getMessage(),
@@ -164,7 +202,7 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Bridge dispatch                                                    */
+    /*  Bridge dispatch */
     /* ------------------------------------------------------------------ */
 
     private function dispatchBridge(SiteHazard $hazard, bool $escalation = false): void
@@ -186,7 +224,7 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
             if ($alert) {
                 $this->linkAlertToHsEvent($hazard, $alert->id);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('SiteHazardObserver: bridge dispatch failed', [
                 'site_hazard_id' => $hazard->id,
                 'error' => $e->getMessage(),
@@ -203,7 +241,7 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
             if ($hsEvent) {
                 $this->hsEventService->linkControlRoomAlert($hsEvent, $alertId);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::warning('SiteHazardObserver: failed to link alert to HsEvent', [
                 'site_hazard_id' => $hazard->id,
                 'error' => $e->getMessage(),
@@ -212,25 +250,34 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Existing helpers (unchanged)                                        */
+    /*  Existing helpers (unchanged) */
     /* ------------------------------------------------------------------ */
 
     private function autoAssignHealthSafetyOfficer(SiteHazard $hazard): void
     {
-        $hsOfficer = \App\Models\User::query()
+        if ($hazard->assigned_to_user_id) {
+            return;
+        }
+        $siteAccess = app(UserSiteAccessService::class);
+        $candidates = User::query()->staff()->whereNotNull('approved_at')
             ->whereHas('roles', fn ($q) => $q->where('name', 'health_safety_officer'))
-            ->first();
+            ->orderBy('id')->get();
+        $site = $hazard->site;
+        foreach ($candidates as $candidate) {
+            if ($site && $candidate->canDo('hazards.view')
+                && $siteAccess->applyStaffScope(User::query()->whereKey($candidate->id), $candidate, ['sites.viewAll'])->exists()
+                && in_array($site->type, app(SiteTypeAccessService::class)->allowedTypes($candidate), true)
+                && in_array((int) $site->id, $siteAccess->accessibleSiteIds($candidate, ['sites.viewAll']), true)) {
+                $hazard->assigned_to_user_id = $candidate->id;
+                $hazard->assigned_at = now();
 
-        if ($hsOfficer) {
-            $hazard->forceFill([
-                'assigned_to_user_id' => $hsOfficer->id,
-                'assigned_at' => now(),
-            ])->saveQuietly();
+                return;
+            }
         }
     }
 
     private function generateReferenceNumber(): string
     {
-        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('HAZ');
+        return app(ReferenceNumberGenerator::class)->next('HAZ');
     }
 }

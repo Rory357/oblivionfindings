@@ -45,12 +45,10 @@ function ShiftMedStat({
     return (
         // eslint-disable-next-line no-restricted-syntax -- compact stat tile (number + label), not a Card surface
         <div className="rounded-lg border border-border bg-background px-2.5 py-2 text-center">
-            <div
-                className={cn('text-[17px] font-bold tabular-nums', toneClass)}
-            >
+            <div className={cn('text-xl font-bold tabular-nums', toneClass)}>
                 {value}
             </div>
-            <div className="text-[10.5px] font-medium text-muted-foreground">
+            <div className="text-xs font-medium text-muted-foreground">
                 {label}
             </div>
         </div>
@@ -79,21 +77,21 @@ export function ShiftMedSummary({
 }) {
     return (
         <div className="rounded-xl border border-primary/20 bg-accent/40 p-3">
-            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
                 <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/15 text-primary">
                     <Pill className="h-3.5 w-3.5" />
                 </span>
                 Medications this shift
-                <span className="ml-auto text-[11px] font-normal text-muted-foreground">
+                <span className="ml-auto text-xs font-normal text-muted-foreground">
                     auto-surfaced from the MAR
                 </span>
             </div>
             {!hasShift ? (
-                <div className="text-[12.5px] text-muted-foreground">
+                <div className="text-sm text-muted-foreground">
                     {noShiftHint}
                 </div>
             ) : loading ? (
-                <div className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Loading the shift's medication state…
                 </div>
@@ -155,7 +153,7 @@ export function ShiftMedSummary({
                         )}
                     </div>
                     {note ? (
-                        <div className="text-[11.5px] text-muted-foreground">
+                        <div className="text-sm text-muted-foreground">
                             {note}
                         </div>
                     ) : null}
@@ -165,7 +163,7 @@ export function ShiftMedSummary({
                                 <div
                                     key={i}
                                     className={cn(
-                                        'flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px]',
+                                        'flex items-center gap-1.5 rounded-md px-2 py-1 text-sm',
                                         a.tone === 'critical'
                                             ? 'bg-status-critical-bg text-status-critical'
                                             : 'bg-status-warning-bg text-status-warning',

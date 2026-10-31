@@ -12,7 +12,12 @@ import { router } from '@inertiajs/react';
 import { Clock } from 'lucide-react';
 import type { MouseEvent } from 'react';
 import { ReferralStageBadge } from '../stage-badge';
-import { label, referralHref, type WorkspaceReferral } from '../types';
+import {
+    label,
+    referralHref,
+    shownReference,
+    type WorkspaceReferral,
+} from '../types';
 import { ReferralCard, ReferralPriorityChip } from './referral-card';
 
 /** Cards / table for the Referrals view; both share the page's one MenuItem[] builder. */
@@ -52,7 +57,7 @@ export function ReferralCollection({
             identity={(record) => ({
                 mark: <PersonDisc name={record.name} size={30} />,
                 name: record.name,
-                subline: `${record.reference} · ${label(record.source)}`,
+                subline: `${shownReference(record)} · ${label(record.source)}`,
             })}
             hrefFor={(record) => referralHref(record.reference)}
             onOpen={(record) => router.visit(referralHref(record.reference))}

@@ -18,6 +18,11 @@ const options = {
     },
     domains: [{ value: 'security', label: 'Security' }],
     statuses: [{ value: 'active', label: 'Active' }],
+    sites: [
+        { id: 1, name: 'Harbour House' },
+        { id: 2, name: 'Kauri Cottage' },
+    ],
+    can_assign: true,
 };
 
 function AddDeviceDialogLauncher() {
@@ -369,5 +374,50 @@ describe('AddDeviceDialog', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
         expect(onClose).toHaveBeenCalledTimes(1);
         expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+
+    it('offers a searchable Site picker and IP/hostname field on the first step and prefills them on edit', async () => {
+        const createView = render(<AddDeviceDialog open onClose={vi.fn()} />);
+        expect(
+            await screen.findByText('What are we registering?'),
+        ).toBeVisible();
+
+        const siteCombobox = screen.getByRole('combobox', { name: 'Site' });
+        expect(siteCombobox).toHaveTextContent('Unassigned (no Site)');
+        const ipInput = screen.getByRole('textbox', {
+            name: 'IP address or hostname',
+        });
+        expect(ipInput).toHaveValue('');
+
+        fireEvent.change(ipInput, { target: { value: '172.16.0.1' } });
+        expect(ipInput).toHaveValue('172.16.0.1');
+        createView.unmount();
+
+        vi.mocked(fetch).mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                ...options,
+                device: {
+                    id: 95,
+                    name: 'Harbour gateway',
+                    domain: 'security',
+                    category: 'cctv',
+                    status: 'active',
+                    site_id: 1,
+                    ip_address: '172.16.0.1',
+                },
+            }),
+        } as Response);
+
+        render(<EditDeviceDialog open onClose={vi.fn()} deviceId={95} />);
+        expect(
+            await screen.findByRole('textbox', { name: /Device name/ }),
+        ).toHaveValue('Harbour gateway');
+        expect(screen.getByRole('combobox', { name: 'Site' })).toHaveTextContent(
+            'Harbour House',
+        );
+        expect(
+            screen.getByRole('textbox', { name: 'IP address or hostname' }),
+        ).toHaveValue('172.16.0.1');
     });
 });

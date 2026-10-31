@@ -37,8 +37,8 @@ class HsHandoverAcceptanceTest extends TestCase
     public function test_authorised_hs_user_accepts_a_submitted_incident_handover_without_changing_governance_status(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteBoundUser($site, ['hazards.manage']);
-        $owner = $this->siteBoundUser($site, ['hazards.manage']);
+        $actor = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
+        $owner = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
         [$incident, $alert, $event] = $this->incidentJourney($site, $actor, [
             'status' => HsEvent::STATUS_INVESTIGATING,
         ]);
@@ -68,8 +68,8 @@ class HsHandoverAcceptanceTest extends TestCase
     public function test_acceptance_is_monotonic_and_an_identical_retry_does_not_rewrite_the_audit_identity(): void
     {
         $site = Site::factory()->create();
-        $firstActor = $this->siteBoundUser($site, ['hazards.manage']);
-        $secondActor = $this->siteBoundUser($site, ['hazards.manage']);
+        $firstActor = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
+        $secondActor = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
         [, , $event] = $this->incidentJourney($site, $firstActor);
 
         $this->travelTo(now()->startOfSecond());
@@ -96,9 +96,9 @@ class HsHandoverAcceptanceTest extends TestCase
         $siteA = Site::factory()->create();
         $siteB = Site::factory()->create();
         $actorA = $this->siteBoundUser($siteA, ['hazards.view', 'hazards.manage']);
-        $actorB = $this->siteBoundUser($siteB, ['hazards.manage']);
+        $actorB = $this->siteBoundUser($siteB, ['hazards.view', 'hazards.manage']);
         $supportWorkerA = $this->siteBoundUser($siteA, ['hazards.view']);
-        $ownerB = $this->siteBoundUser($siteB, ['hazards.manage']);
+        $ownerB = $this->siteBoundUser($siteB, ['hazards.view', 'hazards.manage']);
         [, , $event] = $this->incidentJourney($siteA, $actorA);
 
         $this->actingAs($actorB)
@@ -157,7 +157,7 @@ class HsHandoverAcceptanceTest extends TestCase
     public function test_acceptance_is_visible_in_hs_incident_and_control_room_payloads(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteBoundUser($site, ['hazards.manage']);
+        $actor = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
         [$incident, $alert, $event] = $this->incidentJourney($site, $actor);
 
         $this->actingAs($actor)->post("/health-safety/events/{$event->id}/accept-handover", [
@@ -207,8 +207,14 @@ class HsHandoverAcceptanceTest extends TestCase
         ]);
         $controlRoomWorkspace = app(AlertWorkspaceService::class)->build($controlRoomOnly, $alert->id);
         $this->assertSame(HsEvent::HANDOVER_ACCEPTED, data_get($controlRoomWorkspace, 'linked_hs_event.handover.status'));
-        $this->assertSame($actor->id, data_get($controlRoomWorkspace, 'linked_hs_event.handover.owner.id'));
-        $this->assertNull(data_get($controlRoomWorkspace, 'linked_hs_event.href'));
+        // Main's Control Room workspace keeps its reference and link keys, empty for a viewer without H&S access.
+        $this->assertSame([
+            'access' => 'restricted',
+            'status' => HsEvent::STATUS_OPEN,
+            'handover' => ['status' => HsEvent::HANDOVER_ACCEPTED],
+            'reference_number' => null,
+            'href' => null,
+        ], $controlRoomWorkspace['linked_hs_event']);
     }
 
     public function test_awaiting_handover_is_a_discoverable_hs_worklist_lens(): void
@@ -254,9 +260,10 @@ class HsHandoverAcceptanceTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('detail.handover.can_accept', false)
                 ->where('detail.handover_summary.next_action', null)
-                ->where('detail.source.url', null)
-                ->where('detail.control_room_alert.reference_number', $alert->reference_number)
-                ->where('detail.control_room_alert.url', null)
+                ->where('detail.source', null)
+                ->where('detail.control_room_alert', null)
+                ->where('detail.linked_access.incident', 'restricted')
+                ->where('detail.linked_access.control_room', 'restricted')
             );
 
         $this->actingAs($crossModuleViewer)
@@ -278,7 +285,7 @@ class HsHandoverAcceptanceTest extends TestCase
     public function test_incident_detail_emits_cross_module_urls_only_when_the_viewer_can_open_them(): void
     {
         $site = Site::factory()->create();
-        $reporter = $this->siteBoundUser($site, ['hazards.manage']);
+        $reporter = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
         [$incident, $alert, $event] = $this->incidentJourney($site, $reporter);
         $incidentOnlyViewer = $this->siteBoundUser($site, ['incidents.viewAny']);
         $crossModuleViewer = $this->siteBoundUser($site, [
@@ -292,9 +299,10 @@ class HsHandoverAcceptanceTest extends TestCase
             ->get("/incidents?incident={$incident->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('detail.control_room_alert.url', null)
-                ->where('detail.hs_event.url', null)
-                ->where('detail.hs_event.corrective_actions_url', null)
+                ->where('detail.control_room_alert', null)
+                ->where('detail.hs_event', null)
+                ->where('detail.linked_access.control_room', 'restricted')
+                ->where('detail.linked_access.health_safety', 'restricted')
             );
 
         $this->actingAs($crossModuleViewer)
@@ -314,7 +322,7 @@ class HsHandoverAcceptanceTest extends TestCase
         Storage::disk('public')->put('incident_attachments/handover.txt', 'handover evidence');
         Storage::disk('local')->put('control-room/evidence-note.txt', 'control room evidence');
         $site = Site::factory()->create();
-        $viewer = $this->siteBoundUser($site, ['hazards.view']);
+        $viewer = $this->siteBoundUser($site, ['hazards.view', 'incidents.viewAny', 'controlRoom.alerts.view']);
         [$incident, $alert, $event] = $this->incidentJourney($site, $viewer);
         $attachment = ClientIncidentAttachment::query()->create([
             'incident_id' => $incident->id,
@@ -376,7 +384,7 @@ class HsHandoverAcceptanceTest extends TestCase
         Storage::disk('public')->put('incident_attachments/scene.txt', 'scene evidence');
         Storage::disk('local')->put('evidence/scene-note.txt', 'control room evidence');
         $site = Site::factory()->create();
-        $viewer = $this->siteBoundUser($site, ['hazards.view']);
+        $viewer = $this->siteBoundUser($site, ['hazards.view', 'incidents.viewAny', 'controlRoom.alerts.view']);
         [$incident, $alert, $event] = $this->incidentJourney($site, $viewer);
         $incident->updateQuietly([
             'witnesses' => 'Hana Te Rangi',
@@ -498,6 +506,11 @@ class HsHandoverAcceptanceTest extends TestCase
 
     /**
      * @param  array<int, string>  $permissionKeys
+     */
+    /**
+     * H&S managers hold H&S view as well (as every real role does): a handover owner must be able to open the event.
+     * None of these users can read incidents unless a test grants it, so incident-linked events show in the
+     * restricted view (Stephan, 25 Oct: event yes, incident no).
      */
     private function siteBoundUser(Site $site, array $permissionKeys): User
     {

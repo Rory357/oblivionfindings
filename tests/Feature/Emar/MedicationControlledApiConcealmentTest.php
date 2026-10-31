@@ -85,7 +85,7 @@ class MedicationControlledApiConcealmentTest extends TestCase
 
         foreach ([
             route('api.medications.safety.check', [$client, $medication]),
-            route('api.medications.prn.history', [$client, $medication]),
+            route('api.medications.prnHistory', [$client, $medication]),
             route('api.medications.scan_code.show', [$client, $medication]),
             route('api.medications.scan_code.svg', [$client, $medication]),
             route('api.medications.versions.index', [$client, $medication]),
@@ -578,7 +578,7 @@ class MedicationControlledApiConcealmentTest extends TestCase
 
         foreach (['not-a-number', 0, 721] as $hours) {
             $this->actingAs($actor)
-                ->getJson(route('api.medications.prn.history', [
+                ->getJson(route('api.medications.prnHistory', [
                     'client' => $client,
                     'medication' => $medication,
                     'hours' => $hours,
@@ -588,7 +588,7 @@ class MedicationControlledApiConcealmentTest extends TestCase
         }
 
         $this->actingAs($actor)
-            ->getJson(route('api.medications.prn.history', [
+            ->getJson(route('api.medications.prnHistory', [
                 'client' => $client,
                 'medication' => $medication,
                 'hours' => 24,

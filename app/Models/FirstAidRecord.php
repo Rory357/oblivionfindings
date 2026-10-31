@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FirstAidRecord extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
     use Concerns\HasReferenceNumber;
 
     public const REFERENCE_PREFIX = 'FA';
@@ -36,16 +37,20 @@ class FirstAidRecord extends Model
         'related_incident_id',
         'created_by',
         'updated_by',
+        'lock_version',
+        'creation_key',
+        'creation_fingerprint',
     ];
 
     protected $casts = [
         'treatment_date' => 'datetime',
+        'lock_version' => 'integer',
         'ambulance_called' => 'boolean',
         'incident_reported' => 'boolean',
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function site(): BelongsTo
@@ -86,6 +91,16 @@ class FirstAidRecord extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(FirstAidAttachment::class, 'first_aid_record_id');
+    }
+
+    public function sourceDeliveries(): HasMany
+    {
+        return $this->hasMany(FirstAidSourceDelivery::class, 'first_aid_record_id');
+    }
+
+    public function sourceDelivery(): HasOne
+    {
+        return $this->hasOne(FirstAidSourceDelivery::class, 'first_aid_record_id')->where('purpose', 'source_review')->latest('created_at')->latest('id');
     }
 
     public function followups(): HasMany

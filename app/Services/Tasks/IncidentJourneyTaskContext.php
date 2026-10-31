@@ -5,6 +5,11 @@ namespace App\Services\Tasks;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\HsEventAccessService;
+use App\Services\Incidents\IncidentAccessService;
 
 final class IncidentJourneyTaskContext
 {
@@ -13,11 +18,14 @@ final class IncidentJourneyTaskContext
      */
     public static function make(
         ?ClientIncident $incident,
+        User $viewer,
         ?ControlRoomAlert $alert = null,
         ?HsEvent $event = null,
         bool $includeSearchContext = false,
+        ?HealthSafetyReadContext $readContext = null,
     ): ?array {
-        if ($incident === null) {
+        $readContext?->assertViewer($viewer);
+        if ($incident === null || ! app(IncidentAccessService::class)->canView($viewer, $incident)) {
             return null;
         }
 
@@ -25,18 +33,6 @@ final class IncidentJourneyTaskContext
             'client:id,first_name,last_name',
             'site:id,name',
         ];
-
-        if ($alert === null) {
-            $incidentLoads[] = $includeSearchContext
-                ? 'controlRoomAlert:id,reference_number,assigned_to_user_id'
-                : 'controlRoomAlert:id,reference_number';
-        }
-
-        if ($event === null) {
-            $incidentLoads[] = $includeSearchContext
-                ? 'hsEvent:id,reference_number,owner_user_id'
-                : 'hsEvent:id,reference_number';
-        }
 
         if ($includeSearchContext) {
             array_push(
@@ -46,31 +42,20 @@ final class IncidentJourneyTaskContext
                 'followups.assignedTo:id,name',
             );
 
-            if ($alert === null) {
-                array_push(
-                    $incidentLoads,
-                    'controlRoomAlert.assignedTo:id,name',
-                    'controlRoomAlert.tasks:id,alert_id,title,description,assigned_to_user_id',
-                    'controlRoomAlert.tasks.assignedTo:id,name',
-                );
-            }
-
-            if ($event === null) {
-                array_push(
-                    $incidentLoads,
-                    'hsEvent.owner:id,name',
-                    'hsEvent.investigations:id,hs_event_id,reference_number,lead_investigator_id',
-                    'hsEvent.investigations.leadInvestigator:id,name',
-                    'hsEvent.correctiveActions:id,hs_event_id,reference_number,assigned_to_user_id',
-                    'hsEvent.correctiveActions.assignedTo:id,name',
-                );
-            }
         }
 
         $incident->loadMissing($incidentLoads);
 
         $alert ??= $incident->controlRoomAlert;
         $event ??= $incident->hsEvent;
+        // A task's own read authority never grants access to the other domains.
+        // Filter before constructing either visible references or search terms.
+        if ($alert && ! app(ControlRoomAlertAccessService::class)->canView($alert, $viewer)) {
+            $alert = null;
+        }
+        if ($event && ! app(HsEventAccessService::class)->canView($event, $viewer, $readContext)) {
+            $event = null;
+        }
 
         $context = [
             'key' => 'incident-'.$incident->id,

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "documents": [
+    {
+      "name": "absent",
+      "request_json": "{\"sequence\":2,\"observed_at\":\"2026-10-21T00:00:00Z\",\"agent_version\":\"0.1.0\",\"boot_id\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\",\"inventory\":{\"hostname\":\"SYNTHETIC-SCRIPT-PC\",\"os_version\":\"Synthetic Windows\",\"architecture\":\"amd64\",\"memory_total_bytes\":null,\"memory_available_bytes\":null,\"uptime_seconds\":null,\"cpu_percent\":null,\"disks\":[],\"software\":[],\"software_complete\":false,\"services\":[],\"services_complete\":false,\"probe_errors\":[]}}"
+    },
+    {
+      "name": "ready",
+      "request_json": "{\"script_actions\":{\"version\":1,\"installed_service\":true,\"release_enabled\":true,\"executor\":\"reviewed_script\"},\"sequence\":1,\"observed_at\":\"2026-10-21T00:00:00Z\",\"agent_version\":\"0.1.0\",\"boot_id\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\",\"inventory\":{\"hostname\":\"SYNTHETIC-SCRIPT-PC\",\"os_version\":\"Synthetic Windows\",\"architecture\":\"amd64\",\"memory_total_bytes\":null,\"memory_available_bytes\":null,\"uptime_seconds\":null,\"cpu_percent\":null,\"disks\":[],\"software\":[],\"software_complete\":false,\"services\":[],\"services_complete\":false,\"probe_errors\":[]}}"
+    }
+  ]
+}

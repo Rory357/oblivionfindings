@@ -4,14 +4,15 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\User;
 use App\Models\WorkplaceInjury;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\InjurySourceProjectionService;
+use App\Services\Tasks\Contracts\ContextualHealthSafetyTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
-use App\Services\Tasks\TaskProviderAuthorization;
-use App\Services\UserSiteAccessService;
 
-class WorkplaceInjuryProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
+class WorkplaceInjuryProvider implements ContextualHealthSafetyTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -30,60 +31,52 @@ class WorkplaceInjuryProvider implements HasModelClass, SiteScopedTaskProvider, 
 
     public function canView(User $user): bool
     {
-        // Mirrors routes/health-safety.php: permission:hazards.view|hr.wellbeing.view
         return $user->canDo('hazards.view') || $user->canDo('hr.wellbeing.view');
     }
 
     public function authorizedTasks(User $user, array $filters = []): array
     {
-        $query = WorkplaceInjury::query()
-            ->with(['user:id,name', 'site:id,name'])
-            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
-            ->orderByDesc('injury_date')
-            ->limit(300);
+        // Fresh source authority decides access, including grants restored after this caller was loaded.
+        return $this->readTasks($user, $filters);
+    }
 
-        if (empty($filters['include_done'])) {
-            $query->whereNotIn('status', ['recovered', 'closed']);
-        }
+    public function authorizedTasksInContext(User $viewer, array $filters, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+        return $this->readTasks($viewer, $filters, $context);
+    }
 
-        return app(TaskProviderAuthorization::class)->siteScoped(
-            $user,
-            $this->canView($user),
-            $query,
-            fn ($scoped, User $actor) => app(UserSiteAccessService::class)->applyWorkplaceInjuryScope(
-                $scoped,
-                $actor,
-                UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
-            ),
-            function (WorkplaceInjury $injury) {
-                return new TaskItem(
-                    id: 'injury-'.$injury->id,
-                    source: $this->sourceKey(),
-                    sourceLabel: $this->label(),
-                    ref: $injury->reference_number,
-                    title: 'Injury — '.($injury->user?->name ?: 'Unknown worker'),
-                    status: (string) $injury->status,
-                    bucket: match ($injury->status) {
-                        'recovered', 'closed' => TaskItem::BUCKET_DONE,
-                        'under_treatment', 'return_to_work' => TaskItem::BUCKET_IN_PROGRESS,
-                        default => TaskItem::BUCKET_OPEN,
-                    },
-                    // Injury vocab is minor/moderate/serious/critical — 'serious' is not in
-                    // the shared map, so promote it to 'high' explicitly.
-                    severity: $injury->severity === 'serious'
-                        ? 'high'
-                        : TaskItem::normaliseSeverity($injury->severity),
-                    assignee: null,
-                    site: $injury->site
-                        ? ['id' => $injury->site->id, 'name' => $injury->site->name]
-                        : null,
-                    dueAt: null,
-                    createdAt: optional($injury->created_at)->toIso8601String(),
-                    link: "/health-safety/injuries?injury={$injury->id}",
-                    type: 'Injury',
-                    description: $injury->description ? str($injury->description)->limit(140)->toString() : null,
-                );
+    public function authorizedNavigationTasksInContext(User $viewer, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+        return $this->readTasks($viewer, [], $context);
+    }
+
+    private function readTasks(User $user, array $filters, ?HealthSafetyReadContext $context = null): array
+    {
+        // Callback returns only scalar source facts. No TaskItem/model/builder leaves Access authority.
+        $rows = app(InjurySourceProjectionService::class)->taskRows($user, $filters, $context);
+        return array_map(fn (array $injury): TaskItem => new TaskItem(
+            id: 'injury-'.$injury['id'],
+            source: $this->sourceKey(),
+            sourceLabel: $this->label(),
+            ref: $injury['reference'],
+            title: 'Injury — '.$injury['worker']['name'],
+            status: $injury['status'],
+            bucket: match ($injury['status']) {
+                'recovered', 'closed' => TaskItem::BUCKET_DONE,
+                'under_treatment', 'return_to_work' => TaskItem::BUCKET_IN_PROGRESS,
+                default => TaskItem::BUCKET_OPEN,
             },
-        );
+            severity: $injury['severity'] === 'serious' ? 'high' : TaskItem::normaliseSeverity($injury['severity']),
+            assignee: $injury['coordinator'],
+            site: $injury['site'],
+            dueAt: $injury['due_at'],
+            createdAt: $injury['created_at'],
+            link: $injury['href'],
+            type: 'Injury',
+            restricted: true, // Purpose-fixed facts: drawer must not hydrate private audit/follower context.
+            description: $injury['description'] ? str($injury['description'])->limit(140)->toString() : null,
+        ), $rows);
     }
 }

@@ -28,7 +28,8 @@ beforeEach(function () {
     $this->publisher = app(HubPublishing::class);
     $this->page = $this->publisher->create($this->moderator, 'news', 'Canonical appreciated discussion');
     $draft = $this->page->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'A complete company story for appreciation contracts.';
+    // The story template also starts an image and a second text block; keep one complete text block.
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'A complete company story for appreciation contracts.']];
     $this->page->update(['draft' => $draft]);
     $this->page = $this->publisher->save($this->moderator, $this->page, [...$this->page->draft, 'reactions_enabled' => false], 1);
     $this->revision = $this->publisher->publish($this->moderator, $this->page, 2, null, null);
@@ -117,7 +118,7 @@ test('comment appreciation binds actor revision version page and enabled current
     }
     $another = $this->publisher->create($this->moderator, 'news', 'Another appreciation boundary');
     $draft = $another->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'A complete company story for cross-page denial.';
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'A complete company story for cross-page denial.']];
     $another->update(['draft' => $draft]);
     $release = $this->publisher->publish($this->moderator, $another, 1, null, null);
     $this->putJson('/company-hub/pages/'.$another->id.'/comments/'.$id.'/appreciation', [...$data, 'revision_id' => $release->id])->assertNotFound();

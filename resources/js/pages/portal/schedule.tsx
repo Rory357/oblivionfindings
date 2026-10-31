@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
+import { WORKER_TIMEZONE, toDateInput } from '@/lib/datetime';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     Calendar,
@@ -77,8 +78,11 @@ type Props = {
     showRespite: boolean;
 };
 
+// Shifts are grouped by their NZ date, so their times read in NZ time too (a
+// family member's browser may be in another timezone).
 function formatTime(iso: string): string {
     return new Date(iso).toLocaleTimeString([], {
+        timeZone: WORKER_TIMEZONE,
         hour: '2-digit',
         minute: '2-digit',
     });
@@ -145,7 +149,7 @@ function groupShiftsByDate(shifts: Shift[]): Map<string, Shift[]> {
 function groupRespiteByDate(stays: RespiteStay[]): Map<string, RespiteStay[]> {
     const grouped = new Map<string, RespiteStay[]>();
     for (const stay of stays) {
-        const date = stay.date ?? stay.starts_at?.slice(0, 10) ?? '';
+        const date = stay.date ?? toDateInput(stay.starts_at);
         if (!date) continue;
 
         const existing = grouped.get(date);
@@ -189,7 +193,7 @@ export default function Schedule({
         // The calendar picker has no `min`; keep the old "today or later" rule.
         if (
             form.data.requested_date &&
-            form.data.requested_date < new Date().toISOString().split('T')[0]
+            form.data.requested_date < toDateInput(new Date())
         ) {
             form.setError('requested_date', 'Choose today or a later date.');
             return;

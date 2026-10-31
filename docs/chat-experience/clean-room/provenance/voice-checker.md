@@ -158,7 +158,7 @@ The last run, through the heavy-lock with ffprobe 8.1.1 configured, passed 203 t
   - 67 hand-built bad files, one per rule, each asserting the rule that failed (Vorbis included);
   - Opus R1 to R7 cases;
   - the parts and time limits;
-  - four hostile 20 MiB files, each blocked in under 2 s (one is the checker's padding file from F3);
+  - eight hostile files of up to 20 MiB, each finished in under 2 s with under 48 MiB of working memory. They include the checker's padding file (F3), many-`mdat` file (F5) and many-`free`-box file (F6);
   - CRC equality.
 - **Mutation test:** `ChatVoiceMutationTest` runs 10,000 cases with a fixed seed, in about 50 s. None threw, the slowest file took 0.03 s, and no provably broken file passed. A file counts as provably broken when:
   - any Ogg file is changed (CRCs plus the end page);
@@ -287,6 +287,27 @@ Similarity re-run on the changed files: the best coverage is still 1.0–5.9 %, 
   - Herd's limit here is 1024M, but the production limit is not recorded in the repository. Running out of memory is a fatal error that no `catch` stops: the upload request would fail and the upload would stay "scanning".
   - WebM and Ogg keep no lists that grow with the file.
   - Direction: walk the boxes one at a time instead of collecting them, and keep the `mdat` and range lists compact. Or run the check in a child process with its own memory cap, as `HubPdfText` already does for PDFs.
+
+## F5 and F6 fixes (builder, 23 October 2026; tested 31 October 2026)
+
+The recheck after `98ed39a95` confirmed F1–F4 and found two older MP4 problems, fixed after it:
+
+- **F5, an MP4 could pass the 2-second limit.** Each sample range was matched against the `mdat` list by scanning it from the start: 4.5–5.1 s for 100,000 chunks in the last of 300,000 `mdat` boxes.
+  - Top-level boxes come in file order and cannot overlap, so the right `mdat` is now found by halving the list.
+  - Plain files check each chunk as soon as it is read; only fragment runs wait for the end of the file.
+  - The same file now takes 0.3–0.5 s.
+- **F6, an MP4 could use about 280 MiB.** Child boxes were collected into a list before they were walked.
+  - Children are now walked one at a time.
+  - `mdat` positions and waiting fragment ranges are packed into strings, 16 bytes each.
+  - The checker's 900,000-`free`-box file now needs 0.4 MiB of working memory. The worst MP4 the parts limit allows, about a million `mdat` boxes, needs 16 MiB.
+- **New limit in the tests:** every hostile 20 MiB test file now asserts under 2 s and under 48 MiB of working memory beyond the file itself. The most any of them uses is 20 MiB: an Ogg file whose single packet spans every page.
+- **Test repair:** the five-million-entry size-table file had been refused before reaching its table, because it lacked the `smhd`/`dinf` boxes made mandatory under decision 20. It is rebuilt on a complete movie.
+
+**F5 and F6 tested (31 October 2026, Rory's builder session).** `68f707db4` was committed untested. It is now tested on this branch with the Chat base and main `0a66dafe2` merged in (`f5f41798a`). No code changed.
+
+- Without ffprobe: the voice unit tests, `ChatVoiceInspectorTest`, `ChatServiceHealthTest` and `ChatUploadsTest`. 180 passed and 27 skipped (the ffprobe comparisons).
+- With `CHAT_VOICE_PROBE_BINARY` set to ffprobe **9.0.2** (8.1.1 isn't installed on this PC): the voice unit tests and `ChatVoiceInspectorTest`. All 184 passed, so ffprobe 9.0.2 agrees with the checker on every good file.
+- The checker's recheck of F5 and F6, the similarity check and the REGISTER.md sign-off are still to do, by a session other than this one.
 
 ## Open questions
 

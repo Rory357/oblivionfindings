@@ -134,7 +134,7 @@ describe('Network operating record layouts', () => {
             }),
         );
         expect(
-            screen.getByRole('link', { name: 'Download governed snapshot' }),
+            screen.getByRole('link', { name: 'Download saved snapshot' }),
         ).toHaveAttribute(
             'href',
             '/security-devices/devices/31/configuration-snapshots/902',
@@ -147,7 +147,7 @@ describe('Network operating record layouts', () => {
                 /Additional retained snapshots exist outside this bounded Site history/,
             ),
         ).toBeInTheDocument();
-        fireEvent.click(screen.getByText(/View previous governed snapshots/));
+        fireEvent.click(screen.getByText(/View previous saved snapshots/));
         expect(visit).not.toHaveBeenCalled();
         expect(
             screen.getByRole('link', { name: 'Download this snapshot' }),
@@ -173,7 +173,7 @@ describe('Network operating record layouts', () => {
             }),
         );
         expect(screen.getByText('Download unavailable')).toBeInTheDocument();
-        fireEvent.click(screen.getByText(/View previous governed snapshots/));
+        fireEvent.click(screen.getByText(/View previous saved snapshots/));
         expect(screen.getByText('Unavailable')).toBeInTheDocument();
         expect(
             screen.queryByRole('link', { name: /Download/ }),
@@ -188,7 +188,7 @@ describe('Network operating record layouts', () => {
             />,
         );
         expect(
-            screen.queryByText('Latest governed snapshot'),
+            screen.queryByText('Latest saved snapshot'),
         ).not.toBeInTheDocument();
         const trigger = screen.getByRole('button', {
             name: 'View evidence for Drifted firewall',
@@ -198,7 +198,7 @@ describe('Network operating record layouts', () => {
             name: 'Evidence for Drifted firewall',
         });
         expect(
-            within(dialog).getByText('Latest governed snapshot'),
+            within(dialog).getByText('Latest saved snapshot'),
         ).toBeInTheDocument();
         expect(visit).not.toHaveBeenCalled();
         fireEvent.click(

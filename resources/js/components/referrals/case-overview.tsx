@@ -40,6 +40,7 @@ import { DEFAULT_PRIORITY, ReferralPriorityBadge } from './priority-badge';
 import { stageLabel } from './stage-badge';
 import {
     label,
+    shownReference,
     type Options,
     type Permissions,
     type ReferralFundingTotal,
@@ -1177,7 +1178,7 @@ export function IntakeReview({
                     )}
                     <ReviewRow
                         label="Receipt reference"
-                        value={referral.reference}
+                        value={shownReference(referral)}
                     />
                     {permissions['assessment.view'] &&
                         referral.identity.date_of_birth && (

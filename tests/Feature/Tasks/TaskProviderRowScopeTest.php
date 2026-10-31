@@ -816,6 +816,12 @@ function taskRbacMatrix(): array
         'hs_investigation' => $pair('hs_investigation', $investigationA, $investigationB, 'HSI-91001', 'HSI-92001'),
         'corrective_action' => $pair('corrective_action', $correctiveA, $correctiveB, 'HCA-91001', 'HCA-92001'),
         'hazard' => $pair('hazard', $hazardA, $hazardB, 'HAZ-91001', 'HAZ-92001'),
+        // This retained cross-module fixture creates no procedure/drill work.
+        // Complete ProcedureReviewRequestTaskProviderTest and EmergencyDrillWorkProjectionTest
+        // in the coordinated bundle prove their actual positive and foreign-Site rows.
+        'procedure_review_request' => ['visible' => [], 'hidden' => []],
+        'emergency_drill' => ['visible' => [], 'hidden' => []],
+        'emergency_drill_finding' => ['visible' => [], 'hidden' => []],
         'injury' => $pair('injury', $injuryA, $injuryB, 'INJ-91001', 'INJ-92001'),
         'safeguarding' => $pair('safeguarding', $concernA, $concernB, 'SAF-91001', 'SAF-92001'),
         'safeguarding_action' => $pair('safeguarding_action', $safeguardingActionA, $safeguardingActionB, 'SAF-91001', 'SAF-92001'),
@@ -870,6 +876,13 @@ function taskRbacMatrix(): array
         'referrals' => ['visible' => [], 'hidden' => []],
         'first_aid_followup' => $pair('first_aid_followup', $firstAidFollowupA, $firstAidFollowupB, 'FA-91001', 'FA-92001'),
         'restraint_review' => $pair('restraint_review', $restraintA, $restraintB, 'RST-91001', 'RST-92001'),
+        // This fixture creates no chemical exposure follow-ups; ChemicalExposureTaskPrivacyTest and
+        // ChemicalExposureTaskReadTestCase prove their actual assigned and foreign-Site rows.
+        'chemical_exposure_followup' => ['visible' => [], 'hidden' => []],
+        // No exposure deliveries or review flags here; ChemicalExposureAutomaticDeliveryTest proves those rows show
+        // to exposure and H&S managers only.
+        'chemical_exposure_delivery' => ['visible' => [], 'hidden' => []],
+        'hs_event_review' => ['visible' => [], 'hidden' => []],
     ];
 
     return [
@@ -1122,7 +1135,10 @@ it('applies site revocation reassignment and explicit application wide permissio
             ->where('pagination.total', count($globalIds))
             ->where('items', fn ($items) => collect($items)->pluck('id')->sort()->values()->all() === $globalIds)
             ->where('auth.can.tasks.view', $revokedNavigation['view'])
-            ->where('auth.can.tasks.badge', $revokedNavigation['badge']));
+            // The count loads after the page, with the inbox.
+            ->loadDeferredProps('default', fn ($fill) => $fill
+                ->where('taskNav.view', $revokedNavigation['view'])
+                ->where('taskNav.badge', $revokedNavigation['badge'])));
 
     $profile->update([
         'primary_site_id' => $fixture['siteB']->id,

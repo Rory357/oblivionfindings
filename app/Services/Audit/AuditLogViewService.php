@@ -20,6 +20,10 @@ final class AuditLogViewService
         private readonly MedicationGeneralAuditPrivacy $medicationAudit,
     ) {}
 
+    /** Clinical and narrative fields of a chemical exposure; never shown in a general audit row. */
+    private const EXPOSURE_CLINICAL_FIELDS = ['circumstances', 'symptoms', 'first_aid_given', 'medical_attention_sought',
+        'medical_treatment', 'medical_outcome'];
+
     /** @var array<string, array{actions: array<int, string>, subjects: array<int, string>}> */
     private const MODULES = [
         'it' => [
@@ -146,6 +150,14 @@ final class AuditLogViewService
         $before = $this->firstArray($meta, ['before', 'old', 'previous']);
         $after = $this->firstArray($meta, ['after', 'attributes', 'new', 'changes', 'values']);
         $recordedFields = is_array($meta['fields'] ?? null) ? $meta['fields'] : [];
+        if ($this->isExposureRecord($log)) {
+            // Stephan, 25 Oct ("Hide the clinical notes"): older exposure rows hold the worker's clinical text. Values
+            // only ever show through the safe allow-list below; an exposure row no longer even lists which clinical
+            // fields changed. The row and its other changes still show.
+            $before = Arr::except($before, self::EXPOSURE_CLINICAL_FIELDS);
+            $after = Arr::except($after, self::EXPOSURE_CLINICAL_FIELDS);
+            $recordedFields = array_values(array_diff($recordedFields, self::EXPOSURE_CLINICAL_FIELDS));
+        }
         $fieldMap = collect([...$recordedFields, ...array_keys($before), ...array_keys($after)])
             ->filter(fn (mixed $field): bool => is_string($field) && $field !== '')
             ->take(100)
@@ -349,6 +361,14 @@ final class AuditLogViewService
     }
 
     /** @param array<string, mixed> $meta */
+    private function isExposureRecord(AuditLog $log): bool
+    {
+        return in_array($log->auditable_type, [
+            \App\Models\SubstanceExposureRecord::class,
+            (new \App\Models\SubstanceExposureRecord)->getMorphClass(),
+        ], true);
+    }
+
     private function firstArray(array $meta, array $keys): array
     {
         foreach ($keys as $key) {

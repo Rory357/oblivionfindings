@@ -378,6 +378,36 @@ describe('TrackingWorkspacePanels', () => {
         ).toBeInTheDocument();
         expect(screen.queryByTestId('tracking-map')).not.toBeInTheDocument();
     });
+
+    it('renders masked Queclink hub link on paired tracker cards when permitted', () => {
+        render(
+            <TrackingWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'personal-safety',
+                        label: 'Personal safety',
+                        inventoryShown: 1,
+                        devices: [
+                            {
+                                ...clientDevice,
+                                queclinkHref:
+                                    '/security-devices/integrations/queclink?device_search=6789',
+                            },
+                        ],
+                    },
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByRole('link', { name: 'Open in Queclink hub' }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/integrations/queclink?device_search=6789',
+        );
+    });
 });
 
 function expectFact(label: string, value: string) {

@@ -39,6 +39,7 @@ class AlertWorkspaceService
         private ControlRoomAlertLifecycleService $lifecycle,
         private IncidentJourneyService $journeys,
         private IncidentJourneyPresenter $journeyPresenter,
+        private RestraintHsReferenceVisibility $restraintReferences,
     ) {}
 
     /**
@@ -132,11 +133,13 @@ class AlertWorkspaceService
         $canOpenIncident = $linkedIncident !== null
             && $canViewIncident
             && $user->can('view', $linkedIncident);
-        $canOpenHs = $linkedHsEvent !== null && $user->canDo('hazards.view');
+        // A restraint's H&S reference and link need restraint read; the close requirement itself stays.
+        $hsReferenceVisible = $this->restraintReferences->canSee($user, $linkedHsEvent);
+        $canOpenHs = $linkedHsEvent !== null && $user->canDo('hazards.view') && $hsReferenceVisible;
         $resolveGate = $this->lifecycle->resolveGate($alert)->toArray();
         $closeGate = $this->lifecycle->closeGate($alert)->toArray();
         $closeGate['requirements'] = collect($closeGate['requirements'])
-            ->map(function (array $requirement) use ($canOpenIncident, $canOpenHs): array {
+            ->map(function (array $requirement) use ($canOpenIncident, $canOpenHs, $hsReferenceVisible): array {
                 $canOpen = match ($requirement['key']) {
                     'incident_closed' => $canOpenIncident,
                     'health_safety_closed' => $canOpenHs,
@@ -144,6 +147,9 @@ class AlertWorkspaceService
                 };
                 if (! $canOpen) {
                     $requirement['href'] = null;
+                }
+                if ($requirement['key'] === 'health_safety_closed' && ! $hsReferenceVisible && ! $requirement['complete']) {
+                    $requirement['label'] = 'Close linked H&S governance before closing this alert.';
                 }
 
                 return $requirement;

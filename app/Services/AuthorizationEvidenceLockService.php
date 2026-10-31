@@ -57,6 +57,12 @@ class AuthorizationEvidenceLockService
         return $this->hydrateForUsers([$id], $permissionKeys, [], 'for share nowait')->get($id);
     }
 
+    /** Compound command authority must not wait beneath existing command/device locks. */
+    public function lockForUsersWithoutWaiting(iterable $users, array $permissionKeys): Collection
+    {
+        return $this->hydrateForUsers($users, $permissionKeys, [], 'for update nowait');
+    }
+
     private function hydrateForUsers(iterable $users, array $permissionKeys, array $additionalRoleIds, bool|string $lockMode): Collection
     {
         if (DB::transactionLevel() < 1) {

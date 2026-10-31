@@ -33,12 +33,13 @@ class HealthcareWorkspacePresenter
         'healthy',
     ];
 
-    public function present(User $viewer, Builder $healthcareScope, array $activeTab): array
+    public function present(User $viewer, Builder $healthcareScope, array $activeTab, array $filters = []): array
     {
         $canViewClientContext = $viewer->canDo('clients.viewAny')
             || $viewer->canDo('clients.viewAssigned');
         $canViewClinicalMonitoring = $viewer->canDo('clinical.monitoring.viewAny');
         $canViewMaintenance = $viewer->canDo('securityDevices.maintenance.view');
+        $canManageMonitoring = $viewer->canDo('securityDevices.monitoring.manage');
         $canViewIt = $viewer->canDo('it.view');
         $restricted = $this->restricted($viewer, $activeTab);
 
@@ -70,8 +71,26 @@ class HealthcareWorkspacePresenter
                 $context,
                 $ticketMap,
                 $canViewMaintenance,
+                $canManageMonitoring,
             ))
             ->values();
+        $flowGroups = $restricted
+            ? []
+            : $this->flowGroups($mappedDevices);
+        $flowFilter = ! $restricted
+            && isset($filters['flow'])
+            && is_string($filters['flow'])
+            && in_array($filters['flow'], self::FLOW_ORDER, true)
+                ? [
+                    'key' => $filters['flow'],
+                    'label' => $this->flowFilterLabel($filters['flow']),
+                ]
+                : null;
+        $visibleDevices = $flowFilter !== null
+            ? $mappedDevices->filter(
+                fn (array $device): bool => $device['technical']['flow']['state'] === $flowFilter['key'],
+            )->values()
+            : $mappedDevices;
 
         return [
             'permissions' => [
@@ -96,13 +115,12 @@ class HealthcareWorkspacePresenter
                 'label' => $activeTab['label'],
                 'description' => $activeTab['description'],
                 'restricted' => $restricted,
+                'flowFilter' => $flowFilter,
                 'inventoryTotal' => $inventoryTotal,
-                'inventoryShown' => $mappedDevices->count(),
+                'inventoryShown' => $visibleDevices->count(),
                 'inventoryTruncated' => $inventoryTotal > self::DEVICE_LIMIT,
-                'devices' => $mappedDevices,
-                'flowGroups' => $restricted
-                    ? []
-                    : $this->flowGroups($mappedDevices),
+                'devices' => $visibleDevices,
+                'flowGroups' => $flowGroups,
                 'maintenanceRecords' => $restricted || ! $canViewMaintenance
                     ? []
                     : $this->maintenanceRecords(clone $activeScope),
@@ -326,6 +344,7 @@ class HealthcareWorkspacePresenter
         array $context,
         Collection $ticketMap,
         bool $canViewMaintenance,
+        bool $canManageMonitoring,
     ): array {
         $assignment = $device->assignments->first();
         $client = $assignment?->assignable_type === DeviceAssignment::TARGET_CLIENT
@@ -393,6 +412,12 @@ class HealthcareWorkspacePresenter
                 'state' => $device->monitors->isEmpty() ? 'unsupported_or_not_configured' : 'configured',
                 'enabledCount' => $device->monitors->count(),
             ],
+            'monitoringHref' => $canManageMonitoring && $device->monitors->isEmpty()
+                ? "/security-devices/devices/{$device->id}?section=monitors"
+                : null,
+            'maintenanceHref' => $canViewMaintenance
+                ? "/security-devices/maintenance?device_id={$device->id}"
+                : null,
             'maintenance' => $canViewMaintenance ? [
                 'nextServiceDue' => $device->next_service_due?->toIso8601String(),
                 'openCount' => $openMaintenance->count(),
@@ -536,6 +561,18 @@ class HealthcareWorkspacePresenter
     private function flow(string $state, string $label, string $description): array
     {
         return compact('state', 'label', 'description');
+    }
+
+    private function flowFilterLabel(string $state): string
+    {
+        return match ($state) {
+            'offline' => 'Offline',
+            'integration_failure' => 'Integration failure',
+            'stale_delivery' => 'Stale delivery',
+            'unsupported' => 'Monitoring unsupported',
+            'healthy' => 'Healthy flow',
+            default => 'Unknown',
+        };
     }
 
     private function flowGroups(Collection $devices): Collection

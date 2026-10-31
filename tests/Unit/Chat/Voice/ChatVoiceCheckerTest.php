@@ -23,6 +23,9 @@ final class ChatVoiceCheckerTest extends TestCase
 {
     public const FIXTURES = __DIR__.'/../../../fixtures/chat-voice';
 
+    /** The most working memory the checker may use on a hostile file, beyond the file itself (checker finding F6). */
+    private const WORKING_MEMORY = 48 * 1024 * 1024;
+
     /**
      * Recordings made for Oblivion in headless browsers on 23 October 2026 (tests/fixtures/chat-voice/README.md),
      * with the length the checker finds and the length the earlier ffprobe-based check found.
@@ -317,43 +320,89 @@ final class ChatVoiceCheckerTest extends TestCase
 
                 return $pages;
             }],
+            // Found by the checker session (F5): 100,000 one-byte chunks, all in the last of 300,000 'mdat' boxes.
+            'MP4 with its samples in the last of 300,000 mdat boxes' => [function () {
+                $count = 100_000;
+                $empty = 299_999;
+                $movie = fn (int $first) => self::hostileMovie([
+                    Mp4Fixtures::box('stts', pack('N4', 0, 1, $count, 1)),
+                    Mp4Fixtures::box('stsc', pack('N5', 0, 1, 1, 1, 1)),
+                    Mp4Fixtures::box('stsz', pack('N3', 0, 1, $count)),
+                    Mp4Fixtures::box('stco', pack('N2', 0, $count).pack('N*', ...range($first, $first + $count - 1))),
+                ]);
+                $ftyp = Mp4Fixtures::box('ftyp', 'M4A '.pack('N', 0));
+                $dataStart = strlen(Mp4Fixtures::nodes([$ftyp, $movie(0)])[0]) + $empty * 8 + 8;
+
+                return Mp4Fixtures::nodes([$ftyp, $movie($dataStart)])[0].str_repeat(pack('N', 8).'mdat', $empty)
+                    .pack('N', 8 + $count).'mdat'.str_repeat("\x21", $count);
+            }, 'ready'],
+            // Found by the checker session (F6): a valid file whose 'moov' holds 900,000 empty 'free' boxes.
+            'MP4 with 900,000 free boxes in its moov' => [function () {
+                $count = 50;
+                $movie = fn (int $first) => self::hostileMovie([
+                    Mp4Fixtures::box('stts', pack('N4', 0, 1, $count, 1024)),
+                    Mp4Fixtures::box('stsc', pack('N5', 0, 1, 1, $count, 1)),
+                    Mp4Fixtures::box('stsz', pack('N3', 0, 100, $count)),
+                    Mp4Fixtures::box('stco', pack('N3', 0, 1, $first)),
+                ], str_repeat(pack('N', 8).'free', 900_000));
+                $ftyp = Mp4Fixtures::box('ftyp', 'M4A '.pack('N', 0));
+                $dataStart = strlen(Mp4Fixtures::nodes([$ftyp, $movie(0)])[0]) + 8;
+
+                return Mp4Fixtures::nodes([$ftyp, $movie($dataStart)])[0].pack('N', 8 + 100 * $count).'mdat'.str_repeat("\x21", 100 * $count);
+            }, 'ready'],
+            'MP4 with 990,000 empty mdat boxes' => [function () {
+                $movie = fn (int $first) => self::hostileMovie([
+                    Mp4Fixtures::box('stts', pack('N4', 0, 1, 1, 1024)),
+                    Mp4Fixtures::box('stsc', pack('N5', 0, 1, 1, 1, 1)),
+                    Mp4Fixtures::box('stsz', pack('N3', 0, 1, 1)),
+                    Mp4Fixtures::box('stco', pack('N3', 0, 1, $first)),
+                ]);
+                $ftyp = Mp4Fixtures::box('ftyp', 'M4A '.pack('N', 0));
+                $dataStart = strlen(Mp4Fixtures::nodes([$ftyp, $movie(0)])[0]) + 990_000 * 8 + 8;
+
+                return Mp4Fixtures::nodes([$ftyp, $movie($dataStart)])[0].str_repeat(pack('N', 8).'mdat', 990_000).pack('N', 9).'mdat'."\x21";
+            }],
             'MP4 with a five-million-entry size table' => [function () {
                 $count = 5_000_000;
 
                 return Mp4Fixtures::nodes([
                     Mp4Fixtures::box('ftyp', 'M4A '.pack('N', 0)),
-                    Mp4Fixtures::box('moov', [
-                        Mp4Fixtures::box('mvhd', pack('N', 0).pack('N3', 0, 0, 1000).str_repeat("\0", 84)),
-                        Mp4Fixtures::box('trak', [
-                            Mp4Fixtures::box('tkhd', pack('N', 3).pack('N3', 0, 0, 1).str_repeat("\0", 72)),
-                            Mp4Fixtures::box('mdia', [
-                                Mp4Fixtures::box('mdhd', pack('N', 0).pack('N4', 0, 0, 48000, 0).pack('n2', 0, 0)),
-                                Mp4Fixtures::box('hdlr', pack('N2', 0, 0).'soun'.str_repeat("\0", 13)),
-                                Mp4Fixtures::box('minf', [Mp4Fixtures::box('stbl', [
-                                    Mp4Fixtures::box('stsd', [pack('N2', 0, 1), self::aacEntry()]),
-                                    Mp4Fixtures::box('stts', pack('N4', 0, 1, $count, 1)),
-                                    Mp4Fixtures::box('stsc', pack('N5', 0, 1, 1, $count, 1)),
-                                    Mp4Fixtures::box('stsz', pack('N3', 0, 0, $count).str_repeat(pack('N', 1), $count)),
-                                    Mp4Fixtures::box('stco', pack('N3', 0, 1, 100)),
-                                ])]),
-                            ]),
-                        ]),
+                    self::hostileMovie([
+                        Mp4Fixtures::box('stts', pack('N4', 0, 1, $count, 1)),
+                        Mp4Fixtures::box('stsc', pack('N5', 0, 1, 1, $count, 1)),
+                        Mp4Fixtures::box('stsz', pack('N3', 0, 0, $count).str_repeat(pack('N', 1), $count)),
+                        Mp4Fixtures::box('stco', pack('N3', 0, 1, 100)),
                     ]),
                 ])[0];
+            }],
+            'Ogg whose one 20 MiB packet spans every page' => [function () {
+                $pages = OggFixtures::page(0x02, 0, 5, 0, [19], OpusFrames::head(1)).OggFixtures::page(0, 0, 5, 1, [16], 'OpusTags'.pack('V2', 0, 0));
+                $body = str_repeat("\x21", 255 * 255);
+                for ($sequence = 2; strlen($pages) < 20 * 1024 * 1024 - 2 * 66_000; $sequence++) {
+                    $pages .= OggFixtures::page($sequence === 2 ? 0 : 0x01, -1, 5, $sequence, array_fill(0, 255, 255), $body);
+                }
+
+                return $pages.OggFixtures::page(0x05, 960, 5, $sequence, [10], str_repeat("\x21", 10));
             }],
         ];
     }
 
     #[DataProvider('worstCases')]
-    public function test_bounds_the_work_on_hostile_files(\Closure $make): void
+    public function test_bounds_the_work_on_hostile_files(\Closure $make, string $state = 'blocked'): void
     {
         $bytes = $make();
         self::assertLessThanOrEqual(20 * 1024 * 1024, strlen($bytes));
+        gc_collect_cycles();
+        memory_reset_peak_usage();
+        $before = memory_get_usage();
         $started = hrtime(true);
         $result = (new ChatVoiceChecker)->check($bytes);
         $seconds = (hrtime(true) - $started) / 1e9;
-        self::assertSame('blocked', $result->state);
+        $extra = memory_get_peak_usage() - $before;
+        self::assertSame($state, $result->state);
         self::assertLessThan(2.0, $seconds);
+        // The file itself is already in memory; the checker's own working memory stays small.
+        self::assertLessThan(self::WORKING_MEMORY, $extra, sprintf('%.1f MiB of working memory', $extra / 1048576));
     }
 
     public function test_fast_ogg_crc_matches_the_bit_by_bit_definition(): void
@@ -450,6 +499,27 @@ final class ChatVoiceCheckerTest extends TestCase
         } catch (VoiceFormatException $e) {
             self::assertSame($rule, $e->reason);
         }
+    }
+
+    /** A 'moov' with one AAC sound track and the given sample tables, for the hand-built worst cases. */
+    private static function hostileMovie(array $tables, string $extra = ''): array
+    {
+        return Mp4Fixtures::box('moov', [
+            Mp4Fixtures::box('mvhd', pack('N', 0).pack('N3', 0, 0, 1000).str_repeat("\0", 84)),
+            Mp4Fixtures::box('trak', [
+                Mp4Fixtures::box('tkhd', pack('N', 3).pack('N3', 0, 0, 1).str_repeat("\0", 72)),
+                Mp4Fixtures::box('mdia', [
+                    Mp4Fixtures::box('mdhd', pack('N', 0).pack('N4', 0, 0, 48000, 0).pack('n2', 0, 0)),
+                    Mp4Fixtures::box('hdlr', pack('N2', 0, 0).'soun'.str_repeat("\0", 13)),
+                    Mp4Fixtures::box('minf', [
+                        Mp4Fixtures::box('smhd', pack('N2', 0, 0)),
+                        Mp4Fixtures::box('dinf', [Mp4Fixtures::box('dref', [pack('N2', 0, 1), Mp4Fixtures::box('url ', pack('N', 1))])]),
+                        Mp4Fixtures::box('stbl', [Mp4Fixtures::box('stsd', [pack('N2', 0, 1), self::aacEntry()]), ...$tables]),
+                    ]),
+                ]),
+            ]),
+            $extra,
+        ]);
     }
 
     /** An 'mp4a' sample entry with an AAC LC decoder configuration, for the hand-built worst case. */

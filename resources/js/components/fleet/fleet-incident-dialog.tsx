@@ -10,7 +10,8 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
-import { Link, router, useForm } from '@inertiajs/react';
+import { incidentWorkspaceHref } from '@/lib/incidents/navigation';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Box,
@@ -1251,6 +1252,10 @@ function InvestigationSection({ d }: { d: FleetIncidentDetail }) {
 }
 
 function LinkedSection({ d }: { d: FleetIncidentDetail }) {
+    const pageUrl = usePage().url;
+    const query = new URLSearchParams(pageUrl.split('?')[1]?.split('#')[0] ?? '');
+    query.set('incident', String(d.id));
+    const returnTo = '/fleet-assets/incidents?' + query.toString();
     const empty = !d.hs_event && !d.asset && !d.client_incidents.length;
     return (
         <div className="flex flex-col gap-2">
@@ -1314,7 +1319,7 @@ function LinkedSection({ d }: { d: FleetIncidentDetail }) {
                     icon={User}
                     title="Client incident (resident aboard)"
                     sub={`${ci.client?.name ?? 'Resident'} · ${titleCase(ci.status)} · ${titleCase(ci.type)}`}
-                    href={`/incidents?incident=${ci.id}`}
+                    href={incidentWorkspaceHref(ci.id, returnTo)}
                 />
             ))}
             {empty ? (

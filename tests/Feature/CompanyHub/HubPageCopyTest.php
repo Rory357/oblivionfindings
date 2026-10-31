@@ -222,7 +222,8 @@ test('a late failure after every file was copied rolls back the new page records
 });
 
 test('stale canonical references unavailable files discarded drafts and the singleton homepage fail without creating a copy', function () {
-    $story = $this->publisher->create($this->editor, 'news', 'An authorised featured story');
+    // The default story template starts with unfinished blocks; this featured source only needs to be published.
+    $story = $this->publisher->create($this->editor, 'news', 'An authorised featured story', 'blank');
     $this->publisher->publish($this->editor, $story, 1, null, null);
     $content = $this->page->draft;
     $content['sections'][0]['blocks'][] = ['id' => 'selected-story', 'type' => 'featured', 'title' => '', 'story_id' => $story->id, 'layout' => 'single'];

@@ -30,6 +30,8 @@ class PpeAllocationAttachment extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
         'size' => 'integer',
     ];
 
@@ -46,5 +48,11 @@ class PpeAllocationAttachment extends Model
     public function isImage(): bool
     {
         return str_starts_with((string) $this->mime, 'image/');
+    }
+
+    /** Governed facts remain distinct from legacy rows and current authority. */
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PpeSourceVersion::class, 'source_id')->where('source_type', 'allocation_attachment');
     }
 }

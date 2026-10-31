@@ -1,6 +1,9 @@
+import {
+    actualEventInstant,
+    ActualEventTimeField,
+} from '@/components/clinical/actual-event-time-field';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
@@ -19,6 +22,7 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import { formatDateTime, toDatetimeLocal } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     durationLabel,
@@ -70,7 +74,10 @@ type EventForm = {
     stay_id: string;
     site_id: string;
     started_at: string;
+    /** The chosen NZ offset when a clock reading repeats (autumn change). */
+    started_offset: string;
     ended_at: string;
+    ended_offset: string;
     restraint_type: string;
     severity: string;
     trigger_description: string;
@@ -163,11 +170,9 @@ const ERROR_STEP: { prefix: string; step: number }[] = [
     { prefix: 'authorised_by', step: 5 },
 ];
 
+/** Now as NZ wall-clock, whatever the browser's timezone. */
 function localNow(): string {
-    const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
+    return toDatetimeLocal(new Date());
 }
 
 /**
@@ -221,7 +226,9 @@ export function RestraintEventWizard({
         stay_id: prescope?.stay_id ? String(prescope.stay_id) : '',
         site_id: prescope?.site_id ? String(prescope.site_id) : '',
         started_at: localNow(),
+        started_offset: '',
         ended_at: '',
+        ended_offset: '',
         restraint_type: '',
         severity: 'medium',
         trigger_description: '',
@@ -289,14 +296,26 @@ export function RestraintEventWizard({
         });
     };
 
+    // NZ wall-clock plus its offset, as the H&S restraint form sends it. Empty
+    // while the reading does not exist (spring change) or a repeated reading
+    // (autumn change) has no chosen occurrence yet.
+    const startedInstant = actualEventInstant(
+        data.started_at,
+        data.started_offset,
+    );
+    const endedInstant = data.ended_at
+        ? actualEventInstant(data.ended_at, data.ended_offset)
+        : '';
+    const timesValid = !!startedInstant && (!data.ended_at || !!endedInstant);
+
     const durationPreview = useMemo(() => {
-        if (!data.started_at || !data.ended_at) return null;
-        const start = new Date(data.started_at).getTime();
-        const end = new Date(data.ended_at).getTime();
+        if (!startedInstant || !endedInstant) return null;
+        const start = new Date(startedInstant).getTime();
+        const end = new Date(endedInstant).getTime();
         if (Number.isNaN(start) || Number.isNaN(end) || end <= start)
             return null;
         return Math.round((end - start) / 60000);
-    }, [data.started_at, data.ended_at]);
+    }, [startedInstant, endedInstant]);
 
     const pct = useMemo(() => {
         const checks = [
@@ -320,11 +339,7 @@ export function RestraintEventWizard({
             case 'context':
                 return !!data.client_id;
             case 'episode':
-                return (
-                    !!data.restraint_type &&
-                    !!data.started_at &&
-                    !!data.severity
-                );
+                return !!data.restraint_type && timesValid && !!data.severity;
             case 'trigger':
                 return (
                     !!data.trigger_description.trim() &&
@@ -347,7 +362,7 @@ export function RestraintEventWizard({
         !!data.client_id &&
         !!data.restraint_type &&
         !!data.severity &&
-        !!data.started_at &&
+        timesValid &&
         !!data.trigger_description.trim() &&
         !!data.de_escalation_attempted.trim() &&
         !!data.restraint_description.trim() &&
@@ -365,8 +380,9 @@ export function RestraintEventWizard({
     };
 
     const submit = (addAnother: boolean) => {
-        form.transform((d) => ({
+        form.transform(({ started_offset, ended_offset, ...d }) => ({
             ...d,
+            started_at: actualEventInstant(d.started_at, started_offset),
             client_id: d.client_id ? Number(d.client_id) : null,
             behaviour_support_plan_id: d.behaviour_support_plan_id
                 ? Number(d.behaviour_support_plan_id)
@@ -376,7 +392,9 @@ export function RestraintEventWizard({
                 : null,
             stay_id: d.stay_id ? Number(d.stay_id) : null,
             site_id: d.site_id ? Number(d.site_id) : null,
-            ended_at: d.ended_at || null,
+            ended_at: d.ended_at
+                ? actualEventInstant(d.ended_at, ended_offset)
+                : null,
             authorised_by: d.authorised_by ? Number(d.authorised_by) : null,
             deviation_reason: d.within_support_plan ? null : d.deviation_reason,
             injury_details: d.injury_occurred ? d.injury_details : null,
@@ -410,6 +428,7 @@ export function RestraintEventWizard({
                 site_id: prescope.site_id ? String(prescope.site_id) : '',
                 stay_id: prescope.stay_id ? String(prescope.stay_id) : '',
                 started_at: localNow(),
+                started_offset: '',
             }));
         } else {
             setData('started_at', localNow());
@@ -471,6 +490,10 @@ export function RestraintEventWizard({
             footerEnd={
                 submitted ? undefined : (
                     <div className="flex items-center gap-2">
+                        {/* A way out on every step, not only the corner ✕. */}
+                        <Button variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
                         {stepIndex > 0 ? (
                             <Button
                                 variant="outline"
@@ -625,33 +648,38 @@ export function RestraintEventWizard({
                                 cols={3}
                             />
                         </Field>
+                        {/* The H&S actual-time field: NZ wall-clock sent with
+                            its offset, and a choice when a clock reading
+                            repeats at the autumn change. */}
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field
+                            <ActualEventTimeField
+                                id="restraint-wizard-started-at"
                                 label="Started at"
-                                required
+                                value={data.started_at}
+                                offset={data.started_offset}
+                                onChange={(value, offset) =>
+                                    setData((d) => ({
+                                        ...d,
+                                        started_at: value,
+                                        started_offset: offset,
+                                    }))
+                                }
                                 error={errors.started_at}
-                            >
-                                <Input
-                                    type="datetime-local"
-                                    value={data.started_at}
-                                    onChange={(e) =>
-                                        setData('started_at', e.target.value)
-                                    }
-                                />
-                            </Field>
-                            <Field
-                                label="Ended at"
-                                hint="Optional"
+                            />
+                            <ActualEventTimeField
+                                id="restraint-wizard-ended-at"
+                                label="Ended at (optional)"
+                                value={data.ended_at}
+                                offset={data.ended_offset}
+                                onChange={(value, offset) =>
+                                    setData((d) => ({
+                                        ...d,
+                                        ended_at: value,
+                                        ended_offset: offset,
+                                    }))
+                                }
                                 error={errors.ended_at}
-                            >
-                                <Input
-                                    type="datetime-local"
-                                    value={data.ended_at}
-                                    onChange={(e) =>
-                                        setData('ended_at', e.target.value)
-                                    }
-                                />
-                            </Field>
+                            />
                         </div>
                         {durationPreview != null ? (
                             <InfoCard icon={Activity} tone="info">
@@ -977,7 +1005,11 @@ export function RestraintEventWizard({
                                 />
                                 <ReviewRow
                                     label="Started"
-                                    value={data.started_at?.replace('T', ' ')}
+                                    value={
+                                        startedInstant
+                                            ? formatDateTime(startedInstant)
+                                            : undefined
+                                    }
                                 />
                                 <ReviewRow
                                     label="Duration"
