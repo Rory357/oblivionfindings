@@ -46,6 +46,7 @@ use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mime\Email;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\Support\ConnectedCareSwitches;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 class MedicationBackupDeliveryTest extends TestCase
@@ -1625,11 +1626,14 @@ class MedicationBackupDeliveryTest extends TestCase
         $this->assertSame('mysql', $connection->getPdo()->getAttribute(\PDO::ATTR_DRIVER_NAME));
         $this->assertSame('127.0.0.1', $connection->getConfig('host'));
         $this->assertGreaterThan(0, getmypid());
-        $this->assertContains($connection->getDatabaseName(), [
-            'oblivion_findings_codex_test_'.getmypid(),
-            'emar_connected_backup_retry_20261007_'.getmypid(),
-            'emar_central_email_20261007_'.getmypid(),
-        ]);
+        $this->assertTrue(
+            in_array($connection->getDatabaseName(), [
+                'oblivion_findings_codex_test_'.getmypid(),
+                'emar_connected_backup_retry_20261007_'.getmypid(),
+                'emar_central_email_20261007_'.getmypid(),
+            ], true)
+            || OwnedTestDatabase::isOwnedBy($connection->getDatabaseName(), getmypid()),
+        );
         $this->assertSame(self::$isolatedMysqlDatabase, $connection->getDatabaseName());
         $this->assertSame($connection->getDatabaseName(), $connection->selectOne('SELECT DATABASE() AS owned_database')->owned_database);
         $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));

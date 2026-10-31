@@ -32,6 +32,12 @@ final class CommittedFixtureCleanup
     private const SNAPSHOT_ROW_LIMIT = 5000;
 
     /**
+     * Whether the running test captured a cleanup. Tests\TestCase then trusts
+     * restore()'s own checksum verdict over checking the database again.
+     */
+    public static bool $captured = false;
+
+    /**
      * @param  array<string, array{string, int}>  $highWaterMarks  table => [auto-increment column, max value]
      * @param  array<string, array{list<string>, array<string, true>}>  $keyedRows  table => [key columns, baseline keys]
      * @param  array<string, string|null>  $checksums  table => CHECKSUM TABLE value
@@ -47,6 +53,7 @@ final class CommittedFixtureCleanup
 
     public static function capture(): self
     {
+        self::$captured = true;
         $config = DB::connection()->getConfig();
         $pdo = new PDO(
             sprintf('mysql:host=%s;port=%s;dbname=%s', $config['host'], $config['port'], $config['database']),

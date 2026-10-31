@@ -41,7 +41,10 @@ abstract class CommittedDatabaseTestCase extends TestCase
         $this->assertSame('testing', app()->environment());
         $this->assertTrue(static::$isolatedMysqlPrepared);
         $this->assertNotEmpty(static::$testDatabaseBaseName);
-        $expected = static::$testDatabaseBaseName.'_'.$this->resolveProcessToken();
+        // A kept slot (`<base>_k<checkout>_<n>`) or a throwaway `<base>_<token>`;
+        // either way this process's own database, never the shared base one.
+        $expected = static::$keptDatabase?->name()
+            ?? static::$testDatabaseBaseName.'_'.$this->resolveProcessToken();
         $this->assertSame($expected, static::$isolatedMysqlDatabase);
         $this->assertNotSame(static::$testDatabaseBaseName, $expected);
         $this->assertSame('mysql', $connection->getDriverName());

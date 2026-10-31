@@ -8,13 +8,16 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\OwnedTestDatabase;
 
 test('Designer review: empty package rolls back and every down preserves standalone and corrected sources', function () {
     expect(app()->environment())->toBe('testing');
-    // Tests\TestCase creates this schema for the current process and drops it at exit.
-    expect(DB::connection()->getDatabaseName())
-        ->toMatch('/^oblivion_findings_\w*test_'.preg_quote((string) getmypid(), '/').'$/')
-        ->toBe(static::$isolatedMysqlDatabase);
+    // Tests\TestCase gives the current process this schema: a throwaway one
+    // named after its PID, or the kept slot it holds the lock on.
+    $database = DB::connection()->getDatabaseName();
+    expect($database)->toBe(static::$isolatedMysqlDatabase)
+        ->and(preg_match('/^oblivion_findings_\w*test_'.preg_quote((string) getmypid(), '/').'$/', $database) === 1
+            || OwnedTestDatabase::isOwnedBy($database, getmypid()))->toBeTrue();
     // DDL is tested only in this process-owned disposable schema, outside the
     // RefreshDatabase transaction. No shared or browser database is touched.
     while (DB::transactionLevel() > 0) DB::rollBack();
