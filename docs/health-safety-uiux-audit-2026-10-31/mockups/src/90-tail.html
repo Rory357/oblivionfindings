@@ -1,0 +1,30 @@
+<dialog class="lightbox" id="lb"><img alt=""><p></p></dialog>
+<script>
+(() => {
+  // Scale each 1440 px board to its frame.
+  const fit = () => document.querySelectorAll('.stage-frame:not(.full)').forEach((f) => {
+    const s = f.querySelector('.scaler'); if (!s) return;
+    const k = Math.min(1, f.clientWidth / 1440);
+    s.style.transform = `scale(${k})`;
+    f.style.height = (s.scrollHeight * k) + 'px';
+  });
+  window.addEventListener('resize', fit); window.addEventListener('load', fit); fit();
+  document.querySelectorAll('[data-full]').forEach((b) => b.addEventListener('click', () => {
+    const f = document.getElementById(b.dataset.full); const on = f.classList.toggle('full');
+    f.style.height = on ? 'auto' : ''; b.textContent = on ? 'Fit to width' : 'Full size'; fit();
+  }));
+  // Screenshot lightbox.
+  const lb = document.getElementById('lb');
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-shot], .shot img'); if (!a) return;
+    const img = a.matches('img') ? a : document.querySelector(`#shot-${a.dataset.shot} img`); if (!img || !lb.showModal) return;
+    e.preventDefault(); lb.querySelector('img').src = img.src; lb.querySelector('p').textContent = img.closest('figure')?.querySelector('figcaption')?.textContent || '';
+    lb.showModal();
+  });
+  lb.addEventListener('click', () => lb.close());
+  // Highlight the current section in the nav.
+  const links = [...document.querySelectorAll('.nav a')];
+  const io = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) links.forEach((l) => l.classList.toggle('on', l.getAttribute('href') === '#' + en.target.id)); }), { rootMargin: '-40% 0px -55% 0px' });
+  ['summary', 'problems', 'workflows', 'plan', 'audit', 'mockups', 'evidence'].forEach((id) => { const el = document.getElementById(id); if (el) io.observe(el); });
+})();
+</script>

@@ -10,6 +10,8 @@
  * unchanged BehaviourSupportPlanCommandForm; unsaved drafts still ask before
  * leaving.
  */
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     BehaviourSupportPlanCommandForm,
     PLAN_COMMAND_LABELS,
@@ -324,6 +326,7 @@ export default function BehaviourSupportPlanShow(props: Props) {
 
 function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: providedSection }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const location = restraintLocation(url, 'plans');
     const section = (
         new URLSearchParams(url.split('?')[1]).has('section')
@@ -668,8 +671,7 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                 { title: 'Home', href: '/dashboard' },
                 ...(d.can.view
                     ? [
-                          { title: 'Health & safety', href: '/health-safety' },
-                          { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
+                          ...safetyHubCrumbs('care', safetyCan),
                           { title: 'Restraints', href: RESTRAINT_REGISTER + '?lens=plans' },
                       ]
                     : []),

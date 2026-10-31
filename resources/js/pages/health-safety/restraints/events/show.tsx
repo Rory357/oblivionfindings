@@ -11,6 +11,8 @@
  * RestraintEventCommandForm, gated by eventCommandAllowed; unsaved drafts still
  * ask before leaving.
  */
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     EVENT_COMMAND_LABELS,
     eventCommandAllowed,
@@ -207,6 +209,7 @@ export default function RestraintEventShow(props: Props) {
 function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
     const d = detail.event;
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const location = restraintLocation(url, 'events');
     const section = location.section as RestraintEventSection;
     const command = location.command as RestraintEventCommand | null;
@@ -595,8 +598,7 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                 { title: 'Home', href: '/dashboard' },
                 ...(workspace === 'view'
                     ? [
-                          { title: 'Health & safety', href: '/health-safety' },
-                          { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
+                          ...safetyHubCrumbs('care', safetyCan),
                           { title: 'Restraints', href: RESTRAINT_REGISTER },
                       ]
                     : []),

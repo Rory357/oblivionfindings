@@ -6,9 +6,11 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
     SAFETY_HUBS,
+    safetyHubCrumbs,
     safetyHubForUrl,
     safetySearchEntries,
     safetySidebar,
+    visibleSafetyViews,
     type SafetyNavigationPermissions,
 } from './workspace-navigation';
 
@@ -184,5 +186,45 @@ describe('Health & Safety workspace navigation', () => {
         ).toBe(false);
         const care = SAFETY_HUBS.find((hub) => hub.key === 'care')!;
         expect(care.views.some((view) => view.href === href)).toBe(true);
+    });
+});
+
+describe('safetyHubCrumbs (B5.1)', () => {
+    it('opens the first tab of the hub and links "Health and safety" for Overview readers', () => {
+        expect(safetyHubCrumbs('care', manager)).toEqual([
+            { title: 'Health and safety', href: '/health-safety' },
+            { title: 'Injuries and care', href: '/health-safety/injuries' },
+        ]);
+        expect(safetyHubCrumbs('prevention', manager)[1].href).toBe(
+            '/compliance/hazards',
+        );
+    });
+
+    it('gives wellbeing-only HR no "Health and safety" link the server would refuse', () => {
+        const crumbs = safetyHubCrumbs('care', { hr: { wellbeing: { view: true } } });
+        expect(crumbs[0]).toEqual({ title: 'Health and safety' });
+        expect(crumbs[1].href).not.toContain('registers?view=');
+    });
+});
+
+describe('hub rails hold places, not filters or report forms (B5.3)', () => {
+    const concerns = SAFETY_HUBS.find((hub) => hub.key === 'concerns')!;
+    const rail = (can: SafetyNavigationPermissions) =>
+        visibleSafetyViews(concerns, can)
+            .filter((view) => !view.shortcut)
+            .map((view) => view.key);
+
+    it('keeps Fleet incidents out of a support worker rail (they open it from Fleet & Assets)', () => {
+        expect(rail({ incidents: { viewAny: true }, fleet: { viewAny: true }, safeguarding: { create: true } })).toEqual([
+            'incidents',
+        ]);
+        expect(rail(manager)).toContain('fleet-incidents');
+    });
+
+    it('leaves "Raise a safeguarding concern" and the status filters off the rail', () => {
+        const keys = rail({ ...manager, safeguarding: { create: true } });
+        expect(keys).not.toContain('report-safeguarding');
+        expect(keys).not.toContain('near-misses');
+        expect(keys).not.toContain('investigations');
     });
 });

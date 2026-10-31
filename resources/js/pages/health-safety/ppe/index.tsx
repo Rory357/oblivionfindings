@@ -4,6 +4,7 @@
  * register views as tier-two tabs (drawing D4); then the matching table. Add type sits on the equipment types table. The damaged-record
  * warning and the closing note are in plain words.
  */
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     PageHeader,
     PageHeaderFilterButton,
@@ -47,6 +48,7 @@ export function ppeRegisterQuery(filters: Filters, tab: string) {
 }
 export default function PpeRegister(props: Props) {
     const { auth } = usePage<SharedData>().props; const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const drafts = useSafetyWorkspaceDrafts();
     const [search, setSearch] = useState(props.filters.search ?? '');
     useEffect(() => setSearch(props.filters.search ?? ''), [props.filters.search]);
@@ -76,7 +78,7 @@ export default function PpeRegister(props: Props) {
         <p className="text-subtle">Showing {page.data.length} of {page.total}</p>
         {page.last_page > 1 ? <LaravelPagination links={page.links} lastPage={page.last_page} /> : null}
     </>;
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' }, { title: 'PPE & equipment', href: PPE_REGISTER }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('prevention', safetyCan), { title: 'PPE & equipment', href: PPE_REGISTER }]}>
         <Head title="PPE & equipment" />
         <SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader title="PPE & equipment" icon={HardHat} subline="Protective gear (PPE): stock, who has it, inspections and files"

@@ -140,11 +140,8 @@ class HsCorrectiveActionProvider implements ContextualHealthSafetyTaskProvider, 
                             'hsInvestigation' => ['reference_number'],
                             'sourceControlRoomTask' => ['title', 'description'],
                         ],
-                        [
-                            'open' => 'Not started', 'in_progress' => 'In progress',
-                            'completed' => 'Awaiting independent verification',
-                            'verified' => 'Verified — ready to close', 'closed' => 'Closed',
-                        ],
+                        // B1.1: search by the same words the rows show.
+                        \App\Support\HealthSafety\HsLabels::LABELS['action_status'],
                     ))),
             )
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
@@ -259,14 +256,8 @@ class HsCorrectiveActionProvider implements ContextualHealthSafetyTaskProvider, 
                         HsCorrectiveAction::STATUS_VERIFIED => 'Close corrective action',
                         default => 'Review corrective action',
                     },
-                    displayState: match ($action->status) {
-                        HsCorrectiveAction::STATUS_OPEN => 'Not started',
-                        HsCorrectiveAction::STATUS_IN_PROGRESS => 'In progress',
-                        HsCorrectiveAction::STATUS_COMPLETED => 'Awaiting independent verification',
-                        HsCorrectiveAction::STATUS_VERIFIED => 'Verified — ready to close',
-                        HsCorrectiveAction::STATUS_CLOSED => 'Closed',
-                        default => ucfirst(str_replace('_', ' ', (string) $action->status)),
-                    },
+                    // B1.1: the action's one status, the same words as the board, list and record.
+                    displayState: \App\Support\HealthSafety\HsLabels::actionStatus((string) $action->status, $action->effectiveness_confirmed),
                     searchTerms: $includeSearchContext
                         ? array_values(array_filter([
                             $event?->reference_number,

@@ -1250,6 +1250,11 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     font-size: calc(15rem / 14);
     font-weight: 650;
 }
+/* S1: the step's own button sits at the end of the next-step line. */
+.eh-next-action {
+    margin-left: auto;
+    align-self: center;
+}
 .eh-next > small {
     flex-basis: 100%;
     font-size: calc(12.5rem / 14);

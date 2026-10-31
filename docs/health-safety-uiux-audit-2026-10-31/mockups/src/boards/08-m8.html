@@ -1,0 +1,102 @@
+<section class="board" id="m8"><div class="wide">
+  <div class="board-head"><span class="tag">M8 · packages B1 + B3 + B4</span><h3>The pop-ups: take it on, add an action, tell WorkSafe, close</h3></div>
+  <div class="board-notes">
+    <ul>
+      <li>All on the pop-up kit: round lens, title, one line, ✕, the horizon line, the record it came from, a grey footer with Cancel first and the main button named for what it does.</li>
+      <li>Owners come from a searchable picker that lists only people allowed to own it, and says so. An empty picker says why and who to ask.</li>
+      <li>Dates use the approved calendar with the chosen date shown; times use the approved clock with manual entry, AM/PM and the time zone.</li>
+    </ul>
+    <ul>
+      <li>"Record that WorkSafe was told" has exactly the route's fields: when, how, reference, and whether the site is being kept as it was until WorkSafe releases it. The decision pop-up is on M12.</li>
+      <li>"Close" asks what we learned (outcome note) and says it can't be undone (there is no reopen). "Close anyway" is offered only when exactly one item it can cover is still open (M12).</li>
+      <li>Typing then Esc, ✕ or Cancel asks "Discard this draft?" (kit rule; not drawn).</li>
+    </ul>
+  </div>
+  <div class="stage-frame" id="f-m8"><div class="scaler"><div class="m" style="height:1470px;background:oklch(0.86 0.004 277)">
+
+    <div class="popup w480" style="left:20px;top:20px">
+      <div class="ph"><span class="lens">{{I hand}}</span><div><h5>Take this on for Health and safety</h5><p>The person you choose owns the safety review and its next steps.</p></div><span class="x">{{I x}}</span></div>
+      <div class="ctx">Medication given twice — Oliver Chen · Kauri House · <span class="ref">HS-2026-0023</span> · passed on 30 Apr</div>
+      <div class="pb">
+        <div class="field"><label>Who will own it?</label>
+          <div class="input focus">{{I search}} <span class="muted">Search people who can own it</span></div>
+          <div style="border:1px solid var(--m-border);border-radius:10px;margin-top:6px;padding:4px">
+            <div class="person on"><span class="ini">DH</span><div class="small"><b>You — Dana Hall</b><br><span class="muted">Health and safety officer · all sites</span></div><span style="margin-left:auto;color:var(--m-primary-fill)">{{I check}}</span></div>
+            <div class="person"><span class="ini">HW</span><div class="small"><b>Hemi Walker</b><br><span class="muted">Team lead · Kauri House</span></div></div>
+            <div class="person"><span class="ini">JP</span><div class="small"><b>Jordan Peri</b><br><span class="muted">Health and safety officer · all sites</span></div></div>
+            <div class="person"><span class="ini">DA</span><div class="small"><b>Demo Admin</b><br><span class="muted">Admin · all sites</span></div></div>
+          </div>
+          <div class="hint">Only people who manage health and safety at Kauri House are listed.</div></div>
+        <div class="field"><label>Note for the history <span class="muted" style="font-weight:400">(optional)</span></label><div class="textarea" style="min-height:52px"><span class="muted">For example, what you'll look at first</span></div></div>
+      </div>
+      <div class="pf"><span class="btn out">Cancel</span><span class="btn pri">{{I hand}} Take it on</span></div>
+    </div>
+
+    <div class="popup w720" style="left:540px;top:20px">
+      <div class="ph"><span class="lens">{{I plus}}</span><div><h5>Add an action</h5><p>A job to fix the cause so it doesn't happen again.</p></div><span class="x">{{I x}}</span></div>
+      <div class="ctx">For: Slip in the bathroom — Tane Wineera · Kauri House · <span class="ref">HS-2026-0099</span></div>
+      <div class="pb">
+        <div class="field"><label>What needs to happen?</label><div class="input">Dry the bathroom floor after every shower</div></div>
+        <div class="field"><label>What kind of action?</label>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+            <div class="tile"><span class="radio"></span><div><b>Fix the cause</b><span>Remove what caused it</span></div></div>
+            <div class="tile on"><span class="radio"></span><div><b>Stop it happening</b><span>A check or a control</span></div></div>
+            <div class="tile"><span class="radio"></span><div><b>Improvement</b><span>Better than before</span></div></div>
+          </div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="field"><label>Owner</label><div class="input"><span class="ini" style="width:22px;height:22px;font-size:9.5px">HW</span> Hemi Walker · team lead <span style="margin-left:auto" class="muted">{{I search}} Change</span></div><div class="hint">Only people who manage health and safety at Kauri House</div></div>
+          <div class="field"><label>Priority</label><div style="display:flex;border:1px solid var(--m-border);border-radius:9px;overflow:hidden;height:36px;font-size:13px"><span style="flex:1;display:grid;place-items:center">Low</span><span style="flex:1;display:grid;place-items:center;border-left:1px solid var(--m-border)">Medium</span><span style="flex:1;display:grid;place-items:center;background:oklch(0.54 0.25 293 / .1);color:var(--m-primary-fill);font-weight:650;border-left:1px solid var(--m-border)">High</span><span style="flex:1;display:grid;place-items:center;border-left:1px solid var(--m-border)">Urgent</span></div></div>
+        </div>
+        <div class="field" style="position:relative"><label>Due date</label><div style="display:flex;gap:14px;align-items:flex-start"><div><div class="input focus" style="width:320px">{{I cal}} Fri 13 Nov 2026</div><div class="hint">A calendar day at the site. Calendar drawn open.</div></div>
+          <div class="picker" style="position:static">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span class="kebab">{{I left}}</span><b>November 2026</b><span class="kebab">{{I right}}</span></div>
+            <div class="cal"><span class="dn">Mo</span><span class="dn">Tu</span><span class="dn">We</span><span class="dn">Th</span><span class="dn">Fr</span><span class="dn">Sa</span><span class="dn">Su</span>
+              <span class="d o">26</span><span class="d o">27</span><span class="d o">28</span><span class="d o">29</span><span class="d o">30</span><span class="d o t">31</span><span class="d">1</span>
+              <span class="d">2</span><span class="d">3</span><span class="d">4</span><span class="d">5</span><span class="d">6</span><span class="d">7</span><span class="d">8</span>
+              <span class="d">9</span><span class="d">10</span><span class="d">11</span><span class="d">12</span><span class="d s">13</span><span class="d">14</span><span class="d">15</span>
+              <span class="d">16</span><span class="d">17</span><span class="d">18</span><span class="d">19</span><span class="d">20</span><span class="d">21</span><span class="d">22</span>
+              <span class="d">23</span><span class="d">24</span><span class="d">25</span><span class="d">26</span><span class="d">27</span><span class="d">28</span><span class="d">29</span>
+              <span class="d">30</span><span class="d o">1</span><span class="d o">2</span><span class="d o">3</span><span class="d o">4</span><span class="d o">5</span><span class="d o">6</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12.5px"><span class="muted">Fri 13 Nov 2026</span><span style="display:flex;gap:6px"><span class="btn out sm">Cancel</span><span class="btn pri sm">Use date</span></span></div>
+          </div></div></div>
+      </div>
+      <div class="pf"><span class="btn out">Cancel</span><span class="btn pri">{{I plus}} Add action</span></div>
+    </div>
+
+    <div class="popup w720" style="left:540px;top:860px">
+      <div class="ph"><span class="lens">{{I flag}}</span><div><h5>Record that WorkSafe was told</h5><p>When and how you notified WorkSafe about this notifiable event.</p></div><span class="x">{{I x}}</span></div>
+      <div class="ctx">Burn from the kettle — Liam Davis · Harbour Respite · <span class="ref">HS-2026-0096</span> · decided notifiable by Jordan Peri, Fri 30 Oct</div>
+      <div class="pb">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;position:relative">
+          <div class="field"><label>Date told</label><div class="input">{{I cal}} Sat 31 Oct 2026</div></div>
+          <div class="field"><label>Time told</label><div class="input focus">{{I clock}} 9:15 am <span class="muted" style="margin-left:auto">NZDT</span></div></div>
+          
+        </div>
+        <div class="field"><label>How</label><div class="tiles"><div class="tile on"><span class="radio"></span><div><b>Phone</b></div></div><div class="tile"><span class="radio"></span><div><b>Online form</b></div></div></div></div>
+        <div class="field"><label>WorkSafe reference <span class="muted" style="font-weight:400">(optional)</span></label><div class="input" style="width:320px"><span class="muted">For example, the number they gave you</span></div></div>
+        <div class="field"><label>Is the site being kept as it was until WorkSafe releases it?</label><div class="tiles"><div class="tile on"><span class="radio"></span><div><b>Yes</b><span>Record when WorkSafe releases it, later</span></div></div><div class="tile"><span class="radio"></span><div><b>No</b><span>Record the site-preservation decision next</span></div></div></div></div>
+      </div>
+      <div class="pf"><span class="left">Recorded as Dana Hall, health and safety officer</span><span class="btn out">Cancel</span><span class="btn pri">{{I flag}} Record that WorkSafe was told</span></div>
+    </div>
+
+    <div class="popup w480" style="left:20px;top:690px">
+      <div class="ph"><span class="lens">{{I check}}</span><div><h5>Close this safety review</h5><p>Everything's done. Say what we learned.</p></div><span class="x">{{I x}}</span></div>
+      <div class="ctx">Fall in the lounge — Aroha Kingi · Kauri House · <span class="ref">HS-2026-0094</span></div>
+      <div class="pb">
+        <div class="note" style="color:var(--m-ok-fg);display:grid;gap:4px"><span><span style="color:var(--m-ok)">{{I check}}</span> Can't be skipped: 2 of 2 done (WorkSafe decision, record checks)</span><span><span style="color:var(--m-ok)">{{I check}}</span> "Close anyway" can cover: 3 of 3 done (taken on, findings agreed, actions checked)</span></div>
+        <div class="field"><label>What did we learn?</label><div class="textarea">Rugs in shared rooms need grips, and walkers stay within reach. Both checked on 31 Oct.</div><div class="hint">Kept with the safety review and shown in its history.</div></div>
+        <div class="small muted">This closes the safety review, and it can't be reopened. The incident stays open until Rāwiri Ngata, or another manager at Kauri House, closes it after the manager review.</div>
+      </div>
+      <div class="pf"><span class="btn out">Cancel</span><span class="btn pri">{{I check}} Close safety review</span></div>
+    </div>
+    <div style="position:absolute;left:40px;top:1140px;z-index:9"><div class="small" style="margin-bottom:6px;font-weight:650">The clock for "Time told", drawn open</div>
+          <div class="picker" style="position:static;width:300px">
+            <div style="display:flex;gap:8px;align-items:center;justify-content:center;font-size:22px;font-weight:700"><span style="border:1px solid var(--m-primary);border-radius:8px;padding:2px 10px;color:var(--m-primary-fill)">9</span>:<span style="border:1px solid var(--m-border);border-radius:8px;padding:2px 10px">15</span><span style="display:grid;font-size:12px;gap:2px;margin-left:6px"><span style="background:var(--m-primary-fill);color:#fff;border-radius:5px;padding:1px 7px">AM</span><span style="border:1px solid var(--m-border);border-radius:5px;padding:1px 7px">PM</span></span></div>
+            <div class="cal" style="grid-template-columns:repeat(6,1fr);margin-top:10px"><span class="d">1</span><span class="d">2</span><span class="d">3</span><span class="d">4</span><span class="d">5</span><span class="d">6</span><span class="d">7</span><span class="d">8</span><span class="d s">9</span><span class="d">10</span><span class="d">11</span><span class="d">12</span></div>
+            <div class="small muted" style="margin-top:8px">Type any minute · New Zealand time (NZDT) · clock drawn open</div>
+            <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px"><span class="btn out sm">Cancel</span><span class="btn pri sm">Use time</span></div>
+          </div>
+    </div>
+  </div></div></div>
+  <div class="frame-tools"><button type="button" data-full="f-m8">Full size</button><span>Pop-up widths 480 and 720 from the kit · drawn as Dana Hall, health and safety officer</span></div>
+</div></section>

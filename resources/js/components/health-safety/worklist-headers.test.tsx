@@ -168,8 +168,8 @@ it('uses one review header, four linked numbers and the shared sibling rail', ()
         { preserveScroll: true },
     );
     fireEvent.click(screen.getByRole('button', { name: 'Review view' }));
-    expect(screen.getByText('Investigating (3)')).toBeInTheDocument();
-    expect(screen.getByText('Corrective actions (2)')).toBeInTheDocument();
+    expect(screen.getByText('Being investigated (3)')).toBeInTheDocument();
+    expect(screen.getByText('Actions under way (2)')).toBeInTheDocument();
     expect(screen.getByText('Closed (1)')).toBeInTheDocument();
 });
 
@@ -299,7 +299,7 @@ it('keeps the review owner, source and workflow flags in readable mobile cards',
         'Kauri House',
         'Awaiting acceptance',
         'Investigation overdue',
-        '2 awaiting verification',
+        '2 waiting to be checked',
         'Open actions',
     ])
         expect(cards.getByText(label)).toBeInTheDocument();

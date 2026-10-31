@@ -8,6 +8,8 @@
  * restricted or unavailable line shows. The privacy, recovery and access lines keep the code's wording.
  */
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { RecordIdentity, RecordTable, type RecordTableColumn } from '@/components/incidents/record-table';
 import type { MenuItem } from '@/components/lists';
 import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageLayout } from '@/components/page';
@@ -23,13 +25,14 @@ import { exposureTimeChoices, exposureTimeInput, exposureTimeInstant } from '@/l
 import { CHEMICAL_EXPOSURES, exposureHref, exposureReturn } from '@/lib/health-safety/chemical-exposure-navigation';
 import type { ExposureIndexProps } from '@/lib/health-safety/chemical-exposure-read-contract';
 import { CHEMICAL_REGISTER } from '@/lib/health-safety/chemical-navigation';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { CalendarClock, Eye, FlaskConical, Info, LockKeyhole, MapPin, RefreshCw, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 type Row = NonNullable<ExposureIndexProps['records']>[number];
 function readable(row: Row): row is Extract<Row, { worker: unknown }> { return row.attribution_state !== 'repair_required' && 'worker' in row; }
 export default function ChemicalExposureIndex({ exposure_access, records, counts, page, filters, sites, can, source_integrity, count_integrity }: ExposureIndexProps) {
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const admitted = exposure_access === 'readable'; const restricted = exposure_access === 'restricted'; const rows = admitted ? records ?? [] : [];
     const pendingCount = count_integrity && count_integrity.awaiting_medical_outcome !== 'confirmed' ? null : counts?.awaiting_medical_outcome;
     const note = useRef<HTMLDivElement>(null);
@@ -58,7 +61,7 @@ export default function ChemicalExposureIndex({ exposure_access, records, counts
     ];
     const noteTarget = { onClick: () => note.current?.focus() };
     const timeSet = Boolean(filters?.from || filters?.to);
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' }, { title: 'Private exposures', href: CHEMICAL_EXPOSURES }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('care', safetyCan), { title: 'Private exposures', href: CHEMICAL_EXPOSURES }]}>
         <Head title="Private chemical exposures" /><PageLayout hero={<PageHeader title="Private chemical exposures" icon={LockKeyhole} subline="Identifiable worker records · safety and private wellbeing access"
             actions={can.capture || can.recover ? <>
                 {can.recover ? <PageHeaderGlassButton icon={RefreshCw} onClick={() => router.get(CHEMICAL_EXPOSURES + '/recovery')}>Unfinished uploads</PageHeaderGlassButton> : null}

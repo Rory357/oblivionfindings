@@ -63,12 +63,15 @@ export function ActionOwnerPane({
     ownership,
     onDone,
     onCancel,
+    siteName,
 }: {
     actionId: number;
     owner: Person | null;
     ownership: ActionOwnership;
     onDone: () => void;
     onCancel: () => void;
+    /** The review's site, so the picker can say who is listed and why it may be empty (M13). */
+    siteName?: string | null;
 }) {
     const [requestUuid] = useState(() => crypto.randomUUID());
     const form = useSafetyForm({
@@ -182,8 +185,8 @@ export function ActionOwnerPane({
                     Find the next owner
                 </label>
                 <p className="text-caption text-muted-foreground">
-                    Search Health &amp; safety staff who can access this site ·
-                    shows up to 30
+                    Only people who manage health and safety at{' '}
+                    {siteName ?? 'this site'} are listed · shows up to 30
                 </p>
                 <Input
                     id="action-owner-search"
@@ -261,10 +264,22 @@ export function ActionOwnerPane({
                             })}
                         </div>
                     </fieldset>
-                ) : (
+                ) : search.trim() ? (
                     <p role="status" className="text-sm">
                         No eligible owners match this search.
                     </p>
+                ) : (
+                    // IR6: an empty picker says why and who can help.
+                    <div role="status" className="space-y-1 text-sm">
+                        <p className="font-semibold">
+                            Nobody here can own this yet
+                        </p>
+                        <p className="text-muted-foreground">
+                            Owners need to manage health and safety at{' '}
+                            {siteName ?? 'this site'}. An admin can give someone
+                            that access.
+                        </p>
+                    </div>
                 )}
                 {selected ? (
                     <div className="space-y-1 pt-1">
@@ -342,7 +357,11 @@ export function ActionOwnerPane({
                         !form.data.reason.trim()
                     }
                 >
-                    {form.processing ? 'Saving handover…' : 'Confirm handover'}
+                    {form.processing
+                        ? 'Saving…'
+                        : selected
+                          ? `Make ${selected.name} the owner`
+                          : 'Choose an owner'}
                 </Button>
             </div>
         </form>

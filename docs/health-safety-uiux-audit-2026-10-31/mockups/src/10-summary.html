@@ -1,0 +1,115 @@
+<header class="hero" id="summary"><div class="wrap">
+  <p class="eyebrow">Health and safety · UI/UX audit, plan and mockups · 31 Oct 2026</p>
+  <h1>Why health and safety feels hidden, and how to fix it</h1>
+  <p class="lede">I walked every H&amp;S page live on the .com as admin, manager, team lead and support worker. The pages work and
+    the rules are right. They feel hidden and AI-made because one accident is split across two records that disagree, the
+    next step rarely comes with its button, and everything is said in the system's voice with the same weight.</p>
+  <div class="meta">
+    <span><b>22</b> live screenshots, 1440 × 900, light mode</span>
+    <span><b>25</b> problems, ranked</span>
+    <span><b>10</b> build packages</span>
+    <span><b>12</b> decisions for you</span>
+    <span><b>8</b> independent audit rounds of the plan and boards</span>
+    <span><b>15</b> mockup boards, drawn as they'll be built</span>
+  </div>
+</div></header>
+
+<section class="doc" style="border-top:0;padding-top:0"><div class="wrap">
+  <h2 class="sec">The ten things that hurt most</h2>
+  <div class="tldr">
+    <article class="prob">
+      <div class="top"><span class="rank p1">P1</span><span class="role">every role</span></div>
+      <h3>One accident, two records that disagree</h3>
+      <p>The incident says "Waiting for an owner · Safety review: done". Its safety review says "Actions under way, stage 3 of 5" and "Awaiting independent verification". Two owners, two progress lines, two close lists.</p>
+      <a class="thumb" href="#shot-a10" data-shot="a10"><img src="shots/a10-admin-incident-record.jpg" alt="Incident page showing its own progress line"></a>
+    </article>
+    <article class="prob">
+      <div class="top"><span class="rank p1">P1</span><span class="role">admin · manager · team lead</span></div>
+      <h3>The next step has no button</h3>
+      <p>"Choose a new owner", but the only button is "Start action". "No safety review owner yet", with no way to assign. A manager reads "You can read this review" and nothing more.</p>
+      <a class="thumb" href="#shot-a08" data-shot="a08"><img src="shots/a08-admin-action-record.jpg" alt="Action page with next step but no matching button"></a>
+    </article>
+    <article class="prob">
+      <div class="top"><span class="rank p1">P1</span><span class="role">admin · manager · team lead</span></div>
+      <h3>Buttons you can't use, work that isn't yours</h3>
+      <p>A team lead's Close button works until they submit, then the server refuses anyone but the owner. Managers get "Accept" rows that open read-only. Some reviews can't close at all without "close anyway".</p>
+      <a class="thumb" href="#shot-m02" data-shot="m02" style="--pos: right top"><img src="shots/m02-manager-safety-review.jpg" alt="Manager sees a read-only review"></a>
+    </article>
+    <article class="prob">
+      <div class="top"><span class="rank p1">P1</span><span class="role">admin · team lead</span></div>
+      <h3>The everyday steps are hidden</h3>
+      <p>Start, mark done and check an action live only in ⋮ and right-click menus. Eleven pages print "right-click a row for options".</p>
+      <a class="thumb" href="#shot-a06" data-shot="a06"><img src="shots/a06-admin-actions-board.jpg" alt="Actions board with steps hidden in menus"></a>
+    </article>
+    <article class="prob">
+      <div class="top"><span class="rank p1">P1</span><span class="role">admin · manager · team lead</span></div>
+      <h3>Ownership is the bottleneck</h3>
+      <p>Most safety reviews and incidents say "Needs an owner". Only accepting an incident handover sets an owner, so chemical exposure, restraint and drill reviews can never get one, and no owner can be changed later.</p>
+      <a class="thumb" href="#shot-a05" data-shot="a05"><img src="shots/a05-admin-safety-reviews.png" alt="Safety reviews list full of Needs an owner"></a>
+    </article>
+    <article class="prob">
+      <div class="top"><span class="rank p1">P1</span><span class="role">admin · manager</span></div>
+      <h3>The waiting state cries wolf</h3>
+      <p>While the Overview loads, "Needs attention could not be loaded" shows for a few seconds although nothing failed (the H&amp;S session is fixing this now). The headline numbers arrive last; board M2 designs the wait.</p>
+      <a class="thumb" href="#shot-a01" data-shot="a01"><img src="shots/a01-admin-overview-loading.png" alt="Overview while loading"></a>
+    </article>
+    <article class="prob">
+      <div class="top"><span class="rank p1">P1</span><span class="role">admin · H&amp;S officer · team lead</span></div>
+      <h3>A failed fix can close a review</h3>
+      <p>Checking an action as "it didn't work" still counts as done, so the safety review can close with no replacement action. Found in audit round 2; decision Q11.</p>
+      <a class="thumb" href="#shot-a06" data-shot="a06" style="--pos: right top"><img src="shots/a06-admin-actions-board.jpg" alt="Actions board"></a>
+    </article>
+    <article class="prob">
+      <div class="top"><span class="rank p2">P2</span><span class="role">every role</span></div>
+      <h3>It talks like the system</h3>
+      <p>A disclaimer on every page, close checks like "Linked Control Room alert has the same Site scope", "Fire_evacuation drill", five words for "waiting to be checked".</p>
+      <a class="thumb" href="#shot-a07" data-shot="a07" style="--pos: right 40%"><img src="shots/a07-admin-safety-review-record.jpg" alt="Safety review with a technical close list"></a>
+    </article>
+    <article class="prob">
+      <div class="top"><span class="rank p2">P2</span><span class="role">admin · team lead</span></div>
+      <h3>Hubs are directories</h3>
+      <p>"Injuries and care" opens four plain cards with no numbers. The lists behind them already have the right tab rail, so it's an extra click that tells you nothing.</p>
+      <a class="thumb" href="#shot-a11" data-shot="a11"><img src="shots/a11-admin-injuries-care-hub.jpg" alt="Card directory page"></a>
+    </article>
+    <article class="prob">
+      <div class="top"><span class="rank p2">P2</span><span class="role">support worker · manager</span></div>
+      <h3>The start doesn't fit the role</h3>
+      <p>Support workers find reporting at the bottom right of My Day, next to a second report button. Managers get a support worker's start and a queue they can't act on.</p>
+      <a class="thumb" href="#shot-s02" data-shot="s02" style="--pos: right bottom"><img src="shots/s02-sw-myday-record-care.jpg" alt="My Day with Record care at the bottom right"></a>
+    </article>
+  </div>
+
+  <h2 class="sec" style="margin-top:34px">Why the workflows feel weird</h2>
+  <div class="causes">
+    <div class="cause"><b>Built from the tables, not the job</b><span>Incident, review, investigation, action and WorkSafe each got their own page. "Deal with this fall" spans four pages that don't agree.</span></div>
+    <div class="cause"><b>Permissions enforced, not designed</b><span>Pages show the whole feature and let the server say no. They never say who can do a step.</span></div>
+    <div class="cause"><b>Privacy as disclaimers</b><span>"Records you can access", "Restricted", "Not available" as text everywhere instead of quiet, consistent states.</span></div>
+    <div class="cause"><b>Legal completeness over guidance</b><span>Copy explains the system instead of saying what to do next.</span></div>
+    <div class="cause"><b>No hierarchy</b><span>One card style for urgent work, zero counts and help text alike.</span></div>
+    <div class="cause"><b>Approved fixes half-built</b><span>"One accident, one place" and "hubs as tabs" were approved in Part 2; only their smaller parts were built.</span></div>
+    <div class="cause"><b>Each page works out status alone</b><span>Nobody checks one record across every page, so titles and statuses drift.</span></div>
+  </div>
+
+  <div class="callout">
+    <h3>Why Parts 1–4 didn't fix the feel</h3>
+    <p>They fixed symptoms page by page inside inherited layouts. The "user test" checked that things worked and were allowed, not what a person does next. Most time went on permissions and speed. The two big structural drawings were approved but only partly built. The demo data still reads like test data. This round started from each role's next step instead, checked one record across every page, put every fix with a check, and had the plan and boards audited eight times by reviewers with no earlier context, until a round found nothing major.</p>
+  </div>
+
+  <div class="callout" style="background:var(--paper);border:1px solid var(--line)">
+    <h3>What I need from you</h3>
+    <p style="background:var(--ok-bg);color:var(--ok);border-radius:10px;padding:10px 12px;margin-bottom:10px"><b>Answered 31 Oct:</b> all 10 packages approved, in order, and every decision answered. Three answers differ from my suggestion: Q4 (provider managers can act on H&amp;S items at their sites, not restraints), and Q7 and Q13 stay as today. The full list is in the plan under "Stephan's answers". M3 is redrawn for Q4 before B2 starts.</p>
+    <p>Approve the packages you want built (one at a time), and answer the decisions about who can see or do what. Nothing changes until you say so. Packages, in build order:</p>
+    <div class="pk">
+      <div><b>B9 Demo data tidy</b>First, through MASTER, with a dump; junk records make every page look broken. <i>S</i></div>
+      <div><b>B5 Hubs as tabs</b>Finish the approved D4: every path lands on a list with tabs; filters leave the rails. No decisions from you. <i>S</i></div>
+      <div><b>B1 Tell the truth</b>One status everywhere; every next step with its button; blocked steps say why; the agreed words land first. <i>M</i></div>
+      <div><b>B2 Overview by person</b>D1's starts and blocks, telling WorkSafe first; a designed waiting state; the compliance lead's queue. <i>L</i></div>
+      <div><b>B3 One accident, told the same way</b>Finish the approved D3: one title, two tracks, a close list that says what can't be skipped. <i>L</i></div>
+      <div><b>B4 Lists and actions</b>Row click, ⋯ and right-click, the next step on the row; a board that keeps failed checks visible. <i>L</i></div>
+      <div><b>B6 Reporting and frontline</b>"Something happened?" at the top of My Day; "What you reported". <i>M</i></div>
+      <div><b>B10 Restraints and injuries</b>The same treatment for restraint reviews and return to work, with their own mockups first. <i>L</i></div>
+      <div><b>B8 Hierarchy and pickers</b>One lead block per page on the remaining pages; the last 33 plain date boxes move to the approved pickers. <i>M</i></div>
+      <div><b>B7 One vocabulary</b>Runs inside every package: the agreed words, one title per record. <i>M</i></div>
+    </div>
+  </div>
+</div></section>

@@ -29,6 +29,14 @@ class HsLabelsTest extends TestCase
         $this->assertSame('New kind of thing', HsLabels::label('review_category', 'new_kind_of_thing'));
     }
 
+    public function test_an_action_has_one_status_and_a_check_says_whether_it_worked(): void
+    {
+        $this->assertSame('Done — waiting to be checked', HsLabels::actionStatus('completed', null));
+        $this->assertSame('Checked — it worked', HsLabels::actionStatus('verified', true));
+        $this->assertSame("Checked — it didn't work", HsLabels::actionStatus('verified', false));
+        $this->assertSame('Checked', HsLabels::actionStatus('verified', null));
+    }
+
     public function test_approved_words_and_missing_values(): void
     {
         $this->assertSame('Near miss', HsLabels::label('review_category', 'near_miss'));

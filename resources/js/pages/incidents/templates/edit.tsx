@@ -93,7 +93,7 @@ export default function IncidentTemplateEdit({ template }: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Health and safety', href: '/health-safety' },
                 { title: 'Incidents', href: '/incidents' },
                 { title: 'Templates', href: '/incidents/templates' },
                 {

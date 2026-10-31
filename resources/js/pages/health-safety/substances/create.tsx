@@ -4,6 +4,7 @@
  * wizard itself (fields, checks, review and saving) is unchanged and stays a pop-up over the page.
  */
 import { PageHeader, PageHeaderGlassButton, PageLayout } from '@/components/page';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { PageHeaderStages, type PageHeaderStage } from '@/components/page/page-header-strip';
 import { Note, QuietLine } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
@@ -21,12 +22,13 @@ const STEPS = ['About the chemical', 'Safe use', 'Check and save'];
 
 export default function ChemicalCreate({ capture, return_to, chemical_confirmation, chemical_href }: ChemicalCreateProps) {
     const { props: shared } = usePage<SharedData>(); const drafts = useSafetyWorkspaceDrafts(); const [open, setOpen] = useState(!chemical_confirmation);
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const [progress, setProgress] = useState({ step: 0, saved: false });
     const onStep = useCallback((step: number, saved: boolean) => setProgress((current) => (current.step === step && current.saved === saved ? current : { step, saved })), []);
     const returnTo = chemicalReturn(return_to);
     const finished = progress.saved || !!chemical_confirmation;
     const stages: PageHeaderStage[] = STEPS.map((label, index) => ({ label, state: finished || index < progress.step ? 'done' : index === progress.step ? 'now' : 'todo' }));
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('prevention', safetyCan),
         { title: 'Chemical register', href: CHEMICAL_REGISTER }, { title: 'Add chemical', href: `${CHEMICAL_REGISTER}/create` }]}>
         <Head title="Add chemical" /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" title="Add chemical" icon={FlaskConical} backHref={returnTo} subline="Add the chemical, then its safety data sheets (SDS) and storage"

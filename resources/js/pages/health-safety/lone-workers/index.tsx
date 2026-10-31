@@ -8,6 +8,8 @@
  * the code's wording.
  */
 import { boardReportHref } from '@/lib/health-safety/board-reports';
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     canonicalControlRoomAlertId,
     type Alert,
@@ -154,6 +156,7 @@ export default function LoneWorkersIndex({
     can,
 }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const returnTo = loneWorkerReturn(url);
     const drafts = useSafetyWorkspaceDrafts();
     const [search, setSearch] = useState(filters.q ?? '');
@@ -337,8 +340,7 @@ export default function LoneWorkersIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
+                ...safetyHubCrumbs('prevention', safetyCan),
                 { title: 'Lone-worker safety', href: LONE_WORKER_REGISTER },
             ]}
         >

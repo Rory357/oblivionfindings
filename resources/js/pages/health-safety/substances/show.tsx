@@ -7,6 +7,7 @@
  * its details and changes. Exposure records are never shown or counted here.
  */
 import { PageHeader, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageHeaderStatusChip, PageLayout } from '@/components/page';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { PageHeaderFacts } from '@/components/page/page-header-strip';
 import { Note, SideColumn, Surface } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ type Pending = { action: ChemicalAction; storage?: ChemicalStorageLocation; shee
 export default function ChemicalShow(props: ChemicalShowProps) { return <ChemicalWorkspace key={props.detail.id} {...props} />; }
 function ChemicalWorkspace({ detail, return_to, chemical_confirmation }: ChemicalShowProps) {
     const { url, props: shared } = usePage<SharedData>(); const location = chemicalLocation(url); const drafts = useSafetyWorkspaceDrafts();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const [withdrawn, setWithdrawn] = useState(false); const onWithdraw = useCallback(() => setWithdrawn(true), []);
     const damaged = detail.source_integrity === 'repair_required' || withdrawn;
     const archived = detail.archived_storage.items ?? [];
@@ -53,7 +55,7 @@ function ChemicalWorkspace({ detail, return_to, chemical_confirmation }: Chemica
     const counted = (count: number | null | undefined) => (count === null || count === undefined ? {} : { count });
     const rail = damaged ? [SECTIONS[0]] : SECTIONS.map((item) => item.key === 'sds' ? { ...item, ...counted(detail.counts.sds) } : item.key === 'storage' ? { ...item, ...counted(detail.counts.storage) } : item);
     const side = damaged ? null : <ChemicalRecordSide detail={detail} section={section} onStorage={() => move('storage')} />;
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('prevention', safetyCan),
         { title: 'Chemical register', href: CHEMICAL_REGISTER }, { title, href: chemicalHref(detail.id) }]}>
         <Head title={`${title} · Chemical register`} /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" wrapTitle title={title} icon={FlaskConical} backHref={returnTo}

@@ -261,9 +261,9 @@ class HsDashboardService
                     ->map(fn (HsEvent $event) => [
                         'id' => $event->id,
                         'event_reference' => $event->reference_number,
-                        'title' => $event->clientIncident?->title
-                            ?: $event->clientIncident?->description
-                            ?: ucfirst(str_replace('_', ' ', $event->event_category)).' event',
+                        // B1.1/B7: the record's title. protectIncidentEagerLoads() leaves the incident out for a viewer
+                        // who can't read it, so they get kind and person, never the incident's words.
+                        'title' => $this->reviewTitle($event),
                         'severity' => $event->severity,
                         'reported_at' => $event->reported_at?->toIso8601String(),
                         'site' => $event->site?->name,
@@ -370,8 +370,7 @@ class HsDashboardService
                 ->map(fn (HsEvent $event) => [
                     'id' => $event->id,
                     'event_reference' => $event->reference_number,
-                    'title' => $event->clientIncident?->title
-                        ?: $event->clientIncident?->description,
+                    'title' => $this->reviewTitle($event),
                     'incident_type' => $event->clientIncident?->type
                         ?: $event->event_category,
                     'status' => $event->worksafe_status,
@@ -794,6 +793,17 @@ class HsDashboardService
     }
 
     /** Prepare the original incident/HSE parent before either the event or copied incident body SELECT. */
+    /** The record's title from what this list already loaded (no extra reads); the incident is only there for readers. */
+    private function reviewTitle(HsEvent $event): string
+    {
+        $incident = $event->relationLoaded('clientIncident') ? $event->clientIncident : null;
+        $client = $event->relationLoaded('client') ? $event->client : null;
+        $site = $event->relationLoaded('site') ? $event->site : null;
+
+        return \App\Support\HealthSafety\HsReviewTitle::make((string) $event->event_category, $incident !== null, $incident?->title,
+            $client ? trim($client->first_name.' '.$client->last_name) : null, null, $site?->name);
+    }
+
     private function protectIncidentEagerLoads(Builder $events, ?User $viewer, ?HealthSafetyReadContext $context): Builder
     {
         $original = $events->getEagerLoads()['clientIncident'];

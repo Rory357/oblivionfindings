@@ -153,7 +153,7 @@ describe('Permanent corrective action', () => {
         expect(
             screen.getByText(/The safety review is closed/),
         ).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Mark done' }));
         expect(state.replace).toHaveBeenCalledWith(
             expect.objectContaining({
                 url: expect.stringContaining(
@@ -222,7 +222,7 @@ describe('Permanent corrective action', () => {
         ).toBeInTheDocument();
         expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
         expect(
-            screen.queryByRole('button', { name: 'Verify action' }),
+            screen.queryByRole('button', { name: 'Check it worked' }),
         ).not.toBeInTheDocument();
     });
 
@@ -286,5 +286,25 @@ describe('Permanent corrective action', () => {
             {},
             expect.any(Object),
         );
+    });
+});
+
+describe('An action whose owner has left (M13, B1.6)', () => {
+    it('leads with "Choose a new owner" and Start says why it waits, without posting', () => {
+        const data = workspace();
+        data.action.status = 'open';
+        data.ownership = { ...data.ownership, state: 'replacement_needed' };
+        data.can = { ...data.can, start: false, complete: false };
+        data.blocked = { start: { reason: 'Choose a new owner first', unblock: 'Someone who manages health and safety at this site chooses a new owner.' } };
+        data.next_step = { key: 'choose_owner', can: true };
+        render(<ActionShow workspace={data} />);
+
+        expect(screen.getByText('What happens next')).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'Choose a new owner' }).length).toBeGreaterThan(0);
+        const start = screen.getByRole('button', { name: 'Start action' });
+        expect(start).toBeDisabled();
+        expect(screen.getByText('Choose a new owner first')).toBeInTheDocument();
+        fireEvent.click(start);
+        expect(state.post).not.toHaveBeenCalled();
     });
 });

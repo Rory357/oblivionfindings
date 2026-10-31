@@ -9,6 +9,7 @@
  * Known gaps (no field yet): when an owner became needed, the manager review
  * due time, and a per-row safety review status on the register.
  */
+import { HS_LABELS, hsLabel } from '@/lib/health-safety/hs-labels';
 import type { PageHeaderNextStep, PageHeaderStage } from '@/components/page/page-header-strip';
 import { formatDate, formatDateTime, formatTime, toDateInput } from '@/lib/datetime';
 import type { IncidentDetail } from './incident-detail-dialog';
@@ -57,13 +58,8 @@ export const SOURCE_LABELS: Record<string, string> = {
     automated: 'Automated',
 };
 
-export const HS_STATUS_LABELS: Record<string, string> = {
-    open: 'Open',
-    investigating: 'Investigating',
-    corrective_action: 'Corrective action',
-    monitoring: 'Monitoring',
-    closed: 'Closed',
-};
+/** B1.1: the safety review stage in the shared words (hs-labels.ts). */
+export const HS_STATUS_LABELS: Record<string, string> = HS_LABELS.review_status;
 
 export function sentenceCase(value: string): string {
     const text = value.replaceAll('_', ' ').trim();
@@ -205,18 +201,17 @@ export function incidentStageLine(d: IncidentDetail, now: Date = new Date()): In
         safety:
             closed ||
             ((investigation ? investigation.complete : true) &&
-                (d.hs_event
-                    ? ['corrective_action', 'monitoring', 'closed'].includes(hsStatus ?? '')
-                    : hsRestricted
-                      ? (governance?.complete ?? false)
-                      : true)),
+                (d.hs_event ? hsStatus === 'closed' : hsRestricted ? (governance?.complete ?? false) : true)),
         actions:
             closed ||
             (openFollowups === 0 &&
                 (d.hs_event ? hsStatus === 'closed' : hsRestricted ? (governance?.complete ?? false) : true)),
         closed,
     };
-    const order: StageKey[] = ['reported', 'owner', 'review', 'safety', 'actions', 'closed'];
+    // B1.3: a viewer who can't read the safety review doesn't see its step (no reference, owner or progress).
+    const order: StageKey[] = hsRestricted
+        ? ['reported', 'owner', 'review', 'actions', 'closed']
+        : ['reported', 'owner', 'review', 'safety', 'actions', 'closed'];
     const current = order.find((key) => !done[key]) ?? null;
     const latestOwnerChange = ownership?.history?.[0];
     const ownerName = ownership?.owner?.name ?? null;
@@ -237,9 +232,9 @@ export function incidentStageLine(d: IncidentDetail, now: Date = new Date()): In
                 : undefined,
         review: done.review ? (d.reviewed_at ? `Reviewed ${shortWhen(d.reviewed_at)}` : undefined) : current === 'review' ? 'Waiting for review' : undefined,
         safety: d.hs_event
-            ? [d.hs_event.reference_number, hsOwner].filter(Boolean).join(' · ')
+            ? [d.hs_event.reference_number, hsLabel('review_status', hsStatus), hsOwner].filter(Boolean).join(' · ')
             : hsRestricted
-              ? 'Access restricted'
+              ? undefined
               : d.linked_access?.health_safety === 'absent'
                 ? 'No safety review linked'
                 : undefined,
