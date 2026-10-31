@@ -15,7 +15,8 @@ describe('respite date display round trip', () => {
     it('shows the NZ day across both daylight-saving changes', () => {
         // Sun 5 Apr 2026 10:00 NZST (+12) and Sun 27 Sep 2026 10:00 NZDT (+13).
         expect(fmtDate('2026-04-04T22:00:00+00:00')).toBe('5 Apr');
-        expect(fmtDate('2026-09-26T21:00:00+00:00')).toBe('27 Sep');
+        // en-NZ writes September as "Sept" in current ICU data, "Sep" in older.
+        expect(fmtDate('2026-09-26T21:00:00+00:00')).toMatch(/^27 Sept?$/);
     });
 
     it('gives back the NZ wall-clock the coordinator typed', () => {

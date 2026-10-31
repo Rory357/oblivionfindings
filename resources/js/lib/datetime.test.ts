@@ -11,8 +11,8 @@ import {
     timeOffsetsInZone,
     toDateInput,
     toDatetimeLocal,
-    workerTimeOffsets,
     workerDayRange,
+    workerTimeOffsets,
 } from './datetime';
 
 describe('age on the NZ calendar day', () => {
