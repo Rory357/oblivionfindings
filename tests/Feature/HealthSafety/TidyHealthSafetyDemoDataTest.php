@@ -30,6 +30,10 @@ function tidyFixture(): array
 
 function tidyUserWithRole(string $role): User
 {
+    // The kept test databases start from the schema dump without roles; seed them when this test needs one.
+    if (! Role::where('name', $role)->exists()) {
+        test()->seed(\Database\Seeders\RbacSeeder::class);
+    }
     $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now(), 'role' => $role]);
     $user->roles()->sync([Role::where('name', $role)->sole()->id]);
 
