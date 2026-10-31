@@ -264,6 +264,27 @@ class HsInvestigation extends Model
             && $this->isActive();
     }
 
+    /** Answer 20: proposed corrections to the findings (never deleted). */
+    public function corrections(): HasMany
+    {
+        return $this->hasMany(HsInvestigationCorrection::class, 'hs_investigation_id');
+    }
+
+    /**
+     * The findings people see: the latest approved correction, else the findings as they were agreed. The original
+     * findings_summary is never overwritten by a correction.
+     */
+    public function effectiveFindingsSummary(): ?string
+    {
+        $approved = $this->corrections()
+            ->where('field', HsInvestigationCorrection::FIELD_FINDINGS)
+            ->where('status', HsInvestigationCorrection::STATUS_APPROVED)
+            ->orderByDesc('approved_at')->orderByDesc('id')
+            ->value('after_value');
+
+        return $approved ?? $this->findings_summary;
+    }
+
     public function hasFindings(): bool
     {
         return ! empty($this->immediate_causes)

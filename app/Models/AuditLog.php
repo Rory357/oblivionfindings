@@ -62,6 +62,7 @@ class AuditLog extends Model
         \App\Models\HsCorrectiveActionOwnerChange::class,
         \App\Models\HsEventOwnerChange::class,
         \App\Models\HsInvestigation::class,
+        \App\Models\HsInvestigationCorrection::class,
         \App\Models\HsRecommendationDisposition::class,
         \App\Models\HsClosureException::class,
         \App\Models\HsClosureExceptionDecision::class,
