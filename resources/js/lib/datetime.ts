@@ -139,6 +139,21 @@ export function toDateInput(
     return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+/**
+ * "2026-10-08" — a YYYY-MM-DD calendar date moved by whole days. Pure date
+ * arithmetic (no instant, no timezone), so `addCalendarDays(toDateInput(now),
+ * i)` walks NZ days in any browser and across daylight saving.
+ */
+export function addCalendarDays(value: string, days: number): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match || !Number.isInteger(days)) return '';
+    const [, year, month, day] = match;
+    const date = new Date(
+        Date.UTC(Number(year), Number(month) - 1, Number(day) + days),
+    );
+    return date.toISOString().slice(0, 10);
+}
+
 /** Inclusive reporting days on the NZ calendar, independent of browser timezone. */
 export function workerDayRange(
     days: number,

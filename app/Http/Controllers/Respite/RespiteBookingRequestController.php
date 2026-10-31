@@ -14,6 +14,7 @@ use App\Services\Respite\RespiteShiftSync;
 use App\Services\Respite\RespiteStateTransitionService;
 use App\Services\Respite\RespiteStayScope;
 use App\Support\Respite\RespiteFundingSource;
+use App\Support\Respite\RespiteWallClock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,9 @@ use Inertia\Response;
 class RespiteBookingRequestController extends Controller
 {
     private const FUNDING_STATUSES = ['not_required', 'pending_approval', 'approved', 'declined', 'expired'];
+
+    /** Posted as NZ wall-clock (datetime-local or date); stored as UTC. */
+    private const WALL_CLOCK_INPUTS = ['requested_start', 'requested_end', 'funding_approved_at'];
 
     public function __construct(
         private readonly RespiteStateTransitionService $states,
@@ -124,6 +128,7 @@ class RespiteBookingRequestController extends Controller
             'recurrence_rule' => 'nullable|string|max:255',
             'allocated_days' => 'nullable|integer|min:1',
         ]);
+        $validated = RespiteWallClock::inputsToUtc($validated, self::WALL_CLOCK_INPUTS);
 
         [$requestModel, $referral] = DB::transaction(function () use ($request, $validated): array {
             $client = $this->scope->resolveAuthorizedClient($request, (int) $validated['client_id'], true);
@@ -248,6 +253,7 @@ class RespiteBookingRequestController extends Controller
             'allocated_days' => 'nullable|integer|min:1',
             'decision_notes' => 'nullable|string',
         ]);
+        $validated = RespiteWallClock::inputsToUtc($validated, self::WALL_CLOCK_INPUTS);
 
         $request = $this->states->transitionRequest(
             $httpRequest,

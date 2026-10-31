@@ -105,6 +105,61 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
         }
     }
 
+    /**
+     * /incidents sends every register prop as Inertia::always, so its inbox request used to rebuild and resend the whole
+     * register. Stephan (31 Oct, "Change it"): it now gets only the inbox; the page keeps the register it just loaded.
+     */
+    public function test_the_incidents_inbox_request_skips_the_register_and_answers_like_the_page(): void
+    {
+        [$own] = $this->world();
+        $noPermission = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $viewers = ['no permission' => $noPermission];
+        foreach (self::ROLES as $role) {
+            $viewers[$role] = $this->viewer($role, $own);
+        }
+
+        $served = 0;
+        foreach ($viewers as $label => $viewer) {
+            [$full] = $this->measure(fn () => $this->actingAs($viewer)->get('/incidents', $this->inertia()));
+            // The inbox request as it used to cost: the same partial request also asking for the register rows.
+            [, $withRegisterQueries] = $this->measure(fn () => $this->actingAs($viewer)
+                ->get('/incidents', [...$this->inertia('incidents/index'), 'X-Inertia-Partial-Data' => 'inbox,rows']));
+            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->get('/incidents', $this->inertia('incidents/index')));
+
+            $this->assertSame($full->status(), $inbox->status(), "{$label}: the inbox request must answer like the page.");
+            if ($full->status() !== 200) {
+                continue;
+            }
+
+            $served++;
+            $inbox->assertJsonPath('component', 'incidents/index')->assertHeader('Referrer-Policy', 'no-referrer');
+            $this->assertStringContainsString('no-store', (string) $inbox->headers->get('Cache-Control'), $label);
+            $this->assertStringContainsString('private', (string) $inbox->headers->get('Cache-Control'), $label);
+            $props = $inbox->json('props');
+            $this->assertArrayHasKey('inbox', $props, $label);
+            foreach (['viewer_id', 'filters', 'rows', 'hero', 'sites', 'clients', 'can', 'detail'] as $register) {
+                $this->assertArrayHasKey($register, $full->json('props'), "{$label}: the page sends {$register}.");
+                $this->assertArrayNotHasKey($register, $props, "{$label}: the inbox request must not send {$register}.");
+            }
+            foreach (array_diff(array_keys($props), ['inbox', 'taskNav']) as $key) {
+                $this->assertSame($full->json("props.{$key}"), $props[$key], "{$label}: {$key} must match the full page.");
+            }
+            $this->assertLessThan($withRegisterQueries, $inboxQueries, "{$label}: the inbox request must not build the register ({$inboxQueries} vs {$withRegisterQueries} queries).");
+        }
+        $this->assertSame(403, $this->actingAs($noPermission)->get('/incidents', $this->inertia('incidents/index'))->status());
+
+        // A query the page refuses is refused for the inbox request too, with the same message. (Last, because a
+        // refusal leaves its message in the session for the next request.)
+        foreach ($viewers as $label => $viewer) {
+            $page = $this->actingAs($viewer)->get('/incidents?owner=everyone', $this->inertia());
+            $pageErrors = session('errors')?->getBag('default')->toArray();
+            $inbox = $this->actingAs($viewer)->get('/incidents?owner=everyone', $this->inertia('incidents/index'));
+            $this->assertSame($page->status(), $inbox->status(), "{$label}: an invalid owner lens must be refused alike.");
+            $this->assertSame($pageErrors, session('errors')?->getBag('default')->toArray(), "{$label}: with the same message.");
+        }
+        $this->assertGreaterThanOrEqual(2, $served, 'At least two roles must open the register.');
+    }
+
     public function test_only_a_request_for_shared_deferred_props_alone_counts(): void
     {
         Inertia::share('inbox', Inertia::defer(fn () => []));

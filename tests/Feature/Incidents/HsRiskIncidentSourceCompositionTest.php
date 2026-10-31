@@ -437,7 +437,6 @@ final class HsRiskIncidentSourceCompositionTest extends IncidentIndependenceTest
     /** Open whole-page gate: Root owns wrapping later Client assembly in the original final barrier. */
     public function test_client_final_page_withholds_earlier_risk_panel_after_late_picker_source_withdrawal(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::UNMET_CHECK, 'a permission withdrawn during the client page\'s later picker read, after the H&S risk panel was read in the same request, is not re-checked against that panel before the page returns (the client page code is Codex\'s own); the next request applies it.', 're-prove the client page\'s H&S risk panel at the end of the request.'));
         $event =$this->event($this->incident(['client_id' => $this->client->id])); $risk = $this->risk($event, 'dual');
         DB::table('hs_risk_assessments')->where('id', $risk->id)->update(['assessable_type' => \App\Models\Client::class, 'assessable_id' => $this->client->id]);
         $state = (object) ['armed' => true, 'fired' => false, 'earlierRiskBodies' => 0];
