@@ -565,6 +565,18 @@ class HsEventController extends Controller
     }
 
     /**
+     * G3 History tab: everything done on this safety review, newest first, in plain words. Only for people who can read
+     * the whole review (the event read; 404 otherwise). Read only.
+     */
+    public function activity(Request $request, int $hsEvent): \Illuminate\Http\JsonResponse
+    {
+        $entries = DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent,
+            fn (HsEvent $event): array => app(\App\Services\HealthSafety\HsEventActivityService::class)->forEvent($event), false));
+
+        return response()->json(['entries' => $entries]);
+    }
+
+    /**
      * Q2 (Stephan, 31 Oct; G3 boards approved 1 Nov 2026): change the owner of a safety review that already has one.
      * The same people may be chosen as for taking it on (handover owner rules), a reason is always needed, each change
      * is kept in hs_event_owner_changes and the audit log, and the previous and new owners are told.

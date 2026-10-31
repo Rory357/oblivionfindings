@@ -71,6 +71,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     Route::middleware('permission:hazards.view')->group(function () {
         Route::get('/events', [HsEventController::class, 'index'])->name('events.index');
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
+        // G3 History tab: the review's activity log (read only, the event read).
+        Route::get('/events/{hsEvent}/activity', [HsEventController::class, 'activity'])->whereNumber('hsEvent')->name('events.activity');
         Route::get('/events/{hsEvent}/incident-attachments/{attachment}/download', [HsEventController::class, 'downloadIncidentAttachment'])->name('events.incident-attachments.download');
         Route::get('/events/{hsEvent}/control-room-evidence/{item}/download', [HsEventController::class, 'downloadControlRoomEvidence'])->name('events.control-room-evidence.download');
         Route::get('/corrective-actions', [HsEventController::class, 'correctiveActions'])->name('corrective-actions.index');
