@@ -200,3 +200,18 @@ closes underneath, so B3 departs from "closed once" and "one line": see **Q10**.
 ## Build order
 B9 → B5 → B1 (with B7's labels) → B2 → B3 → B4 → B6 → B10 → B8. Each starts with its mockups approved. Decisions Q2, Q8,
 Q9, Q10, Q11 and Q12 come before B1; Q1, Q3, Q4, Q6, Q7 and Q13 before B2 and B6.
+
+## G2 (B2) board, approved 31 Oct
+- Stephan sent his own Overview header (`mockups/g2/stephan-overview-header-2026-10-31.webp`): four count boxes with the change since a date and weekly bars, four charts (severity of open incidents, incidents reported each day, actions due each day, top incident types), and the tabs with Period, site picker and Find on the right. He chose "Every role's Overview".
+- The G2 board (`mockups/g2/hs-overview-g2.html`) draws it on M3 (provider manager, his numbers exactly: Incidents need an owner · Open incidents · Actions overdue · Open hazards) and M1 (H&S officer, the approved four numbers). Stephan approved it on 31 Oct ("Approve, build it"). It replaces B2.3's header layout. B2's other rows stand.
+- Role boxes:
+  - admin and H&S officer: Need an owner · WorkSafe: decide or tell · Actions overdue · Actions to check;
+  - team lead: the same four at their sites;
+  - compliance lead: Close-anyway requests · WorkSafe: decide or tell · Actions overdue · Open safety reviews;
+  - maintenance coordinator: Open hazards · Checks due · Actions overdue · Drills due, with hazard and check charts in place of the incident charts.
+- Guards (MASTER):
+  - every number and chart goes through the same proven read as the lists (PROOF_PARITY);
+  - the boxes and charts are deferred, so the first response stays fast;
+  - a change is shown only when the records' own dates prove what the number was, otherwise "No trend yet";
+  - no small number may reveal a hidden item.
+- D1 (Stephan, 31 Oct): the server refuses a new start while the owner needs replacing; an exact retry of an accepted start returns the first result.
