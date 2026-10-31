@@ -286,10 +286,12 @@ class HsCorrectiveActionService
             );
             $dueDate = $this->requiredDueDate($data);
             $priority = $this->requiredPriority($data);
+            $replaces = $this->replaceableAction($event, $data['replaces_action_id'] ?? null);
 
             $action = HsCorrectiveAction::create([
                 'hs_event_id' => $event->id,
                 'hs_investigation_id' => $data['hs_investigation_id'] ?? null,
+                'replaces_action_id' => $replaces?->id,
                 'source_control_room_task_id' => $data['source_control_room_task_id'] ?? null,
                 'reference_number' => HsCorrectiveAction::generateReferenceNumber(),
                 'action_type' => $data['action_type'] ?? HsCorrectiveAction::TYPE_CORRECTIVE,
@@ -313,6 +315,7 @@ class HsCorrectiveActionService
                 'due_date' => $dueDate,
                 'priority' => $priority,
                 'source_control_room_task_id' => $action->source_control_room_task_id,
+                'replaces_action_id' => $action->replaces_action_id,
             ]);
             $this->notifyOwner($action, $owner);
 
@@ -324,6 +327,31 @@ class HsCorrectiveActionService
 
             return $action->fresh('assignedTo');
         }, 3);
+    }
+
+    /**
+     * Q11: a revised action may only replace an action on the same safety review whose check said it didn't work.
+     * Locked so two people can't both read a stale state while adding revisions.
+     */
+    private function replaceableAction(HsEvent $event, mixed $replacesActionId): ?HsCorrectiveAction
+    {
+        if ($replacesActionId === null || $replacesActionId === '') {
+            return null;
+        }
+        if (! is_numeric($replacesActionId) || (int) $replacesActionId < 1) {
+            throw new InvalidArgumentException('Choose the action whose check said it didn\'t work.');
+        }
+
+        $replaced = HsCorrectiveAction::query()
+            ->whereKey((int) $replacesActionId)
+            ->where('hs_event_id', $event->id)
+            ->lockForUpdate()
+            ->first();
+        if ($replaced === null || ! $replaced->checkedIneffective()) {
+            throw new InvalidArgumentException('A revised action can only replace an action on this safety review whose check said it didn\'t work.');
+        }
+
+        return $replaced;
     }
 
     /**

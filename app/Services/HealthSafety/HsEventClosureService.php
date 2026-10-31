@@ -249,6 +249,30 @@ final class HsEventClosureService
             HsClosureReadiness::EXCEPTIONAL,
         );
 
+        // Q11 (G3): a check that said an action didn't work blocks closing until a revised action replacing it has
+        // been done and checked as working (or its own failed check is itself replaced, and so on). Hard: no
+        // close-anyway category covers it.
+        $unresolvedFailures = $this->unresolvedFailedChecks($event);
+        $requirements[] = $this->requirement(
+            'revised_actions',
+            $unresolvedFailures === [],
+            $unresolvedFailures === []
+                ? 'Every action whose check said it didn\'t work has a revised action that worked'
+                : 'Add a revised action for '.implode(', ', $unresolvedFailures).' (its check said it didn\'t work), then do it and check it worked.',
+            "/health-safety/events/{$event->id}?section=actions",
+            HsClosureReadiness::HARD,
+        );
+
+        // Decision 3 (G3): a safety review needs an owner before it can close. Hard: no close-anyway category covers it.
+        $hasOwner = $event->owner_user_id !== null;
+        $requirements[] = $this->requirement(
+            'has_owner',
+            $hasOwner,
+            $hasOwner ? 'The safety review has an owner' : 'Choose an owner for this safety review before closing it.',
+            "/health-safety/events/{$event->id}?action=choose-owner",
+            HsClosureReadiness::HARD,
+        );
+
         return new HsClosureReadiness((int) $event->id, $event->site_id ? (int) $event->site_id : null, $requirements);
     }
 
@@ -613,6 +637,45 @@ final class HsEventClosureService
     }
 
     /** @return array{key: string, complete: bool, label: string, href: string, classification: string} */
+    /**
+     * Q11: reference numbers of actions whose check said they didn't work and that no revised action has yet resolved.
+     * A failed action is resolved when one of its revisions was checked as working, or one of its revisions itself
+     * failed and was in turn resolved. Cycles can't be made through the service, but are guarded anyway.
+     *
+     * @return list<string>
+     */
+    private function unresolvedFailedChecks(HsEvent $event): array
+    {
+        $actions = HsCorrectiveAction::query()
+            ->where('hs_event_id', $event->id)
+            ->get(['id', 'reference_number', 'status', 'effectiveness_confirmed', 'replaces_action_id']);
+        $revisionsOf = $actions->groupBy(fn (HsCorrectiveAction $action): int => (int) $action->replaces_action_id);
+
+        $resolved = function (HsCorrectiveAction $failed, array $seen) use (&$resolved, $revisionsOf): bool {
+            if (isset($seen[$failed->id])) {
+                return false;
+            }
+            $seen[$failed->id] = true;
+            foreach ($revisionsOf->get($failed->id, collect()) as $revision) {
+                if ($revision->checkedEffective()) {
+                    return true;
+                }
+                if ($revision->checkedIneffective() && $resolved($revision, $seen)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        return $actions
+            ->filter(fn (HsCorrectiveAction $action): bool => $action->checkedIneffective() && ! $resolved($action, []))
+            ->sortBy('id')
+            ->map(fn (HsCorrectiveAction $action): string => (string) ($action->reference_number ?: "action {$action->id}"))
+            ->values()
+            ->all();
+    }
+
     private function requirement(string $key, bool $complete, string $label, string $href, string $classification): array
     {
         return compact('key', 'complete', 'label', 'href', 'classification');
