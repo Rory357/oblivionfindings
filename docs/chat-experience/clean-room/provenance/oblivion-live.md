@@ -34,6 +34,14 @@ On this branch with the Chat base and main `0a66dafe2` merged in (`8720d117e`). 
 - Vitest: the `live/` connection and sync tests, the sound-session and update-watch tests, 57 passed. `chat-calling.test.tsx` can't load here until `npm ci` installs `livekit-client`.
 - Still to do: the production build, the two-browser end-to-end test, the removal draft (branch `claude/oblivion-live-removal-wip`), and the checker session.
 
+**Removal draft tested (31 Oct 2026).** On `claude/oblivion-live-removal-wip`, with this branch merged in (`105fb52e6`):
+
+- Pest: `ChatRealtimeActorTest`, `OblivionLiveTest`, `SharedChatTest`, `ChatRealtimeCspTest`, `ChatReplacedEnginesGuardTest`, `ChatServiceHealthTest` and `ChatSessionActivityTest`. All 223 passed. Pusher is gone, so nothing needs it any more.
+- Vitest: `chat-realtime-connection.test.ts` and the `live/` tests, 35 passed. Gateway: 68 passed.
+- The lock files match: no `pusher-js`, `laravel-echo`, `pusher/pusher-php-server` or `laravel/reverb` remain, and `composer validate` passes.
+- ESLint: the gateway's import rule refused its own `node:` and relative imports (35 errors). It now uses a regex, and a probe file showed both bans still refuse `ws` in the gateway and `pusher-js` in the browser code.
+- Still to do: after `npm ci`, regenerate `public/legal/chat-third-party-notices.txt` (`node scripts/chat-license-notices.mjs`). `composer.lock` must be regenerated, not hand-merged, when the push sender branch lands first.
+
 ## Decisions taken while building
 
 - **Rotation key ID.** The spec lists `previous_secret` but no key ID for it. Tickets name their key with `kid`, so the gateway needs to know the old key's ID during a rotation: added `LIVE_PREVIOUS_KEY_ID` / `chat.live.previous_key_id`.
