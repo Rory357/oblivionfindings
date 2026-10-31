@@ -2,6 +2,7 @@
  * workflow commands. EventDetail mirrors the permission-shaped server payload;
  * a URL selects a view, never grants permission or changes a record. */
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { HS_LABELS, hsLabel } from '@/lib/health-safety/hs-labels';
 import {
     CorrectiveActionHandoverPane,
     type CorrectiveActionHandover,
@@ -453,6 +454,8 @@ export type ClosureException = {
 export type EventDetail = {
     id: number;
     reference_number: string;
+    /** B1.1/B7: the server-made title for this viewer (HsReviewTitle); always preferred over the local fallback. */
+    title?: string;
     /** Source changes a person must review (job 3): open flags only. */
     review_flags?: EventReviewFlag[];
     event_category: string;
@@ -602,19 +605,19 @@ const STAGE: Record<
         icon: AlertTriangle,
     },
     investigating: {
-        label: 'Investigating',
+        label: HS_LABELS.review_status.investigating,
         chip: 'bg-primary/10 text-primary',
         dot: 'bg-primary',
         icon: Search,
     },
     corrective_action: {
-        label: 'Corrective action',
+        label: HS_LABELS.review_status.corrective_action,
         chip: 'bg-status-warning-bg text-status-warning',
         dot: 'bg-status-warning',
         icon: ListChecks,
     },
     monitoring: {
-        label: 'Monitoring',
+        label: HS_LABELS.review_status.monitoring,
         chip: 'bg-[var(--live-bg)] text-[var(--live)]',
         dot: 'bg-[var(--live)]',
         icon: Activity,
@@ -636,28 +639,22 @@ const INV_ORDER = [
     'reviewed',
     'completed',
 ] as const;
-const INV_STAGE: Record<string, string> = {
-    draft: 'Draft',
-    in_progress: 'In progress',
-    findings_recorded: 'Findings recorded',
-    under_review: 'Under review',
-    reviewed: 'Reviewed',
-    completed: 'Completed',
-};
+// B1.1: the shared words (hs-labels.ts), not a local copy.
+const INV_STAGE: Record<string, string> = HS_LABELS.investigation_status;
 
 const CA_STATUS: Record<string, { label: string; chip: string }> = {
-    open: { label: 'Open', chip: 'bg-status-info-bg text-status-info' },
-    in_progress: { label: 'In progress', chip: 'bg-primary/10 text-primary' },
+    open: { label: HS_LABELS.action_status.open, chip: 'bg-status-info-bg text-status-info' },
+    in_progress: { label: HS_LABELS.action_status.in_progress, chip: 'bg-primary/10 text-primary' },
     completed: {
-        label: 'Awaiting verification',
+        label: HS_LABELS.action_status.completed,
         chip: 'bg-status-warning-bg text-status-warning',
     },
     verified: {
-        label: 'Verified',
+        label: HS_LABELS.action_status.verified,
         chip: 'bg-status-success-bg text-status-success',
     },
     closed: {
-        label: 'Closed',
+        label: HS_LABELS.action_status.closed,
         chip: 'bg-status-success-bg text-status-success',
     },
 };
@@ -698,10 +695,10 @@ function worksafeChipClass(worksafe: WorksafeState): string {
     return 'bg-status-warning-bg text-status-warning';
 }
 function handoverStatusLabel(status: string): string {
-    if (status === 'accepted') return 'Accepted into H&S';
-    if (status === 'awaiting_acceptance' || status === 'awaiting_hs_acceptance')
-        return 'Awaiting H&S acceptance';
-    return titleCase(status).replace(/\bHs\b/g, 'H&S');
+    return hsLabel(
+        'handover_status',
+        status === 'awaiting_hs_acceptance' ? 'awaiting_acceptance' : status,
+    );
 }
 function lifecycleStatusLabel(status: string | null): string {
     if (!status) return 'Not linked';
@@ -1318,8 +1315,10 @@ const REVIEW_SECTIONS: { key: EventSectionKey; label: string }[] = [
  * workplace injury or exposure, otherwise the client. The reference stays in the sub-line.
  */
 export function safetyReviewTitle(
-    d: Pick<EventDetail, 'event_category' | 'client' | 'staff' | 'site'>,
+    d: Pick<EventDetail, 'event_category' | 'client' | 'staff' | 'site'> &
+        Partial<Pick<EventDetail, 'title'>>,
 ): string {
+    if (d.title) return d.title;
     const category =
         EVENT_CATEGORY_LABELS[d.event_category] ?? titleCase(d.event_category);
     const worker = ['injury', 'exposure'].includes(d.event_category);
@@ -1587,7 +1586,8 @@ function SafetyReviewPage({
         REVIEW_SECTIONS.find((item) => item.key === section)?.label ??
         'Overview';
     const nextRows: [ReactNode, ReactNode][] = [
-        ['Status', d.journey_state],
+        // B1.1 (H4): one status, the review stage; journey_state stays a machine state and is not shown here.
+        ['Status', hsLabel('review_status', d.status)],
         ['Safety review owner', owner ?? 'Not assigned'],
         ['Handover', handoverStatusLabel(d.handover.status)],
     ];

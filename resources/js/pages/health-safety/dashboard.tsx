@@ -669,7 +669,7 @@ function NeedsYouNow({ worklists }: { worklists: WorklistsPayload }) {
             time: shortDay(c.due_date),
             tone: 'critical',
             // Marked completed but not yet verified: say what is waiting, counted from completion.
-            title: `${c.status === 'completed' ? 'Waiting for verification' : 'Corrective action overdue'} — ${c.title ?? c.reference ?? `#${c.id}`}`,
+            title: `${c.status === 'completed' ? hsLabel('action_status', 'completed') : 'Action overdue'} — ${c.title ?? c.reference ?? `#${c.id}`}`,
             sub: [
                 c.reference,
                 c.priority ? `${hsLabel('action_priority', c.priority)} priority` : null,
@@ -692,7 +692,7 @@ function NeedsYouNow({ worklists }: { worklists: WorklistsPayload }) {
             sortAt: accept.reported_at ?? '',
             time: shortDay(accept.reported_at),
             tone: 'warning',
-            title: `Accept for Health & safety — ${accept.title}`,
+            title: `${hsLabel('handover_status', 'awaiting_acceptance')} — ${accept.title}`,
             sub: [accept.event_reference, accept.client, accept.site, accept.owner ? `proposed owner ${accept.owner}` : null]
                 .filter(Boolean)
                 .join(' · '),

@@ -9,6 +9,7 @@
  * Known gaps (no field yet): when an owner became needed, the manager review
  * due time, and a per-row safety review status on the register.
  */
+import { HS_LABELS } from '@/lib/health-safety/hs-labels';
 import type { PageHeaderNextStep, PageHeaderStage } from '@/components/page/page-header-strip';
 import { formatDate, formatDateTime, formatTime, toDateInput } from '@/lib/datetime';
 import type { IncidentDetail } from './incident-detail-dialog';
@@ -57,13 +58,8 @@ export const SOURCE_LABELS: Record<string, string> = {
     automated: 'Automated',
 };
 
-export const HS_STATUS_LABELS: Record<string, string> = {
-    open: 'Open',
-    investigating: 'Investigating',
-    corrective_action: 'Corrective action',
-    monitoring: 'Monitoring',
-    closed: 'Closed',
-};
+/** B1.1: the safety review stage in the shared words (hs-labels.ts). */
+export const HS_STATUS_LABELS: Record<string, string> = HS_LABELS.review_status;
 
 export function sentenceCase(value: string): string {
     const text = value.replaceAll('_', ' ').trim();

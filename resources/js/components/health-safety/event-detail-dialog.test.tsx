@@ -1131,7 +1131,7 @@ describe('EventDetailDialog control-room handover', () => {
     it('shows awaiting ownership and all three lifecycle states in the overview', () => {
         renderDialog();
 
-        expect(screen.getByText('Awaiting H&S acceptance')).toBeInTheDocument();
+        expect(screen.getByText('Waiting for Health and safety to take it on')).toBeInTheDocument();
         expect(screen.getByText('No H&S owner assigned')).toBeInTheDocument();
         expect(screen.getAllByText('Control Room')).not.toHaveLength(0);
         expect(screen.getByText('Resolved')).toBeInTheDocument();
@@ -1216,7 +1216,7 @@ describe('EventDetailDialog control-room handover', () => {
             } as EventDetailOverrides),
         );
 
-        expect(screen.getByText('Accepted into H&S')).toBeInTheDocument();
+        expect(screen.getByText('Taken on by Health and safety')).toBeInTheDocument();
         expect(screen.getByText('Moana Rangi')).toBeInTheDocument();
         expect(screen.getByText('Tama Lewis')).toBeInTheDocument();
         expect(

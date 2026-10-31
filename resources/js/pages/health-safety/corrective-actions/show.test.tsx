@@ -153,7 +153,7 @@ describe('Permanent corrective action', () => {
         expect(
             screen.getByText(/The safety review is closed/),
         ).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Mark done' }));
         expect(state.replace).toHaveBeenCalledWith(
             expect.objectContaining({
                 url: expect.stringContaining(
@@ -222,7 +222,7 @@ describe('Permanent corrective action', () => {
         ).toBeInTheDocument();
         expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
         expect(
-            screen.queryByRole('button', { name: 'Verify action' }),
+            screen.queryByRole('button', { name: 'Check it worked' }),
         ).not.toBeInTheDocument();
     });
 

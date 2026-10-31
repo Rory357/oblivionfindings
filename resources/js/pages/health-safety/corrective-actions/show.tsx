@@ -1,7 +1,7 @@
 /* One corrective action — the approved drawing pg-hsn-43 (Stephan, 23 Oct 2026): the action's five stages with the
  * independent check as the next step, what we agreed told as a story, people and linked records beside it. The
  * complete / verify / return / owner panes and their submissions are unchanged. */
-import { HS_LABELS, hsLabel } from '@/lib/health-safety/hs-labels';
+import { hsActionStatus, hsLabel } from '@/lib/health-safety/hs-labels';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     ActionOwnerPane,
@@ -96,8 +96,6 @@ export type CorrectiveActionWorkspace = {
     ownership: ActionOwnership;
     can: Record<'start' | 'complete' | 'verify' | 'return' | 'close', boolean>;
 };
-// Words from the shared H&S labels (docs/health-safety-build/vocabulary.md).
-const statuses = HS_LABELS.action_status as Record<string, string>;
 const PRIORITY_TONE: Record<string, PageHeaderFact['tone']> = {
     low: 'success',
     medium: 'warning',
@@ -187,7 +185,8 @@ function ActionRecord({
         });
         return () => registerDraft('lifecycle-command', null);
     }, [registerDraft, command.processing]);
-    const status = statuses[ca.status] ?? 'Needs review';
+    // B1.1: the one status (a checked action says whether it worked), the same words as the board, list and /tasks.
+    const status = hsActionStatus(ca).label;
     const loaded = ca.evidence.load_state === 'loaded';
     const changeView = (
         nextSection: CorrectiveActionSection,
@@ -238,7 +237,7 @@ function ActionRecord({
             ? [
                   {
                       key: 'verify',
-                      label: 'Verify action',
+                      label: 'Check it worked',
                       icon: ShieldCheck,
                       run: () => select('overview', 'verify'),
                   },
@@ -248,7 +247,7 @@ function ActionRecord({
             ? [
                   {
                       key: 'complete',
-                      label: 'Mark complete',
+                      label: 'Mark done',
                       icon: CheckCircle2,
                       run: () => select('overview', 'complete'),
                   },

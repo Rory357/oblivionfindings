@@ -44,7 +44,7 @@ import {
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Field, SelectInput } from '@/components/wizard/primitives';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { hsLabel } from '@/lib/health-safety/hs-labels';
+import { HS_LABELS, hsLabel } from '@/lib/health-safety/hs-labels';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDateOnly, toDateInput } from '@/lib/datetime';
 import {
@@ -270,15 +270,15 @@ const CATEGORY_CHIP: Record<string, string> = {
 };
 
 const TABLE_TITLE: Record<string, string> = {
-    all: 'All corrective actions',
-    open: 'Open actions',
-    in_progress: 'In progress',
-    awaiting_verification: 'Awaiting verification',
+    all: 'All actions',
+    open: HS_LABELS.action_status.open,
+    in_progress: HS_LABELS.action_status.in_progress,
+    awaiting_verification: HS_LABELS.action_status.completed,
     overdue: 'Overdue actions',
-    verified: 'Verified actions',
-    closed: 'Closed actions',
-    critical_open: 'High / critical open actions',
-    unassigned: 'Actions needing an owner',
+    verified: HS_LABELS.action_status.verified,
+    closed: HS_LABELS.action_status.closed,
+    critical_open: 'Urgent and high, not done',
+    unassigned: HS_LABELS.owner_state.unassigned,
 };
 
 const TRACEABILITY_REPORT = '/health-safety/reports?view=action-traceability';
@@ -433,7 +433,7 @@ export default function CorrectiveActionsIndex({
         },
         {
             id: 'open',
-            label: 'Open',
+            label: HS_LABELS.action_status.open,
             icon: ListChecks,
             tone: 'info',
             badge: tabCounts.open || undefined,
@@ -447,7 +447,7 @@ export default function CorrectiveActionsIndex({
         },
         {
             id: 'awaiting_verification',
-            label: 'Awaiting verification',
+            label: HS_LABELS.action_status.completed,
             icon: ShieldCheck,
             tone: 'warning',
             badge: tabCounts.awaiting_verification || undefined,
@@ -958,7 +958,7 @@ export function ActionBoard({
         },
         {
             key: 'completed',
-            title: 'Waiting to be checked',
+            title: HS_LABELS.action_status.completed,
             tab: 'awaiting_verification',
             tone: 'info',
             sub: 'Someone other than the owner checks it',
