@@ -697,7 +697,7 @@ describe('Permanent safety review workspace', () => {
     it('tells a read-only viewer the next step without offering decisions', () => {
         render(
             <EventRecordWorkspace
-                detail={eventDetail({
+                detail={withoutNextAction(eventDetail({
                     can: {
                         manage: false,
                         close: false,
@@ -707,6 +707,12 @@ describe('Permanent safety review workspace', () => {
                         verify_corrective_actions: false,
                     },
                     worksafe: { can_decide: false },
+                    next_step: {
+                        key: 'worksafe_decision',
+                        label: 'Record the WorkSafe decision',
+                        can: false,
+                        who: 'Moana Rangi, the owner, or anyone who manages health and safety at Kauri House records it.',
+                    },
                     handover: {
                         status: 'accepted',
                         owner: { id: 8, name: 'Moana Rangi' },
@@ -715,17 +721,16 @@ describe('Permanent safety review workspace', () => {
                         notes: null,
                         can_accept: false,
                     },
-                } as EventDetailOverrides)}
+                } as EventDetailOverrides))}
             />,
         );
         expect(
             screen.getByRole('heading', { name: 'Next step' }),
         ).toBeInTheDocument();
+        // B1.4: the step and who does it, said once; no read-only fallback text.
         expect(
-            screen.getByText(
-                'You can read this review. Specialist decisions show here if you’re allowed to make them.',
-            ),
-        ).toBeInTheDocument();
+            screen.getAllByText(/Moana Rangi, the owner, or anyone who manages health and safety at Kauri House records it./),
+        ).toHaveLength(1);
         expect(
             screen.queryByRole('button', { name: 'Accept handover' }),
         ).not.toBeInTheDocument();
@@ -2646,3 +2651,9 @@ describe('K1a: who can close (B1.5)', () => {
         ).not.toBeInTheDocument();
     });
 });
+
+/** The server sends no manager next_action to a viewer who can't act (B1.4 uses next_step instead). */
+function withoutNextAction(detail: EventDetail): EventDetail {
+    detail.handover_summary = { ...detail.handover_summary, next_action: null };
+    return detail;
+}

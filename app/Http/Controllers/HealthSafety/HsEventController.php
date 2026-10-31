@@ -1113,6 +1113,28 @@ class HsEventController extends Controller
             default => null,
         };
         $closureReadiness = $this->closures->readiness($hsEvent);
+        // B1.4 (IR2/IR3b): the review's next step for every viewer, in the same order as next_action; `can` says whether
+        // this viewer may do it now, otherwise `who` says who does (no names beyond the owner until B3.4).
+        $siteName = $hsEvent->site?->name ?? 'this site';
+        $ownerName = $hsEvent->owner?->name;
+        $managers = "anyone who manages health and safety at {$siteName}";
+        $who = $ownerName ? "{$ownerName}, the owner, or {$managers}" : ucfirst($managers);
+        $nextStep = $hsEvent->status === HsEvent::STATUS_CLOSED ? null : match (true) {
+            $hsEvent->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE => ['key' => 'take_on', 'label' => 'Take it on',
+                'can' => $canAccept, 'who' => "Someone who manages health and safety at {$siteName} takes it on."],
+            ! $hsEvent->hasSignedWorksafeDecision() => ['key' => 'worksafe_decision', 'label' => 'Record the WorkSafe decision',
+                'can' => $canDecideWorksafe, 'who' => "{$who} records it."],
+            $hsEvent->worksafe_notifiable === true && $hsEvent->worksafe_status === HsEvent::WORKSAFE_PENDING => ['key' => 'worksafe_notify',
+                'label' => 'Record that WorkSafe was told', 'can' => $canNotifyWorksafe, 'who' => "{$who} records it."],
+            $hsEvent->worksafe_status === HsEvent::WORKSAFE_NOTIFIED => ['key' => 'worksafe_acknowledge',
+                'label' => 'Record the WorkSafe acknowledgement', 'can' => $canAcknowledgeWorksafe, 'who' => "{$who} records it."],
+            $hsEvent->investigation_required && ! $hsEvent->hasCompletedInvestigation() => ['key' => 'investigation',
+                'label' => 'Finish the investigation', 'can' => $canManage, 'who' => "{$who} does it."],
+            $hsEvent->hasOpenCorrectiveActions() => ['key' => 'actions', 'label' => 'Finish the actions',
+                'can' => $canManage, 'who' => 'Each action\'s owner does their part.'],
+            default => ['key' => 'close', 'label' => 'Close the safety review',
+                'can' => $this->closures->closeAuthority($currentUser, $hsEvent)['allowed'], 'who' => "{$who} closes it."],
+        };
         $closureExceptions = $hsEvent->closureExceptions()
             ->with(['requester:id,name', 'latestDecision.decidedBy:id,name'])
             ->orderByDesc('requested_at')
@@ -1276,6 +1298,7 @@ class HsEventController extends Controller
             'close_gate' => $closureReadiness->toJourneyGate()->toArray(),
             'close_readiness' => $closureReadiness->toArray(),
             'closure_exceptions' => $closureExceptions,
+            'next_step' => $nextStep,
             // K1a (B1.5): who can close, said once on the page for viewers who can't (no other names until B3.4).
             'close_authority' => [
                 'who' => $hsEvent->owner_user_id !== null ? 'owner_or_close_any' : 'anyone_at_site',

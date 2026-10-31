@@ -165,4 +165,20 @@ class HsEventRecordAbilitiesTest extends RestraintEventCommandTestCase
         $this->assertFalse($entry['can_decide']);
         $this->assertSame('This request is no longer current.', $entry['decide_blocked_reason']);
     }
+
+    public function test_every_viewer_gets_the_next_step_and_who_does_it(): void
+    {
+        $owner = $this->as('health_safety_officer');
+        $owner->forceFill(['name' => 'Jordan Peri'])->save();
+        $event = $this->review($owner);
+
+        $forOwner = $this->detail($owner, $event)['next_step'];
+        $this->assertSame('worksafe_decision', $forOwner['key']);
+        $this->assertTrue($forOwner['can']);
+
+        $forManager = $this->detail($this->as('provider_manager'), $event)['next_step'];
+        $this->assertSame('worksafe_decision', $forManager['key']);
+        $this->assertFalse($forManager['can']);
+        $this->assertStringContainsString('Jordan Peri, the owner', $forManager['who']);
+    }
 }

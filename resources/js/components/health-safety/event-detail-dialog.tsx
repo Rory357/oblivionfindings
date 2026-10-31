@@ -512,6 +512,8 @@ export type EventDetail = {
         exceptional_blockers: ClosureRequirement[];
     };
     closure_exceptions: ClosureException[];
+    /** B1.4: the next step for every viewer; `who` says who does it when this viewer can't. */
+    next_step?: { key: string; label: string; can: boolean; who: string } | null;
     /** K1a: who can close this review (said to viewers who can't). */
     close_authority?: { who: 'owner_or_close_any' | 'anyone_at_site'; text: string };
     journey_state: string;
@@ -1428,7 +1430,18 @@ function reviewStages(
 /** Who does what next, from the server's permission-shaped next action. */
 function reviewNextStep(d: EventDetail): PageHeaderNextStep | null {
     const next = d.handover_summary.next_action;
-    if (!next || d.status === 'closed') return null;
+    if (d.status === 'closed') return null;
+    if (!next) {
+        // B1.4: a viewer who can't act still sees the step, and who does it (IR3b: no disabled buttons).
+        const step = d.next_step;
+        if (!step) return null;
+        return {
+            label: 'Next step',
+            text: step.label,
+            meta: step.can ? undefined : step.who,
+            tone: reviewTone(d),
+        };
+    }
     const owner = d.handover.owner?.name ?? null;
     const awaiting = isAwaitingHandover(d.handover.status);
     const worksafe = /worksafe/i.test(next.label);
@@ -1448,7 +1461,9 @@ function reviewNextStep(d: EventDetail): PageHeaderNextStep | null {
                       owner
                           ? `${owner} · safety review owner`
                           : 'No safety review owner yet',
-                      worksafe ? worksafeLabel(d.worksafe) : d.journey_state,
+                      worksafe
+                          ? worksafeLabel(d.worksafe)
+                          : hsLabel('review_status', d.status),
                   ].join(' · '),
         tone: awaiting ? 'critical' : tone,
     };
@@ -1702,7 +1717,8 @@ function SafetyReviewPage({
         <>
             <FactRows
                 title="Next step"
-                sub="You can read this review. Specialist decisions show here if you’re allowed to make them."
+                // B1.4: who does the step is said once, on the header's next step.
+                sub={undefined}
                 rows={nextRows}
             />
             {ring}
