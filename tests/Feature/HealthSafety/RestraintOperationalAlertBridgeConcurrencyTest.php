@@ -30,7 +30,8 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
         $this->assertSame('testing', app()->environment());
         $this->assertSame('mysql', DB::connection()->getDriverName());
         $database = DB::connection()->getDatabaseName();
-        $this->assertMatchesRegularExpression('/^(oblivion_hs_goal_test_[0-9]+|oblivion_findings_codex_test_[0-9]+)$/D', $database);
+        // A throwaway `<base>_<pid>` schema or a kept `<base>_k<checkout>_<slot>` one.
+        $this->assertMatchesRegularExpression('/^(oblivion_hs_goal_test_[0-9]+|oblivion_findings_codex_test_(?:k[0-9a-f]{6}_)?[0-9]+)$/D', $database);
         $this->assertSame($database, getenv('DB_DATABASE'));
         Queue::fake();
     }

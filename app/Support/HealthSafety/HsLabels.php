@@ -43,7 +43,21 @@ final class HsLabels
             'original_context_restricted' => "Hidden — you don't have access",
             'unavailable' => 'Not available',
         ],
+        // H&S UI/UX plan B1/B7 (31 Oct 2026): the check result, the owner state and the handover, one set of words everywhere.
+        'action_check' => ['worked' => 'Checked — it worked', 'not_worked' => "Checked — it didn't work"],
+        'owner_state' => ['unassigned' => 'No owner yet', 'replacement_needed' => 'Owner needs replacing'],
+        'handover_status' => ['not_ready' => 'Not passed on yet', 'awaiting_acceptance' => 'Waiting for Health and safety to take it on', 'accepted' => 'Taken on by Health and safety', 'not_required' => 'Not needed'],
     ];
+
+    /** An action's one status: a checked action says whether it worked (vocabulary.md "Checking an action worked"). */
+    public static function actionStatus(string|null $status, ?bool $worked): string
+    {
+        if (strtolower(trim((string) $status)) === 'verified' && $worked !== null) {
+            return self::LABELS['action_check'][$worked ? 'worked' : 'not_worked'];
+        }
+
+        return self::label('action_status', $status);
+    }
 
     /** The approved words for a stored value; unknown values are made readable, missing ones read "Not set". */
     public static function label(string $domain, string|int|null $value): string

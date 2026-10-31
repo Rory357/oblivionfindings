@@ -366,10 +366,14 @@ class HsCorrectiveActionPresentationTest extends TestCase
 
     public function test_history_uses_actor_neutral_labels_when_a_manager_is_not_the_owner(): void
     {
-        $owner = User::factory()->create();
+        // D1: a start needs an owner who can still own the action, so the owner is an H&S officer at the event's site.
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $owner = $this->staffAtSite($site, 'health_safety_officer');
         $manager = User::factory()->create();
         $viewer = User::factory()->create();
+        $event = HsEvent::factory()->create(['organization_id' => 1, 'site_id' => $site->id, 'event_category' => HsEvent::CATEGORY_HAZARD]);
         $action = HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $event->id,
             'assigned_to_user_id' => $owner->id,
             'status' => HsCorrectiveAction::STATUS_OPEN,
         ]);

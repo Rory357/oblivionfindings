@@ -9,6 +9,7 @@
  * if the signed-in account changes.
  */
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     EntityContextMenu,
     type MenuItem,
@@ -145,6 +146,7 @@ function ParticipationWorkspace({
     staff,
     committees,
 }: Props) {
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [recordCtx, setRecordCtx] = useState<{
         x: number;
@@ -512,8 +514,7 @@ function ParticipationWorkspace({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
-                { title: 'People and participation', href: '/health-safety/registers?view=participation' },
+                ...safetyHubCrumbs('participation', safetyCan),
                 { title: 'Worker participation', href: BASE },
             ]}
         >

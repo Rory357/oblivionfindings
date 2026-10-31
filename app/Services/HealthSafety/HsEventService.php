@@ -173,7 +173,7 @@ class HsEventService
                         $hasCompleteDecision && $worksafeNotifiable,
                     ),
                     'control_room_alert_id' => $data['control_room_alert_id'] ?? null,
-                    'handover_status' => $data['handover_status'] ?? HsEvent::HANDOVER_NOT_REQUIRED,
+                    'handover_status' => self::initialHandoverStatus($source, $data['handover_status'] ?? null),
                     'owner_user_id' => $data['owner_user_id'] ?? null,
                     'idempotency_key' => $idempotencyKey,
                     'created_by' => $data['created_by'] ?? auth()->id(),
@@ -274,6 +274,22 @@ class HsEventService
      * Acceptance is monotonic: retries return the first accepted record and never
      * replace its owner, actor, timestamp, or notes.
      */
+    /**
+     * K8 (H&S audit Q8, 31 Oct 2026): a review from an incident always goes through an accepted handover. "Not required"
+     * left such reviews unable to close (the close check asks for an acceptance that "not required" can't give), so an
+     * incident source never starts there; other sources keep their own value or "not required".
+     */
+    public static function initialHandoverStatus(mixed $source, ?string $requested): string
+    {
+        if (! $source instanceof ClientIncident) {
+            return $requested ?? HsEvent::HANDOVER_NOT_REQUIRED;
+        }
+
+        return in_array($requested, [HsEvent::HANDOVER_NOT_READY, HsEvent::HANDOVER_AWAITING_ACCEPTANCE, HsEvent::HANDOVER_ACCEPTED], true)
+            ? $requested
+            : HsEvent::HANDOVER_AWAITING_ACCEPTANCE;
+    }
+
     public function acceptHandover(
         HsEvent $event,
         User $actor,

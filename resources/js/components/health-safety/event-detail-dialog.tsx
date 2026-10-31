@@ -2,6 +2,7 @@
  * workflow commands. EventDetail mirrors the permission-shaped server payload;
  * a URL selects a view, never grants permission or changes a record. */
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { HS_LABELS, hsLabel } from '@/lib/health-safety/hs-labels';
 import {
     CorrectiveActionHandoverPane,
     type CorrectiveActionHandover,
@@ -448,11 +449,17 @@ export type ClosureException = {
     expires_at: string | null;
     review_at: string | null;
     provenance_hash: string;
+    /** K1a: the server's answer for this viewer (older payloads fall back to the permission). */
+    can_decide?: boolean;
+    decide_blocked_reason?: string | null;
+    can_revoke?: boolean;
 };
 
 export type EventDetail = {
     id: number;
     reference_number: string;
+    /** B1.1/B7: the server-made title for this viewer (HsReviewTitle); always preferred over the local fallback. */
+    title?: string;
     /** Source changes a person must review (job 3): open flags only. */
     review_flags?: EventReviewFlag[];
     event_category: string;
@@ -505,6 +512,10 @@ export type EventDetail = {
         exceptional_blockers: ClosureRequirement[];
     };
     closure_exceptions: ClosureException[];
+    /** B1.4: the next step for every viewer; `who` says who does it when this viewer can't. */
+    next_step?: { key: string; label: string; can: boolean; who: string } | null;
+    /** K1a: who can close this review (said to viewers who can't). */
+    close_authority?: { who: 'owner_or_close_any' | 'anyone_at_site'; text: string };
     journey_state: string;
     assignable_staff: Array<{ id: number; name: string }>;
     action_handover: CorrectiveActionHandover;
@@ -602,19 +613,19 @@ const STAGE: Record<
         icon: AlertTriangle,
     },
     investigating: {
-        label: 'Investigating',
+        label: HS_LABELS.review_status.investigating,
         chip: 'bg-primary/10 text-primary',
         dot: 'bg-primary',
         icon: Search,
     },
     corrective_action: {
-        label: 'Corrective action',
+        label: HS_LABELS.review_status.corrective_action,
         chip: 'bg-status-warning-bg text-status-warning',
         dot: 'bg-status-warning',
         icon: ListChecks,
     },
     monitoring: {
-        label: 'Monitoring',
+        label: HS_LABELS.review_status.monitoring,
         chip: 'bg-[var(--live-bg)] text-[var(--live)]',
         dot: 'bg-[var(--live)]',
         icon: Activity,
@@ -636,28 +647,22 @@ const INV_ORDER = [
     'reviewed',
     'completed',
 ] as const;
-const INV_STAGE: Record<string, string> = {
-    draft: 'Draft',
-    in_progress: 'In progress',
-    findings_recorded: 'Findings recorded',
-    under_review: 'Under review',
-    reviewed: 'Reviewed',
-    completed: 'Completed',
-};
+// B1.1: the shared words (hs-labels.ts), not a local copy.
+const INV_STAGE: Record<string, string> = HS_LABELS.investigation_status;
 
 const CA_STATUS: Record<string, { label: string; chip: string }> = {
-    open: { label: 'Open', chip: 'bg-status-info-bg text-status-info' },
-    in_progress: { label: 'In progress', chip: 'bg-primary/10 text-primary' },
+    open: { label: HS_LABELS.action_status.open, chip: 'bg-status-info-bg text-status-info' },
+    in_progress: { label: HS_LABELS.action_status.in_progress, chip: 'bg-primary/10 text-primary' },
     completed: {
-        label: 'Awaiting verification',
+        label: HS_LABELS.action_status.completed,
         chip: 'bg-status-warning-bg text-status-warning',
     },
     verified: {
-        label: 'Verified',
+        label: HS_LABELS.action_status.verified,
         chip: 'bg-status-success-bg text-status-success',
     },
     closed: {
-        label: 'Closed',
+        label: HS_LABELS.action_status.closed,
         chip: 'bg-status-success-bg text-status-success',
     },
 };
@@ -698,10 +703,10 @@ function worksafeChipClass(worksafe: WorksafeState): string {
     return 'bg-status-warning-bg text-status-warning';
 }
 function handoverStatusLabel(status: string): string {
-    if (status === 'accepted') return 'Accepted into H&S';
-    if (status === 'awaiting_acceptance' || status === 'awaiting_hs_acceptance')
-        return 'Awaiting H&S acceptance';
-    return titleCase(status).replace(/\bHs\b/g, 'H&S');
+    return hsLabel(
+        'handover_status',
+        status === 'awaiting_hs_acceptance' ? 'awaiting_acceptance' : status,
+    );
 }
 function lifecycleStatusLabel(status: string | null): string {
     if (!status) return 'Not linked';
@@ -1318,8 +1323,10 @@ const REVIEW_SECTIONS: { key: EventSectionKey; label: string }[] = [
  * workplace injury or exposure, otherwise the client. The reference stays in the sub-line.
  */
 export function safetyReviewTitle(
-    d: Pick<EventDetail, 'event_category' | 'client' | 'staff' | 'site'>,
+    d: Pick<EventDetail, 'event_category' | 'client' | 'staff' | 'site'> &
+        Partial<Pick<EventDetail, 'title'>>,
 ): string {
+    if (d.title) return d.title;
     const category =
         EVENT_CATEGORY_LABELS[d.event_category] ?? titleCase(d.event_category);
     const worker = ['injury', 'exposure'].includes(d.event_category);
@@ -1423,7 +1430,18 @@ function reviewStages(
 /** Who does what next, from the server's permission-shaped next action. */
 function reviewNextStep(d: EventDetail): PageHeaderNextStep | null {
     const next = d.handover_summary.next_action;
-    if (!next || d.status === 'closed') return null;
+    if (d.status === 'closed') return null;
+    if (!next) {
+        // B1.4: a viewer who can't act still sees the step, and who does it (IR3b: no disabled buttons).
+        const step = d.next_step;
+        if (!step) return null;
+        return {
+            label: 'Next step',
+            text: step.label,
+            meta: step.can ? undefined : step.who,
+            tone: reviewTone(d),
+        };
+    }
     const owner = d.handover.owner?.name ?? null;
     const awaiting = isAwaitingHandover(d.handover.status);
     const worksafe = /worksafe/i.test(next.label);
@@ -1443,7 +1461,9 @@ function reviewNextStep(d: EventDetail): PageHeaderNextStep | null {
                       owner
                           ? `${owner} · safety review owner`
                           : 'No safety review owner yet',
-                      worksafe ? worksafeLabel(d.worksafe) : d.journey_state,
+                      worksafe
+                          ? worksafeLabel(d.worksafe)
+                          : hsLabel('review_status', d.status),
                   ].join(' · '),
         tone: awaiting ? 'critical' : tone,
     };
@@ -1587,7 +1607,8 @@ function SafetyReviewPage({
         REVIEW_SECTIONS.find((item) => item.key === section)?.label ??
         'Overview';
     const nextRows: [ReactNode, ReactNode][] = [
-        ['Status', d.journey_state],
+        // B1.1 (H4): one status, the review stage; journey_state stays a machine state and is not shown here.
+        ['Status', hsLabel('review_status', d.status)],
         ['Safety review owner', owner ?? 'Not assigned'],
         ['Handover', handoverStatusLabel(d.handover.status)],
     ];
@@ -1696,7 +1717,8 @@ function SafetyReviewPage({
         <>
             <FactRows
                 title="Next step"
-                sub="You can read this review. Specialist decisions show here if you’re allowed to make them."
+                // B1.4: who does the step is said once, on the header's next step.
+                sub={undefined}
                 rows={nextRows}
             />
             {ring}
@@ -1895,7 +1917,12 @@ function ClosureRing({ d }: { d: EventDetail }) {
                       ? `To close: ${done} of ${requirements.length} done`
                       : 'Nothing blocks closing'
             }
-            sub="Resolving the response, closing the incident and closing this review are separate steps"
+            sub={
+                // K1a (B1.5): a viewer who can't close is told once, here, who can.
+                !d.can.close && d.status !== 'closed' && d.close_authority
+                    ? d.close_authority.text
+                    : 'Resolving the response, closing the incident and closing this review are separate steps'
+            }
             checks={checks}
         />
     );
@@ -3706,7 +3733,19 @@ function ClosureExceptionRecord({
                 Provenance {exception.provenance_hash.slice(0, 16)}
             </p>
 
-            {d.can.approve_closure_exception &&
+            {exception.status === 'pending' &&
+            exception.can_decide === false &&
+            exception.decide_blocked_reason ? (
+                <p className="mt-3 border-t pt-3 text-sm text-muted-foreground">
+                    {exception.decide_blocked_reason}
+                    {exception.expires_at
+                        ? ` It needs a decision before ${formatDateTime(exception.expires_at)}.`
+                        : null}
+                </p>
+            ) : null}
+
+            {(exception.can_decide ??
+                d.can.approve_closure_exception) &&
             exception.status === 'pending' ? (
                 <div className="mt-3 space-y-2 border-t pt-3">
                     <Field label="Independent decision reason" required>
@@ -3738,7 +3777,7 @@ function ClosureExceptionRecord({
                 </div>
             ) : null}
 
-            {d.can.approve_closure_exception &&
+            {(exception.can_revoke ?? d.can.approve_closure_exception) &&
             exception.status === 'approved' ? (
                 <form
                     className="mt-3 space-y-2 border-t pt-3"

@@ -529,7 +529,9 @@ describe('Permanent incident workspace', () => {
             within(screen.getByRole('banner')).getByRole('list', {
                 name: /Where the incident is up to/,
             });
-        expect(within(stages()).getByText('Access restricted')).toBeVisible();
+        // B1.3: a viewer who can't read the safety review sees no step for it (no reference, owner or progress).
+        expect(within(stages()).queryByText('Safety review')).not.toBeInTheDocument();
+        expect(within(stages()).queryByText('Access restricted')).not.toBeInTheDocument();
         incident.linked_access.health_safety = 'absent';
         view.rerender(<IncidentShow detail={incident} />);
         expect(

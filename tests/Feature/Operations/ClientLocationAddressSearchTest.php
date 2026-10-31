@@ -10,7 +10,8 @@ beforeEach(function () {
     Http::preventStrayRequests();
     Queue::fake();
     $this->assertTrue(static::$isolatedMysqlPrepared);
-    $ownedDatabase = static::$testDatabaseBaseName.'_'.$this->resolveProcessToken();
+    // A kept slot (`<base>_k<checkout>_<n>`) or a throwaway `<base>_<token>`.
+    $ownedDatabase = static::$keptDatabase?->name() ?? static::$testDatabaseBaseName.'_'.$this->resolveProcessToken();
     $this->assertSame($ownedDatabase, static::$isolatedMysqlDatabase);
     $this->assertNotSame(static::$testDatabaseBaseName, $ownedDatabase);
     $this->assertSame($ownedDatabase, DB::connection()->getDatabaseName());

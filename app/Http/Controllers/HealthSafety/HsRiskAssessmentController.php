@@ -89,12 +89,19 @@ class HsRiskAssessmentController extends Controller
         // Tab counts and hero share every current facet, excluding only the active tab.
         $this->assertAccessibleFilters($request, $filters, $context);
 
-        $base = function () use ($filters, $request, $context): Builder {
-            $query = $this->applyScope(HsRiskAssessment::query(), $filters, $request, $context);
+        // Speed R3b: the guarded scope is proved once; counts, hero and list run over that set (see proveRegisterScope()).
+        $proven = RiskAssessmentPresenter::proveRegisterScope($this->applyScope(HsRiskAssessment::query(), $filters, $request, $context), $request->user(), $context);
+        $base = function () use ($filters, $proven, $context): Builder {
+            $query = RiskAssessmentPresenter::provenRegisterQuery($proven, $context);
             $this->applyFacets($query, $filters);
 
             return $query;
         };
+        if (\App\Support\HealthSafety\ProofParity::$enabled) {
+            $guarded = $this->applyScope(HsRiskAssessment::query(), $filters, $request, $context);
+            $this->applyFacets($guarded, $filters);
+            \App\Support\HealthSafety\ProofParity::assertSameRows($base(), $guarded, 'hs_risk_assessments.id', 'Risk register scope');
+        }
 
         $tabCounts = [
             'all' => (clone $base())->count(),
@@ -108,14 +115,14 @@ class HsRiskAssessmentController extends Controller
         $hero = $this->buildHero($base);
 
         // Displayed list — scope + tab + facet filters.
-        $list = $this->applyScope(HsRiskAssessment::query(), $filters, $request, $context);
+        $list = RiskAssessmentPresenter::provenRegisterQuery($proven, $context);
         $this->applyTab($list, (string) $filters['tab']);
         $this->applyFacets($list, $filters);
 
         $assessments = $list
             ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])
             ->withCount('attachments')
-            ->tap(fn (Builder $query) => RiskAssessmentPresenter::guardEagerQuery($query, $request->user(), $context))
+            ->tap(fn (Builder $query) => RiskAssessmentPresenter::bindProvenEagerLoads($query, $proven, $context))
             ->orderByDesc('created_at')
             ->paginate(25)
             ->withQueryString()

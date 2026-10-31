@@ -60,6 +60,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Phase 4: Dashboard & Analytics ──────────────────────────────────
     Route::middleware('permission:hazards.view')->group(function () {
         Route::get('/', [HealthSafetyDashboardController::class, 'index'])->name('dashboard');
+        // G2 (B5.2/K9): attention counts for the Incidents and safety reviews rail, counted like the Overview's boxes.
+        Route::get('/rail-counts', [HealthSafetyDashboardController::class, 'railCounts'])->name('rail-counts');
         Route::get('/analytics', [HealthSafetyDashboardController::class, 'analytics'])->name('analytics');
         Route::get('/analytics/export', [HealthSafetyDashboardController::class, 'analyticsExport'])->name('analytics.export');
         Route::get('/analytics/records', [HealthSafetyDashboardController::class, 'analyticsRecords'])->name('analytics.records');
