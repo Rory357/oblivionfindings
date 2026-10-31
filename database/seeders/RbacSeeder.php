@@ -578,6 +578,9 @@ class RbacSeeder extends Seeder
             ['key' => 'healthSafety.closureExceptions.request', 'description' => 'Request a narrow H&S closure exception', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'healthSafety.closureExceptions.approve', 'description' => 'Independently decide or revoke H&S closure exceptions', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'healthSafety.settings.manage', 'description' => 'Configure the organisation approval workflow with an attributable change history', 'group' => 'hazards', 'module' => 'Compliance'],
+            // G3 (Stephan, 1 Nov 2026): Q1 story read and answer 23. Grant migrations 2026_11_01_110000 / _120000.
+            ['key' => 'healthSafety.events.readIncidentStory', 'description' => 'Read what happened and what was done straight away for an incident behind a safety review at your Sites (never restricted incidents)', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.actions.ownOnStoryReviews', 'description' => 'Own, start and finish an action on a safety review whose incident story you can read (never the review itself)', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Restraints & Behaviour Support
             ['key' => 'restraints.view', 'description' => 'View the restraint register & behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
@@ -976,6 +979,9 @@ class RbacSeeder extends Seeder
             // No incident register. Grant migration: 2026_10_30_110000_grant_team_lead_incident_reporting.
             'incidents.create', 'clients.viewAny',
             'healthSafety.events.close', 'healthSafety.closureExceptions.request',
+            // G3 (Stephan, 1 Nov 2026): read an incident's story on its safety review (Q1), and own/finish actions there
+            // (answer 23). Never the incident itself. Grant migrations 2026_11_01_110000 and 2026_11_01_120000.
+            'healthSafety.events.readIncidentStory', 'healthSafety.actions.ownOnStoryReviews',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.schedule',
             'vendors.view', 'credentials.view', 'reports.sites.view',
