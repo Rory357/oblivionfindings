@@ -5,10 +5,13 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\OwnedTestDatabase;
 
 test('PKG-02B workspace rollback never discards recorded vehicle evidence', function () {
     expect(app()->environment())->toBe('testing');
-    expect(DB::connection()->getDatabaseName())->toMatch('/^oblivion_findings_(?:pkg01_2375_test|pkg02b_5b0a_test|pkg02b_final_test|codex_test)_'.preg_quote((string) getmypid(), '/').'$/');
+    $database = DB::connection()->getDatabaseName();
+    expect(preg_match('/^oblivion_findings_(?:pkg01_2375_test|pkg02b_5b0a_test|pkg02b_final_test|codex_test)_'.preg_quote((string) getmypid(), '/').'$/', $database) === 1
+        || OwnedTestDatabase::isOwnedBy($database, getmypid()))->toBeTrue();
     // Keep the current integrated schema and the test transaction intact.
     // Later Finance history is intentionally irreversible; an old package's
     // empty-schema round trip is no longer a supported integrated rollback.
