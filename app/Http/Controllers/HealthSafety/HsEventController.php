@@ -565,6 +565,77 @@ class HsEventController extends Controller
     }
 
     /**
+     * Q2 (Stephan, 31 Oct; G3 boards approved 1 Nov 2026): change the owner of a safety review that already has one.
+     * The same people may be chosen as for taking it on (handover owner rules), a reason is always needed, each change
+     * is kept in hs_event_owner_changes and the audit log, and the previous and new owners are told.
+     */
+    public function changeOwner(Request $request, int $hsEvent)
+    {
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->changeOwnerWithinSourceAuthority($request, $event)));
+    }
+
+    private function changeOwnerWithinSourceAuthority(Request $request, HsEvent $hsEvent)
+    {
+        $data = $request->validate([
+            'owner_user_id' => ['required', 'integer', 'min:1'],
+            'reason' => ['required', 'string', 'min:10', 'max:2000'],
+        ]);
+        $actor = $request->user();
+
+        if (! $hsEvent->isOpen()) {
+            throw ValidationException::withMessages(['owner_user_id' => 'A closed safety review keeps its owner.']);
+        }
+        if ($hsEvent->owner_user_id === null) {
+            throw ValidationException::withMessages(['owner_user_id' => 'Take it on or choose the owner first.']);
+        }
+        if ((int) $hsEvent->owner_user_id === (int) $data['owner_user_id']) {
+            throw ValidationException::withMessages(['owner_user_id' => 'This person already owns the safety review.']);
+        }
+        $owner = $this->handoverOwnerQuery($hsEvent, $actor)->whereKey((int) $data['owner_user_id'])->first();
+        if (! $owner || ! $this->canOwnEvent($owner, $hsEvent, $actor)) {
+            throw ValidationException::withMessages(['owner_user_id' => 'Choose someone who manages health and safety at this site and can open this safety review.']);
+        }
+
+        $previous = User::query()->find($hsEvent->owner_user_id);
+        $reason = trim((string) $data['reason']);
+        $change = \App\Models\HsEventOwnerChange::create([
+            'hs_event_id' => $hsEvent->id,
+            'previous_owner_user_id' => $previous?->id,
+            'previous_owner_name' => $previous?->name,
+            'owner_user_id' => $owner->id,
+            'owner_name' => (string) $owner->name,
+            'actor_user_id' => $actor->id,
+            'actor_name' => (string) $actor->name,
+            'reason' => $reason,
+        ]);
+        $hsEvent->forceFill(['owner_user_id' => $owner->id])->save();
+        \App\Services\AuditLogger::logOrFail('healthSafety.event.ownerChanged', $hsEvent, [
+            'actor_id' => $actor->id,
+            'previous_owner_user_id' => $previous?->id,
+            'owner_user_id' => $owner->id,
+            'change_id' => $change->id,
+            'reason' => $reason,
+        ]);
+        foreach ([[$owner, 'incoming'], [$previous, 'outgoing']] as [$recipient, $role]) {
+            if ($recipient === null || (int) $recipient->id === (int) $actor->id) {
+                continue;
+            }
+            $recipient->notify(new \App\Notifications\AppEventNotification([
+                'title' => 'Safety review owner changed',
+                'message' => $role === 'incoming'
+                    ? 'You now own safety review '.$hsEvent->reference_number.'.'
+                    : 'Safety review '.$hsEvent->reference_number.' now has a new owner.',
+                'type' => 'health_safety_event_owner_changed',
+                'hs_event_id' => $hsEvent->id,
+                'change_id' => $change->id,
+                'url' => '/health-safety/events/'.$hsEvent->id,
+            ]));
+        }
+
+        return back()->with('success', 'Owner changed.');
+    }
+
+    /**
      * Record the WorkSafe NZ notification for a notifiable event (E-Gap 2):
      * pending â†’ notified, persisting date/method/reference + site preservation.
      */
