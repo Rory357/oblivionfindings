@@ -51,14 +51,14 @@ export function buildHsTabItems(
         { id: 'leading', label: 'Prevention', icon: TrendingUp, tone: 'success' },
         {
             id: 'lagging',
-            label: 'Harm & injuries',
+            label: 'Harm and injuries',
             icon: TrendingDown,
             tone: 'critical',
             badge: laggingCount > 0 ? laggingCount : undefined,
         },
         {
             id: 'compliance',
-            label: 'Duties',
+            label: 'Legal duties',
             icon: ShieldCheck,
             tone: 'primary',
             badge: complianceCount > 0 ? complianceCount : undefined,

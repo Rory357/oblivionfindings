@@ -180,6 +180,29 @@ final class HsOverviewHeaderReadService
         });
     }
 
+    /**
+     * B5.2/K9: attention counts for the Incidents and safety reviews rail (view key => count), every Site this person may
+     * see. Incidents need incident read; without it that tab gets no count rather than a 0.
+     *
+     * @return array<string, int|null>
+     */
+    public function railCounts(User $viewer, HealthSafetyReadContext $context): array
+    {
+        return HealthSafetyReadMaterialisationProof::within($context, function (HealthSafetyReadMaterialisationProof $proof) use ($viewer, $context): array {
+            $events = fn (): Builder => $this->events($viewer, null, $context, $proof);
+            $readsIncidents = $viewer->canDo('incidents.viewAny') || $viewer->canDo('incidents.viewAssigned');
+
+            return [
+                'incidents' => $readsIncidents ? $this->incidentsNeedingOwner(null, $context) : null,
+                'reviews' => $events()->where('hs_events.handover_status', HsEvent::HANDOVER_AWAITING_ACCEPTANCE)
+                    ->where('hs_events.status', '!=', HsEvent::STATUS_CLOSED)->count(),
+                'actions' => $proof->protect(HsCorrectiveAction::query()
+                    ->whereIn('hs_corrective_actions.hs_event_id', $events()->select('hs_events.id')))->overdue()->count(),
+                'notifications' => $events()->worksafeDecideOrTell()->count(),
+            ];
+        });
+    }
+
     /** Counts for fixed keys, in order (missing keys count 0; other values are left out). */
     private function tally(Builder $query, string $column, array $keys): array
     {

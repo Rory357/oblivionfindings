@@ -453,6 +453,17 @@ class HealthSafetyDashboardController extends Controller
             ->boxes($user, $f['siteScope'] === null ? null : array_map('intval', (array) $f['siteScope']), $f['now'], $context, $checksDue, $drillsDue)];
     }
 
+    /**
+     * G2 (B5.2/K9): the Incidents and safety reviews rail's attention counts, from the boxes' own counts, in one locked
+     * read with the viewer's Sites. A count this person can't read is left out (null), never sent as 0.
+     */
+    public function railCounts(Request $request): JsonResponse
+    {
+        return response()->json(HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
+            fn (HealthSafetyReadContext $context): array => app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class)
+                ->railCounts($context->consumeSourceViewer([], fn (User $current): User => $current), $context)));
+    }
+
     /** Background parts "chart_*" (G2): one header chart, counted like the boxes. */
     private function overviewChart(string $group, Request $request, HealthSafetyReadContext $context): array
     {

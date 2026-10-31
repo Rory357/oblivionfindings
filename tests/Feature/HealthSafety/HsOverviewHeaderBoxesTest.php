@@ -118,6 +118,22 @@ class HsOverviewHeaderBoxesTest extends TestCase
         $this->assertCount(30, $this->chartFor($officer, 'over_time')['days']);
     }
 
+    public function test_the_concerns_rail_counts_follow_the_boxes_and_the_viewers_sites(): void
+    {
+        $this->overdueAction($this->own, 'CA-OWN', createdDaysAgo: 10, dueDaysAgo: 3);
+        $this->overdueAction($this->other, 'CA-OTHER', createdDaysAgo: 10, dueDaysAgo: 3);
+
+        $lead = $this->actingAs($this->viewer('team_lead'))->getJson('/health-safety/rail-counts')->assertOk()->json();
+        $this->assertSame(1, $lead['actions'], 'Only their own Site.');
+        $officer = $this->actingAs($this->viewer('health_safety_officer'))->getJson('/health-safety/rail-counts')->assertOk()->json();
+        $this->assertSame(2, $officer['actions']);
+        $this->assertSame(['incidents', 'reviews', 'actions', 'notifications'], array_keys($officer));
+
+        $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $worker->roles()->attach(Role::where('name', 'support_worker')->sole());
+        $this->actingAs($worker)->getJson('/health-safety/rail-counts')->assertForbidden();
+    }
+
     private function chartFor(User $viewer, string $chart): array
     {
         return $this->actingAs($viewer)->get('/health-safety', [
