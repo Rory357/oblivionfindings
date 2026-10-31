@@ -174,6 +174,12 @@ The recheck after `98ed39a95` confirmed F1–F4 and found two older MP4 problems
 - **New limit in the tests:** every hostile 20 MiB test file now asserts under 2 s and under 48 MiB of working memory beyond the file itself. The most any of them uses is 20 MiB: an Ogg file whose single packet spans every page.
 - **Test repair:** the five-million-entry size-table file had been refused before reaching its table, because it lacked the `smhd`/`dinf` boxes made mandatory under decision 20. It is rebuilt on a complete movie.
 
+**F5 and F6 tested (31 October 2026, Rory's builder session).** `68f707db4` was committed untested. It is now tested on this branch with the Chat base and main `0a66dafe2` merged in (`f5f41798a`). No code changed.
+
+- Without ffprobe: the voice unit tests, `ChatVoiceInspectorTest`, `ChatServiceHealthTest` and `ChatUploadsTest`. 180 passed and 27 skipped (the ffprobe comparisons).
+- With `CHAT_VOICE_PROBE_BINARY` set to ffprobe **9.0.2** (8.1.1 isn't installed on this PC): the voice unit tests and `ChatVoiceInspectorTest`. All 184 passed, so ffprobe 9.0.2 agrees with the checker on every good file.
+- The checker's recheck of F5 and F6, the similarity check and the REGISTER.md sign-off are still to do, by a session other than this one.
+
 ## Open questions
 
 - **Safari.** Real Safari recordings (5 s and 119 s) are still needed from a Mac or an iPhone. The MP4 parser has only seen Chrome's fragmented MP4 and generated files.
