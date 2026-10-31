@@ -8,6 +8,17 @@ Companion documents: [surface inventory and findings](2026-10-15-surface-invento
 
 ## 1. Intended outcome and confirmed decisions
 
+**Decisions — 22 October 2026 (Stephan approved): the Chat rebuild.** These supersede the 16 October calling ownership decision and the voice-only default below. The audit, the 10-stage plan and all 15 decisions are in [2026-10-22-rebuild-plan.html](2026-10-22-rebuild-plan.html); the approved boards are the "Chat v3 — proposed rebuild" page of the design viewer, with sources in [v3/](v3/).
+
+- **Ownership (D1):** every chat-specific outside engine is replaced with Oblivion's own code through a clean room: live updates (Oblivion Live, D2), calls, browser push and the voice-note checker. The platform (PHP, Laravel, React, MySQL, the browser) and the separate virus scanner stay, with their notices. The clean-room rules are in [clean-room/](clean-room/).
+- **Calls (D3–D5, D13, D15):** Oblivion's own calls on the browser's built-in calling: voice up to 8 people, video up to 4, screen share. coturn runs as a separate standard relay for callers behind firewalls. Family one-to-one video with the care team is off by default per Site. Calls start in one click; the microphone check appears only when the browser reports a problem. Answer uses the primary colour and Decline the destructive red.
+- **Content (D6, D7):** Oblivion stickers and an organisation-uploaded library; no outside GIF service. Outside link previews are on by default (an admin can switch them off), fetched by Oblivion's server behind a guard; Oblivion links become care cards.
+- **Messages (D8, D9):** staff see per-person read status and Message info; family see only "Seen by care team". Edit for 15 minutes and delete for everyone for 1 hour, with the original kept in the encrypted history.
+- **Records (D11):** second-person approval of investigator access is an organisation setting; it starts off, so self-grant with the separate audit log stays the default.
+- **Design (D12, D14):** Chat is drawn with the Oblivion signature and ships it when the signature is approved for the whole app. `/chat` is a full-height Workspace page with only the breadcrumb strip (a DESIGN.md exception). Emoji are content, never icons.
+- **AI helpers (D10):** catch-up summaries, draft replies, voice-note transcripts and family translation are planned, off by default, with a switch per feature and Site.
+- **Staff who move Site (23 October 2026):** a private group or one-to-one chat stays with its members when one of them moves to a Site the others can't see, and that person's name keeps showing. A managed Site channel follows its Site, so the person who moved loses it. A new group still needs everyone to see everyone. Adding to an existing group needs the people added to see, and be seen by, the adder and every member the adder can still see; members who have moved out of the adder's Sites don't block it. Nobody can add someone they can't see.
+
 **Decisions — 20 October 2026 (Stephan approved):**
 
 - **Slate look:** Chat and the family portal take the app-wide Slate look (DESIGN.md "The Slate look"). Codex's approved structure — regions, order, controls, labels and flows — is kept exactly; only the skin changes. Chat uses semantic tokens only, so it follows the Slate token change automatically. The Oblivion signature (horizon line, ring glyphs, pathway) is applied later, only after it is approved.
