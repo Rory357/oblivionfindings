@@ -72,7 +72,6 @@ function HandoverCard({
     onActions: (e: ReactMouseEvent<HTMLElement>, h: Handover) => void;
 } & CardHandlers) {
     const counts = cardCounts(h);
-    const attn = h.status === 'submitted';
     const outRole = humanizeRole(h.outgoing_staff?.role);
     const incRole = humanizeRole(h.incoming_staff?.role);
 
@@ -90,7 +89,6 @@ function HandoverCard({
             }}
             className={cn(
                 'group cursor-pointer rounded-[14px] border border-border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_12px_30px_-16px_rgba(20,12,40,0.22)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-[18px]',
-                attn && 'border-l-[3px] border-l-status-warning',
             )}
         >
             {/* Flow header */}

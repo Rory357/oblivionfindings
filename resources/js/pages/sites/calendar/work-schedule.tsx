@@ -94,7 +94,7 @@ export function CalendarWorkRows({
                             className={cn(
                                 'px-4 py-4',
                                 nextKey === entry.key &&
-                                    'border-l-2 border-l-primary bg-primary/5',
+                                    'bg-primary/5',
                             )}
                             data-work-key={entry.key}
                             onContextMenu={(event) => {

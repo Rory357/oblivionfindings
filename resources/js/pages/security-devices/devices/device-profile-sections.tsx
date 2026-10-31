@@ -1220,7 +1220,7 @@ function DeviceManagementWorkspace({
                                         'mismatch',
                                     ].includes(command.status)) && (
                                     <>
-                                        <div className="mt-3 rounded-lg border-l-4 border-l-primary bg-muted/30 p-3 text-sm">
+                                        <div className="mt-3 rounded-lg bg-muted/30 p-3 text-sm">
                                             <span className="font-medium">
                                                 Next action:
                                             </span>{' '}

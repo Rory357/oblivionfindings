@@ -66,7 +66,9 @@ calendar · map · board · settings card · form · note (a box) · builder · 
 2. No tile per number. Numbers that belong together share one line; a zero is a sentence.
 3. People are never numbers. Name them where the work is, with their presence ring.
 4. Progress closes the ring, steps are the Journey line, and every chart makes one point.
-5. No coloured side borders. A surface that matters carries the horizon line on its top edge.
+5. No coloured lines on any edge of a box — top, side or bottom — on cards, surfaces, strips, panels and pop-ups
+   (hard rule, Stephan 31 Oct 2026: "it is obvious a AI thing"; DESIGN.md non-negotiable 8). A surface that matters
+   says so with its title, a badge or a ring, never with a coloured edge.
 6. Icons tell kinds apart; rings tell state. No icon on a row just because there is room.
 7. A card tells its thing's own story (a person's day, a house's beds), not a template of icon, title and pills.
 8. A small empty is one quiet line. The islands are only for whole empty pages, first run and success.

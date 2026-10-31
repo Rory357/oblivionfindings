@@ -1,7 +1,7 @@
 /**
  * Signature page blocks — the body parts of the approved Health & safety drawings (Stephan, 23 Oct 2026, design
- * viewer v35). Each block answers one question in Oblivion's own shapes: the surface with its horizon line, the
- * ring (state and progress) and the Journey line. Styles: resources/css/signature-blocks.css.
+ * viewer v35). Each block answers one question in Oblivion's own shapes: the plain surface (no coloured line on any
+ * edge, DESIGN.md non-negotiable 8), the ring (state and progress) and the Journey line. Styles: resources/css/signature-blocks.css.
  *
  * The props mirror the drawing blocks, so a page port reads straight from its drawing. Colour is never the only
  * signal: every ring sits beside words, and rings carry a screen-reader state.
@@ -96,14 +96,14 @@ export interface SurfaceProps {
     title?: string;
     sub?: ReactNode;
     action?: SgAction | null;
-    /** The horizon line takes a status tone when the block carries one. */
+    /** A status tone colours the block's ring and kicker (never a line on its edge). */
     tone?: SgStatusTone | null;
     className?: string;
     children?: ReactNode;
     'aria-label'?: string;
 }
 
-/** A card with the horizon line on its top edge and an optional head (title · sub · action). */
+/** A plain card with an optional head (title · sub · action). No coloured line on any edge (DESIGN.md non-negotiable 8). */
 export function Surface({ title, sub, action, tone, className, children, ...rest }: SurfaceProps) {
     return (
         <section

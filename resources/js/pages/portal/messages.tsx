@@ -1244,7 +1244,7 @@ export default function PortalMessages({
 
                                 {/* Reply preview */}
                                 {replyingTo && (
-                                    <div className="flex items-center gap-2 border-t border-l-4 border-l-primary bg-primary/5 px-4 py-2">
+                                    <div className="flex items-center gap-2 border-t bg-primary/5 px-4 py-2">
                                         <div className="min-w-0 flex-1">
                                             <p className="text-[10px] font-semibold text-primary">
                                                 Replying to{' '}

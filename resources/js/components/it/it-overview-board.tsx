@@ -307,8 +307,6 @@ export function ItOverviewBoard({
                 <Card
                     className={cn(
                         'min-w-0 gap-4 p-5',
-                        response?.sla.clocks.first_response.state ===
-                            'breached' && 'border-l-4 border-l-status-critical',
                     )}
                 >
                     <div className="flex flex-wrap items-center gap-2">

@@ -169,6 +169,9 @@ export default [
                     'no-oblivion-fallback': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-edge-accent-line': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
@@ -195,6 +198,18 @@ export default [
                         "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/])",
                     message:
                         'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white / bg-primary-foreground, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. On a hero, use PageHeaderPrimaryButton (white primary) or PageHeaderGlassButton (glass secondary). See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                },
+            ],
+            // DESIGN.md non-negotiable 8 (Stephan, 31 Oct 2026: "never look like this it is obvious a AI thing"):
+            // no coloured line on any edge of a box. Matches one class string that pairs a thick edge width
+            // (border-t/l/r/b-2|3|4|8|[Npx]) with a coloured edge (border-t/l/r/b-primary|status-*|category-*|…).
+            'design/no-edge-accent-line': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/^(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:2|3|4|8|\\[\\d+px\\])(?=\\s|$))(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:primary|status-|category-|destructive|chart-|live|accent))/], TemplateElement[value.raw=/^(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:2|3|4|8|\\[\\d+px\\])(?=\\s|$))(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:primary|status-|category-|destructive|chart-|live|accent))/])',
+                    message:
+                        'No coloured line on any edge of a card, surface, strip, panel or pop-up (DESIGN.md non-negotiable 8 and the anti-pattern "Coloured edge lines"). Keep the neutral border; say what the box means with its title, a StatusBadge, a ring or an icon.',
                 },
             ],
         },

@@ -930,7 +930,7 @@ export function FleetMap({
                                         event.clientY,
                                     );
                                 }}
-                                className={`flex items-center gap-2 border-b p-2 ${focusId === vehicle.id ? 'border-l-[3px] border-l-primary bg-accent' : ''}`}
+                                className={`flex items-center gap-2 border-b p-2 ${focusId === vehicle.id ? 'bg-accent' : ''}`}
                             >
                                 <Checkbox
                                     checked={selected.has(vehicle.id)}

@@ -219,7 +219,7 @@ export function OpenShiftsPane({
                 {shifts.map((sh) => (
                     <article
                         key={sh.id}
-                        className="rounded-[14px] border border-l-4 border-border border-l-status-warning bg-card p-4"
+                        className="rounded-[14px] border border-border bg-card p-4"
                     >
                         <div className="grid items-center gap-4 md:grid-cols-[130px_1fr_auto_auto]">
                             <div>

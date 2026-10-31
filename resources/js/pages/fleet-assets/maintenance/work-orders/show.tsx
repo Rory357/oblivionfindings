@@ -504,7 +504,7 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
                 </div>
 
                 <div className={activeTab === 'detail' ? 'space-y-5' : 'contents'}>
-                    <Card className={activeTab === 'detail' ? 'work-next-action border-t-[3px] border-t-primary' : 'hidden'}><CardHeader><CardTitle><Clock className="size-4" />Next action</CardTitle></CardHeader><CardContent className="space-y-3">
+                    <Card className={activeTab === 'detail' ? 'work-next-action' : 'hidden'}><CardHeader><CardTitle><Clock className="size-4" />Next action</CardTitle></CardHeader><CardContent className="space-y-3">
                         <p className="text-base font-semibold">{work.next_action || 'Assessment and a next action are needed.'}</p>
                         <p className="text-sm text-muted-foreground">{work.assigned_to?.name ?? 'Site Coordinator'} · {work.due_at ? formatDateTime(work.due_at) : 'Target not set'} · Pacific/Auckland</p>
                         {can.manage && !['completed', 'cancelled'].includes(work.status) && <Button variant="outline" className="w-full" onClick={() => { setTriageStep(0); { setErrors({}); setTriageOpen(true); } }}>

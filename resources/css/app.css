@@ -1909,35 +1909,10 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     color: var(--status-warning);
     background: var(--status-warning-bg);
 }
-/* No `position` here: this rule is outside Tailwind's layers, so it would
-   beat the dialog's `fixed` and drop the pop-up to the foot of the page.
-   Every frame that uses it is already fixed, sticky or `relative`. */
-.popup-horizon::after {
-    content: '';
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 2px;
-    pointer-events: none;
-    z-index: 4;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        color-mix(
-                in oklch,
-                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
-                transparent
-            )
-            20%,
-        var(--primary) 50%,
-        color-mix(
-                in oklch,
-                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
-                transparent
-            )
-            80%,
-        transparent 100%
-    );
-}
+/* `.popup-horizon` no longer draws anything: pop-ups and cards carry no
+   coloured line on their top edge (Stephan, 31 Oct 2026: "it is obvious a AI
+   thing"; DESIGN.md non-negotiable 8). The class stays on the frames so
+   nothing else about them changes. */
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Control Room's own marks (Stephan, 24 Oct 2026: "light board + Oblivion
