@@ -195,6 +195,7 @@ final class HealthSafetyReadContext
                     // The proven sets' response barrier (speed option B): prove once more before anything leaves.
                     app(HsEventAccessService::class)->recheckProvenSourceEventIds($context);
                     app(\App\Services\Incidents\IncidentHsEventSourceReadService::class)->recheckProvenIncidentIds($reads);
+                    app(InjurySourceProjectionService::class)->recheckProvenMetricIds($context);
                 }
 
                 return $result;
