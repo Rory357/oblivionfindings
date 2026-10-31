@@ -435,7 +435,7 @@ export default function HealthSafetyDashboard({
                                             queue={queue}
                                             lists={visible(lists)}
                                             link={destination}
-                                            title={header_box_set === 'queue' && filters.lens === 'governance' ? 'Your queue' : 'Your sites'}
+                                            title="Your queue"
                                         />
                                     )}
                                 </DeferredPanel>
