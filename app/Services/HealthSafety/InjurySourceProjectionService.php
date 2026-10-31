@@ -40,61 +40,171 @@ final class InjurySourceProjectionService
                 if ($purpose === 'medical_recordability' && ! $medical) {
                     return $consume(null, ['access' => 'restricted', 'source_scope' => 'readable_subset', 'source_completeness' => 'unknown', 'attribution_state' => 'unavailable']);
                 }
-                $query = (clone $candidates)->setEagerLoads([])->whereIn('site_id', $sites);
-                $query = $this->metricAuthority($query, $context, $current, $reads, $sites);
-                $discovery = (clone $query)->reorder()->when(true, QueryPaging::clear(...))->select(InjuryAccessService::FACTUAL_COLUMNS);
-                $discovery = $materialisation->protect($this->metricLifetime($discovery, $reads));
-                $roots = $discovery->get();
-                $parents = ($this->metricParents ??= new \WeakMap)[$context] ?? [];
-                $branches = []; $states = []; $repair = false;
-                foreach ($roots as $root) {
-                    if (! isset($parents[$root->id])) {
-                        $proof = $this->access->factualSourceProof($root, $current, $reads, $sites);
-                        $states[] = $proof['attribution_state'];
-                        if ($proof['attribution_state'] === 'repair_required') {
-                            $parents[$root->id] = ['query' => null, 'state' => 'repair_required'];
-                            $repair = true; continue;
-                        }
-                        $guard = WorkplaceInjury::query()->whereKey($root->id);
-                        $this->metricExact($guard, $root->getRawOriginal(), 'workplace_injuries');
-                        if ($proof['attribution_state'] === 'recorded') {
-                            $version = $reads->query(DB::table('workplace_injury_source_versions')->where('id', $proof['source_version_id']))
-                                ->first(['id', 'workplace_injury_id', 'aggregate_revision', 'source_schema_version', 'worker_id', 'site_id', 'factual_content', 'factual_digest']);
-                            if (! $version) { throw new LogicException('Original injury factual version disappeared.'); }
-                            $guard->whereExists($this->metricExact(DB::table('workplace_injury_source_versions')->where('id', $version->id), (array) $version)->selectRaw('1'))
-                                ->whereNotExists(DB::table('workplace_injury_source_versions')->where('workplace_injury_id', $root->id)->where('aggregate_revision', '>', $proof['source_revision'])->selectRaw('1'));
-                        } else {
-                            $guard->whereNotExists(DB::table('workplace_injury_source_versions')->where('workplace_injury_id', $root->id)
-                                ->where(fn ($version) => $version->where('source_schema_version', '<>', 0)->orWhere('aggregate_revision', '<>', 0)
-                                    ->orWhereNotNull('factual_content')->orWhereNotNull('factual_digest'))->selectRaw('1'));
-                        }
-                        $parents[$root->id] = ['query' => $this->metricLifetime($guard, $reads), 'state' => $proof['attribution_state']];
-                    } else { $states[] = $parents[$root->id]['state']; }
-                    if ($parents[$root->id]['state'] === 'repair_required') { $repair = true; continue; }
-                    $branches[] = clone $parents[$root->id]['query'];
+                // Page-wide reads (Overview, Analytics) prove the injury set once (speed R3b; see provenMetricSet()).
+                // A caller that removed a model scope (e.g. trashed rows) reaches outside that set, so it keeps the full proof.
+                if ($context->provesPageWide() && $candidates->removedScopes() === []) {
+                    return $this->consumeProvenMetric($context, $candidates, $consume, $materialisation, $current, $reads, $sites);
                 }
-                $this->metricParents[$context] = $parents;
-                $query->where(function (Builder $allowed) use ($branches): void {
-                    if ($branches === []) { $allowed->whereRaw('1 = 0'); return; }
-                    foreach ($branches as $branch) { $allowed->orWhereIn('workplace_injuries.id', (clone $branch)->select('workplace_injuries.id')); }
-                });
-                foreach ([$discovery, ...$branches] as $branch) {
-                    $query->whereRaw(new class(clone $branch) extends Expression {
-                        public function __construct(private readonly Builder $original) { parent::__construct('1 = 1'); }
-                        public function getValue(Grammar $grammar) { (clone $this->original)->toSql(); return parent::getValue($grammar); }
-                    });
-                }
-                $states = array_values(array_unique($states));
-                $query = $materialisation->protect($this->metricLifetime($query, $reads));
-                abort_unless((clone $query)->count() === count($branches), 404, 'Original injury metric source changed before materialisation.');
-                $result = $consume($query, [
-                    'access' => $repair ? 'repair_required' : 'readable', 'source_scope' => 'readable_subset', 'source_completeness' => 'unknown',
-                    'attribution_state' => count($states) === 1 ? $states[0] : ($states === [] ? 'unavailable' : 'mixed'),
-                ]);
-                abort_unless((clone $query)->count() === count($branches), 404, 'Original injury metric source changed during materialisation.');
+                [$query, $state, $expected] = $this->embeddedMetric($context, $candidates, $materialisation, $current, $reads, $sites);
+                abort_unless((clone $query)->count() === $expected, 404, 'Original injury metric source changed before materialisation.');
+                $result = $consume($query, $state);
+                abort_unless((clone $query)->count() === $expected, 404, 'Original injury metric source changed during materialisation.');
                 return $result;
             });
         });
+    }
+
+    /** @var \WeakMap<HealthSafetyReadContext, array<int, array{admitted: list<int>, states: array<int, string>}>>|null */
+    private static ?\WeakMap $provenMetricSets = null;
+
+    /** @var \WeakMap<HealthSafetyReadContext, array<int, array{0: User, 1: list<int>, 2: self}>>|null viewer, Sites and the
+     * proving instance (its per-read proofs and authority snapshot) for each set */
+    private static ?\WeakMap $provenMetricViewers = null;
+
+    /**
+     * Speed R3b (MASTER for Stephan, 31 Oct 2026; the approved speed option B rule, as for incidents and H&S events):
+     * inside ONE page-wide read, the injury ids the full unchanged embedded proof admits, over every injury at the
+     * viewer's Sites, are proven once. Each monthly metric in that read is then "its own filters AND id IN that set",
+     * and its coverage state comes from the same per-injury proofs. The embedded proof decides each injury on its own
+     * facts, so the rows are the same (PROOF_PARITY compares both, metric by metric). The set lives only in this read
+     * (one request, one transaction, one viewer): never cached across requests, stored or given to another user.
+     * Before the response leaves, recheckProvenMetricIds() runs the full embedded proof once more and withholds the
+     * whole response (404) if anything it was proven on has changed.
+     *
+     * @return array{admitted: list<int>, states: array<int, string>}
+     */
+    private function provenMetricSet(HealthSafetyReadContext $context, User $current, CurrentAuthorizationReads $reads, array $sites): array
+    {
+        $context->assertViewer($current);
+        self::$provenMetricSets ??= new \WeakMap;
+        $known = self::$provenMetricSets[$context] ?? [];
+        if (! array_key_exists((int) $current->id, $known)) {
+            $known[(int) $current->id] = $this->proveMetricSet($context, $current, $reads, $sites);
+            self::$provenMetricSets[$context] = $known;
+            self::$provenMetricViewers ??= new \WeakMap;
+            self::$provenMetricViewers[$context] = [...(self::$provenMetricViewers[$context] ?? []), (int) $current->id => [$current, array_values($sites), $this]];
+        }
+
+        return $known[(int) $current->id];
+    }
+
+    /** The full embedded proof over every injury at the viewer's Sites, with the same count check as each metric. */
+    private function proveMetricSet(HealthSafetyReadContext $context, User $current, CurrentAuthorizationReads $reads, array $sites): array
+    {
+        [$query, , $expected, $states] = $this->embeddedMetric($context, WorkplaceInjury::query(), null, $current, $reads, $sites);
+        $admitted = $query->reorder()->pluck('workplace_injuries.id')->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+        abort_unless(count($admitted) === $expected, 404, 'Original injury metric source changed before materialisation.');
+        ksort($states);
+
+        return ['admitted' => $admitted, 'states' => $states];
+    }
+
+    /** Response barrier for the proven injury sets (called with the other proven sets in HealthSafetyReadContext::within).
+     * It re-proves through the instance that proved the set, so the same original authority snapshot is compared. */
+    public function recheckProvenMetricIds(HealthSafetyReadContext $context): void
+    {
+        foreach (self::$provenMetricViewers[$context] ?? [] as $id => [$current, $sites, $prover]) {
+            $proven = self::$provenMetricSets[$context][$id] ?? null;
+            if ($proven === null) { continue; }
+            $changed = $context->consumeSourceViewer([], fn ($actor, CurrentAuthorizationReads $reads): bool => $prover->proveMetricSet($context, $current, $reads, $sites) !== $proven);
+            if ($changed) {
+                throw new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+            }
+        }
+    }
+
+    /** One metric inside a page-wide read: its own filters AND id IN the proven set (see provenMetricSet()). */
+    private function consumeProvenMetric(HealthSafetyReadContext $context, Builder $candidates, callable $consume, HealthSafetyReadMaterialisationProof $materialisation, User $current, CurrentAuthorizationReads $reads, array $sites): mixed
+    {
+        $proven = $this->provenMetricSet($context, $current, $reads, $sites);
+        $base = (clone $candidates)->setEagerLoads([])->whereIn('site_id', $sites);
+        // This metric's own injuries among those the proof discovered: their states give the coverage, as before.
+        $roots = (clone $base)->reorder()->when(true, QueryPaging::clear(...))->select('workplace_injuries.id')
+            ->whereIn('workplace_injuries.id', array_keys($proven['states']));
+        $roots = $materialisation->protect($this->metricLifetime($roots, $reads))->pluck('workplace_injuries.id');
+        $states = []; $repair = false;
+        foreach ($roots as $id) {
+            $state = $proven['states'][(int) $id] ?? throw new LogicException('Injury metric found an injury outside its proven set.');
+            $states[] = $state;
+            if ($state === 'repair_required') { $repair = true; }
+        }
+        $states = array_values(array_unique($states));
+        $state = ['access' => $repair ? 'repair_required' : 'readable', 'source_scope' => 'readable_subset', 'source_completeness' => 'unknown',
+            'attribution_state' => count($states) === 1 ? $states[0] : ($states === [] ? 'unavailable' : 'mixed')];
+        $original = \App\Support\HealthSafety\ProofParity::$enabled ? clone $candidates : null;
+        $query = $materialisation->protect($this->metricLifetime((clone $base)->whereIn('workplace_injuries.id', $proven['admitted']), $reads));
+        if ($original !== null) {
+            [$embedded, $embeddedState] = $this->embeddedMetric($context, $original, null, $current, $reads, $sites);
+            \App\Support\HealthSafety\ProofParity::assertSameRows($query, $embedded, 'workplace_injuries.id', 'Injury metric source scope');
+            if ($embeddedState !== $state) {
+                throw new LogicException('Injury metric coverage: proven set gives '.json_encode($state).' but the embedded proof gives '.json_encode($embeddedState).'.');
+            }
+        }
+
+        return $consume($query, $state);
+    }
+
+    /**
+     * The embedded proof for one metric: every admitted injury's own exact guard in the query.
+     *
+     * @return array{0: Builder, 1: array<string, string>, 2: int, 3: array<int, string>} query, coverage state,
+     *         admitted count, and the proof state of every injury it discovered
+     */
+    private function embeddedMetric(HealthSafetyReadContext $context, Builder $candidates, ?HealthSafetyReadMaterialisationProof $materialisation, User $current, CurrentAuthorizationReads $reads, array $sites): array
+    {
+        $protect = fn (Builder $query): Builder => $materialisation === null ? $query : $materialisation->protect($query);
+        $query = (clone $candidates)->setEagerLoads([])->whereIn('site_id', $sites);
+        $query = $this->metricAuthority($query, $context, $current, $reads, $sites);
+        $discovery = (clone $query)->reorder()->when(true, QueryPaging::clear(...))->select(InjuryAccessService::FACTUAL_COLUMNS);
+        $discovery = $protect($this->metricLifetime($discovery, $reads));
+        $roots = $discovery->get();
+        $parents = ($this->metricParents ??= new \WeakMap)[$context] ?? [];
+        $branches = []; $states = []; $repair = false; $rootStates = [];
+        foreach ($roots as $root) {
+            if (! isset($parents[$root->id])) {
+                $proof = $this->access->factualSourceProof($root, $current, $reads, $sites);
+                $states[] = $proof['attribution_state'];
+                if ($proof['attribution_state'] === 'repair_required') {
+                    $parents[$root->id] = ['query' => null, 'state' => 'repair_required'];
+                    $rootStates[(int) $root->id] = 'repair_required';
+                    $repair = true; continue;
+                }
+                $guard = WorkplaceInjury::query()->whereKey($root->id);
+                $this->metricExact($guard, $root->getRawOriginal(), 'workplace_injuries');
+                if ($proof['attribution_state'] === 'recorded') {
+                    $version = $reads->query(DB::table('workplace_injury_source_versions')->where('id', $proof['source_version_id']))
+                        ->first(['id', 'workplace_injury_id', 'aggregate_revision', 'source_schema_version', 'worker_id', 'site_id', 'factual_content', 'factual_digest']);
+                    if (! $version) { throw new LogicException('Original injury factual version disappeared.'); }
+                    $guard->whereExists($this->metricExact(DB::table('workplace_injury_source_versions')->where('id', $version->id), (array) $version)->selectRaw('1'))
+                        ->whereNotExists(DB::table('workplace_injury_source_versions')->where('workplace_injury_id', $root->id)->where('aggregate_revision', '>', $proof['source_revision'])->selectRaw('1'));
+                } else {
+                    $guard->whereNotExists(DB::table('workplace_injury_source_versions')->where('workplace_injury_id', $root->id)
+                        ->where(fn ($version) => $version->where('source_schema_version', '<>', 0)->orWhere('aggregate_revision', '<>', 0)
+                            ->orWhereNotNull('factual_content')->orWhereNotNull('factual_digest'))->selectRaw('1'));
+                }
+                $parents[$root->id] = ['query' => $this->metricLifetime($guard, $reads), 'state' => $proof['attribution_state']];
+            } else { $states[] = $parents[$root->id]['state']; }
+            $rootStates[(int) $root->id] = $parents[$root->id]['state'];
+            if ($parents[$root->id]['state'] === 'repair_required') { $repair = true; continue; }
+            $branches[] = clone $parents[$root->id]['query'];
+        }
+        $this->metricParents[$context] = $parents;
+        $query->where(function (Builder $allowed) use ($branches): void {
+            if ($branches === []) { $allowed->whereRaw('1 = 0'); return; }
+            foreach ($branches as $branch) { $allowed->orWhereIn('workplace_injuries.id', (clone $branch)->select('workplace_injuries.id')); }
+        });
+        foreach ([$discovery, ...$branches] as $branch) {
+            $query->whereRaw(new class(clone $branch) extends Expression {
+                public function __construct(private readonly Builder $original) { parent::__construct('1 = 1'); }
+                public function getValue(Grammar $grammar) { (clone $this->original)->toSql(); return parent::getValue($grammar); }
+            });
+        }
+        $states = array_values(array_unique($states));
+        $query = $protect($this->metricLifetime($query, $reads));
+        return [$query, [
+            'access' => $repair ? 'repair_required' : 'readable', 'source_scope' => 'readable_subset', 'source_completeness' => 'unknown',
+            'attribution_state' => count($states) === 1 ? $states[0] : ($states === [] ? 'unavailable' : 'mixed'),
+        ], count($branches), $rootStates];
     }
 
     private function metricLifetime(Builder $query, CurrentAuthorizationReads $reads): Builder

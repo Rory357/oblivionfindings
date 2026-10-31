@@ -276,7 +276,54 @@ final class IncidentIndependenceIntakeService
      * incident's Site boundary and every independence rule here, but not the HR-confidential content rule, so the
      * H&S event of a confidential incident still shows to H&S at that Site. Its content keeps the full rule.
      */
-    public function applySourceScopeInReads(Builder $query, User $current, CurrentAuthorizationReads $reads, string $purpose = 'read', bool $siteBoundaryOnly = false): Builder
+    /** @var \WeakMap<CurrentAuthorizationReads, array<string, array<int, ClientIncident|null>>>|null scope key => root id => identity row (null: not in scope) */
+    private static ?\WeakMap $rootIdentities = null;
+
+    /**
+     * Speed R3b (MASTER for Stephan, 31 Oct 2026): a page that scopes many incidents one by one read each one's identity
+     * row (root columns + binding fingerprint) in its own query, ~450 per Overview. Here the SAME identity query runs
+     * once for a batch: the caller's canonical access query for `id IN (batch)` instead of `id = X`, then the same Site
+     * scope, columns and fingerprint. Every condition is decided row by row, so each root's row is exactly what its own
+     * query returns in this read (and a root missing from the batch result is one its own query would not return).
+     * applySourceScopeInReads() then uses the stored row for a root it is told was prefetched under the same $key;
+     * everything after the identity read (evidence proof, binding graph, admitted guards) is unchanged.
+     * PROOF_PARITY also runs the root's own query and compares the raw rows.
+     *
+     * @param  Builder  $batch  the caller's access query for the batch (same construction as for one root)
+     * @param  list<int>  $ids
+     */
+    public function prefetchSourceIdentitiesInReads(Builder $batch, array $ids, User $current, CurrentAuthorizationReads $reads, string $key, bool $siteBoundaryOnly = false): void
+    {
+        $reads->assertActive();
+        self::$rootIdentities ??= new \WeakMap;
+        $known = self::$rootIdentities[$reads] ?? [];
+        $ids = array_values(array_diff(array_unique(array_map('intval', $ids)), array_keys($known[$key] ?? [])));
+        if ($ids === []) { return; }
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $rows = $reads->query($this->identityQuery((clone $batch)->whereIn('client_incidents.id', $chunk), $current, $reads, $siteBoundaryOnly)[1])->get()->keyBy('id');
+            foreach ($chunk as $id) { $known[$key][$id] = $rows->get($id); }
+        }
+        self::$rootIdentities[$reads] = $known;
+        $this->prefetchEvidenceInReads(array_keys(array_filter($known[$key])), $reads);
+    }
+
+    /** The Site-scoped source query and its identity read (root columns + binding fingerprint, no paging or order). */
+    private function identityQuery(Builder $query, User $current, CurrentAuthorizationReads $reads, bool $siteBoundaryOnly): array
+    {
+        $access = app(IncidentAccessService::class);
+        $query = $siteBoundaryOnly ? $access->applySiteBoundary($query, $current, $reads) : $access->applySiteScope($query, $current, $reads);
+        $identities = (clone $query)->withoutEagerLoads()->reorder();
+        $identities->getQuery()->limit = null; $identities->getQuery()->offset = null;
+        $identities->select(array_map(fn ($column) => 'client_incidents.'.$column, self::ROOT_COLUMNS))
+            ->selectRaw(IncidentIndependenceBindingSql::fingerprint('root', 'client_incidents').' AS independence_binding');
+
+        return [$query, $identities];
+    }
+
+    /** @param  array{0: string, 1: int|list<int>}|null  $prefetched  [scope key, root id or ids] when $query is the access
+     *         query for exactly that root (`whereKey`) or those roots (`whereIn`), built the same way as the batch given
+     *         to prefetchSourceIdentitiesInReads() */
+    public function applySourceScopeInReads(Builder $query, User $current, CurrentAuthorizationReads $reads, string $purpose = 'read', bool $siteBoundaryOnly = false, ?array $prefetched = null): Builder
     {
         $reads->assertActive();
         if (! $query->getModel() instanceof ClientIncident || $query->getQuery()->from !== 'client_incidents'
@@ -284,14 +331,21 @@ final class IncidentIndependenceIntakeService
             || ! in_array($purpose, ['read', 'notification', 'assignment'], true)) {
             throw new LogicException('Independent-handling scope requires the canonical incident source and supported purpose.');
         }
-        $access = app(IncidentAccessService::class);
-        $query = $siteBoundaryOnly ? $access->applySiteBoundary($query, $current, $reads) : $access->applySiteScope($query, $current, $reads);
-        $identities = (clone $query)->withoutEagerLoads()->reorder();
-        $identities->getQuery()->limit = null; $identities->getQuery()->offset = null;
-        $identities->select(array_map(fn ($column) => 'client_incidents.'.$column, self::ROOT_COLUMNS))
-            ->selectRaw(IncidentIndependenceBindingSql::fingerprint('root', 'client_incidents').' AS independence_binding');
+        [$query, $identities] = $this->identityQuery($query, $current, $reads, $siteBoundaryOnly);
         $admitted = [];
-        $roots = $reads->query($identities)->get();
+        $stored = $prefetched === null ? [] : (self::$rootIdentities[$reads] ?? [])[$prefetched[0]] ?? [];
+        $wanted = $prefetched === null ? [] : array_map('intval', (array) $prefetched[1]);
+        if ($wanted !== [] && array_diff($wanted, array_keys($stored)) === []) {
+            $roots = collect(array_values(array_filter(array_map(fn (int $id) => $stored[$id], $wanted))))->sortBy('id')->values();
+            if (\App\Support\HealthSafety\ProofParity::$enabled) {
+                $own = $reads->query(clone $identities)->get()->sortBy('id')->values()->map(fn (ClientIncident $row) => $row->getRawOriginal())->all();
+                if ($own !== $roots->map(fn (ClientIncident $row) => $row->getRawOriginal())->all()) {
+                    throw new LogicException('Incident identity: the batched rows for ['.implode(',', $wanted).'] differ from their own query.');
+                }
+            }
+        } else {
+            $roots = $reads->query($identities)->get();
+        }
         $this->prefetchEvidenceInReads($roots->pluck('id'), $reads);
         foreach ($roots as $root) {
             try {
