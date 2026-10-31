@@ -15,8 +15,11 @@ use Illuminate\Support\Str;
 
 /**
  * Ends the Chat footprint of someone whose employment or approved care
- * relationship has ended. Only memberships the person can no longer use are
- * removed; messages, call metadata, care records and investigation evidence
+ * relationship has ended. Only memberships the person can no longer use end.
+ * A private staff chat keeps the membership, marked as left, so the leaver's
+ * name stays and a re-hire gets the chat back without the messages from while
+ * they were away (ChatMembershipGaps; Stephan, 31 Oct 2026); other memberships
+ * are removed. Messages, call metadata, care records and investigation evidence
  * are never deleted. Owned groups pass to a remaining eligible member, and
  * unresolved callbacks and family work pass to a chosen authorised lead or
  * back to the shared care-team queue. Current access is never removed here:
@@ -28,6 +31,7 @@ final class ChatOffboarding
         private readonly ChatAccess $access,
         private readonly ChatCallbacks $callbacks,
         private readonly OpsMessageVisibilityService $staff,
+        private readonly ChatMembershipGaps $gaps,
     ) {}
 
     public function authorize(?User $actor): void
@@ -104,9 +108,14 @@ final class ChatOffboarding
                     }
                 }
                 $affected = $affected->merge($conversation->participants()->pluck('user_id'));
-                OpsConversationParticipant::whereKey($row->id)->delete();
-                DB::table('chat_invitations')->where('conversation_id', $conversation->id)->where('user_id', $person->id)->where('status', 'accepted')
-                    ->update(['status' => 'removed', 'updated_at' => now()]);
+                if ($this->keepsMembership($row)) {
+                    // A re-hire comes back as a member, never as the group's owner.
+                    OpsConversationParticipant::whereKey($row->id)->where('role', 'admin')->update(['role' => 'member']);
+                } else {
+                    OpsConversationParticipant::whereKey($row->id)->delete();
+                    DB::table('chat_invitations')->where('conversation_id', $conversation->id)->where('user_id', $person->id)->where('status', 'accepted')
+                        ->update(['status' => 'removed', 'updated_at' => now()]);
+                }
                 DB::table('chat_invitations')->where('conversation_id', $conversation->id)->where('status', 'pending')
                     ->where(fn ($query) => $query->where('invited_by', $person->id)->orWhere('user_id', $person->id))
                     ->update(['status' => 'cancelled', 'updated_at' => now()]);
@@ -147,6 +156,8 @@ final class ChatOffboarding
                 app(ChatRealtime::class)->queueConversation($conversation->id);
             }
 
+            // Marks the kept memberships as left, unless the hourly check already has.
+            $this->gaps->sync([$person->id]);
             foreach ($affected->unique() as $id) {
                 Cache::forget("user:{$id}:ops-unread:v1");
             }
@@ -163,7 +174,10 @@ final class ChatOffboarding
     {
         $current = $this->staff->isCurrentStaff($person);
         $rows = OpsConversationParticipant::where('user_id', $person->id)->with('conversation.client')->get()->filter(fn ($row) => $row->conversation);
-        $expired = $rows->filter(fn ($row) => ! $this->stillAuthorised($person, $row->conversation, $current))->values();
+        $expired = $rows->filter(fn ($row) => ! $this->stillAuthorised($person, $row->conversation, $current));
+        // A kept membership already marked as left needs nothing more once it owns no group.
+        $left = DB::table('chat_membership_gaps')->whereIn('participant_id', $expired->pluck('id'))->whereNull('returned_at')->pluck('participant_id')->flip();
+        $expired = $expired->reject(fn ($row) => $this->keepsMembership($row) && $left->has($row->id) && ! $this->ownsGroup($row))->values();
 
         return [
             'current_staff' => $current,
@@ -184,6 +198,12 @@ final class ChatOffboarding
         return $currentStaff;
     }
 
+    /** Private staff chats keep a leaver's membership; family and client conversations don't. */
+    private function keepsMembership(OpsConversationParticipant $row): bool
+    {
+        return in_array($row->conversation->conversation_type, ['direct', 'group'], true) && ! $row->conversation->client_id;
+    }
+
     private function ownsGroup(OpsConversationParticipant $row): bool
     {
         return $row->role === 'admin' && $row->conversation->conversation_type === 'group' && ! $row->conversation->client_id;
@@ -191,8 +211,9 @@ final class ChatOffboarding
 
     /**
      * The longest-standing remaining member who is current staff with access to
-     * the channel's site. Full allows() is not used here: while the leaver's row
-     * still exists, the staff-audience check would fail for everyone.
+     * the channel's site. Full allows() is not used here: while the row of a
+     * leaver who is now a client or family sign-in still exists, the staff
+     * conversation check fails for everyone.
      */
     private function nextOwner(OpsConversation $conversation, User $leaving): ?User
     {

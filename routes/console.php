@@ -85,6 +85,7 @@ use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\SyncWorkCalendarsJob;
 use App\Jobs\System\RecordDefaultWorkerHeartbeatJob;
 use App\Models\MedicationIdempotencyResult;
+use App\Services\Chat\SelfHostedCalling;
 use App\Services\Eligibility\WorkforceEligibilityRefresh;
 use App\Services\Fleet\FinanceReviewNotices;
 use App\Services\Medication\PharmacyConnect\PharmacyDispatchService;
@@ -1080,10 +1081,12 @@ app(Schedule::class)->command('referrals:prune-intake-drafts')->dailyAt('02:20')
 // Chat's 10-second sweeps start only when they have work: the call sweep needs a configured voice
 // server, and delivery needs shared Chat switched on. Otherwise they cost ~17,000 process starts a day.
 app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground()
-    ->when(fn (): bool => app(\App\Services\Chat\SelfHostedCalling::class)->configured());
+    ->when(fn (): bool => app(SelfHostedCalling::class)->configured());
 app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground()
     ->when(fn (): bool => (bool) config('chat.shared_experience'));
 app(Schedule::class)->command('chat:prune')->dailyAt('02:40')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+// Hourly, so a re-hire's gap closes soon after they're current again; until then new messages stay hidden from them too.
+app(Schedule::class)->command('chat:sync-membership-gaps')->hourlyAt(7)->withoutOverlapping()->onOneServer();
 
 // Procedure review assignment delivery is independent of reading or completing work.
 app(Schedule::class)->job(new RecoverProcedureReviewDeliveries)->everyMinute()->onOneServer()->withoutOverlapping();

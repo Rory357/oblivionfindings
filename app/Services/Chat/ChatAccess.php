@@ -21,6 +21,7 @@ final class ChatAccess
         private readonly OpsMessageVisibilityService $visibility,
         private readonly ClientFamilyCommunicationAccess $family,
         private readonly UserSiteAccessService $sites,
+        private readonly ChatMembershipGaps $gaps,
     ) {}
 
     public function allows(User $user, OpsConversation $conversation, bool $write = false): bool
@@ -138,7 +139,9 @@ final class ChatAccess
             ->when($member?->history_after_id !== null, fn (Builder $query) => $query->where(fn (Builder $history) => $history
                 ->where('ops_messages.id', '>', $member->history_after_id)
                 ->orWhereExists(fn ($grant) => $grant->selectRaw('1')->from('chat_history_grants')
-                    ->whereColumn('message_id', 'ops_messages.id')->where('participant_id', $member->id))));
+                    ->whereColumn('message_id', 'ops_messages.id')->where('participant_id', $member->id))))
+            // A re-hired member never sees what was sent while they were away.
+            ->when($member, fn (Builder $query) => $this->gaps->hide($query, (int) $member->id, (int) $viewer->id));
     }
 
     public function message(User $user, OpsMessage $message, bool $write = false): OpsConversation
@@ -166,6 +169,7 @@ final class ChatAccess
             ->where(fn ($history) => $history->whereNull('chat_search_members.history_after_id')
                 ->orWhereColumn('ops_messages.id', '>', 'chat_search_members.history_after_id')
                 ->orWhereExists(fn ($grants) => $grants->selectRaw('1')->from('chat_history_grants')
-                    ->whereColumn('message_id', 'ops_messages.id')->whereColumn('participant_id', 'chat_search_members.id')));
+                    ->whereColumn('message_id', 'ops_messages.id')->whereColumn('participant_id', 'chat_search_members.id')))
+            ->tap(fn ($query) => $this->gaps->hide($query, 'chat_search_members.id', (int) $viewer->id));
     }
 }
