@@ -307,6 +307,42 @@ class HsCorrectiveAction extends Model
             && $this->effectiveness_confirmed === true;
     }
 
+    /**
+     * Q11: reference numbers of a safety review's actions whose check said they didn't work and that no revised action
+     * has yet resolved. A failed action is resolved when one of its revisions was checked as working, or one of its
+     * revisions itself failed and was in turn resolved. Cycles can't be made through the service but are guarded.
+     *
+     * @return list<string>
+     */
+    public static function unresolvedFailedReferences(int $hsEventId): array
+    {
+        $actions = self::query()
+            ->where('hs_event_id', $hsEventId)
+            ->get(['id', 'reference_number', 'status', 'effectiveness_confirmed', 'replaces_action_id']);
+        $revisionsOf = $actions->groupBy(fn (self $action): int => (int) $action->replaces_action_id);
+
+        $resolved = function (self $failed, array $seen) use (&$resolved, $revisionsOf): bool {
+            if (isset($seen[$failed->id])) {
+                return false;
+            }
+            $seen[$failed->id] = true;
+            foreach ($revisionsOf->get($failed->id, collect()) as $revision) {
+                if ($revision->checkedEffective() || ($revision->checkedIneffective() && $resolved($revision, $seen))) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        return $actions
+            ->filter(fn (self $action): bool => $action->checkedIneffective() && ! $resolved($action, []))
+            ->sortBy('id')
+            ->map(fn (self $action): string => (string) ($action->reference_number ?: "action {$action->id}"))
+            ->values()
+            ->all();
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Reference number generation */
     /* ------------------------------------------------------------------ */
