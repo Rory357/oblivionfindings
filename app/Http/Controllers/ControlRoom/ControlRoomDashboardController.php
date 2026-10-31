@@ -31,6 +31,8 @@ class ControlRoomDashboardController extends Controller
         }
 
         return Inertia::render('control-room/index', [
+            // Live counts on the Live response tabs (same rules as each tab).
+            'tabCounts' => fn () => app(\App\Services\ControlRoom\LiveResponseTabCounts::class)->for($user),
             'detail' => fn () => $request->filled('alert')
                 ? app(AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
                 : null,

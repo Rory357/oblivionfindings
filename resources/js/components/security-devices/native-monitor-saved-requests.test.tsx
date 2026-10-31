@@ -25,7 +25,12 @@ vi.mock('@inertiajs/react', async () => {
             props: {
                 auth: {
                     user: { id: scope.actor },
-                    can: { 'securityDevices.monitoring.manage': scope.manage },
+                    can: {
+                        securityDevices: {
+                            viewAny: true,
+                            monitoringManage: scope.manage,
+                        },
+                    },
                 },
             },
         }),
@@ -116,7 +121,7 @@ describe('Saved native monitor requests under current authority', () => {
         });
         fireEvent.click(screen.getByText('Review', { exact: true }));
         fireEvent.click(
-            screen.getByRole('button', { name: 'Create direct monitor' }),
+            screen.getByRole('button', { name: 'Add direct monitor' }),
         );
         await screen.findByRole('button', { name: 'Check saved request' });
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));

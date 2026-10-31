@@ -173,7 +173,12 @@ export function ReassignDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Users className="h-5 w-5 text-primary" />
@@ -327,7 +332,7 @@ function CandidateRow({
                     : 'hover:border-border hover:bg-muted/60',
             )}
         >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-primary">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-fill/10 text-xs font-bold text-primary">
                 {initials(candidate.name)}
             </div>
             <div className="min-w-0 flex-1">
@@ -336,12 +341,12 @@ function CandidateRow({
                         {candidate.name}
                     </span>
                     {isCurrent ? (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
                             <UserCheck className="h-3 w-3" /> Current
                         </span>
                     ) : null}
                 </div>
-                <div className="truncate text-[11px] text-muted-foreground">
+                <div className="truncate text-xs text-muted-foreground">
                     {Math.round(candidate.weekly_hours)}h this week
                     {detail ? ` · ${detail}` : ''}
                 </div>

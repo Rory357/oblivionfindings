@@ -209,19 +209,32 @@ final class NativeMonitoringOperatorWorkflowTest extends TestCase
             'target' => '10.99.0.10',
         ])->assertUnprocessable()->assertJsonValidationErrors('target');
 
-        $collector = MonitoringCollector::factory()->create(['site_id' => $site->id]);
-        $remoteScope = DiscoveryScope::factory()->create([
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden Remote Collector Site']);
+        $hiddenCollector = MonitoringCollector::factory()->create(['site_id' => $hiddenSite->id]);
+        $inaccessibleRemoteScope = DiscoveryScope::factory()->create([
             'site_id' => $site->id,
-            'collector_id' => $collector->id,
+            'collector_id' => $hiddenCollector->id,
         ]);
         $this->actingAs($manager)
-            ->patchJson("/security-devices/discovery/scopes/{$remoteScope->id}", [
+            ->patchJson("/security-devices/discovery/scopes/{$inaccessibleRemoteScope->id}", [
                 'name' => 'Attempted remote mutation',
             ])
             ->assertNotFound();
 
+        $accessibleCollector = MonitoringCollector::factory()->create(['site_id' => $site->id]);
+        $accessibleRemoteScope = DiscoveryScope::factory()->create([
+            'site_id' => $site->id,
+            'collector_id' => $accessibleCollector->id,
+        ]);
+        $this->actingAs($manager)
+            ->patchJson("/security-devices/discovery/scopes/{$accessibleRemoteScope->id}", [
+                'name' => 'Updated accessible hub scope',
+            ])
+            ->assertOk()
+            ->assertJsonPath('scope.name', 'Updated accessible hub scope');
+
         $this->assertDatabaseCount('monitors', 0);
-        $this->assertNotSame('Attempted remote mutation', $remoteScope->fresh()->name);
+        $this->assertNotSame('Attempted remote mutation', $inaccessibleRemoteScope->fresh()->name);
     }
 
     public function test_monitor_deactivation_is_dependency_safe_and_scope_apply_is_bounded(): void

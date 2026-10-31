@@ -10,8 +10,7 @@ interface PaginationLink {
     active: boolean;
 }
 
-interface LaravelPaginationProps {
-    links: PaginationLink[];
+interface SharedPaginationProps {
     lastPage?: number;
     className?: string;
     preserveState?: boolean;
@@ -23,7 +22,37 @@ interface LaravelPaginationProps {
      * link's `?page=N` instead of an Inertia visit.
      */
     onPage?: (page: number) => void;
+    ariaLabel?: string;
+    /** Disables every page button, e.g. while the owning list is loading. */
+    disabled?: boolean;
 }
+
+type LaravelPaginationProps = SharedPaginationProps & (
+    | { links: PaginationLink[]; navigation?: never; cursor?: never }
+    | {
+        links?: never;
+        cursor?: never;
+        /** Uses only server-supplied adjacent pages; the owner handles draft-safe visits. */
+        navigation: {
+            currentPage: number;
+            previousPage: number | null;
+            nextPage: number | null;
+            pending?: boolean;
+            onPageChange: (page: number) => void;
+        };
+    }
+    | {
+        links?: never;
+        navigation?: never;
+        /** Cursor lists supply no trustworthy page number or total. */
+        cursor: {
+            previousHref: string | null; nextHref: string | null;
+            pending?: boolean;
+            /** Inline lists retain their owning form and use the canonical supplied cursor. */
+            onPageChange?: (href: string) => void;
+        };
+    }
+);
 
 function stripHtml(html: string): string {
     return html
@@ -47,9 +76,19 @@ export function LaravelPagination({
     preserveScroll = false,
     only,
     onPage,
+    navigation,
+    cursor,
+    ariaLabel = 'Pagination',
+    disabled = false,
 }: LaravelPaginationProps) {
-    if (!links || links.length <= 3) return null;
-    if (lastPage !== undefined && lastPage <= 1) return null;
+    if (cursor) {
+        if (cursor.previousHref === null && cursor.nextHref === null) return null;
+    } else if (navigation) {
+        if (navigation.previousPage === null && navigation.nextPage === null) return null;
+    } else {
+        if (!links || links.length <= 3) return null;
+        if (lastPage !== undefined && lastPage <= 1) return null;
+    }
     const visitOptions = {
         preserveState,
         ...(only ? { only } : {}),
@@ -68,19 +107,49 @@ export function LaravelPagination({
         }
         router.get(url, {}, visitOptions);
     };
+    const controls = cursor
+        ? [
+            { label: 'Previous', url: cursor.previousHref },
+            { label: 'Next', url: cursor.nextHref },
+        ].map((link) => ({
+            ...link, active: false, disabled: cursor.pending === true || link.url === null,
+            visit: () => {
+                if (!link.url || cursor.pending) return;
+                if (cursor.onPageChange) cursor.onPageChange(link.url);
+                else router.get(link.url, {}, visitOptions);
+            },
+        }))
+        : navigation
+        ? [
+            { label: 'Previous', active: false, page: navigation.previousPage },
+            { label: String(navigation.currentPage), active: true, page: null },
+            { label: 'Next', active: false, page: navigation.nextPage },
+        ].map((link) => ({
+            ...link,
+            disabled: navigation.pending === true || link.page === null,
+            visit: () => {
+                if (!navigation.pending && link.page !== null) navigation.onPageChange(link.page);
+            },
+        }))
+        : (links ?? []).map((link) => ({
+            ...link,
+            disabled: !link.url,
+            visit: () => open(link.url),
+        }));
 
     // The buttons keep the compact sm size; frontline-hit gives each a 44 px
     // target, and the 36 px minimum width plus gap-2.5 keep neighbouring
     // targets from overlapping.
     return (
         <nav
-            aria-label="Pagination"
+            aria-label={ariaLabel}
+            aria-busy={disabled || undefined}
             className={cn(
                 'flex items-center justify-center gap-2.5',
                 className,
             )}
         >
-            {links.map((link, i) => {
+            {controls.map((link, i) => {
                 const nav = isNavLabel(link.label);
 
                 if (nav === 'prev') {
@@ -89,8 +158,8 @@ export function LaravelPagination({
                             key={i}
                             variant="outline"
                             size="sm"
-                            disabled={!link.url}
-                            onClick={() => open(link.url)}
+                            disabled={disabled || link.disabled}
+                            onClick={link.visit}
                             aria-label="Previous page"
                             className="frontline-hit min-w-[36px]"
                         >
@@ -105,8 +174,8 @@ export function LaravelPagination({
                             key={i}
                             variant="outline"
                             size="sm"
-                            disabled={!link.url}
-                            onClick={() => open(link.url)}
+                            disabled={disabled || link.disabled}
+                            onClick={link.visit}
                             aria-label="Next page"
                             className="frontline-hit min-w-[36px]"
                         >
@@ -120,8 +189,8 @@ export function LaravelPagination({
                         key={i}
                         variant={link.active ? 'default' : 'outline'}
                         size="sm"
-                        disabled={!link.url}
-                        onClick={() => open(link.url)}
+                        disabled={disabled || link.disabled}
+                        onClick={link.visit}
                         aria-current={link.active ? 'page' : undefined}
                         className="frontline-hit min-w-[36px]"
                     >

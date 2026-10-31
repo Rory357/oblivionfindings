@@ -512,6 +512,63 @@ describe('HealthcareWorkspacePanels', () => {
             screen.queryByText(/no client devices/i),
         ).not.toBeInTheDocument();
     });
+
+    it('renders data-flow filter controls and canonical maintenance/monitoring quick links', () => {
+        render(
+            <HealthcareWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'data-flow',
+                        label: 'Connectivity & data flow',
+                        flowFilter: {
+                            key: 'unsupported',
+                            label: 'Monitoring unsupported',
+                        },
+                        flowGroups: [
+                            {
+                                state: 'unsupported',
+                                label: 'Monitoring unsupported',
+                                description: 'No supported monitor configured.',
+                                count: 1,
+                                deviceIds: [clientDevice.id],
+                            },
+                        ],
+                        devices: [
+                            {
+                                ...clientDevice,
+                                maintenanceHref:
+                                    '/security-devices/maintenance?device_id=11',
+                                monitoringHref:
+                                    '/security-devices/devices/11?section=monitors',
+                            },
+                        ],
+                    },
+                }}
+            />,
+        );
+
+        expect(screen.getByText(/Filtered to:/)).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: 'Clear flow filter' }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/healthcare?tab=data-flow',
+        );
+        expect(
+            screen.getByRole('link', { name: 'Open maintenance' }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/maintenance?device_id=11',
+        );
+        expect(
+            screen.getByRole('link', { name: 'Configure monitoring' }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/devices/11?section=monitors',
+        );
+    });
 });
 
 function expectFact(label: string, value: string) {

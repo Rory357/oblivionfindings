@@ -1,0 +1,497 @@
+/* ──────────────────────────────────────────────────────────────────────────
+ * The public website (the client demo site, mockup v2, approved by Stephan
+ * 23 Oct 2026). It speaks as the provider, never as Oblivion Care. Same
+ * tokens as the Journey sign-in pages: --journey-* derive from --primary, so
+ * Settings › Branding recolours the whole site. Scoped to .journey-site.
+ * Components: layouts/marketing-layout.tsx, components/Header.tsx,
+ * components/Footer.tsx, components/public-site/*.
+ *
+ * Font sizes are calc(Nrem / 14): N px at the default 14 px root, and they
+ * follow a signed-in person's text-size preference (DESIGN.md "Pixel font
+ * sizes in feature CSS").
+ * ────────────────────────────────────────────────────────────────────────── */
+@layer components {
+    .journey-site {
+        font-family:
+            'Instrument Sans Journey', 'Instrument Sans', ui-sans-serif,
+            system-ui, sans-serif;
+        background: var(--journey-surface);
+        color: var(--foreground);
+        font-size: calc(16rem / 14);
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+    }
+
+    /* Ink band: header + page intro share one continuous surface, like the
+       staff sign-in brand half. */
+    .journey-site-ink {
+        color: var(--journey-paper);
+        background:
+            radial-gradient(
+                60% 70% at 92% 100%,
+                color-mix(in oklch, var(--primary) 46%, transparent) 0%,
+                transparent 70%
+            ),
+            radial-gradient(
+                45% 50% at 0% 0%,
+                color-mix(in oklch, var(--primary) 18%, transparent) 0%,
+                transparent 70%
+            ),
+            var(--journey-ink);
+    }
+    .journey-site-ink .journey-lede {
+        max-width: 520px;
+        font-size: calc(18rem / 14);
+    }
+
+    .journey-site-container {
+        width: 100%;
+        max-width: 1240px;
+        margin-inline: auto;
+        padding-inline: 20px;
+    }
+    @media (min-width: 768px) {
+        .journey-site-container {
+            padding-inline: 32px;
+        }
+    }
+
+    .journey-site-display {
+        margin: 0;
+        font-size: clamp(calc(40rem / 14), 6vw, calc(64rem / 14));
+        line-height: 1.02;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+    }
+    /* Page titles on inner pages: a step down from the home display. */
+    .journey-site-display--page {
+        font-size: clamp(calc(34rem / 14), 4.6vw, calc(52rem / 14));
+        line-height: 1.05;
+    }
+    .journey-site-eyebrow {
+        font-size: calc(13rem / 14);
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--journey-lavender);
+    }
+    .journey-site-section-title {
+        margin: 0;
+        font-size: clamp(calc(28rem / 14), 3.2vw, calc(38rem / 14));
+        line-height: 1.08;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+    }
+    .journey-site-kicker {
+        font-size: calc(13rem / 14);
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--primary-text, var(--primary));
+    }
+
+    /* Header nav links on ink: ≥ 7:1 muted text, paper on hover/current. */
+    .journey-site-navlink {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        padding-inline: 12px;
+        border-radius: 10px;
+        color: var(--journey-ink-muted);
+        font-weight: 500;
+        transition:
+            color 160ms ease,
+            background-color 160ms ease;
+    }
+    .journey-site-navlink:hover,
+    .journey-site-navlink[aria-current='page'] {
+        color: var(--journey-paper);
+        background: color-mix(in oklch, var(--journey-paper) 8%, transparent);
+    }
+    .journey-site-navlink:focus-visible {
+        outline: 2px solid var(--journey-lavender);
+        outline-offset: 2px;
+    }
+
+    /* Oblivion's own default only (no client branding at all): the islands
+       mark doubles as the referral journey. The pathway's start dot
+       (Southland) is "a first conversation", its end (East Cape) "support
+       that fits", placed in the mark's own 280 × 372 coordinate space. */
+    .journey-site-map {
+        position: relative;
+        width: min(100%, 360px);
+        aspect-ratio: 280 / 372;
+        margin-inline: auto;
+    }
+    .journey-site-map svg {
+        width: 100%;
+        height: 100%;
+    }
+    .journey-site-pin {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        font-size: calc(13rem / 14);
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 999px;
+        color: var(--journey-ink);
+        background: var(--journey-paper);
+        box-shadow: 0 8px 28px
+            color-mix(in oklch, var(--journey-ink) 40%, transparent);
+    }
+    .journey-site-pin--start {
+        left: 18.2%;
+        top: 79.3%;
+        transform: translate(-30%, 40%);
+    }
+    .journey-site-pin--end {
+        left: 75.4%;
+        top: 29%;
+        transform: translate(-60%, -150%);
+    }
+    /* Journey pins laid over the home photo (or the plain brand panel). */
+    .journey-site-pin--photo-start {
+        left: 16px;
+        bottom: 16px;
+    }
+    .journey-site-pin--photo-end {
+        right: 16px;
+        top: 16px;
+    }
+    @media (min-width: 1024px) {
+        .journey-site-pin--photo-start {
+            left: -20px;
+            bottom: 36px;
+        }
+        .journey-site-pin--photo-end {
+            right: -16px;
+            top: 36px;
+        }
+    }
+
+    /* A client site without its own photo shows a plain brand-colour panel:
+       never our demo photos, never the islands art. Floored like the page
+       hero band (L ≤ 0.38 → 0.30), so paper text on it stays AA for any
+       brand. */
+    .journey-site-panel {
+        background: linear-gradient(
+            160deg,
+            oklch(from var(--primary) min(l, 0.38) c h),
+            oklch(from var(--primary) min(l, 0.3) c h)
+        );
+        color: var(--journey-paper);
+    }
+
+    /* Option tiles (also the radio tiles in the enquiry). */
+    .journey-site-tile {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        height: 100%;
+        padding: 22px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        text-align: left;
+        transition:
+            transform 160ms ease,
+            box-shadow 160ms ease,
+            border-color 160ms ease;
+    }
+    .journey-site-tile:hover {
+        transform: translateY(-1px);
+        border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+        box-shadow: 0 10px 30px
+            color-mix(in oklch, var(--primary) 12%, transparent);
+    }
+    .journey-site-tile:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+    }
+    /* Tile picker: a choice, not a card — no fill of its own on the card,
+       and a ring "check" that closes when chosen. Selected uses the brand
+       fill tint (never bg-accent). Brand-with-neutral mixes are in oklab:
+       in oklch the white card's hue 0 drags a teal tint to pink. */
+    .journey-site-tile--choice {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 16px;
+        background: transparent;
+    }
+    .journey-site-tile--choice:hover {
+        transform: none;
+        box-shadow: none;
+    }
+    .journey-site-tile[aria-checked='true'] {
+        border-color: var(--primary-strong);
+        box-shadow: inset 0 0 0 1px var(--primary-strong);
+        background: color-mix(in oklab, var(--primary-fill) 10%, var(--card));
+    }
+    .dark .journey-site-tile[aria-checked='true'] {
+        border-color: var(--primary-text);
+        box-shadow: inset 0 0 0 1px var(--primary-text);
+    }
+    .journey-site-tile-check {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        margin-top: 11px;
+        border-radius: 999px;
+        color: var(--primary-fill-foreground);
+        box-shadow: inset 0 0 0 1.5px
+            color-mix(in oklch, var(--muted-foreground) 60%, transparent);
+    }
+    .journey-site-tile[aria-checked='true'] .journey-site-tile-check {
+        background: var(--primary-fill);
+        box-shadow: none;
+    }
+    /* Signature lens: the icon sits in a ring with a little brand light. */
+    .journey-site-tile-icon {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        color: var(--primary-text);
+        background: radial-gradient(
+            circle at 50% 30%,
+            color-mix(in oklch, var(--primary) 16%, transparent) 0%,
+            transparent 70%
+        );
+        box-shadow: inset 0 0 0 1.5px
+            color-mix(in oklch, var(--primary) 45%, transparent);
+    }
+
+    /* The four-step journey drawn as a pathway with dots: vertical on
+       phones, one line across from 1024 px. */
+    .journey-site-steps {
+        position: relative;
+        display: grid;
+        gap: 28px;
+    }
+    .journey-site-step {
+        position: relative;
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr);
+        gap: 16px;
+    }
+    /* The Journey pathway: a solid line with round ends — dashes mean a
+       target or forecast in Oblivion charts. */
+    .journey-site-step:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        left: 14px;
+        top: 30px;
+        bottom: -28px;
+        border-left: 2px solid
+            color-mix(in oklch, var(--primary) 45%, transparent);
+    }
+    @media (min-width: 1024px) {
+        .journey-site-steps {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 24px;
+        }
+        .journey-site-step {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .journey-site-step:not(:last-child)::after {
+            display: none;
+        }
+        .journey-site-steps::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            /* End at the last (filled) dot: one column width minus its centre. */
+            right: calc((100% - 72px) / 4 - 15px);
+            top: 14px;
+            border-top: 2px solid
+                color-mix(in oklch, var(--primary) 45%, transparent);
+            border-radius: 2px;
+        }
+    }
+    .journey-site-step-dot {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        font-size: calc(13rem / 14);
+        font-weight: 700;
+        color: var(--primary-text);
+        background: var(--journey-surface);
+        box-shadow:
+            inset 0 0 0 2px var(--primary),
+            0 0 0 6px var(--journey-surface);
+    }
+    /* Pathway ends are filled dots, as in the Journey mark. */
+    .journey-site-steps > li:first-child .journey-site-step-dot,
+    .journey-site-steps > li:last-child .journey-site-step-dot {
+        color: var(--primary-fill-foreground);
+        background: var(--primary-fill);
+        box-shadow: 0 0 0 6px var(--journey-surface);
+    }
+
+    /* Progress on the pathway ("what happens next"): done = filled, now =
+       the ring with a halo, next = hollow. Solid line. */
+    .journey-site-progress {
+        display: grid;
+        gap: 20px;
+    }
+    .journey-site-progress > li {
+        position: relative;
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 14px;
+    }
+    .journey-site-progress > li:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        left: 11px;
+        top: 28px;
+        bottom: -16px;
+        border-left: 2px solid var(--border);
+    }
+    .journey-site-progress-dot {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        margin-top: 1px;
+        border-radius: 999px;
+        background: var(--card);
+        box-shadow: inset 0 0 0 2px
+            color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+    }
+    .journey-site-progress > li[data-state='done']::after {
+        border-color: color-mix(in oklch, var(--primary) 55%, transparent);
+    }
+    .journey-site-progress > li[data-state='done'] .journey-site-progress-dot {
+        color: var(--primary-fill-foreground);
+        background: var(--primary-fill);
+        box-shadow: none;
+    }
+    .journey-site-progress > li[data-state='now'] .journey-site-progress-dot {
+        box-shadow:
+            inset 0 0 0 3px var(--primary-strong),
+            0 0 0 5px color-mix(in oklch, var(--primary) 18%, transparent);
+    }
+    .dark
+        .journey-site-progress
+        > li[data-state='now']
+        .journey-site-progress-dot {
+        box-shadow:
+            inset 0 0 0 3px var(--primary-text),
+            0 0 0 5px color-mix(in oklch, var(--primary) 22%, transparent);
+    }
+    /* A plan (what happens next): the pathway's own shape — filled ends,
+       rings between, one brand line. */
+    .journey-site-progress--plan > li:not(:last-child)::after {
+        border-color: color-mix(in oklch, var(--primary) 45%, transparent);
+    }
+    .journey-site-progress--plan .journey-site-progress-dot {
+        box-shadow: inset 0 0 0 2px var(--primary);
+    }
+    .journey-site-progress--plan > li:first-child .journey-site-progress-dot,
+    .journey-site-progress--plan > li:last-child .journey-site-progress-dot {
+        background: var(--primary-fill);
+        box-shadow: none;
+    }
+
+    /* Sections reached by a link (/services#respite). */
+    .journey-site-anchor {
+        scroll-margin-top: 24px;
+    }
+
+    .journey-site-skip {
+        position: absolute;
+        left: 16px;
+        top: -200px;
+        z-index: 70;
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-weight: 600;
+        color: var(--foreground);
+        background: var(--card);
+        box-shadow: 0 8px 28px
+            color-mix(in oklch, var(--journey-ink) 30%, transparent);
+    }
+    .journey-site-skip:focus-visible {
+        top: 12px;
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+    }
+
+    /* Horizon line on floating surfaces: rim → brand → rim. */
+    .journey-site-horizon {
+        border-top: 0;
+        background-image: linear-gradient(
+            90deg,
+            transparent,
+            color-mix(in oklab, var(--primary) 85%, var(--journey-paper)) 50%,
+            transparent
+        );
+        background-size: 100% 2px;
+        background-repeat: no-repeat;
+    }
+
+    /* Success: the brand ring closes around a check. */
+    .journey-site-ring-done {
+        position: relative;
+        flex: none;
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        box-shadow: inset 0 0 0 3px var(--primary);
+    }
+    .journey-site-ring-done::after {
+        content: '';
+        position: absolute;
+        left: 16px;
+        top: 11px;
+        width: 10px;
+        height: 18px;
+        border: solid var(--primary);
+        border-width: 0 3px 3px 0;
+        transform: rotate(45deg);
+    }
+
+    .journey-site-lilac {
+        background:
+            radial-gradient(
+                55% 70% at 100% 0%,
+                color-mix(in oklch, var(--journey-lavender) 70%, transparent) 0%,
+                transparent 70%
+            ),
+            var(--journey-lilac);
+    }
+    .dark .journey-site-lilac {
+        color: var(--journey-paper);
+        background: var(--journey-ink);
+    }
+
+    .journey-site-footer {
+        color: var(--journey-ink-muted);
+        background: var(--journey-ink);
+    }
+    .journey-site-footer a {
+        color: var(--journey-ink-muted);
+    }
+    .journey-site-footer a:hover {
+        color: var(--journey-paper);
+    }
+    .journey-site-footer a:focus-visible {
+        outline: 2px solid var(--journey-lavender);
+        outline-offset: 2px;
+        border-radius: 6px;
+    }
+}

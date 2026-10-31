@@ -68,11 +68,12 @@ export default function StaffAvailability({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/availability' },
                 { title: 'Availability', href: '/operations/availability' },
             ]}
         >
             <Head title={`Availability: ${user.name}`} />
-            <div className="space-y-4">
+            <div className="space-y-5">
                 <PageHeader
                     icon={CalendarCheck}
                     title="Availability"

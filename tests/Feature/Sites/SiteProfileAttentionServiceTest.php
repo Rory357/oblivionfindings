@@ -44,6 +44,9 @@ class SiteProfileAttentionServiceTest extends TestCase
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $this->site = Site::factory()->create(['type' => 'house']);
+        // PPE attention comes through the PPE source read, which needs current staff (Stephan, 25 Oct): the admin works here.
+        \App\Domain\Hr\Models\HrEmployeeProfile::factory()->create(['user_id' => $this->admin->id, 'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [], 'start_date' => '2020-01-01', 'end_date' => null, 'is_active' => true]);
     }
 
     public function test_it_aggregates_permission_shaped_attention_with_real_resolution_paths(): void
@@ -183,6 +186,9 @@ class SiteProfileAttentionServiceTest extends TestCase
         $this->assertSame("/compliance/hazards?hazard={$hazard->id}", $hazardItem['href']);
 
         foreach ($result['items'] as $item) {
+            // PPE items also carry their source integrity, so a record needing repair isn't presented as ordinary.
+            $extra = $item['source'] === 'ppe' ? ['source_integrity', 'attribution_state'] : [];
+            $this->assertSame($extra, array_values(array_diff(array_keys($item), ['id', 'source', 'severity', 'title', 'detail', 'due_date', 'tab', 'href'])));
             $this->assertSame([
                 'id',
                 'source',
@@ -192,7 +198,7 @@ class SiteProfileAttentionServiceTest extends TestCase
                 'due_date',
                 'tab',
                 'href',
-            ], array_keys($item));
+            ], array_slice(array_keys($item), 0, 8));
         }
 
         $encoded = json_encode($result, JSON_THROW_ON_ERROR);

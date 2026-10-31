@@ -1,7 +1,6 @@
 /* First-aid treatments tab — read-only client-profile panel. Surfaces the first-aid
  * records linked to this client (first_aid_records.client_id), mirroring IncidentsTab:
- * a stat strip + outcome-toned treatment cards that deep-link to the register's detail
- * modal. Recording/editing stays in the H&S First Aid register (need-to-know + perms). */
+ * factual treatment cards with source-owned links to permanent treatment pages. */
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,12 +14,24 @@ import {
 import { Link } from '@inertiajs/react';
 import { Ambulance, HeartPulse } from 'lucide-react';
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- raw Eloquent rows from the profile
- * controller, matching the sibling IncidentsTab contract. */
-export function FirstAidTab({ records }: { records: any[] }) {
+type ClientFirstAidRecord = {
+    id: number;
+    reference_number: string | null;
+    treatment_date: string | null;
+    treatment_outcome: string;
+    injury_illness_type: string;
+    body_part: string | null;
+    treatment_given: string | null;
+    ambulance_called: boolean;
+    firstAider: { name: string } | null;
+    site: { name: string } | null;
+    href: string;
+};
+export function FirstAidTab({ records }: { records: ClientFirstAidRecord[] }) {
     const last30 = records.filter(
         (r) =>
             r.treatment_date &&
+            Date.now() >= new Date(r.treatment_date).getTime() &&
             Date.now() - new Date(r.treatment_date).getTime() < 30 * 86400000,
     ).length;
     const ambulance = records.filter((r) => r.ambulance_called).length;
@@ -70,7 +81,7 @@ export function FirstAidTab({ records }: { records: any[] }) {
             {/* Treatment cards */}
             {records.length ? (
                 <div className="space-y-3">
-                    {records.map((r: any) => {
+                    {records.map((r) => {
                         const tone = outcomeTone(
                             String(r.treatment_outcome ?? ''),
                         );
@@ -138,12 +149,11 @@ export function FirstAidTab({ records }: { records: any[] }) {
                                         <div className="mt-2">
                                             <Button
                                                 size="sm"
+                                                className="frontline-tap"
                                                 variant="outline"
                                                 asChild
                                             >
-                                                <Link
-                                                    href={`/health-safety/first-aid?record=${r.id}`}
-                                                >
+                                                <Link href={r.href}>
                                                     Open record
                                                 </Link>
                                             </Button>

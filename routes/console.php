@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\CompanyHub\Services\HubSearchInsights;
 use App\Domain\Finance\Jobs\CalculateGstReturnJob;
 use App\Domain\Finance\Jobs\CheckBillDueDatesJob;
 use App\Domain\Finance\Jobs\GenerateRecurringJournalsJob;
@@ -37,11 +38,13 @@ use App\Domain\Monitoring\Jobs\EnforceMonitoringRetention;
 use App\Domain\Monitoring\Jobs\EvaluateCollectorHealth;
 use App\Domain\Monitoring\Jobs\ScheduleDueMonitors;
 use App\Domain\Monitoring\Jobs\ScheduleProviderCapabilities;
+use App\Domain\Referrals\Models\ReferralIntakeDraft;
 use App\Domain\Roadmap\Jobs\DetectRoadmapTriageOverloadJob;
 use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
 use App\Domain\Roadmap\Jobs\SendRoadmapDigestJob;
 use App\Domain\SecurityDevices\Credentials\Jobs\ReconcileCredentialLeases;
+use App\Domain\SecurityDevices\Endpoints\Services\IntuneReadClient;
 use App\Domain\SecurityDevices\Management\Jobs\RecoverCollectorCommands;
 use App\Jobs\AutoEscalateControlRoomQueues;
 use App\Jobs\CheckControlRoomSlaBreaches;
@@ -69,11 +72,18 @@ use App\Jobs\PruneIncidentReportDrafts;
 use App\Jobs\PrunePersonalTrackingTelemetry;
 use App\Jobs\RecalculateFutureShiftEligibility;
 use App\Jobs\ReconcileTimesheetsJob;
+use App\Jobs\RecoverEmergencyDrillFailures;
+use App\Jobs\RecoverFirstAidDeliveries;
+use App\Jobs\RecoverIncidentOwnerDeliveries;
+use App\Jobs\RecoverLoneWorkerEmergencies;
+use App\Jobs\RecoverProcedureReviewDeliveries;
+use App\Jobs\RecoverWorkerParticipationMeetingDeliveries;
 use App\Jobs\SendEventReminderJob;
 use App\Jobs\ShiftAutoAlertJob;
 use App\Jobs\ShiftTaskDueJob;
 use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\SyncWorkCalendarsJob;
+use App\Jobs\System\RecordDefaultWorkerHeartbeatJob;
 use App\Models\MedicationIdempotencyResult;
 use App\Services\Eligibility\WorkforceEligibilityRefresh;
 use App\Services\Fleet\FinanceReviewNotices;
@@ -82,9 +92,16 @@ use App\Services\MedicationAlertService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 app(Schedule::class)->job(new SyncWorkCalendarsJob)->everyFifteenMinutes()->withoutOverlapping();
+app(Schedule::class)->job(new RecoverIncidentOwnerDeliveries)->everyMinute()->onOneServer()->withoutOverlapping();
+
+// Recovery rotates through committed routing intents and source-owner checks.
+// Initial routing never relies on a scheduler transaction or a report recipient grant.
+app(Schedule::class)->command('incidents:recover-routing --limit=100')
+    ->everyMinute()->onOneServer()->withoutOverlapping();
 
 if (config('fleet_maintenance.effects_enabled', false)) {
     app(Schedule::class)->command('maintenance:dispatch-effects --limit=25')
@@ -94,6 +111,23 @@ if (config('fleet_maintenance.effects_enabled', false)) {
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('system:scheduler-heartbeat', function () {
+    Cache::put('system:scheduler:last_heartbeat_at', now()->utc()->toIso8601String(), 3600);
+
+    if ((string) config('queue.default') !== 'sync') {
+        try {
+            dispatch(new RecordDefaultWorkerHeartbeatJob);
+        } catch (Throwable) {
+            // Queue transport errors are reported separately on Server readiness.
+        }
+    }
+})->purpose('Record scheduler and default background worker readiness heartbeats');
+
+app(Schedule::class)
+    ->command('system:scheduler-heartbeat')
+    ->everyMinute()
+    ->withoutOverlapping();
 
 // Schedule lightweight monitor orchestration only. Protocol checks and remote
 // collector configuration are routed to their isolated runtime workloads.
@@ -1010,6 +1044,13 @@ app(Schedule::class)->command('monitoring:prune-enrolment-recovery')
 // Native attempt expiry is bookkeeping only; it never retries a computer action.
 app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
 
+// Read-only Intune visibility refreshes explicitly linked computer records only when configured.
+app(Schedule::class)->command('endpoints:intune-sync')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->when(static fn (): bool => app(IntuneReadClient::class)->isConfigured());
+
 // Media watchdogs enforce 15-second authority; this erases expired central signalling.
 Illuminate\Support\Facades\Schedule::command('cctv:expire-live-sessions')->everyMinute()->withoutOverlapping();
 
@@ -1025,7 +1066,7 @@ app(Schedule::class)->command('workforce:recover-eligibility-refresh')->everyMin
 app(Schedule::class)->command('company-hub:deliver-notices')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
 
 Artisan::command('company-hub:prune-search-insights', function () {
-    $this->info((string) app(\App\Domain\CompanyHub\Services\HubSearchInsights::class)->prune());
+    $this->info((string) app(HubSearchInsights::class)->prune());
 })->purpose('Remove Company Hub search topic totals older than 90 calendar days');
 app(Schedule::class)->command('company-hub:prune-search-insights')->dailyAt('02:10')->timezone('Pacific/Auckland')->withoutOverlapping();
 
@@ -1033,10 +1074,9 @@ app(Schedule::class)->command('referrals:deliver-communications --limit=25')->ev
 
 // Intake drafts already expire after seven days, but were only removed when their author came back.
 Artisan::command('referrals:prune-intake-drafts', function () {
-    $this->info((string) \App\Domain\Referrals\Models\ReferralIntakeDraft::query()->where('expires_at', '<=', now())->delete());
+    $this->info((string) ReferralIntakeDraft::query()->where('expires_at', '<=', now())->delete());
 })->purpose('Remove unfinished referral intake drafts once their seven-day expiry has passed');
 app(Schedule::class)->command('referrals:prune-intake-drafts')->dailyAt('02:20')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
-
 // Chat's 10-second sweeps start only when they have work: the call sweep needs a configured voice
 // server, and delivery needs shared Chat switched on. Otherwise they cost ~17,000 process starts a day.
 app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground()
@@ -1044,3 +1084,29 @@ app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withou
 app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground()
     ->when(fn (): bool => (bool) config('chat.shared_experience'));
 app(Schedule::class)->command('chat:prune')->dailyAt('02:40')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+
+// Procedure review assignment delivery is independent of reading or completing work.
+app(Schedule::class)->job(new RecoverProcedureReviewDeliveries)->everyMinute()->onOneServer()->withoutOverlapping();
+
+// Recover retained drill review and signal delivery independently of source completion.
+app(Schedule::class)->job(new RecoverEmergencyDrillFailures)->everyMinute()->onOneServer()->withoutOverlapping();
+
+app(Schedule::class)->job(new RecoverLoneWorkerEmergencies)->everyMinute()->onOneServer()->withoutOverlapping();
+
+// Recover accepted First Aid review/inbox intents without resending confirmed receipts.
+app(Schedule::class)->job(new RecoverFirstAidDeliveries)->everyMinute()->withoutOverlapping();
+
+// Accepted restraint commands retain delivery intents independently of source completion.
+app(Schedule::class)->command('restraints:recover-deliveries')->everyMinute()->withoutOverlapping();
+// Saved chemical exposures reach the H&S register straight after the save; this retries failed or missed deliveries
+// (30 s doubling to 15 min) without the queue worker, so the register still fills if the worker is down.
+app(Schedule::class)->command('chemical-exposures:recover-deliveries')->everyMinute()->withoutOverlapping();
+app(Schedule::class)->command('restraints:followup-reminders')->dailyAt('08:00')->timezone('Pacific/Auckland')->withoutOverlapping();
+
+// Recover committed participation intents through independently current recipient source admission.
+// A sending mail claim becomes uncertain after a crash and is never automatically resent.
+app(Schedule::class)->job(new RecoverWorkerParticipationMeetingDeliveries)
+    ->everyMinute()->withoutOverlapping();
+
+// Content expiry applies independently of publication, execution policy and agent enrolment.
+app(Schedule::class)->command('endpoints:purge-script-outputs')->everyMinute()->withoutOverlapping();

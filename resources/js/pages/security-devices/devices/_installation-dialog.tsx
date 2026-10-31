@@ -11,9 +11,10 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDateTime } from '@/lib/datetime';
-import { Download, Loader2, Monitor } from 'lucide-react';
+import { Check, Copy, Download, Loader2, Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+    encodeComputerSetupCode,
     installationJSON,
     installationOptions,
     installationProfile,
@@ -34,7 +35,12 @@ export function InstallationProfileDialog({
 }: Props) {
     return (
         <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
                 {open && (
                     <InstallationBody
                         key={deviceId + ':' + actorId}
@@ -53,9 +59,12 @@ function InstallationBody({ deviceId, actorId, onClose }: Omit<Props, 'open'>) {
     const [error, setError] = useState('');
     const [confirmRevoke, setConfirmRevoke] = useState(false);
     const [reason, setReason] = useState('');
-    const [file, setFile] = useState<{ url: string; expires: string } | null>(
-        null,
-    );
+    const [file, setFile] = useState<{
+        url: string;
+        expires: string;
+        setupCode: string;
+    } | null>(null);
+    const [copiedCode, setCopiedCode] = useState(false);
     const active = useRef(false),
         pending = useRef(false),
         abort = useRef(new AbortController());
@@ -66,7 +75,10 @@ function InstallationBody({ deviceId, actorId, onClose }: Omit<Props, 'open'>) {
         fileUrl.current = null;
         if (expiryTimer.current) clearTimeout(expiryTimer.current);
         expiryTimer.current = null;
-        if (active.current) setFile(null);
+        if (active.current) {
+            setFile(null);
+            setCopiedCode(false);
+        }
     }, []);
     useEffect(() => {
         active.current = true;
@@ -172,7 +184,11 @@ function InstallationBody({ deviceId, actorId, onClose }: Omit<Props, 'open'>) {
                 }),
             );
             fileUrl.current = url;
-            setFile({ url, expires: profile.expires_at });
+            setFile({
+                url,
+                expires: profile.expires_at,
+                setupCode: encodeComputerSetupCode(profile),
+            });
             expiryTimer.current = setTimeout(
                 () => {
                     clearFile();
@@ -206,6 +222,23 @@ function InstallationBody({ deviceId, actorId, onClose }: Omit<Props, 'open'>) {
                 setOptions(installationOptions(value, deviceId, actorId));
         });
     }
+    async function copySetupCode() {
+        if (!file?.setupCode || !navigator.clipboard?.writeText) {
+            setError(
+                'Clipboard access is unavailable in this browser. Save the installation profile file instead.',
+            );
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(file.setupCode);
+            if (active.current) setCopiedCode(true);
+        } catch {
+            if (active.current)
+                setError(
+                    'The one-time setup code could not be copied. Save the installation profile file instead.',
+                );
+        }
+    }
     const existing =
         options &&
         ['pending', 'expired', 'enrolled'].includes(options.enrolment.state);
@@ -221,7 +254,8 @@ function InstallationBody({ deviceId, actorId, onClose }: Omit<Props, 'open'>) {
                 </DialogTitle>
                 <DialogDescription>
                     Review the destination, then create a Windows installation
-                    profile.
+                    profile or one-time setup code for the Obli tray helper and
+                    computer support service.
                 </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 overflow-x-hidden">
@@ -279,10 +313,12 @@ function InstallationBody({ deviceId, actorId, onClose }: Omit<Props, 'open'>) {
                         {file ? (
                             <Alert>
                                 <AlertDescription>
-                                    Profile ready. Save it and use it with the
+                                    Profile ready. Copy the one-time setup code
+                                    or save the profile file and use it with the
                                     signed Windows installer before{' '}
-                                    {formatDateTime(file.expires)}. Keep this
-                                    file private; delete it after installation.
+                                    {formatDateTime(file.expires)}. Keep it
+                                    private; delete any saved file after
+                                    installation.
                                     <p className="mt-2">
                                         Closing or leaving this tab clears this
                                         copy. It does not revoke a profile you
@@ -306,20 +342,22 @@ function InstallationBody({ deviceId, actorId, onClose }: Omit<Props, 'open'>) {
                                 {options.enrolment_minutes} minutes and connects
                                 only this approved computer to the server shown
                                 above. Creating it does not install software or
-                                start a remote session. AI provider keys stay in
-                                Oblivion.
+                                start a remote session. AI provider keys stay on
+                                this server.
                             </p>
                         )}
                         <p className="text-subtle">
-                            Get the signed software from{' '}
+                            Get the signed Windows installer and package from{' '}
                             <a
                                 className="frontline-focus underline"
                                 href="/security-devices/agent-downloads"
                             >
                                 Agent downloads
                             </a>
-                            . This profile is for Windows computer support; site
-                            collectors use their own approved enrolment.
+                            . Computer support installs the Windows computer
+                            service and starts the Obli tray helper when staff
+                            sign in; site collectors use their own approved
+                            enrolment.
                         </p>
                         {confirmRevoke && (
                             <div className="space-y-2 rounded-lg border p-4">
@@ -378,15 +416,33 @@ function InstallationBody({ deviceId, actorId, onClose }: Omit<Props, 'open'>) {
                     Check installation status
                 </Button>
                 {file && (
-                    <Button asChild>
-                        <a
-                            href={file.url}
-                            download={'oblivion-computer-' + deviceId + '.json'}
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void copySetupCode()}
                         >
-                            <Download aria-hidden="true" />
-                            Save installation profile
-                        </a>
-                    </Button>
+                            {copiedCode ? (
+                                <Check aria-hidden="true" />
+                            ) : (
+                                <Copy aria-hidden="true" />
+                            )}
+                            {copiedCode
+                                ? 'Setup code copied'
+                                : 'Copy one-time setup code'}
+                        </Button>
+                        <Button asChild>
+                            <a
+                                href={file.url}
+                                download={
+                                    'oblivion-computer-' + deviceId + '.json'
+                                }
+                            >
+                                <Download aria-hidden="true" />
+                                Save installation profile
+                            </a>
+                        </Button>
+                    </>
                 )}
                 {!file && existing && !confirmRevoke && (
                     <Button

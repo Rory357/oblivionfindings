@@ -143,6 +143,18 @@ class SafeguardingConcernPolicy
         });
     }
 
+    /**
+     * The Sites whose concerns this reader may see: every active Site with the
+     * reports bypass, otherwise their current HR Site assignments. Used to keep
+     * the register's Site and subject pickers inside the same boundary.
+     *
+     * @return array<int, int>
+     */
+    public function visibleSiteIds(User $user): array
+    {
+        return $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
+    }
+
     private function canAccessConcernSite(User $user, SafeguardingConcern $concern): bool
     {
         $siteId = is_numeric($concern->site_id) && (int) $concern->site_id > 0

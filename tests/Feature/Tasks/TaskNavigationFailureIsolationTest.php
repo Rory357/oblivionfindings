@@ -122,8 +122,11 @@ it('renders administrator support worker and clinical lead landing pages when a 
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('auth.can.tasks.view', true)
-                ->where('auth.can.tasks.badge', 0)
-                ->where('auth.can.tasks.badgeDegraded', true)
+                // The count loads after the page, with the inbox.
+                ->loadDeferredProps('default', fn ($fill) => $fill
+                    ->where('taskNav.view', true)
+                    ->where('taskNav.badge', 0)
+                    ->where('taskNav.badgeDegraded', true))
             );
 
         $assertLandingPage();

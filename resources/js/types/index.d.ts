@@ -77,6 +77,7 @@ export interface AuthPermissions {
         update?: boolean;
         submit?: boolean;
         approve?: boolean;
+        export?: boolean;
         templatesManage?: boolean;
     };
     governance?: {
@@ -115,6 +116,7 @@ export interface AuthPermissions {
     hr?: {
         recruitment?: { view?: boolean; manage?: boolean };
         employees?: { viewAny?: boolean; manage?: boolean };
+        wellbeing?: { view?: boolean; manage?: boolean };
     };
     [key: string]: unknown;
 }

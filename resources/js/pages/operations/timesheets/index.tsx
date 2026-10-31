@@ -118,7 +118,7 @@ const TABS: Array<{
 
 // Preserved export — index.test.ts references this constant.
 export const needsApprovalBadgeClassName =
-    'border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning';
+    'border-status-warning/30 bg-status-warning-bg text-xs text-status-warning';
 
 export function canEditTimesheetRow(
     row: Pick<
@@ -219,10 +219,10 @@ function HoverPopover({
             >
                 <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
                     <div className="min-w-0">
-                        <div className="text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                        <div className="text-xs tracking-wider text-muted-foreground uppercase">
                             Timesheet #{t.id}
                         </div>
-                        <div className="truncate text-[13px] font-semibold">
+                        <div className="truncate text-sm font-semibold">
                             {t.client
                                 ? `${t.client.first_name} ${t.client.last_name}`
                                 : (t.activity_type ?? 'Manual entry')}
@@ -231,38 +231,38 @@ function HoverPopover({
                     <TimesheetStatusBadge status={t.status} />
                 </div>
                 <div className="space-y-2.5 px-3 py-3 text-xs">
-                    <div className="text-[11.5px] text-muted-foreground italic">
+                    <div className="text-sm text-muted-foreground italic">
                         {blurb[t.status] ?? ''}
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                         <div className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
-                            <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                            <div className="text-xs tracking-wider text-muted-foreground uppercase">
                                 Hours
                             </div>
-                            <div className="mt-0.5 text-[12.5px] font-semibold tabular-nums">
+                            <div className="mt-0.5 text-sm font-semibold tabular-nums">
                                 {hours.toFixed(2)}h
                             </div>
                         </div>
                         <div className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
-                            <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                            <div className="text-xs tracking-wider text-muted-foreground uppercase">
                                 Break
                             </div>
-                            <div className="mt-0.5 text-[12.5px] font-semibold tabular-nums">
+                            <div className="mt-0.5 text-sm font-semibold tabular-nums">
                                 {t.break_minutes}m
                             </div>
                         </div>
                         <div className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
-                            <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                            <div className="text-xs tracking-wider text-muted-foreground uppercase">
                                 Mileage
                             </div>
-                            <div className="mt-0.5 text-[12.5px] font-semibold tabular-nums">
+                            <div className="mt-0.5 text-sm font-semibold tabular-nums">
                                 {(t.mileage_km ?? 0) > 0
                                     ? `${t.mileage_km}km`
                                     : '—'}
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-[11.5px] text-muted-foreground">
+                    <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-sm text-muted-foreground">
                         <span className="tabular-nums">
                             {formatTimesheetTime(t.starts_at, timezone)} –{' '}
                             {formatTimesheetTime(t.ends_at, timezone)}
@@ -271,7 +271,7 @@ function HoverPopover({
                     </div>
                     {t.shift ? (
                         <div className="rounded-md border border-border px-2 py-1.5">
-                            <div className="flex items-center justify-between text-[11.5px]">
+                            <div className="flex items-center justify-between text-sm">
                                 <span className="font-medium">
                                     Shift #{t.shift.id}
                                 </span>
@@ -283,7 +283,7 @@ function HoverPopover({
                                 </span>
                             </div>
                             {t.shift.location ? (
-                                <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
                                     <MapPin className="h-3 w-3" />
                                     {t.shift.location}
                                 </div>
@@ -291,16 +291,16 @@ function HoverPopover({
                         </div>
                     ) : null}
                     {recordedActivityCount(t) > 0 ? (
-                        <div className="text-[11.5px]">
+                        <div className="text-sm">
                             Activity items: {recordedActivityCount(t)} recorded
                         </div>
                     ) : hasLinkedShift(t) && (t.tasks_total ?? 0) > 0 ? (
                         <div>
                             <div className="mb-1 flex items-center justify-between">
-                                <span className="text-[11.5px] font-medium">
+                                <span className="text-sm font-medium">
                                     Tasks pulled from shift
                                 </span>
-                                <span className="text-[11px] text-muted-foreground tabular-nums">
+                                <span className="text-xs text-muted-foreground tabular-nums">
                                     {t.tasks_completed ?? 0}/
                                     {t.tasks_total ?? 0}
                                 </span>
@@ -318,7 +318,7 @@ function HoverPopover({
                             </div>
                         </div>
                     ) : null}
-                    <div className="rounded-md bg-muted/30 px-2 py-1.5 text-[11.5px] text-muted-foreground">
+                    <div className="rounded-md bg-muted/30 px-2 py-1.5 text-sm text-muted-foreground">
                         <div>
                             <span className="text-muted-foreground/70">
                                 Worked by
@@ -329,13 +329,13 @@ function HoverPopover({
                         </div>
                     </div>
                     {t.status === 'returned' && t.returned_notes ? (
-                        <div className="flex items-start gap-1.5 rounded-md bg-status-critical-bg px-2 py-1.5 text-[11.5px] text-status-critical">
+                        <div className="flex items-start gap-1.5 rounded-md bg-status-critical-bg px-2 py-1.5 text-sm text-status-critical">
                             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                             <span>{t.returned_notes}</span>
                         </div>
                     ) : null}
                 </div>
-                <div className="border-t border-border bg-muted/40 px-3 py-1.5 text-[10.5px] text-muted-foreground">
+                <div className="border-t border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
                     Click to open · right-click for actions
                 </div>
             </GuardrailCard>
@@ -499,13 +499,13 @@ function ContextMenu({
         >
             <div className="flex items-center justify-between gap-2 px-3 py-1.5">
                 <div className="min-w-0">
-                    <div className="truncate text-[11.5px] font-semibold">
+                    <div className="truncate text-sm font-semibold">
                         #{row.id} ·{' '}
                         {row.client
                             ? `${row.client.first_name} ${row.client.last_name}`
                             : (row.activity_type ?? 'Manual')}
                     </div>
-                    <div className="text-[10.5px] text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                         {row.staff?.name ?? 'Staff'} · {fmtDate(row.work_date)}
                     </div>
                 </div>
@@ -527,7 +527,7 @@ function ContextMenu({
                             onClose();
                         }}
                         className={cn(
-                            'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] hover:bg-muted',
+                            'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm hover:bg-muted',
                             toneCls[it.tone ?? 'primary'] ?? 'text-foreground',
                         )}
                         role="menuitem"
@@ -682,8 +682,12 @@ export default function TimesheetsIndex({
     const currentReason = timesheets.data.find(
         (row) => row.id === reasonTarget?.row.id,
     );
-    const currentMenuRow = timesheets.data.find((row) => row.id === menu?.row.id);
-    const currentHoverRow = timesheets.data.find((row) => row.id === hover?.row.id);
+    const currentMenuRow = timesheets.data.find(
+        (row) => row.id === menu?.row.id,
+    );
+    const currentHoverRow = timesheets.data.find(
+        (row) => row.id === hover?.row.id,
+    );
     const reasonAllowed = Boolean(
         currentReason?.can_mutate &&
         (reasonTarget?.action === 'submit'
@@ -697,7 +701,9 @@ export default function TimesheetsIndex({
     );
 
     function openEditing(row: TimesheetRow) {
-        const current = dialogContext.current.rows.find((candidate) => candidate.id === row.id);
+        const current = dialogContext.current.rows.find(
+            (candidate) => candidate.id === row.id,
+        );
         if (!current || !canEditTimesheetRow(current)) return;
         setEditing(current);
         setEditingOpen(true);
@@ -705,13 +711,19 @@ export default function TimesheetsIndex({
 
     function openReview(row: ViewTimesheetRow, action: TimesheetReviewAction) {
         const context = dialogContext.current;
-        const current = context.rows.find((candidate) => candidate.id === row.id);
+        const current = context.rows.find(
+            (candidate) => candidate.id === row.id,
+        );
         if (!current?.can_mutate) return;
-        const allowed = action === 'submit'
-            ? current.can_submit === true
-            : context.canApprove && (action === 'approve'
-                ? current.can_approve === true
-                : action === 'reject' ? current.can_reject === true : current.can_return === true);
+        const allowed =
+            action === 'submit'
+                ? current.can_submit === true
+                : context.canApprove &&
+                  (action === 'approve'
+                      ? current.can_approve === true
+                      : action === 'reject'
+                        ? current.can_reject === true
+                        : current.can_return === true);
         if (!allowed) return;
         setReasonTarget({ action, row: current });
         setReasonOpen(true);
@@ -831,13 +843,14 @@ export default function TimesheetsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/timesheets' },
                 {
                     title: isOwnOnlyView ? 'My timesheets' : 'Timesheets',
                     href: '/operations/timesheets',
                 },
             ]}
         >
-            <Head title={isOwnOnlyView ? 'My Timesheets' : 'Timesheets'} />
+            <Head title={isOwnOnlyView ? 'My timesheets' : 'Timesheets'} />
 
             <PageShell>
                 <TimesheetsHero
@@ -1111,7 +1124,7 @@ export default function TimesheetsIndex({
                     {/* Desktop table keeps the full comparison columns. */}
                     <div className="hidden overflow-x-auto md:block">
                         <table className="w-full text-sm">
-                            <thead className="bg-muted/40 text-[11.5px] tracking-wider text-muted-foreground uppercase">
+                            <thead className="bg-muted/40 text-sm tracking-wider text-muted-foreground uppercase">
                                 <tr className="text-left">
                                     <th className="w-10 py-2.5 pl-4">
                                         <input
@@ -1246,7 +1259,7 @@ export default function TimesheetsIndex({
                                                 <div className="font-semibold">
                                                     {fmtDate(t.work_date)}
                                                 </div>
-                                                <div className="text-[11px] text-muted-foreground tabular-nums">
+                                                <div className="text-xs text-muted-foreground tabular-nums">
                                                     {formatTimesheetTime(
                                                         t.starts_at,
                                                         evidence.timezone,
@@ -1262,7 +1275,7 @@ export default function TimesheetsIndex({
                                                 <td className="px-2 py-3">
                                                     <div className="flex items-center gap-2">
                                                         <div
-                                                            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white"
+                                                            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
                                                             style={{
                                                                 background: `oklch(0.55 0.14 ${hueFor(t.staff?.name)})`,
                                                             }}
@@ -1277,7 +1290,7 @@ export default function TimesheetsIndex({
                                                                     ?.name ??
                                                                     '—'}
                                                             </div>
-                                                            <div className="text-[11px] text-muted-foreground">
+                                                            <div className="text-xs text-muted-foreground">
                                                                 #{t.staff?.id}
                                                             </div>
                                                         </div>
@@ -1297,7 +1310,7 @@ export default function TimesheetsIndex({
                                                 </div>
                                                 {t.shift?.location ||
                                                 t.site?.name ? (
-                                                    <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                    <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                                                         <MapPin className="h-3 w-3" />
                                                         {t.shift?.location ??
                                                             t.site?.name}
@@ -1305,7 +1318,7 @@ export default function TimesheetsIndex({
                                                 ) : null}
                                             </td>
                                             <td className="px-2 py-3">
-                                                <div className="text-[12px] capitalize">
+                                                <div className="text-sm capitalize">
                                                     {t.shift
                                                         ? (
                                                               t.shift
@@ -1315,7 +1328,7 @@ export default function TimesheetsIndex({
                                                         : (t.activity_type ??
                                                           'manual')}
                                                 </div>
-                                                <div className="text-[11px] text-muted-foreground">
+                                                <div className="text-xs text-muted-foreground">
                                                     {typeof t.shift
                                                         ?.service_context ===
                                                     'string'
@@ -1330,7 +1343,7 @@ export default function TimesheetsIndex({
                                                 <div className="font-semibold tabular-nums">
                                                     {hours.toFixed(2)}h
                                                 </div>
-                                                <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                                                     <Coffee className="h-3 w-3" />
                                                     {t.break_minutes}m
                                                     {(t.mileage_km ?? 0) > 0 ? (
@@ -1352,7 +1365,7 @@ export default function TimesheetsIndex({
                                             <td className="w-[120px] px-2 py-3">
                                                 {recordedActivityCount(t) >
                                                 0 ? (
-                                                    <span className="text-[11px] text-muted-foreground">
+                                                    <span className="text-xs text-muted-foreground">
                                                         {recordedActivityCount(
                                                             t,
                                                         )}{' '}
@@ -1382,13 +1395,13 @@ export default function TimesheetsIndex({
                                                                 }}
                                                             />
                                                         </div>
-                                                        <span className="w-9 text-right text-[11px] text-muted-foreground tabular-nums">
+                                                        <span className="w-9 text-right text-xs text-muted-foreground tabular-nums">
                                                             {t.tasks_completed}/
                                                             {t.tasks_total}
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-[11px] text-muted-foreground/60">
+                                                    <span className="text-xs text-muted-foreground/60">
                                                         —
                                                     </span>
                                                 )}
@@ -1495,12 +1508,20 @@ export default function TimesheetsIndex({
                     </nav>
 
                     <ContextMenu
-                        menu={menu && currentMenuRow ? { ...menu, row: currentMenuRow } : null}
+                        menu={
+                            menu && currentMenuRow
+                                ? { ...menu, row: currentMenuRow }
+                                : null
+                        }
                         onClose={() => setMenu(null)}
                         onAction={handleAction}
                     />
                     <HoverPopover
-                        hover={hover && currentHoverRow ? { ...hover, row: currentHoverRow } : null}
+                        hover={
+                            hover && currentHoverRow
+                                ? { ...hover, row: currentHoverRow }
+                                : null
+                        }
                         timezone={evidence.timezone}
                     />
                 </section>

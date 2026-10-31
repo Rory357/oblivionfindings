@@ -8,10 +8,12 @@ import {
     EvidenceRecords,
     type EvidenceRecordsView,
 } from '@/components/lists/evidence-records';
+import type { MonitorHistoryTarget } from '@/components/security-devices/monitor-history-dialog';
 import { ControlRoomAlertAccessRequired } from '@/components/security-devices/permission-destinations';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewRow } from '@/components/wizard/shell';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { readableKey, readablePhrase } from '@/lib/security-devices-labels';
 import type {
     CentralSiteReadiness,
     CollectionPath,
@@ -36,12 +38,13 @@ import type { ReactNode } from 'react';
 export type MonitoringView = EvidenceRecordsView;
 export type MonitoringOwners = { profiles: boolean };
 type Fact = [string, ReactNode];
+/** Sentence-case words for a monitoring key ("Collection unavailable"). */
 export function monitoringLabel(value: string | null | undefined) {
-    return value
-        ? value
-              .replace(/[_-]/g, ' ')
-              .replace(/\b\w/g, (letter) => letter.toUpperCase())
-        : 'Not recorded';
+    return readableKey(value);
+}
+/** The same words mid-sentence ("Runtime collection unavailable"). */
+export function monitoringPhrase(value: string | null | undefined) {
+    return readablePhrase(value);
 }
 export function monitoringTone(value: string): StatusVariant {
     if (
@@ -124,7 +127,7 @@ function Owner({
     return allowed && href ? (
         <Link
             href={href}
-            className="frontline-focus rounded-sm text-primary hover:underline"
+            className="frontline-focus rounded-sm text-primary underline underline-offset-2"
             onClick={(event) => event.stopPropagation()}
         >
             {name}
@@ -282,6 +285,12 @@ function correlation(row: MonitorRow) {
         </div>
     );
 }
+const monitorRunsFrom = (r: MonitorRow): string =>
+    r.runs_from ??
+    (r.collection.mode === 'remote_collector'
+        ? `Runs from: hub ${r.collection.collector_name}`
+        : 'Runs from: server');
+
 export function MonitorRecords({
     rows,
     view,
@@ -289,6 +298,7 @@ export function MonitorRecords({
     total,
     onEdit,
     onDeactivate,
+    onViewHistory,
     title = 'Monitor states',
     empty = 'No monitors match these filters',
     description = 'Collection failures are shown as uncertainty, not duplicated device failures.',
@@ -299,6 +309,7 @@ export function MonitorRecords({
     total?: number;
     onEdit?: (row: MonitorRow) => void;
     onDeactivate?: (row: MonitorRow) => void;
+    onViewHistory?: (target: MonitorHistoryTarget) => void;
     title?: string;
     description?: string;
     empty?: string;
@@ -340,15 +351,23 @@ export function MonitorRecords({
                         ) : null}
                     </p>
                     <p>
-                        {monitoringLabel(r.kind)} ·{' '}
-                        {r.collection.mode === 'remote_collector'
-                            ? r.collection.collector_name
-                            : r.collection.label}
+                        {monitoringLabel(r.kind)} · {monitorRunsFrom(r)}
                     </p>
                     {r.reported_state !== r.effective_state ? (
                         <EntityChip>
-                            Reported {monitoringLabel(r.reported_state)}
+                            Reported {monitoringPhrase(r.reported_state)}
                         </EntityChip>
+                    ) : null}
+                    {r.maintenance?.active_window ? (
+                        <StatusBadge variant="warning">
+                            Active maintenance:{' '}
+                            {r.maintenance.active_window.name}
+                        </StatusBadge>
+                    ) : r.maintenance?.upcoming_window ? (
+                        <StatusBadge variant="info">
+                            Upcoming maintenance:{' '}
+                            {r.maintenance.upcoming_window.name}
+                        </StatusBadge>
                     ) : null}
                     {r.latest_observation ? (
                         <p>
@@ -372,7 +391,7 @@ export function MonitorRecords({
                                 allowed={owners.profiles}
                             />
                             {r.suppression_reason
-                                ? ` · ${monitoringLabel(r.suppression_reason)}`
+                                ? ` · ${monitoringPhrase(r.suppression_reason)}`
                                 : ''}
                         </p>
                     ) : null}
@@ -408,12 +427,9 @@ export function MonitorRecords({
                 },
                 {
                     key: 'collection',
-                    label: 'Collection',
-                    width: '155px',
-                    cell: (r) =>
-                        r.collection.mode === 'remote_collector'
-                            ? r.collection.collector_name
-                            : r.collection.label,
+                    label: 'Runs from',
+                    width: '175px',
+                    cell: (r) => monitorRunsFrom(r),
                 },
                 {
                     key: 'freshness',
@@ -432,6 +448,20 @@ export function MonitorRecords({
                 },
             ]}
             actionsFor={(r) => [
+                ...(onViewHistory
+                    ? [
+                          {
+                              label: 'View history',
+                              icon: Activity,
+                              onClick: () =>
+                                  onViewHistory({
+                                      monitorId: r.id,
+                                      monitorName: r.name,
+                                      deviceName: r.device.name,
+                                  }),
+                          },
+                      ]
+                    : []),
                 ownerAction(
                     'Open device profile',
                     deviceHref(r.device.id, r.device.href, owners),
@@ -493,6 +523,14 @@ export function MonitorRecords({
                 ['Suppressed until', stamp(r.suppressed_until)],
                 ['Suppression reason', monitoringLabel(r.suppression_reason)],
                 [
+                    'Maintenance window',
+                    r.maintenance?.active_window
+                        ? `Active: ${r.maintenance.active_window.name} (until ${stamp(r.maintenance.active_window.ends_at)})`
+                        : r.maintenance?.upcoming_window
+                          ? `Upcoming: ${r.maintenance.upcoming_window.name} (starts ${stamp(r.maintenance.upcoming_window.starts_at)})`
+                          : 'None active or scheduled in next 24h',
+                ],
+                [
                     'Root cause',
                     r.root_cause
                         ? `${r.root_cause.monitor_name} (monitor #${r.root_cause.monitor_id}, device #${r.root_cause.device_id})`
@@ -540,6 +578,7 @@ export function MonitorRecords({
                         'No Site assigned'
                     ),
                 ],
+                ['Runs from', monitorRunsFrom(r)],
                 ['Collection mode', monitoringLabel(r.collection.mode)],
                 [
                     'Collection state',
@@ -657,7 +696,7 @@ export function CollectionRecords({
                         · {r.affected_devices} affected devices ·{' '}
                         {r.affected_monitors} affected monitors
                     </p>
-                    <p>Reported {monitoringLabel(r.reported_status)}</p>
+                    <p>Reported {monitoringPhrase(r.reported_status)}</p>
                 </>
             )}
             footer={(r) => `Last heartbeat ${stamp(r.last_seen_at)}`}
@@ -765,15 +804,15 @@ export function ReadinessRecords({
                         />
                         <MonitoringState
                             value={r.runtime.state}
-                            label={`Runtime ${monitoringLabel(r.runtime.state)}`}
+                            label={`Runtime ${monitoringPhrase(r.runtime.state)}`}
                         />
                         <MonitoringState
                             value={r.topology.state}
-                            label={`Topology ${monitoringLabel(r.topology.state)}`}
+                            label={`Topology ${monitoringPhrase(r.topology.state)}`}
                         />
                         <MonitoringState
                             value={r.discovery.state}
-                            label={`Discovery ${monitoringLabel(r.discovery.state)}`}
+                            label={`Discovery ${monitoringPhrase(r.discovery.state)}`}
                         />
                         {r.unmonitored_devices > 0 ? (
                             <EntityChip>
@@ -1007,7 +1046,7 @@ export function DependencyRecords({
                     <p>{percent(r.confidence)} confidence</p>
                     <p>
                         {monitoringLabel(r.source)} evidence ·{' '}
-                        {monitoringLabel(r.policy)}
+                        {monitoringPhrase(r.policy)}
                     </p>
                 </>
             )}
@@ -1112,10 +1151,12 @@ export function TrendRecords({
     rows,
     view,
     owners,
+    onViewHistory,
 }: {
     rows: MonitoringWorkspace['trends'];
     view: MonitoringView;
     owners: MonitoringOwners;
+    onViewHistory?: (target: MonitorHistoryTarget) => void;
 }) {
     return (
         <RecordList
@@ -1141,7 +1182,7 @@ export function TrendRecords({
                         {r.latest_value ?? 'No numeric value'} {r.unit ?? ''}
                     </p>
                     <p>
-                        {r.samples} samples · {monitoringLabel(r.direction)} ·{' '}
+                        {r.samples} samples · {monitoringPhrase(r.direction)} ·{' '}
                         {r.state_changes} state changes
                     </p>
                 </>
@@ -1177,6 +1218,20 @@ export function TrendRecords({
                 },
             ]}
             actionsFor={(r) => [
+                ...(onViewHistory
+                    ? [
+                          {
+                              label: 'View history',
+                              icon: Activity,
+                              onClick: () =>
+                                  onViewHistory({
+                                      monitorId: r.monitor_id,
+                                      monitorName: r.monitor_name,
+                                      deviceName: r.device.name,
+                                  }),
+                          },
+                      ]
+                    : []),
                 ownerAction(
                     'Open device profile',
                     deviceHref(r.device.id, r.device.href, owners),
@@ -1222,7 +1277,7 @@ export function CapacityRecords({
             rows={rows}
             view={view}
             title="External history and retention"
-            description="Retained series evidence and measured capacity projections."
+            description="Retained series evidence and measured capacity trends."
             total={total}
             keyFor={(r) => r.series_id}
             name={(r) => `${r.device.name} · ${monitoringLabel(r.metric)}`}
@@ -1245,7 +1300,7 @@ export function CapacityRecords({
                         samples
                     </p>
                     <p>
-                        Projection {monitoringLabel(r.projection.state)}
+                        Trend {monitoringPhrase(r.projection.state)}
                         {r.projection.threshold_at
                             ? ` · threshold ${stamp(r.projection.threshold_at)}`
                             : ''}
@@ -1278,7 +1333,7 @@ export function CapacityRecords({
                 },
                 {
                     key: 'projection',
-                    label: 'Projection',
+                    label: 'Trend',
                     width: '195px',
                     cell: (r) => <MonitoringState value={r.projection.state} />,
                 },
@@ -1313,12 +1368,12 @@ export function CapacityRecords({
                 ['Samples', r.sample_count],
                 ['Observed at', stamp(r.observed_at)],
                 ['Storage', <MonitoringState value={r.storage_state} />],
-                ['Projection', <MonitoringState value={r.projection.state} />],
+                ['Trend', <MonitoringState value={r.projection.state} />],
                 ['Threshold', r.projection.threshold ?? 'Not configured'],
                 ['Measured from', stamp(r.projection.measured_from)],
                 ['Measured to', stamp(r.projection.measured_to)],
                 ['History points', r.projection.sample_count],
-                ['Projection p95', r.projection.p95 ?? 'Insufficient data'],
+                ['Trend p95', r.projection.p95 ?? 'Insufficient data'],
                 [
                     'Slope per day',
                     r.projection.slope_per_day ?? 'Insufficient data',
@@ -1346,7 +1401,7 @@ export function RetentionRecords({
             keyFor={(r) => r.id}
             name={(r) => r.name}
             subline={(r) =>
-                `${monitoringLabel(r.scope)} · ${monitoringLabel(r.data_class)}`
+                `${monitoringLabel(r.scope)} · ${monitoringPhrase(r.data_class)}`
             }
             icon={Clock3}
             state={(r) => (r.legal_hold ? 'legal_hold' : 'retention_policy')}
@@ -1416,13 +1471,13 @@ export function QueueRecords({
             description="A dispatched heartbeat alone does not prove a worker consumed it."
             keyFor={(r) => r.name}
             name={(r) => monitoringLabel(r.name)}
-            subline={(r) => `Queue ${monitoringLabel(r.name)}`}
+            subline={(r) => `Queue ${monitoringPhrase(r.name)}`}
             icon={Activity}
             state={(r) => r.state}
             summary={(r) => (
                 <>
                     <p>
-                        Worker {monitoringLabel(r.worker_state)}
+                        Worker {monitoringPhrase(r.worker_state)}
                         {r.heartbeat_age_seconds === null
                             ? ' · no heartbeat consumed'
                             : ` · heartbeat ${r.heartbeat_age_seconds}s ago`}

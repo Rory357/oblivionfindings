@@ -12,11 +12,13 @@ use App\Domain\Monitoring\Models\MonitorDependency;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
+use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CapacityProjectionService;
 use App\Domain\Monitoring\Services\CentralSiteMonitoringReadinessService;
+use App\Domain\Monitoring\Services\EffectiveMonitoringPolicyResolver;
 use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
 use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringRecoveryRequestService;
@@ -69,6 +71,7 @@ class MonitoringOperationsPresenter
             $device->id => $this->siteForDevice($device, $siteContext),
         ]);
         $accessibleSiteIds = $this->access->accessibleSiteIds($viewer);
+        $canViewAllSites = $this->access->canViewAllSites($viewer);
         $canManageNativeMonitors = $viewer->canDo('securityDevices.monitoring.manage');
         $accessibleSites = $accessibleSiteIds === []
             ? collect()
@@ -95,6 +98,13 @@ class MonitoringOperationsPresenter
                 ->get();
         $observations = $this->recentObservations($allMonitors->pluck('id'));
         $correlations = $this->correlations($allMonitors, $sitesByDevice, $viewer);
+        $maintenanceWindows = $accessibleSiteIds === []
+            ? collect()
+            : MonitoringMaintenanceWindow::query()
+                ->where('status', 'active')
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->orderBy('starts_at')
+                ->get();
         $mapped = $allMonitors->map(fn (Monitor $monitor): array => $this->mapMonitor(
             $monitor,
             $sitesByDevice->get($monitor->device_id),
@@ -102,6 +112,9 @@ class MonitoringOperationsPresenter
             $correlations->get($monitor->id),
             $canManageNativeMonitors,
             (int) $viewer->id,
+            $maintenanceWindows,
+            $canViewAllSites,
+            $accessibleSiteIds,
         ));
         $collectionPaths = $this->collectionPaths($allMonitors, $sitesByDevice);
         $monitorFindings = $mapped
@@ -128,6 +141,71 @@ class MonitoringOperationsPresenter
             $runtime['queues'],
         );
 
+        $monitorProfiles = $canManageNativeMonitors
+            ? MonitoringProfile::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (MonitoringProfile $profile): array => [
+                    'id' => (int) $profile->id,
+                    'name' => $profile->name,
+                ])
+                ->values()
+                ->all()
+            : [];
+        $monitorDevices = $canManageNativeMonitors
+            ? $visibleDevices
+                ->filter(fn (Device $device): bool => $sitesByDevice->get($device->id) instanceof Site)
+                ->map(function (Device $device) use ($sitesByDevice): array {
+                    $site = $sitesByDevice->get($device->id);
+
+                    return [
+                        'id' => (int) $device->id,
+                        'name' => $device->name,
+                        'site' => ['id' => (int) $site->id, 'name' => $site->name],
+                    ];
+                })
+                ->values()
+                ->all()
+            : [];
+        $monitorCollectors = $canManageNativeMonitors && ($canViewAllSites || $accessibleSiteIds !== [])
+            ? MonitoringCollector::query()
+                ->with('site:id,name')
+                ->whereNull('revoked_at')
+                ->when(! $canViewAllSites, fn ($query) => $query->whereIn('site_id', $accessibleSiteIds))
+                ->orderBy('name')
+                ->get()
+                ->map(fn (MonitoringCollector $collector): array => [
+                    'id' => (int) $collector->id,
+                    'name' => $collector->name,
+                    'home_site_id' => (int) $collector->site_id,
+                    'home_site_name' => $collector->site?->name,
+                    'authorised_site_ids' => array_values(array_filter(
+                        $collector->authorisedSiteIds(),
+                        fn (int $id): bool => $canViewAllSites || in_array($id, $accessibleSiteIds, true),
+                    )),
+                    'state' => $this->collectorState($collector),
+                ])
+                ->values()
+                ->all()
+            : [];
+        $missingCheckReason = null;
+        $missingCheckFixHref = null;
+        $missingCheckFixLabel = null;
+        if (! $canManageNativeMonitors) {
+            $missingCheckReason = 'You need monitoring management permission to add checks.';
+        } elseif ($monitorDevices === []) {
+            $missingCheckReason = $visibleDevices->isEmpty()
+                ? 'Register a device and assign it to a Site first.'
+                : 'Assign a device to an active Site first so checks know where it lives.';
+            $missingCheckFixHref = '/security-devices/devices';
+            $missingCheckFixLabel = 'Open Devices';
+        } elseif ($monitorProfiles === []) {
+            $missingCheckReason = 'Create an active check schedule on Setup first.';
+            $missingCheckFixHref = '/security-devices/settings';
+            $missingCheckFixLabel = 'Open Setup';
+        }
+
         return [
             'actor_id' => (int) $viewer->id,
             'tabs' => [
@@ -140,9 +218,9 @@ class MonitoringOperationsPresenter
             ],
             'active_tab' => $this->tab($filters['tab'] ?? null),
             'boundary' => [
-                'title' => 'Oblivion native monitoring',
+                'title' => 'Built-in monitoring',
                 'description' => 'The main application monitors SD-WAN reachable sites directly. Hardened collectors extend coverage only where a remote path requires local collection.',
-                'privacy_note' => 'Probe targets, credentials, configuration, raw messages, and metric dimensions are never projected into this workspace. Only bounded retained summaries and aggregate capacity projections are shown.',
+                'privacy_note' => 'Saved passwords, private targets, and raw device messages stay hidden on this overview. Only check results and health summaries are shown.',
                 'control_room_note' => 'This workspace explains technical evidence and coverage. Control Room remains the operational triage and escalation destination.',
             ],
             'can' => [
@@ -181,33 +259,12 @@ class MonitoringOperationsPresenter
                 'kinds' => $canManageNativeMonitors
                     ? NativeMonitoringDefinitionService::directKindOptions()
                     : [],
-                'profiles' => $canManageNativeMonitors
-                    ? MonitoringProfile::query()
-                        ->where('is_active', true)
-                        ->orderBy('name')
-                        ->get(['id', 'name'])
-                        ->map(fn (MonitoringProfile $profile): array => [
-                            'id' => (int) $profile->id,
-                            'name' => $profile->name,
-                        ])
-                        ->values()
-                        ->all()
-                    : [],
-                'devices' => $canManageNativeMonitors
-                    ? $visibleDevices
-                        ->filter(fn (Device $device): bool => $sitesByDevice->get($device->id) instanceof Site)
-                        ->map(function (Device $device) use ($sitesByDevice): array {
-                            $site = $sitesByDevice->get($device->id);
-
-                            return [
-                                'id' => (int) $device->id,
-                                'name' => $device->name,
-                                'site' => ['id' => (int) $site->id, 'name' => $site->name],
-                            ];
-                        })
-                        ->values()
-                        ->all()
-                    : [],
+                'profiles' => $monitorProfiles,
+                'devices' => $monitorDevices,
+                'collectors' => $monitorCollectors,
+                'missing_reason' => $missingCheckReason,
+                'fix_href' => $missingCheckFixHref,
+                'fix_label' => $missingCheckFixLabel,
             ],
             'inventory' => [
                 'total' => $filtered->count(),
@@ -223,7 +280,7 @@ class MonitoringOperationsPresenter
                 'stale' => (int) ($freshness['stale'] ?? 0),
                 'never_observed' => (int) ($freshness['never'] ?? 0),
                 'unsupported_state' => 'evidence_backed',
-                'unsupported_note' => 'Coverage is classified from enabled monitors and governed expectations. Missing checks remain visible instead of being inferred from vendor or model names.',
+                'unsupported_note' => 'Coverage is based on active checks. Devices without checks stay listed as unmonitored instead of guessing support from brand or model names.',
                 'by_kind' => $mapped->groupBy('kind')->map->count()->sortKeys(),
                 'by_site' => $this->coverageBySite($visibleDevices, $mapped, $sitesByDevice),
             ],
@@ -385,7 +442,12 @@ class MonitoringOperationsPresenter
             ->map(fn (Collection $rows): Collection => $rows->take(10)->values());
     }
 
-    /** @param Collection<int, MonitorObservation> $observations @return array<string, mixed> */
+    /**
+     * @param  Collection<int, MonitorObservation>  $observations
+     * @param  Collection<int, MonitoringMaintenanceWindow>  $maintenanceWindows
+     * @param  array<int, int>  $accessibleSiteIds
+     * @return array<string, mixed>
+     */
     private function mapMonitor(
         Monitor $monitor,
         ?Site $site,
@@ -393,8 +455,13 @@ class MonitoringOperationsPresenter
         ?array $correlation,
         bool $canManage,
         int $actorId,
+        Collection $maintenanceWindows,
+        bool $canViewAllSites,
+        array $accessibleSiteIds,
     ): array {
-        $nativeDirect = $monitor->collector_id === null
+        $collectorHomeVisible = $monitor->collector_id === null
+            || ($monitor->collector !== null && ($canViewAllSites || in_array((int) $monitor->collector->site_id, $accessibleSiteIds, true)));
+        $nativeManageable = $collectorHomeVisible
             && in_array(
                 $monitor->kind?->value ?? (string) $monitor->kind,
                 NativeMonitoringDefinitionService::directKindValues(),
@@ -435,6 +502,7 @@ class MonitoringOperationsPresenter
             ] : null,
             'suppressed_until' => $monitor->suppressed_until?->toIso8601String(),
             'suppression_reason' => $monitor->suppression_reason,
+            'maintenance' => $this->maintenanceForMonitor($monitor, $site, $maintenanceWindows),
             'root_cause' => $monitor->rootCauseMonitor ? [
                 'monitor_id' => $monitor->rootCauseMonitor->id,
                 'monitor_name' => $monitor->rootCauseMonitor->name,
@@ -457,6 +525,11 @@ class MonitoringOperationsPresenter
                 'name' => $site->name,
                 'href' => "/security-devices/sites/{$site->id}",
             ] : null,
+            'collector_id' => $monitor->collector_id === null ? null : (int) $monitor->collector_id,
+            'collector_name' => $monitor->collector?->name,
+            'runs_from' => $monitor->collector_id === null
+                ? 'Runs from: server'
+                : 'Runs from: hub '.($monitor->collector?->name ?? '#'.$monitor->collector_id),
             'collection' => $monitor->collector ? [
                 'mode' => 'remote_collector',
                 'collector_id' => $monitor->collector->id,
@@ -470,14 +543,14 @@ class MonitoringOperationsPresenter
             ],
             'actions' => [
                 'actor_id' => $actorId,
-                'can_manage' => $canManage && $nativeDirect,
-                'review_token' => $canManage && $nativeDirect && $site
+                'can_manage' => $canManage && $nativeManageable,
+                'review_token' => $canManage && $nativeManageable && $site
                     ? app(NativeMonitorCommandService::class)->reviewToken($monitor, (int) $site->id)
                     : null,
-                'update_url' => $canManage && $nativeDirect
+                'update_url' => $canManage && $nativeManageable
                     ? "/security-devices/monitoring/native-monitors/{$monitor->id}"
                     : null,
-                'deactivate_url' => $canManage && $nativeDirect && $monitor->is_enabled
+                'deactivate_url' => $canManage && $nativeManageable && $monitor->is_enabled
                     ? "/security-devices/monitoring/native-monitors/{$monitor->id}/deactivate"
                     : null,
             ],
@@ -498,6 +571,50 @@ class MonitoringOperationsPresenter
                 'retained_from' => $observations->last()?->observed_at?->toIso8601String(),
                 'retained_to' => $latest?->observed_at?->toIso8601String(),
             ],
+        ];
+    }
+
+    /** @param Collection<int, MonitoringMaintenanceWindow> $windows @return array<string, mixed> */
+    private function maintenanceForMonitor(Monitor $monitor, ?Site $site, Collection $windows): array
+    {
+        if (! $site) {
+            return ['active_window' => null, 'upcoming_window' => null];
+        }
+
+        $now = now();
+        $horizon = $now->copy()->addDays(7);
+        $lifeSafetyProtected = in_array(
+            (string) ($monitor->device?->domain ?? ''),
+            EffectiveMonitoringPolicyResolver::LIFE_SAFETY_DOMAINS,
+            true,
+        );
+        $matching = $windows->filter(function (MonitoringMaintenanceWindow $window) use ($monitor, $site): bool {
+            return (int) $window->site_id === (int) $site->id
+                && ($window->monitor_id === null || (int) $window->monitor_id === (int) $monitor->id)
+                && ($window->device_id === null || (int) $window->device_id === (int) $monitor->device_id);
+        });
+        /** @var MonitoringMaintenanceWindow|null $active */
+        $active = $matching->first(fn (MonitoringMaintenanceWindow $window): bool => $window->isActiveAt($now));
+        /** @var MonitoringMaintenanceWindow|null $upcoming */
+        $upcoming = $matching
+            ->filter(fn (MonitoringMaintenanceWindow $window): bool => $window->starts_at !== null
+                && $window->starts_at->gt($now)
+                && $window->starts_at->lte($horizon))
+            ->sortBy('starts_at')
+            ->first();
+
+        $format = static fn (?MonitoringMaintenanceWindow $window): ?array => $window === null ? null : [
+            'id' => (int) $window->id,
+            'name' => $window->name,
+            'starts_at' => $window->starts_at?->toIso8601String(),
+            'ends_at' => $window->ends_at?->toIso8601String(),
+            'timezone' => $window->timezone,
+            'life_safety_protected' => $lifeSafetyProtected,
+        ];
+
+        return [
+            'active_window' => $format($active),
+            'upcoming_window' => $format($upcoming),
         ];
     }
 
@@ -751,7 +868,7 @@ class MonitoringOperationsPresenter
                     'state' => $this->collectorState($collector),
                     'reported_status' => $collector?->status ?? 'unknown',
                     'last_seen_at' => $lastHeartbeat?->toIso8601String(),
-                    'heartbeat_lag_seconds' => $lastHeartbeat?->diffInSeconds(now()),
+                    'heartbeat_lag_seconds' => $lastHeartbeat === null ? null : (int) round(max(0, $lastHeartbeat->diffInSeconds(now()))),
                     'site' => $site ? [
                         'id' => $site->id,
                         'name' => $site->name,

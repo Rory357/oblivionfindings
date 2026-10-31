@@ -25,7 +25,8 @@ beforeEach(function () {
     $this->publisher = app(HubPublishing::class);
     $this->page = $this->publisher->create($this->moderator, 'news', 'Moderated company story');
     $draft = $this->page->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'A complete company story for moderation contracts.';
+    // The story template also starts an image and a second text block; keep one complete text block.
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'A complete company story for moderation contracts.']];
     $this->page->update(['draft' => $draft]);
     $this->revision = $this->publisher->publish($this->moderator, $this->page, 1, null, null);
     $this->participation = app(HubParticipation::class);
@@ -193,7 +194,7 @@ test('moderation rejects forged author parent page body and noncomment identifie
     $reply = ($this->comment)('One level reply', $id);
     $other = $this->publisher->create($this->moderator, 'news', 'Another company story');
     $draft = $other->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'A complete company story for cross-page denial.';
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'A complete company story for cross-page denial.']];
     $other->update(['draft' => $draft]);
     $release = $this->publisher->publish($this->moderator, $other, 1, null, null);
     $this->actingAs($this->moderator);

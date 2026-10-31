@@ -18,7 +18,7 @@ use Tests\TestCase;
 
 class LoneWorkerSiteAccessTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\LoneWorkerReviewedCommandFixtures;
 
     protected function setUp(): void
     {
@@ -164,6 +164,7 @@ class LoneWorkerSiteAccessTest extends TestCase
             'hazards.view',
             'hazards.manage',
             'healthSafety.viewAllSites',
+            'assets.telemetry.view',
         ]);
         $localWorker = $this->siteUser($localSite);
         $outsideWorker = $this->siteUser($outsideSite);
@@ -180,7 +181,7 @@ class LoneWorkerSiteAccessTest extends TestCase
         $this->actingAs($allSitesViewer)
             ->post("/health-safety/lone-workers/sessions/{$validOutside->id}/locate")
             ->assertRedirect()
-            ->assertSessionHas('error', 'This worker does not have a paired GPS tracker.');
+            ->assertSessionHasErrors('tracker');
         $this->assertSame('active', $validOutside->fresh()->status);
 
         $this->actingAs($localViewer)
@@ -256,8 +257,8 @@ class LoneWorkerSiteAccessTest extends TestCase
         foreach ([$missingProfile, $expiredProfile, $shiftWorkerConflict] as $unsafeSession) {
             $this->actingAs($viewer)
                 ->get('/health-safety/lone-workers?period=all&session='.$unsafeSession->id)
-                ->assertOk()
-                ->assertInertia(fn (Assert $page) => $page->where('detail', null));
+                ->assertNotFound();
+            $this->get('/health-safety/lone-workers/sessions/'.$unsafeSession->id)->assertForbidden();
             $this->actingAs($viewer)
                 ->post("/health-safety/lone-workers/sessions/{$unsafeSession->id}/end")
                 ->assertForbidden();

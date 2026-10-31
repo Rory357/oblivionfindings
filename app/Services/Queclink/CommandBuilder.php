@@ -106,6 +106,18 @@ class CommandBuilder
     }
 
     /**
+     * Request a live device status report (+RESP:GTINF).
+     *
+     * Spec references:
+     *   - Queclink GL30MEU @Track Air Interface Protocol (GL30MEUR01 Rev 2.04 §3.2.8, AT+GTRTO sub-command A = INF)
+     *   - Queclink GV500CG @Track Air Interface Protocol (TRACGV500CGAN005 Rev 5.01 §3.5.1, AT+GTRTO sub-command A = INF)
+     */
+    public function requestDeviceInfo(string $family, #[\SensitiveParameter] ?string $password = null): array
+    {
+        return $this->build($family, 'RTO', ['A', '', '', '', '', ''], $password);
+    }
+
+    /**
      * Build GL30MEU backend server registration settings.
      *
      * @param  array<string, mixed>  $settings
@@ -452,15 +464,18 @@ class CommandBuilder
         ]);
     }
 
-    public function setReportingInterval(string $family, int $seconds): array
-    {
+    public function setReportingInterval(
+        string $family,
+        int $seconds,
+        #[\SensitiveParameter] ?string $password = null,
+    ): array {
         if ($seconds < 5 || $seconds > 86400) {
             throw new InvalidArgumentException('Reporting interval must be 5..86400 seconds.');
         }
         if (strtolower($family) === self::FAMILY_GL30M) {
             return $this->gl30GlobalConfiguration([
                 'continuous_send_interval_seconds' => $seconds,
-            ]);
+            ], $password);
         }
 
         // AT+GTFRI fields (after password), per @Track v5.01 §3.4.1:
@@ -489,7 +504,61 @@ class CommandBuilder
             0,           // Continue Time
             '',          // Reserved
             0,           // Wrap Corner Point
-        ]);
+        ], $password);
+    }
+
+    /**
+     * Build scheduled protocol watchdog configuration (AT+GTDOG).
+     *
+     * Spec references:
+     *   - Queclink GL30MEU @Track Air Interface Protocol (GL30MEUR01 Rev 2.04 §3.2.2.3 AT+GTDOG)
+     *   - Queclink GV500CG @Track Air Interface Protocol (TRACGV500CGAN005 Rev 5.01 §3.2.5 AT+GTDOG)
+     *
+     * @param  array<string, mixed>  $args
+     */
+    public function watchdog(
+        string $family,
+        array $args,
+        #[\SensitiveParameter] ?string $password = null,
+    ): array {
+        $mode = (int) ($args['mode'] ?? 1);
+        $intervalDays = (int) ($args['reboot_interval'] ?? 7);
+        $rebootTime = trim((string) ($args['reboot_time'] ?? '0200'));
+        $reportBeforeReboot = (int) ($args['report_before_reboot'] ?? 1);
+
+        if (! in_array($mode, [0, 1, 2], true)) {
+            throw new InvalidArgumentException('Watchdog mode must be 0 (off), 1 (time-based), or 2 (ignition/network-based).');
+        }
+        if ($intervalDays < 1 || $intervalDays > 30) {
+            throw new InvalidArgumentException('Watchdog reboot interval must be between 1 and 30 days.');
+        }
+        if (preg_match('/^(?:[01][0-9]|2[0-3])[0-5][0-9]$/', $rebootTime) !== 1) {
+            throw new InvalidArgumentException('Watchdog reboot time must be a 24-hour HHMM string such as 0200.');
+        }
+
+        if (strtolower($family) === self::FAMILY_GL30M) {
+            return $this->gl30Dog([
+                'mode' => $mode,
+                'reboot_interval' => $intervalDays,
+                'reboot_time' => $rebootTime,
+                'report_before_reboot' => $reportBeforeReboot,
+                'unit' => 0,
+            ], $password);
+        }
+
+        return $this->build($family, 'DOG', [
+            $mode,
+            60,                  // Ignition frequency (minutes)
+            $intervalDays,       // Interval
+            $rebootTime,         // Time (HHMM)
+            '',                  // Reserved
+            $reportBeforeReboot,  // Report before reboot
+            1,                   // Unit = day
+            '',                  // Reserved
+            '',                  // Reserved
+            '',                  // Reserved
+            '',                  // Reserved
+        ], $password);
     }
 
     /**

@@ -15,6 +15,10 @@ class ModifiedDuty extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'source_schema_version',
+        'source_revision',
+        'worker_snapshot',
+        'recorder_snapshot',
         'return_to_work_plan_id',
         'user_id',
         'start_date',
@@ -30,6 +34,10 @@ class ModifiedDuty extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
+        'worker_snapshot' => 'array',
+        'recorder_snapshot' => 'array',
         'start_date' => 'date',
         'end_date' => 'date',
         'hours_per_day' => 'decimal:1',
@@ -76,5 +84,11 @@ class ModifiedDuty extends Model
                 $q->whereNull('end_date')
                     ->orWhere('end_date', '>=', now());
             });
+    }
+
+    /** Immutable source history; no authority is inherited from this relation. */
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(WorkplaceInjurySourceVersion::class, 'source_id')->where('source_type', 'modified_duty');
     }
 }

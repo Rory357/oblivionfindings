@@ -81,6 +81,7 @@ function makeUniversalIncidentJourney(
         : null;
 
     $incident->forceFill([
+        'reference_number' => 'INC-TASK-'.$incident->id,
         'hs_event_id' => $event->id,
         'control_room_alert_id' => $alert?->id,
     ])->saveQuietly();
@@ -113,6 +114,7 @@ it('groups the five incident entry paths under truthful journey references witho
     $user = makeIncidentJourneyTasksUser($site, [
         'incidents.viewAny',
         'controlRoom.viewAny',
+        'controlRoom.alerts.view',
         'hazards.view',
     ]);
     $client = Client::factory()->create([
@@ -166,6 +168,7 @@ it('uses the same current and incident-time Site access as the source modules', 
     $user = makeIncidentJourneyTasksUser($visibleSite, [
         'incidents.viewAny',
         'controlRoom.viewAny',
+        'controlRoom.alerts.view',
         'hazards.view',
     ]);
     $visibleClient = Client::factory()->create([
@@ -194,6 +197,7 @@ it('finds every related responsibility by any official journey reference', funct
     $user = makeIncidentJourneyTasksUser($site, [
         'incidents.viewAny',
         'controlRoom.viewAny',
+        'controlRoom.alerts.view',
         'hazards.view',
     ]);
     $client = Client::factory()->create(['site_id' => $site->id]);
@@ -281,6 +285,7 @@ it('finds the incident journey by people place source work narrative references 
     $viewer = makeIncidentJourneyTasksUser($site, [
         'incidents.viewAny',
         'controlRoom.viewAny',
+        'controlRoom.alerts.view',
         'hazards.view',
     ]);
     $viewer->forceFill(['name' => 'Playwright Queue Viewer'])->save();
@@ -398,6 +403,7 @@ it('searches incident journey responsibilities beyond each providers normal 300 
     $viewer = makeIncidentJourneyTasksUser($site, [
         'incidents.viewAny',
         'controlRoom.viewAny',
+        'controlRoom.alerts.view',
         'hazards.view',
         'fleet.viewAny',
     ]);
@@ -443,9 +449,11 @@ it('searches incident journey responsibilities beyond each providers normal 300 
             ->where('items', fn ($items) => collect($items)
                 ->contains(fn ($item) => $item['id'] === 'corrective_action-'.$targetAction->id)));
 
+    // One read each for the page's items. The sidebar's All Tasks count no longer runs
+    // with the page (it loads after it, with the inbox), so the second read is gone.
     expect(TaskSearch::hasQuery(['q' => '0']))->toBeTrue()
-        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_work_orders')))->toHaveCount(2)
-        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_service_schedules')))->toHaveCount(2)
+        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_work_orders')))->toHaveCount(1)
+        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_service_schedules')))->toHaveCount(1)
         ->and(collect($queries)->contains(
             fn (string $sql) => str_contains($sql, 'hs_corrective_actions')
                 && str_contains($sql, ' like '),
@@ -472,7 +480,9 @@ it('keeps completed journey work in explicit history only', function () {
 it('replaces transferred operational work with one retry-safe H&S responsibility', function () {
     $site = Site::factory()->create();
     $user = makeIncidentJourneyTasksUser($site, [
+        'incidents.viewAny',
         'controlRoom.viewAny',
+        'controlRoom.alerts.view',
         'hazards.view',
         'hazards.manage',
     ]);
@@ -502,4 +512,135 @@ it('replaces transferred operational work with one retry-safe H&S responsibility
         ->and($items->where('id', 'corrective_action-'.$first->id))->toHaveCount(1)
         ->and($items->pluck('id')->contains("alert_task-{$task->id}"))->toBeFalse()
         ->and(HsCorrectiveAction::query()->whereKey($first->id)->count())->toBe(1);
+});
+
+it('does not match an incident task through restricted Control Room or H&S search material', function () {
+    $site = Site::factory()->create();
+    $user = makeIncidentJourneyTasksUser($site, ['incidents.viewAny']);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $journey = makeUniversalIncidentJourney($site, $client, $user, 'manual');
+    $journey['incident']->updateQuietly(['description' => 'Readable front-line account.']);
+    AlertTask::query()->create([
+        'alert_id' => $journey['alert']->id,
+        'title' => 'RestrictedOperatorZephyr',
+        'status' => AlertTask::STATUS_IN_PROGRESS,
+        'priority' => 'high',
+    ]);
+    $filters = ['sources' => ['incident', 'followup']];
+    $items = collect((new TaskAggregator)->arrayFor($user, $filters));
+    $incidentTask = $items->firstWhere('id', 'incident-'.$journey['incident']->id);
+    expect($incidentTask)->not->toBeNull()
+        ->and(data_get($incidentTask, 'journey.references.control_room'))->toBeNull()
+        ->and(data_get($incidentTask, 'journey.references.health_safety'))->toBeNull();
+
+    foreach (['RestrictedOperatorZephyr', $journey['alert']->reference_number, $journey['event']->reference_number] as $secret) {
+        expect((new TaskAggregator)->arrayFor($user, [...$filters, 'q' => $secret]))->toBeEmpty();
+    }
+    expect((new TaskAggregator)->arrayFor($user, [...$filters, 'q' => 'Readable front-line account']))->not->toBeEmpty();
+});
+
+it('does not reveal a confidential incident through H&S task context or search', function () {
+    $site = Site::factory()->create();
+    $user = makeIncidentJourneyTasksUser($site, ['incidents.viewAny', 'hazards.view']);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $journey = makeUniversalIncidentJourney($site, $client, $user, 'manual');
+    $journey['incident']->forceFill([
+        'is_hr_confidential' => true,
+        'description' => 'ConfidentialStaffOrchid',
+    ])->saveQuietly();
+    expect((bool) $journey['incident']->fresh()->is_hr_confidential)->toBeTrue();
+    $filters = ['sources' => ['hs_event', 'hs_investigation', 'corrective_action']];
+    $items = collect((new TaskAggregator)->arrayFor($user, $filters));
+    expect($items)->not->toBeEmpty()
+        ->and($items->every(fn (array $item) => $item['journey'] === null))->toBeTrue();
+    foreach (['ConfidentialStaffOrchid', $journey['incident']->reference_number] as $secret) {
+        expect((new TaskAggregator)->arrayFor($user, [...$filters, 'q' => $secret]))->toBeEmpty();
+    }
+    expect((new TaskAggregator)->arrayFor($user, [...$filters, 'q' => $journey['event']->reference_number]))->not->toBeEmpty();
+});
+
+it('does not match corrective actions through restricted operational task notes', function () {
+    $site = Site::factory()->create();
+    $user = makeIncidentJourneyTasksUser($site, ['hazards.view']);
+    $event = HsEvent::factory()->create(['site_id' => $site->id]);
+    $alert = ControlRoomAlert::factory()->create(['site_id' => $site->id]);
+    $task = AlertTask::query()->create([
+        'alert_id' => $alert->id,
+        'title' => 'PrivateOperatorPohutukawa',
+        'description' => 'Private task account.',
+        'status' => AlertTask::STATUS_TRANSFERRED,
+        'priority' => 'high',
+    ]);
+    $action = HsCorrectiveAction::factory()->create([
+        'hs_event_id' => $event->id,
+        'source_control_room_task_id' => $task->id,
+        'title' => 'ReadableRepairManuka',
+    ]);
+    $filters = ['sources' => ['corrective_action']];
+    expect((new TaskAggregator)->arrayFor($user, [...$filters, 'q' => 'PrivateOperatorPohutukawa']))->toBeEmpty();
+    expect(collect((new TaskAggregator)->arrayFor($user, [...$filters, 'q' => 'ReadableRepairManuka']))->pluck('id')->all())
+        ->toContain('corrective_action-'.$action->id);
+});
+
+it('withholds copied corrective action source prose from queue detail search and exports after source access changes', function () {
+    $site = Site::factory()->create();
+    $user = makeIncidentJourneyTasksUser($site, ['hazards.view']);
+    $alert = ControlRoomAlert::factory()->create(['site_id' => $site->id]);
+    $event = HsEvent::factory()->create(['site_id' => $site->id, 'control_room_alert_id' => $alert->id]);
+    $task = AlertTask::create(['alert_id' => $alert->id, 'title' => 'PrivateOperatorRimu', 'description' => 'CopiedOperatorKauri instruction', 'status' => 'transferred', 'priority' => 'medium']);
+    $action = HsCorrectiveAction::factory()->create(['hs_event_id' => $event->id, 'source_control_room_task_id' => $task->id, 'title' => 'Readable repair responsibility', 'description' => $task->description]);
+    $original = $action->fresh()->getAttributes();
+    $filters = ['sources' => ['corrective_action']];
+    $this->actingAs($user)->get('/tasks?sources=corrective_action')->assertOk()->assertInertia(fn ($page) => $page
+        ->has('items', 1)->where('items.0.description', null));
+    $this->get('/tasks/detail?source=corrective_action&id='.$action->id)->assertOk()->assertJsonPath('item.description', null);
+    foreach (['CopiedOperatorKauri', 'PrivateOperatorRimu'] as $privateTerm) {
+        $this->get('/tasks?sources=corrective_action&q='.$privateTerm)->assertOk()->assertInertia(fn ($page) => $page->has('items', 0)->where('pagination.total', 0));
+        $export = $this->get('/tasks?sources=corrective_action&format=csv&q='.$privateTerm)->assertOk();
+        expect($export->streamedContent())->not->toContain($privateTerm)->not->toContain($action->reference_number);
+    }
+
+    $permission = Permission::where('key', 'controlRoom.alerts.view')->firstOrFail();
+    $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+    expect(collect((new TaskAggregator)->arrayFor($user->fresh(), [...$filters, 'q' => 'CopiedOperatorKauri']))->first()['description'])->toBe($task->description);
+    $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
+    expect((new TaskAggregator)->arrayFor($user->fresh(), [...$filters, 'q' => 'CopiedOperatorKauri']))->toBeEmpty();
+    $this->assertSame($original, $action->fresh()->getAttributes());
+});
+
+it('withholds copied action prose when an otherwise readable source belongs to a different journey', function () {
+    $site = Site::factory()->create();
+    $user = makeIncidentJourneyTasksUser($site, ['hazards.view', 'controlRoom.alerts.view']);
+    $alert = ControlRoomAlert::factory()->create(['site_id' => $site->id]);
+    $event = HsEvent::factory()->create(['site_id' => $site->id]);
+    $task = AlertTask::create(['alert_id' => $alert->id, 'title' => 'ForeignOperatorMatai', 'description' => 'ForeignSourceTotara', 'status' => 'open', 'priority' => 'medium']);
+    $action = HsCorrectiveAction::factory()->create(['hs_event_id' => $event->id, 'source_control_room_task_id' => $task->id, 'description' => $task->description]);
+    $filters = ['sources' => ['corrective_action']];
+    foreach (['ForeignSourceTotara', 'ForeignOperatorMatai'] as $term) {
+        expect((new TaskAggregator)->arrayFor($user->fresh(), [...$filters, 'q' => $term]))->toBeEmpty();
+    }
+    $event->update(['control_room_alert_id' => $alert->id, 'client_id' => Client::factory()->create(['site_id' => $site->id])->id]);
+    expect((new TaskAggregator)->arrayFor($user->fresh(), [...$filters, 'q' => 'ForeignSourceTotara']))->toBeEmpty();
+    $this->assertSame($task->description, $action->fresh()->description);
+});
+
+it('finds standalone H&S events investigations and actions by their own records and approved person', function () {
+    $site = Site::factory()->create();
+    $user = makeIncidentJourneyTasksUser($site, ['hazards.view']);
+    $client = Client::factory()->create(['site_id' => $site->id, 'first_name' => 'Kauri', 'last_name' => 'Standalone']);
+    $event = HsEvent::factory()->create(['site_id' => $site->id, 'client_id' => $client->id]);
+    $investigation = HsInvestigation::factory()->create(['hs_event_id' => $event->id, 'status' => HsInvestigation::STATUS_DRAFT]);
+    $action = HsCorrectiveAction::factory()->create(['hs_event_id' => $event->id, 'title' => 'StandaloneRimuRepair']);
+    foreach ([
+        ['hs_event', $event->id, $event->reference_number],
+        ['hs_investigation', $investigation->id, $investigation->reference_number],
+        ['corrective_action', $action->id, 'StandaloneRimuRepair'],
+    ] as [$source, $id, $term]) {
+        foreach ([$term, 'Kauri Standalone'] as $query) {
+            $items = (new TaskAggregator)->arrayFor($user, ['sources' => [$source], 'q' => $query]);
+            expect(collect($items)->pluck('id')->all())->toContain("{$source}-{$id}");
+        }
+    }
+    $event->updateQuietly(['site_id' => Site::factory()->create()->id]);
+    expect((new TaskAggregator)->arrayFor($user, ['sources' => ['hs_event', 'hs_investigation', 'corrective_action'], 'q' => 'Kauri Standalone']))->toBeEmpty();
 });

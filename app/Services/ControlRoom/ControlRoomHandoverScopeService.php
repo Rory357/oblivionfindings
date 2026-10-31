@@ -98,6 +98,7 @@ class ControlRoomHandoverScopeService
         ]);
         $governanceByAlert = $this->incidentJourneys
             ->governanceRecordsForAlerts($governanceCandidates);
+        $this->assertGovernanceResolved($governanceCandidates, $governanceByAlert);
 
         foreach ($alerts as $alert) {
             $governance = $governanceByAlert->get((int) $alert->id);
@@ -230,6 +231,27 @@ class ControlRoomHandoverScopeService
         ]);
 
         return $alerts;
+    }
+
+    /**
+     * The shift handover fails closed on a governance conflict. The batch journey read marks a conflicting alert as
+     * "unavailable" so one bad record doesn't blank a whole worklist; here that alert would otherwise come back with
+     * no incident or H&S event, look settled and be carried forward unreviewed. The single-alert read raises the
+     * exact conflict, so the handover can't be prepared until it's fixed, as before the batch read changed.
+     *
+     * @param  Collection<int, ControlRoomAlert>  $candidates
+     * @param  Collection<int, array<string, mixed>>  $governance
+     */
+    private function assertGovernanceResolved(Collection $candidates, Collection $governance): void
+    {
+        foreach ($candidates as $alert) {
+            if (($governance->get((int) $alert->id)['integrity'] ?? null) !== 'unavailable') {
+                continue;
+            }
+            $this->incidentJourneys->governanceRecordsForAlert($alert);
+
+            throw new \DomainException('H&S handover provenance conflict: the alert governance could not be resolved.');
+        }
     }
 
     private function hasGovernanceClaim(ControlRoomAlert $alert): bool

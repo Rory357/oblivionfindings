@@ -139,6 +139,37 @@ export function toDateInput(
     return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+/**
+ * "2026-10-08" — a YYYY-MM-DD calendar date moved by whole days. Pure date
+ * arithmetic (no instant, no timezone), so `addCalendarDays(toDateInput(now),
+ * i)` walks NZ days in any browser and across daylight saving.
+ */
+export function addCalendarDays(value: string, days: number): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match || !Number.isInteger(days)) return '';
+    const [, year, month, day] = match;
+    const date = new Date(
+        Date.UTC(Number(year), Number(month) - 1, Number(day) + days),
+    );
+    return date.toISOString().slice(0, 10);
+}
+
+/** Inclusive reporting days on the NZ calendar, independent of browser timezone. */
+export function workerDayRange(
+    days: number,
+    asAt: DateInput = new Date(),
+): { from: string; to: string } {
+    const to = toDateInput(asAt);
+    if (!to || !Number.isInteger(days) || days < 1) {
+        return { from: '', to: '' };
+    }
+    // UTC is only the arithmetic carrier for calendar components here, not the
+    // zone of the reported events. Subtracting 24-hour instants crosses DST badly.
+    const calendar = new Date(`${to}T00:00:00Z`);
+    calendar.setUTCDate(calendar.getUTCDate() - (days - 1));
+    return { from: calendar.toISOString().slice(0, 10), to };
+}
+
 /** Completed calendar years on the worker's NZ day; a birth date is not an instant. */
 export function ageOnWorkerDay(
     birthDate: string | null | undefined,

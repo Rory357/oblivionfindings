@@ -7,18 +7,19 @@ use App\Http\Controllers\Controller;
 use App\Models\EmergencyDrill;
 use App\Models\EmergencyDrillAttachment;
 use App\Models\EmergencyDrillFinding;
-use App\Models\HsEvent;
-use App\Models\Site;
 use App\Models\SiteEmergencyPlan;
-use App\Models\User;
 use App\Services\HealthSafety\DrillComplianceService;
+use App\Services\HealthSafety\EmergencyDrillAccessService;
+use App\Services\HealthSafety\EmergencyDrillConnectionsService;
+use App\Services\HealthSafety\EmergencyDrillService;
+use App\Support\HealthSafety\EmergencyDrillPresenter;
+use App\Support\HealthSafety\EmergencyDrillReturn;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -27,816 +28,290 @@ class EmergencyDrillController extends Controller
 {
     use ServesPrivateAttachments;
 
-    private const FIRE_DRILL_TYPES = ['fire', 'fire_evacuation'];
+    private const TERMINAL_FINDINGS = ['resolved', 'closed', 'accepted'];
 
-    private const DRILL_TYPES = ['fire_evacuation', 'earthquake', 'lockdown', 'tsunami', 'chemical_spill', 'medical_emergency', 'other'];
+    public function __construct(private readonly DrillComplianceService $compliance, private readonly EmergencyDrillAccessService $access, private readonly EmergencyDrillService $service, private readonly EmergencyDrillPresenter $presenter, private readonly EmergencyDrillConnectionsService $connections) {}
 
-    private const OUTCOMES = ['passed', 'passed_actions', 'failed'];
-
-    private const FINDING_TYPES = ['observation', 'non_conformance', 'improvement', 'positive'];
-
-    private const SEVERITIES = ['critical', 'high', 'medium', 'low'];
-
-    private const OPEN_FINDING_STATUSES = ['resolved', 'closed'];
-
-    public function __construct(private readonly DrillComplianceService $compliance) {}
-
-    /**
-     * Emergency Drills register — the readiness view. Mirrors the H&S Events register:
-     * hero clusters + NZ compliance badges, live tab counts, standardised rows with
-     * lifecycle flags and, on ?drill=, the detail payload for the over-the-list modal.
-     */
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
-        $tab = (string) $request->input('tab', 'all');
+        return $this->access->withCurrentViewer($request->user(), function ($current, $reads, $sites) use ($request) {
+            abort_unless($current->canDo('hazards.view'), 403);
+            if ($request->has('drill')) {
+                $id = $request->query('drill');
+                abort_unless(is_string($id) && preg_match('/^[1-9]\d*$/D', $id), 404);
+                $target = $reads->query($this->access->scopeForSites(EmergencyDrill::query(), $sites))->findOrFail((int) $id);
 
-        $query = EmergencyDrill::query()
-            ->with(['site:id,name,region,city'])
-            ->withCount([
-                'participants',
-                'findings',
-                'findings as open_findings_count' => fn (Builder $q) => $q->whereNotIn('status', self::OPEN_FINDING_STATUSES),
-                'findings as overdue_findings_count' => fn (Builder $q) => $q
-                    ->whereNotNull('due_date')
-                    ->where('due_date', '<', now())
-                    ->whereNotIn('status', self::OPEN_FINDING_STATUSES),
-            ])
-            ->orderByDesc('scheduled_at');
+                return redirect(EmergencyDrillReturn::href($target->id, EmergencyDrillReturn::fromRegister($request->query())));
+            }
+            $this->validateFilters($request);
+            $tab = in_array($request->input('tab'), ['all', 'scheduled', 'overdue', 'in_progress', 'completed', 'findings'], true) ? $request->input('tab') : 'all';
+            $base = $this->base($request, $sites);
+            $query = $this->filtered(clone $base, $request, $tab);
+            $origin = EmergencyDrillReturn::fromRegister($request->query());
+            $drills = $query->orderByDesc('scheduled_at')->orderByDesc('id')->paginate(25)->withQueryString()
+                ->through(fn ($record) => $this->presenter->row($record, $current, $origin));
+            $counts = (clone $base)->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status');
+            $scheduled = (clone $base)->where('status', 'scheduled')->where('scheduled_at', '>=', now())->count();
+            $overdue = (clone $base)->where('status', 'scheduled')->where('scheduled_at', '<', now())->count();
+            $withFindings = (clone $base)->whereHas('findings', fn ($query) => $query->whereNotIn('status', self::TERMINAL_FINDINGS))->count();
+            $findingQuery = EmergencyDrillFinding::query()->whereNotIn('status', self::TERMINAL_FINDINGS)->whereIn('emergency_drill_id', (clone $base)->select('id'));
+            $openFindings = (clone $findingQuery)->count();
+            $overdueFindings = (clone $findingQuery)->where('due_date', '<', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())->count();
+            $summarySites = $request->filled('site_id') ? array_values(array_intersect($sites, [$request->integer('site_id')])) : $sites;
+            $summary = $this->compliance->summary($summarySites);
+            $plansDue = SiteEmergencyPlan::query()->whereIn('site_id', $summarySites)->where('status', 'active')->get()->filter(fn ($plan) => method_exists($plan, 'dueDate') && $plan->dueDate() !== null && Carbon::parse($plan->dueDate())->isPast())->count();
+            $pickers = $this->presenter->pickers($current);
 
-        $this->applyScope($query, $request);
-        $this->applyTab($query, $tab);
-
-        if ($request->filled('drill_type')) {
-            $this->applyDrillTypeFilter($query, (string) $request->input('drill_type'));
-        }
-        if ($request->filled('outcome')) {
-            $query->where('outcome', $request->input('outcome'));
-        }
-        if ($request->filled('q')) {
-            $term = trim((string) $request->input('q'));
-            $query->where(function (Builder $q) use ($term) {
-                $q->where('title', 'like', "%{$term}%")
-                    ->orWhere('drill_type', 'like', "%{$term}%");
-            });
-        }
-
-        $paginator = $query->paginate(25)->withQueryString();
-        $drills = $paginator->through(fn (EmergencyDrill $d) => $this->buildDrillRow($d));
-
-        // ── Hero + tab counts (respect scope only — not tab/refinements) ──
-        $statusCounts = $this->scopedBase($request)
-            ->selectRaw('status, count(*) as c')
-            ->groupBy('status')
-            ->pluck('c', 'status');
-
-        $count = fn (string $s): int => (int) ($statusCounts[$s] ?? 0);
-        $upcoming = (int) $this->scopedBase($request)->where('status', 'scheduled')->where('scheduled_at', '>=', now())->count();
-        $overdue = (int) $this->scopedBase($request)->where('status', 'scheduled')->where('scheduled_at', '<', now())->count();
-        $withOpenFindings = (int) $this->scopedBase($request)
-            ->whereHas('findings', fn (Builder $q) => $q->whereNotIn('status', self::OPEN_FINDING_STATUSES))
-            ->count();
-
-        $openFindings = (int) EmergencyDrillFinding::query()
-            ->whereNotIn('status', self::OPEN_FINDING_STATUSES)
-            ->whereHas('emergencyDrill', fn (Builder $q) => $this->applyScope($q, $request))
-            ->count();
-        $overdueFindings = (int) EmergencyDrillFinding::query()
-            ->whereNotNull('due_date')
-            ->where('due_date', '<', now())
-            ->whereNotIn('status', self::OPEN_FINDING_STATUSES)
-            ->whereHas('emergencyDrill', fn (Builder $q) => $this->applyScope($q, $request))
-            ->count();
-
-        $tabCounts = [
-            'all' => (int) $statusCounts->sum(),
-            'scheduled' => $upcoming,
-            'overdue' => $overdue,
-            'in_progress' => $count('in_progress'),
-            'completed' => $count('completed'),
-            'findings' => $withOpenFindings,
-        ];
-
-        $complianceSummary = $this->compliance->summary();
-        $fenzReviewsDue = $this->fenzReviewsDue();
-
-        $hero = [
-            'live' => [
-                'scheduled' => $upcoming,
-                'overdue' => $overdue,
-                'in_progress' => $count('in_progress'),
-                'completed' => $count('completed'),
-            ],
-            'attention' => [
-                'sites_overdue' => $complianceSummary['overdue'],
-                'findings_open' => $openFindings,
-                'findings_overdue' => $overdueFindings,
-                'awaiting_writeup' => $count('in_progress'),
-            ],
-            'badges' => [
-                'sites_drilled_pct' => $complianceSummary['pct'],
-                'drills_overdue' => $overdue,
-                'sites_overdue' => $complianceSummary['overdue'],
-                'fenz_reviews_due' => $fenzReviewsDue,
-            ],
-        ];
-
-        // ── Detail-over-list (?drill=) ──
-        $detail = null;
-        if ($request->filled('drill')) {
-            $target = EmergencyDrill::find($request->integer('drill'));
-            $detail = $target ? $this->buildDrillDetail($target) : null;
-        }
-
-        $canManage = (bool) ($request->user()?->canDo('hazards.manage') ?? false);
-
-        return Inertia::render('health-safety/drills/index', [
-            'drills' => $drills,
-            'tab' => $tab,
-            'tabCounts' => $tabCounts,
-            'hero' => $hero,
-            'filters' => [
-                'q' => $request->input('q'),
-                'tab' => $tab,
-                'period' => $request->input('period', '6mo'),
-                'drill_type' => $request->input('drill_type'),
-                'outcome' => $request->input('outcome'),
-                'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
-            ],
-            'sites' => Site::where('is_active', true)->orderBy('name')->get(['id', 'name', 'region']),
-            'staff' => $canManage ? $this->assignableStaff() : [],
-            'detail' => $detail,
-            'can' => ['manage' => $canManage],
-        ]);
+            return Inertia::render('health-safety/drills/index', [
+                'drills' => $drills, 'tab' => $tab,
+                'tabCounts' => ['all' => (int) $counts->sum(), 'scheduled' => $scheduled, 'overdue' => $overdue, 'in_progress' => (int) ($counts['in_progress'] ?? 0), 'completed' => (int) ($counts['completed'] ?? 0), 'findings' => $withFindings],
+                'hero' => ['live' => ['scheduled' => $scheduled, 'overdue' => $overdue, 'in_progress' => (int) ($counts['in_progress'] ?? 0), 'completed' => (int) ($counts['completed'] ?? 0)],
+                    'attention' => ['sites_overdue' => $summary['overdue'], 'findings_open' => $openFindings, 'findings_overdue' => $overdueFindings, 'awaiting_writeup' => (int) ($counts['in_progress'] ?? 0)],
+                    'badges' => ['sites_drilled_pct' => $summary['pct'], 'drills_overdue' => $overdue, 'sites_overdue' => $summary['overdue'], 'fenz_reviews_due' => $plansDue]],
+                'filters' => ['q' => $request->input('q'), 'tab' => $tab, 'period' => $request->input('period', '6mo'), 'drill_type' => $request->input('drill_type'), 'outcome' => $request->input('outcome'), 'site_id' => $request->filled('site_id') ? $request->integer('site_id') : null],
+                'sites' => $pickers['sites'], 'staff' => $pickers['staff'], 'pickers' => $pickers, 'detail' => null,
+                'can' => ['manage' => $current->canDo('hazards.manage'), 'schedule' => $this->access->canCreate($current)],
+                'exports' => ['register_href' => '/health-safety/drills/export'.($request->query() === [] ? '' : '?'.http_build_query($request->except(['drill', 'schedule', 'action', 'return_to'])))],
+            ]);
+        });
     }
 
-    /**
-     * Retire the standalone create page — the Schedule wizard lives on the register.
-     */
-    public function create(): RedirectResponse
+    public function create(Request $request): RedirectResponse
     {
+        abort_unless($this->access->canCreate($request->user()), 403);
+
         return redirect()->route('health-safety.drills.index', ['schedule' => 1]);
     }
 
-    /**
-     * Schedule a drill (Schedule wizard). Persists the drill + seeds the coordinator
-     * and warden participant rows so the roll-call is pre-populated.
-     */
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'site_id' => ['required', 'exists:sites,id'],
-            'drill_type' => ['required', 'string', 'in:'.implode(',', [...self::DRILL_TYPES, 'fire'])],
-            'title' => ['required', 'string', 'max:255'],
-            'scheduled_at' => ['required', 'date'],
-            'scenario_description' => ['nullable', 'string', 'max:5000'],
-            'assembly_point' => ['nullable', 'string', 'max:255'],
-            'evacuation_scheme' => ['nullable', 'string', 'max:255'],
-            'conducted_by' => ['nullable', 'exists:users,id'],
-            'total_participants' => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'warden_ids' => ['nullable', 'array'],
-            'warden_ids.*' => ['integer', 'exists:users,id'],
-        ]);
+        $row = $this->service->create($request->user(), $request->all());
 
-        $validated['drill_type'] = $this->normalizeDrillType($validated['drill_type']);
-        $wardenIds = collect($validated['warden_ids'] ?? [])->map(fn ($id) => (int) $id);
-        unset($validated['warden_ids']);
-
-        $drill = EmergencyDrill::create(array_merge($validated, [
-            'status' => 'scheduled',
-            'is_unannounced' => $request->boolean('is_unannounced'),
-            'created_by' => $request->user()->id,
-        ]));
-
-        // Seed the roll-call: coordinator + wardens (deduped, unique per drill+user).
-        $seed = collect();
-        if (! empty($validated['conducted_by'])) {
-            $seed->put((int) $validated['conducted_by'], 'coordinator');
-        }
-        foreach ($wardenIds as $id) {
-            if (! $seed->has($id)) {
-                $seed->put($id, 'warden');
-            }
-        }
-        foreach ($seed as $userId => $role) {
-            $drill->participants()->create(['user_id' => $userId, 'role' => $role, 'attended' => false]);
-        }
-
-        if ($request->boolean('stay')) {
-            return back()->with('success', 'Emergency drill scheduled.');
-        }
-
-        return redirect()->route('health-safety.drills.index')->with('success', 'Emergency drill scheduled.');
+        return $this->confirmed($request, $row, 'Emergency drill scheduled.', 'overview');
     }
 
-    /**
-     * Deep-link / share fallback — renders the same detail modal on a thin shell.
-     */
-    public function show(EmergencyDrill $drill): Response
+    public function show(Request $request, EmergencyDrill $drill): Response|JsonResponse
     {
-        return Inertia::render('health-safety/drills/show', [
-            'detail' => $this->buildDrillDetail($drill),
-        ]);
+        $return = EmergencyDrillReturn::sanitize($request->query('return_to'));
+        $detail = $this->presenter->detail($drill, $request->user(), $return);
+        $props = ['detail' => $detail, 'pickers' => $this->presenter->pickers($request->user(), $drill), 'return_to' => $return, 'section' => in_array($request->input('section'), ['overview', 'run', 'participants', 'findings', 'evidence', 'history', 'connections'], true) ? $request->input('section') : 'overview'];
+
+        return $request->expectsJson() ? response()->json($props) : Inertia::render('health-safety/drills/show', $props);
     }
 
-    /**
-     * Edit / reschedule a drill (no lifecycle transition).
-     */
+    public function options(Request $request): JsonResponse
+    {
+        $request->validate(['site_id' => ['required', 'integer', 'min:1'], 'drill_id' => ['nullable', 'integer', 'min:1']]);
+
+        return $this->access->withCurrentViewer($request->user(), function ($current, $reads, $sites) use ($request) {
+            abort_unless($current->canDo('hazards.view') && in_array($request->integer('site_id'), $sites, true), 403);
+            $record = $request->filled('drill_id') ? $reads->query($this->access->scopeForSites(EmergencyDrill::query(), $sites))->findOrFail($request->integer('drill_id')) : new EmergencyDrill(['site_id' => $request->integer('site_id')]);
+            abort_unless((int) $record->site_id === $request->integer('site_id'), 404);
+
+            return response()->json($this->presenter->pickers($current, $record));
+        });
+    }
+
     public function update(Request $request, EmergencyDrill $drill): RedirectResponse
     {
-        $validated = $request->validate([
-            'title' => ['sometimes', 'required', 'string', 'max:255'],
-            'drill_type' => ['sometimes', 'required', 'string', 'in:'.implode(',', [...self::DRILL_TYPES, 'fire'])],
-            'scheduled_at' => ['sometimes', 'required', 'date'],
-            'scenario_description' => ['sometimes', 'nullable', 'string', 'max:5000'],
-            'assembly_point' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'evacuation_scheme' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'conducted_by' => ['sometimes', 'nullable', 'exists:users,id'],
-        ]);
-
-        if (isset($validated['drill_type'])) {
-            $validated['drill_type'] = $this->normalizeDrillType($validated['drill_type']);
-        }
-        if ($request->has('is_unannounced')) {
-            $validated['is_unannounced'] = $request->boolean('is_unannounced');
-        }
-        $validated['updated_by'] = $request->user()->id;
-
-        $drill->update($validated);
-
-        return back()->with('success', 'Drill updated.');
+        return $this->confirmed($request, $this->service->update($drill, $request->user(), $request->all()), 'Drill planning updated.', 'overview');
     }
 
-    /**
-     * Lifecycle: scheduled → in_progress.
-     */
     public function start(Request $request, EmergencyDrill $drill): RedirectResponse
     {
-        if (! in_array($drill->status, ['scheduled'], true)) {
-            return back()->with('error', 'Only a scheduled drill can be started.');
-        }
-
-        $drill->update([
-            'status' => 'in_progress',
-            'started_at' => $drill->started_at ?? now(),
-            'updated_by' => $request->user()->id,
-        ]);
-
-        return back()->with('success', 'Drill started — now in progress.');
+        return $this->confirmed($request, $this->service->start($drill, $request->user(), $request->all()), 'Drill started.', 'run');
     }
 
-    /**
-     * Lifecycle: in_progress → completed (Complete wizard). Recording the write-up
-     * fires EmergencyDrillObserver — a non-passing outcome raises a drill_failure
-     * safety event + Control Room signal.
-     */
     public function complete(Request $request, EmergencyDrill $drill): RedirectResponse
     {
-        if (in_array($drill->status, ['completed', 'cancelled'], true)) {
-            return back()->with('error', 'This drill has already been closed out.');
-        }
-
-        $validated = $request->validate([
-            'completed_at' => ['required', 'date'],
-            'duration_minutes' => ['nullable', 'integer', 'min:0', 'max:1440'],
-            'evacuation_time_seconds' => ['nullable', 'integer', 'min:0', 'max:86400'],
-            'weather_conditions' => ['nullable', 'string', 'max:255'],
-            'total_participants' => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'residents_evacuated' => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'outcome' => ['required', 'string', 'in:'.implode(',', self::OUTCOMES)],
-            'observer_notes' => ['nullable', 'string', 'max:5000'],
-            'improvements_identified' => ['nullable', 'string', 'max:5000'],
-            'conducted_by' => ['nullable', 'exists:users,id'],
-        ]);
-
-        $drill->update(array_merge($validated, [
-            'status' => 'completed',
-            'started_at' => $drill->started_at ?? now(),
-            'all_areas_checked' => $request->boolean('all_areas_checked'),
-            'assembly_point_reached' => $request->boolean('assembly_point_reached'),
-            'roll_call_completed' => $request->boolean('roll_call_completed'),
-            'updated_by' => $request->user()->id,
-        ]));
-
-        return back()->with('success', 'Completion recorded.');
+        return $this->confirmed($request, $this->service->complete($drill, $request->user(), $request->all()), 'Completion recorded.', 'run');
     }
 
-    /**
-     * Lifecycle: → cancelled.
-     */
     public function cancel(Request $request, EmergencyDrill $drill): RedirectResponse
     {
-        if (in_array($drill->status, ['completed', 'cancelled'], true)) {
-            return back()->with('error', 'This drill cannot be cancelled.');
-        }
-
-        $validated = $request->validate([
-            'reason' => ['nullable', 'string', 'max:2000'],
-        ]);
-
-        $notes = $drill->observer_notes;
-        if (! empty($validated['reason'])) {
-            $stamp = 'Cancelled: '.$validated['reason'];
-            $notes = $notes ? $notes."\n".$stamp : $stamp;
-        }
-
-        $drill->update([
-            'status' => 'cancelled',
-            'observer_notes' => $notes,
-            'updated_by' => $request->user()->id,
-        ]);
-
-        return back()->with('success', 'Drill cancelled.');
+        return $this->confirmed($request, $this->service->cancel($drill, $request->user(), $request->all()), 'Drill cancellation recorded.', 'run');
     }
 
-    /**
-     * Add a participant to the roll-call.
-     */
     public function addParticipant(Request $request, EmergencyDrill $drill): RedirectResponse
     {
-        $validated = $request->validate([
-            'user_id' => ['required', 'exists:users,id'],
-            'role' => ['nullable', 'string', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:500'],
-        ]);
-
-        $drill->participants()->updateOrCreate(
-            ['user_id' => $validated['user_id']],
-            [
-                'role' => $validated['role'] ?? 'participant',
-                'attended' => $request->boolean('attended'),
-                'notes' => $validated['notes'] ?? null,
-            ],
-        );
-
-        return back()->with('success', 'Participant added.');
+        return $this->confirmed($request, $this->service->upsertParticipant($drill, $request->user(), $request->all()), 'Participant record saved.', 'participants');
     }
 
-    /**
-     * Add a drill finding (observation / non-conformance / improvement / positive).
-     */
     public function addFinding(Request $request, EmergencyDrill $drill): RedirectResponse
     {
-        $validated = $request->validate([
-            'finding_type' => ['required', 'string', 'in:'.implode(',', self::FINDING_TYPES)],
-            'description' => ['required', 'string', 'max:2000'],
-            'severity' => ['required', 'string', 'in:'.implode(',', self::SEVERITIES)],
-            'corrective_action' => ['nullable', 'string', 'max:2000'],
-            'assigned_to' => ['nullable', 'exists:users,id'],
-            'due_date' => ['nullable', 'date'],
-        ]);
-
-        $drill->findings()->create(array_merge($validated, [
-            'status' => 'open',
-            'created_by' => $request->user()->id,
-        ]));
-
-        return back()->with('success', 'Finding recorded.');
+        return $this->confirmed($request, $this->service->addFinding($drill, $request->user(), $request->all()), 'Finding recorded.', 'findings');
     }
 
-    /**
-     * Update a finding (edit/reassign from the detail modal).
-     */
-    public function updateFinding(Request $request, EmergencyDrillFinding $finding): RedirectResponse
+    public function updateFinding(Request $request, EmergencyDrill $drill, EmergencyDrillFinding $finding): RedirectResponse
     {
-        $validated = $request->validate([
-            'finding_type' => ['sometimes', 'string', 'in:'.implode(',', self::FINDING_TYPES)],
-            'description' => ['sometimes', 'required', 'string', 'max:2000'],
-            'severity' => ['sometimes', 'string', 'in:'.implode(',', self::SEVERITIES)],
-            'status' => ['sometimes', 'string', 'in:open,in_progress,resolved,closed'],
-            'corrective_action' => ['sometimes', 'nullable', 'string', 'max:2000'],
-            'assigned_to' => ['sometimes', 'nullable', 'exists:users,id'],
-            'due_date' => ['sometimes', 'nullable', 'date'],
-            'resolution_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
-        ]);
+        abort_unless((int) $finding->emergency_drill_id === (int) $drill->id, 404);
 
-        $validated['updated_by'] = $request->user()->id;
-        $finding->update($validated);
-
-        return back()->with('success', 'Finding updated.');
+        return $this->confirmed($request, $this->service->updateFinding($drill, $finding, $request->user(), $request->all()), 'Finding updated.', 'findings', $finding->id);
     }
 
-    /**
-     * Resolve a finding (open/in_progress → resolved).
-     */
+    public function updateLegacyFinding(Request $request, EmergencyDrillFinding $finding): RedirectResponse
+    {
+        return $this->updateFinding($request, $finding->emergencyDrill()->firstOrFail(), $finding);
+    }
+
     public function resolveFinding(Request $request, EmergencyDrill $drill, EmergencyDrillFinding $finding): RedirectResponse
     {
         abort_unless((int) $finding->emergency_drill_id === (int) $drill->id, 404);
 
-        $validated = $request->validate([
-            'resolution_notes' => ['nullable', 'string', 'max:2000'],
-        ]);
-
-        $finding->update([
-            'status' => 'resolved',
-            'resolved_at' => now(),
-            'resolution_notes' => $validated['resolution_notes'] ?? $finding->resolution_notes,
-            'updated_by' => $request->user()->id,
-        ]);
-
-        return back()->with('success', 'Finding resolved.');
+        return $this->confirmed($request, $this->service->resolveFinding($drill, $finding, $request->user(), $request->all()), 'Finding resolution recorded.', 'findings', $finding->id);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Evidence (premium document upload) */
-    /* ------------------------------------------------------------------ */
+    public function correctiveAction(Request $request, EmergencyDrill $drill, EmergencyDrillFinding $finding): RedirectResponse
+    {
+        abort_unless((int) $finding->emergency_drill_id === (int) $drill->id, 404);
+
+        return $this->confirmed($request, $this->service->createOrLinkCorrectiveAction($drill, $finding, $request->user(), $request->all()), 'Required remedy linked.', 'findings', $finding->id);
+    }
+
+    public function correctiveActionOptions(Request $request, EmergencyDrill $drill, EmergencyDrillFinding $finding): JsonResponse
+    {
+        $row = $this->access->recordForViewer($drill, $request->user());
+        abort_unless((int) $finding->emergency_drill_id === (int) $row->id, 404);
+        $can = $this->access->findingCan($row, $finding, $request->user());
+        abort_unless($can['create_action'] || $can['link_action'], 403);
+        $connections = $this->connections->forViewer($row, $request->user());
+
+        $staff = $this->presenter->pickers($request->user(), $row)['staff']->filter(fn ($candidate) => $this->access->withCurrentViewer($candidate, fn ($current) => $current->canDo('hazards.manage')))->values();
+
+        return response()->json(['actions' => $connections['corrective_actions'], 'staff' => $staff, 'can' => ['create' => $can['create_action'], 'link' => $can['link_action']]]);
+    }
+
+    public function scheduleNext(Request $request, EmergencyDrill $drill): RedirectResponse
+    {
+        return $this->confirmed($request, $this->service->scheduleNext($drill, $request->user(), $request->all()), 'Next drill scheduled.', 'connections');
+    }
 
     public function uploadAttachment(Request $request, EmergencyDrill $drill): RedirectResponse
     {
-        $data = $request->validate([
-            'file' => ['required', 'file', 'max:20480'], // 20 MB
-            'kind' => ['nullable', 'string', 'max:30'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-            'alt_text' => ['nullable', 'string', 'max:255'],
-        ]);
+        $request->validate(['file' => ['required', 'file', 'max:20480']]);
 
-        $file = $request->file('file');
-        $disk = 'private';
-        $path = $file->store('emergency_drill_attachments', $disk);
-
-        $drill->attachments()->create([
-            'uploaded_by' => $request->user()?->id,
-            'disk' => $disk,
-            'original_name' => $file->getClientOriginalName(),
-            'path' => $path,
-            'mime' => $file->getClientMimeType(),
-            'size' => $file->getSize(),
-            'kind' => $data['kind'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'alt_text' => $data['alt_text'] ?? null,
-        ]);
-
-        return back()->with('success', 'Evidence uploaded.');
+        return $this->confirmed($request, $this->service->addEvidence($drill, $request->user(), $request->all(), $request->file('file')), 'Evidence added.', 'evidence');
     }
 
     public function downloadAttachment(Request $request, EmergencyDrill $drill, EmergencyDrillAttachment $attachment): StreamedResponse
     {
-        abort_unless((int) $attachment->emergency_drill_id === (int) $drill->id, 404);
+        $this->access->recordForViewer($drill, $request->user());
+        $file = EmergencyDrillAttachment::query()->where('emergency_drill_id', $drill->id)->findOrFail($attachment->id);
+        abort_unless($file->disk === 'private', 404);
 
-        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
-        return $this->streamPrivateAttachment(
-            $attachment->disk,
-            $attachment->path,
-            $attachment->original_name,
-            $attachment->mime,
-        );
+        return $this->streamPrivateAttachment('private', $file->path, basename(str_replace(chr(92), '/', $file->original_name)), $file->mime);
     }
 
     public function destroyAttachment(Request $request, EmergencyDrill $drill, EmergencyDrillAttachment $attachment): RedirectResponse
     {
         abort_unless((int) $attachment->emergency_drill_id === (int) $drill->id, 404);
 
-        $disk = $attachment->disk ?: 'private';
-        if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
-            Storage::disk($disk)->delete($attachment->path);
-        }
-        $attachment->delete();
-
-        return back()->with('success', 'Evidence removed.');
+        return $this->confirmed($request, $this->service->removeEvidence($drill, $attachment, $request->user(), $request->all()), 'Evidence removed from current view.', 'evidence');
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Payload builders */
-    /* ------------------------------------------------------------------ */
-
-    private function buildDrillRow(EmergencyDrill $d): array
+    public function export(Request $request): StreamedResponse
     {
-        $isOverdue = $d->status === 'scheduled' && $d->scheduled_at !== null && $d->scheduled_at->isPast();
-        $openFindings = (int) ($d->open_findings_count ?? 0);
+        $rows = $this->access->withCurrentViewer($request->user(), function ($current, $reads, $sites) use ($request) {
+            abort_unless($current->canDo('hazards.view'), 403);
 
-        return [
-            'id' => $d->id,
-            'reference' => 'DR-'.$d->id,
-            'drill_type' => $d->drill_type,
-            'type_label' => $this->typeLabel($d->drill_type),
-            'title' => $d->title,
-            'scheduled_at' => $d->scheduled_at?->toIso8601String(),
-            'started_at' => $d->started_at?->toIso8601String(),
-            'completed_at' => $d->completed_at?->toIso8601String(),
-            'status' => $isOverdue ? 'overdue' : $d->status,
-            'raw_status' => $d->status,
-            'outcome' => $d->outcome,
-            'site' => $d->site ? [
-                'id' => $d->site->id,
-                'name' => $d->site->name,
-                'region' => $d->site->region ?: $d->site->city,
-            ] : null,
-            'participants_count' => (int) ($d->participants_count ?? 0),
-            'total_participants' => $d->total_participants,
-            'people_label' => $this->peopleLabel($d),
-            'findings_open' => $openFindings,
-            'findings_count' => (int) ($d->findings_count ?? 0),
-            'flags' => [
-                'overdue' => $isOverdue,
-                'running' => $d->status === 'in_progress',
-                'finding_overdue' => (int) ($d->overdue_findings_count ?? 0) > 0,
-                'open_findings' => $openFindings,
-            ],
-        ];
+            $this->validateFilters($request);
+
+            return $this->filtered($this->base($request, $sites), $request, (string) $request->input('tab', 'all'))->with('site:id,name')->withCount(['participants as attended_count' => fn ($query) => $query->where('attended', true), 'findings as open_findings_count' => fn ($query) => $query->whereNotIn('status', self::TERMINAL_FINDINGS)])->orderByDesc('scheduled_at')->orderByDesc('id')->get()->map(fn ($row) => ['DR-'.$row->id, $row->title, $row->site?->name, $row->drill_type, $row->status, $row->outcome, $row->scheduled_at?->toIso8601String(), $row->completed_at?->toIso8601String(), (int) $row->attended_count, (int) $row->open_findings_count, '/health-safety/drills/'.$row->id])->all();
+        });
+
+        return $this->csv('emergency-drills.csv', ['Reference', 'Title', 'Site', 'Type', 'Status', 'Outcome', 'Scheduled instant', 'Completed instant', 'Actual attended', 'Open findings', 'Source'], $rows);
     }
 
-    private function buildDrillDetail(EmergencyDrill $drill): array
+    public function exportParticipants(Request $request, EmergencyDrill $drill): StreamedResponse
     {
-        $drill->loadMissing(['site:id,name,region,city', 'conductor:id,name', 'creator:id,name']);
+        $detail = $this->presenter->detail($drill, $request->user());
+        $rows = array_map(fn ($row) => [$detail['reference'], $row['name'], $row['role'], $row['attended'] ? 'Attended' : 'Not recorded as attended', $row['notes'], $row['accommodations']], $detail['participants']);
 
-        $participants = $drill->participants()
-            ->with('user:id,name')
-            ->get()
-            ->map(fn ($p) => [
-                'id' => $p->id,
-                'user_id' => $p->user_id,
-                'name' => $p->user?->name ?? 'Unknown',
-                'role' => $p->role,
-                'attended' => (bool) $p->attended,
-                'notes' => $p->notes,
-            ]);
-
-        $findings = $drill->findings()
-            ->with('assignee:id,name')
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (EmergencyDrillFinding $f) => [
-                'id' => $f->id,
-                'finding_type' => $f->finding_type,
-                'description' => $f->description,
-                'severity' => $f->severity,
-                'status' => $f->status,
-                'corrective_action' => $f->corrective_action,
-                'assigned_to' => $f->assigned_to,
-                'assignee_name' => $f->assignee?->name,
-                'due_date' => $f->due_date?->toDateString(),
-                'resolved_at' => $f->resolved_at?->toDateString(),
-                'resolution_notes' => $f->resolution_notes,
-                'is_overdue' => $f->due_date !== null
-                    && $f->due_date->isPast()
-                    && ! in_array($f->status, self::OPEN_FINDING_STATUSES, true),
-            ]);
-
-        $attachments = $drill->attachments()
-            ->with('uploader:id,name')
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (EmergencyDrillAttachment $a) => [
-                'id' => $a->id,
-                'original_name' => $a->original_name,
-                'mime' => $a->mime,
-                'size' => $a->size,
-                'kind' => $a->kind,
-                'notes' => $a->notes,
-                'alt_text' => $a->alt_text,
-                'is_image' => $a->isImage(),
-                'uploaded_by_name' => $a->uploader?->name,
-                'created_at' => $a->created_at?->toIso8601String(),
-                'url' => "/health-safety/drills/{$drill->id}/attachments/{$a->id}/download",
-            ]);
-
-        $canManage = (bool) (auth()->user()?->canDo('hazards.manage') ?? false);
-
-        // Two-way convergence: the drill_failure HsEvent (if any) the observer raised.
-        $hsEvent = HsEvent::query()
-            ->where('source_type', EmergencyDrill::class)
-            ->where('source_id', $drill->id)
-            ->latest('id')
-            ->first(['id', 'reference_number', 'status', 'severity']);
-
-        return [
-            'id' => $drill->id,
-            'reference' => 'DR-'.$drill->id,
-            'drill_type' => $drill->drill_type,
-            'type_label' => $this->typeLabel($drill->drill_type),
-            'title' => $drill->title,
-            'status' => $drill->status,
-            'outcome' => $drill->outcome,
-            'scheduled_at' => $drill->scheduled_at?->toIso8601String(),
-            'started_at' => $drill->started_at?->toIso8601String(),
-            'completed_at' => $drill->completed_at?->toIso8601String(),
-            'duration_minutes' => $drill->duration_minutes,
-            'evacuation_time_seconds' => $drill->evacuation_time_seconds,
-            'weather_conditions' => $drill->weather_conditions,
-            'total_participants' => $drill->total_participants,
-            'residents_evacuated' => $drill->residents_evacuated,
-            'all_areas_checked' => (bool) $drill->all_areas_checked,
-            'assembly_point_reached' => (bool) $drill->assembly_point_reached,
-            'roll_call_completed' => (bool) $drill->roll_call_completed,
-            'scenario_description' => $drill->scenario_description,
-            'is_unannounced' => (bool) $drill->is_unannounced,
-            'assembly_point' => $drill->assembly_point,
-            'evacuation_scheme' => $drill->evacuation_scheme,
-            'observer_notes' => $drill->observer_notes,
-            'improvements_identified' => $drill->improvements_identified,
-            'site' => $drill->site ? [
-                'id' => $drill->site->id,
-                'name' => $drill->site->name,
-                'region' => $drill->site->region ?: $drill->site->city,
-            ] : null,
-            'coordinator_name' => $drill->conductor?->name,
-            'conducted_by' => $drill->conducted_by,
-            'created_by_name' => $drill->creator?->name,
-            'created_at' => $drill->created_at?->toIso8601String(),
-            'participants' => $participants,
-            'findings' => $findings,
-            'attachments' => $attachments,
-            'timeline' => $this->buildTimeline($drill, $findings, $hsEvent),
-            'hs_event' => $hsEvent ? [
-                'id' => $hsEvent->id,
-                'reference_number' => $hsEvent->reference_number,
-                'status' => $hsEvent->status,
-                'severity' => $hsEvent->severity,
-                'url' => "/health-safety/events?event={$hsEvent->id}",
-            ] : null,
-            'assignable_staff' => $canManage ? $this->assignableStaff() : [],
-            'can' => ['manage' => $canManage],
-        ];
+        return $this->csv('drill-'.$drill->id.'-participants.csv', ['Drill', 'Staff', 'Role', 'Attendance', 'Notes', 'Participation support'], $rows);
     }
 
-    /**
-     * Derived audit timeline from the drill's own lifecycle timestamps + findings +
-     * the linked safety event (no separate audit table needed).
-     *
-     * @param  Collection<int,array<string,mixed>>  $findings
-     */
-    private function buildTimeline(EmergencyDrill $drill, $findings, ?HsEvent $hsEvent): array
+    public function exportEvidence(Request $request, EmergencyDrill $drill): StreamedResponse
     {
-        $events = [];
+        $detail = $this->presenter->detail($drill, $request->user());
+        $rows = array_map(fn ($row) => [$detail['reference'], $row['original_name'], $row['kind'], $row['mime'], $row['size'], $row['notes'], $row['alt_text'], $row['created_at'], $row['url']], $detail['attachments']);
 
-        $events[] = [
-            'key' => 'scheduled',
-            'label' => 'Drill scheduled',
-            'icon' => 'plus',
-            'at' => $drill->created_at?->toIso8601String(),
-            'meta' => $drill->creator?->name,
-        ];
-
-        if ($drill->started_at) {
-            $events[] = [
-                'key' => 'started',
-                'label' => 'Drill started',
-                'icon' => 'play',
-                'at' => $drill->started_at->toIso8601String(),
-                'meta' => 'Now in progress',
-            ];
-        }
-
-        if ($drill->completed_at) {
-            $events[] = [
-                'key' => 'completed',
-                'label' => 'Completion recorded',
-                'icon' => 'check-circle-2',
-                'at' => $drill->completed_at->toIso8601String(),
-                'meta' => $drill->outcome ? 'Outcome: '.$this->outcomeLabel($drill->outcome) : null,
-            ];
-        }
-
-        if ($drill->status === 'cancelled') {
-            $events[] = [
-                'key' => 'cancelled',
-                'label' => 'Drill cancelled',
-                'icon' => 'x-circle',
-                'at' => $drill->updated_at?->toIso8601String(),
-                'meta' => null,
-            ];
-        }
-
-        foreach ($findings as $f) {
-            $events[] = [
-                'key' => 'finding-'.$f['id'],
-                'label' => 'Finding logged — '.$this->typeLabel($f['finding_type']),
-                'icon' => 'clipboard-list',
-                'at' => null,
-                'meta' => $f['assignee_name'] ? 'Assigned to '.$f['assignee_name'] : null,
-            ];
-        }
-
-        if ($hsEvent) {
-            $events[] = [
-                'key' => 'safety-event',
-                'label' => 'Safety event raised',
-                'icon' => 'shield-alert',
-                'at' => null,
-                'meta' => 'drill_failure · Control Room notified',
-            ];
-        }
-
-        return $events;
+        return $this->csv('drill-'.$drill->id.'-evidence.csv', ['Drill', 'Name', 'Kind', 'Type', 'Bytes', 'Notes', 'Description', 'Recorded instant', 'Authorized download'], $rows);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Helpers */
-    /* ------------------------------------------------------------------ */
-
-    /** Scope = the hero/tab "period + site" lens (never tab/refinements). */
-    private function applyScope(Builder $query, Request $request): Builder
+    private function confirmed(Request $request, EmergencyDrill $row, string $message, string $section, ?int $findingId = null): RedirectResponse
     {
+        $requestedSection = $request->input('section');
+        $href = EmergencyDrillReturn::href($row->id, $request->input('return_to'), is_string($requestedSection) ? $requestedSection : $section, $findingId);
+        $action = $request->input('action');
+        $aliases = ['participant' => 'add-participant', 'add_participant' => 'add-participant', 'edit_participant' => 'edit-participant',
+            'finding' => 'add-finding', 'add_finding' => 'add-finding', 'edit_finding' => 'edit-finding', 'resolve' => 'resolve-finding', 'resolve_finding' => 'resolve-finding',
+            'corrective_action' => 'corrective-action', 'schedule_next' => 'schedule-next'];
+        $action = is_string($action) ? ($aliases[$action] ?? $action) : null;
+        if (in_array($action, ['edit', 'start', 'complete', 'cancel', 'add-participant', 'edit-participant', 'add-finding', 'edit-finding', 'resolve-finding', 'corrective-action', 'schedule-next'], true)) {
+            $href .= (str_contains($href, '?') ? '&' : '?').'action='.rawurlencode($action);
+            $participant = $request->input('participant');
+            if ($action === 'edit-participant' && (is_int($participant) || (is_string($participant) && ctype_digit($participant))) && $row->participants()->whereKey((int) $participant)->exists()) {
+                $href .= '&participant='.(int) $participant;
+            }
+        }
+
+        return redirect($href)->with('success', $message);
+    }
+
+    private function validateFilters(Request $request): void
+    {
+        $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'q' => ['nullable', 'string', 'max:200'],
+            'tab' => ['nullable', Rule::in(['all', 'scheduled', 'overdue', 'in_progress', 'completed', 'findings'])],
+            'period' => ['nullable', Rule::in(['30d', 'quarter', '6mo', 'all'])],
+            'drill_type' => ['nullable', Rule::in([...EmergencyDrillService::DRILL_TYPES, 'fire'])],
+            'outcome' => ['nullable', Rule::in(['passed', 'passed_actions', 'failed'])]]);
+    }
+
+    private function base(Request $request, array $sites): Builder
+    {
+        $query = $this->access->scopeForSites(EmergencyDrill::query(), $sites);
         if ($request->filled('site_id')) {
-            $query->where('site_id', (int) $request->input('site_id'));
+            $query->where('site_id', $request->integer('site_id'));
         }
-        if ($from = $this->periodFrom($request)) {
-            $query->where('scheduled_at', '>=', $from);
+        $from = match ((string) $request->input('period', '6mo')) {
+            '30d' => now()->subDays(30), 'quarter' => now()->subMonths(3), 'all' => null, default => now()->subMonths(6),
+        };
+
+        return $from ? $query->where('scheduled_at', '>=', $from) : $query;
+    }
+
+    private function filtered(Builder $query, Request $request, string $tab): Builder
+    {
+        match ($tab) {
+            'scheduled' => $query->where('status', 'scheduled')->where('scheduled_at', '>=', now()),
+            'overdue' => $query->where('status', 'scheduled')->where('scheduled_at', '<', now()),
+            'in_progress', 'completed' => $query->where('status', $tab),
+            'findings' => $query->whereHas('findings', fn ($q) => $q->whereNotIn('status', self::TERMINAL_FINDINGS)),
+            default => $query,
+        };
+        if ($request->filled('drill_type')) {
+            $type = $request->input('drill_type');
+            in_array($type, ['fire', 'fire_evacuation'], true) ? $query->whereIn('drill_type', ['fire', 'fire_evacuation']) : $query->where('drill_type', $type);
+        }
+        if ($request->filled('outcome')) {
+            $query->where('outcome', $request->input('outcome'));
+        }
+        if ($request->filled('q')) {
+            $query->where(fn ($q) => $q->where('title', 'like', '%'.trim((string) $request->input('q')).'%')->orWhere('drill_type', 'like', '%'.trim((string) $request->input('q')).'%'));
         }
 
         return $query;
     }
 
-    private function scopedBase(Request $request): Builder
+    private function csv(string $name, array $columns, array $rows): StreamedResponse
     {
-        return $this->applyScope(EmergencyDrill::query(), $request);
-    }
-
-    private function periodFrom(Request $request): ?Carbon
-    {
-        return match ((string) $request->input('period', '6mo')) {
-            '30d' => now()->subDays(30),
-            'quarter' => now()->subMonths(3),
-            'all' => null,
-            default => now()->subMonths(6),
-        };
-    }
-
-    private function applyTab(Builder $query, string $tab): void
-    {
-        match ($tab) {
-            'scheduled' => $query->where('status', 'scheduled')->where('scheduled_at', '>=', now()),
-            'overdue' => $query->where('status', 'scheduled')->where('scheduled_at', '<', now()),
-            'in_progress' => $query->where('status', 'in_progress'),
-            'completed' => $query->where('status', 'completed'),
-            'findings' => $query->whereHas('findings', fn (Builder $q) => $q->whereNotIn('status', self::OPEN_FINDING_STATUSES)),
-            default => $query, // 'all'
-        };
-    }
-
-    private function applyDrillTypeFilter(Builder $query, string $type): void
-    {
-        $normalized = $this->normalizeDrillType($type);
-
-        if ($normalized === 'fire_evacuation') {
-            $query->whereIn('drill_type', self::FIRE_DRILL_TYPES);
-
-            return;
-        }
-
-        $query->where('drill_type', $normalized);
-    }
-
-    private function normalizeDrillType(string $type): string
-    {
-        return $type === 'fire' ? 'fire_evacuation' : $type;
-    }
-
-    private function typeLabel(string $type): string
-    {
-        return Str::headline($this->normalizeDrillType($type));
-    }
-
-    private function outcomeLabel(?string $outcome): string
-    {
-        return match ($outcome) {
-            'passed' => 'Passed',
-            'passed_actions' => 'Passed with actions',
-            'failed' => 'Failed',
-            default => $outcome ? Str::headline($outcome) : '—',
-        };
-    }
-
-    private function peopleLabel(EmergencyDrill $d): ?string
-    {
-        $attended = (int) ($d->participants_count ?? 0);
-        $expected = $d->total_participants;
-
-        return match ($d->status) {
-            'completed' => $attended > 0 ? $attended.' took part' : ($expected ? $expected.' recorded' : null),
-            'in_progress' => $attended > 0 ? $attended.' on site' : ($expected ? $expected.' expected' : null),
-            default => $expected ? $expected.' expected' : ($attended > 0 ? $attended.' assigned' : null),
-        };
-    }
-
-    /** Active emergency / evacuation (FENZ) plan reviews currently overdue. */
-    private function fenzReviewsDue(): int
-    {
-        if (! class_exists(SiteEmergencyPlan::class)) {
-            return 0;
-        }
-
-        return SiteEmergencyPlan::query()
-            ->where('status', 'active')
-            ->get()
-            ->filter(function ($plan) {
-                $due = method_exists($plan, 'dueDate') ? $plan->dueDate() : null;
-
-                return $due !== null && Carbon::parse($due)->isPast();
-            })
-            ->count();
-    }
-
-    /**
-     * @return array<int,array{id:int,name:string}>
-     */
-    private function assignableStaff(): array
-    {
-        return User::query()
-            ->whereNotNull('approved_at')
-            ->orderBy('name')
-            ->limit(300)
-            ->get(['id', 'name'])
-            ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])
-            ->all();
+        return response()->streamDownload(function () use ($columns, $rows): void {
+            $stream = fopen('php://output', 'wb');
+            fputcsv($stream, $columns);
+            foreach ($rows as $row) {
+                fputcsv($stream, array_map(fn ($value) => is_string($value) && preg_match('/^[\s]*[=+@-]/', $value) ? "'".$value : $value, $row));
+            }
+            fclose($stream);
+        }, $name, ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
     }
 }

@@ -54,11 +54,11 @@ class PlaybookStep extends Model
     {
         return [
             self::TYPE_TASK => 'Task',
-            self::TYPE_DECISION => 'Decision Point',
-            self::TYPE_NOTIFICATION => 'Send Notification',
+            self::TYPE_DECISION => 'Decision point',
+            self::TYPE_NOTIFICATION => 'Send a notification',
             self::TYPE_ESCALATION => 'Escalate',
-            self::TYPE_EVIDENCE => 'Collect Evidence',
-            self::TYPE_APPROVAL => 'Approval Required',
+            self::TYPE_EVIDENCE => 'Collect evidence',
+            self::TYPE_APPROVAL => 'Get approval',
         ];
     }
 }

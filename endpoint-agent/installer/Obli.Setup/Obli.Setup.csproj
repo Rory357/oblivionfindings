@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AssemblyName>oblivion-setup</AssemblyName><RootNamespace>Oblivion.Setup</RootNamespace><ApplicationManifest>app.manifest</ApplicationManifest><Deterministic>true</Deterministic><TreatWarningsAsErrors>true</TreatWarningsAsErrors><BackendSha256 Condition="'$(BackendSha256)'==''">unconfigured</BackendSha256></PropertyGroup>
  <ItemGroup><AssemblyMetadata Include="OblivionSetupBackendSHA256" Value="$(BackendSha256)"/>
+ <EmbeddedResource Include="$(BackendExecutablePath)" LogicalName="oblivion-setup-core.exe" Condition="'$(BackendExecutablePath)'!=''" />
  <Page Include="../../tray/Obli/Theme.xaml" Link="Theme.xaml"/>
  <Page Include="../../tray/Obli/ObliOrb.xaml" Link="ObliOrb.xaml"/>
  <Compile Include="../../tray/Obli/ObliOrb.xaml.cs" Link="ObliOrb.xaml.cs"/></ItemGroup>

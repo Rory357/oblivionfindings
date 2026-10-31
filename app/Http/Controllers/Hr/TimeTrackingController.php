@@ -315,7 +315,7 @@ class TimeTrackingController extends Controller
             $access,
         );
         $tab = $request->query('tab', 'overview');
-        $tz = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+        $tz = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
 
         // --- Team members list (for filters and dialogs) ---
         $teamMembers = [];
@@ -1084,7 +1084,7 @@ class TimeTrackingController extends Controller
 
         $access = $this->resolveAccess($user);
         abort_unless($access['canReportAny'], 403);
-        $tz = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+        $tz = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
         $scope = $this->normaliseScope(
             (string) $request->query(
                 'scope',

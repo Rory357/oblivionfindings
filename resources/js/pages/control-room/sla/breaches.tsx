@@ -1,24 +1,39 @@
-import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
-import { AlertStatusChip } from '@/components/control-room/alert-worklist/alert-status';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
-import { Head, Link, router } from '@inertiajs/react';
-import { ShieldAlert, XCircle } from 'lucide-react';
+    plainLabel,
+    severityBadge,
+} from '@/components/control-room/alert-record/alert-labels';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
+import {
+    ControlRoomRowActions,
+    type ControlRoomRowAction,
+} from '@/components/control-room/control-room-row-actions';
+import { HeaderDateRange } from '@/components/control-room/reports/report-parts';
+import {
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+} from '@/components/page';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import { Link, router } from '@inertiajs/react';
+import { Copy, Eye, Gauge, ShieldCheck, Target, Timer } from 'lucide-react';
 
 // --- Types ---
+
+type BreachType = 'acknowledge' | 'response' | 'resolution';
 
 interface BreachRecord {
     id: number;
@@ -52,6 +67,8 @@ interface PaginatedBreaches {
     current_page: number;
     last_page: number;
     total: number;
+    from?: number | null;
+    to?: number | null;
 }
 
 interface Stats {
@@ -76,14 +93,28 @@ interface Props {
 
 // --- Constants ---
 
-const breachTypeColors: Record<string, string> = {
-    acknowledge:
-        'bg-status-warning-bg text-status-warning border-status-warning/30',
-    response:
-        'bg-status-warning-bg text-status-warning border-status-warning/30',
-    resolution:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
+const BASE = '/control-room/sla/breaches';
+
+const TARGET_LABEL: Record<BreachType, string> = {
+    acknowledge: 'Acknowledge',
+    response: 'Response',
+    resolution: 'Resolution',
 };
+
+const SEVERITY_OPTIONS = [
+    { value: 'all', label: 'All severities' },
+    { value: 'critical', label: 'Critical' },
+    { value: 'high', label: 'High' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'low', label: 'Low' },
+];
+
+const TARGET_OPTIONS = [
+    { value: 'all', label: 'All targets' },
+    { value: 'acknowledge', label: 'Acknowledge' },
+    { value: 'response', label: 'Response' },
+    { value: 'resolution', label: 'Resolution' },
+];
 
 // --- Helpers ---
 
@@ -97,429 +128,290 @@ function formatVariance(minutes: number | null): string {
     return `${hours}h ${mins}m late`;
 }
 
+/** The worst missed target decides the row's deadline, actual and variance. */
+function primaryTarget(breach: BreachRecord): BreachType {
+    if (breach.breach_types.includes('resolution')) return 'resolution';
+    if (breach.breach_types.includes('response')) return 'response';
+    return 'acknowledge';
+}
+
+function milestone(breach: BreachRecord, target: BreachType) {
+    switch (target) {
+        case 'acknowledge':
+            return {
+                deadline: breach.acknowledge_deadline,
+                actual: breach.acknowledged_at,
+                variance: breach.acknowledge_variance_minutes,
+            };
+        case 'response':
+            return {
+                deadline: breach.response_deadline,
+                actual: breach.responded_at,
+                variance: breach.response_variance_minutes,
+            };
+        case 'resolution':
+            return {
+                deadline: breach.resolution_deadline,
+                actual: breach.resolved_at,
+                variance: breach.resolution_variance_minutes,
+            };
+    }
+}
+
 // --- Main Page ---
 
+/**
+ * Reports › Target breaches — every alert that missed a response target in
+ * the chosen dates, with the deadline, when it actually happened and how
+ * late. The header numbers filter the list by which target was missed.
+ */
 export default function SlaBreaches({ breaches, stats, filters }: Props) {
-    const applyFilter = (key: string, value: string | null) => {
-        const newFilters: Record<string, string | undefined> = {
-            date_from: filters.date_from,
-            date_to: filters.date_to,
-            severity: filters.severity ?? undefined,
-            breach_type: filters.breach_type ?? undefined,
+    const visit = (next: Partial<Filters>) => {
+        const merged = { ...filters, ...next };
+        const params: Record<string, string> = {
+            date_from: merged.date_from,
+            date_to: merged.date_to,
         };
-
-        if (value) {
-            newFilters[key] = value;
-        } else {
-            delete newFilters[key];
-        }
-
-        router.get('/control-room/sla/breaches', newFilters, {
-            preserveState: true,
-            preserveScroll: true,
-        });
+        if (merged.severity) params.severity = merged.severity;
+        if (merged.breach_type) params.breach_type = merged.breach_type;
+        router.get(BASE, params, { preserveState: true, preserveScroll: true });
     };
 
-    const clearFilters = () => {
-        router.get(
-            '/control-room/sla/breaches',
-            {},
-            {
-                preserveState: true,
-                preserveScroll: true,
-            },
-        );
-    };
+    const range = `${formatDateOnly(filters.date_from)} – ${formatDateOnly(filters.date_to)}`;
+    const active = filters.breach_type;
 
-    const hasActiveFilters = filters.severity || filters.breach_type;
+    const meter = (
+        type: BreachType | null,
+        label: string,
+        count: number,
+        caption: string,
+    ) => (
+        <PageHeaderMeterBlock
+            label={label}
+            tone={count > 0 ? (type === null || type === 'resolution' ? 'critical' : 'warning') : 'brand'}
+            onClick={() => visit({ breach_type: type })}
+            pressed={(active ?? null) === type}
+            ariaLabel={
+                type === null
+                    ? 'Show every missed response target'
+                    : `Show missed ${type} targets`
+            }
+        >
+            <PageHeaderMeterBig>{count}</PageHeaderMeterBig>
+            <PageHeaderMeterCaption>{caption}</PageHeaderMeterCaption>
+        </PageHeaderMeterBlock>
+    );
+
+    const first = breaches.from ?? (breaches.data.length ? (breaches.current_page - 1) * 25 + 1 : 0);
+    const last = breaches.to ?? first + breaches.data.length - 1;
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'SLA Management', href: '/control-room/sla' },
-                { title: 'Breach Report', href: '#' },
-            ]}
+        <ControlRoomPage
+            headTitle="Target breaches"
+            header={{
+                subline: `Alerts that missed a response target, and how late they were · ${range}`,
+                actions: (
+                    <PageHeaderGlassButton icon={Target} asChild>
+                        <Link href="/control-room/sla">Response targets</Link>
+                    </PageHeaderGlassButton>
+                ),
+                meters: (
+                    <>
+                        {meter(null, 'Missed targets', stats.total, 'alerts in these dates')}
+                        {meter('acknowledge', 'Acknowledge', stats.acknowledge, 'acknowledged late')}
+                        {meter('response', 'Response', stats.response, 'responded to late')}
+                        {meter('resolution', 'Resolution', stats.resolution, 'resolved late')}
+                    </>
+                ),
+                filters: (
+                    <>
+                        <PageHeaderFilterSelect
+                            icon={Gauge}
+                            label="All severities"
+                            value={filters.severity ?? 'all'}
+                            options={SEVERITY_OPTIONS}
+                            onChange={(value) =>
+                                visit({ severity: value === 'all' ? null : value })
+                            }
+                        />
+                        <PageHeaderFilterSelect
+                            icon={Timer}
+                            label="All targets"
+                            value={filters.breach_type ?? 'all'}
+                            options={TARGET_OPTIONS}
+                            onChange={(value) =>
+                                visit({ breach_type: value === 'all' ? null : value })
+                            }
+                        />
+                        <HeaderDateRange
+                            idPrefix="breaches-range"
+                            from={filters.date_from}
+                            to={filters.date_to}
+                            onChange={(date_from, date_to) => visit({ date_from, date_to })}
+                        />
+                    </>
+                ),
+            }}
         >
-            <Head title="SLA Breach Report - Control Room" />
-            <PageShell>
-                <CommandCentrePage
-                    variant="compact"
-                    current="/control-room/sla/breaches"
-                    icon={ShieldAlert}
-                    title="SLA breach report"
-                    description="View and analyse SLA breaches across all alert types."
-                    status="SLA exception workspace"
-                    freshness={`${stats.total} recorded breaches`}
-                >
-                    {/* Stats Cards */}
-                    <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-xs font-medium text-muted-foreground">
-                                    Total Breaches
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p
-                                    className={`text-2xl font-bold ${stats.total > 0 ? 'text-status-critical' : ''}`}
-                                >
-                                    {stats.total}
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-xs font-medium text-muted-foreground">
-                                    Acknowledge Breaches
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p
-                                    className={`text-2xl font-bold ${stats.acknowledge > 0 ? 'text-status-warning' : ''}`}
-                                >
-                                    {stats.acknowledge}
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-xs font-medium text-muted-foreground">
-                                    Response Breaches
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p
-                                    className={`text-2xl font-bold ${stats.response > 0 ? 'text-status-warning' : ''}`}
-                                >
-                                    {stats.response}
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-xs font-medium text-muted-foreground">
-                                    Resolution Breaches
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p
-                                    className={`text-2xl font-bold ${stats.resolution > 0 ? 'text-status-critical' : ''}`}
-                                >
-                                    {stats.resolution}
-                                </p>
-                            </CardContent>
-                        </Card>
+            <Card className="min-w-0 gap-0 overflow-hidden py-0">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+                    <div className="min-w-0">
+                        <h2 className="text-section-title">Missed response targets</h2>
+                        <p className="text-subtle mt-0.5">
+                            Each row shows the latest target the alert missed: when it was due,
+                            when it happened and how late.
+                        </p>
                     </div>
-
-                    {/* Filter Bar */}
-                    <Card className="mb-6">
-                        <CardContent className="pt-6">
-                            <div className="flex flex-wrap items-end gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-xs">From</Label>
-                                    <Input
-                                        type="date"
-                                        value={filters.date_from}
-                                        onChange={(e) =>
-                                            applyFilter(
-                                                'date_from',
-                                                e.target.value,
-                                            )
-                                        }
-                                        className="w-40"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs">To</Label>
-                                    <Input
-                                        type="date"
-                                        value={filters.date_to}
-                                        onChange={(e) =>
-                                            applyFilter(
-                                                'date_to',
-                                                e.target.value,
-                                            )
-                                        }
-                                        className="w-40"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs">Severity</Label>
-                                    <Select
-                                        value={filters.severity ?? 'all'}
-                                        onValueChange={(v) =>
-                                            applyFilter(
-                                                'severity',
-                                                v === 'all' ? null : v,
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger className="w-36">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All Severities
-                                            </SelectItem>
-                                            <SelectItem value="critical">
-                                                Critical
-                                            </SelectItem>
-                                            <SelectItem value="high">
-                                                High
-                                            </SelectItem>
-                                            <SelectItem value="medium">
-                                                Medium
-                                            </SelectItem>
-                                            <SelectItem value="low">
-                                                Low
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs">
-                                        Breach Type
-                                    </Label>
-                                    <Select
-                                        value={filters.breach_type ?? 'all'}
-                                        onValueChange={(v) =>
-                                            applyFilter(
-                                                'breach_type',
-                                                v === 'all' ? null : v,
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger className="w-40">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All Types
-                                            </SelectItem>
-                                            <SelectItem value="acknowledge">
-                                                Acknowledge
-                                            </SelectItem>
-                                            <SelectItem value="response">
-                                                Response
-                                            </SelectItem>
-                                            <SelectItem value="resolution">
-                                                Resolution
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                {hasActiveFilters && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={clearFilters}
-                                    >
-                                        <XCircle className="mr-1 h-3.5 w-3.5" />
-                                        Clear filters
-                                    </Button>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Breach Table */}
-                    {breaches.data.length === 0 ? (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <ShieldAlert className="mb-4 h-12 w-12 text-status-success" />
-                                <p className="text-lg font-medium text-muted-foreground">
-                                    No breaches found
-                                </p>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    No SLA breaches match the current filters.
-                                    Great work!
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <Card>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/50">
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Alert
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Type
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Severity
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Breach Type
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Deadline
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Actual
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Variance
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                SLA
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {breaches.data.map((breach) => (
-                                            <BreachRow
-                                                key={breach.id}
-                                                breach={breach}
-                                            />
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Pagination */}
-                            {breaches.links?.length > 3 && (
-                                <div className="flex justify-center gap-2 border-t p-4">
-                                    {breaches.links.map((link, i: number) => (
-                                        <Button
-                                            key={i}
-                                            variant={
-                                                link.active
-                                                    ? 'default'
-                                                    : 'outline'
-                                            }
-                                            size="sm"
-                                            disabled={!link.url}
-                                            onClick={() =>
-                                                link.url &&
-                                                router.get(
-                                                    link.url,
-                                                    {},
-                                                    {
-                                                        preserveState: true,
-                                                        preserveScroll: true,
-                                                    },
-                                                )
-                                            }
-                                        >
-                                            <span
-                                                dangerouslySetInnerHTML={{
-                                                    __html: link.label,
-                                                }}
-                                            />
-                                        </Button>
-                                    ))}
-                                </div>
-                            )}
-                        </Card>
-                    )}
-                </CommandCentrePage>
-            </PageShell>
-        </AppLayout>
+                    {breaches.total > 0 ? (
+                        <StatusBadge variant="neutral" className="tabular-nums">
+                            Showing {first}–{last} of {breaches.total}
+                        </StatusBadge>
+                    ) : null}
+                </div>
+                {breaches.data.length === 0 ? (
+                    <div className="px-5 py-10">
+                        <EmptyState
+                            icon={ShieldCheck}
+                            title="No missed response targets"
+                            description={`Nothing matches these filters for ${range}.`}
+                        />
+                    </div>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="pl-5">Alert</TableHead>
+                                <TableHead>Severity</TableHead>
+                                <TableHead>Missed target</TableHead>
+                                <TableHead>Deadline</TableHead>
+                                <TableHead>Actual</TableHead>
+                                <TableHead>Variance</TableHead>
+                                <TableHead>Response target</TableHead>
+                                <TableHead className="w-12 pr-5">
+                                    <span className="sr-only">Actions</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {breaches.data.map((breach) => (
+                                <BreachRow key={breach.id} breach={breach} />
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+                {breaches.last_page > 1 ? (
+                    <div className="border-t border-border px-5 py-3">
+                        <LaravelPagination
+                            links={breaches.links}
+                            lastPage={breaches.last_page}
+                            preserveScroll
+                        />
+                    </div>
+                ) : null}
+            </Card>
+        </ControlRoomPage>
     );
 }
 
 // --- Breach Row ---
 
 function BreachRow({ breach }: { breach: BreachRecord }) {
-    // Pick the most severe breach to show deadline/actual/variance for
-    // If multiple, show the worst one (resolution > response > acknowledge)
-    const primaryBreach = breach.breach_types.includes('resolution')
-        ? 'resolution'
-        : breach.breach_types.includes('response')
-          ? 'response'
-          : 'acknowledge';
+    const reference = breach.alert_reference ?? `Alert ${breach.alert_id}`;
+    const href = `/control-room/alerts/${breach.alert_id}`;
+    const target = primaryTarget(breach);
+    const { deadline, actual, variance } = milestone(breach, target);
+    const severity = breach.severity ? severityBadge(breach.severity) : null;
 
-    const deadlineMap: Record<string, string | null> = {
-        acknowledge: breach.acknowledge_deadline,
-        response: breach.response_deadline,
-        resolution: breach.resolution_deadline,
-    };
-
-    const actualMap: Record<string, string | null> = {
-        acknowledge: breach.acknowledged_at,
-        response: breach.responded_at,
-        resolution: breach.resolved_at,
-    };
-
-    const varianceMap: Record<string, number | null> = {
-        acknowledge: breach.acknowledge_variance_minutes,
-        response: breach.response_variance_minutes,
-        resolution: breach.resolution_variance_minutes,
-    };
+    const items: ControlRoomRowAction[] = [
+        {
+            key: 'open',
+            label: 'Open alert',
+            icon: Eye,
+            onSelect: () => router.visit(href),
+        },
+        {
+            key: 'copy',
+            label: 'Copy alert reference',
+            icon: Copy,
+            onSelect: () => void navigator.clipboard?.writeText(reference),
+        },
+    ];
 
     return (
-        <tr className="border-b transition-colors hover:bg-muted/50">
-            <td className="px-4 py-3">
-                <Link
-                    href={`/control-room/alerts/${breach.alert_id}`}
-                    className="font-medium text-primary hover:underline"
+        <ControlRoomRowActions label={`Actions for ${reference}`} items={items}>
+            {({ rowProps, overflowButton }) => (
+                <TableRow
+                    {...rowProps}
+                    className="cursor-pointer outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    onClick={(event) => {
+                        // The reference link and the kebab handle their own clicks.
+                        if ((event.target as HTMLElement).closest('a,button')) return;
+                        router.visit(href);
+                    }}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter' && event.target === event.currentTarget) {
+                            router.visit(href);
+                        }
+                    }}
                 >
-                    {breach.alert_reference ?? `Alert ${breach.alert_id}`}
-                </Link>
-            </td>
-            <td className="px-4 py-3 text-xs">
-                {breach.alert_type?.replace(/_/g, ' ') ?? '-'}
-            </td>
-            <td className="px-4 py-3">
-                {breach.severity ? (
-                    <AlertStatusChip kind="severity" value={breach.severity} />
-                ) : (
-                    '-'
-                )}
-            </td>
-            <td className="px-4 py-3">
-                <div className="flex flex-wrap gap-1">
-                    {breach.breach_types.map((bt) => (
-                        <Badge
-                            key={bt}
-                            variant="outline"
-                            className={`text-[10px] ${breachTypeColors[bt] ?? ''}`}
-                        >
-                            {bt}
-                        </Badge>
-                    ))}
-                </div>
-            </td>
-            <td className="px-4 py-3 text-xs text-muted-foreground">
-                {formatDateTime(deadlineMap[primaryBreach])}
-            </td>
-            <td className="px-4 py-3 text-xs text-muted-foreground">
-                {actualMap[primaryBreach]
-                    ? formatDateTime(actualMap[primaryBreach])
-                    : 'Pending'}
-            </td>
-            <td className="px-4 py-3">
-                {varianceMap[primaryBreach] !== null ? (
-                    <span className="text-xs font-semibold text-status-critical">
-                        {formatVariance(varianceMap[primaryBreach])}
-                    </span>
-                ) : (
-                    <span className="text-xs font-semibold text-status-critical">
-                        Ongoing
-                    </span>
-                )}
-            </td>
-            <td className="px-4 py-3">
-                {breach.sla_name ? (
-                    <div>
-                        <span className="text-xs">{breach.sla_name}</span>
-                        {breach.sla_code && (
-                            <Badge
-                                variant="outline"
-                                className="ml-1 font-mono text-[10px]"
-                            >
-                                {breach.sla_code}
-                            </Badge>
+                    <TableCell className="pl-5">
+                        {/* What happened first; the reference is the small secondary line. */}
+                        <span className="block font-medium text-foreground">
+                            {plainLabel(breach.alert_type) || 'Alert'}
+                        </span>
+                        <span className="text-caption block">
+                            <Link href={href} className="font-medium text-primary hover:underline">
+                                {reference}
+                            </Link>
+                            {breach.source ? ` · ${plainLabel(breach.source)}` : null}
+                        </span>
+                    </TableCell>
+                    <TableCell>
+                        {severity ? (
+                            <StatusBadge variant={severity.tone} size="sm">
+                                {severity.label}
+                            </StatusBadge>
+                        ) : null}
+                    </TableCell>
+                    <TableCell>
+                        <span className="flex flex-wrap gap-1">
+                            {breach.breach_types.map((type) => (
+                                <StatusBadge key={type} variant="neutral" size="sm">
+                                    {TARGET_LABEL[type as BreachType] ?? plainLabel(type)}
+                                </StatusBadge>
+                            ))}
+                        </span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {deadline ? formatDateTime(deadline) : null}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {actual ? formatDateTime(actual) : 'Pending'}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                        {variance !== null ? (
+                            <span className="font-semibold text-status-critical">
+                                {formatVariance(variance)}
+                            </span>
+                        ) : (
+                            <StatusBadge variant="critical" size="sm">
+                                Ongoing
+                            </StatusBadge>
                         )}
-                    </div>
-                ) : (
-                    '-'
-                )}
-            </td>
-        </tr>
+                    </TableCell>
+                    <TableCell>
+                        {breach.sla_name ? (
+                            <span className="block min-w-0">
+                                {breach.sla_name}
+                                {breach.sla_code ? (
+                                    <span className="text-caption block">{breach.sla_code}</span>
+                                ) : null}
+                            </span>
+                        ) : null}
+                    </TableCell>
+                    <TableCell className="pr-5 text-right">{overflowButton}</TableCell>
+                </TableRow>
+            )}
+        </ControlRoomRowActions>
     );
 }

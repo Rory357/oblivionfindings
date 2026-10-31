@@ -16,6 +16,10 @@ export type Page<T> = {
 };
 export type ReferralSummary = {
     reference: string;
+    /** ENQ- number of a general enquiry (Contact us, general questions); shown instead of the reference. */
+    enquiry_reference?: string | null;
+    /** A general enquiry, not (yet) a referral: its own queue, left out of referral counts. */
+    is_general_enquiry?: boolean;
     version: number;
     name: string;
     preferred_name: string | null;
@@ -112,6 +116,12 @@ export type ReferralDetail = ReferralSummary & {
         provenance?: string;
         preparation_reason?: string;
     };
+    /** A Contact us message: topic, what they wrote and how they asked us to reply. */
+    enquiry?: {
+        topic?: string;
+        message?: string;
+        reply_by?: 'phone' | 'text' | 'email';
+    } | null;
     contact_permission: boolean;
     people_contacts?: import('./people-contacts').PeopleContact[];
     can_complete_intake: boolean;
@@ -202,7 +212,16 @@ export const referralHref = (reference: string) =>
     `/operations/referrals/${reference}`;
 
 /* ---- Workspace (list / funding / follow-ups) payloads — additive types ---- */
-export type WorkspaceView = 'referrals' | 'funding' | 'follow_ups';
+export type WorkspaceView =
+    | 'referrals'
+    | 'enquiries'
+    | 'funding'
+    | 'follow_ups';
+/** The reference to show people: ENQ- for a general enquiry, the referral reference otherwise. */
+export const shownReference = (record: {
+    reference: string;
+    enquiry_reference?: string | null;
+}) => record.enquiry_reference || record.reference;
 export type WorkspaceReferral = ReferralSummary & {
     /** An overdue next action or accessible open follow-up (the Reports rule). */
     is_overdue: boolean;
@@ -210,6 +229,7 @@ export type WorkspaceReferral = ReferralSummary & {
 };
 export type WorkspaceReferralLink = {
     reference: string;
+    enquiry_reference?: string | null;
     name: string;
     preferred_name: string | null;
     site_name: string | null;

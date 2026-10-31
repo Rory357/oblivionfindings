@@ -14,8 +14,9 @@ import AgentDownloads, {
 } from './agent-downloads';
 const mocks = vi.hoisted(() => ({
     actor: 7,
-    can: {} as Record<string, boolean>,
+    can: {} as Record<string, Record<string, boolean>>,
     reload: vi.fn(),
+    visit: vi.fn(),
 }));
 vi.mock('@inertiajs/react', async () => {
     const actual =
@@ -33,7 +34,7 @@ vi.mock('@inertiajs/react', async () => {
                 },
             },
         }),
-        router: { ...actual.router, reload: mocks.reload },
+        router: { ...actual.router, reload: mocks.reload, visit: mocks.visit },
     };
 });
 vi.mock('@/layouts/app-layout', () => ({
@@ -84,19 +85,53 @@ function fixture(): AgentDownloadsProps {
 beforeEach(() => {
     mocks.actor = 7;
     mocks.can = {
-        'securityDevices.viewAny': true,
-        'securityDevices.commands.admin': true,
-        'securityDevices.integrations.manage': true,
-        'securityDevices.devices.view': true,
-        'securityDevices.integrations.view': true,
+        securityDevices: {
+            viewAny: true,
+            commandsAdmin: true,
+            integrationsManage: true,
+            devicesView: true,
+            integrationsView: true,
+        },
     };
     mocks.reload.mockReset();
+    mocks.visit.mockReset();
 });
 afterEach(() => {
     cleanup();
     vi.useRealTimers();
 });
+describe('Published releases retain their original account context', () => {
+    it('withholds retained release links when the current account changes and recovers through a complete read', () => {
+        const data = fixture();
+        const ui = render(<AgentDownloads {...data} />);
+        expect(
+            screen.getAllByRole('link', { name: /^Download / }).length,
+        ).toBeGreaterThan(0);
+        mocks.actor = 8;
+        ui.rerender(<AgentDownloads {...data} />);
+        expect(
+            screen.queryByRole('link', { name: /^Download / }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.visit).toHaveBeenCalledWith(
+            '/security-devices/agent-downloads',
+            expect.objectContaining({ preserveState: false }),
+        );
+    });
+});
+
 describe('Agent downloads shared release records', () => {
+    it('withholds packages when only obsolete flat permission keys are supplied', () => {
+        mocks.can = {
+            'securityDevices.viewAny': true,
+            'securityDevices.commands.admin': true,
+            'securityDevices.integrations.manage': true,
+        } as unknown as typeof mocks.can;
+        render(<AgentDownloads {...fixture()} />);
+        expect(screen.getByText('Downloads restricted')).toBeInTheDocument();
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    });
+
     it('keeps exact release and file verification fields in the shared full viewer', async () => {
         render(<AgentDownloads {...fixture()} />);
         expect(
@@ -197,7 +232,7 @@ describe('Agent downloads shared release records', () => {
             ).getByRole('button', { name: /Open/ }),
         );
         expect(await screen.findByRole('dialog')).toBeInTheDocument();
-        mocks.can['securityDevices.commands.admin'] = false;
+        mocks.can.securityDevices.commandsAdmin = false;
         view.rerender(<AgentDownloads {...props} />);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(
@@ -298,8 +333,8 @@ describe('Agent downloads shared release records', () => {
                 'auth',
             ],
         });
-        mocks.can['securityDevices.devices.view'] = false;
-        mocks.can['securityDevices.integrations.view'] = false;
+        mocks.can.securityDevices.devicesView = false;
+        mocks.can.securityDevices.integrationsView = false;
         view.rerender(<AgentDownloads {...props} />);
         expect(
             screen.queryByRole('link', { name: 'Open device register' }),

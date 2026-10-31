@@ -11,6 +11,7 @@ use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
@@ -519,6 +520,13 @@ class MedicationAlertService
                 'discrepancy_count' => $openDiscrepancies->count(),
                 'discrepancy_ids' => $openDiscrepancies->pluck('id')->toArray(),
                 'site_id' => $client->site_id,
+                // One open alert per person while they have an open
+                // discrepancy; each check refreshes its count and ids.
+                SignalProcessingService::CONDITION_KEY => SignalProcessingService::conditionKey(
+                    MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY,
+                    'client',
+                    $client->id,
+                ),
             ],
         );
 

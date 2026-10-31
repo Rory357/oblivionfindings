@@ -1,3 +1,7 @@
+import {
+    RestraintsBspSummary,
+    type RestraintSummary,
+} from '@/components/clients/profile/restraints-bsp-panel';
 import { PageHero, PageLayout } from '@/components/page';
 import {
     RespiteCheckIn,
@@ -20,12 +24,18 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
+import { ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
     stay: any;
     serviceStartReviewUrl?: string | null;
     supportPreparation?: RespitePreparation | null;
+    restraints?: {
+        can: { capture: boolean; view: boolean; review: boolean };
+        summary: RestraintSummary | null;
+        report_href: string | null;
+    };
 };
 
 const statusColor: Record<string, string> = {
@@ -55,6 +65,7 @@ export default function RespiteStayShow({
     stay,
     serviceStartReviewUrl,
     supportPreparation,
+    restraints,
 }: Props) {
     const [extendOpen, setExtendOpen] = useState(false);
     const [dischargeOpen, setDischargeOpen] = useState(false);
@@ -119,12 +130,40 @@ export default function RespiteStayShow({
                                         Evidence Pack Linked
                                     </Badge>
                                 )}
+                                {restraints?.can.capture &&
+                                restraints.report_href ? (
+                                    <Button size="sm" asChild>
+                                        <Link href={restraints.report_href}>
+                                            <ShieldAlert className="h-3.5 w-3.5" />
+                                            Record a restraint
+                                        </Link>
+                                    </Button>
+                                ) : null}
                             </div>
                         }
                     />
                 }
             >
                 <RespiteSubnav />
+
+                {restraints?.can.view &&
+                restraints.summary &&
+                stay.client?.id ? (
+                    <section
+                        aria-label="Restraint and behaviour support history"
+                        className="space-y-2"
+                    >
+                        <p className="text-caption text-muted-foreground">
+                            This person’s history across the records you can
+                            see. Each restraint keeps its own stay.
+                        </p>
+                        <RestraintsBspSummary
+                            summary={restraints.summary}
+                            clientId={stay.client.id}
+                            origin={`/respite/stays/${stay.id}`}
+                        />
+                    </section>
+                ) : null}
 
                 <div className="grid gap-4 md:grid-cols-2">
                     {/* Stay Details */}

@@ -18,8 +18,33 @@ import {
 const mock = vi.hoisted(() => ({ json: vi.fn(), visit: vi.fn() }));
 vi.mock('./live-transport', () => ({ cctvRecordingJson: mock.json }));
 vi.mock('@/layouts/app-layout', () => ({
-    default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
+    default: ({
+        breadcrumbs = [],
+        children,
+    }: {
+        breadcrumbs?: { title: string; href?: string }[];
+        children: ReactNode;
+    }) => (
+        <main>
+            <nav aria-label="Breadcrumbs">
+                {breadcrumbs.map((crumb) =>
+                    crumb.href ? (
+                        <a key={crumb.title} href={crumb.href}>
+                            {crumb.title}
+                        </a>
+                    ) : (
+                        <span key={crumb.title}>{crumb.title}</span>
+                    ),
+                )}
+            </nav>
+            {children}
+        </main>
+    ),
 }));
+const trail = () =>
+    [...screen.getByRole('navigation', { name: 'Breadcrumbs' }).children].map(
+        (crumb) => [crumb.textContent, crumb.getAttribute('href')],
+    );
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
     Link: ({ href, children }: { href: string; children: ReactNode }) => (
@@ -70,6 +95,31 @@ async function review() {
         target: { value: recordingDetailFixture().reference.purpose },
     });
 }
+describe('Recording reference placement', () => {
+    it('roots both trails at Home and follows the sidebar to All devices and the camera', () => {
+        render(<RecordingReferencesPage {...recordingPageFixture()} />);
+        expect(trail()).toEqual([
+            ['Home', '/dashboard'],
+            ['Security & Devices', '/security-devices'],
+            ['All devices', '/security-devices/devices'],
+            ['Main entrance', '/security-devices/devices/42'],
+            ['Recording references', null],
+        ]);
+        cleanup();
+        render(<RecordingReferencePage {...recordingDetailFixture()} />);
+        expect(trail()).toEqual([
+            ['Home', '/dashboard'],
+            ['Security & Devices', '/security-devices'],
+            ['All devices', '/security-devices/devices'],
+            ['Main entrance', '/security-devices/devices/42'],
+            [
+                'Recording references',
+                '/security-devices/devices/42/recording-references',
+            ],
+            ['Saved reference', null],
+        ]);
+    });
+});
 describe('Recording reference workflows', () => {
     it('separates current access, reference creation and unverified footage', () => {
         const page = recordingPageFixture();
@@ -77,7 +127,7 @@ describe('Recording reference workflows', () => {
         page.create_href = null;
         render(<RecordingReferencesPage {...page} />);
         expect(
-            screen.queryByRole('button', { name: 'Save recording reference' }),
+            screen.queryByRole('button', { name: 'Add recording reference' }),
         ).not.toBeInTheDocument();
         expect(screen.getByText('No recording references')).toBeInTheDocument();
         expect(mock.json).not.toHaveBeenCalled();

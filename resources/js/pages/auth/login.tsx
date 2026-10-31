@@ -185,6 +185,7 @@ export default function Login({
             title={t('app.auth.login.head', 'Sign in')}
             lede="Sign in to open My Day: your roster, the people you support, medication rounds and handovers."
             signing={signing}
+            backToWebsite
             footer={
                 <>
                     <span>
@@ -340,7 +341,7 @@ export default function Login({
                                     autoComplete="username"
                                     autoFocus
                                     required
-                                    placeholder="you@oblivioncare.co.nz"
+                                    placeholder="Your work email"
                                     value={form.data.email}
                                     onChange={(event) =>
                                         form.setData(

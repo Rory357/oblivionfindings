@@ -729,7 +729,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                         {workflowError ?? createShiftLauncher.error}
                     </p>
                 ) : null}
-                <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)]">
+                <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)]">
                     <div ref={listAnchor} className="min-w-0">
                         <ConflictQueueList
                             filter={filter}

@@ -192,7 +192,7 @@ function TopologyMapPage({ topology }: { topology: TopologyMapData }) {
                 variant="compact"
                 icon={GitBranch}
                 title="No visible topology nodes"
-                description="Topology stays empty until evidence links canonical Devices in the current Site view."
+                description="Topology stays empty until links between registered Devices are found in the current Site view."
             />
         );
     return (

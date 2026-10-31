@@ -1,0 +1,91 @@
+{
+    "version": 1,
+    "actor_id": 1,
+    "device_id": 1,
+    "documents": [
+        {
+            "name": "default",
+            "method": "GET",
+            "request_json": null,
+            "status": 200,
+            "response_json": "{\"actor_id\":1,\"device_id\":1,\"policy\":{\"version\":0,\"enabled\":false,\"consent_mode\":\"attended\"},\"assignment_matches\":true,\"available\":false,\"unavailable_reason\":\"script_execution_not_implemented\",\"can_manage\":true,\"can_run\":false,\"can_unattended\":false,\"identity_confirmed\":true}"
+        },
+        {
+            "name": "not_received",
+            "method": "GET",
+            "request_json": null,
+            "status": 404,
+            "response_json": "{\"message\":\"This remote-support request is unavailable.\"}"
+        },
+        {
+            "name": "new_after_unknown",
+            "method": "PUT",
+            "request_json": "{\"expected_actor_id\":1,\"expected_version\":0,\"request_key\":\"e5acd49a-5120-45b9-9b29-8a8df5146e7d\",\"enabled\":false,\"consent_mode\":\"attended\",\"reason\":\"Review a separate change after an unconfirmed request.\"}",
+            "status": 200,
+            "response_json": "{\"actor_id\":1,\"device_id\":1,\"policy\":{\"version\":1,\"enabled\":false,\"consent_mode\":\"attended\"},\"assignment_matches\":true,\"available\":false,\"unavailable_reason\":\"script_execution_not_implemented\",\"can_manage\":true,\"can_run\":false,\"can_unattended\":false,\"identity_confirmed\":true,\"receipt\":{\"device_id\":1,\"actor_id\":1,\"request_key\":\"e5acd49a-5120-45b9-9b29-8a8df5146e7d\",\"assignment_fingerprint\":\"94246de781449e41e3789ef38c5c1f6502e465ef4292821be4afe829431b3302\",\"policy\":{\"version\":1,\"enabled\":false,\"consent_mode\":\"attended\"},\"reason\":\"Review a separate change after an unconfirmed request.\",\"recorded_at\":\"2026-10-20T12:13:20Z\"}}"
+        },
+        {
+            "name": "late_old_rejected",
+            "method": "PUT",
+            "request_json": "{\"expected_actor_id\":1,\"expected_version\":0,\"request_key\":\"318f939f-6c84-4abb-b560-79e45021dc3d\",\"enabled\":true,\"consent_mode\":\"attended\",\"reason\":\"Configure this synthetic test computer.\"}",
+            "status": 409,
+            "response_json": "{\"message\":\"The computer, policy or session changed. Refresh before continuing.\"}"
+        },
+        {
+            "name": "current_after_late",
+            "method": "GET",
+            "request_json": null,
+            "status": 200,
+            "response_json": "{\"actor_id\":1,\"device_id\":1,\"policy\":{\"version\":1,\"enabled\":false,\"consent_mode\":\"attended\"},\"assignment_matches\":true,\"available\":false,\"unavailable_reason\":\"script_execution_not_implemented\",\"can_manage\":true,\"can_run\":false,\"can_unattended\":false,\"identity_confirmed\":true}"
+        },
+        {
+            "name": "old_still_unconfirmed",
+            "method": "GET",
+            "request_json": null,
+            "status": 404,
+            "response_json": "{\"message\":\"This remote-support request is unavailable.\"}"
+        },
+        {
+            "name": "original_save",
+            "method": "PUT",
+            "request_json": "{\"expected_actor_id\":1,\"expected_version\":1,\"request_key\":\"d5dda8c5-90cb-4bfb-8994-78b4b39d4ff8\",\"enabled\":true,\"consent_mode\":\"attended\",\"reason\":\"  Approved Māori staff / computer policy review.  \"}",
+            "status": 200,
+            "response_json": "{\"actor_id\":1,\"device_id\":1,\"policy\":{\"version\":2,\"enabled\":true,\"consent_mode\":\"attended\"},\"assignment_matches\":true,\"available\":false,\"unavailable_reason\":\"script_execution_not_implemented\",\"can_manage\":true,\"can_run\":false,\"can_unattended\":false,\"identity_confirmed\":true,\"receipt\":{\"device_id\":1,\"actor_id\":1,\"request_key\":\"d5dda8c5-90cb-4bfb-8994-78b4b39d4ff8\",\"assignment_fingerprint\":\"94246de781449e41e3789ef38c5c1f6502e465ef4292821be4afe829431b3302\",\"policy\":{\"version\":2,\"enabled\":true,\"consent_mode\":\"attended\"},\"reason\":\"  Approved M\\u0101ori staff \\/ computer policy review.  \",\"recorded_at\":\"2026-10-20T12:13:21Z\"}}"
+        },
+        {
+            "name": "stale_new_rejected",
+            "method": "PUT",
+            "request_json": "{\"expected_actor_id\":1,\"expected_version\":1,\"request_key\":\"12becbfe-f23b-4443-8ffa-e7f1f997a002\",\"enabled\":false,\"consent_mode\":\"attended\",\"reason\":\"Configure this synthetic test computer.\"}",
+            "status": 409,
+            "response_json": "{\"message\":\"The computer, policy or session changed. Refresh before continuing.\"}"
+        },
+        {
+            "name": "newer_save",
+            "method": "PUT",
+            "request_json": "{\"expected_actor_id\":1,\"expected_version\":2,\"request_key\":\"69285f89-429c-47af-8d9a-e101f6d15f73\",\"enabled\":false,\"consent_mode\":\"attended\",\"reason\":\"Configure this synthetic test computer.\"}",
+            "status": 200,
+            "response_json": "{\"actor_id\":1,\"device_id\":1,\"policy\":{\"version\":3,\"enabled\":false,\"consent_mode\":\"attended\"},\"assignment_matches\":true,\"available\":false,\"unavailable_reason\":\"script_execution_not_implemented\",\"can_manage\":true,\"can_run\":false,\"can_unattended\":false,\"identity_confirmed\":true,\"receipt\":{\"device_id\":1,\"actor_id\":1,\"request_key\":\"69285f89-429c-47af-8d9a-e101f6d15f73\",\"assignment_fingerprint\":\"94246de781449e41e3789ef38c5c1f6502e465ef4292821be4afe829431b3302\",\"policy\":{\"version\":3,\"enabled\":false,\"consent_mode\":\"attended\"},\"reason\":\"Configure this synthetic test computer.\",\"recorded_at\":\"2026-10-20T12:13:21Z\"}}"
+        },
+        {
+            "name": "original_replay",
+            "method": "PUT",
+            "request_json": "{\"expected_actor_id\":1,\"expected_version\":1,\"request_key\":\"d5dda8c5-90cb-4bfb-8994-78b4b39d4ff8\",\"enabled\":true,\"consent_mode\":\"attended\",\"reason\":\"  Approved Māori staff / computer policy review.  \"}",
+            "status": 200,
+            "response_json": "{\"actor_id\":1,\"device_id\":1,\"policy\":{\"version\":3,\"enabled\":false,\"consent_mode\":\"attended\"},\"assignment_matches\":true,\"available\":false,\"unavailable_reason\":\"script_execution_not_implemented\",\"can_manage\":true,\"can_run\":false,\"can_unattended\":false,\"identity_confirmed\":true,\"receipt\":{\"device_id\":1,\"actor_id\":1,\"request_key\":\"d5dda8c5-90cb-4bfb-8994-78b4b39d4ff8\",\"assignment_fingerprint\":\"94246de781449e41e3789ef38c5c1f6502e465ef4292821be4afe829431b3302\",\"policy\":{\"version\":2,\"enabled\":true,\"consent_mode\":\"attended\"},\"reason\":\"  Approved M\\u0101ori staff \\/ computer policy review.  \",\"recorded_at\":\"2026-10-20T12:13:21Z\"}}"
+        },
+        {
+            "name": "original_recovery",
+            "method": "GET",
+            "request_json": null,
+            "status": 200,
+            "response_json": "{\"actor_id\":1,\"device_id\":1,\"policy\":{\"version\":3,\"enabled\":false,\"consent_mode\":\"attended\"},\"assignment_matches\":true,\"available\":false,\"unavailable_reason\":\"script_execution_not_implemented\",\"can_manage\":true,\"can_run\":false,\"can_unattended\":false,\"identity_confirmed\":false,\"receipt\":{\"device_id\":1,\"actor_id\":1,\"request_key\":\"d5dda8c5-90cb-4bfb-8994-78b4b39d4ff8\",\"assignment_fingerprint\":\"94246de781449e41e3789ef38c5c1f6502e465ef4292821be4afe829431b3302\",\"policy\":{\"version\":2,\"enabled\":true,\"consent_mode\":\"attended\"},\"reason\":\"  Approved M\\u0101ori staff \\/ computer policy review.  \",\"recorded_at\":\"2026-10-20T12:13:21Z\"}}"
+        },
+        {
+            "name": "revoked_recovery",
+            "method": "GET",
+            "request_json": null,
+            "status": 403,
+            "response_json": "{\"message\":\"Your current access does not allow this remote-support action.\"}"
+        }
+    ]
+}

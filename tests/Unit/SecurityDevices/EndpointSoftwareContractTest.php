@@ -12,6 +12,7 @@ use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePackages;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePolicy;
 use App\Models\User;
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Foundation\Application;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Facades\Facade;
@@ -24,11 +25,14 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class EndpointSoftwareContractTest extends TestCase
 {
+    private $previousContainer;
+
     private $previous;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->previousContainer = Container::getInstance();
         $this->previous = Facade::getFacadeApplication();
         $app = new Application;
         $app->instance('config', new Repository);
@@ -39,6 +43,7 @@ final class EndpointSoftwareContractTest extends TestCase
 
     protected function tearDown(): void
     {
+        Container::setInstance($this->previousContainer);
         Facade::setFacadeApplication($this->previous);
         Facade::clearResolvedInstances();
         parent::tearDown();

@@ -2,33 +2,33 @@
  * Health & Safety Analytics — trend / root-cause / governance explorer.
  *
  * Read-only analyse/explore/export surface (no create wizards — those live on
- * the dashboard). Shares the dashboard's hero/tab/filter idiom. NZ-only:
+ * the dashboard). The Reports hub sits on the header rail and the analysis
+ * views below it as tier-two tabs (drawing D4). NZ-only:
  * LTIFR / TRIFR, WorkSafe notifiable events, Nga Paerewa NZS 8134:2021, ACC.
  */
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
+import { PageLayout } from '@/components/page';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
+import { Note, Surface } from '@/components/signature/blocks';
 import type {
     RosterTabItem,
     ShiftCtxItem,
     ShiftCtxState,
 } from '@/components/rostering';
-import {
-    EntityFilter,
-    ShiftContextMenu,
-    TabStrip,
-} from '@/components/rostering';
+import { ShiftContextMenu } from '@/components/rostering';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
 import type { WizardStep } from '@/components/wizard/shell';
 import { WizardShell } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import {
+    BOARD_REPORTS,
+    BOARD_REPORTS_LABEL,
+    boardReportHref,
+    type BoardReportKey,
+} from '@/lib/health-safety/board-reports';
+import { hsLabel, humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -38,16 +38,13 @@ import {
     BarChart3,
     Building2,
     Calendar,
-    ChevronDown,
     ClipboardList,
-    Clock,
     Download,
     ExternalLink,
     Eye,
     FileText,
     LayoutDashboard,
     Shield,
-    TrendingDown,
     TrendingUp,
     User,
     Users,
@@ -77,20 +74,19 @@ import type {
     ScorecardItem,
     SiteRow,
 } from './analytics-types';
-import { RoleLensBanner } from './components/dashboard-tabs';
 import {
-    HeroCluster,
-    HeroClusterTile,
-    HeroComplianceBadges,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    HeroSummaryMetric,
-    HeroSummaryStrip,
-    type HeroSegItem,
-    type Tone,
-} from './components/hs-hero-kit';
+    AnalyticsHeader,
+    AnalyticsPeriodSummary,
+} from './components/analytics-header';
+import { Scorecard } from './components/analytics-scorecard';
+import { FirstAidBreakdowns } from './components/first-aid-breakdowns';
+import {
+    participationAccessForViewer,
+    participationSourceMatches,
+    participationValue,
+    participationViewer,
+    workerParticipationTable,
+} from './participation-source-state';
 
 const PALETTE = [
     TOKEN.c1,
@@ -99,14 +95,6 @@ const PALETTE = [
     TOKEN.c4,
     TOKEN.c5,
     'var(--status-info)',
-];
-
-// Lens segmented items (shared kit shape). Period presets are built inline in the
-// component because the Custom item embeds a range-picker popover with live closures.
-const LENS_SEG_ITEMS: HeroSegItem[] = [
-    { key: 'governance', label: 'Governance' },
-    { key: 'manager', label: 'Manager' },
-    { key: 'frontline', label: 'Frontline' },
 ];
 
 const TABS: RosterTabItem[] = [
@@ -131,36 +119,20 @@ const REGISTER: Record<string, string> = {
     first_aid: '/health-safety/first-aid',
 };
 
-// Governance report set — same list as the dashboard's export popover; analytics opens each
-// dated report in a new tab (export-led), the dashboard navigates (report-led).
-const GOV_REPORTS: { name: string; label: string }[] = [
-    { name: 'board-summary', label: 'Board summary' },
-    { name: 'worksafe-register', label: 'WorkSafe register' },
-    { name: 'investigation-outcomes', label: 'Investigation outcomes' },
-    {
-        name: 'corrective-action-traceability',
-        label: 'Corrective-action traceability',
-    },
-    { name: 'risk-assessment-register', label: 'Risk-assessment register' },
-];
-
-function rangeLabel(period: string): string {
-    return (
-        {
-            '30d': 'Last 30 days',
-            q: 'This quarter',
-            '6m': 'Last 6 months',
-            ytd: 'Year to date',
-            custom: 'Custom range',
-        }[period] ?? 'Year to date'
-    );
-}
+// Board reports: the shared list and names (lib/health-safety/board-reports); each opens its readable page.
+const REPORT_ICONS: Record<BoardReportKey, typeof FileText> = {
+    board: FileText,
+    notifications: Shield,
+    'investigation-outcomes': Activity,
+    'action-traceability': ClipboardList,
+    'risk-register': AlertTriangle,
+};
 
 function fmt(v: number | null | undefined, suffix = ''): string {
     return v === null || v === undefined ? '—' : `${v}${suffix}`;
 }
 
-function toneFromDir(dir: string): Tone {
+function toneFromDir(dir: string): 'success' | 'critical' | 'neutral' {
     return dir === 'improving'
         ? 'success'
         : dir === 'watch'
@@ -174,7 +146,31 @@ function deltaArrow(dir: string): string {
 
 // ── small UI helpers ────────────────────────────────────────────────────
 
-function ScorecardCell({ item }: { item: ScorecardItem }) {
+export function ScorecardCell({ item }: { item: ScorecardItem }) {
+    const viewer = participationViewer(usePage<SharedData>().props.auth);
+    const participation =
+        item.key === 'worker_engagement' || item.key === 'worker_consultation';
+    const sourceAccess = participationAccessForViewer(
+        item.source_access,
+        item.viewer_id,
+        viewer,
+    );
+    const value = participation
+        ? participationValue(
+              item.value,
+              item.source_access,
+              item.viewer_id,
+              viewer,
+          )
+        : item.value;
+    const delta = participation
+        ? participationValue(
+              item.delta,
+              item.source_access,
+              item.viewer_id,
+              viewer,
+          )
+        : item.delta;
     const tone =
         item.dir === 'improving'
             ? 'text-status-success'
@@ -188,12 +184,12 @@ function ScorecardCell({ item }: { item: ScorecardItem }) {
                 {item.label}
             </div>
             <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
-                {fmt(item.value)}
+                {fmt(value)}
                 <span className="text-xs font-semibold text-muted-foreground">
-                    {item.value !== null ? item.suffix : ''}
+                    {value !== null ? item.suffix : ''}
                 </span>
             </div>
-            {item.delta !== null ? (
+            {delta !== null ? (
                 <div
                     className={cn(
                         'mt-0.5 flex items-center gap-1 text-[11px] font-medium',
@@ -202,68 +198,21 @@ function ScorecardCell({ item }: { item: ScorecardItem }) {
                 >
                     <span aria-hidden>{deltaArrow(item.dir)}</span>
                     <span>
-                        {item.delta > 0 ? '+' : ''}
-                        {item.delta} vs last mo
+                        {delta > 0 ? '+' : ''}
+                        {delta} vs last mo
                     </span>
                 </div>
             ) : (
                 <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    no prior data
+                    {participation &&
+                    (item.source_access !== 'readable' ||
+                        !participationSourceMatches(item.viewer_id, viewer))
+                        ? sourceAccess === 'restricted'
+                            ? 'Access restricted'
+                            : 'Not confirmed'
+                        : 'no prior data'}
                 </div>
             )}
-        </div>
-    );
-}
-
-function Scorecard({
-    leading,
-    lagging,
-}: {
-    leading: ScorecardItem[];
-    lagging: ScorecardItem[];
-}) {
-    return (
-        <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-status-success/30 bg-status-success-bg/40 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
-                        <TrendingUp className="h-4 w-4" />
-                    </span>
-                    <div>
-                        <h3 className="text-sm font-bold text-foreground">
-                            Leading indicators
-                        </h3>
-                        <p className="text-[11px] text-muted-foreground">
-                            Proactive — a healthy safety culture trends up
-                        </p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {leading.map((it) => (
-                        <ScorecardCell key={it.key} item={it} />
-                    ))}
-                </div>
-            </div>
-            <div className="rounded-xl border border-status-warning/30 bg-status-warning-bg/40 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
-                        <AlertTriangle className="h-4 w-4" />
-                    </span>
-                    <div>
-                        <h3 className="text-sm font-bold text-foreground">
-                            Lagging outcomes
-                        </h3>
-                        <p className="text-[11px] text-muted-foreground">
-                            Reactive — harm already occurred; lower is better
-                        </p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {lagging.map((it) => (
-                        <ScorecardCell key={it.key} item={it} />
-                    ))}
-                </div>
-            </div>
         </div>
     );
 }
@@ -318,6 +267,7 @@ function SiteLeague({
         rows.sort((a, b) => {
             const av = a[sortKey];
             const bv = b[sortKey];
+            if (av === null && bv === null) return 0;
             if (av === null) return 1;
             if (bv === null) return -1;
             if (typeof av === 'number' && typeof bv === 'number')
@@ -397,7 +347,7 @@ function SiteLeague({
                                 {s.open_hazards}
                             </td>
                             <td className="py-2 tabular-nums">
-                                {s.lost_time_days}
+                                {s.lost_time_days ?? 'Not confirmed'}
                             </td>
                             <td className="py-2 tabular-nums">
                                 {fmt(s.ltifr)}
@@ -409,14 +359,18 @@ function SiteLeague({
                                 <span
                                     className={cn(
                                         'font-semibold tabular-nums',
-                                        s.compliance_score >= 90
-                                            ? 'text-status-success'
-                                            : s.compliance_score >= 70
-                                              ? 'text-status-warning'
-                                              : 'text-status-critical',
+                                        s.compliance_score === null
+                                            ? 'text-muted-foreground'
+                                            : s.compliance_score >= 90
+                                              ? 'text-status-success'
+                                              : s.compliance_score >= 70
+                                                ? 'text-status-warning'
+                                                : 'text-status-critical',
                                     )}
                                 >
-                                    {s.compliance_score}%
+                                    {s.compliance_score === null
+                                        ? 'Not confirmed'
+                                        : `${s.compliance_score}%`}
                                 </span>
                             </td>
                             <td className="py-2">
@@ -505,6 +459,7 @@ function Heatmap({
                                 {s.name}
                             </th>
                             {HEAT_COLS.map(([key, , invert]) => {
+                                const unknown = s[key] === null;
                                 const raw = Number(s[key] ?? 0);
                                 const norm = raw / maxes[key as string];
                                 // darker = higher burden; compliance inverts (low compliance = worse).
@@ -514,22 +469,26 @@ function Heatmap({
                                     1,
                                     Math.max(0, invert ? 1 - raw / 100 : norm),
                                 );
-                                const mixPct = Math.round(8 + 44 * burden);
+                                const mixPct = unknown
+                                    ? 0
+                                    : Math.round(8 + 44 * burden);
                                 return (
                                     <td key={key as string} className="p-0">
                                         {/* eslint-disable-next-line no-restricted-syntax -- heatmap intensity cell, custom shaded surface */}
                                         <button
                                             type="button"
                                             onClick={() => onCell(s)}
-                                            title={`${s.name} · ${String(key).replace(/_/g, ' ')}: ${fmt(s[key] as number)}`}
+                                            title={`${s.name} · ${humaniseHsValue(String(key))}: ${unknown ? 'Not available' : fmt(s[key] as number)}`}
                                             className="flex h-9 w-full min-w-[68px] items-center justify-center rounded-md font-semibold text-foreground tabular-nums transition-transform hover:scale-[1.04] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                                             style={{
                                                 backgroundColor: `color-mix(in oklab, var(--status-critical) ${mixPct}%, var(--card))`,
                                             }}
                                         >
-                                            {key === 'compliance_score'
-                                                ? `${raw}%`
-                                                : fmt(s[key] as number)}
+                                            {unknown
+                                                ? '—'
+                                                : key === 'compliance_score'
+                                                  ? `${raw}%`
+                                                  : fmt(s[key] as number)}
                                         </button>
                                     </td>
                                 );
@@ -539,8 +498,8 @@ function Heatmap({
                 </tbody>
             </table>
             <p className="mt-2 text-[11px] text-muted-foreground">
-                Darker = higher burden (compliance inverted). Click a cell to
-                drill into the site.
+                — = not confirmed. Darker = higher recorded burden (compliance
+                inverted). Click a cell to drill into the site.
             </p>
         </div>
     );
@@ -562,9 +521,9 @@ function GovPackCard({
     actionLabel?: string;
 }) {
     return (
-        <Card className="flex flex-col rounded-xl shadow-sm">
-            <CardContent className="flex flex-1 flex-col gap-2 p-4">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-primary">
+        <section className="sg-surface flex flex-col">
+            <div className="flex flex-1 flex-col gap-2 p-4">
+                <span aria-hidden className="sg-av !size-9">
                     <Icon className="h-4 w-4" />
                 </span>
                 <div className="flex-1">
@@ -588,8 +547,8 @@ function GovPackCard({
                     )}
                     {actionLabel}
                 </Button>
-            </CardContent>
-        </Card>
+            </div>
+        </section>
     );
 }
 
@@ -706,7 +665,7 @@ function DrillModal({
                         <span className="text-muted-foreground">
                             Selection:
                         </span>{' '}
-                        <span className="font-medium text-foreground capitalize">
+                        <span className="font-medium text-foreground">
                             {target.label}
                         </span>
                     </span>
@@ -805,7 +764,6 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const [tab, setTab] = useState('overview');
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [drill, setDrill] = useState<DrillTarget | null>(null);
-    const [showSummary, setShowSummary] = useState(true);
 
     const params = useMemo(
         () => ({
@@ -849,12 +807,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
             : p.toString();
     };
 
-    const reportUrl = (name: string) => {
-        const p = new URLSearchParams();
-        if (filters.from) p.set('from', filters.from);
-        if (filters.to) p.set('to', filters.to);
-        return `/health-safety/reports/${name}?${p.toString()}`;
-    };
+    const reportUrl = (key: BoardReportKey) => boardReportHref(key, filters);
 
     const openDrill = (target: DrillTarget) => setDrill(target);
 
@@ -862,7 +815,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
         e: React.MouseEvent,
         target: DrillTarget,
         tag: string,
-        tone: 'success' | 'warning' | 'critical' | 'info',
+        tone: 'success' | 'warning' | 'critical' | 'info' | 'neutral',
     ) => {
         e.preventDefault();
         const items: ShiftCtxItem[] = [
@@ -915,26 +868,26 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     // ── derived chart data ──
     const severitySegments: DonutDatum[] = severity_data.map((d) => ({
         key: d.severity,
-        label: d.severity.replace(/_/g, ' '),
+        label: hsLabel('severity', d.severity),
         value: d.count,
         color: severityFill(d.severity),
     }));
     const riskSegments: DonutDatum[] = hazard_data.map((d) => ({
         key: d.risk_rating,
-        label: d.risk_rating,
+        label: hsLabel('risk_level', d.risk_rating),
         value: d.count,
         color: riskFill(d.risk_rating),
     }));
     const incidentTypeItems: BreakdownItem[] = incident_data.map((d, i) => ({
         key: d.type,
-        label: d.type.replace(/_/g, ' '),
+        label: humaniseHsValue(d.type),
         value: d.count,
         color: PALETTE[i % PALETTE.length],
     }));
     const injuryTypeItems: BreakdownItem[] = injury_data.by_type.map(
         (d, i) => ({
             key: d.type,
-            label: d.type.replace(/_/g, ' '),
+            label: humaniseHsValue(d.type),
             value: d.count,
             color: PALETTE[i % PALETTE.length],
         }),
@@ -942,31 +895,11 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const bodyPartItems: BreakdownItem[] = injury_data.by_body_part.map(
         (d, i) => ({
             key: d.body_part,
-            label: d.body_part.replace(/_/g, ' '),
+            label: humaniseHsValue(d.body_part),
             value: d.count,
             color: PALETTE[i % PALETTE.length],
         }),
     );
-    // First-aid breakdowns (optional + additive). Leading care-activity signal — first-aid-only
-    // treatment is excluded from TRIFR, so these navigate to the First Aid register rather than
-    // the recordable-injury drill modal (the records endpoint has no first-aid view).
-    const firstAidTypeItems: BreakdownItem[] = (
-        props.first_aid_data?.by_type ?? []
-    ).map((d, i) => ({
-        key: d.type,
-        label: d.type.replace(/_/g, ' '),
-        value: d.count,
-        color: PALETTE[i % PALETTE.length],
-    }));
-    const firstAidOutcomeItems: DonutDatum[] = (
-        props.first_aid_data?.by_outcome ?? []
-    ).map((d, i) => ({
-        key: d.outcome,
-        label: d.outcome.replace(/_/g, ' '),
-        value: d.count,
-        color: PALETTE[i % PALETTE.length],
-    }));
-
     // ── drill builders ──
     const incidentTypeTarget = (it: BreakdownItem): DrillTarget => ({
         view: 'incidents',
@@ -1015,478 +948,210 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     // First Aid register rather than opening the recordable-injury drill modal.
     const goFirstAid = () => router.visit(REGISTER.first_aid);
 
-    // ── hero pieces ──
-    // Cluster tiles read from the scorecard split (it carries the period-over-period
-    // deltas); the dashboard's hero_stats overlap so we don't read hero_stats here.
-    const scoreByKey = useMemo(() => {
-        const m: Record<string, ScorecardItem> = {};
-        for (const it of [...scorecard.leading, ...scorecard.lagging])
-            m[it.key] = it;
-        return m;
-    }, [scorecard]);
-    const heroVal = (key: string): number | null =>
-        scoreByKey[key]?.value ?? null;
-    const heroDelta = (key: string): { delta?: string; deltaTone?: Tone } => {
-        const it = scoreByKey[key];
-        if (!it || it.delta === null || it.delta === 0) return {};
-        // ▲ = improving (good), ▼ = worsening — sentiment, not numeric sign (matches the body scorecard).
-        return {
-            delta: `${deltaArrow(it.dir)} ${Math.abs(it.delta)}`,
-            deltaTone: toneFromDir(it.dir),
-        };
-    };
-
-    const siteScope = filters.site_id
-        ? (sites.find((s) => s.id === filters.site_id)?.name ?? 'Selected site')
-        : `${sites.length} supported-living sites`;
-    // analytics tracks completed-vs-total drills (no due-soon granularity) → non-compliant = overdue.
-    const drillsOverdue = Math.max(
-        0,
-        period_summary.drills_total - period_summary.drills_complete,
-    );
-
-    // Period presets — analytics keeps its longer-horizon set; Custom embeds the range popover.
-    const periodItems: HeroSegItem[] = [
-        { key: '30d', label: 'Last 30d' },
-        { key: 'q', label: 'Quarter' },
-        { key: '6m', label: '6 months' },
-        { key: 'ytd', label: 'YTD' },
-        {
-            key: 'custom',
-            label: 'Custom',
-            popover: (
-                <CustomRangeFields
-                    from={filters.from}
-                    to={filters.to}
-                    onApply={(f, t) =>
-                        reload({ period: 'custom', from: f, to: t })
-                    }
-                />
-            ),
-        },
-    ];
-
-    const heroFooter = (
-        <>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <HeroSegmented
-                    variant="pill"
-                    label="Period"
-                    ariaLabel="Date range"
-                    items={periodItems}
-                    value={filters.period}
-                    onChange={setPeriod}
-                />
-                <div className="flex flex-wrap items-center gap-2">
-                    <EntityFilter
-                        onDark
-                        label="Site"
-                        allLabel="All sites"
-                        items={sites}
-                        value={filters.site_id}
-                        onChange={(id) => reload({ site_id: id })}
-                    />
-                    <HeroSegmented
-                        variant="segmented"
-                        label="Lens"
-                        ariaLabel="Role lens"
-                        items={LENS_SEG_ITEMS}
-                        value={filters.lens}
-                        onChange={(l) => reload({ lens: l })}
-                    />
-                </div>
-            </div>
-            <HeroSummaryStrip
-                label={rangeLabel(filters.period)}
-                collapsed={!showSummary}
-                onToggle={() => setShowSummary((v) => !v)}
-            >
-                <HeroSummaryMetric
-                    tone={period_summary.incidents > 0 ? 'warning' : 'success'}
-                >
-                    {period_summary.incidents} incidents
-                </HeroSummaryMetric>
-                <HeroSummaryMetric tone="neutral">
-                    {period_summary.near_misses} near misses
-                </HeroSummaryMetric>
-                <HeroSummaryMetric
-                    tone={
-                        worksafe_notifiable.awaiting > 0
-                            ? 'critical'
-                            : 'success'
-                    }
-                >
-                    {worksafe_notifiable.awaiting} WorkSafe-notifiable
-                </HeroSummaryMetric>
-                <HeroSummaryMetric
-                    tone={
-                        period_summary.open_hazards > 0 ? 'warning' : 'success'
-                    }
-                >
-                    {period_summary.open_hazards} open hazards
-                </HeroSummaryMetric>
-                <HeroSummaryMetric
-                    tone={
-                        (period_summary.actions_on_time_pct ?? 0) >= 90
-                            ? 'success'
-                            : 'warning'
-                    }
-                >
-                    {fmt(period_summary.actions_on_time_pct, '%')} actions on
-                    time
-                </HeroSummaryMetric>
-                <HeroSummaryMetric
-                    tone={
-                        period_summary.drills_complete ===
-                        period_summary.drills_total
-                            ? 'success'
-                            : 'warning'
-                    }
-                >
-                    {period_summary.drills_complete}/
-                    {period_summary.drills_total} drills complete
-                </HeroSummaryMetric>
-            </HeroSummaryStrip>
-        </>
-    );
-
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Analytics', href: '/health-safety/analytics' },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Reports', href: '/health-safety/reports' },
+                { title: 'Health & safety analytics', href: '/health-safety/analytics' },
             ]}
         >
-            <Head title="H&S Analytics" />
+            <Head title="Health & safety analytics" />
 
-            <div className="flex flex-col gap-6 p-6">
-                <HeroShell footer={heroFooter}>
-                    {/* Eyebrow + export actions */}
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <HeroStatusPill>
-                            Safety analytics · {rangeLabel(filters.period)}
-                        </HeroStatusPill>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Link
-                                href="/health-safety"
-                                className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                            >
-                                <LayoutDashboard className="h-4 w-4" />
-                                H&amp;S command centre
-                            </Link>
-                            <PageHeaderPrimaryButton asChild icon={Download}>
-                                <a
-                                    href={queryFor(
-                                        tab === 'sites' ? 'sites' : 'incidents',
-                                    )}
-                                >
-                                    Export
-                                </a>
-                            </PageHeaderPrimaryButton>
-                            {canViewBoardReports ? (
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
-                                        <button
-                                            type="button"
-                                            className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                                        >
-                                            <FileText className="h-4 w-4" />
-                                            Board reports
-                                            <ChevronDown className="h-3.5 w-3.5" />
-                                        </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                        align="end"
-                                        className="w-60 p-1"
-                                    >
-                                        {GOV_REPORTS.map((r) => (
-                                            // eslint-disable-next-line no-restricted-syntax -- governance report row; opens the dated report in a new tab.
-                                            <button
-                                                key={r.name}
-                                                type="button"
-                                                onClick={() =>
-                                                    window.open(
-                                                        reportUrl(r.name),
-                                                        '_blank',
-                                                    )
-                                                }
-                                                className="block w-full rounded-md px-2.5 py-2 text-left text-[13px] text-foreground transition-colors hover:bg-muted"
-                                            >
-                                                {r.label}
-                                            </button>
-                                        ))}
-                                    </PopoverContent>
-                                </Popover>
-                            ) : null}
-                        </div>
-                    </div>
-
-                    {/* Title block */}
-                    <div className="flex items-start gap-4 md:gap-5">
-                        <HeroMedallion icon={BarChart3} />
-                        <div className="min-w-0 flex-1">
-                            <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">
-                                Health &amp; Safety analytics
-                            </h1>
-                            <p className="mt-1 text-sm text-primary-foreground/75">
-                                <span className="underline decoration-primary-foreground/40 underline-offset-4">
-                                    {siteScope}
-                                </span>
-                                {
-                                    ' · Ngā Paerewa NZS 8134:2021 · HSWA 2015 · ACC'
-                                }
-                            </p>
-                            <HeroComplianceBadges
-                                worksafeAwaiting={worksafe_notifiable.awaiting}
-                                sdsExpiring={sds_expiring}
-                                drillsOverdue={drillsOverdue}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Stat clusters — Leading / Lagging with period-over-period deltas */}
-                    <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster
-                            title="Lagging · outcomes"
-                            icon={TrendingDown}
-                        >
-                            <HeroClusterTile
-                                href="/incidents"
-                                label="Incidents"
-                                value={fmt(heroVal('incidents'))}
-                                caption="this period"
-                                tone={
-                                    (heroVal('incidents') ?? 0) > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                                {...heroDelta('incidents')}
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/injuries"
-                                label="LTIFR"
-                                value={fmt(heroVal('ltifr'))}
-                                caption="per M hrs"
-                                tone="neutral"
-                                {...heroDelta('ltifr')}
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/injuries"
-                                label="TRIFR"
-                                value={fmt(heroVal('trifr'))}
-                                caption="per M hrs"
-                                tone="neutral"
-                                {...heroDelta('trifr')}
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/injuries"
-                                label="Days LTI-free"
-                                value={fmt(heroVal('days_since_lti'))}
-                                caption="since last LTI"
-                                tone={
-                                    (heroVal('days_since_lti') ?? 0) >= 30
-                                        ? 'success'
-                                        : 'warning'
-                                }
-                                {...heroDelta('days_since_lti')}
-                            />
-                        </HeroCluster>
-
-                        <HeroCluster title="Leading · proactive" icon={Clock}>
-                            <HeroClusterTile
-                                href="/incidents?type=near_miss"
-                                label="Near-miss"
-                                value={fmt(heroVal('near_miss_ratio'), '×')}
-                                caption=": incident"
-                                tone={
-                                    (heroVal('near_miss_ratio') ?? 0) >= 3
-                                        ? 'success'
-                                        : 'warning'
-                                }
-                                {...heroDelta('near_miss_ratio')}
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/corrective-actions"
-                                label="Actions on time"
-                                value={fmt(heroVal('actions_on_time_pct'), '%')}
-                                caption="30-day"
-                                tone={
-                                    (heroVal('actions_on_time_pct') ?? 0) >= 90
-                                        ? 'success'
-                                        : 'warning'
-                                }
-                                {...heroDelta('actions_on_time_pct')}
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/worker-participation"
-                                label="Train / audit"
-                                value={fmt(heroVal('training_pct'), '%')}
-                                caption="compliance"
-                                tone={
-                                    (heroVal('training_pct') ?? 0) >= 90
-                                        ? 'success'
-                                        : 'warning'
-                                }
-                                {...heroDelta('training_pct')}
-                            />
-                            <HeroClusterTile
-                                href="/compliance/hazards"
-                                label="Open hazards"
-                                value={fmt(heroVal('open_hazards'))}
-                                caption="open now"
-                                tone={
-                                    (heroVal('open_hazards') ?? 0) > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                                {...heroDelta('open_hazards')}
-                            />
-                        </HeroCluster>
-                    </div>
-                </HeroShell>
-
-                <TabStrip
-                    value={tab}
-                    onChange={setTab}
-                    items={TABS}
-                    ariaLabel="Analytics views"
-                />
-
-                <RoleLensBanner lens={filters.lens} />
-
-                {tab === 'overview' ? (
-                    <OverviewTab
-                        lens={filters.lens}
+            <PageLayout
+                hero={
+                    <AnalyticsHeader
+                        filters={filters}
+                        sites={sites}
                         scorecard={scorecard}
-                        trends={trends}
-                        hoursMeta={hours_meta}
-                        severitySegments={severitySegments}
-                        incidentTypeItems={incidentTypeItems}
-                        onDrill={openDrill}
-                        onCtx={openCtx}
-                        severityTarget={severityTarget}
-                        incidentTypeTarget={incidentTypeTarget}
+                        period_summary={period_summary}
+                        worksafe_notifiable={worksafe_notifiable}
+                        rail={
+                            <SafetyWorkspaceRail
+                                hub="reports"
+                                current="trends"
+                            />
+                        }
+                        onPeriod={setPeriod}
+                        onReload={reload}
+                        exportHref={queryFor(
+                            tab === 'sites' ? 'sites' : 'incidents',
+                        )}
+                        canViewBoardReports={canViewBoardReports}
+                        reports={BOARD_REPORTS.map((report) => ({
+                            label: report.label,
+                            href: reportUrl(report.key),
+                        }))}
                     />
-                ) : null}
+                }
+                tabs={
+                    <TierTwoTabs
+                        tabs={TABS.map(({ id, label, icon }) => ({
+                            key: id,
+                            label,
+                            icon,
+                        }))}
+                        activeTab={tab}
+                        onTab={setTab}
+                        testIdPrefix="analytics"
+                        ariaLabel="Analytics views"
+                        panelId="analytics-panel"
+                        // Views carry no href, so the strip renders its own buttons.
+                        renderLink={() => null}
+                    />
+                }
+            >
+                <div
+                    id="analytics-panel"
+                    role="tabpanel"
+                    aria-label={
+                        TABS.find((item) => item.id === tab)?.label ??
+                        'Analytics'
+                    }
+                    className="flex min-w-0 flex-col gap-5"
+                >
+                    <AnalyticsPeriodSummary
+                        summary={period_summary}
+                        sdsExpiring={sds_expiring}
+                        sourceCompleteness={props.source_completeness}
+                        lens={filters.lens}
+                    />
 
-                {tab === 'trends' ? <TrendsTab trends={trends} /> : null}
-
-                {tab === 'breakdowns' ? (
-                    <div className="grid gap-4">
-                        <BreakdownsTab
-                            incidentTypeItems={incidentTypeItems}
+                    {tab === 'overview' ? (
+                        <OverviewTab
+                            lens={filters.lens}
+                            scorecard={scorecard}
+                            trends={trends}
+                            hoursMeta={hours_meta}
                             severitySegments={severitySegments}
-                            rootCause={root_cause_data}
-                            injuryTypeItems={injuryTypeItems}
-                            bodyPartItems={bodyPartItems}
-                            riskSegments={riskSegments}
-                            firstAidTypeItems={firstAidTypeItems}
-                            firstAidOutcomeItems={firstAidOutcomeItems}
+                            incidentTypeItems={incidentTypeItems}
                             onDrill={openDrill}
                             onCtx={openCtx}
-                            onFirstAid={goFirstAid}
-                            incidentTypeTarget={incidentTypeTarget}
                             severityTarget={severityTarget}
-                            causeTarget={causeTarget}
-                            injuryTypeTarget={injuryTypeTarget}
-                            bodyPartTarget={bodyPartTarget}
-                            riskTarget={riskTarget}
+                            incidentTypeTarget={incidentTypeTarget}
                         />
-                        <RestraintBreakdowns data={restraint_analytics} />
+                    ) : null}
+
+                    {tab === 'trends' ? <TrendsTab trends={trends} /> : null}
+
+                    {tab === 'breakdowns' ? (
+                        <div className="grid gap-4">
+                            <BreakdownsTab
+                                sourceNotices={[
+                                    ...(injury_data.access === 'restricted'
+                                        ? [
+                                              'Access to injury breakdowns is restricted.',
+                                          ]
+                                        : injury_data.access ===
+                                            'repair_required'
+                                          ? [
+                                                'Recorded injury facts need source review.',
+                                            ]
+                                          : []),
+                                ]}
+                                incidentTypeItems={incidentTypeItems}
+                                severitySegments={severitySegments}
+                                rootCause={root_cause_data}
+                                injuryTypeItems={injuryTypeItems}
+                                bodyPartItems={bodyPartItems}
+                                riskSegments={riskSegments}
+                                firstAidData={props.first_aid_data}
+                                onDrill={openDrill}
+                                onCtx={openCtx}
+                                onFirstAid={goFirstAid}
+                                incidentTypeTarget={incidentTypeTarget}
+                                severityTarget={severityTarget}
+                                causeTarget={causeTarget}
+                                injuryTypeTarget={injuryTypeTarget}
+                                bodyPartTarget={bodyPartTarget}
+                                riskTarget={riskTarget}
+                            />
+                            <RestraintBreakdowns data={restraint_analytics} />
+                        </div>
+                    ) : null}
+
+                    {tab === 'sites' ? (
+                        <div className="grid gap-5">
+                            <Surface
+                                title="Sites side by side"
+                                sub="Click a column to sort · click or right-click a row to drill in. Compliance score reflects NZ obligations (incidents, open hazards, emergency-drill cadence)."
+                            >
+                                <div className="px-[18px] pt-2 pb-4">
+                                    <SiteLeague
+                                        sites={site_comparison}
+                                        onRow={(s) => openDrill(siteTarget(s))}
+                                        onRowCtx={(e, s) =>
+                                            openCtx(
+                                                e,
+                                                siteTarget(s),
+                                                s.compliance_score === null
+                                                    ? 'Not confirmed'
+                                                    : `${s.compliance_score}%`,
+                                                s.compliance_score === null
+                                                    ? 'neutral'
+                                                    : s.compliance_score >= 90
+                                                      ? 'success'
+                                                      : s.compliance_score >= 70
+                                                        ? 'warning'
+                                                        : 'critical',
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </Surface>
+                            <Surface title="Where the load sits" sub="Sites × burden measures, shaded by how much each carries">
+                                <div className="px-[18px] pt-2 pb-4">
+                                    <Heatmap
+                                        sites={site_comparison}
+                                        onCell={(s) => openDrill(siteTarget(s))}
+                                    />
+                                </div>
+                            </Surface>
+                        </div>
+                    ) : null}
+
+                    {tab === 'governance' ? (
+                        <GovernanceTab
+                            scorecard={scorecard}
+                            trends={trends}
+                            reportUrl={reportUrl}
+                            exportUrl={() =>
+                                (window.location.href = queryFor('incidents'))
+                            }
+                            canViewReports={canViewBoardReports}
+                        />
+                    ) : null}
+
+                    {/* hours-worked honesty footnote — frequency rates need a meaningful exposure basis */}
+                    {hours_meta.total_hours < 1000 ? (
+                        <Note>
+                            LTIFR / TRIFR need ≥1,000 worked hours in the
+                            trailing-12-month basis to report a meaningful rate
+                            (standard frequency-rate convention); they show “—”
+                            until then.
+                        </Note>
+                    ) : null}
+
+                    {/* org + NZ framework footer */}
+                    <div className="sg-surface sg-quiet flex-wrap">
+                        <span>WorkSafe NZ · HSWA 2015</span>
+                        <span aria-hidden>·</span>
+                        <span>Ngā Paerewa NZS 8134:2021</span>
+                        <span aria-hidden>·</span>
+                        <span>Hazardous Substances Regulations 2017</span>
+                        <span aria-hidden>·</span>
+                        <span>ACC</span>
+                        <span aria-hidden>·</span>
+                        <span>
+                            {Math.round(
+                                hours_meta.total_hours,
+                            ).toLocaleString()}{' '}
+                            hours worked in the last 12 months
+                        </span>
                     </div>
-                ) : null}
-
-                {tab === 'sites' ? (
-                    <div className="grid gap-4">
-                        <Card className="rounded-xl shadow-sm">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-bold">
-                                    Site comparison league
-                                </CardTitle>
-                                <p className="text-xs text-muted-foreground">
-                                    Click a column to sort · click or
-                                    right-click a row to drill in. Compliance
-                                    score reflects NZ obligations (incidents,
-                                    open hazards, emergency-drill cadence).
-                                </p>
-                            </CardHeader>
-                            <CardContent>
-                                <SiteLeague
-                                    sites={site_comparison}
-                                    onRow={(s) => openDrill(siteTarget(s))}
-                                    onRowCtx={(e, s) =>
-                                        openCtx(
-                                            e,
-                                            siteTarget(s),
-                                            `${s.compliance_score}%`,
-                                            s.compliance_score >= 90
-                                                ? 'success'
-                                                : s.compliance_score >= 70
-                                                  ? 'warning'
-                                                  : 'critical',
-                                        )
-                                    }
-                                />
-                            </CardContent>
-                        </Card>
-                        <Card className="rounded-xl shadow-sm">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-bold">
-                                    Hotspot heatmap
-                                </CardTitle>
-                                <p className="text-xs text-muted-foreground">
-                                    Sites × burden metrics, intensity-shaded.
-                                </p>
-                            </CardHeader>
-                            <CardContent>
-                                <Heatmap
-                                    sites={site_comparison}
-                                    onCell={(s) => openDrill(siteTarget(s))}
-                                />
-                            </CardContent>
-                        </Card>
-                    </div>
-                ) : null}
-
-                {tab === 'governance' ? (
-                    <GovernanceTab
-                        scorecard={scorecard}
-                        trends={trends}
-                        reportUrl={reportUrl}
-                        exportUrl={() =>
-                            (window.location.href = queryFor('incidents'))
-                        }
-                        canViewReports={canViewBoardReports}
-                    />
-                ) : null}
-
-                {/* hours-worked honesty footnote — frequency rates need a meaningful exposure basis */}
-                {hours_meta.total_hours < 1000 ? (
-                    <p className="text-[11px] text-muted-foreground">
-                        LTIFR / TRIFR need ≥1,000 worked hours in the
-                        trailing-12-month basis to report a meaningful rate
-                        (standard frequency-rate convention); they show “—”
-                        until then.
-                    </p>
-                ) : null}
-
-                {/* org + NZ framework footer */}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-[11px] text-muted-foreground">
-                    <span>WorkSafe NZ · HSWA 2015</span>
-                    <span aria-hidden>·</span>
-                    <span>Ngā Paerewa NZS 8134:2021</span>
-                    <span aria-hidden>·</span>
-                    <span>Hazardous Substances Regulations 2017</span>
-                    <span aria-hidden>·</span>
-                    <span>ACC</span>
-                    <span aria-hidden>·</span>
-                    <span>
-                        {Math.round(hours_meta.total_hours).toLocaleString()}{' '}
-                        hours worked (12-month basis)
-                    </span>
                 </div>
-            </div>
+            </PageLayout>
 
             {ctx ? (
                 <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
@@ -1509,49 +1174,6 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
 }
 
 // ── sub-components ──────────────────────────────────────────────────────
-
-/** Range-picker fields rendered inside the period segmented control's Custom popover. */
-function CustomRangeFields({
-    from,
-    to,
-    onApply,
-}: {
-    from: string;
-    to: string;
-    onApply: (from: string, to: string) => void;
-}) {
-    const [f, setF] = useState(from);
-    const [t, setT] = useState(to);
-    return (
-        <>
-            <div className="flex items-end gap-2">
-                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                    From
-                    <Input
-                        type="date"
-                        value={f}
-                        max={t || undefined}
-                        onChange={(e) => setF(e.target.value)}
-                        className="mt-1"
-                    />
-                </label>
-                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                    To
-                    <Input
-                        type="date"
-                        value={t}
-                        min={f || undefined}
-                        onChange={(e) => setT(e.target.value)}
-                        className="mt-1"
-                    />
-                </label>
-            </div>
-            <Button size="sm" className="w-full" onClick={() => onApply(f, t)}>
-                Apply range
-            </Button>
-        </>
-    );
-}
 
 type DrillBuilders = {
     onDrill: (t: DrillTarget) => void;
@@ -1587,10 +1209,10 @@ function OverviewTab({
         <Scorecard leading={scorecard.leading} lagging={scorecard.lagging} />
     );
     const headlineTrends = (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-5">
             <ChartCard
-                title="LTIFR & TRIFR"
-                subtitle="Lost-time & total recordable injury frequency (per 1M hrs)"
+                title="Injury rates"
+                subtitle="Lost-time and recordable injuries per million hours worked"
                 aria="LTIFR and TRIFR trend over time"
                 table={{
                     caption: 'LTIFR and TRIFR by month',
@@ -1605,13 +1227,13 @@ function OverviewTab({
                 <LtifrTrifrChart trends={trends} />
             </ChartCard>
             <ChartCard
-                title="Near-miss : incident ratio"
-                subtitle="Higher is healthier — a strong reporting culture trends up"
+                title="Near misses for each incident"
+                subtitle="Higher is better — it means people report problems early"
                 aria="Near-miss to incident ratio over time"
                 table={{
                     caption: 'Near-miss ratio by month',
                     columns: ['Month', 'Ratio'],
-                    rows: trends.map((t) => [t.label, t.near_miss_ratio]),
+                    rows: trends.map((t) => [t.label, t.near_miss_ratio ?? '—']),
                 }}
             >
                 <SingleAreaChart
@@ -1624,10 +1246,10 @@ function OverviewTab({
         </div>
     );
     const threeUp = (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-5">
             <ChartCard
                 title="Incident severity"
-                subtitle="Distribution this period"
+                subtitle="This period"
                 aria="Incident severity distribution"
                 table={{
                     caption: 'Incidents by severity',
@@ -1645,7 +1267,7 @@ function OverviewTab({
             </ChartCard>
             <ChartCard
                 title="Incidents by type"
-                subtitle="Click a bar or row to drill in"
+                subtitle="Click a bar to see those incidents"
                 aria="Incidents by type"
                 table={{
                     caption: 'Incidents by type',
@@ -1663,8 +1285,8 @@ function OverviewTab({
                 />
             </ChartCard>
             <ChartCard
-                title="Hazard burn-down"
-                subtitle="Opened vs closed + running open"
+                title="Open hazards coming down"
+                subtitle="Opened, closed and still open"
                 aria="Hazard burn-down over time"
                 table={{
                     caption: 'Hazards opened, closed and running open by month',
@@ -1685,7 +1307,7 @@ function OverviewTab({
     // role re-weights ordering: governance leads with the board scorecard;
     // frontline leads with the live breakdowns; manager leads with trends.
     return (
-        <div className="grid gap-4">
+        <div className="grid gap-5">
             {lens === 'frontline' ? (
                 <>
                     {threeUp}
@@ -1710,6 +1332,9 @@ function OverviewTab({
 }
 
 function TrendsTab({ trends }: { trends: AnalyticsProps['trends'] }) {
+    const participationAudience = participationViewer(
+        usePage<SharedData>().props.auth,
+    );
     return (
         <div className="grid gap-4 lg:grid-cols-2">
             <ChartCard
@@ -1735,7 +1360,7 @@ function TrendsTab({ trends }: { trends: AnalyticsProps['trends'] }) {
                 table={{
                     caption: 'Near-miss ratio by month',
                     columns: ['Month', 'Ratio'],
-                    rows: trends.map((t) => [t.label, t.near_miss_ratio]),
+                    rows: trends.map((t) => [t.label, t.near_miss_ratio ?? '—']),
                 }}
             >
                 <SingleAreaChart
@@ -1839,12 +1464,15 @@ function TrendsTab({ trends }: { trends: AnalyticsProps['trends'] }) {
                 aria="Worker participation trend"
                 table={{
                     caption: 'Worker participation by month',
-                    columns: ['Month', 'Engagement %', 'Consultation %'],
-                    rows: trends.map((t) => [
-                        t.label,
-                        t.worker_engagement ?? '—',
-                        t.worker_consultation ?? '—',
-                    ]),
+                    columns: [
+                        'Month',
+                        'Meetings completed %',
+                        'Consultation %',
+                    ],
+                    rows: workerParticipationTable(
+                        trends,
+                        participationAudience,
+                    ),
                 }}
             >
                 <WorkerParticipationChart trends={trends} />
@@ -1854,14 +1482,14 @@ function TrendsTab({ trends }: { trends: AnalyticsProps['trends'] }) {
 }
 
 function BreakdownsTab({
+    sourceNotices,
     incidentTypeItems,
     severitySegments,
     rootCause,
     injuryTypeItems,
     bodyPartItems,
     riskSegments,
-    firstAidTypeItems,
-    firstAidOutcomeItems,
+    firstAidData,
     onDrill,
     onCtx,
     onFirstAid,
@@ -1872,14 +1500,14 @@ function BreakdownsTab({
     bodyPartTarget,
     riskTarget,
 }: DrillBuilders & {
+    sourceNotices: string[];
     incidentTypeItems: BreakdownItem[];
     severitySegments: DonutDatum[];
     rootCause: AnalyticsProps['root_cause_data'];
     injuryTypeItems: BreakdownItem[];
     bodyPartItems: BreakdownItem[];
     riskSegments: DonutDatum[];
-    firstAidTypeItems: BreakdownItem[];
-    firstAidOutcomeItems: DonutDatum[];
+    firstAidData: AnalyticsProps['first_aid_data'];
     onFirstAid: () => void;
     incidentTypeTarget: (i: BreakdownItem) => DrillTarget;
     severityTarget: (d: DonutDatum) => DrillTarget;
@@ -1890,6 +1518,11 @@ function BreakdownsTab({
 }) {
     return (
         <div className="grid gap-4">
+            {sourceNotices.length > 0 && (
+                <p role="status" className="text-subtle text-muted-foreground">
+                    {sourceNotices.join(' ')}
+                </p>
+            )}
             <ChartCard
                 title="Root-cause Pareto"
                 subtitle="The vital few behind ~80% of events — the key HSWA investigation output"
@@ -2032,40 +1665,7 @@ function BreakdownsTab({
                         }
                     />
                 </ChartCard>
-                <ChartCard
-                    title="First aid by outcome"
-                    subtitle="Care-activity signal — first-aid-only treatment is excluded from TRIFR"
-                    aria="First aid by treatment outcome"
-                    table={{
-                        caption: 'First aid by outcome',
-                        columns: ['Outcome', 'Count'],
-                        rows: firstAidOutcomeItems.map((s) => [
-                            s.label,
-                            s.value,
-                        ]),
-                    }}
-                >
-                    <FocusDonut
-                        segments={firstAidOutcomeItems}
-                        onSegment={onFirstAid}
-                    />
-                </ChartCard>
-                <ChartCard
-                    title="First aid by type"
-                    subtitle="Click to open the First Aid register"
-                    aria="First aid by injury or illness type"
-                    table={{
-                        caption: 'First aid by type',
-                        columns: ['Type', 'Count'],
-                        rows: firstAidTypeItems.map((s) => [s.label, s.value]),
-                    }}
-                >
-                    <HorizontalBars data={firstAidTypeItems} />
-                    <BreakdownRows
-                        items={firstAidTypeItems}
-                        onItem={onFirstAid}
-                    />
-                </ChartCard>
+                <FirstAidBreakdowns data={firstAidData} onOpen={onFirstAid} />
             </div>
 
             <ChartCard
@@ -2104,12 +1704,12 @@ function RestraintBreakdowns({
     if (!data) return null;
     const s = data.summary;
     const toItems = (
-        rows: { label: string; count: number }[],
+        rows: { label: string; count: number }[] | null,
         colour: (label: string, i: number) => string,
     ): BreakdownItem[] =>
-        rows.map((r, i) => ({
+        (rows ?? []).map((r, i) => ({
             key: r.label || 'unspecified',
-            label: titleCaseLabel(r.label),
+            label: r.label ? humaniseHsValue(r.label) : 'Not recorded',
             value: r.count,
             color: colour(r.label, i),
         }));
@@ -2128,7 +1728,7 @@ function RestraintBreakdowns({
 
     const stats: {
         label: string;
-        value: number;
+        value: number | null;
         tone: 'neutral' | 'warning' | 'critical';
         href: string;
     }[] = [
@@ -2171,9 +1771,9 @@ function RestraintBreakdowns({
     ];
     const statValueClass = (
         tone: 'neutral' | 'warning' | 'critical',
-        value: number,
+        value: number | null,
     ) =>
-        `mt-0.5 text-xl font-bold tabular-nums ${value <= 0 ? 'text-foreground' : tone === 'critical' ? 'text-status-critical' : tone === 'warning' ? 'text-status-warning' : 'text-foreground'}`;
+        `mt-0.5 text-xl font-bold tabular-nums ${value === null || value <= 0 ? 'text-foreground' : tone === 'critical' ? 'text-status-critical' : tone === 'warning' ? 'text-status-warning' : 'text-foreground'}`;
 
     return (
         <div className="grid gap-4">
@@ -2206,62 +1806,78 @@ function RestraintBreakdowns({
                             {st.label}
                         </span>
                         <span className={statValueClass(st.tone, st.value)}>
-                            {st.value}
+                            {st.value ?? 'Not confirmed'}
                         </span>
                     </Link>
                 ))}
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-                <ChartCard
-                    title="Restraints by type"
-                    subtitle="Restrictive practice used"
-                    aria="Restraint events by type"
-                    table={{
-                        caption: 'Restraint events by type',
-                        columns: ['Type', 'Count'],
-                        rows: typeItems.map((s) => [s.label, s.value]),
-                    }}
-                >
-                    {typeItems.length ? (
-                        <HorizontalBars data={typeItems} />
-                    ) : (
-                        <EmptyBreakdown />
-                    )}
-                </ChartCard>
-                <ChartCard
-                    title="Restraints by severity"
-                    subtitle="Distribution this period"
-                    aria="Restraint events by severity"
-                    table={{
-                        caption: 'Restraint events by severity',
-                        columns: ['Severity', 'Count'],
-                        rows: severityItems.map((s) => [s.label, s.value]),
-                    }}
-                >
-                    {severityItems.length ? (
-                        <HorizontalBars data={severityItems} />
-                    ) : (
-                        <EmptyBreakdown />
-                    )}
-                </ChartCard>
-                <ChartCard
-                    title="Behaviour support plans"
-                    subtitle="By lifecycle status"
-                    aria="Behaviour support plans by status"
-                    table={{
-                        caption: 'Behaviour support plans by status',
-                        columns: ['Status', 'Count'],
-                        rows: planStatusItems.map((s) => [s.label, s.value]),
-                    }}
-                >
-                    {planStatusItems.length ? (
-                        <HorizontalBars data={planStatusItems} />
-                    ) : (
-                        <EmptyBreakdown />
-                    )}
-                </ChartCard>
-            </div>
+            <p className="text-subtle text-muted-foreground">
+                {s.source_access === 'restricted'
+                    ? 'Access to restraint measures is restricted.'
+                    : 'Measures cover readable records; the full picture may be incomplete.'}
+            </p>
+            {data.breakdowns.by_type !== null &&
+            data.breakdowns.by_severity !== null &&
+            data.breakdowns.by_plan_status !== null ? (
+                <div className="grid gap-4 lg:grid-cols-3">
+                    <ChartCard
+                        title="Restraints by type"
+                        subtitle="Restrictive practice used"
+                        aria="Restraint events by type"
+                        table={{
+                            caption: 'Restraint events by type',
+                            columns: ['Type', 'Count'],
+                            rows: typeItems.map((s) => [s.label, s.value]),
+                        }}
+                    >
+                        {typeItems.length ? (
+                            <HorizontalBars data={typeItems} />
+                        ) : (
+                            <EmptyBreakdown />
+                        )}
+                    </ChartCard>
+                    <ChartCard
+                        title="Restraints by severity"
+                        subtitle="Distribution this period"
+                        aria="Restraint events by severity"
+                        table={{
+                            caption: 'Restraint events by severity',
+                            columns: ['Severity', 'Count'],
+                            rows: severityItems.map((s) => [s.label, s.value]),
+                        }}
+                    >
+                        {severityItems.length ? (
+                            <HorizontalBars data={severityItems} />
+                        ) : (
+                            <EmptyBreakdown />
+                        )}
+                    </ChartCard>
+                    <ChartCard
+                        title="Behaviour support plans"
+                        subtitle="By lifecycle status"
+                        aria="Behaviour support plans by status"
+                        table={{
+                            caption: 'Behaviour support plans by status',
+                            columns: ['Status', 'Count'],
+                            rows: planStatusItems.map((s) => [
+                                s.label,
+                                s.value,
+                            ]),
+                        }}
+                    >
+                        {planStatusItems.length ? (
+                            <HorizontalBars data={planStatusItems} />
+                        ) : (
+                            <EmptyBreakdown />
+                        )}
+                    </ChartCard>
+                </div>
+            ) : (
+                <p className="text-subtle text-muted-foreground">
+                    Restraint breakdowns are unavailable.
+                </p>
+            )}
         </div>
     );
 }
@@ -2274,10 +1890,6 @@ function EmptyBreakdown() {
     );
 }
 
-function titleCaseLabel(s: string): string {
-    if (!s) return 'Unspecified';
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 function planStatusFill(status: string): string {
     switch (status) {
@@ -2303,10 +1915,13 @@ function GovernanceTab({
 }: {
     scorecard: AnalyticsProps['scorecard'];
     trends: AnalyticsProps['trends'];
-    reportUrl: (n: string) => string;
+    reportUrl: (key: BoardReportKey) => string;
     exportUrl: () => void;
     canViewReports: boolean;
 }) {
+    const participationAudience = participationViewer(
+        usePage<SharedData>().props.auth,
+    );
     return (
         <div className="grid gap-4">
             <Scorecard
@@ -2321,12 +1936,15 @@ function GovernanceTab({
                     aria="Worker participation trend"
                     table={{
                         caption: 'Worker participation by month',
-                        columns: ['Month', 'Engagement %', 'Consultation %'],
-                        rows: trends.map((t) => [
-                            t.label,
-                            t.worker_engagement ?? '—',
-                            t.worker_consultation ?? '—',
-                        ]),
+                        columns: [
+                            'Month',
+                            'Meetings completed %',
+                            'Consultation %',
+                        ],
+                        rows: workerParticipationTable(
+                            trends,
+                            participationAudience,
+                        ),
                     }}
                 >
                     <WorkerParticipationChart trends={trends} />
@@ -2360,73 +1978,23 @@ function GovernanceTab({
 
             <div>
                 <h3 className="mb-2 text-sm font-bold text-foreground">
-                    Governance packs
+                    {BOARD_REPORTS_LABEL}
                 </h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {/* Report packs open governance.view-gated routes; hide them for
                         register-only roles. The CSV export below is hazards.view-gated,
                         so it stays available. */}
-                    {canViewReports ? (
-                        <>
-                            <GovPackCard
-                                icon={FileText}
-                                title="Board safety summary"
-                                desc="Leading-vs-lagging assurance for the board pack."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl('board-summary'),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                            <GovPackCard
-                                icon={Shield}
-                                title="WorkSafe register analytics"
-                                desc="Notifiable events register (HSWA s.56)."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl('worksafe-register'),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                            <GovPackCard
-                                icon={Activity}
-                                title="Investigation outcomes"
-                                desc="Investigation status and outcomes summary."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl('investigation-outcomes'),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                            <GovPackCard
-                                icon={ClipboardList}
-                                title="Corrective-action traceability"
-                                desc="Action close-out evidence trail."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl(
-                                            'corrective-action-traceability',
-                                        ),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                            <GovPackCard
-                                icon={AlertTriangle}
-                                title="Risk-assessment register"
-                                desc="Current hazard/risk assessment register."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl('risk-assessment-register'),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                        </>
-                    ) : null}
+                    {canViewReports
+                        ? BOARD_REPORTS.map((report) => (
+                              <GovPackCard
+                                  key={report.key}
+                                  icon={REPORT_ICONS[report.key]}
+                                  title={report.label}
+                                  desc={report.description}
+                                  onOpen={() => window.open(reportUrl(report.key), '_blank')}
+                              />
+                          ))
+                        : null}
                     <GovPackCard
                         icon={Download}
                         title="Export current view"

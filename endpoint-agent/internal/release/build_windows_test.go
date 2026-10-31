@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -33,7 +34,7 @@ func TestBuildKeepsVerifiedExecutablesLockedUntilArchiveIsWritten(t *testing.T) 
 	}
 }
 
-func TestPublicBuildRejectsActualUnsignedDevelopmentExecutables(t *testing.T) {
+func TestPublicBuildAcceptsUnsignedPEWithSignedManifestAndRejectsArchitectureMismatch(t *testing.T) {
 	source, output, spec, key, _ := buildFixture(t)
 	executable, err := os.Executable()
 	if err != nil {
@@ -48,10 +49,21 @@ func TestPublicBuildRejectsActualUnsignedDevelopmentExecutables(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	signer := &buildSigner{key: key}
-	_, err = BuildWindows(context.Background(), source, output, spec, signer, key.Public().(ed25519.PublicKey), time.Now())
-	if err == nil || signer.calls != 0 {
-		t.Fatal("unsigned PE reached publisher signing", err)
+	other := "arm64"
+	if runtime.GOARCH == "arm64" {
+		other = "amd64"
+	}
+	spec.Architecture = other
+	mismatchSigner := &buildSigner{key: key}
+	if _, err = BuildWindows(context.Background(), source, output, spec, mismatchSigner, key.Public().(ed25519.PublicKey), time.Now()); err == nil || mismatchSigner.calls != 0 {
+		t.Fatal("wrong-architecture PE reached publisher signing", err)
 	}
 	assertNoBuildOutput(t, output)
+
+	spec.Architecture = runtime.GOARCH
+	signer := &buildSigner{key: key}
+	result, err := BuildWindows(context.Background(), source, output, spec, signer, key.Public().(ed25519.PublicKey), time.Now())
+	if err != nil || signer.calls != 1 || result.SHA256 == "" {
+		t.Fatal("unsigned PE with valid publisher-signed manifest failed", err)
+	}
 }

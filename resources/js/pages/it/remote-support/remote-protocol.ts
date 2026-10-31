@@ -247,8 +247,17 @@ export function relayConfig(
     desktop: string,
     access: AccessMode,
 ): RTCConfiguration {
-    const r = record(value),
-        now = Date.now();
+    const outer = record(value);
+    let r = outer;
+    if ('relay' in outer) {
+        if (
+            (outer.status !== 'allowed' && outer.status !== 'active') ||
+            !outer.relay
+        )
+            throw Error('Relay permission unavailable');
+        r = record(outer.relay);
+    }
+    const now = Date.now();
     const issued =
         typeof r.issued_at === 'string' ? Date.parse(r.issued_at) : NaN;
     const expires =

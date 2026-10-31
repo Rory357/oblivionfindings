@@ -99,6 +99,13 @@ function review() {
         screen.getByRole('button', { name: /^Review.*Check before saving/ }),
     );
 }
+async function chooseValue(name: string) {
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Value' }), {
+        key: 'Enter',
+        code: 'Enter',
+    });
+    fireEvent.click(await screen.findByRole('option', { name }));
+}
 function openCreate() {
     return render(
         <GroupWizard open onClose={mocks.close} onSaved={mocks.saved} />,
@@ -127,7 +134,9 @@ describe('Shared Device group wizard', () => {
             screen.getByRole('button', { name: /Custom.*another purpose/ }),
         ).toHaveAttribute('aria-pressed', 'true');
         review();
-        fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add device group' }),
+        );
         expect(screen.getByRole('alert')).toHaveTextContent(
             'Enter a group name',
         );
@@ -147,8 +156,10 @@ describe('Shared Device group wizard', () => {
         openCreate();
         enterName(' New group ');
         review();
-        fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
-        await screen.findByRole('heading', { name: 'Group created' });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add device group' }),
+        );
+        await screen.findByRole('heading', { name: 'Group added' });
         expect(mocks.post.mock.calls[0].slice(0, 2)).toEqual([
             '/security-devices/device-groups',
             {
@@ -171,7 +182,7 @@ describe('Shared Device group wizard', () => {
         expect(mocks.visit).toHaveBeenCalledWith(
             '/security-devices/device-groups/24',
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Create another' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add another' }));
         details();
         expect(screen.getByLabelText(/Group name/)).toHaveValue('');
     });
@@ -295,15 +306,19 @@ describe('Shared Device group wizard', () => {
         openCreate();
         enterName();
         review();
-        fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add device group' }),
+        );
         await screen.findByText('This name is already used.');
         expect(screen.getByLabelText(/Group name/)).toHaveValue('New group');
         fireEvent.change(screen.getByLabelText(/Group name/), {
             target: { value: 'New unique group' },
         });
         review();
-        fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
-        await screen.findByRole('heading', { name: 'Group created' });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add device group' }),
+        );
+        await screen.findByRole('heading', { name: 'Group added' });
         expect(mocks.post).toHaveBeenCalledTimes(2);
     });
     it('blocks automatic replay after an uncertain save and does not turn a response for another identity into success', async () => {
@@ -334,10 +349,12 @@ describe('Shared Device group wizard', () => {
         openCreate();
         enterName('Permission denied draft');
         review();
-        fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add device group' }),
+        );
         await screen.findByText(/current access/);
         expect(
-            screen.getByRole('button', { name: 'Create group' }),
+            screen.getByRole('button', { name: 'Add device group' }),
         ).toBeDisabled();
         details();
         expect(screen.getByLabelText(/Group name/)).toHaveValue(
@@ -393,19 +410,19 @@ describe('Shared Device group wizard', () => {
         fireEvent.click(
             screen.getByRole('switch', { name: 'Automatic membership' }),
         );
-        fireEvent.change(screen.getByLabelText('Value'), {
-            target: { value: 'security' },
-        });
+        // The value is picked from the stored areas, shown in words.
+        await chooseValue('Security');
         fireEvent.click(
             screen.getByRole('button', { name: 'Preview matches' }),
         );
         expect(mocks.post.mock.calls[0][0]).toBe(
             '/security-devices/device-groups/auto-rules/preview',
         );
+        expect(mocks.post.mock.calls[0][1].auto_rules.conditions).toEqual([
+            { field: 'domain', op: 'equals', value: 'security' },
+        ]);
         const signal = mocks.post.mock.calls[0][2].signal as AbortSignal;
-        fireEvent.change(screen.getByLabelText('Value'), {
-            target: { value: 'facilities' },
-        });
+        await chooseValue('Facilities & IoT');
         expect(signal.aborted).toBe(true);
         pending.resolve({ data: { count: 99, sample: [] } });
         await waitFor(() =>
@@ -419,10 +436,14 @@ describe('Shared Device group wizard', () => {
     });
     it('keeps direct create/edit entry routes as adapters to the same shared wizard', () => {
         const view = render(<DeviceGroupForm />);
-        expect(screen.getByRole('dialog')).toHaveTextContent('Create group');
+        expect(screen.getByRole('dialog')).toHaveTextContent(
+            'Add device group',
+        );
         view.rerender(<DeviceGroupForm group={group} isEdit />);
         details();
         expect(screen.getByLabelText(/Group name/)).toHaveValue(group.name);
-        expect(screen.getByRole('dialog')).toHaveTextContent('Edit group');
+        expect(screen.getByRole('dialog')).toHaveTextContent(
+            'Edit device group',
+        );
     });
 });

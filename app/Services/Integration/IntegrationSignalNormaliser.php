@@ -37,6 +37,8 @@ class IntegrationSignalNormaliser
      * If that generated code doesn't exist in SignalType, it falls back to "integration_unknown".
      */
     public const SIGNAL_TYPE_MAP = [
+        'fall_detected' => 'fall_detected',
+        'fall_alarm' => 'fall_detected',
         'device_offline' => 'integration_device_offline',
         'camera_offline' => 'integration_device_offline',
         'device_online' => 'integration_device_offline',      // same type, rules can differentiate
@@ -62,6 +64,8 @@ class IntegrationSignalNormaliser
      * Safety-critical events that must never be silently suppressed.
      */
     public const ALWAYS_ALERT_EVENT_TYPES = [
+        'fall_detected',
+        'fall_alarm',
         'device_offline',
         'camera_offline',
         'door_forced',
@@ -89,6 +93,8 @@ class IntegrationSignalNormaliser
      * or where the operational context demands a specific severity floor.
      */
     public const SEVERITY_OVERRIDES = [
+        'fall_detected' => AlertSeverity::CRITICAL,
+        'fall_alarm' => AlertSeverity::CRITICAL,
         'sos_triggered' => AlertSeverity::CRITICAL,
         'sos' => AlertSeverity::CRITICAL,
         'panic_alarm' => AlertSeverity::CRITICAL,
@@ -146,7 +152,9 @@ class IntegrationSignalNormaliser
             'external_ref' => $event->source_event_id,
             'severity_hint' => $severity,
             'occurred_at' => $event->occurred_at ?? now(),
-            'payload' => $event->raw_payload ?? [],
+            // Verified provider projections deliberately discard raw payloads.
+            // Carry their safe evidence instead of losing it at this boundary.
+            'payload' => $event->normalized_payload ?? $event->raw_payload ?? [],
             'normalized_data' => $this->buildNormalisedContext($event, $signalTypeCode, $severity),
         ];
     }
@@ -201,6 +209,12 @@ class IntegrationSignalNormaliser
             // Verify the mapped code actually exists in the DB
             if (SignalType::where('code', $code)->where('is_active', true)->exists()) {
                 return $code;
+            }
+
+            if ($code === 'fall_detected') {
+                // Preserve the failed delivery for retry/configuration repair;
+                // a care fall must not silently become an unknown event.
+                throw new SafetySignalUnroutable('The care fall signal type is unavailable.');
             }
 
             Log::warning('IntegrationSignalNormaliser: mapped signal type not found in DB', SafeOperationalData::logContext([
@@ -352,6 +366,8 @@ class IntegrationSignalNormaliser
             'provider' => $event->provider,
             'source_app' => $event->source_app,
             'source_event_id' => $event->source_event_id,
+            'source_received_at' => $event->received_at?->toIso8601String(),
+            'evidence_hash' => $normalizedPayload['evidence_hash'] ?? null,
 
             // Classification
             'original_event_type' => $event->event_type,
@@ -363,6 +379,9 @@ class IntegrationSignalNormaliser
             'site_id' => $event->site_id,
             'room_id' => $event->room_id,
             'hardware_id' => $event->hardware_id,
+            // This identity belongs to the canonical devices table. It is
+            // deliberately separate from the legacy control_room_devices FK.
+            'canonical_device_id' => $event->canonical_device_id,
 
             // Operator-facing summary
             'title' => $this->generateTitle($event->event_type),

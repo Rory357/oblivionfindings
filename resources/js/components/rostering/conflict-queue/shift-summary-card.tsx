@@ -34,14 +34,14 @@ export function ShiftSummaryCard({ shift }: { shift: QueueShift }) {
                 </span>
                 <span
                     className={cn(
-                        'shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold capitalize',
+                        'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize',
                         statusPillClass(shift.status),
                     )}
                 >
                     {shift.status}
                 </span>
             </div>
-            <div className="mt-2 space-y-1 text-[12.5px] text-muted-foreground">
+            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5 shrink-0" />
                     {shift.staff || shift.userId != null ? (

@@ -37,6 +37,8 @@ import {
     KeyRound,
     Loader2,
     Network,
+    RadioTower,
+    Server,
     ShieldCheck,
     ShieldX,
 } from 'lucide-react';
@@ -53,10 +55,22 @@ import {
     type NativeMonitorDraft,
 } from './native-monitor-wizard-data';
 
+export type NativeMonitorCollectorOption = {
+    id: number;
+    name: string;
+    site_id: number;
+    authorised_site_ids: number[];
+};
+
 export type NativeMonitorManagement = {
     actor_id?: number;
     can_manage: boolean;
+    can_add_check?: boolean;
     create_url: string | null;
+    default_target?: string | null;
+    missing_reason?: string | null;
+    fix_href?: string | null;
+    fix_label?: string | null;
     kinds: Array<{ value: string; label: string }>;
     profiles: Array<{ id: number; name: string }>;
     devices: Array<{
@@ -64,6 +78,7 @@ export type NativeMonitorManagement = {
         name: string;
         site: { id: number; name: string };
     }>;
+    collectors?: NativeMonitorCollectorOption[];
 };
 
 export type NativeMonitorTarget = {
@@ -72,6 +87,7 @@ export type NativeMonitorTarget = {
     kind: string;
     enabled: boolean;
     affects_availability: boolean;
+    collector_id?: number | null;
     profile: { id: number; name: string } | null;
     device: { id: number; name: string; site?: { id: number; name: string } };
     actions: {
@@ -219,11 +235,19 @@ function useNativeMonitorCommit() {
 }
 function useNativeActor() {
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, boolean> };
+        auth?: {
+            user?: { id: number } | null;
+            can?: {
+                securityDevices?: {
+                    viewAny?: boolean;
+                    monitoringManage?: boolean;
+                };
+            };
+        };
     }>().props;
     return {
         id: auth?.user?.id ?? 0,
-        manage: auth?.can?.['securityDevices.monitoring.manage'] === true,
+        manage: auth?.can?.securityDevices?.monitoringManage === true,
         identity: JSON.stringify([auth?.user?.id, auth?.can]),
     };
 }
@@ -399,6 +423,7 @@ function NativeMonitorWizardBody({
             const names: Partial<Record<keyof NativeMonitorDraft, string>> = {
                 deviceId: 'device_id',
                 profileId: 'profile_id',
+                collectorId: 'collector_id',
                 dnsName: 'dns_name',
                 dnsType: 'dns_type',
                 expectedAnswers: 'expected_answers',
@@ -417,6 +442,7 @@ function NativeMonitorWizardBody({
     const {
         deviceId,
         profileId,
+        collectorId,
         kind,
         name,
         target,
@@ -431,8 +457,33 @@ function NativeMonitorWizardBody({
         hostKeyFingerprint,
         affectsAvailability,
     } = draft;
-    const setDeviceId = (v: string) => change('deviceId', v),
+    const setDeviceId = (v: string) => {
+            if (blocked || !permitted) return;
+            const nextSiteId = management.devices.find(
+                (item) => String(item.id) === v,
+            )?.site.id;
+            const keepHub =
+                nextSiteId === undefined ||
+                draft.collectorId === '' ||
+                (management.collectors ?? []).some(
+                    (hub) =>
+                        String(hub.id) === draft.collectorId &&
+                        hub.authorised_site_ids.includes(nextSiteId),
+                );
+            setDraft((before) => ({
+                ...before,
+                deviceId: v,
+                collectorId: keepHub ? before.collectorId : '',
+            }));
+            commit.setErrors((before) => {
+                const next = { ...before };
+                delete next.device_id;
+                delete next.collector_id;
+                return next;
+            });
+        },
         setProfileId = (v: string) => change('profileId', v),
+        setCollectorId = (v: string) => change('collectorId', v),
         setName = (v: string) => change('name', v),
         setTarget = (v: string) => change('target', v),
         setPort = (v: string) => change('port', v),
@@ -499,11 +550,24 @@ function NativeMonitorWizardBody({
                 name: draft.name.trim(),
                 kind,
                 profile: Number(profileId),
+                ...(collectorId !== '' ||
+                (editing && monitor?.collector_id != null)
+                    ? {
+                          collectorId:
+                              collectorId === '' ? null : Number(collectorId),
+                      }
+                    : {}),
                 availability: affectsAvailability,
                 enabled: monitor?.enabled ?? true,
             },
         });
     };
+    const eligibleCollectors = (management.collectors ?? []).filter(
+        (hub) => !site || hub.authorised_site_ids.includes(site.id),
+    );
+    const selectedCollector = eligibleCollectors.find(
+        (hub) => String(hub.id) === collectorId,
+    );
     const label =
         management.kinds.find((item) => item.value === kind)?.label ??
         kindDetails[kind]?.label ??
@@ -531,13 +595,21 @@ function NativeMonitorWizardBody({
                 open
                 onClose={close}
                 title={
-                    editing ? `Update ${monitor.name}` : 'Create direct monitor'
+                    editing
+                        ? `Update ${monitor.name}`
+                        : collectorId
+                          ? 'Add hub monitor'
+                          : 'Add direct monitor'
                 }
                 description="Configure an approved device check. A saved configuration does not prove the connection works."
                 railIcon={Activity}
                 railTitle={editing ? 'Update monitor' : 'Create monitor'}
                 railSub={
-                    monitor ? `Monitor #${monitor.id}` : 'Approved direct check'
+                    monitor
+                        ? `Monitor #${monitor.id}`
+                        : collectorId
+                          ? 'Approved hub check'
+                          : 'Approved direct check'
                 }
                 steps={steps}
                 stepIndex={step}
@@ -594,7 +666,9 @@ function NativeMonitorWizardBody({
                                 ? 'Saving…'
                                 : editing
                                   ? 'Apply monitor update'
-                                  : 'Create direct monitor'}
+                                  : collectorId
+                                    ? 'Add hub monitor'
+                                    : 'Add direct monitor'}
                         </Button>
                     )
                 }
@@ -730,6 +804,8 @@ function NativeMonitorWizardBody({
                                                                 before.deviceId,
                                                             profileId:
                                                                 before.profileId,
+                                                            collectorId:
+                                                                before.collectorId,
                                                             name: before.name,
                                                             affectsAvailability:
                                                                 before.affectsAvailability,
@@ -832,6 +908,66 @@ function NativeMonitorWizardBody({
                                     required
                                 />
                             </div>
+                            <div className="space-y-2">
+                                <Label>Runs from</Label>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    <Button
+                                        type="button"
+                                        variant={
+                                            collectorId === ''
+                                                ? 'secondary'
+                                                : 'outline'
+                                        }
+                                        aria-pressed={collectorId === ''}
+                                        className="h-auto flex-col items-start gap-1 p-3 text-left whitespace-normal"
+                                        onClick={() => setCollectorId('')}
+                                    >
+                                        <span className="flex items-center gap-1.5 font-semibold">
+                                            <Server className="size-4" />
+                                            Server (direct when routable)
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Runs from: server
+                                        </span>
+                                    </Button>
+                                    {eligibleCollectors.map((hub) => {
+                                        const selected =
+                                            collectorId === String(hub.id);
+                                        const isSdWan =
+                                            site !== undefined &&
+                                            hub.site_id !== site.id;
+                                        return (
+                                            <Button
+                                                key={hub.id}
+                                                type="button"
+                                                variant={
+                                                    selected
+                                                        ? 'secondary'
+                                                        : 'outline'
+                                                }
+                                                aria-pressed={selected}
+                                                className="h-auto flex-col items-start gap-1 p-3 text-left whitespace-normal"
+                                                onClick={() =>
+                                                    setCollectorId(
+                                                        String(hub.id),
+                                                    )
+                                                }
+                                            >
+                                                <span className="flex items-center gap-1.5 font-semibold">
+                                                    <RadioTower className="size-4" />
+                                                    Hub {hub.name}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Runs from: hub {hub.name}
+                                                    {isSdWan
+                                                        ? ' · covers this Site over SD-WAN'
+                                                        : ''}
+                                                </span>
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                             <label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
                                 <Checkbox
                                     checked={affectsAvailability}
@@ -843,7 +979,7 @@ function NativeMonitorWizardBody({
                                     <strong>Affects Device availability</strong>
                                     <span className="mt-1 block text-xs text-muted-foreground">
                                         Use only for checks that should change
-                                        the canonical Device availability state.
+                                        this device's availability state.
                                     </span>
                                 </span>
                             </label>
@@ -851,6 +987,7 @@ function NativeMonitorWizardBody({
                                 {[
                                     'device_id',
                                     'profile_id',
+                                    'collector_id',
                                     'name',
                                     'expected_site_id',
                                 ].map((key) => (
@@ -1116,6 +1253,16 @@ function NativeMonitorWizardBody({
                                 />
                                 <ReviewRow label="Check type" value={label} />
                                 <ReviewRow
+                                    label="Runs from"
+                                    value={
+                                        selectedCollector
+                                            ? `hub ${selectedCollector.name}`
+                                            : collectorId
+                                              ? `hub #${collectorId}`
+                                              : 'server'
+                                    }
+                                />
+                                <ReviewRow
                                     label="Affects availability"
                                     value={affectsAvailability ? 'Yes' : 'No'}
                                 />
@@ -1261,7 +1408,12 @@ function NativeContextUnavailable({ onClose }: { onClose: () => void }) {
                 if (!open) onClose();
             }}
         >
-            <DialogContent>
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 480px)',
+                    width: 'min(92vw, 480px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>Refresh monitor context</DialogTitle>
                     <DialogDescription>
@@ -1394,7 +1546,13 @@ function NativeMonitorDeactivateBody({
                     if (!open) close();
                 }}
             >
-                <DialogContent className="max-h-[90vh] w-[94vw] overflow-x-hidden overflow-y-auto sm:max-w-lg">
+                <DialogContent
+                    className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
+                    style={{
+                        maxWidth: 'min(92vw, 480px)',
+                        width: 'min(92vw, 480px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>
                             {commit.saved

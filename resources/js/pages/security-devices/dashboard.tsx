@@ -23,41 +23,81 @@ import {
 } from '@/components/security-devices/estate-records';
 import type { EstateProps } from '@/components/security-devices/estate-types';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Cctv, Cpu, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react';
+import {
+    ArrowRight,
+    Cctv,
+    CheckCircle2,
+    Circle,
+    Cpu,
+    LayoutGrid,
+    List,
+    Plus,
+    RefreshCw,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+
+type CurrentPermissions = {
+    securityDevices?: {
+        viewAny?: boolean;
+        devicesView?: boolean;
+        eventsView?: boolean;
+        maintenanceView?: boolean;
+        devicesCreate?: boolean;
+    };
+    it?: {
+        view?: boolean;
+    };
+    controlRoom?: {
+        viewAny?: boolean;
+        alertsView?: boolean;
+    };
+};
+
 export type { EstateProps } from '@/components/security-devices/estate-types';
 export default function Dashboard(data: EstateProps) {
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+        auth?: { user?: { id: number } | null; can?: CurrentPermissions };
     }>().props;
+    // Metadata-only partial changes cannot transfer ownership of retained DTOs.
+    // A complete read with a fresh page mount establishes the next source actor.
+    const [sourceActor] = useState(data.actor_id);
     const [layout, setLayout] = useState<'cards' | 'table'>('cards');
     const visible = Boolean(
         auth?.user?.id &&
         data.actor_id === auth.user.id &&
-        auth.can?.['securityDevices.viewAny'] === true,
+        data.actor_id === sourceActor &&
+        auth.can?.securityDevices?.viewAny === true,
     );
     const devices =
         visible &&
         data.can.view_devices &&
-        auth?.can?.['securityDevices.devices.view'] === true;
+        auth?.can?.securityDevices?.devicesView === true;
     const permission: EstatePermissions = {
         devices,
         events:
             devices &&
             data.can.view_events &&
-            auth?.can?.['securityDevices.events.view'] === true,
+            auth?.can?.securityDevices?.eventsView === true,
         maintenance:
             devices &&
             data.can.view_maintenance &&
-            auth?.can?.['securityDevices.maintenance.view'] === true,
-        it: visible && auth?.can?.['it.view'] === true,
+            auth?.can?.securityDevices?.maintenanceView === true,
+        it: visible && auth?.can?.it?.view === true,
         controlRoom:
             visible &&
-            (auth?.can?.['controlRoom.viewAny'] === true ||
-                auth?.can?.['controlRoom.alerts.view'] === true),
+            (auth?.can?.controlRoom?.viewAny === true ||
+                auth?.can?.controlRoom?.alertsView === true),
     };
     return (
         <DashboardBody
@@ -69,7 +109,7 @@ export default function Dashboard(data: EstateProps) {
             create={
                 visible &&
                 data.can.create &&
-                auth?.can?.['securityDevices.devices.create'] === true
+                auth?.can?.securityDevices?.devicesCreate === true
             }
             layout={layout}
             setLayout={setLayout}
@@ -148,6 +188,17 @@ function DashboardBody({
         if (refreshing.current) return;
         refreshing.current = true;
         setNotice('');
+        if (!visible) {
+            router.visit('/security-devices', {
+                method: 'get',
+                preserveState: false,
+                preserveScroll: true,
+                onFinish: () => {
+                    if (live.current) refreshing.current = false;
+                },
+            });
+            return;
+        }
         router.reload({
             only: [
                 'actor_id',
@@ -160,6 +211,7 @@ function DashboardBody({
                 'overdueMaintenance',
                 'groupCount',
                 'operations',
+                'first_run_checklist',
                 'can',
                 'auth',
             ],
@@ -169,14 +221,14 @@ function DashboardBody({
                     actor_id?: number;
                     auth?: {
                         user?: { id?: number };
-                        can?: Record<string, unknown>;
+                        can?: CurrentPermissions;
                     };
                 };
                 if (
                     page.component === 'security-devices/dashboard' &&
                     props.actor_id === actor &&
                     props.auth?.user?.id === actor &&
-                    props.auth.can?.['securityDevices.viewAny'] === true
+                    props.auth.can?.securityDevices?.viewAny === true
                 )
                     setDenied(false);
                 else {
@@ -209,6 +261,8 @@ function DashboardBody({
         value: number | string;
         caption: string;
         view: EstateView;
+        /** The page that owns the number when it lives outside these views. */
+        owner?: { href: string; label: string };
     }> = [
         {
             label: 'Affected Sites',
@@ -235,6 +289,12 @@ function DashboardBody({
                 : 'Restricted',
             caption: 'Devices with an enabled monitor',
             view: 'overview',
+            owner: permission.events
+                ? {
+                      href: '/security-devices/monitoring?tab=coverage',
+                      label: 'Open monitoring coverage',
+                  }
+                : undefined,
         },
         {
             label: 'Open IT work',
@@ -243,6 +303,12 @@ function DashboardBody({
                 : 'Restricted',
             caption: 'Existing IT work queue',
             view: 'overview',
+            owner: permission.it
+                ? {
+                      href: '/it?tab=tickets&view=all_open',
+                      label: 'Open the IT open work queue',
+                  }
+                : undefined,
         },
         {
             label: 'Device records',
@@ -328,7 +394,7 @@ function DashboardBody({
                 <PageHeader
                     icon={Cctv}
                     title="Security & Devices estate"
-                    subline="Operational records and work across your approved Sites."
+                    subline="Operational records and work across your approved Sites"
                     mobileSummary={
                         visible
                             ? permission.devices
@@ -370,8 +436,15 @@ function DashboardBody({
                         <PageHeaderMeterBlock
                             key={meter.label}
                             label={meter.label}
-                            ariaLabel={`Open ${views.find((tab) => tab.key === meter.view)?.label.toLowerCase()} view`}
-                            onClick={() => select(meter.view)}
+                            {...(visible && meter.owner
+                                ? {
+                                      href: meter.owner.href,
+                                      ariaLabel: meter.owner.label,
+                                  }
+                                : {
+                                      ariaLabel: `Open ${views.find((tab) => tab.key === meter.view)?.label.toLowerCase()} view`,
+                                      onClick: () => select(meter.view),
+                                  })}
                         >
                             <PageHeaderMeterBig>
                                 {visible ? meter.value : 'Restricted'}
@@ -460,6 +533,104 @@ function DashboardBody({
                             </p>
                         ) : (
                             <>
+                                {view === 'overview' &&
+                                data.first_run_checklist &&
+                                !data.first_run_checklist.all_complete ? (
+                                    <Card aria-label="First-run setup">
+                                        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                            <div className="space-y-1">
+                                                <CardTitle>
+                                                    First-run setup
+                                                </CardTitle>
+                                                <CardDescription>
+                                                    Complete these steps to
+                                                    start monitoring devices
+                                                    across your Sites.
+                                                </CardDescription>
+                                            </div>
+                                            <StatusBadge variant="info">
+                                                {`${data.first_run_checklist.completed} of ${data.first_run_checklist.total} done`}
+                                            </StatusBadge>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <ul className="grid gap-5 md:grid-cols-2">
+                                                {data.first_run_checklist.steps.map(
+                                                    (step) => (
+                                                        <li
+                                                            key={step.key}
+                                                            className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-4"
+                                                        >
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div className="flex items-center gap-2 font-medium text-foreground">
+                                                                        {step.done ? (
+                                                                            <CheckCircle2
+                                                                                aria-hidden="true"
+                                                                                className="size-4 shrink-0 text-status-success"
+                                                                            />
+                                                                        ) : (
+                                                                            <Circle
+                                                                                aria-hidden="true"
+                                                                                className="size-4 shrink-0 text-muted-foreground"
+                                                                            />
+                                                                        )}
+                                                                        <span>
+                                                                            {
+                                                                                step.title
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                    <StatusBadge
+                                                                        size="sm"
+                                                                        variant={
+                                                                            step.done
+                                                                                ? 'success'
+                                                                                : 'neutral'
+                                                                        }
+                                                                    >
+                                                                        {step.done
+                                                                            ? 'Done'
+                                                                            : 'To do'}
+                                                                    </StatusBadge>
+                                                                </div>
+                                                                <p className="text-caption">
+                                                                    {
+                                                                        step.summary
+                                                                    }
+                                                                </p>
+                                                            </div>
+                                                            {step.href &&
+                                                            step.action_label ? (
+                                                                <div>
+                                                                    <Button
+                                                                        asChild
+                                                                        size="sm"
+                                                                        variant={
+                                                                            step.done
+                                                                                ? 'ghost'
+                                                                                : 'outline'
+                                                                        }
+                                                                    >
+                                                                        <Link
+                                                                            href={
+                                                                                step.href
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                step.action_label
+                                                                            }
+                                                                            <ArrowRight className="size-3.5" />
+                                                                        </Link>
+                                                                    </Button>
+                                                                </div>
+                                                            ) : null}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        </CardContent>
+                                    </Card>
+                                ) : null}
                                 <EstateRecords
                                     rows={rows}
                                     view={layout}
@@ -505,15 +676,15 @@ function DashboardBody({
                                 ) : null}
                                 {view === 'findings' && permission.events ? (
                                     <Button asChild variant="outline">
-                                        <Link href="/security-devices/alerts-events">
+                                        <Link href="/security-devices/monitoring?tab=findings">
                                             View all findings
                                         </Link>
                                     </Button>
                                 ) : null}
                                 {view === 'work' && permission.maintenance ? (
                                     <Button asChild variant="outline">
-                                        <Link href="/security-devices/maintenance-health">
-                                            View all maintenance & health
+                                        <Link href="/security-devices/maintenance?tab=due">
+                                            View due or overdue maintenance
                                         </Link>
                                     </Button>
                                 ) : null}

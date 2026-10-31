@@ -169,7 +169,7 @@ class ClientHealthcareDevicesProjectionTest extends TestCase
 
     private function partialHealthcareDevices(User $viewer, Client $client)
     {
-        $version = app(HandleInertiaRequests::class)->version(request());
+        $version = (string) app(HandleInertiaRequests::class)->version(request());
 
         return $this->actingAs($viewer)->get("/operations/clients/{$client->id}", [
             'X-Inertia' => 'true',

@@ -94,8 +94,8 @@ test('hazard registers details exports and mutations honour canonical Site acces
 
     $this->actingAs($this->viewer)
         ->get("/compliance/hazards?hazard={$hiddenHazard->id}")
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('detail', null));
+        ->assertNotFound()
+        ->assertDontSee('Restricted safety hazard');
 
     foreach ([$hiddenHazard->id, (int) SiteHazard::query()->max('id') + 1] as $hazardId) {
         $this->actingAs($this->viewer)

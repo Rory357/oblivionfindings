@@ -13,6 +13,9 @@ final class CurrentAuthorizationReads
 {
     private bool $active = true;
 
+    /** @var array<string, array{0: object, 1: mixed}> */
+    private array $remembered = [];
+
     private function __construct(private Connection $connection) {}
 
     public static function within(callable $decision): mixed
@@ -40,6 +43,30 @@ final class CurrentAuthorizationReads
         $base->beforeQuery(fn (Builder $compiled) => $this->lockTree($compiled));
 
         return $query;
+    }
+
+    /**
+     * A fact this session read for one exact object (a viewer), kept until the session ends and
+     * never shared with another object or session. Every read here is FOR SHARE inside the
+     * session's transaction, so the rows behind the fact stay locked: reading them again would
+     * return the same answer. Only for facts the session reads and does not itself change.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $read
+     * @return T
+     */
+    public function rememberFor(object $subject, string $fact, callable $read): mixed
+    {
+        $this->assertActive();
+        $key = $fact.'|'.spl_object_id($subject);
+        if (isset($this->remembered[$key]) && $this->remembered[$key][0] === $subject) {
+            return $this->remembered[$key][1];
+        }
+        $value = $read();
+        $this->remembered[$key] = [$subject, $value];
+
+        return $value;
     }
 
     public function assertActive(): void

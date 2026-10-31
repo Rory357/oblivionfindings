@@ -213,7 +213,7 @@ function selectBulkManagementEvidenceTargets(Browser $browser, Device $excluded)
         ->assertSee('2 ready')
         ->assertSee('1 exclusions')
         ->press('Review selected targets')
-        ->waitForText('Review governed bulk action', 20)
+        ->waitForText('Review bulk action', 20)
         ->assertSee('Explicit exclusions')
         ->assertSee($excluded->name)
         ->assertSee('A fresh Device observation is required.')
@@ -253,7 +253,7 @@ test('governed bulk Device management is understandable and independently reconc
             if ($case['suffix'] === 'wide') {
                 foreach ($otherWorkspaceUrls as $workspaceUrl) {
                     $browser->visit($workspaceUrl)
-                        ->waitForText('Governed Device management', 40)
+                        ->waitForText('Bulk device management', 40)
                         ->assertSee('Management')
                         ->assertScript(
                             'document.documentElement.scrollWidth <= document.documentElement.clientWidth',
@@ -271,7 +271,7 @@ test('governed bulk Device management is understandable and independently reconc
                 ->waitForText('Confirm your password', 20)
                 ->type('#password', $case['password'])
                 ->press('Confirm password')
-                ->waitForText('Governed Device management', 40);
+                ->waitForText('Bulk device management', 40);
 
             selectBulkManagementEvidenceTargets($browser, $excluded);
             $reason = 'Apply the approved bounded access window and verify every child result independently.';

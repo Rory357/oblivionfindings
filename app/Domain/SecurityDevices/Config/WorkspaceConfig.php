@@ -52,7 +52,7 @@ class WorkspaceConfig
                     self::tab('overview', 'Overview', 'Physical security technology posture across authorised sites.'),
                     self::tab('cctv', 'CCTV', 'Cameras, recorders, and video infrastructure.', categories: ['cctv']),
                     self::tab('alarms', 'Alarms', 'Alarm panels, zones, sensors, sirens, and perimeter devices.', categories: ['alarm', 'perimeter']),
-                    self::tab('access-control', 'Access Control', 'Doors, locks, readers, panels, and physical access hardware.', categories: ['access_control']),
+                    self::tab('access-control', 'Access control', 'Doors, locks, readers, panels, and physical access hardware.', categories: ['access_control']),
                     self::tab(
                         'events',
                         'Security events',

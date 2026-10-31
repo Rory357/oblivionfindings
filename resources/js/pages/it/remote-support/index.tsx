@@ -1,6 +1,7 @@
 import { ItModuleShell } from '@/components/it/it-module-shell';
 import {
     PageHeader,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderSearch,
@@ -11,10 +12,13 @@ import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
+import { endpointAgentBadgeMeta } from '@/pages/security-devices/devices/device-endpoint-section';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowRight,
+    Download,
     ExternalLink,
+    FileCode,
     Monitor,
     Search,
     ShieldCheck,
@@ -24,6 +28,7 @@ import { useState, type FormEvent } from 'react';
 import { RemoteConnectionDialog } from './_dialogs';
 import { RemotePolicyEditor } from './policy-editor';
 import { RestartPolicyEditor } from './restart-policy';
+import { ScriptPolicyEditor } from './script-policy';
 import { ServiceActionPolicyEditor } from './service-action-policy';
 import { SoftwarePolicyEditor } from './software-policy';
 import { TechnicianObli } from './technician-obli';
@@ -37,14 +42,25 @@ interface Computer {
     last_seen_at: string | null;
     href: string;
     management_href?: string;
+    endpoint_posture_href?: string | null;
+    endpoint_agent?: {
+        state: string;
+        agentVersion: string | null;
+        lastSeenAt: string | null;
+        observedAt: string | null;
+    } | null;
 }
 export interface RemoteSupportProps {
     actor_id: number;
     can_manage_remote_policy: boolean;
+    can_manage_remote_support_settings?: boolean;
     can_manage_action_policy?: boolean;
     can_manage_restart_policy?: boolean;
     can_manage_software_policy?: boolean;
     can_view_software_catalogue?: boolean;
+    can_view_script_catalogue?: boolean;
+    can_view_agent_downloads?: boolean;
+    can_view_endpoint_posture?: boolean;
     computers: {
         data: Computer[];
         total: number;
@@ -54,7 +70,11 @@ export interface RemoteSupportProps {
     ticket: { id: number; reference: string; href: string } | null;
     filters: { q: string };
     summary: { computers: number; endpoints: number; servers: number };
-    availability: { remote_support: boolean; obli: boolean };
+    availability: {
+        remote_support: boolean;
+        obli: boolean;
+        script_execution?: boolean;
+    };
 }
 
 export default function RemoteSupport(props: RemoteSupportProps) {
@@ -64,10 +84,13 @@ export default function RemoteSupport(props: RemoteSupportProps) {
 function RemoteSupportWorkspace({
     actor_id,
     can_manage_remote_policy,
+    can_manage_remote_support_settings,
     can_manage_action_policy,
     can_manage_restart_policy,
     can_manage_software_policy,
     can_view_software_catalogue,
+    can_view_script_catalogue,
+    can_view_agent_downloads,
     computers,
     selected,
     ticket,
@@ -104,20 +127,43 @@ function RemoteSupportWorkspace({
                     title="Remote support"
                     subline="Computer support and Obli assistance"
                     actions={
-                        <form
-                            onSubmit={searchComputers}
-                            className="flex items-center gap-2"
-                        >
-                            <PageHeaderSearch
-                                value={search}
-                                onChange={setSearch}
-                                placeholder="Search computers…"
-                            />
-                            <Button type="submit" variant="secondary">
-                                <Search aria-hidden="true" />
-                                Search
-                            </Button>
-                        </form>
+                        <>
+                            <form
+                                onSubmit={searchComputers}
+                                className="flex items-center gap-2"
+                            >
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search computers…"
+                                />
+                                <PageHeaderGlassButton type="submit">
+                                    <Search aria-hidden="true" />
+                                    Search
+                                </PageHeaderGlassButton>
+                            </form>
+                            {can_view_script_catalogue && (
+                                <PageHeaderGlassButton asChild>
+                                    <Link
+                                        href={
+                                            '/security-devices/scripts?expected_actor_id=' +
+                                            actor_id
+                                        }
+                                    >
+                                        <FileCode aria-hidden="true" />
+                                        Approved scripts
+                                    </Link>
+                                </PageHeaderGlassButton>
+                            )}
+                            {can_view_agent_downloads && (
+                                <PageHeaderGlassButton asChild>
+                                    <Link href="/security-devices/agent-downloads">
+                                        <Download aria-hidden="true" />
+                                        Agent downloads
+                                    </Link>
+                                </PageHeaderGlassButton>
+                            )}
+                        </>
                     }
                     meters={
                         <>
@@ -176,40 +222,56 @@ function RemoteSupportWorkspace({
                         </div>
                         {computers.data.length ? (
                             <ul className="divide-y">
-                                {computers.data.map((computer) => (
-                                    <li key={computer.id}>
-                                        <Link
-                                            href={`/it/remote-support?device=${computer.id}${filters.q ? '&q=' + encodeURIComponent(filters.q) : ''}`}
-                                            aria-current={
-                                                selected?.id === computer.id
-                                                    ? 'page'
-                                                    : undefined
-                                            }
-                                            className={`frontline-focus flex items-center gap-3 px-4 py-3 ${selected?.id === computer.id ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'}`}
-                                        >
-                                            <Monitor
-                                                className="h-4 w-4 shrink-0"
-                                                aria-hidden="true"
-                                            />
-                                            <span className="min-w-0 flex-1">
-                                                <span className="block truncate font-medium">
-                                                    {computer.name}
+                                {computers.data.map((computer) => {
+                                    const agentBadge = computer.endpoint_agent
+                                        ? endpointAgentBadgeMeta(
+                                              computer.endpoint_agent.state,
+                                          )
+                                        : null;
+                                    return (
+                                        <li key={computer.id}>
+                                            <Link
+                                                href={`/it/remote-support?device=${computer.id}${filters.q ? '&q=' + encodeURIComponent(filters.q) : ''}`}
+                                                aria-current={
+                                                    selected?.id === computer.id
+                                                        ? 'page'
+                                                        : undefined
+                                                }
+                                                className={`frontline-focus flex items-center gap-3 px-4 py-3 ${selected?.id === computer.id ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'}`}
+                                            >
+                                                <Monitor
+                                                    className="h-4 w-4 shrink-0"
+                                                    aria-hidden="true"
+                                                />
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate font-medium">
+                                                        {computer.name}
+                                                    </span>
+                                                    <span className="text-caption block">
+                                                        {computer.uid} ·{' '}
+                                                        {computer.category ===
+                                                        'server'
+                                                            ? 'Server'
+                                                            : 'Workstation'}
+                                                    </span>
                                                 </span>
-                                                <span className="text-caption block">
-                                                    {computer.uid} ·{' '}
-                                                    {computer.category ===
-                                                    'server'
-                                                        ? 'Server'
-                                                        : 'Workstation'}
-                                                </span>
-                                            </span>
-                                            <ArrowRight
-                                                className="h-4 w-4 shrink-0"
-                                                aria-hidden="true"
-                                            />
-                                        </Link>
-                                    </li>
-                                ))}
+                                                {agentBadge && (
+                                                    <StatusBadge
+                                                        variant={
+                                                            agentBadge.variant
+                                                        }
+                                                    >
+                                                        {agentBadge.label}
+                                                    </StatusBadge>
+                                                )}
+                                                <ArrowRight
+                                                    className="h-4 w-4 shrink-0"
+                                                    aria-hidden="true"
+                                                />
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         ) : (
                             <div className="p-5">
@@ -231,7 +293,7 @@ function RemoteSupportWorkspace({
                     </section>
                     <section
                         aria-labelledby="support-title"
-                        className="min-w-0 space-y-4"
+                        className="flex min-w-0 flex-col gap-5"
                     >
                         <Card className="gap-0 p-5 shadow-none">
                             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -248,33 +310,80 @@ function RemoteSupportWorkspace({
                                             : 'Choose a computer to open its support workspace.'}
                                     </p>
                                 </div>
-                                <StatusBadge variant="neutral">
-                                    {connectionOpen
-                                        ? 'Remote workspace open'
-                                        : 'No remote session'}
-                                </StatusBadge>
+                                {availability.remote_support && (
+                                    <StatusBadge variant="neutral">
+                                        {connectionOpen
+                                            ? 'Remote workspace open'
+                                            : 'No remote session'}
+                                    </StatusBadge>
+                                )}
                             </div>
                             {selected && (
                                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-                                    <p className="text-subtle">
-                                        Last device observation:{' '}
-                                        {formatDateTime(
-                                            selected.last_seen_at,
-                                            'Not yet reported',
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {selected.endpoint_agent && (
+                                            <StatusBadge
+                                                variant={
+                                                    endpointAgentBadgeMeta(
+                                                        selected.endpoint_agent
+                                                            .state,
+                                                    ).variant
+                                                }
+                                            >
+                                                {
+                                                    endpointAgentBadgeMeta(
+                                                        selected.endpoint_agent
+                                                            .state,
+                                                    ).label
+                                                }
+                                                {selected.endpoint_agent
+                                                    .agentVersion
+                                                    ? ` (${selected.endpoint_agent.agentVersion})`
+                                                    : ''}
+                                            </StatusBadge>
                                         )}
-                                    </p>
-                                    <Button variant="outline" asChild>
-                                        <Link href={selected.href}>
-                                            <ExternalLink aria-hidden="true" />
-                                            Device record
-                                        </Link>
-                                    </Button>
+                                        <p className="text-subtle">
+                                            Last device observation:{' '}
+                                            {formatDateTime(
+                                                selected.last_seen_at,
+                                                'Not yet reported',
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selected.endpoint_posture_href && (
+                                            <Button variant="outline" asChild>
+                                                <Link
+                                                    href={
+                                                        selected.endpoint_posture_href
+                                                    }
+                                                >
+                                                    <Monitor aria-hidden="true" />
+                                                    Endpoint posture
+                                                </Link>
+                                            </Button>
+                                        )}
+                                        <Button variant="outline" asChild>
+                                            <Link href={selected.href}>
+                                                <ExternalLink aria-hidden="true" />
+                                                Device record
+                                            </Link>
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                             {selected && can_manage_remote_policy && (
                                 <div className="mt-4">
                                     <RemotePolicyEditor
                                         key={actor_id + ':' + selected.id}
+                                        actorId={actor_id}
+                                        device={selected}
+                                    />
+                                </div>
+                            )}
+                            {selected && availability.script_execution && (
+                                <div className="mt-4">
+                                    <ScriptPolicyEditor
                                         actorId={actor_id}
                                         device={selected}
                                     />
@@ -360,34 +469,60 @@ function RemoteSupportWorkspace({
                                 </div>
                             )}
                         </Card>
-                        <Card className="gap-4 p-5 shadow-none sm:flex-row sm:items-center">
-                            <Monitor
-                                className="h-5 w-5 shrink-0 text-primary"
-                                aria-hidden="true"
-                            />
-                            <div className="min-w-0 flex-1 space-y-1">
-                                <h3 className="text-section-title">
-                                    Connect to computer
-                                </h3>
-                                <p
-                                    id="connection-readiness"
-                                    className="text-subtle"
+                        {availability.remote_support ? (
+                            <Card className="gap-4 p-5 shadow-none sm:flex-row sm:items-center">
+                                <Monitor
+                                    className="h-5 w-5 shrink-0 text-primary"
+                                    aria-hidden="true"
+                                />
+                                <div className="min-w-0 flex-1 space-y-1">
+                                    <h3 className="text-section-title">
+                                        Connect to computer
+                                    </h3>
+                                    <p
+                                        id="connection-readiness"
+                                        className="text-subtle"
+                                    >
+                                        Screen viewing and control follow the
+                                        consent policy and your current
+                                        permissions.
+                                    </p>
+                                </div>
+                                <Button
+                                    disabled={!selected}
+                                    onClick={() => setConnectionOpen(true)}
+                                    aria-describedby="connection-readiness"
                                 >
-                                    {availability.remote_support
-                                        ? 'Screen viewing and control follow the consent policy and your current permissions.'
-                                        : 'Not available yet. Remote connection is still being built.'}
-                                </p>
-                            </div>
-                            <Button
-                                disabled={
-                                    !selected || !availability.remote_support
-                                }
-                                onClick={() => setConnectionOpen(true)}
-                                aria-describedby="connection-readiness"
-                            >
-                                Connect
-                            </Button>
-                        </Card>
+                                    Connect
+                                </Button>
+                            </Card>
+                        ) : (
+                            can_manage_remote_support_settings && (
+                                <Card className="gap-4 p-5 shadow-none sm:flex-row sm:items-center">
+                                    <Monitor
+                                        className="h-5 w-5 shrink-0 text-muted-foreground"
+                                        aria-hidden="true"
+                                    />
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                        <h3 className="text-section-title">
+                                            Attended remote support is off
+                                        </h3>
+                                        <p className="text-subtle">
+                                            Turn on Windows computer management
+                                            and configure a TURN relay in Obli
+                                            settings. Staff on the computer
+                                            always see an Allow or Decline
+                                            prompt and a Stop button.
+                                        </p>
+                                    </div>
+                                    <Button variant="outline" asChild>
+                                        <Link href="/settings/obli">
+                                            Configure remote support
+                                        </Link>
+                                    </Button>
+                                </Card>
+                            )
+                        )}
                         {selected && (
                             <TechnicianObli
                                 scope={{

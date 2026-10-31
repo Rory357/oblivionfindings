@@ -255,7 +255,15 @@ it('allows an explicit all-site permission to watch then removes delivery after 
         'title' => 'Explicit global access lifecycle',
     ]);
 
+    // A generic reporting grant does not cross the incident's historical Site boundary.
     $this->actingAs($watcher)
+        ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
+        ->assertNotFound();
+    $this->assertDatabaseMissing('task_watchers', ['source' => 'incident', 'item_id' => $incident->id, 'user_id' => $watcher->id]);
+    $globalPermission = Permission::query()->where('key', 'healthSafety.viewAllSites')->firstOrFail();
+    $watcher->permissionOverrides()->syncWithoutDetaching([$globalPermission->id => ['allowed' => true]]);
+
+    $this->actingAs($watcher->fresh())
         ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
         ->assertRedirect()
         ->assertSessionHas('success', 'Following this task.');
@@ -265,10 +273,12 @@ it('allows an explicit all-site permission to watch then removes delivery after 
         'user_id' => $watcher->id,
     ]);
 
-    $globalPermission = Permission::query()->where('key', 'reports.viewAny')->firstOrFail();
     $watcher->permissionOverrides()->syncWithoutDetaching([
         $globalPermission->id => ['allowed' => false],
     ]);
+    $this->actingAs($watcher->fresh())
+        ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
+        ->assertNotFound();
 
     $aggregator = app(TaskAggregator::class);
     $provider = $aggregator->providerFor('incident');

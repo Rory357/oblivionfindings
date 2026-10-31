@@ -175,7 +175,7 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/settings')
                 ->has('areas', 1)
-                ->where('areas.0.title', 'Reports & exports')
+                ->where('areas.0.title', 'Reports')
                 ->where('areas.0.href', '/security-devices/reports')
             );
     }

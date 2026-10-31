@@ -47,6 +47,8 @@ export const statusColors: Record<string, string> = {
     warning: WARNING,
     offline: CRITICAL,
     unknown: NEUTRAL,
+    not_monitored: NEUTRAL,
+    unmonitored: NEUTRAL,
 
     // Severity levels
     critical: CRITICAL,

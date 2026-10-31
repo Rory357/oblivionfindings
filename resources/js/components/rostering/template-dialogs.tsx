@@ -1001,13 +1001,13 @@ function RowEditor({
         >
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-semibold">
-                    <span className="grid h-6 w-6 place-items-center rounded-md bg-primary/10 text-[11px] text-primary">
+                    <span className="grid h-6 w-6 place-items-center rounded-md bg-primary/10 text-xs text-primary">
                         {index + 1}
                     </span>
                     {DAY_LABELS[Number(row.day_of_week)] ?? 'Day'} ·{' '}
                     {row.start_time}–{row.end_time}
                     {overnight ? (
-                        <span className="text-[11px] font-normal text-muted-foreground">
+                        <span className="text-xs font-normal text-muted-foreground">
                             (+1 day)
                         </span>
                     ) : null}
@@ -1385,8 +1385,8 @@ export function TemplateDetailDialog({
                 className="frontline-dialog max-h-[92vh] min-w-0 grid-cols-1 overflow-hidden p-0"
                 onCloseAutoFocus={onCloseAutoFocus}
                 style={{
-                    maxWidth: 'min(94vw, 940px)',
-                    width: 'min(94vw, 940px)',
+                    maxWidth: 'min(92vw, 900px)',
+                    width: 'min(92vw, 900px)',
                 }}
             >
                 <DialogTitle className="sr-only">
@@ -1501,7 +1501,7 @@ function DetailBody({
                     <h2 className="text-lg font-bold tracking-tight">
                         {template.name}
                     </h2>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary capitalize">
                             {template.template_type}
                         </span>
@@ -1599,7 +1599,7 @@ function DetailBody({
                             <CalendarPlus className="h-4 w-4 text-primary" />
                             Apply to a week
                         </div>
-                        <p className="mt-1 text-[13px] text-muted-foreground">
+                        <p className="mt-1 text-sm text-muted-foreground">
                             Creates draft shifts for the chosen week (snapped to
                             its Monday). Apply more than one cycle to stamp
                             several weeks.
@@ -1675,7 +1675,7 @@ function DetailBody({
                             </div>
                             {template.template_shifts_count > 0 ? (
                                 <div
-                                    className="rounded-md border border-border bg-card/60 p-2.5 text-[12px] text-muted-foreground"
+                                    className="rounded-md border border-border bg-card/60 p-2.5 text-sm text-muted-foreground"
                                     data-test="template-apply-preview"
                                 >
                                     Creates{' '}
@@ -1762,12 +1762,12 @@ function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
                 <div className="text-sm font-semibold">
                     {dayLabel} · {shift.start_time}–{shift.end_time}
                     {overnight ? (
-                        <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
                             (+1 day)
                         </span>
                     ) : null}
                 </div>
-                <div className="flex flex-wrap gap-1.5 text-[11px]">
+                <div className="flex flex-wrap gap-1.5 text-xs">
                     <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground capitalize">
                         {shift.shift_type ?? 'standard'}
                     </span>
@@ -1788,7 +1788,7 @@ function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
                     ) : null}
                 </div>
             </div>
-            <div className="mt-2 grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-[13px] text-muted-foreground sm:grid-cols-2">
+            <div className="mt-2 grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-sm text-muted-foreground sm:grid-cols-2">
                 <span>
                     Client:{' '}
                     <span className="font-medium text-foreground">
@@ -1833,7 +1833,7 @@ function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
                 ) : null}
             </div>
             {shift.notes ? (
-                <p className="mt-2 text-[13px] text-muted-foreground">
+                <p className="mt-2 text-sm text-muted-foreground">
                     {shift.notes}
                 </p>
             ) : null}

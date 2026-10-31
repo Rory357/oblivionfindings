@@ -4,17 +4,26 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\SiteHazard;
 use App\Models\User;
-use App\Services\AuditLogger;
+use App\Services\Sites\HazardAssignmentService;
+use App\Services\SiteTypeAccessService;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\ManagesAssignmentNotifications;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
+use App\Services\Tasks\SiteHazardTaskItem;
+use App\Services\Tasks\TaskAggregator;
+use App\Services\Tasks\TaskAssignmentNotifier;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\UserSiteAccessService;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
-class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
+class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, ManagesAssignmentNotifications, SiteScopedTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -34,47 +43,28 @@ class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, SiteS
     public function canAssign(User $user): bool
     {
         // Mirrors routes/sites.php: POST /hazards/{hazard}/assign → permission:hazards.assign.
-        return $user->canDo('hazards.assign');
+        return $user->canDo('hazards.assign') && $user->canDo('sites.viewAny');
     }
 
     public function assign(User $actor, int $id, ?int $assigneeId): void
     {
-        $hazard = SiteHazard::query()->with('site')->find($id);
-
-        if (! $hazard) {
-            throw ValidationException::withMessages([
-                'assignee_id' => 'Hazard not found.',
-            ]);
-        }
-
         if ($assigneeId === null) {
-            // The module's assign action requires an assignee — there is no unassign flow.
-            throw ValidationException::withMessages([
-                'assignee_id' => 'Hazards must be assigned to a staff member.',
-            ]);
+            throw ValidationException::withMessages(['assignee_id' => 'Hazards must be assigned to a staff member.']);
         }
-
-        // SiteHazardController::assign authorizes view on the hazard's site.
-        if ($hazard->site && ! $actor->can('view', $hazard->site)) {
-            throw ValidationException::withMessages([
-                'assignee_id' => 'You are not authorized to assign hazards for this site.',
-            ]);
-        }
-
-        // Persist quietly: the SiteHazardObserver would notify the assignee on
-        // an observed update, and the queue endpoint sends its own assignment
-        // notification — quiet save keeps exactly one ping. assigned_at is the
-        // stamp the observer would have set.
-        $hazard->forceFill([
-            'assigned_to_user_id' => $assigneeId,
-            'assigned_at' => now(),
-        ])->saveQuietly();
-
-        $assignee = User::query()->find($assigneeId);
-        AuditLogger::log('hazard.assigned', $hazard, [
-            'assignee_id' => $assigneeId,
-            'assignee_name' => $assignee?->name,
+        $options = request()->validate([
+            'expected_assigned_to_user_id' => 'sometimes|nullable|integer',
+            'expected_due_date' => 'sometimes|nullable|date_format:Y-m-d',
         ]);
+        $result = app(HazardAssignmentService::class)->assign($actor, $id, $assigneeId, $options, notify: false, requireRead: true);
+        if ($result['owner_changed']) {
+            DB::afterCommit(function () use ($result, $id, $assigneeId): void {
+                try {
+                    TaskAssignmentNotifier::notify($result['actor'], $this, $id, $assigneeId, app(TaskAggregator::class));
+                } catch (Throwable $error) {
+                    Log::warning('Hazard task assignment notification failed after commit', ['hazard_id' => $id, 'error_class' => $error::class]);
+                }
+            });
+        }
     }
 
     public function canView(User $user): bool
@@ -86,13 +76,14 @@ class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, SiteS
     {
         $query = SiteHazard::query()
             ->with(['site:id,name', 'assignedTo:id,name'])
+            ->whereHas('site', fn ($query) => $query->whereIn('type', app(SiteTypeAccessService::class)->allowedTypes($user)))
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
             ->limit(300);
 
         if (empty($filters['include_done'])) {
-            // Mirrors SiteHazard::scopeOpen() — 'mitigated' folds into closed.
-            $query->whereIn('status', ['open', 'in_progress']);
+            // Mitigated controls still require source review and closure.
+            $query->whereIn('status', ['open', 'in_progress', 'mitigated']);
         }
 
         return app(TaskProviderAuthorization::class)->siteScoped(
@@ -104,7 +95,7 @@ class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, SiteS
                 app(UserSiteAccessService::class)->accessibleSiteIds($actor, ['sites.viewAll']),
             ),
             function (SiteHazard $hazard) {
-                return new TaskItem(
+                return new SiteHazardTaskItem(
                     id: 'hazard-'.$hazard->id,
                     source: $this->sourceKey(),
                     sourceLabel: $this->label(),
@@ -114,7 +105,7 @@ class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, SiteS
                     status: (string) $hazard->status,
                     bucket: match ($hazard->status) {
                         'open' => TaskItem::BUCKET_OPEN,
-                        'in_progress' => TaskItem::BUCKET_IN_PROGRESS,
+                        'in_progress', 'mitigated' => TaskItem::BUCKET_IN_PROGRESS,
                         default => TaskItem::BUCKET_DONE,
                     },
                     severity: TaskItem::normaliseSeverity($hazard->risk_rating),
@@ -124,11 +115,13 @@ class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, SiteS
                     site: $hazard->site
                         ? ['id' => $hazard->site->id, 'name' => $hazard->site->name]
                         : null,
-                    dueAt: optional($hazard->due_date)->toIso8601String(),
+                    dueAt: $hazard->due_date ? Carbon::parse($hazard->due_date->toDateString(), config('app.worker_timezone', 'Pacific/Auckland'))->endOfDay()->toIso8601String() : null,
                     createdAt: optional($hazard->created_at)->toIso8601String(),
                     link: "/hazards/{$hazard->id}",
                     type: 'Hazard',
                     description: $hazard->description ? str($hazard->description)->limit(140)->toString() : null,
+                    displayState: $hazard->status === 'mitigated' ? 'Awaiting closure' : null,
+                    actionHelp: $hazard->status === 'mitigated' ? 'Controls are recorded as mitigated. Review the hazard and complete its remaining actions before closure.' : null,
                 );
             },
         );

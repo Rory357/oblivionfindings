@@ -41,6 +41,15 @@ static partial class Program {
   waiting.Close();Complete(first);Check(delayed.Cancelled&&delayed.Installs==0,"Close did not cancel pending review.");
   var stopping=new FakeEngine{InstallPending=new(TaskCreationOptions.RunContinuationsAsynchronously)};var stoppingWindow=new SetupWindow(stopping);Fill(stoppingWindow);Complete(stoppingWindow.AdvanceAsync());Find<CheckBox>(stoppingWindow,"ConfirmDestination").IsChecked=true;var activeInstall=stoppingWindow.AdvanceAsync();Complete(stoppingWindow.AdvanceAsync());Check(stopping.Installs==1,"Duplicate install started.");stoppingWindow.Close();Complete(activeInstall);Check(stopping.InstallCancelled,"Closing installer did not cancel the active engine.");
   var failed=new FakeEngine{FailInstall=true};var failure=new SetupWindow(failed);Fill(failure);Complete(failure.AdvanceAsync());Find<CheckBox>(failure,"ConfirmDestination").IsChecked=true;Complete(failure.AdvanceAsync());Check(Find<TextBlock>(failure,"ResultTitle").Text=="Installation needs attention","Failure became success.");Render(failure,"obli-setup-failure.png");failure.Close();
+  string profileJson="{\"version\":1,\"platform\":\"windows\",\"device_label\":\"Reception PC\"}";
+  string setupCode="ofc1_"+Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(profileJson)).TrimEnd('=').Replace('+','-').Replace('/','_');
+  var codeEngine=new FakeEngine();var codeWindow=new SetupWindow(codeEngine);Find<ComboBox>(codeWindow,"RoleChoice").SelectedIndex=0;Find<TextBox>(codeWindow,"PackagePath").Text=@"C:\fixture\release.zip";Find<TextBox>(codeWindow,"ComputerPath").Text=setupCode;
+  Complete(codeWindow.AdvanceAsync());Check(codeEngine.Reviews==1&&codeEngine.LastReviewInput!=null&&File.Exists(codeEngine.LastReviewInput.ComputerProfile)&&File.ReadAllText(codeEngine.LastReviewInput.ComputerProfile)==profileJson,"One-time computer setup code did not resolve to temporary profile.");
+  string tempComputerFile=codeEngine.LastReviewInput!.ComputerProfile;
+  Find<CheckBox>(codeWindow,"ConfirmDestination").IsChecked=true;Complete(codeWindow.AdvanceAsync());Check(!File.Exists(tempComputerFile),"Temporary computer profile was not deleted after installation.");codeWindow.Close();
+  var badCodeEngine=new FakeEngine();var badCodeWindow=new SetupWindow(badCodeEngine);Find<ComboBox>(badCodeWindow,"RoleChoice").SelectedIndex=0;Find<TextBox>(badCodeWindow,"PackagePath").Text=@"C:\fixture\release.zip";
+  Find<TextBox>(badCodeWindow,"ComputerPath").Text="ofc1_!";Complete(badCodeWindow.AdvanceAsync());Check(badCodeEngine.Reviews==0&&Find<Border>(badCodeWindow,"NoticeBox").Visibility==Visibility.Visible,"Malformed ofc1_ setup code was accepted.");
+  Find<TextBox>(badCodeWindow,"ComputerPath").Text="ofc1_"+new string('a',24600);Complete(badCodeWindow.AdvanceAsync());Check(badCodeEngine.Reviews==0,"Oversized ofc1_ setup code was accepted.");badCodeWindow.Close();
   Reject(()=>new InstallerEngine().ReviewAsync(input,CancellationToken.None).GetAwaiter().GetResult());
   Console.WriteLine("PASS: strict review, role/profile bounds, explicit confirmation, duplicate prevention, close cancellation, failure state, unconfigured engine rejection, native Orbit rendering.");app.Shutdown();return 0;
  }catch(Exception e){Console.Error.WriteLine(e);return 1;}}
@@ -54,8 +63,8 @@ static partial class Program {
   }finally{Directory.Delete(root,true);}
  }
  sealed class FakeEngine:IInstallerEngine {
-  public int Reviews,Installs;public bool Cancelled,FailInstall,InstallCancelled;public TaskCompletionSource<InstallationReview>? Pending;public TaskCompletionSource? InstallPending;
-  public async Task<InstallationReview> ReviewAsync(InstallationInput input,CancellationToken token){Reviews++;try{return Pending!=null?await Pending.Task.WaitAsync(token):InstallationReview.Parse(Sample(input.Role),input.Role);}catch(OperationCanceledException){Cancelled=true;throw;}}
+  public int Reviews,Installs;public bool Cancelled,FailInstall,InstallCancelled;public InstallationInput? LastReviewInput;public TaskCompletionSource<InstallationReview>? Pending;public TaskCompletionSource? InstallPending;
+  public async Task<InstallationReview> ReviewAsync(InstallationInput input,CancellationToken token){Reviews++;LastReviewInput=input;try{return Pending!=null?await Pending.Task.WaitAsync(token):InstallationReview.Parse(Sample(input.Role),input.Role);}catch(OperationCanceledException){Cancelled=true;throw;}}
   public async Task InstallAsync(InstallationInput input,InstallationReview review,CancellationToken token){Installs++;if(FailInstall)throw new InvalidOperationException("Installation stopped; existing identity was retained. Contact your IT team before retrying.");try{if(InstallPending!=null)await InstallPending.Task.WaitAsync(token);}catch(OperationCanceledException){InstallCancelled=true;throw;}}
  }
 }

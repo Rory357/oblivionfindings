@@ -152,6 +152,8 @@ class ControlRoomEscalationController extends Controller
         });
 
         return Inertia::render('control-room/escalations', [
+            // Live counts on the Live response tabs (same rules as each tab).
+            'tabCounts' => fn () => app(\App\Services\ControlRoom\LiveResponseTabCounts::class)->for($user),
             'queues' => $queues,
             'allQueues' => $allQueues,
             'worklist' => $worklist,

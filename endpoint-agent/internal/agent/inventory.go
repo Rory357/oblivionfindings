@@ -43,6 +43,7 @@ type Inventory struct {
 	ProbeErrors      []string   `json:"probe_errors"`
 }
 type Heartbeat struct {
+	ScriptActions             *ScriptCapability          `json:"script_actions,omitempty"`
 	SoftwareActions           *SoftwareCapability        `json:"software_actions,omitempty"`
 	SoftwareObservations      []SoftwareObservation      `json:"software_observations,omitempty"`
 	RestartActions            *RestartCapability         `json:"restart_actions,omitempty"`
@@ -152,5 +153,7 @@ func bootUUID(seed string) string {
 
 func pendingHeartbeatReusable(old Heartbeat, serviceActions bool, now time.Time) bool {
 	when, e := time.Parse(time.RFC3339, old.ObservedAt)
-	return e == nil && now.Sub(when) < 90*time.Second && when.Sub(now) < 30*time.Second && (old.ServiceActions != nil) == serviceActions
+	// There is no installed reviewed-script executor yet. Never retransmit an
+	// old/future capability claim just because a pending observation is recent.
+	return old.ScriptActions == nil && e == nil && now.Sub(when) < 90*time.Second && when.Sub(now) < 30*time.Second && (old.ServiceActions != nil) == serviceActions
 }

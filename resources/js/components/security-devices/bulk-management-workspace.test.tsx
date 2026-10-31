@@ -125,7 +125,7 @@ describe('BulkManagementWorkspace', () => {
 
         expect(
             screen.getByRole('heading', {
-                name: 'Governed Device management',
+                name: 'Bulk device management',
             }),
         ).toBeInTheDocument();
         expect(screen.getByText('Independent approval')).toBeInTheDocument();
@@ -139,7 +139,7 @@ describe('BulkManagementWorkspace', () => {
         const dialog = screen.getByRole('dialog');
         expect(
             within(dialog).getByRole('heading', {
-                name: 'Review governed bulk action',
+                name: 'Review bulk action',
             }),
         ).toBeInTheDocument();
         expect(
@@ -342,7 +342,7 @@ describe('BulkManagementWorkspace', () => {
         );
 
         expect(
-            screen.getByRole('heading', { name: 'Recent governed activity' }),
+            screen.getByRole('heading', { name: 'Recent bulk activity' }),
         ).toBeInTheDocument();
         expect(
             screen.getByRole('link', { name: 'Unlock door temporarily' }),

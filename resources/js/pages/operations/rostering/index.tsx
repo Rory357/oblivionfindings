@@ -13,6 +13,7 @@ import {
     PageLayout,
 } from '@/components/page';
 import {
+    addDaysWP,
     AnalyticsPane,
     type AnalyticsTrendPoint,
     type AvailabilityLeaveRequest,
@@ -28,6 +29,7 @@ import {
     EntityFilter,
     type EntityFilterOption,
     type FillBySite,
+    formatWeekRange,
     type GridConflictPeer,
     type GridShift,
     type GridShiftStatus,
@@ -55,28 +57,26 @@ import {
     type Signal,
     SignalRail,
     SiteFilter,
+    startOfWeek,
     TimeOffPane,
     type TimeOffRequest,
     UnassignMakeOpenDialog,
     type UnassignMakeOpenShift,
     WeekGridPane,
-    WeekPicker,
-    addDaysWP,
-    formatWeekRange,
-    startOfWeek,
     weekLabel,
+    WeekPicker,
 } from '@/components/rostering';
 import {
     type EligibilityObservation,
     EligibilityRefreshPanel,
 } from '@/components/rostering/eligibility-refresh-panel';
-import { TemplateLibrary } from '@/components/rostering/template-library';
 import { rosterShiftListUrl } from '@/components/rostering/roster-shift-list-url';
 import {
+    type RosterView,
     RosterWorkspaceRail,
     RosterWorkspaceViewSelect,
-    type RosterView,
 } from '@/components/rostering/roster-workspace-navigation';
+import { TemplateLibrary } from '@/components/rostering/template-library';
 import { TEMPLATE_READ_KEYS } from '@/components/rostering/use-template-command';
 import ViewTimesheetDialog, {
     type ViewTimesheetRow,
@@ -464,14 +464,15 @@ function initialRosterTab(
     return isRosterTab(requested) ? requested : defaultTab;
 }
 
+// Shift types are categories, not severities: use the chart palette, never
+// the status (safety) colours or fixed hex values.
 const SHIFT_TYPE_COLORS = [
-    'var(--primary)',
-    'var(--status-info)',
-    'var(--status-success)',
-    'var(--status-warning)',
-    'var(--status-critical)',
-    '#06b6d4',
-    '#94a3b8',
+    'var(--chart-1)',
+    'var(--chart-2)',
+    'var(--chart-3)',
+    'var(--chart-4)',
+    'var(--chart-5)',
+    'var(--muted-foreground)',
 ];
 
 function ymd(d: Date) {
@@ -2270,11 +2271,12 @@ export default function RosteringIndex(props: Props) {
 
     const railItems: PageHeaderRailItem<RosterTab>[] = tabItems.map((item) => ({
         key: item.id as RosterTab,
-        label: item.id === 'coverage'
-            ? activeShiftCount > 0
-                ? `${item.label} · ${coverageRate}% of shifts assigned`
-                : `${item.label} · No active shifts`
-            : item.label,
+        label:
+            item.id === 'coverage'
+                ? activeShiftCount > 0
+                    ? `${item.label} · ${coverageRate}% of shifts assigned`
+                    : `${item.label} · No active shifts`
+                : item.label,
         icon: item.icon,
         count:
             typeof (item as { badge?: unknown }).badge === 'number'
@@ -2475,22 +2477,33 @@ export default function RosteringIndex(props: Props) {
                         onOpenConflicts={() => router.visit(conflictQueueHref)}
                         onOpenShiftList={
                             auth?.can?.shifts?.viewAny === true
-                                ? () => router.visit(rosterShiftListUrl({
-                                    from: ymd(weekStartDate),
-                                    to: ymd(addDaysWP(weekStartDate, 6)),
-                                    siteIds: props.filters.site_ids?.length
-                                        ? props.filters.site_ids
-                                        : props.filters.site_id
-                                          ? [props.filters.site_id]
-                                          : [],
-                                    staffId: props.filters.staff_id ?? null,
-                                    clientId: props.filters.client_id ?? null,
-                                }))
+                                ? () =>
+                                      router.visit(
+                                          rosterShiftListUrl({
+                                              from: ymd(weekStartDate),
+                                              to: ymd(
+                                                  addDaysWP(weekStartDate, 6),
+                                              ),
+                                              siteIds: props.filters.site_ids
+                                                  ?.length
+                                                  ? props.filters.site_ids
+                                                  : props.filters.site_id
+                                                    ? [props.filters.site_id]
+                                                    : [],
+                                              staffId:
+                                                  props.filters.staff_id ??
+                                                  null,
+                                              clientId:
+                                                  props.filters.client_id ??
+                                                  null,
+                                          }),
+                                      )
                                 : undefined
                         }
                         onOpenQualifications={
                             auth?.can?.rostering?.viewAny === true
-                                ? () => router.visit('/operations/qualifications')
+                                ? () =>
+                                      router.visit('/operations/qualifications')
                                 : undefined
                         }
                     />
@@ -2523,7 +2536,7 @@ export default function RosteringIndex(props: Props) {
                         items={staffFilterItems}
                         value={props.filters.staff_id}
                         onChange={(next) => updateFilter({ staff_id: next })}
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <EntityFilter
                         compact
@@ -2533,14 +2546,14 @@ export default function RosteringIndex(props: Props) {
                         items={clientFilterItems}
                         value={props.filters.client_id}
                         onChange={(next) => updateFilter({ client_id: next })}
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <SiteFilter
                         onDark
                         sites={props.sites ?? []}
                         value={props.filters.site_ids ?? []}
                         onChange={(next) => updateFilter({ site_ids: next })}
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                 </>
             }
@@ -2580,7 +2593,7 @@ export default function RosteringIndex(props: Props) {
                             />
                         </div>
                     )}
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="min-w-0">
                         {tab === 'shifts' ? (
                             <WeekGridPane
@@ -3090,7 +3103,9 @@ export default function RosteringIndex(props: Props) {
                 <ReassignDialog
                     open={Boolean(reassignShift)}
                     shift={reassignShift}
-                    canOverride={auth?.can?.shifts?.overrideEligibility === true}
+                    canOverride={
+                        auth?.can?.shifts?.overrideEligibility === true
+                    }
                     onOpenChange={(open) => {
                         if (!open) setReassignShift(null);
                     }}

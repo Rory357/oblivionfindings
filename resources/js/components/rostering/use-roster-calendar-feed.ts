@@ -15,6 +15,26 @@ type Assessment = {
 const unavailable =
     'Could not load this calendar range. Retry to see its shifts.';
 
+/** The server appends one dateless range/coverage assessment row; it is not a shift. */
+function isAssessmentMarker(row: unknown): boolean {
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) return false;
+    const item = row as Record<string, unknown>;
+    const extra = item.extendedProps;
+    return (
+        item.id === 'roster-calendar-assessment' &&
+        extra !== null &&
+        typeof extra === 'object' &&
+        !Array.isArray(extra) &&
+        (extra as Record<string, unknown>).event_type === 'calendar_assessment'
+    );
+}
+
+function withoutAssessment(value: unknown): unknown {
+    return Array.isArray(value)
+        ? value.filter((row) => !isAssessmentMarker(row))
+        : value;
+}
+
 function validEvents(value: unknown): value is RosterCalendarEvent[] {
     if (!Array.isArray(value)) return false;
     return value.every((row: unknown) => {
@@ -87,7 +107,7 @@ export function useRosterCalendarFeed(url: string, scope: string) {
                     signal: controller.signal,
                 });
                 if (!response.ok) throw new Error('Calendar request failed');
-                const data: unknown = await response.json();
+                const data: unknown = withoutAssessment(await response.json());
                 if (!validEvents(data))
                     throw new Error('Calendar response unavailable');
                 if (!cancelled)

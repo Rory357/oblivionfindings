@@ -104,8 +104,18 @@ class FacilitiesWorkspacePresenter
             'utilities' => $mapped->where('group', 'utilities')->values(),
             'automations' => $mapped->where('group', 'automations')->values(),
         ];
+        $attentionFilter = $this->resolveAttentionFilter($filters['attention'] ?? null, $permissions);
+        $filteredMapped = $attentionFilter !== null
+            ? $mapped->filter(fn (array $device): bool => $this->matchesAttentionFilter($device, $attentionFilter['key']))->values()
+            : $mapped;
+        $filteredGroups = [
+            'environment' => $filteredMapped->where('group', 'environment')->values(),
+            'buildingSystems' => $filteredMapped->where('group', 'building_systems')->values(),
+            'utilities' => $filteredMapped->where('group', 'utilities')->values(),
+            'automations' => $filteredMapped->where('group', 'automations')->values(),
+        ];
         $history = $activeTab['key'] === 'history'
-            ? $this->history($viewer, $devices, $events, $filters, $permissions)
+            ? $this->history($viewer, $devices, $events, $filters, $permissions, $attentionFilter['key'] ?? null)
             : $this->emptyHistory($filters, $permissions);
 
         return [
@@ -122,11 +132,12 @@ class FacilitiesWorkspacePresenter
                 'label' => $activeTab['label'],
                 'description' => $activeTab['description'],
                 'inventoryTruncated' => $inventoryTruncated,
-                'devices' => in_array($activeTab['key'], ['overview'], true) ? $mapped : collect(),
-                'environment' => $activeTab['key'] === 'environment' ? $groups['environment'] : collect(),
-                'buildingSystems' => $activeTab['key'] === 'building-systems' ? $groups['buildingSystems'] : collect(),
-                'utilities' => $activeTab['key'] === 'utilities' ? $groups['utilities'] : collect(),
-                'automations' => $activeTab['key'] === 'automations' ? $groups['automations'] : collect(),
+                'attentionFilter' => $attentionFilter,
+                'devices' => in_array($activeTab['key'], ['overview'], true) ? $filteredMapped : collect(),
+                'environment' => $activeTab['key'] === 'environment' ? $filteredGroups['environment'] : collect(),
+                'buildingSystems' => $activeTab['key'] === 'building-systems' ? $filteredGroups['buildingSystems'] : collect(),
+                'utilities' => $activeTab['key'] === 'utilities' ? $filteredGroups['utilities'] : collect(),
+                'automations' => $activeTab['key'] === 'automations' ? $filteredGroups['automations'] : collect(),
                 'history' => $history,
                 'gaps' => [
                     'environmentWithoutReadings' => $groups['environment']->where('freshness.state', 'not_collected')->count(),
@@ -587,11 +598,13 @@ class FacilitiesWorkspacePresenter
         Collection $events,
         array $filters,
         array $permissions,
+        ?string $attentionKey = null,
     ): array {
         $normalised = $this->historyFilters($filters, $devices);
         $deviceIds = $devices->pluck('id');
         $filteredEvents = $permissions['events']
             ? $events
+                ->when($attentionKey === 'active-events', fn (Collection $rows) => $rows->whereNull('processed_at'))
                 ->when($normalised['deviceId'], fn (Collection $rows, int $id) => $rows->where('device_id', $id))
                 ->when($normalised['severity'], fn (Collection $rows, string $severity) => $rows->where('severity', $severity))
                 ->when($normalised['eventType'], fn (Collection $rows, string $type) => $rows->where('event_type', $type))
@@ -719,6 +732,43 @@ class FacilitiesWorkspacePresenter
     private function filterString(mixed $value): ?string
     {
         return is_string($value) && $value !== '' && strlen($value) <= 100 ? $value : null;
+    }
+
+    /**
+     * @param  array<string, bool>  $permissions
+     * @return array{key: string, label: string}|null
+     */
+    private function resolveAttentionFilter(mixed $attention, array $permissions): ?array
+    {
+        if (! is_string($attention) || $attention === '') {
+            return null;
+        }
+
+        $label = match ($attention) {
+            'device-attention' => 'Facility devices requiring attention',
+            'monitoring' => 'Monitor failures or degradation',
+            'active-events' => $permissions['events'] ? 'Active facility events' : null,
+            'unmonitored' => 'Unmonitored facility devices',
+            'stale' => 'Stale facility evidence',
+            'maintenance' => $permissions['maintenance'] ? 'Overdue facility maintenance' : null,
+            default => null,
+        };
+
+        return $label !== null ? ['key' => $attention, 'label' => $label] : null;
+    }
+
+    /** @param array<string, mixed> $device */
+    private function matchesAttentionFilter(array $device, string $key): bool
+    {
+        return match ($key) {
+            'device-attention' => in_array($device['technicalState'] ?? null, ['offline', 'failed', 'degraded'], true),
+            'monitoring' => (int) data_get($device, 'monitoring.attention', 0) > 0,
+            'active-events' => (int) ($device['activeEventCount'] ?? 0) > 0,
+            'unmonitored' => ($device['unmonitored'] ?? false) === true,
+            'stale' => data_get($device, 'freshness.state') === 'stale',
+            'maintenance' => (int) data_get($device, 'maintenance.overdueCount', 0) > 0,
+            default => true,
+        };
     }
 
     /** @return array<string, mixed> */

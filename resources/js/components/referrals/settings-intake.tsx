@@ -30,11 +30,31 @@ import {
 type Service = ReferralConfiguration['services'][number];
 type Dialog =
     | { kind: 'notice' }
+    | { kind: 'contact' }
     | { kind: 'questions' }
     | { kind: 'routing' }
     | { kind: 'service'; index: number | null };
 
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+type PublicSettings = ReferralConfiguration['public'];
+const CONTACT_DETAILS = [
+    ['office_address', 'office address'],
+    ['contact_email', 'email'],
+    ['opening_hours', 'opening hours'],
+] as const;
+/** "Office address, email and opening hours shown" — or what's still missing. */
+const contactSummary = (value: PublicSettings) => {
+    const shown = CONTACT_DETAILS.filter(([key]) => value[key]?.trim()).map(
+        ([, name]) => name,
+    );
+    if (!shown.length)
+        return 'Not set · the Contact us page shows the phone number only';
+    const list =
+        shown.length === 1
+            ? shown[0]
+            : `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}`;
+    return `${list.charAt(0).toUpperCase()}${list.slice(1)} shown on the Contact us page`;
+};
 
 /** Intake: the public enquiry form, services, questions, documents and routing of new enquiries. */
 export function IntakeSettings({
@@ -211,6 +231,12 @@ export function IntakeSettings({
                                 copy.public.response_hours = next;
                             })
                         }
+                    />
+                    <DialogRow
+                        label="Contact us page details"
+                        hint={contactSummary(value.public)}
+                        action={readOnly ? 'Review details' : 'Edit details'}
+                        onOpen={() => setDialog({ kind: 'contact' })}
                     />
                     <SettingRow
                         label="Privacy and safe-contact questions"
@@ -400,6 +426,83 @@ export function IntakeSettings({
                                         set({
                                             ...draft,
                                             notice: event.target.value,
+                                        })
+                                    }
+                                />
+                            </Field>
+                        </>
+                    )}
+                </ConfigDialog>
+            )}
+            {dialog?.kind === 'contact' && (
+                <ConfigDialog<PublicSettings>
+                    title="Contact us page details"
+                    description="Shown on the website’s Contact us page with the contact phone number. Leave a detail blank to hide it. Messages sent from that page arrive here as general enquiries."
+                    initial={value.public}
+                    readOnly={readOnly}
+                    width={480}
+                    onClose={() => setDialog(null)}
+                    onApply={(next) =>
+                        edit((copy) => {
+                            copy.public = {
+                                ...next,
+                                office_address:
+                                    next.office_address?.trim() ?? '',
+                                contact_email: next.contact_email?.trim() ?? '',
+                                opening_hours: next.opening_hours?.trim() ?? '',
+                            };
+                        })
+                    }
+                    validate={(next) =>
+                        next.contact_email?.trim() &&
+                        !/^\S+@\S+\.\S+$/.test(next.contact_email.trim())
+                            ? 'Check the email address, or leave it blank.'
+                            : null
+                    }
+                >
+                    {(draft, set) => (
+                        <>
+                            <Field label="Office address">
+                                <Input
+                                    value={draft.office_address ?? ''}
+                                    readOnly={readOnly}
+                                    maxLength={300}
+                                    autoComplete="off"
+                                    placeholder="Level 1, 18 Example Street, Porirua 5022"
+                                    onChange={(event) =>
+                                        set({
+                                            ...draft,
+                                            office_address: event.target.value,
+                                        })
+                                    }
+                                />
+                            </Field>
+                            <Field label="Contact email">
+                                <Input
+                                    type="email"
+                                    value={draft.contact_email ?? ''}
+                                    readOnly={readOnly}
+                                    maxLength={254}
+                                    autoComplete="off"
+                                    onChange={(event) =>
+                                        set({
+                                            ...draft,
+                                            contact_email: event.target.value,
+                                        })
+                                    }
+                                />
+                            </Field>
+                            <Field label="Opening hours">
+                                <Input
+                                    value={draft.opening_hours ?? ''}
+                                    readOnly={readOnly}
+                                    maxLength={200}
+                                    autoComplete="off"
+                                    placeholder="Monday to Friday, 8.30am to 5pm"
+                                    onChange={(event) =>
+                                        set({
+                                            ...draft,
+                                            opening_hours: event.target.value,
                                         })
                                     }
                                 />

@@ -25,6 +25,15 @@
 - Interop without fakes: a ticket from the PHP signer opened a real gateway connection; `OblivionLive::publish()` reached it in about 33 ms on loopback (three runs, 32–35 ms, from just before the call to receipt); `health()` read the node; `revoke()` closed it with 4403.
 - Browser: Vitest connection, sync-loop, typing and row tests, and all 596 existing chat tests.
 
+## Re-run after the fixture fix (31 Oct 2026, Rory's builder session)
+
+On this branch with the Chat base and main `0a66dafe2` merged in (`8720d117e`). No code changed.
+
+- `OblivionLiveTest`, `ChatRealtimeActorTest` and `ChatRealtimeCspTest`: 22 passed. The 1 failure needs the Pusher package that this PC's `vendor` folder is missing (`Class "Pusher\Pusher" not found`); it is the same on the base branch.
+- Gateway: all 68 `npm run test:live` tests pass.
+- Vitest: the `live/` connection and sync tests, the sound-session and update-watch tests, 57 passed. `chat-calling.test.tsx` can't load here until `npm ci` installs `livekit-client`.
+- Still to do: the production build, the two-browser end-to-end test, the removal draft (branch `claude/oblivion-live-removal-wip`), and the checker session.
+
 ## Decisions taken while building
 
 - **Rotation key ID.** The spec lists `previous_secret` but no key ID for it. Tickets name their key with `kid`, so the gateway needs to know the old key's ID during a rotation: added `LIVE_PREVIOUS_KEY_ID` / `chat.live.previous_key_id`.

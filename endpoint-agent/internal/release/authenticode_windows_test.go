@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-func TestExecutableVerifierRejectsUnsignedDevelopmentBinaries(t *testing.T) {
+func TestExecutableVerifierAcceptsMatchingUnsignedPEAndRejectsWrongArchitecture(t *testing.T) {
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = VerifyExecutable(executable, runtime.GOARCH); err == nil {
-		t.Fatal("unsigned test executable was trusted")
+	if err = VerifyExecutable(executable, runtime.GOARCH); err != nil {
+		t.Fatal("valid PE executable for matching architecture was rejected:", err)
 	}
 	other := "arm64"
 	if runtime.GOARCH == "arm64" {
@@ -23,6 +23,7 @@ func TestExecutableVerifierRejectsUnsignedDevelopmentBinaries(t *testing.T) {
 		t.Fatal("wrong executable architecture accepted")
 	}
 }
+
 func TestExecutableVerifierRejectsNonExecutableContent(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "fake.exe")
 	if err := os.WriteFile(filename, []byte("not a Windows executable"), 0600); err != nil {

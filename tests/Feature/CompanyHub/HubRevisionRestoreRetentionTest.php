@@ -102,7 +102,8 @@ test('revision restore retention rejects stale and unauthorised or foreign snaps
     $this->actingAs($this->editor)->postJson($this->restoreUrl, ['version' => 2])->assertConflict();
     $other = $this->publisher->create($this->editor, 'news', 'Another page');
     $draft = $other->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'A complete foreign published page.';
+    // The story template also starts an image and a second text block; keep one complete text block.
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'A complete foreign published page.']];
     $other->update(['draft' => $draft]);
     $foreign = $this->publisher->publish($this->editor, $other, 1, null, null);
     $this->postJson($this->base.'/revisions/'.$foreign->id.'/restore', ['version' => 3])->assertNotFound();
@@ -158,7 +159,7 @@ test('revision restore retention and the replacement draft roll back together wh
 test('revision restore retention does not duplicate published baselines or discarded drafts already kept in recovery', function () {
     $baseline = $this->publisher->create($this->editor, 'news', 'A published baseline');
     $draft = $baseline->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'A complete published baseline.';
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'A complete published baseline.']];
     $baseline->update(['draft' => $draft]);
     $release = $this->publisher->publish($this->editor, $baseline, 1, null, null);
     $this->publisher->restore($this->editor, $baseline, $release, 1);

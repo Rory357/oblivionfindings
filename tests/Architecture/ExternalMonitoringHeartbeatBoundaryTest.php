@@ -57,6 +57,7 @@ it('withholds an external dead-man heartbeat unless the central runtime is genui
     $schedule = (string) file_get_contents($root.'/routes/console.php');
     $presenter = (string) file_get_contents($root.'/app/Domain/Monitoring/Services/MonitoringRuntimeHealthService.php');
     $page = (string) file_get_contents($root.'/resources/js/pages/security-devices/monitoring.tsx');
+    $runtimeRecords = (string) file_get_contents($root.'/resources/js/components/security-devices/monitoring-operational-records.tsx');
     $runbook = (string) file_get_contents($root.'/docs/runbooks/monitoring/runtime-and-regional-outage.md');
 
     expect($service)
@@ -82,7 +83,8 @@ it('withholds an external dead-man heartbeat unless the central runtime is genui
             'MONITORING_EXTERNAL_HEARTBEAT_ALLOWED_HOSTS',
         )
         ->and($presenter)->toContain("'external_heartbeat' =>")
-        ->and($page)->toContain('Independent outage watchdog', 'workspace.runtime.external_heartbeat')
+        ->and($page)->toContain('external_heartbeat:', 'runtime={workspace.runtime}')
+        ->and($runtimeRecords)->toContain('Independent outage watchdog', 'external_heartbeat.state')
         ->and($runbook)->toContain(
             'independently hosted dead-man monitor',
             'withholds its heartbeat',

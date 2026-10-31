@@ -6,13 +6,24 @@ use App\Domain\Monitoring\Models\MonitoringOutbox;
 use App\Domain\Monitoring\Services\MonitoringEnvelopeConsumer;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Exceptions\SafetySignalUnroutable;
+use App\Models\Client;
+use App\Models\ClientIncident;
+use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoom\SignalRule;
+use App\Models\ControlRoom\SignalType;
+use App\Models\ControlRoomAlert;
+use App\Models\HsEvent;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Site;
+use App\Models\User;
+use App\Services\ControlRoom\SensorIncidentBridgeService;
 use App\Services\Integration\AlertRoutingService;
 use App\Services\Integration\Contracts\WebhookVerificationCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Services\Integration\IntegrationSignalNormaliser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Queue;
@@ -118,6 +129,134 @@ final class MilesightWebhookContractTest extends TestCase
             ->assertNotFound()
             ->assertJson(['error' => 'Webhook endpoint not found']);
         $this->assertDatabaseCount('monitoring_outbox', 0);
+    }
+
+    public function test_verified_falls_keep_device_identity_and_evidence_through_real_routing_and_confirmation(): void
+    {
+        [$site, $firstDevice, $secret] = $this->mappedDevice();
+        $secondDevice = Device::factory()->iotHealthcare()->create([
+            'provider' => 'milesight',
+            'name' => 'Room 5 resident sensor',
+            'external_ref' => [
+                'provider' => 'milesight',
+                'provider_entity_id' => '1904371063669395458',
+                'application_id' => 'application-a',
+            ],
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $secondDevice->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
+        $fallType = SignalType::query()->where('code', 'fall_detected')->sole();
+        SignalRule::query()->create([
+            'name' => 'Care fall correlation regression',
+            'signal_type_id' => $fallType->id,
+            'signal_type_code' => 'fall_detected',
+            'conditions' => [],
+            'deduplicate' => true,
+            'dedup_window_minutes' => 30,
+            'priority' => 0,
+            'is_active' => true,
+        ]);
+
+        foreach ([$firstDevice, $secondDevice] as $index => $device) {
+            $fall = $this->payload((string) $device->external_ref['provider_entity_id'])[1];
+            $fall['eventID'] = 'msc-distinct-fall-'.$index;
+            $this->postJson('/webhooks/milesight', [$fall], $this->headers($secret, 'nonce-distinct-fall-'.$index))
+                ->assertOk()->assertJson(['accepted' => 1]);
+        }
+
+        // Real provider projection, normalisation, ingestion and processing.
+        // Replaying a delivery must not create another alert or source record.
+        foreach (MonitoringOutbox::query()->orderBy('id')->get() as $outbox) {
+            foreach ([1, 2] as $attempt) {
+                app(MonitoringEnvelopeConsumer::class)->consume('event-projector', $outbox->envelope_bytes, $site->id);
+            }
+        }
+
+        $this->assertDatabaseCount('integration_events', 2);
+        $this->assertDatabaseCount('control_room_signals', 2);
+        $this->assertDatabaseCount('control_room_alerts', 2);
+        $signals = Signal::query()->orderBy('id')->get();
+        $this->assertNotSame($signals[0]->alert_id, $signals[1]->alert_id);
+        foreach ([$firstDevice, $secondDevice] as $index => $device) {
+            $signal = $signals[$index];
+            $this->assertSame('fall_detected', $signal->signal_type_code);
+            $this->assertSame('critical', $signal->severity_hint);
+            $this->assertNull($signal->device_id);
+            $this->assertSame($device->id, data_get($signal->normalized_data, 'canonical_device_id'));
+            $this->assertSame('fall_detected', data_get($signal->payload, 'reported_values.alarm'));
+            $this->assertFalse(data_get($signal->payload, 'reported_values.occupied'));
+            $this->assertNotEmpty(data_get($signal->normalized_data, 'source_received_at'));
+            $this->assertNotEmpty(data_get($signal->normalized_data, 'evidence_hash'));
+        }
+
+        // A person is explicitly identified by the operator, never inferred
+        // merely from the device being assigned to the same site.
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $operator = User::factory()->create();
+        $alert = ControlRoomAlert::query()->findOrFail($signals[0]->alert_id);
+        $alert->forceFill(['client_id' => $client->id])->save();
+        $this->assertSame('critical', $alert->severity);
+        $bridge = app(SensorIncidentBridgeService::class);
+        $incident = $bridge->confirm($alert, $operator, ['immediate_action_taken' => 'Person checked and support arranged.']);
+        $again = $bridge->confirm($alert->fresh(), $operator);
+
+        $this->assertTrue($again->is($incident));
+        $this->assertSame('fall', $incident->type);
+        $this->assertSame($firstDevice->id, data_get($incident->metadata, 'sensor_evidence.canonical_device_id'));
+        $this->assertSame('fall_detected', data_get($incident->metadata, 'sensor_evidence.payload.reported_values.alarm'));
+        $this->assertSame(data_get($signals[0]->normalized_data, 'evidence_hash'), data_get($incident->metadata, 'sensor_evidence.evidence_hash'));
+        $this->assertNotNull($incident->hs_event_id);
+        $this->assertDatabaseCount((new ClientIncident)->getTable(), 1);
+        $this->assertDatabaseCount((new HsEvent)->getTable(), 1);
+        $encoded = $signals->toJson().$incident->toJson();
+        $this->assertStringNotContainsString($secret, $encoded);
+        $this->assertStringNotContainsString('24D124707E04SECRET', $encoded);
+    }
+
+    public function test_canonical_fall_severity_is_applied_before_quiet_hours(): void
+    {
+        $this->travelTo(now()->setTime(12, 0));
+        [$site, $device] = $this->mappedDevice();
+        $connection = IntegrationProviderConnection::query()->where('provider', 'milesight')->sole();
+        $connection->update(['config' => [
+            ...$connection->config,
+            'quiet_hours_start' => '00:00',
+            'quiet_hours_end' => '23:59',
+        ]]);
+        $event = IntegrationEvent::query()->create([
+            'site_id' => $site->id,
+            'canonical_device_id' => $device->id,
+            'provider' => 'milesight',
+            'source_app' => 'milesight-development-platform',
+            'source_event_id' => 'quiet-hours-fall',
+            'event_type' => 'fall_detected',
+            'severity' => IntegrationEvent::SEVERITY_INFO,
+            'occurred_at' => now(),
+            'received_at' => now(),
+            'normalized_payload' => ['summary' => 'Possible fall'],
+            'raw_payload' => null,
+        ]);
+
+        $alert = app(AlertRoutingService::class)->processEvent($event);
+
+        $this->assertNotNull($alert);
+        $this->assertSame('critical', $alert->severity);
+        $this->assertSame('fall_detected', Signal::query()->sole()->signal_type_code);
+    }
+
+    public function test_disabled_care_fall_classification_fails_for_repair_instead_of_falling_back_to_unknown(): void
+    {
+        SignalType::query()->where('code', 'fall_detected')->update(['is_active' => false]);
+        $event = new IntegrationEvent(['provider' => 'milesight', 'event_type' => 'fall_detected']);
+
+        $this->expectException(SafetySignalUnroutable::class);
+        $this->expectExceptionMessage('The care fall signal type is unavailable.');
+
+        app(IntegrationSignalNormaliser::class)->resolveSignalTypeCode($event);
     }
 
     public function test_signed_webhook_cannot_reactivate_an_archived_site_mapping(): void

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrApplication;
+use App\Domain\Referrals\Services\PublicProviderWebsite;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -29,26 +30,29 @@ class CareerPortalController extends Controller
             ])
             ->firstOrFail();
 
+        // Public copy: sentence case, NZ English.
         $stageLabels = [
-            'new' => 'Application Received',
-            'screening' => 'Under Review',
-            'interview_scheduled' => 'Interview Scheduled',
-            'interview_completed' => 'Interview Completed',
-            'reference_check' => 'Reference Check in Progress',
-            'offer_pending' => 'Offer Being Prepared',
-            'offer_sent' => 'Offer Sent',
-            'offer_accepted' => 'Offer Accepted',
-            'onboarding' => 'Onboarding',
-            'hired' => 'Hired',
-            'active' => 'Application Received',
-            'offered' => 'Offer Extended',
-            'rejected' => 'Application Unsuccessful',
-            'withdrawn' => 'Application Withdrawn',
+            'new' => 'Application received',
+            'screening' => 'Under review',
+            'interview_scheduled' => 'Interview arranged',
+            'interview_completed' => 'Interview done',
+            'reference_check' => 'Checking references',
+            'offer_pending' => 'Preparing an offer',
+            'offer_sent' => 'Offer sent',
+            'offer_accepted' => 'Offer accepted',
+            'onboarding' => 'Getting ready to start',
+            'hired' => 'Welcome aboard',
+            'active' => 'Application received',
+            'offered' => 'Offer sent',
+            'rejected' => 'Not successful this time',
+            'withdrawn' => 'Application withdrawn',
         ];
 
         $candidateStage = $application->candidate?->status ?? $application->status ?? 'active';
 
         return Inertia::render('careers/application-status', [
+            // The site header and footer (the public layout).
+            'provider' => app(PublicProviderWebsite::class)->content(),
             'application' => [
                 'position_title' => $application->position_title,
                 'applied_at' => $application->created_at?->toDateString(),

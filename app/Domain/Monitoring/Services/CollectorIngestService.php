@@ -14,6 +14,8 @@ use App\Domain\Monitoring\Models\CollectorCheckpoint;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
+use App\Domain\Monitoring\Protocols\Flow\FlowIntakeService;
+use App\Domain\Monitoring\Protocols\Syslog\SyslogIntakeService;
 use App\Domain\SecurityDevices\Management\Services\CollectorCommandResultService;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -27,6 +29,9 @@ final readonly class CollectorIngestService
         private RuntimeEnvelopeHandlerRegistry $handlers,
         private DiscoveryRunner $discovery,
         private CollectorCommandResultService $commands,
+        private CanonicalDeviceSiteResolver $sites,
+        private ?SyslogIntakeService $syslog = null,
+        private ?FlowIntakeService $flow = null,
     ) {}
 
     /**
@@ -160,6 +165,41 @@ final readonly class CollectorIngestService
 
             return;
         }
+        if ($itemType === 'syslog_event') {
+            $siteId = $this->positiveSiteId($payload['site_id'] ?? null);
+            $senderIp = $this->nonEmptyString($payload['sender_ip'] ?? null, 'Collector Syslog sender IP is invalid.');
+            $datagram = $this->decodeBase64Payload($payload['datagram_base64'] ?? null, 'Collector Syslog datagram is invalid.');
+            $built = ($this->syslog ?? app(SyslogIntakeService::class))->buildCollectorEnvelope(
+                collector: $collector,
+                siteId: $siteId,
+                datagram: $datagram,
+                senderAddress: $senderIp,
+                sequence: $sequence,
+                itemId: $id,
+            );
+            $this->handlers->for(RuntimeMessageType::Event)->handle($built['envelope'], $built['site_id']);
+
+            return;
+        }
+        if ($itemType === 'flow_datagram') {
+            $siteId = $this->positiveSiteId($payload['site_id'] ?? null);
+            $senderIp = $this->nonEmptyString($payload['sender_ip'] ?? null, 'Collector Flow sender IP is invalid.');
+            $packet = $this->decodeBase64Payload($payload['packet_base64'] ?? null, 'Collector Flow datagram is invalid.');
+            $built = ($this->flow ?? app(FlowIntakeService::class))->buildCollectorEnvelopes(
+                collector: $collector,
+                siteId: $siteId,
+                packet: $packet,
+                senderAddress: $senderIp,
+                sequence: $sequence,
+                itemId: $id,
+            );
+            $handler = $this->handlers->for(RuntimeMessageType::Event);
+            foreach ($built['items'] as $eventItem) {
+                $handler->handle($eventItem['envelope'], $built['site_id']);
+            }
+
+            return;
+        }
         if ($itemType !== 'observation') {
             throw new RuntimePayloadInvalid('Collector item type is invalid.');
         }
@@ -167,10 +207,19 @@ final readonly class CollectorIngestService
         $monitorId = $this->positiveIntegerString($payload['check_id'] ?? null);
         $deviceId = $this->positiveIntegerString($payload['device_id'] ?? null);
         $monitor = Monitor::query()->with(['collector', 'device.assignments'])->findOrFail($monitorId);
+        $reportedTarget = (string) ($payload['target'] ?? '');
         if ((int) $monitor->collector_id !== (int) $collector->id || (int) $monitor->device_id !== $deviceId
-            || ! hash_equals((string) $monitor->target, (string) ($payload['target'] ?? ''))
+            || ! $this->matchesMonitorTarget($monitor, $reportedTarget)
             || $this->protocol($monitor) !== ($payload['protocol'] ?? null)) {
             throw new RuntimeScopeViolation('Collector item is outside its canonical monitor scope.');
+        }
+        try {
+            $monitorSiteId = $this->sites->resolve($deviceId);
+        } catch (\Throwable) {
+            throw new RuntimeSiteScopeViolation('Collector observation device does not resolve to an active Site.');
+        }
+        if (! in_array($monitorSiteId, $collector->authorisedSiteIds(), true)) {
+            throw new RuntimeSiteScopeViolation('Collector observation Site is outside its approved Site scope.');
         }
         $state = MonitorState::tryFrom((string) ($payload['state'] ?? ''));
         $observedAt = $payload['observed_at'] ?? null;
@@ -219,7 +268,7 @@ final readonly class CollectorIngestService
             payload: [
                 'monitor_id' => $monitorId,
                 'device_id' => $deviceId,
-                'site_id' => (int) $collector->site_id,
+                'site_id' => $monitorSiteId,
                 'collector_uuid' => (string) $collector->collector_uuid,
                 'source_key' => "collector:{$collector->collector_uuid}:{$sequence}",
                 'state' => $state->value,
@@ -229,7 +278,22 @@ final readonly class CollectorIngestService
                 'metrics' => [...$metrics, 'protocol' => (string) $payload['protocol'], 'reason_code' => $reason],
             ],
         );
-        $this->handlers->for(RuntimeMessageType::Observation)->handle($envelope, (int) $collector->site_id);
+        $this->handlers->for(RuntimeMessageType::Observation)->handle($envelope, $monitorSiteId);
+    }
+
+    private function matchesMonitorTarget(Monitor $monitor, string $reportedTarget): bool
+    {
+        if (hash_equals((string) $monitor->target, $reportedTarget)) {
+            return true;
+        }
+        $kind = $monitor->kind instanceof MonitorKind ? $monitor->kind : MonitorKind::tryFrom((string) $monitor->kind);
+        if (in_array($kind, [MonitorKind::Http, MonitorKind::WinRmInventory], true)) {
+            $host = trim((string) parse_url((string) $monitor->target, PHP_URL_HOST), '[]');
+
+            return $host !== '' && hash_equals($host, $reportedTarget);
+        }
+
+        return false;
     }
 
     private function positiveIntegerString(mixed $value): int
@@ -239,6 +303,40 @@ final readonly class CollectorIngestService
         }
 
         return (int) $value;
+    }
+
+    private function positiveSiteId(mixed $value): int
+    {
+        if (is_int($value) && $value > 0) {
+            return $value;
+        }
+        if (is_string($value) && preg_match('/\A[1-9][0-9]{0,18}\z/', $value) === 1) {
+            return (int) $value;
+        }
+
+        throw new RuntimePayloadInvalid('Collector telemetry Site identity is invalid.');
+    }
+
+    private function nonEmptyString(mixed $value, string $errorMessage): string
+    {
+        if (! is_string($value) || trim($value) === '' || strlen($value) > 128) {
+            throw new RuntimePayloadInvalid($errorMessage);
+        }
+
+        return trim($value);
+    }
+
+    private function decodeBase64Payload(mixed $value, string $errorMessage): string
+    {
+        if (! is_string($value) || $value === '' || strlen($value) > 131_072) {
+            throw new RuntimePayloadInvalid($errorMessage);
+        }
+        $decoded = base64_decode($value, true);
+        if (! is_string($decoded) || $decoded === '') {
+            throw new RuntimePayloadInvalid($errorMessage);
+        }
+
+        return $decoded;
     }
 
     private function protocol(Monitor $monitor): ?string

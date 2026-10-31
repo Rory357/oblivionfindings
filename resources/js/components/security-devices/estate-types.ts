@@ -107,6 +107,7 @@ export type EstateProps = {
             href: string | null;
         }>;
     };
+    first_run_checklist?: EstateFirstRunChecklist;
     can: {
         create: boolean;
         export: boolean;
@@ -114,4 +115,20 @@ export type EstateProps = {
         view_events: boolean;
         view_maintenance: boolean;
     };
+};
+
+export type EstateFirstRunStep = {
+    key: string;
+    title: string;
+    summary: string;
+    done: boolean;
+    href: string | null;
+    action_label: string | null;
+};
+
+export type EstateFirstRunChecklist = {
+    completed: number;
+    total: number;
+    all_complete: boolean;
+    steps: EstateFirstRunStep[];
 };

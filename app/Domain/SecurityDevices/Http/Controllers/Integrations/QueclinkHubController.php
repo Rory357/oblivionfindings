@@ -64,6 +64,8 @@ class QueclinkHubController extends Controller
 {
     private const DEVICE_PAGE_SIZE = 25;
 
+    private const UNLINKED_TRACKER_MESSAGE = 'This tracker is not linked to a device record yet, so it cannot continue to Device Management.';
+
     public function __construct(
         private readonly QueclinkIntegrationAccessService $queclinkAccess,
         private readonly IntegrationSiteCredentialsPresenter $siteCredentials,
@@ -85,6 +87,7 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $user = $request->user();
+        $asOf = now()->toImmutable();
         $targetType = in_array($request->string('target_type')->toString(), ['vehicle', 'staff', 'client'], true)
             ? $request->string('target_type')->toString()
             : null;
@@ -95,6 +98,8 @@ class QueclinkHubController extends Controller
         $deviceSearch = Str::limit(trim($request->string('device_search')->toString()), 100, '');
 
         return Inertia::render('security-devices/integrations/queclink-hub', [
+            'actor_id' => (int) $user->id,
+            'as_of' => $asOf->toISOString(),
             'listener' => function () use ($user): array {
                 $port = (int) (AppSetting::query()->where('key', 'queclink.listener.port')->value('value')
                     ?? config('services.queclink.port', 8090));
@@ -119,7 +124,7 @@ class QueclinkHubController extends Controller
 
                 return [
                     'frames_last_hour' => $this->visibleFrameQuery($user)->where('created_at', '>=', now()->subHour())->count(),
-                    'last_frame_at' => $lastFrameAt ? Carbon::parse($lastFrameAt)->toDateTimeString() : null,
+                    'last_frame_at' => $lastFrameAt ? Carbon::parse($lastFrameAt)->toISOString() : null,
                 ];
             },
             'cloudIntegration' => function (): array {
@@ -229,7 +234,9 @@ class QueclinkHubController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->queclinkAccess->assertDevice($request->user(), $lockedDevice);
-            abort_unless($lockedDevice->isPending(), 422, 'Device is not in the pending state.');
+            if (! $lockedDevice->isPending()) {
+                $this->rejectRequest($request, 422, 'This tracker is no longer waiting to be claimed. Refresh the page to see its current state.');
+            }
 
             $pairingType = $validated['pairing_type'];
             $targetId = (int) $validated['target_id'];
@@ -264,22 +271,18 @@ class QueclinkHubController extends Controller
                     ->active()
                     ->lockForUpdate()
                     ->get();
-                abort_if(
-                    $activeAssignments->isNotEmpty(),
-                    409,
-                    'This person already has an active tracker assignment.',
-                );
+                if ($activeAssignments->isNotEmpty()) {
+                    $this->rejectRequest($request, 409, 'This person already has a tracker assigned. Release that tracker before claiming another one.', 'target_id');
+                }
             }
 
             $device = $this->ensureCanonicalDevice($lockedDevice, $request->user(), $pairingType);
 
             $activeAssetLinks = $device->activeAssetLinks()->lockForUpdate()->get();
-            abort_if(
-                $activeAssetLinks->count() > 1
-                || ($activeAssetLinks->isNotEmpty() && (int) $activeAssetLinks->first()->asset_id !== (int) $asset->id),
-                409,
-                'This provider identity is already linked to another canonical asset.',
-            );
+            if ($activeAssetLinks->count() > 1
+                || ($activeAssetLinks->isNotEmpty() && (int) $activeAssetLinks->first()->asset_id !== (int) $asset->id)) {
+                $this->rejectRequest($request, 409, 'This tracker is already linked to another asset. Release it from that asset first.');
+            }
             if ($activeAssetLinks->isEmpty()) {
                 $this->deviceLinks->link($device, $asset, (int) $request->user()->id);
             }
@@ -308,7 +311,7 @@ class QueclinkHubController extends Controller
                 'consent_id' => $consentId,
             ]);
 
-            return back()->with('success', "Device {$lockedDevice->imei} paired.");
+            return back()->with('success', $this->trackerReference($lockedDevice).' paired.');
         });
     }
 
@@ -351,14 +354,16 @@ class QueclinkHubController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->queclinkAccess->assertDevice($request->user(), $lockedDevice);
-            abort_unless($lockedDevice->isPending(), 422, 'Only pending devices can be rejected.');
+            if (! $lockedDevice->isPending()) {
+                $this->rejectRequest($request, 422, 'Only trackers waiting to be claimed can be rejected. Refresh the page to see its current state.');
+            }
 
             $before = ['status' => $lockedDevice->status];
             $lockedDevice->update(['status' => QueclinkDevice::STATUS_REJECTED]);
             $this->logAudit($request, $lockedDevice, 'reject', null, $before, ['status' => QueclinkDevice::STATUS_REJECTED]);
         });
 
-        return back()->with('success', "Device {$queclinkDevice->imei} rejected.");
+        return back()->with('success', $this->trackerReference($queclinkDevice).' rejected.');
     }
 
     public function restoreDevice(Request $request, QueclinkDevice $queclinkDevice)
@@ -372,14 +377,16 @@ class QueclinkHubController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->queclinkAccess->assertDevice($request->user(), $lockedDevice);
-            abort_unless($lockedDevice->status === QueclinkDevice::STATUS_REJECTED, 422, 'Only rejected devices can be restored.');
+            if ($lockedDevice->status !== QueclinkDevice::STATUS_REJECTED) {
+                $this->rejectRequest($request, 422, 'Only rejected trackers can be restored. Refresh the page to see its current state.');
+            }
 
             $before = ['status' => $lockedDevice->status];
             $lockedDevice->update(['status' => QueclinkDevice::STATUS_PENDING]);
             $this->logAudit($request, $lockedDevice, 'restore', null, $before, ['status' => QueclinkDevice::STATUS_PENDING]);
         });
 
-        return back()->with('success', "Device {$queclinkDevice->imei} restored to pending.");
+        return back()->with('success', $this->trackerReference($queclinkDevice).' restored to pending.');
     }
 
     public function releaseDevice(Request $request, QueclinkDevice $queclinkDevice)
@@ -393,7 +400,9 @@ class QueclinkHubController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->assertDeviceForRelease($request->user(), $lockedDevice);
-            abort_unless($lockedDevice->isPaired(), 422);
+            if (! $lockedDevice->isPaired()) {
+                $this->rejectRequest($request, 422, 'Only paired trackers can be released. Refresh the page to see its current state.');
+            }
 
             $canonicalDeviceId = $lockedDevice->device_id ? (int) $lockedDevice->device_id : null;
             $auditSiteId = $this->resolveAuditSiteId($canonicalDeviceId);
@@ -423,14 +432,14 @@ class QueclinkHubController extends Controller
             ], canonicalDeviceId: $canonicalDeviceId, siteId: $auditSiteId);
         });
 
-        return back()->with('success', "Device {$queclinkDevice->imei} released — moved back to pending.");
+        return back()->with('success', $this->trackerReference($queclinkDevice).' released and moved back to pending.');
     }
 
     public function sendCommand(Request $request, QueclinkDevice $queclinkDevice, LocateNowService $locateNow)
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
-        abort_unless($queclinkDevice->isPaired(), 422, 'Commands can only be sent to paired devices.');
+        $this->rejectUnless($queclinkDevice->isPaired(), 422, 'Device actions can only be started for paired trackers.');
 
         $validated = $request->validate([
             'mode' => ['required', 'in:preset,raw'],
@@ -445,7 +454,9 @@ class QueclinkHubController extends Controller
                 'command' => 'Direct or state-changing Queclink commands are not available from the provider console. Use the governed Device Management workflow.',
             ]);
         }
-        abort_unless($queclinkDevice->device, 422, 'This Queclink tracker is not linked to a canonical Device.');
+        if (! $queclinkDevice->device) {
+            $this->rejectRequest($request, 422, self::UNLINKED_TRACKER_MESSAGE);
+        }
 
         if ($validated['preset'] === 'reboot') {
             return $this->deviceManagementHandoff(
@@ -465,7 +476,7 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
-        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be read from paired devices.');
+        $this->rejectUnless($queclinkDevice->isPaired(), 422, 'Settings can only be read from paired trackers.');
 
         $validated = $request->validate([
             'section' => ['nullable', 'string', 'in:all,BSI,SRI,NTS,TLS,CFG,PIN,DOG,TMA,NMD,PDS,GEO,BTS,WFI,BID,UPC,WLT,FVR'],
@@ -480,7 +491,7 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
-        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be read from paired devices.');
+        $this->rejectUnless($queclinkDevice->isPaired(), 422, 'Settings can only be read from paired trackers.');
 
         $code = $this->resolveReadSectionCode($section, $request->string('command')->toString());
 
@@ -491,8 +502,8 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
-        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
-        abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
+        $this->rejectUnless($queclinkDevice->isPaired(), 422, 'Settings can only be changed for paired trackers.');
+        $this->rejectUnless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 trackers can be configured here at the moment.');
 
         if ($request->filled('command') && ! in_array($request->string('command')->toString(), ['server', 'sri'], true)) {
             return $this->configurationApplyDraftHandoff($request, $queclinkDevice, 'server', $request->all());
@@ -521,8 +532,8 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
-        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
-        abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
+        $this->rejectUnless($queclinkDevice->isPaired(), 422, 'Settings can only be changed for paired trackers.');
+        $this->rejectUnless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 trackers can be configured here at the moment.');
 
         $validated = $request->validate([
             'device_name' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z0-9_-]+$/'],
@@ -552,8 +563,8 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
-        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
-        abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
+        $this->rejectUnless($queclinkDevice->isPaired(), 422, 'Settings can only be changed for paired trackers.');
+        $this->rejectUnless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 trackers can be configured here at the moment.');
 
         $preset = QueclinkPreset::query()->active()->where('slug', 'resident-safety')->firstOrFail();
 
@@ -569,8 +580,8 @@ class QueclinkHubController extends Controller
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
         $this->queclinkAccess->assertPreset($request->user(), $preset);
-        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
-        abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
+        $this->rejectUnless($queclinkDevice->isPaired(), 422, 'Settings can only be changed for paired trackers.');
+        $this->rejectUnless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 trackers can be configured here at the moment.');
 
         if ($preset->target_category === 'vehicle_tracker') {
             throw ValidationException::withMessages([
@@ -650,35 +661,35 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertPreset($request->user(), $preset);
-        abort_if($preset->is_system, 422, 'Built-in presets cannot be retired.');
+        if ($preset->is_system) {
+            $this->rejectRequest($request, 422, 'Built-in presets cannot be retired.');
+        }
 
         $validated = $request->validate([
             'reason' => ['required', 'string', 'min:10', 'max:500', 'not_regex:/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/'],
         ]);
         $actor = $request->user();
 
-        $name = DB::transaction(function () use ($actor, $preset, $validated): string {
+        $name = DB::transaction(function () use ($actor, $preset, $validated, $request): string {
             $locked = QueclinkPreset::query()
                 ->whereKey($preset->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->queclinkAccess->assertPreset($actor, $locked);
-            abort_if($locked->is_system, 422, 'Built-in presets cannot be retired.');
+            if ($locked->is_system) {
+                $this->rejectRequest($request, 422, 'Built-in presets cannot be retired.');
+            }
 
             $profile = DeviceConfigurationProfile::query()
                 ->whereKey($locked->device_configuration_profile_id)
                 ->lockForUpdate()
                 ->first();
-            abort_unless(
-                $profile instanceof DeviceConfigurationProfile,
-                409,
-                'This preset has no governed configuration profile. Repair its retained evidence before retrying.',
-            );
-            abort_unless(
-                $profile->status === DeviceConfigurationProfile::STATUS_ACTIVE,
-                409,
-                'This preset configuration is already retired. Reconcile its retained preset evidence before retrying.',
-            );
+            if (! $profile instanceof DeviceConfigurationProfile) {
+                $this->rejectRequest($request, 409, 'This preset has no saved settings profile, so it cannot be retired here. Ask an administrator to repair it.');
+            }
+            if ($profile->status !== DeviceConfigurationProfile::STATUS_ACTIVE) {
+                $this->rejectRequest($request, 409, 'This preset\'s settings are already retired. Refresh the page to see current presets.');
+            }
 
             $activeVersions = DeviceConfigurationProfile::query()
                 ->where('profile_key', $profile->profile_key)
@@ -709,8 +720,8 @@ class QueclinkHubController extends Controller
     public function updateSectionConfiguration(UpdateSectionRequest $request, QueclinkDevice $queclinkDevice, string $section)
     {
         $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
-        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
-        abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
+        $this->rejectUnless($queclinkDevice->isPaired(), 422, 'Settings can only be changed for paired trackers.');
+        $this->rejectUnless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 trackers can be configured here at the moment.');
 
         return $this->configurationApplyDraftHandoff($request, $queclinkDevice, $section, $request->validated());
     }
@@ -719,12 +730,10 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertCommand($request->user(), $command);
-        abort_if(
-            $command->device_command_request_id !== null,
-            409,
-            'Governed commands must be cancelled from the canonical Device Management workflow.',
-        );
-        abort_unless($command->status === QueclinkPendingCommand::STATUS_QUEUED, 422, 'Only queued commands can be cancelled.');
+        if ($command->device_command_request_id !== null) {
+            $this->rejectRequest($request, 409, 'This action was started in Device Management. Cancel it there.');
+        }
+        $this->rejectUnless($command->status === QueclinkPendingCommand::STATUS_QUEUED, 422, 'This command has already been sent, so it can no longer be cancelled. Refresh the page to see its current state.');
 
         $before = $command->only(['status', 'raw_command', 'serial_number']);
         $command->cancel((int) $request->user()->id);
@@ -1100,7 +1109,7 @@ class QueclinkHubController extends Controller
         return [
             'id' => $d->id,
             'canonical_device_id' => $canonicalDevice?->id,
-            'reference' => 'Tracker ending '.substr((string) $d->imei, -4),
+            'reference' => $this->trackerReference($d),
             'status' => $d->status,
             'pending_pairing_type' => $d->pending_pairing_type,
             'model_hint' => $d->model_hint,
@@ -1114,7 +1123,7 @@ class QueclinkHubController extends Controller
                 'type' => $assignment->assignable_type,
                 'assigned_at' => $assignment->assigned_at?->toIso8601String(),
                 'label' => $assignmentLabels[$assignment->assignable_type.':'.$assignment->assignable_id]
-                    ?? "(unknown {$assignment->assignable_type} #{$assignment->assignable_id})",
+                    ?? 'Not visible with your current access',
             ] : null,
             'configuration' => [
                 'state' => ($snapshot['available'] ?? false) ? 'observed' : 'not_observed',
@@ -1179,7 +1188,9 @@ class QueclinkHubController extends Controller
     ) {
         $commandKey = strtolower((string) ($payload['command'] ?? $section));
         $device = $queclinkDevice->device;
-        abort_unless($device, 422, 'This Queclink tracker is not linked to a canonical Device.');
+        if (! $device) {
+            $this->rejectRequest(request(), 422, self::UNLINKED_TRACKER_MESSAGE);
+        }
         $profile = $this->configurationProfiles->createProfile(
             profileKey: 'queclink:device-'.$device->id.':draft:'.Str::orderedUuid(),
             name: $device->name.' · '.Str::headline($commandKey).' change',
@@ -1203,7 +1214,9 @@ class QueclinkHubController extends Controller
         DeviceConfigurationProfile $profile,
     ) {
         $device = $queclinkDevice->device;
-        abort_unless($device, 422, 'This Queclink tracker is not linked to a canonical Device.');
+        if (! $device) {
+            $this->rejectRequest(request(), 422, self::UNLINKED_TRACKER_MESSAGE);
+        }
         $this->configurationProfiles->assertCompatible($device, (int) $profile->id);
 
         return $this->deviceManagementHandoff(
@@ -1281,7 +1294,9 @@ class QueclinkHubController extends Controller
     private function configurationRefreshHandoff(QueclinkDevice $queclinkDevice, string $section)
     {
         $device = $queclinkDevice->device;
-        abort_unless($device, 422, 'This Queclink tracker is not linked to a canonical Device.');
+        if (! $device) {
+            $this->rejectRequest(request(), 422, self::UNLINKED_TRACKER_MESSAGE);
+        }
         $parameter = strtoupper(trim($section));
         if ($parameter === '' || $parameter === 'ALL') {
             $parameter = 'all';
@@ -1304,7 +1319,9 @@ class QueclinkHubController extends Controller
         array $parameters = [],
     ) {
         $device = $queclinkDevice->device;
-        abort_unless($device, 422, 'This Queclink tracker is not linked to a canonical Device.');
+        if (! $device) {
+            $this->rejectRequest(request(), 422, self::UNLINKED_TRACKER_MESSAGE);
+        }
 
         return redirect()->to('/security-devices/devices/'.$device->id.'?'.http_build_query([
             'section' => 'management',
@@ -1780,6 +1797,35 @@ class QueclinkHubController extends Controller
         @exec('systemctl is-active oblivion-queclink.service 2>&1', $output, $code);
 
         return SafeOperationalData::serviceState(implode(' ', $output), $code);
+    }
+
+    /**
+     * A refused request that changed nothing. Inertia visits get the reason
+     * back as a validation message the page shows beside the request (a
+     * non-Inertia error page would arrive as a raw modal with no message);
+     * other clients keep the explicit status. Messages are the fixed strings
+     * in this controller, never exception text.
+     */
+    private function rejectRequest(Request $request, int $status, string $message, string $field = 'request'): never
+    {
+        if ($request->header('X-Inertia')) {
+            throw ValidationException::withMessages([$field => $message]);
+        }
+
+        abort($status, $message);
+    }
+
+    private function rejectUnless(bool $condition, int $status, string $message): void
+    {
+        if (! $condition) {
+            $this->rejectRequest(request(), $status, $message);
+        }
+    }
+
+    /** The masked reference the workspace shows; flash text never carries the raw IMEI. */
+    private function trackerReference(QueclinkDevice $device): string
+    {
+        return 'Tracker ending '.substr((string) $device->imei, -4);
     }
 
     private function userCanManage($user): bool

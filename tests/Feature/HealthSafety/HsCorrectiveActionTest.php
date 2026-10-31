@@ -549,9 +549,7 @@ class HsCorrectiveActionTest extends TestCase
     public function test_can_start_action(): void
     {
         $action = HsCorrectiveAction::factory()->assigned()->create();
-        $assignee = User::factory()->create();
-
-        $result = $this->service->start($action, $assignee->id);
+        $result = $this->service->start($action);
 
         $this->assertEquals(HsCorrectiveAction::STATUS_IN_PROGRESS, $result->status);
     }

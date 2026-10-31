@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class EmergencyDrillFinding extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
 
     protected $fillable = [
@@ -25,22 +25,31 @@ class EmergencyDrillFinding extends Model
         'due_date',
         'resolved_at',
         'resolution_notes',
+        'resolution_evidence_ids',
+        'hs_corrective_action_id',
         'created_by',
         'updated_by',
     ];
 
     protected $casts = [
+        'resolution_evidence_ids' => 'array',
+        'hs_corrective_action_id' => 'integer',
         'due_date' => 'date',
         'resolved_at' => 'date',
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function emergencyDrill(): BelongsTo
     {
         return $this->belongsTo(EmergencyDrill::class);
+    }
+
+    public function correctiveAction(): BelongsTo
+    {
+        return $this->belongsTo(HsCorrectiveAction::class, 'hs_corrective_action_id');
     }
 
     public function assignee(): BelongsTo
@@ -59,7 +68,7 @@ class EmergencyDrillFinding extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeOpen($query)
@@ -70,8 +79,8 @@ class EmergencyDrillFinding extends Model
     public function scopeOverdue($query)
     {
         return $query->whereNotNull('due_date')
-            ->where('due_date', '<', now())
-            ->whereNotIn('status', ['resolved', 'accepted']);
+            ->where('due_date', '<', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
+            ->whereNotIn('status', ['resolved', 'closed', 'accepted']);
     }
 
     public function scopeOfSeverity($query, string $severity)

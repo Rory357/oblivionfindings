@@ -5,6 +5,7 @@ namespace Oblivion\Collector;
 use DateTimeImmutable;
 use JsonException;
 use Oblivion\Collector\Config\SignedConfigLoader;
+use Oblivion\Collector\Discovery\LanDiscoveryScanner;
 use Oblivion\Collector\Enrollment\InstallationProfile;
 use Oblivion\Collector\Enrollment\RecoverableEnrollment;
 use Oblivion\Collector\Exceptions\CentralApiFailure;
@@ -26,7 +27,7 @@ use RuntimeException;
 
 final class CollectorApplication
 {
-    public const string VERSION = '0.1.0';
+    public const string VERSION = '0.2.0';
 
     /**
      * @param  null|\Closure(string, string, string, string, string): array<string, mixed>  $enrolmentTransport
@@ -312,6 +313,7 @@ final class CollectorApplication
             $identity['client_private_key_file'],
         );
         $configurationError = null;
+        $config = null;
         try {
             $envelope = $central->configuration(
                 $identity['collector_id'],
@@ -320,11 +322,12 @@ final class CollectorApplication
             $config = $loader->load($envelope);
             $this->writePrivateFile($configPath, $envelope);
         } catch (CentralApiFailure $exception) {
-            if (! is_file($configPath)) {
+            if (is_file($configPath)) {
+                $configurationError = $this->boundedMessage($exception);
+                $config = $loader->load($this->readBounded($configPath));
+            } elseif (! str_ends_with($exception->getMessage(), ': 409.')) {
                 throw $exception;
             }
-            $configurationError = $this->boundedMessage($exception);
-            $config = $loader->load($this->readBounded($configPath));
         }
         $spool = new EncryptedSpool($stateDirectory, $checkpoint);
         $uploadError = $this->flush($central, $identity['collector_id'], $spool);
@@ -333,7 +336,7 @@ final class CollectorApplication
         $checksExecuted = 0;
         $discoveryTargetsExecuted = 0;
         $commandsExecuted = 0;
-        if ($spool->status()['state'] !== 'buffer_full') {
+        if ($config !== null && $spool->status()['state'] !== 'buffer_full') {
             $scope = new ScopeGuard($config);
             $credentialDecryptor = new CredentialLeaseDecryptor($secretKey);
             $runner = new ProbeRunner(
@@ -380,7 +383,12 @@ final class CollectorApplication
                 }
             }
 
-            $discovery = new RemoteDiscoveryRunner($scope);
+            $discovery = new RemoteDiscoveryRunner(
+                $scope,
+                null,
+                $credentialDecryptor,
+                new LanDiscoveryScanner,
+            );
             $completedIds = $checkpoint->read()['acknowledged_ids'];
             foreach ($config->discoveryRuns as $run) {
                 foreach ($discovery->run($run, $config->collectorId, $completedIds) as $result) {
@@ -404,10 +412,11 @@ final class CollectorApplication
         $uploadError ??= $this->flush($central, $identity['collector_id'], $spool);
         try {
             (new HeartbeatReporter($central, $identity['collector_id'], $spool))->report([
+                'version' => self::VERSION,
                 'checks_executed' => $checksExecuted,
                 'discovery_targets_executed' => $discoveryTargetsExecuted,
                 'commands_executed' => $commandsExecuted,
-                'config_sequence' => $config->sequence,
+                'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
         } catch (CentralApiFailure $exception) {

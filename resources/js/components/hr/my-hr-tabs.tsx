@@ -5,6 +5,7 @@ import {
     FileText,
     GraduationCap,
     HeartHandshake,
+    HeartPulse,
     LayoutDashboard,
     Megaphone,
     MessageSquare,
@@ -33,6 +34,7 @@ export type MyHrTab =
     | 'expenses'
     | 'payslips'
     | 'benefits'
+    | 'injuries'
     | 'training'
     | 'policies'
     | 'reviews'
@@ -51,6 +53,7 @@ const TAB_URLS: Record<MyHrTab, string> = {
     expenses: '/hr/my/expenses',
     payslips: '/hr/my/payslips',
     benefits: '/hr/my/benefits',
+    injuries: '/hr/my/injuries',
     training: '/hr/my/training',
     policies: '/hr/my/policies',
     reviews: '/hr/my/reviews',
@@ -85,6 +88,7 @@ const ITEMS: Omit<HrTabItem, 'badge'>[] = [
         icon: HeartHandshake,
         tone: 'success',
     },
+    { id: 'injuries', label: 'Injuries', icon: HeartPulse, tone: 'warning' },
     { id: 'training', label: 'Training', icon: GraduationCap, tone: 'violet' },
     { id: 'policies', label: 'Policies', icon: ScrollText, tone: 'warning' },
     { id: 'reviews', label: 'Reviews', icon: Star, tone: 'info' },
@@ -104,11 +108,18 @@ const ITEMS: Omit<HrTabItem, 'badge'>[] = [
 export function MyHrTabs({
     active,
     badges,
+    showInjuries = false,
 }: {
     active: MyHrTab;
     badges?: Partial<Record<MyHrTab, ReactNode>>;
+    /** The Injuries tab shows only to someone with a workplace injury on record. */
+    showInjuries?: boolean;
 }) {
-    const items: HrTabItem[] = ITEMS.map((item) => {
+    const visible = ITEMS.filter(
+        (item) =>
+            item.id !== 'injuries' || showInjuries || active === 'injuries',
+    );
+    const items: HrTabItem[] = visible.map((item) => {
         const badge = badges?.[item.id as MyHrTab];
         return badge ? { ...item, badge } : item;
     });

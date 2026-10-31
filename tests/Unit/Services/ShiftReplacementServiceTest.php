@@ -88,6 +88,10 @@ class ShiftReplacementServiceTest extends TestCase
 
         $this->assertSame(ShiftReplacementService::REQUESTED, $replacement->status);
         $this->assertNotNull($replacement->openPosition);
+        // Anyone who can claim the posting can reach its notes, so the absent
+        // worker's reason stays on the replacement request only.
+        $this->assertStringContainsString('Need cover', (string) $replacement->openPosition->notes);
+        $this->assertStringNotContainsString('Unavailable for shift', (string) $replacement->openPosition->notes);
         $this->assertDatabaseHas('timeline_events', [
             'source_type' => ShiftReplacementRequest::class,
             'source_id' => $replacement->id,
