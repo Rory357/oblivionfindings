@@ -78,7 +78,7 @@ describe('Action ownership handover', () => {
             { target: { value: 'Agreed leave cover and evidence follow-up.' } },
         );
         fireEvent.click(
-            screen.getByRole('button', { name: 'Confirm handover' }),
+            screen.getByRole('button', { name: `Make ${next.name} the owner` }),
         );
         expect(state.post).toHaveBeenCalledWith(
             '/health-safety/corrective-actions/42/owner',
@@ -93,7 +93,7 @@ describe('Action ownership handover', () => {
         expect(done).not.toHaveBeenCalled();
         const first = state.post.mock.calls[0][1].request_uuid;
         fireEvent.click(
-            screen.getByRole('button', { name: 'Confirm handover' }),
+            screen.getByRole('button', { name: `Make ${next.name} the owner` }),
         );
         expect(state.post.mock.calls[1][1].request_uuid).toBe(first);
     });
@@ -117,7 +117,7 @@ describe('Action ownership handover', () => {
         expect(screen.getByText('Changed Owner')).toBeInTheDocument();
         expect(reason).toHaveValue('Keep this handover reason.');
         expect(
-            screen.getByRole('button', { name: 'Confirm handover' }),
+            screen.getByRole('button', { name: `Make ${next.name} the owner` }),
         ).toBeDisabled();
         fireEvent.click(
             screen.getByRole('button', {
@@ -125,7 +125,7 @@ describe('Action ownership handover', () => {
             }),
         );
         fireEvent.click(
-            screen.getByRole('button', { name: 'Confirm handover' }),
+            screen.getByRole('button', { name: `Make ${next.name} the owner` }),
         );
         expect(state.post.mock.calls[0][1].expected_revision).toBe(4);
         expect(state.post.mock.calls[0][1].reason).toBe(
@@ -221,5 +221,15 @@ describe('Action ownership handover', () => {
         expect(
             screen.getByText('Keep all handover evidence.'),
         ).toBeInTheDocument();
+    });
+});
+
+describe('Choose a new owner picker (M13, B1.6)', () => {
+    it('says why nobody is listed and who can help, and says who is listed', async () => {
+        fetchMock.mockResolvedValue({ ok: true, json: async () => ({ options: [] }) });
+        render(<ActionOwnerPane {...props} siteName="Aroha Respite" />);
+        expect(await screen.findByText('Nobody here can own this yet')).toBeInTheDocument();
+        expect(screen.getByText(/Owners need to manage health and safety at\s+Aroha Respite\. An admin can give someone that access\./)).toBeInTheDocument();
+        expect(screen.getByText(/Only people who manage health and safety at\s+Aroha Respite are listed/)).toBeInTheDocument();
     });
 });

@@ -288,3 +288,23 @@ describe('Permanent corrective action', () => {
         );
     });
 });
+
+describe('An action whose owner has left (M13, B1.6)', () => {
+    it('leads with "Choose a new owner" and Start says why it waits, without posting', () => {
+        const data = workspace();
+        data.action.status = 'open';
+        data.ownership = { ...data.ownership, state: 'replacement_needed' };
+        data.can = { ...data.can, start: false, complete: false };
+        data.blocked = { start: { reason: 'Choose a new owner first', unblock: 'Someone who manages health and safety at this site chooses a new owner.' } };
+        data.next_step = { key: 'choose_owner', can: true };
+        render(<ActionShow workspace={data} />);
+
+        expect(screen.getByText('What happens next')).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'Choose a new owner' }).length).toBeGreaterThan(0);
+        const start = screen.getByRole('button', { name: 'Start action' });
+        expect(start).toBeDisabled();
+        expect(screen.getByText('Choose a new owner first')).toBeInTheDocument();
+        fireEvent.click(start);
+        expect(state.post).not.toHaveBeenCalled();
+    });
+});

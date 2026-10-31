@@ -95,6 +95,10 @@ export type CorrectiveActionWorkspace = {
     source_task_url: string | null;
     ownership: ActionOwnership;
     can: Record<'start' | 'complete' | 'verify' | 'return' | 'close', boolean>;
+    /** K1a: a step blocked for now, with the server's reason (only for viewers who could otherwise do it). */
+    blocked?: { start?: { reason: string; unblock: string } } | [];
+    /** K1a: the next step the server names for this action. */
+    next_step?: { key: 'choose_owner'; can: boolean } | null;
 };
 const PRIORITY_TONE: Record<string, PageHeaderFact['tone']> = {
     low: 'success',
@@ -276,16 +280,26 @@ function ActionRecord({
               ]
             : []),
     ];
+    const replacementNeeded = ownership.state === 'replacement_needed';
+    const blockedStart = Array.isArray(workspace.blocked)
+        ? undefined
+        : workspace.blocked?.start;
     const ownerAction: HeaderAction | null = ownership.can_assign
         ? {
               key: 'owner',
-              label: ca.owner ? 'Hand over ownership' : 'Assign owner',
+              label: replacementNeeded
+                  ? 'Choose a new owner'
+                  : ca.owner
+                    ? 'Hand over ownership'
+                    : 'Assign owner',
               icon: Plus,
               run: () => select('overview', 'owner'),
           }
         : null;
+    // M13: while the owner needs replacing, choosing a new one is the main step.
     const primary: HeaderAction | null =
-        lifecycle[0] ?? (!ca.owner && ownerAction ? ownerAction : null);
+        lifecycle[0] ??
+        ((!ca.owner || replacementNeeded) && ownerAction ? ownerAction : null);
     const glass: HeaderAction[] = [
         ...(can.return
             ? [
@@ -370,7 +384,7 @@ function ActionRecord({
               ? {
                     label: 'Owner needs replacing',
                     text: 'Choose a new owner',
-                    meta: 'The recorded owner needs replacement because their current role, employment or site access no longer supports this responsibility.',
+                    meta: 'Then they start the action and mark it done.',
                     tone: 'warning',
                 }
               : !ca.owner || ownership.state === 'unassigned'
@@ -546,6 +560,7 @@ function ActionRecord({
                             actionId={ca.id}
                             owner={ca.owner}
                             ownership={ownership}
+                            siteName={review.site_name}
                             onDone={done}
                             onCancel={cancel}
                         />
@@ -651,7 +666,46 @@ function ActionRecord({
                 ) : null}
             </>
         ) : (
-            <Story title="What we agreed" facts={storyFacts} paras={storyParas} />
+            <>
+                {replacementNeeded && ca.status !== 'closed' ? (
+                    // M13 "What happens next": the step with its button, and Start saying why it waits (IR3a).
+                    <Surface title="What happens next">
+                        <div className="space-y-3 px-[18px] pt-1 pb-4">
+                            <p className="text-sm">
+                                <b>Choose a new owner.</b> The person who owned
+                                this action can no longer own it. The new owner
+                                starts the action and marks it done.
+                            </p>
+                            {ownership.can_assign ? (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Button
+                                        onClick={() => select('overview', 'owner')}
+                                    >
+                                        Choose a new owner
+                                    </Button>
+                                    {blockedStart ? (
+                                        <>
+                                            <Button variant="outline" disabled>
+                                                Start action
+                                            </Button>
+                                            <span className="text-caption text-muted-foreground">
+                                                {blockedStart.reason}
+                                            </span>
+                                        </>
+                                    ) : null}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">
+                                    Someone who manages health and safety at{' '}
+                                    {review.site_name ?? 'this site'} chooses the
+                                    new owner.
+                                </p>
+                            )}
+                        </div>
+                    </Surface>
+                ) : null}
+                <Story title="What we agreed" facts={storyFacts} paras={storyParas} />
+            </>
         );
 
     const people: PersonCardItem[] = [
