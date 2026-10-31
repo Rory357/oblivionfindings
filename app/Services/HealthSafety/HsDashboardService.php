@@ -428,9 +428,8 @@ class HsDashboardService
         return $this->withSourceRead($viewer, $context, function (?User $viewer, ?HealthSafetyReadContext $context) use ($siteId, $limit) {
             $query = HsCorrectiveAction::query()->where('hs_corrective_actions.status', HsCorrectiveAction::STATUS_COMPLETED)
                 ->with(['completedBy:id,name', 'hsEvent:id,site_id,reference_number']);
-            foreach (['created_by', 'assigned_to_user_id', 'completed_by_user_id'] as $column) {
-                $query->where(fn (Builder $q) => $q->whereNull('hs_corrective_actions.'.$column)->orWhere('hs_corrective_actions.'.$column, '!=', $viewer->id));
-            }
+            // The server's separation-of-duties rule, shared with the header box (HsOverviewHeaderReadService::checkableBy).
+            HsOverviewHeaderReadService::checkableBy($query, $viewer);
             $this->applyRelatedSiteScope($query, 'hsEvent', $siteId);
             $this->applyRelatedSourceScope($query, $viewer, $context);
             $query = $this->protectSourceEagerLoads($query)->orderBy('completed_at');

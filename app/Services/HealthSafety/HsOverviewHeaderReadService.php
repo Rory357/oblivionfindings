@@ -153,9 +153,17 @@ final class HsOverviewHeaderReadService
      *
      * @param  'severity'|'over_time'|'due'|'types'  $chart
      */
+    /** Which charts this person gets: incident charts need incident read (the compliance lead has none), else hazards. */
+    public static function chartKindFor(User $viewer): string
+    {
+        $readsIncidents = $viewer->canDo('incidents.viewAny') || $viewer->canDo('incidents.viewAssigned');
+
+        return self::setFor($viewer) === self::SET_HAZARDS || ! $readsIncidents ? 'hazards' : 'incidents';
+    }
+
     public function chart(string $chart, User $viewer, ?array $siteIds, Carbon $now, HealthSafetyReadContext $context): array
     {
-        $kind = self::setFor($viewer) === self::SET_HAZARDS ? 'hazards' : 'incidents';
+        $kind = self::chartKindFor($viewer);
 
         return HealthSafetyReadMaterialisationProof::within($context, function (HealthSafetyReadMaterialisationProof $proof) use ($chart, $kind, $viewer, $siteIds, $now, $context): array {
             $source = fn (): Builder => $kind === 'hazards' ? $this->hazards($siteIds) : $this->incidents($siteIds, $context, $proof);
@@ -351,14 +359,19 @@ final class HsOverviewHeaderReadService
                 ->where('hs_closure_exceptions.status', HsClosureException::STATUS_PENDING))->count());
     }
 
-    /** B2.3: "Actions to check" counts only actions this viewer may check: not one they added, own or did. */
-    private function checkableBy(Builder $actions, User $viewer): Builder
+    /**
+     * B2.3: "Actions to check" counts only actions this viewer may check, with the server's separation-of-duties rule
+     * (HsCorrectiveActionService::verify): not one they added, own or ever owned, or did, nor one on a review they opened.
+     */
+    public static function checkableBy(Builder $actions, User $viewer): Builder
     {
         foreach (['created_by', 'assigned_to_user_id', 'completed_by_user_id'] as $column) {
             $actions->where(fn (Builder $q) => $q->whereNull('hs_corrective_actions.'.$column)->orWhere('hs_corrective_actions.'.$column, '!=', $viewer->id));
         }
 
-        return $actions;
+        return $actions
+            ->whereDoesntHave('ownerChanges', fn (Builder $q) => $q->where(fn (Builder $c) => $c->where('owner_user_id', $viewer->id)->orWhere('previous_owner_user_id', $viewer->id)))
+            ->whereNotIn('hs_corrective_actions.hs_event_id', HsEvent::query()->where('hs_events.created_by', $viewer->id)->select('hs_events.id'));
     }
 
     /**

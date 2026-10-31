@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -60,6 +61,41 @@ class HsOverviewQueueTest extends TestCase
         $toCheck = $this->queue($lead)['to_check'];
         $this->assertSame(1, $toCheck['count']);
         $this->assertSame([$checkable->id], array_column($toCheck['rows'], 'id'));
+    }
+
+    public function test_actions_to_check_follow_the_servers_separation_of_duties(): void
+    {
+        $lead = $this->viewer('team_lead');
+        $other = User::factory()->create();
+        $opened = HsEvent::factory()->create(['site_id' => $this->own->id, 'event_category' => 'hazard', 'severity' => 'low', 'created_by' => $lead->id]);
+        $event = HsEvent::factory()->create(['site_id' => $this->own->id, 'event_category' => 'hazard', 'severity' => 'low', 'created_by' => $other->id]);
+        $done = ['status' => HsCorrectiveAction::STATUS_COMPLETED, 'created_by' => $other->id, 'assigned_to_user_id' => $other->id,
+            'completed_by_user_id' => $other->id, 'completed_at' => now()->subDay()];
+        // On a review the lead opened: the server won't let them check it.
+        HsCorrectiveAction::factory()->create(['hs_event_id' => $opened->id, ...$done]);
+        // Once owned by the lead (handed on since): the server won't let them check it either.
+        $handedOn = HsCorrectiveAction::factory()->create(['hs_event_id' => $event->id, ...$done, 'owner_revision' => 1]);
+        DB::table('hs_corrective_action_owner_changes')->insert(['action_id' => $handedOn->id, 'revision' => 1,
+            'previous_owner_user_id' => $lead->id, 'previous_owner_name' => 'Lead', 'owner_user_id' => $other->id, 'owner_name' => 'Other',
+            'actor_user_id' => $lead->id, 'actor_name' => 'Lead', 'reason' => 'Handed on', 'request_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'request_hash' => str_repeat('a', 64), 'created_at' => now()->subDays(2)]);
+        $checkable = HsCorrectiveAction::factory()->create(['hs_event_id' => $event->id, ...$done]);
+
+        $this->assertSame([$checkable->id], array_column($this->queue($lead)['to_check']['rows'], 'id'));
+    }
+
+    public function test_people_without_incident_read_get_the_hazard_charts(): void
+    {
+        $compliance = $this->viewer('compliance_lead');
+        $page = $this->actingAs($compliance)->get('/health-safety', [
+            'X-Inertia' => 'true', 'X-Inertia-Version' => (string) app(HandleInertiaRequests::class)->version(request()),
+        ])->assertOk()->json('props');
+        if (! $compliance->canDo('incidents.viewAny') && ! $compliance->canDo('incidents.viewAssigned')) {
+            $this->assertSame('hazards', $page['header_chart_kind']);
+        }
+        $this->assertSame('incidents', $this->actingAs($this->viewer('health_safety_officer'))->get('/health-safety', [
+            'X-Inertia' => 'true', 'X-Inertia-Version' => (string) app(HandleInertiaRequests::class)->version(request()),
+        ])->assertOk()->json('props.header_chart_kind'));
     }
 
     public function test_stages_count_open_reviews_by_stage_and_reviews_closed_this_month(): void

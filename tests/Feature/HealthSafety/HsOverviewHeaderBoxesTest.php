@@ -101,10 +101,13 @@ class HsOverviewHeaderBoxesTest extends TestCase
     {
         $this->overdueAction($this->own, 'CA-SOON', createdDaysAgo: 2, dueDaysAgo: -5);  // due in 5 days
         $this->overdueAction($this->other, 'CA-ELSEWHERE', createdDaysAgo: 2, dueDaysAgo: -5);
-        $lead = $this->viewer('team_lead');
+        $manager = $this->viewer('provider_manager');
         $officer = $this->viewer('health_safety_officer');
 
-        $due = $this->chartFor($lead, 'due');
+        // A team lead has no incident read, so their chart row is the hazard version (never zero incident charts).
+        $this->assertSame('hazards', $this->chartFor($this->viewer('team_lead'), 'due')['kind']);
+
+        $due = $this->chartFor($manager, 'due');
         $this->assertSame('actions', $due['kind']);
         $this->assertCount(30, $due['days']);
         $this->assertSame(1, $due['total'], 'Only their own Site.');
@@ -150,7 +153,8 @@ class HsOverviewHeaderBoxesTest extends TestCase
         $event = HsEvent::factory()->create(['site_id' => $site->id, 'event_category' => 'hazard', 'severity' => 'low',
             'created_by' => $creator->id, 'created_at' => now()->subDays($createdDaysAgo + 1)]);
         HsCorrectiveAction::factory()->create(['hs_event_id' => $event->id, 'reference_number' => $reference, 'status' => $status,
-            'priority' => 'medium', 'due_date' => now()->subDays($dueDaysAgo)->toDateString(), 'created_by' => $creator->id,
+            // Due dates are worker-calendar (NZ) dates, like the service's "overdue" and "due each day" (stable across midnight).
+            'priority' => 'medium', 'due_date' => now((string) (config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone')))->subDays($dueDaysAgo)->toDateString(), 'created_by' => $creator->id,
             'created_at' => now()->subDays($createdDaysAgo), 'verified_at' => null, 'closed_at' => null, 'completed_at' => null]);
     }
 

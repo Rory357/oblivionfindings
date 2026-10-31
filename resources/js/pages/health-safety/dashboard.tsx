@@ -117,6 +117,8 @@ type Props = {
     incident_stages?: IncidentStagesData | null;
     /** G2: which four header boxes this person gets (the boxes themselves load as `header_boxes`). */
     header_box_set?: HeaderBoxes['set'];
+    /** G2: incident charts need incident read; otherwise the chart row is the hazard version. */
+    header_chart_kind?: 'incidents' | 'hazards';
 
     // Background group "headline".
     kpis?: Kpis;
@@ -193,6 +195,7 @@ export default function HealthSafetyDashboard({
     worklists,
     incident_stages = null,
     header_box_set,
+    header_chart_kind,
 }: Props) {
     // A tab can be opened from a link (?tab=leading); unknown values fall back to the overview.
     const pageUrl = usePage().url;
@@ -366,7 +369,10 @@ export default function HealthSafetyDashboard({
                         boxSet={header_box_set}
                         charts={
                             header_box_set ? (
-                                <OverviewHeaderCharts hazards={header_box_set === 'hazards'} link={destination} />
+                                <OverviewHeaderCharts
+                                    hazards={header_chart_kind ? header_chart_kind === 'hazards' : header_box_set === 'hazards'}
+                                    link={destination}
+                                />
                             ) : undefined
                         }
                         rail={
