@@ -402,7 +402,7 @@ function ClockOutForm({
                                         Breaks tracked this session
                                     </SubHead>
                                     {session.breaks.length === 0 ? (
-                                        <p className="mt-2 text-[13px] text-muted-foreground">
+                                        <p className="mt-2 text-sm text-muted-foreground">
                                             No breaks tracked — use “Start
                                             break” on the attendance page next
                                             time and this fills itself in.
@@ -412,7 +412,7 @@ function ClockOutForm({
                                             {session.breaks.map((b, i) => (
                                                 <li
                                                     key={b.id ?? i}
-                                                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[13px]"
+                                                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
                                                 >
                                                     <Coffee className="h-3.5 w-3.5 text-muted-foreground" />
                                                     <span className="font-medium">
@@ -446,10 +446,10 @@ function ClockOutForm({
                                         <Timer className="h-5 w-5" />
                                     </span>
                                     <div>
-                                        <div className="text-[15px] font-bold">
+                                        <div className="text-lg font-bold">
                                             {workedH}h attendance estimate
                                         </div>
-                                        <div className="text-[13px] text-muted-foreground">
+                                        <div className="text-sm text-muted-foreground">
                                             {display(session.clock_in_at)} →{' '}
                                             {display(outAt)} minus {totalBreakM}
                                             m breaks
@@ -465,7 +465,7 @@ function ClockOutForm({
                             <StepHead
                                 icon={ArrowLeftRight}
                                 title="Brief the next shift"
-                                blurb="Save the essentials as a draft, then assign and submit it from Shift Handovers."
+                                blurb="Save the essentials as a draft, then assign and submit it from Handovers."
                             />
                             <div className="grid gap-4">
                                 {!hasShift ? (
@@ -474,7 +474,7 @@ function ClockOutForm({
                                         there is no shift record to hand over.
                                         File one from{' '}
                                         <strong>
-                                            Operations → Shift Handovers
+                                            Workforce → Handovers
                                         </strong>{' '}
                                         if the next worker needs a brief.
                                     </InfoCard>
@@ -552,7 +552,7 @@ function ClockOutForm({
                                             already exists, that record is kept
                                             and these notes are not added to it.
                                             Open{' '}
-                                            <strong>Shift Handovers</strong> to
+                                            <strong>Handovers</strong> to
                                             assign the exact incoming shift,
                                             review it, and submit it. If an
                                             incoming Shift is due, submission
@@ -613,9 +613,9 @@ function ClockOutForm({
                                     onEdit={() => setStepIndex(1)}
                                 >
                                     {!hasShift ? (
-                                        <p className="py-1.5 text-[13px] text-muted-foreground">
+                                        <p className="py-1.5 text-sm text-muted-foreground">
                                             No shift is linked to this session.
-                                            Use Shift Handovers if the next
+                                            Use Handovers if the next
                                             worker needs a brief.
                                         </p>
                                     ) : (
@@ -688,10 +688,10 @@ function ClockOutSuccess({
                     {timezone}) with {done.break_minutes}m of breaks.{' '}
                     {attendanceTimesheetMessage(done)}{' '}
                     {done.handover_outcome === 'draft_saved'
-                        ? 'Your handover was saved as a draft. If an incoming Shift is due, assign and submit it from Shift Handovers, then check its status and complete the Shift separately if still required. Attendance is already clocked out.'
+                        ? 'Your handover was saved as a draft. If an incoming Shift is due, assign and submit it from Handovers, then check its status and complete the Shift separately if still required. Attendance is already clocked out.'
                         : done.handover_outcome ===
                             'existing_submitted_or_acknowledged'
-                          ? 'An existing submitted or acknowledged handover was kept. The notes entered here were not added to it. Check Shift Handovers and the Shift status; complete the Shift separately if still required.'
+                          ? 'An existing submitted or acknowledged handover was kept. The notes entered here were not added to it. Check Handovers and the Shift status; complete the Shift separately if still required.'
                           : done.handover_outcome === 'no_shift'
                             ? 'No shift was linked, so no handover draft was created.'
                             : 'No handover draft was saved by this action. Check the Shift record for any remaining care and completion tasks.'}

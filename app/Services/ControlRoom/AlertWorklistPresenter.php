@@ -12,6 +12,7 @@ class AlertWorklistPresenter
         private readonly AlertPriorityService $priority,
         private readonly ControlRoomAlertProvenanceService $provenance,
         private readonly ControlRoomAlertAccessService $access,
+        private readonly RestraintHsReferenceVisibility $restraintReferences,
     ) {}
 
     /** @return array<string, mixed> */
@@ -27,9 +28,11 @@ class AlertWorklistPresenter
             'sla',
             'queue:id,name,tier',
             'clientIncident:id,reference_number,control_room_alert_id,status',
-            'hsEvent:id,reference_number,control_room_alert_id,handover_status,status',
+            'hsEvent:id,reference_number,control_room_alert_id,handover_status,status,source_type',
             'playbookRun.playbook:id,name',
         ]);
+        // The handover state stays (as on the alert record); a restraint's H&S reference and link need restraint read.
+        $hsReferenceVisible = $this->restraintReferences->canSee($viewer, $alert->hsEvent);
 
         $client = $this->provenance->safeClient($alert);
         $assignee = $alert->relationLoaded('assignedTo')
@@ -72,26 +75,27 @@ class AlertWorklistPresenter
             'queue' => $alert->queue ? ['id' => $alert->queue->id, 'name' => $alert->queue->name] : null,
             'journey' => [
                 'incident_reference' => $alert->clientIncident?->reference_number ?: null,
-                'health_safety_reference' => $alert->hsEvent?->reference_number ?: null,
+                'health_safety_reference' => $hsReferenceVisible ? ($alert->hsEvent?->reference_number ?: null) : null,
                 'handover_status' => $alert->hsEvent?->handover_status,
             ],
             'next_action' => ($canManageAlerts ?? $viewer->canDo('controlRoom.alerts.manage'))
                 ? ['label' => 'Continue response', 'href' => '/control-room/alerts/'.$alert->id]
                 : ['label' => 'View alert', 'href' => '/control-room/alerts/'.$alert->id],
-            'actions' => $this->actions($alert, $viewer),
+            'actions' => $this->actions($alert, $viewer, $hsReferenceVisible),
             'href' => '/control-room/alerts/'.$alert->id,
         ];
     }
 
     /** @return array<string, bool|string|null> */
-    private function actions(ControlRoomAlert $alert, User $viewer): array
+    private function actions(ControlRoomAlert $alert, User $viewer, bool $hsReferenceVisible): array
     {
         $capabilities = $this->access->capabilitiesForScopedAlert($viewer);
         $actionable = $alert->isActionable();
         $canViewIncident = $alert->clientIncident !== null
             && $viewer->can('view', $alert->clientIncident);
         $canViewHealthSafety = $alert->hsEvent !== null
-            && $viewer->canDo('hazards.view');
+            && $viewer->canDo('hazards.view')
+            && $hsReferenceVisible;
 
         return [
             'can_claim' => $actionable

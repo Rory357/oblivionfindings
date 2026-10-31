@@ -103,6 +103,8 @@ export interface EntityCardProps {
     selected?: boolean;
     onToggleSelect?: () => void;
     className?: string;
+    /** Touch and focus treatment for worker-facing action menus. */
+    frontline?: boolean;
 }
 
 export function EntityCard({
@@ -128,6 +130,7 @@ export function EntityCard({
     selected = false,
     onToggleSelect,
     className,
+    frontline = false,
 }: EntityCardProps) {
     selected = selection?.checked ?? selected;
     const activate = () => (selectMode ? onToggleSelect?.() : onOpen?.());
@@ -222,6 +225,7 @@ export function EntityCard({
                     {!selectMode ? (
                         <EntityKebab
                             actions={actions}
+                            frontline={frontline}
                             label={`Actions for ${name}`}
                             className="-mt-0.5 -mr-1"
                         />

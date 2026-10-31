@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, InfoCard, SelectInput } from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
-import { useForm } from '@inertiajs/react';
+import { useSafetyForm as useForm } from '@/hooks/use-safety-workspace-drafts';
 import {
     ArrowRightLeft,
     ListChecks,
@@ -37,6 +37,7 @@ type Props = {
     };
     handover: CorrectiveActionHandover;
     onDone: () => void;
+    onCancel?: () => void;
 };
 
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
@@ -54,6 +55,7 @@ export function CorrectiveActionHandoverPane({
     recommendation,
     handover,
     onDone,
+    onCancel = onDone,
 }: Props) {
     const initialPriority = PRIORITIES.includes(recommendation.priority ?? '')
         ? (recommendation.priority as string)
@@ -353,7 +355,7 @@ export function CorrectiveActionHandoverPane({
             </ReviewCard>
 
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing || !canSubmit}>

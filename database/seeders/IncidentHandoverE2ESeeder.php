@@ -432,8 +432,38 @@ final class IncidentHandoverE2ESeeder extends Seeder
             MedicationError::withTrashed()->where('client_id', $client->id)->forceDelete();
             ControlRoomAlert::query()->where('client_id', $client->id)->delete();
             HsEvent::withTrashed()->where('client_id', $client->id)->get()->each->forceDelete();
+            $this->clearIncidentRoutingEvidence($client);
             ClientIncident::query()->where('client_id', $client->id)->delete();
         });
+    }
+
+    /**
+     * Submission routing, ownership and independent-handling records are
+     * restrictive children of the report. Like the medication evidence above,
+     * this synthetic reset removes only those of this fixture person's reports;
+     * every other person's routing history is untouched.
+     */
+    private function clearIncidentRoutingEvidence(Client $client): void
+    {
+        $incidentIds = ClientIncident::query()->where('client_id', $client->id)->pluck('id');
+        if ($incidentIds->isEmpty()) {
+            return;
+        }
+        $intentIds = DB::table('incident_routing_intents')->whereIn('incident_id', $incidentIds)->pluck('id');
+        $decisionIds = DB::table('incident_routing_decisions')->whereIn('intent_id', $intentIds)->pluck('id');
+        DB::table('incident_triage_deliveries')->whereIn('decision_id', $decisionIds)->delete();
+        DB::table('incident_routing_decisions')->whereIn('id', $decisionIds)->delete();
+        DB::table('incident_routing_intents')->whereIn('id', $intentIds)->delete();
+
+        $changeIds = DB::table('incident_owner_changes')->whereIn('incident_id', $incidentIds)->pluck('id');
+        DB::table('incident_owner_deliveries')->whereIn('change_id', $changeIds)->delete();
+        DB::table('incident_owner_changes')->whereIn('id', $changeIds)->delete();
+
+        $declarationIds = DB::table('incident_independent_handling_declarations')->whereIn('incident_id', $incidentIds)->pluck('id');
+        DB::table('incident_independent_handling_exclusions')->whereIn('declaration_id', $declarationIds)->delete();
+        DB::table('incident_independent_handling_declarations')->whereIn('id', $declarationIds)->delete();
+        DB::table('incident_owner_exclusions')->whereIn('incident_id', $incidentIds)->delete();
+        DB::table('incident_saved_copies')->whereIn('incident_id', $incidentIds)->delete();
     }
 
     /** @return array{id: int, email: string, name: string} */

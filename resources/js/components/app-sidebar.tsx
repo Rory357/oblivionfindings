@@ -12,8 +12,14 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { communicationAccess } from '@/components/workforce/communication-workspace-rail';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
+import {
+    controlRoomDestinations,
+    controlRoomPrimaryLinkActive,
+    type ControlRoomNavCapabilities,
+} from '@/lib/control-room-navigation';
 import {
     EMAR_SEARCH_KEYWORDS,
     emarHubLinkActive,
@@ -40,13 +46,18 @@ import {
     governanceHubContainsUrl,
     visibleSectionTabs,
 } from '@/lib/governance-sections';
+import {
+    safetyHubLinkActive,
+    safetySearchEntries,
+    safetySidebar,
+    type SafetyNavigationPermissions,
+} from '@/lib/health-safety/workspace-navigation';
 import { cn, resolveUrl } from '@/lib/utils';
 import { vendorRegisterTab } from '@/lib/vendor-navigation';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
-    AlertOctagon,
     AlertTriangle,
     Banknote,
     BarChart3,
@@ -66,24 +77,17 @@ import {
     Clock,
     DollarSign,
     FileText,
-    FlaskConical,
     GitBranch,
     GraduationCap,
-    HardHat,
     Heart,
-    HeartPulse,
     Home,
     Landmark,
-    LayoutDashboard,
     LayoutGrid,
     ListChecks,
     Map,
     MapPin,
-    Megaphone,
-    MessageSquare,
     MessageSquareText,
     Package,
-    PersonStanding,
     PieChart,
     Pill,
     Radio,
@@ -91,10 +95,7 @@ import {
     Server,
     Settings,
     Shield,
-    ShieldAlert,
     ShieldCheck,
-    Siren,
-    Smartphone,
     Stethoscope,
     Target,
     Timer,
@@ -114,7 +115,10 @@ import {
     useRef,
     useState,
 } from 'react';
-import { buildSecurityDevicesNavigationGroups } from './security-devices/security-devices-navigation';
+import {
+    buildSecurityDevicesNavigationGroups,
+    securityDevicesPrimaryLinkActive,
+} from './security-devices/security-devices-navigation';
 
 /* Event Horizon ink rail (APP_SHELL_STYLE_GUIDE.md §3). Sits below the
  * 58px command header; the two share the sidebar tokens so they read as one
@@ -135,13 +139,30 @@ const SIDEBAR_ICON_INACTIVE = 'text-sidebar-foreground/60';
 
 function CountPill({
     count,
+    pending = false,
     collapsed = false,
     testId,
 }: {
     count: number;
+    /** The count is not known yet (still loading, or its load failed): a dash, never "0". */
+    pending?: boolean;
     collapsed?: boolean;
     testId?: string;
 }) {
+    if (pending) {
+        return (
+            <span
+                data-test={testId}
+                title="Count not loaded yet"
+                className={cn(
+                    'flex h-5 min-w-5 items-center justify-center rounded-full bg-sidebar-accent px-1 text-[10px] leading-none font-bold text-sidebar-accent-foreground',
+                    collapsed ? 'absolute top-0.5 right-0.5' : 'ml-auto',
+                )}
+            >
+                –
+            </span>
+        );
+    }
     if (!count || count <= 0) return null;
     return (
         <span
@@ -266,6 +287,8 @@ interface IconNavItem {
     subPanel?: boolean;
     dividerAfter?: boolean;
     badge?: number;
+    /** The count is still loading (or failed to load): show a dash, never "0". */
+    badgePending?: boolean;
 }
 
 export interface SubPanelGroup {
@@ -346,6 +369,18 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
             : -1;
     }
 
+    const safetyActive = safetyHubLinkActive(current, item);
+    if (safetyActive !== undefined)
+        return safetyActive ? 2000 + item.length : -1;
+    // A Control Room destination stays lit on every view of its rail
+    // (/control-room prefixes every Control Room URL).
+    const controlRoomActive = controlRoomPrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (controlRoomActive !== undefined)
+        return controlRoomActive ? 2000 + item.length : -1;
+
     const fleetActive = fleetPrimaryLinkActive(
         normalizedCurrentPath,
         normalizedItemPath,
@@ -370,15 +405,19 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
         return -1;
     }
 
-    // The Conflict Queue has its own Workforce entry; select that destination.
-    const conflictQueuePath = '/operations/rostering/conflicts';
-    if (
-        normalizedItemPath === '/operations/rostering' &&
-        (normalizedCurrentPath === conflictQueuePath ||
-            normalizedCurrentPath.startsWith(`${conflictQueuePath}/`))
-    ) {
-        return -1;
-    }
+    const workforceActive = workforcePrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (workforceActive !== undefined)
+        return workforceActive ? 2000 + item.length : -1;
+
+    const securityDevicesActive = securityDevicesPrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (securityDevicesActive !== undefined)
+        return securityDevicesActive ? 2000 + item.length : -1;
 
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&
@@ -432,6 +471,15 @@ export function isIconActive(
     if (item.id === 'operations' && isWorkforceUrl(currentUrl)) {
         return false;
     }
+    // Approved scripts belongs to IT & Support › Remote support (see
+    // isSubItemActive), not to the Security & Devices group its URL sits in.
+    if (item.subPanel && subPanelGroups && isApprovedScriptsUrl(currentUrl)) {
+        return subPanelGroups.some((group) =>
+            (group?.items ?? []).some(
+                (sub) => resolveUrl(sub.href) === '/it/remote-support',
+            ),
+        );
+    }
     // For sub-panel items, check if any child is active
     if (item.subPanel && subPanelGroups) {
         return subPanelGroups.some((group) =>
@@ -451,7 +499,27 @@ export function isSubItemActive(
         const path = normalizePath(resolveUrl(currentUrl));
         return path === '/it' || path.startsWith('/it/tickets/');
     }
+    // Estate overview's address is the start of every Security & Devices
+    // page, so a prefix match lit it beside the real page. It is current only
+    // on itself (the module's own isSecurityDevicesDestinationActive rule).
+    if (resolveUrl(href) === '/security-devices') {
+        return normalizePath(resolveUrl(currentUrl)) === '/security-devices';
+    }
+    // Approved scripts lives under /security-devices but is reached only from
+    // IT & Support › Remote support, so that is the link that stays lit.
+    if (isApprovedScriptsUrl(currentUrl)) {
+        return resolveUrl(href) === '/it/remote-support';
+    }
     return matchScore(currentUrl, href) > 0;
+}
+
+function isApprovedScriptsUrl(url: string): boolean {
+    const path = normalizePath(resolveUrl(url));
+
+    return (
+        path === '/security-devices/scripts' ||
+        path.startsWith('/security-devices/scripts/')
+    );
 }
 
 // ── Build icon nav items ───────────────────────────────────────────────────
@@ -566,16 +634,31 @@ function canAccessShiftHandovers(can?: any): boolean {
     );
 }
 
+/**
+ * The All Tasks count, or null while it is not known: still loading after the
+ * page (`taskNav`), its load failed, or a task module could not be read. Null
+ * shows a dash, never "0". The H&S event page still sends the count with
+ * `auth.can.tasks`.
+ */
+export function allTasksBadge(props: Record<string, any>): number | null {
+    const nav = props.taskNav ?? props.auth?.can?.tasks;
+    if (typeof nav?.badge !== 'number' || nav.badgeDegraded) return null;
+    return nav.badge;
+}
+
 function buildIconNavItems({
     role,
     can,
     portalClients,
     unreadMessageCount,
+    taskBadge,
 }: {
     role?: string | null;
     can?: any;
     portalClients?: PortalClient[] | null;
     unreadMessageCount?: number;
+    /** All Tasks count; null while it is not known (shown as a dash). */
+    taskBadge?: number | null;
 }): IconNavItem[] {
     // Portal users (family members / clients) get a dedicated sidebar
     if (role === 'next_of_kin' || role === 'client') {
@@ -641,7 +724,8 @@ function buildIconNavItems({
                       icon: ListChecks,
                       label: 'All Tasks',
                       href: '/tasks',
-                      badge: can?.tasks?.badge,
+                      badge: taskBadge ?? undefined,
+                      badgePending: taskBadge === null,
                       dividerAfter: true,
                   } as IconNavItem,
               ]
@@ -755,12 +839,7 @@ function buildIconNavItems({
     }
 
     // Health & Safety
-    const hasSafety =
-        can?.incidents?.viewAny ||
-        can?.incidents?.viewAssigned ||
-        can?.compliance?.view ||
-        can?.hazards?.view ||
-        can?.['health-safety']?.view;
+    const hasSafety = safetySidebar(can).length > 0;
     if (hasSafety) {
         items.push({
             id: 'safety',
@@ -1312,38 +1391,31 @@ function buildOperationsSubPanelGroups({
     return groups;
 }
 
+/**
+ * Workforce shows six destinations (Stephan, 12 Oct 2026): Rostering,
+ * Available shifts, Attendance, Timesheets, Handovers and Settings. The
+ * full Shifts list, Conflict queue, Qualifications and Availability are
+ * reached from Rostering's header; Shift notes is a tab in the Handovers
+ * header. Their routes and permissions are unchanged, and they stay in
+ * command search (`workforceSearchEntries`).
+ */
 function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const workforce: NavItem[] = [];
 
-    // The Shifts table is the scheduler view. Frontline staff still use
-    // `/my-day` for their assigned shifts rather than this manager surface.
-    if (can?.shifts?.viewAny)
-        workforce.push({
-            title: 'Shifts',
-            href: '/operations/shifts',
-            icon: CalendarDays,
-        });
-    if (
-        can?.job_board?.viewAny ||
-        can?.job_board?.claim ||
-        can?.shifts?.viewAny ||
-        can?.shifts?.viewAssigned
-    )
-        workforce.push({
-            title: 'Job Board',
-            href: '/operations/job-board',
-            icon: ClipboardList,
-            badge: can?.job_board?.open_count,
-        });
-    // Rostering's own TabStrip is the navigation for its Calendar tab
-    // (/operations/rostering?tab=calendar) — no separate sidebar item.
     if (can?.rostering?.viewAny)
         workforce.push({
             title: 'Rostering',
             href: '/operations/rostering',
             icon: CalendarDays,
         });
-    // Roster readers already reach this workspace through its Availability tab.
+    // Without roster access there is no Rostering header to reach these
+    // from, so shift readers and availability editors keep a direct entry.
+    if (!can?.rostering?.viewAny && can?.shifts?.viewAny)
+        workforce.push({
+            title: 'Shifts',
+            href: '/operations/shifts',
+            icon: CalendarDays,
+        });
     if (
         !can?.rostering?.viewAny &&
         (can?.staff?.viewAny ||
@@ -1355,23 +1427,17 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/operations/availability',
             icon: Clock,
         });
-    if (canAccessShiftHandovers(can))
+    if (
+        can?.job_board?.viewAny ||
+        can?.job_board?.claim ||
+        can?.shifts?.viewAny ||
+        can?.shifts?.viewAssigned
+    )
         workforce.push({
-            title: 'Handovers',
-            href: '/operations/handovers',
-            icon: GitBranch,
-        });
-    if (can?.shifts?.viewAny)
-        workforce.push({
-            title: 'Shift Notes',
-            href: '/operations/shift-notes',
-            icon: BookOpen,
-        });
-    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned)
-        workforce.push({
-            title: 'Timesheets',
-            href: '/operations/timesheets',
-            icon: Clock,
+            title: 'Available shifts',
+            href: '/operations/job-board',
+            icon: ClipboardList,
+            badge: can?.job_board?.open_count,
         });
     // Attendance (clock sessions ↔ timesheet sync) sits between Shifts and
     // Timesheets in the workflow; the route also admits frontline workers
@@ -1387,21 +1453,29 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/attendance',
             icon: Timer,
         });
-    if (can?.rostering?.viewAny)
+    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned)
         workforce.push({
-            title: 'Conflict Queue',
-            href: '/operations/rostering/conflicts',
-            icon: AlertTriangle,
+            title: 'Timesheets',
+            href: '/operations/timesheets',
+            icon: Clock,
+        });
+    if (canAccessShiftHandovers(can))
+        workforce.push({
+            title: 'Handovers',
+            href: '/operations/handovers',
+            icon: GitBranch,
+        });
+    // Shift notes keeps its own entry only for a shift reader whose Handovers
+    // header doesn't offer the Shift notes tab (that tab is shown to managers).
+    if (can?.shifts?.viewAny && !communicationAccess(can).notes)
+        workforce.push({
+            title: 'Shift notes',
+            href: '/operations/shift-notes',
+            icon: BookOpen,
         });
     if (can?.rostering?.viewAny)
         workforce.push({
-            title: 'Qualifications',
-            href: '/operations/qualifications',
-            icon: ShieldCheck,
-        });
-    if (can?.rostering?.viewAny)
-        workforce.push({
-            title: 'Workforce settings',
+            title: 'Settings',
             href: '/operations/workforce-settings',
             icon: Settings,
         });
@@ -1409,6 +1483,99 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     return workforce.length > 0
         ? [{ label: 'Workforce', items: workforce }]
         : [];
+}
+
+/** Former sidebar names stay searchable after the six-entry rename. */
+const WORKFORCE_SEARCH_KEYWORDS: Record<string, string[]> = {
+    '/operations/job-board': ['job board', 'open shifts', 'claim a shift'],
+    '/operations/workforce-settings': ['workforce settings'],
+};
+
+/**
+ * Workforce pages that are reached from a header rather than the sidebar,
+ * kept in command search under the entry that leads to them.
+ */
+function workforceSearchEntries(can?: any): Array<{
+    label: string;
+    href: string;
+    group: string;
+    icon: LucideIcon;
+    keywords?: string[];
+}> {
+    const entries: Array<{
+        label: string;
+        href: string;
+        group: string;
+        icon: LucideIcon;
+        keywords?: string[];
+    }> = [];
+    if (canAccessShiftHandovers(can) && communicationAccess(can).notes)
+        entries.push({
+            label: 'Shift notes',
+            href: '/operations/shift-notes',
+            group: 'Handovers',
+            icon: BookOpen,
+            keywords: ['progress notes', 'shift documentation'],
+        });
+    if (!can?.rostering?.viewAny) return entries;
+    entries.push({
+        label: 'Availability',
+        href: '/operations/rostering?tab=availability',
+        group: 'Rostering',
+        icon: Clock,
+    });
+    if (can?.shifts?.viewAny)
+        entries.push({
+            label: 'Shifts',
+            href: '/operations/shifts',
+            group: 'Rostering',
+            icon: CalendarDays,
+            keywords: ['shift list', 'all shifts'],
+        });
+    entries.push(
+        {
+            label: 'Conflict queue',
+            href: '/operations/rostering/conflicts',
+            group: 'Rostering',
+            icon: AlertTriangle,
+            keywords: ['conflicts', 'coverage problems'],
+        },
+        {
+            label: 'Qualifications',
+            href: '/operations/qualifications',
+            group: 'Rostering',
+            icon: ShieldCheck,
+            keywords: ['requirements', 'skills'],
+        },
+    );
+    return entries;
+}
+
+/**
+ * Keep the sidebar entry lit for the pages reached from its header:
+ * Rostering for the Shifts list, Conflict queue, Qualifications and
+ * Availability; Handovers for Shift notes.
+ */
+function workforcePrimaryLinkActive(
+    currentPath: string,
+    itemPath: string,
+): boolean | undefined {
+    const within = (prefix: string) =>
+        currentPath === prefix || currentPath.startsWith(`${prefix}/`);
+    if (itemPath === '/operations/rostering') {
+        return [
+            '/operations/rostering',
+            '/operations/shifts',
+            '/operations/qualifications',
+            '/operations/availability',
+        ].some(within);
+    }
+    if (itemPath === '/operations/handovers') {
+        return ['/operations/handovers', '/operations/shift-notes'].some(
+            within,
+        );
+    }
+    return undefined;
 }
 
 /** The Medication module's hubs (lib/emar-navigation.ts), each at its first permitted view. */
@@ -1427,183 +1594,13 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     ];
 }
 
-function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
-
-    // ── 1. Command centre — the H&S home / "start here" ──────────────────
-    const overview: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view)
-        overview.push({
-            title: 'H&S Dashboard',
-            href: '/health-safety',
-            icon: ShieldCheck,
-        });
-    if (overview.length > 0)
-        groups.push({ label: 'Command centre', items: overview });
-
-    // ── 2. Report & respond — the front doors. Every safety event is logged
-    //    here (incident / near miss / fleet / safeguarding) before it converges
-    //    into the governance registers below. ─────────────────────────────────
-    const incidents: NavItem[] = [];
-    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned)
-        incidents.push({
-            title: 'Incidents',
-            href: '/incidents',
-            icon: ShieldAlert,
-        });
-    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned)
-        incidents.push({
-            title: 'Near Misses',
-            href: '/incidents?tab=near_misses',
-            icon: AlertTriangle,
-        });
-    if (can?.fleet?.viewAny || can?.assets?.viewAny || can?.incidents?.viewAny)
-        incidents.push({
-            title: 'Fleet Incidents',
-            href: '/fleet-assets/incidents',
-            icon: Truck,
-        });
-    if (can?.safeguarding?.viewAny || can?.safeguarding?.create)
-        incidents.push({
-            title: 'Safeguarding',
-            href: '/safeguarding',
-            icon: Shield,
-        });
-    if (incidents.length > 0)
-        groups.push({ label: 'Report & respond', items: incidents });
-
-    // ── 3. Investigate & resolve — the governance registers where every event
-    //    converges, is investigated, and is driven to a verified corrective
-    //    action. "Events" is the master register (was mislabelled
-    //    "Investigations"); Corrective Actions is the verification register. ───
-    const investigate: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view)
-        investigate.push({
-            title: 'Events',
-            href: '/health-safety/events',
-            icon: ClipboardCheck,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        investigate.push({
-            title: 'Corrective Actions',
-            href: '/health-safety/corrective-actions',
-            icon: Wrench,
-        });
-    if (investigate.length > 0)
-        groups.push({ label: 'Investigate & resolve', items: investigate });
-
-    // ── 4. Analyse & assure — trends, KPIs and board assurance close the loop.
-    //    Sits after the operational registers so the nav reads report →
-    //    investigate → resolve → analyse top-to-bottom. ───────────────────────
-    const analyse: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view || can?.reports?.viewAny)
-        analyse.push({
-            title: 'Analytics',
-            href: '/health-safety/analytics',
-            icon: BarChart3,
-        });
-    if (analyse.length > 0)
-        groups.push({ label: 'Analyse & assure', items: analyse });
-
-    // H&S Management
-    const hsManagement: NavItem[] = [];
-    if (can?.hazards?.view)
-        hsManagement.push({
-            title: 'Hazards',
-            href: '/compliance/hazards',
-            icon: AlertOctagon,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        hsManagement.push({
-            title: 'Worker Participation',
-            href: '/health-safety/worker-participation',
-            icon: Users,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        hsManagement.push({
-            title: 'Lone Worker Safety',
-            href: '/health-safety/lone-workers',
-            icon: PersonStanding,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        hsManagement.push({
-            title: 'Emergency Drills',
-            href: '/health-safety/drills',
-            icon: Siren,
-        });
-    if (hsManagement.length > 0)
-        groups.push({ label: 'H&S Management', items: hsManagement });
-
-    // Registers
-    const registers: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view)
-        registers.push({
-            title: 'Chemical Register',
-            href: '/health-safety/substances',
-            icon: FlaskConical,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        registers.push({
-            title: 'PPE & Equipment',
-            href: '/health-safety/ppe',
-            icon: HardHat,
-        });
-    if (can?.hazards?.view || can?.compliance?.view || can?.clinical?.dashboard)
-        registers.push({
-            title: 'First Aid Register',
-            href: '/health-safety/first-aid',
-            icon: HeartPulse,
-        });
-    if (can?.restraints?.view)
-        registers.push({
-            title: 'Restraints & Behaviour Support',
-            href: '/health-safety/restraints',
-            icon: Clipboard,
-        });
-    if (registers.length > 0)
-        groups.push({ label: 'Registers', items: registers });
-
-    // Injury & Recovery
-    const injury: NavItem[] = [];
-    if (can?.hazards?.view || can?.hr?.wellbeing?.view)
-        injury.push({
-            title: 'Workplace Injuries',
-            href: '/health-safety/injuries',
-            icon: Activity,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        injury.push({
-            title: 'Safe Work Procedures',
-            href: '/health-safety/procedures',
-            icon: FileText,
-        });
-    if (injury.length > 0)
-        groups.push({ label: 'Injury & Procedures', items: injury });
-
-    // Compliance & Risk
-    const compliance: NavItem[] = [];
-    if (can?.compliance?.view)
-        compliance.push({
-            title: 'Compliance',
-            href: '/compliance',
-            icon: Shield,
-        });
-    if (can?.risks?.viewAny || can?.risks?.viewAssigned)
-        compliance.push({
-            title: 'Risks',
-            href: '/health-safety/risk-assessments',
-            icon: Target,
-        });
-    if (can?.privacy?.viewRequests)
-        compliance.push({
-            title: 'Privacy',
-            href: '/privacy/dashboard',
-            icon: Shield,
-        });
-    if (compliance.length > 0)
-        groups.push({ label: 'Compliance & Risk', items: compliance });
-
-    return groups;
+export function buildSafetySubPanelGroups({
+    can,
+}: {
+    can?: SafetyNavigationPermissions;
+}): SubPanelGroup[] {
+    const items = safetySidebar(can);
+    return items.length ? [{ label: 'Health & Safety', items }] : [];
 }
 
 function buildFleetAssetsSubPanelGroups({
@@ -1893,100 +1890,18 @@ function buildReportingSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     return groups.filter((g) => g.items.length > 0);
 }
 
+/** Control Room's six destinations (lib/control-room-navigation.ts, approved
+ * 11 Oct 2026: 12 menu items → 6). Each destination's views are tabs on its
+ * header rail, not more sidebar links. */
 function buildControlRoomSubPanelGroups({
     can,
 }: {
-    can?: any;
+    can?: ControlRoomNavCapabilities;
 }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
-
-    // All items assume `controlRoom.viewAny` because the icon itself is
-    // already gated on that capability. We still gate sub-items that require
-    // richer permissions (alerts, reports, messaging, settings).
-    // The old Dashboard / All Alerts / Escalation Queue / Incident Tracker
-    // entries merged into ONE command centre (tabs on the page itself).
-    const live: NavItem[] = [];
-    if (can?.controlRoom?.viewAny) {
-        live.push({
-            title: 'Desk',
-            href: '/control-room',
-            icon: LayoutDashboard,
-        });
-        live.push({
-            title: 'My queue',
-            href: '/control-room/my-tasks',
-            icon: CheckCircle2,
-        });
-        live.push({ title: 'Live Map', href: '/control-room/map', icon: Map });
-        live.push({
-            title: 'Shifts',
-            href: '/control-room/shifts',
-            icon: Clock,
-        });
-    }
-    if (live.length) groups.push({ label: 'Live Monitoring', items: live });
-
-    const comms: NavItem[] = [];
-    if (can?.controlRoom?.alertsCreate || can?.controlRoom?.alertsManage)
-        comms.push({
-            title: 'Broadcast',
-            href: '/control-room/broadcast',
-            icon: Megaphone,
-        });
-    if (can?.messages?.send || can?.messages?.viewAny)
-        comms.push({
-            title: 'Staff Messaging',
-            href: '/control-room/messaging',
-            icon: MessageSquare,
-        });
-    if (comms.length) groups.push({ label: 'Communications', items: comms });
-
-    const ops: NavItem[] = [];
-    if (can?.controlRoom?.viewAny)
-        ops.push({
-            title: 'Device signals',
-            href: '/control-room/devices',
-            icon: Smartphone,
-        });
-    if (can?.controlRoom?.viewAny)
-        ops.push({
-            title: 'Playbooks',
-            href: '/control-room/playbooks',
-            icon: ClipboardCheck,
-        });
-    if (can?.controlRoom?.viewAny)
-        ops.push({
-            title: 'SLA Management',
-            href: '/control-room/sla',
-            icon: Target,
-        });
-    if (ops.length) groups.push({ label: 'Operations', items: ops });
-
-    const analytics: NavItem[] = [];
-    if (can?.controlRoom?.viewAny)
-        analytics.push({
-            title: 'Real-time Stats',
-            href: '/control-room/stats',
-            icon: Activity,
-        });
-    if (can?.controlRoom?.reportsView)
-        analytics.push({
-            title: 'Reports',
-            href: '/control-room/reports',
-            icon: FileText,
-        });
-    if (analytics.length) groups.push({ label: 'Analytics', items: analytics });
-
-    const config: NavItem[] = [];
-    if (can?.controlRoom?.alertsManage)
-        config.push({
-            title: 'Settings',
-            href: '/control-room/settings',
-            icon: Settings,
-        });
-    if (config.length) groups.push({ label: 'Configuration', items: config });
-
-    return groups;
+    const items: NavItem[] = controlRoomDestinations(can).map(
+        ({ title, href, icon }) => ({ title, href, icon }),
+    );
+    return items.length ? [{ label: 'Control Room', items }] : [];
 }
 
 function buildSecurityDevicesSubPanelGroups({
@@ -2454,6 +2369,7 @@ export function AppSidebar({
     const chatUnread = useChatCalling()?.unreadCount;
     const unreadMessageCount =
         chatUnread ?? (auth as any)?.unreadMessageCount ?? 0;
+    const taskBadge = allTasksBadge(page.props);
     const currentUrl = page.url;
     const { collapsed: fallbackCollapsed, setExpanded: setFallbackExpanded } =
         useAppSidebarState((page.props as any)?.sidebarOpen ?? true);
@@ -2477,8 +2393,14 @@ export function AppSidebar({
 
     const iconNavItems = useMemo(
         () =>
-            buildIconNavItems({ role, can, portalClients, unreadMessageCount }),
-        [role, can, portalClients, unreadMessageCount],
+            buildIconNavItems({
+                role,
+                can,
+                portalClients,
+                unreadMessageCount,
+                taskBadge,
+            }),
+        [role, can, portalClients, unreadMessageCount, taskBadge],
     );
 
     const subPanelMap = useMemo(
@@ -2751,6 +2673,7 @@ export function AppSidebar({
                                                 )}
                                                 <CountPill
                                                     count={item.badge ?? 0}
+                                                    pending={item.badgePending}
                                                     collapsed={isCollapsed}
                                                     testId={`sidebar-badge-${item.id}`}
                                                 />
@@ -2879,12 +2802,19 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
     const labels = useStableValue(labelsProp);
     const chatUnread = useChatCalling()?.unreadCount;
     const unreadMessageCount = chatUnread ?? auth?.unreadMessageCount ?? 0;
+    const taskBadge = allTasksBadge(page.props);
     const currentUrl = page.url;
 
     const iconNavItems = useMemo(
         () =>
-            buildIconNavItems({ role, can, portalClients, unreadMessageCount }),
-        [role, can, portalClients, unreadMessageCount],
+            buildIconNavItems({
+                role,
+                can,
+                portalClients,
+                unreadMessageCount,
+                taskBadge,
+            }),
+        [role, can, portalClients, unreadMessageCount, taskBadge],
     );
 
     const mobileSubPanelMap = useMemo(
@@ -3124,15 +3054,18 @@ export function buildNavSearchCatalog(ctx: {
     };
 
     for (const icon of iconNavItems) {
-        if (icon.id === 'workforce' && can?.rostering?.viewAny) {
-            push({
-                id: 'workforce:rostering:availability',
-                label: 'Availability',
-                href: '/operations/rostering?tab=availability',
-                section: icon.label,
-                group: 'Rostering',
-                icon: Clock,
-            });
+        if (icon.id === 'workforce') {
+            for (const entry of workforceSearchEntries(can)) {
+                push({
+                    id: `workforce:rostering:${entry.href}`,
+                    label: entry.label,
+                    href: entry.href,
+                    section: icon.label,
+                    group: entry.group,
+                    icon: entry.icon,
+                    ...(entry.keywords ? { keywords: entry.keywords } : {}),
+                });
+            }
         }
         // Keep relocated Fleet pages discoverable in command search as well as
         // their workspace menus; consolidation only shortens the left rail.
@@ -3167,6 +3100,11 @@ export function buildNavSearchCatalog(ctx: {
                 });
             }
         }
+        if (icon.id === 'safety') {
+            for (const entry of safetySearchEntries(can)) {
+                push({ ...entry, section: icon.label });
+            }
+        }
         if (icon.href && !icon.subPanel) {
             push({
                 id: icon.id,
@@ -3199,6 +3137,10 @@ export function buildNavSearchCatalog(ctx: {
                         icon: sub.icon ?? icon.icon,
                         ...(icon.id === 'emar'
                             ? { keywords: EMAR_SEARCH_KEYWORDS }
+                            : {}),
+                        ...(icon.id === 'workforce' &&
+                        WORKFORCE_SEARCH_KEYWORDS[href]
+                            ? { keywords: WORKFORCE_SEARCH_KEYWORDS[href] }
                             : {}),
                     });
                 }

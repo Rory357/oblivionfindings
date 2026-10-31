@@ -2,8 +2,16 @@
 
 namespace App\Services\Tasks\Providers;
 
+use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
+use App\Services\HealthSafety\FirstAidAccessService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\HsEventAccessService;
+use App\Services\HealthSafety\InjuryAccessService;
+use App\Services\HealthSafety\RestraintAccessService;
+use App\Services\Tasks\Contracts\ContextualHealthSafetyTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
@@ -12,11 +20,12 @@ use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
+use LogicException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use App\Support\HealthSafety\QueryPaging;
 
-class HsInvestigationProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
+class HsInvestigationProvider implements ContextualHealthSafetyTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
-    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
-
     public function sourceKey(): string
     {
         return 'hs_investigation';
@@ -39,6 +48,40 @@ class HsInvestigationProvider implements HasModelClass, SiteScopedTaskProvider, 
 
     public function authorizedTasks(User $user, array $filters = []): array
     {
+        try {
+            return HealthSafetyReadContext::within($user, array_unique([
+                ...FirstAidAccessService::PERMISSIONS,
+                ...RestraintAccessService::PERMISSIONS,
+                ...InjuryAccessService::PERMISSIONS,
+            ]), fn (HealthSafetyReadContext $context): array => $this->authorizedTasksInContext($user, $filters, $context));
+        } catch (HttpException $denial) {
+            if (! in_array($denial->getStatusCode(), [403, 404], true)) {
+                throw $denial;
+            }
+
+            return [];
+        }
+    }
+
+    public function authorizedTasksInContext(User $viewer, array $filters, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+
+        return $context->consumeSourceViewer(FirstAidAccessService::PERMISSIONS,
+            fn (User $current, CurrentAuthorizationReads $reads) => $this->authorizedTasksWithinSourceAuthority($viewer, $filters, $context, $current, $reads));
+    }
+
+    public function authorizedNavigationTasksInContext(User $viewer, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+
+        return $context->consumeSourceViewer(FirstAidAccessService::PERMISSIONS,
+            fn (User $current, CurrentAuthorizationReads $reads) => $this->authorizedTasksWithinSourceAuthority($viewer, [], $context, $current, $reads, true));
+    }
+
+    private function authorizedTasksWithinSourceAuthority(User $user, array $filters, ?HealthSafetyReadContext $context = null, ?User $current = null, ?CurrentAuthorizationReads $reads = null, bool $navigation = false): array
+    {
+        $current ??= $user;
         $includeSearchContext = TaskSearch::hasQuery($filters);
         $with = [
             'leadInvestigator:id,name',
@@ -72,13 +115,18 @@ class HsInvestigationProvider implements HasModelClass, SiteScopedTaskProvider, 
         }
 
         $query = HsInvestigation::query()
-            ->with($with)
+            ->with($navigation ? [] : $with)
             ->when(
                 $includeSearchContext,
-                fn ($q) => $q->whereHas(
-                    'hsEvent.clientIncident',
-                    fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
-                ),
+                fn ($q) => $q->where(fn ($match) => $match
+                    ->whereHas('hsEvent.clientIncident', fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters))
+                    ->orWhere(fn ($own) => TaskSearch::applyRecordPredicate($own, $filters,
+                        ['reference_number', 'investigation_type', 'status', 'findings_summary'],
+                        [
+                            'leadInvestigator' => ['name'], 'hsEvent' => ['reference_number'],
+                            'hsEvent.client' => ['first_name', 'last_name'], 'hsEvent.site' => ['name'],
+                        ],
+                    ))),
             )
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
@@ -88,25 +136,50 @@ class HsInvestigationProvider implements HasModelClass, SiteScopedTaskProvider, 
             $query->whereNotIn('status', [HsInvestigation::STATUS_COMPLETED]);
         }
 
+        if ($reads !== null) {
+            $query = $reads->query($query);
+        }
+
         return app(TaskProviderAuthorization::class)->siteScoped(
-            $user,
-            $this->canView($user),
+            $current,
+            $this->canView($current),
             $query,
-            fn ($scoped, User $actor) => $scoped->whereHas(
-                'hsEvent',
-                fn ($events) => app(UserSiteAccessService::class)->applyHsEventScope(
-                    $events,
-                    $actor,
-                    self::SITE_BYPASS_PERMISSIONS,
-                ),
-            ),
-            function (HsInvestigation $investigation) use ($includeSearchContext) {
+            function ($scoped, User $actor) use ($context) {
+                // Candidate discovery is independent; the final relation retains its outer-row correlation.
+                $childIds = (clone $scoped)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
+                    ->select($scoped->qualifyColumn('hs_event_id'));
+                if ($context === null) {
+                    throw new LogicException('H&S task source discovery requires its active prepared callback.');
+                }
+                $context->assertViewer($actor);
+                $candidates = $context->applyEventSiteScope(
+                    HsEvent::query()->whereIn('hs_events.id', $childIds),
+                    UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+                );
+
+                return $scoped->whereHas('hsEvent', function ($events) use ($actor, $context, $candidates) {
+                    return app(HsEventAccessService::class)->applyReadableScope($events, $actor, $context, $candidates);
+                });
+            },
+            function (HsInvestigation $investigation) use ($includeSearchContext, $user, $context, $current, $navigation) {
+                if ($navigation) {
+                    // Preserve the canonical query, ordering and cap before badge eligibility.
+                    return new TaskItem(id: 'hs_investigation-'.$investigation->id, source: $this->sourceKey(), sourceLabel: $this->label(),
+                        ref: null, title: '', status: (string) $investigation->status, bucket: match ($investigation->status) {
+                            HsInvestigation::STATUS_DRAFT => TaskItem::BUCKET_OPEN, HsInvestigation::STATUS_COMPLETED => TaskItem::BUCKET_DONE, default => TaskItem::BUCKET_IN_PROGRESS
+                        },
+                        severity: 'info', assignee: (int) $investigation->lead_investigator_id === (int) $current->id ? ['id' => $current->id] : null,
+                        dueAt: optional($investigation->target_completion_date)->toIso8601String());
+                }
+
                 $event = $investigation->hsEvent;
                 $journey = IncidentJourneyTaskContext::make(
                     $event?->clientIncident,
+                    $user,
                     $event?->controlRoomAlert,
                     $event,
                     $includeSearchContext,
+                    $context,
                 );
                 $client = $journey['person'] ?? ($event?->client ? [
                     'id' => $event->client->id,
@@ -145,6 +218,7 @@ class HsInvestigationProvider implements HasModelClass, SiteScopedTaskProvider, 
                     journey: $journey,
                     sourceContext: str_replace('_', ' ', (string) $investigation->investigation_type),
                     actionLabel: 'Continue H&S investigation',
+                    searchTerms: $includeSearchContext ? array_filter([$event?->reference_number, $investigation->findings_summary]) : [],
                 );
             },
         );

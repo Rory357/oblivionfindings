@@ -1,5 +1,7 @@
-import { PageHeader } from '@/components/page/page-header';
-import { Button } from '@/components/ui/button';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+} from '@/components/page/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
@@ -64,20 +66,18 @@ export function RecordingReferenceWorkspace({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Security & Devices',
-                    href: '/security-devices/security?tab=cctv',
-                },
+                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
                 {
                     title: camera.name,
                     href: '/security-devices/devices/' + camera.id,
                 },
                 { title: 'Recording references', href: base },
-                { title: 'Saved reference', href: r.reader_href },
+                { title: 'Saved reference' },
             ]}
         >
             <Head title={camera.name + ' · Saved recording reference'} />
-            <div className="space-y-5">
+            <div className="flex flex-col gap-5">
                 <PageHeader
                     variant="profile"
                     title={camera.name}
@@ -86,9 +86,9 @@ export function RecordingReferenceWorkspace({
                     backHref={base}
                     subline={camera.site.name + ' · Saved recording reference'}
                     actions={
-                        <Button variant="secondary" asChild>
+                        <PageHeaderGlassButton asChild>
                             <Link href={base}>All references</Link>
-                        </Button>
+                        </PageHeaderGlassButton>
                     }
                 />
                 <RecordingSourceNote source={detail.current_source} />

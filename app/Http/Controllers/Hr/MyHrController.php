@@ -507,6 +507,23 @@ class MyHrController extends Controller
         ]);
     }
 
+    /**
+     * The worker's own workplace injuries, read-only (Stephan, 30 Oct: facts, care and the return-to-work plan; no
+     * internal notes or files). Being the injured worker is the read rule; see OwnInjuryReadService.
+     */
+    public function injuries(Request $request)
+    {
+        $user = $this->currentMyHrUser($request);
+
+        $response = Inertia::render('hr/my/injuries', [
+            'myHr' => $this->myHrShellProps($user),
+            'injuries' => app(\App\Services\HealthSafety\OwnInjuryReadService::class)->forWorker($user),
+        ])->toResponse($request);
+        $response->headers->set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+
+        return $response;
+    }
+
     public function leave(Request $request)
     {
         $user = $this->currentMyHrUser($request);
@@ -1304,147 +1321,170 @@ class MyHrController extends Controller
     public function time(Request $request)
     {
         $user = $this->currentMyHrUser($request);
-
-        $activeClock = HrTimeEntry::query()
-            ->forUser($user->id)
-            ->active()
-            ->with([
-                'shift:id,client_id,service_context_id,starts_at,ends_at,shift_type,is_sleepover,is_on_call,expected_break_minutes,location',
-                'shift.client:id,first_name,last_name',
-                'shift.serviceContext:id,name',
-            ])
-            ->first(['id', 'clock_in', 'notes', 'shift_id']);
-
-        $todayEntries = HrTimeEntry::query()
-            ->forUser($user->id)
-            ->where('entry_date', now()->toDateString())
-            ->with(
-                'shift:id,client_id,service_context_id,starts_at,ends_at,shift_type,is_sleepover,is_on_call,expected_break_minutes,location',
-                'shift.client:id,first_name,last_name',
-                'shift.serviceContext:id,name',
-                'client:id,first_name,last_name'
-            )
-            ->orderBy('clock_in')
-            ->get()
-            ->map(fn ($entry) => [
-                'id' => $entry->id,
-                'entry_date' => $entry->entry_date->toDateString(),
-                'clock_in' => $entry->clock_in->format('H:i'),
-                'clock_out' => $entry->clock_out?->format('H:i'),
-                'break_minutes' => $entry->break_minutes,
-                'total_hours' => $entry->total_hours,
-                'entry_type' => $entry->entry_type,
-                'status' => $entry->status,
-                'pay_type' => $entry->pay_type ?? 'standard',
-                'notes' => $entry->notes,
-                'shift' => $entry->shift ? [
-                    'id' => $entry->shift->id,
-                    'starts_at' => $entry->shift->starts_at?->format('H:i'),
-                    'ends_at' => $entry->shift->ends_at?->format('H:i'),
-                    'shift_type' => $entry->shift->shift_type ?? 'standard',
-                    'is_sleepover' => (bool) $entry->shift->is_sleepover,
-                    'is_on_call' => (bool) $entry->shift->is_on_call,
-                    'expected_break_minutes' => $entry->shift->expected_break_minutes,
-                    'location' => $entry->shift->location,
-                    'service_context_name' => $entry->shift->serviceContext?->name,
-                    'client_name' => trim(($entry->shift->client?->first_name ?? '').' '.($entry->shift->client?->last_name ?? '')),
-                ] : null,
-                'client_name' => $entry->client
-                    ? trim(($entry->client->first_name ?? '').' '.($entry->client->last_name ?? ''))
-                    : null,
-            ]);
-
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $at = now($timezone);
+        $today = $at->toDateString();
+        $weekStart = $at->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+        $weekEnd = $weekStart->copy()->addWeek();
+        $activeClock = HrTimeEntry::query()->forUser($user->id)->active()
+            ->first(['id', 'user_id', 'clock_in', 'notes', 'shift_id', 'site_id', 'client_id']);
+        // Ledger allocation remains entry_date; work-zone today selects its date.
+        $todayEntries = HrTimeEntry::query()->forUser($user->id)->where('entry_date', $today)
+            ->orderBy('clock_in')->orderBy('id')->get();
         $weeklySummary = $this->timeTrackingService->getWeeklySummary($user->id);
-
-        // This week's roster (read-only from Operations) — 7 day columns.
-        $weekStart = now()->startOfWeek();
-        $weekEnd = now()->endOfWeek();
-        $weekShifts = Shift::where('user_id', $user->id)
-            ->visibleToFrontline()
-            ->whereBetween('starts_at', [$weekStart, $weekEnd])
-            ->with('client:id,first_name,last_name', 'serviceContext:id,name')
-            ->orderBy('starts_at')
-            ->get();
-
+        // Finish existing eager shell reads before projecting related work labels.
+        $shell = $this->myHrShellProps($user);
+        $weekShifts = $this->myHrTimeShiftQuery($user)
+            ->where('starts_at', '<', $weekEnd->copy()->utc())
+            ->where('ends_at', '>', $weekStart->copy()->utc())
+            ->orderBy('starts_at')->orderBy('id')->get();
         $weekRoster = [];
         for ($i = 0; $i < 7; $i++) {
             $day = $weekStart->copy()->addDays($i);
-            $dayShifts = $weekShifts
-                ->filter(fn (Shift $s) => $s->starts_at && $s->starts_at->isSameDay($day))
-                ->map(fn (Shift $s) => [
-                    'id' => $s->id,
-                    'service_context_id' => $s->service_context_id,
-                    'site' => $s->serviceContext?->name ?? $s->location ?? 'Shift',
-                    'client_name' => trim(($s->client?->first_name ?? '').' '.($s->client?->last_name ?? '')) ?: null,
-                    'shift_type' => $s->shift_type ?? 'standard',
-                    'time' => $s->starts_at->format('H:i').'–'.($s->ends_at?->format('H:i') ?? '—'),
-                    'starts_at' => $s->starts_at->toIso8601String(),
-                    'ends_at' => $s->ends_at?->toIso8601String(),
-                ])
-                ->values()
-                ->all();
-
-            $weekRoster[] = [
-                'day' => $day->isoFormat('ddd'),
-                'date' => $day->format('j'),
-                'today' => $day->isSameDay(now()),
-                'shifts' => $dayShifts,
-            ];
+            $dayShifts = [];
+            foreach ($weekShifts as $shift) {
+                $startDay = $shift->starts_at?->copy()->setTimezone($timezone)->toDateString();
+                $carryIn = $startDay !== null && $startDay < $weekStart->toDateString();
+                if ($startDay !== $day->toDateString() && ! ($i === 0 && $carryIn)) continue;
+                $data = $this->myHrTimeShiftData($user, $shift);
+                if (! $data) continue;
+                $start = Carbon::parse($data['starts_at_iso'])->setTimezone($timezone);
+                $end = Carbon::parse($data['ends_at_iso'])->setTimezone($timezone);
+                $dayShifts[] = ['id' => $data['id'], 'service_context_id' => $data['service_context_id'],
+                    'site' => $data['site'], 'client_name' => $data['client_name'] ?: null,
+                    'shift_type' => $data['shift_type'], 'time' => $start->format('H:i').'–'.$end->format('H:i'),
+                    'starts_at' => $data['starts_at_iso'], 'ends_at' => $data['ends_at_iso'],
+                    'continues_from_previous_week' => $carryIn];
+            }
+            $weekRoster[] = ['day' => $day->isoFormat('ddd'), 'date' => $day->format('j'),
+                'date_key' => $day->toDateString(), 'today' => $day->toDateString() === $today, 'shifts' => $dayShifts];
         }
-
-        // Upcoming shifts for the next 3 days
-        $upcomingShifts = Shift::where('user_id', $user->id)
-            ->visibleToFrontline()
+        $upcomingShifts = $this->myHrTimeShiftQuery($user)
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
-            ->where('starts_at', '>=', now())
-            ->where('starts_at', '<=', now()->addDays(3))
-            ->with('client:id,first_name,last_name', 'serviceContext:id,name')
-            ->orderBy('starts_at')
-            ->limit(10)
-            ->get()
-            ->map(fn ($shift) => [
-                'id' => $shift->id,
-                'starts_at' => $shift->starts_at?->format('Y-m-d H:i'),
-                'ends_at' => $shift->ends_at?->format('Y-m-d H:i'),
-                'shift_type' => $shift->shift_type ?? 'standard',
-                'is_sleepover' => (bool) $shift->is_sleepover,
-                'is_on_call' => (bool) $shift->is_on_call,
-                'expected_break_minutes' => $shift->expected_break_minutes,
-                'client_name' => trim(($shift->client?->first_name ?? '').' '.($shift->client?->last_name ?? '')),
-                'location' => $shift->location,
-                'service_context_name' => $shift->serviceContext?->name,
-                'status' => $shift->status,
-            ]);
-
+            ->where('starts_at', '>=', $at->copy()->utc())
+            ->where('starts_at', '<=', $at->copy()->addDays(3)->utc())
+            ->orderBy('starts_at')->orderBy('id')->limit(10)->get()
+            ->map(function (Shift $shift) use ($user, $timezone) {
+                $data = $this->myHrTimeShiftData($user, $shift);
+                if (! $data) return null;
+                return ['id' => $data['id'],
+                    'starts_at' => Carbon::parse($data['starts_at_iso'])->setTimezone($timezone)->format('Y-m-d H:i'),
+                    'ends_at' => Carbon::parse($data['ends_at_iso'])->setTimezone($timezone)->format('Y-m-d H:i'),
+                    'starts_at_iso' => $data['starts_at_iso'], 'ends_at_iso' => $data['ends_at_iso'],
+                    'shift_type' => $data['shift_type'], 'is_sleepover' => $data['is_sleepover'],
+                    'is_on_call' => $data['is_on_call'], 'expected_break_minutes' => $data['expected_break_minutes'],
+                    'client_name' => $data['client_name'], 'location' => $data['location'],
+                    'service_context_name' => $data['service_context_name'], 'status' => $data['status']];
+            })->filter()->values();
+        $todayEntries = $todayEntries->map(function (HrTimeEntry $entry) use ($user, $timezone) {
+            $shift = $this->myHrTimeEntryShift($user, $entry, $timezone);
+            return [
+            'id' => $entry->id, 'entry_date' => $entry->entry_date->toDateString(),
+            'clock_in' => $entry->clock_in->copy()->setTimezone($timezone)->format('H:i'),
+            'clock_out' => $entry->clock_out?->copy()->setTimezone($timezone)->format('H:i'),
+            'clock_in_at' => $entry->clock_in->toIso8601String(), 'clock_out_at' => $entry->clock_out?->toIso8601String(),
+            'break_minutes' => $entry->break_minutes, 'total_hours' => $entry->total_hours,
+            'entry_type' => $entry->entry_type, 'status' => $entry->status, 'pay_type' => $entry->pay_type ?? 'standard',
+            'notes' => $entry->notes, 'shift' => $shift,
+            'client_name' => $this->myHrTimeEntryClientName($user, $entry, $shift),
+            ];
+        });
         return Inertia::render('hr/my/time', [
-            'myHr' => $this->myHrShellProps($user),
-            'weekRoster' => $weekRoster,
-            'activeClock' => $activeClock ? [
-                'id' => $activeClock->id,
-                'clock_in' => $activeClock->clock_in->format('Y-m-d H:i'),
-                'notes' => $activeClock->notes,
-                'shift' => $activeClock->shift ? [
-                    'id' => $activeClock->shift->id,
-                    'starts_at' => $activeClock->shift->starts_at?->format('H:i'),
-                    'ends_at' => $activeClock->shift->ends_at?->format('H:i'),
-                    'shift_type' => $activeClock->shift->shift_type ?? 'standard',
-                    'is_sleepover' => (bool) $activeClock->shift->is_sleepover,
-                    'is_on_call' => (bool) $activeClock->shift->is_on_call,
-                    'expected_break_minutes' => $activeClock->shift->expected_break_minutes,
-                    'location' => $activeClock->shift->location,
-                    'service_context_name' => $activeClock->shift->serviceContext?->name,
-                    'client_name' => trim(($activeClock->shift->client?->first_name ?? '').' '.($activeClock->shift->client?->last_name ?? '')),
-                ] : null,
-            ] : null,
-            'todayEntries' => $todayEntries,
-            'weeklySummary' => $weeklySummary,
-            'upcomingShifts' => $upcomingShifts,
+            'myHr' => $shell, 'timezone' => $timezone, 'todayDate' => $today,
+            'weekStartDate' => $weekStart->toDateString(), 'weekEndDate' => $weekEnd->copy()->subDay()->toDateString(),
+            'weekRoster' => $weekRoster, 'activeClock' => $activeClock ? [
+                'id' => $activeClock->id, 'clock_in' => $activeClock->clock_in->copy()->setTimezone($timezone)->format('Y-m-d H:i'),
+                'clock_in_at' => $activeClock->clock_in->toIso8601String(), 'notes' => $activeClock->notes,
+                'shift' => $this->myHrTimeEntryShift($user, $activeClock, $timezone),
+            ] : null, 'todayEntries' => $todayEntries, 'weeklySummary' => $weeklySummary, 'upcomingShifts' => $upcomingShifts,
         ]);
+    }
+
+    /** Own HR facts stay readable; related work records retain current Site authority. */
+    private function myHrTimeShiftQuery(User $user): \Illuminate\Database\Eloquent\Builder
+    {
+        $reader = $this->currentStaff->currentUsersQuery()->whereKey($user->id)->with('hrEmployeeProfile')->first();
+        $query = Shift::query()->where('user_id', $user->id);
+        if (! $reader) return $query->whereRaw('1 = 0');
+        return (new UserSiteAccessService)->applyShiftScope($query, $reader)->visibleToFrontline()
+            ->whereNotNull('starts_at')->whereNotNull('ends_at')->whereColumn('ends_at', '>', 'starts_at');
+    }
+
+    private function myHrTimeShiftData(User $user, Shift $shift): ?array
+    {
+        if (! ($shift->starts_at instanceof \Carbon\CarbonInterface) || ! ($shift->ends_at instanceof \Carbon\CarbonInterface)
+            || ! $shift->ends_at->gt($shift->starts_at)) return null;
+        $access = new UserSiteAccessService;
+        $siteId = $access->shiftSiteId($shift);
+        if (! $siteId) return null;
+        $client = $shift->client_id ? \App\Models\Client::query()->whereKey($shift->client_id)
+            ->where('site_id', $siteId)->first(['id', 'site_id', 'first_name', 'last_name']) : null;
+        $context = $shift->service_context_id ? \App\Models\ServiceContext::query()->availableToSite($siteId)
+            ->whereKey($shift->service_context_id)->first(['id', 'site_id', 'name']) : null;
+        $query = $this->myHrTimeShiftQuery($user)->whereKey($shift->id);
+        $query->where(fn ($scope) => $scope->where('site_id', $siteId)->orWhere(fn ($fallback) => $fallback
+            ->whereNull('site_id')->whereHas('client', fn ($linked) => $linked->where('site_id', $siteId))));
+        foreach (['user_id', 'client_id', 'site_id', 'service_context_id', 'starts_at', 'ends_at', 'location',
+            'shift_type', 'is_sleepover', 'is_on_call', 'expected_break_minutes', 'status'] as $field) {
+            $query->where($field, $shift->getAttribute($field));
+        }
+        if (! $query->exists()) return null;
+        if ($context && ! \App\Models\ServiceContext::query()->availableToSite($siteId)->whereKey($context->id)
+            ->where('site_id', $context->site_id)->where('name', $context->name)->exists()) $context = null;
+        if ($client && ! \App\Models\Client::query()->whereKey($client->id)->where('site_id', $siteId)
+            ->where('first_name', $client->first_name)->where('last_name', $client->last_name)->exists()) $client = null;
+        return ['id' => (int) $shift->id, 'service_context_id' => $context ? (int) $context->id : null,
+            'site' => $context?->name ?? $shift->location ?? 'Shift',
+            'starts_at_iso' => $shift->starts_at->toIso8601String(), 'ends_at_iso' => $shift->ends_at->toIso8601String(),
+            'shift_type' => $shift->shift_type ?? '', 'is_sleepover' => (bool) $shift->is_sleepover,
+            'is_on_call' => (bool) $shift->is_on_call, 'expected_break_minutes' => $shift->expected_break_minutes,
+            'client_name' => $client ? trim($client->first_name.' '.$client->last_name) : '',
+            'location' => $shift->location, 'service_context_name' => $context?->name, 'status' => $shift->status];
+    }
+
+    private function myHrTimeEntryShift(User $user, HrTimeEntry $entry, string $timezone): ?array
+    {
+        if (! $entry->shift_id) return null;
+        $shift = $this->myHrTimeShiftQuery($user)->whereKey($entry->shift_id)->first();
+        if (! $shift) return null;
+        $siteId = (new UserSiteAccessService)->shiftSiteId($shift);
+        if (($entry->site_id !== null && (int) $entry->site_id !== $siteId)
+            || ($entry->client_id !== null && (int) $entry->client_id !== (int) $shift->client_id)) return null;
+        $data = $this->myHrTimeShiftData($user, $shift);
+        if (! $data) return null;
+        return ['id' => $data['id'],
+            'starts_at' => Carbon::parse($data['starts_at_iso'])->setTimezone($timezone)->format('H:i'),
+            'ends_at' => Carbon::parse($data['ends_at_iso'])->setTimezone($timezone)->format('H:i'),
+            'starts_at_iso' => $data['starts_at_iso'], 'ends_at_iso' => $data['ends_at_iso'],
+            'shift_type' => $data['shift_type'], 'is_sleepover' => $data['is_sleepover'], 'is_on_call' => $data['is_on_call'],
+            'expected_break_minutes' => $data['expected_break_minutes'], 'location' => $data['location'],
+            'service_context_name' => $data['service_context_name'], 'client_name' => $data['client_name']];
+    }
+
+    private function myHrTimeEntryClientName(User $user, HrTimeEntry $entry, ?array $shift): ?string
+    {
+        if (! $entry->client_id || ($entry->shift_id !== null && $shift === null)) return null;
+        $reader = $this->currentStaff->currentUsersQuery()->whereKey($user->id)->with('hrEmployeeProfile')->first();
+        if (! $reader) return null;
+        $siteIds = (new UserSiteAccessService)->accessibleSiteIds($reader);
+        $client = \App\Models\Client::query()->whereKey($entry->client_id)->whereIn('site_id', $siteIds)
+            ->when($entry->site_id !== null, fn ($query) => $query->where('site_id', $entry->site_id))
+            ->first(['id', 'site_id', 'first_name', 'last_name']);
+        if (! $client) return null;
+        $fresh = $this->currentStaff->currentUsersQuery()->whereKey($user->id)->with('hrEmployeeProfile')->first();
+        if (! $fresh || ! in_array((int) $client->site_id, (new UserSiteAccessService)->accessibleSiteIds($fresh), true)
+            || ! \App\Models\Client::query()->whereKey($client->id)->where('site_id', $client->site_id)
+                ->where('first_name', $client->first_name)->where('last_name', $client->last_name)->exists()) return null;
+        return trim($client->first_name.' '.$client->last_name) ?: null;
     }
 
     public function clockIn(Request $request)
     {
         $user = $this->currentMyHrUser($request);
+
+        if ($this->wantsMyHrClockResult($request)) {
+            return $this->checkedMyHrClock($request, $user, 'clock_in');
+        }
 
         $shift = $this->attendanceService->resolveSelfClockInShift(
             $user,
@@ -1484,6 +1524,10 @@ class MyHrController extends Controller
     public function clockOut(Request $request)
     {
         $user = $this->currentMyHrUser($request);
+
+        if ($this->wantsMyHrClockResult($request)) {
+            return $this->checkedMyHrClock($request, $user, 'clock_out');
+        }
 
         $validated = $request->validate([
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
@@ -1545,49 +1589,199 @@ class MyHrController extends Controller
             : redirect()->back()->with('error', 'You are not currently clocked in.');
     }
 
+    private function wantsMyHrClockResult(Request $request): bool
+    {
+        return ! $request->headers->has('X-Inertia')
+            && strtolower($request->getAcceptableContentTypes()[0] ?? '') === 'application/json';
+    }
+
+    /** The checked caller never switches between attendance and orphan recovery. */
+    private function checkedMyHrClock(Request $request, User $user, string $action): JsonResponse
+    {
+        $enteredWriter = false;
+        $selected = null;
+        try {
+            $identity = $request->validate([
+                'actor_id' => ['required', 'integer', 'min:1'],
+                'target' => ['required', 'array:kind,id'],
+                'target.kind' => ['required', Rule::in($action === 'clock_in' ? ['idle'] : ['attendance_session', 'orphan_time_entry'])],
+                'target.id' => [$action === 'clock_in' ? 'prohibited' : 'required', 'integer', 'min:1'],
+                'expected_shift_id' => [$action === 'clock_in' ? 'prohibited' : 'present', 'nullable', 'integer', 'min:1'],
+            ]);
+            if ((int) $identity['actor_id'] !== (int) $user->id) {
+                return $this->unconfirmedMyHrClock();
+            }
+            $kind = $identity['target']['kind'];
+            $shiftId = isset($identity['expected_shift_id']) ? (int) $identity['expected_shift_id'] : null;
+            if ($kind === 'attendance_session') {
+                $selected = $this->attendanceService->resolveSelfAttendanceSession($user, (int) $identity['target']['id']);
+                abort_unless($selected && $selected->shift_id === $shiftId, 404);
+            } elseif ($kind === 'orphan_time_entry') {
+                $selected = HrTimeEntry::query()->whereKey((int) $identity['target']['id'])
+                    ->where('user_id', $user->id)->whereNull('attendance_session_id')->whereNull('clock_out')
+                    ->where(fn ($query) => $query->whereNull('status')->orWhere('status', '!=', 'voided'))->firstOrFail();
+                abort_unless($selected->shift_id === $shiftId, 404);
+            }
+            $data = $request->validate([
+                'shift_id' => [$action === 'clock_in' ? 'nullable' : 'prohibited', 'integer', 'min:1'],
+                'break_minutes' => [$kind === 'attendance_session' || $action === 'clock_in' ? 'prohibited' : 'nullable', 'integer', 'min:0', 'max:240'],
+                'mileage_km' => [$action === 'clock_in' ? 'prohibited' : 'nullable', 'numeric', 'min:0', 'max:9999'],
+                'notes' => ['nullable', 'string', 'max:500'],
+            ]);
+            if ($action === 'clock_in') {
+                $shift = $this->attendanceService->resolveSelfClockInShift($user, $data['shift_id'] ?? null);
+                $data['shift_id'] = $shift?->id;
+            }
+            $outside = $this->myHrClockOutsideTransaction();
+            $enteredWriter = true;
+            if ($action === 'clock_in') {
+                $recorded = $this->attendanceService->clockInRecorded($user, [...$data, 'source' => 'self_service']);
+                $kind = 'attendance_session';
+            } elseif ($kind === 'attendance_session') {
+                $recorded = $this->attendanceService->clockOutRecorded($user, $selected, $shiftId, $data);
+            } else {
+                $recorded = $this->timeTrackingService->closeOpenEntryRecorded(
+                    $user, (int) $selected->id, $shiftId, now(),
+                    isset($data['break_minutes']) ? (int) $data['break_minutes'] : null,
+                    isset($data['mileage_km']) ? (float) $data['mileage_km'] : null,
+                    $data['notes'] ?? null,
+                );
+            }
+            if (! $outside || ! $this->myHrClockOutsideTransaction()) {
+                return $this->unconfirmedMyHrClock();
+            }
+            $reader = $this->myHrClockReader((int) $user->id);
+            if ($kind === 'attendance_session') {
+                $frame = $recorded->getRelation('attendanceClockRecordedResult');
+                $authority = $recorded->getRelation('attendanceClockRecordedAuthority');
+                abort_unless($this->canMyHrAttendanceClock($reader), 403);
+                $current = $this->attendanceService->resolveSelfAttendanceSession($reader, (int) $frame['session_id']);
+                abort_unless($current && (int) $current->user_id === (int) $reader->id
+                    && $current->shift_id === $authority['shift_id'] && $current->site_id === $authority['site_id'], 404);
+                if ($frame['action'] !== $action || ($action === 'clock_out'
+                    && ((int) $frame['session_id'] !== (int) $identity['target']['id'] || $frame['shift_id'] !== $shiftId))) {
+                    return $this->unconfirmedMyHrClock();
+                }
+            } else {
+                $frame = $recorded->getRelation('myHrClockRecordedResult');
+                $authority = $recorded->getRelation('myHrClockRecordedAuthority');
+                $this->assertMyHrOrphanResultReadable($reader, $authority);
+                if ((int) $frame['id'] !== (int) $identity['target']['id'] || $frame['shift_id'] !== $shiftId) {
+                    return $this->unconfirmedMyHrClock();
+                }
+            }
+            return $this->myHrClockJson([
+                'schema_version' => 1, 'scope' => 'my_hr_clock_recorded_result',
+                'actor_id' => (int) $reader->id, 'action' => $action, 'target_kind' => $kind,
+                'attendance_result' => $kind === 'attendance_session' ? $frame : null,
+                'time_entry_result' => $kind === 'orphan_time_entry' ? $frame : null,
+            ]);
+        } catch (ValidationException $exception) {
+            return $enteredWriter ? $this->unconfirmedMyHrClock()
+                : $this->myHrClockJson(['code' => 'my_hr_clock_rejected', 'message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
+        } catch (AttendanceClockOutBlockedException $exception) {
+            // Guidance is shown only after a new current self-scope check. It
+            // never changes uncertainty into proof that the writer rolled back.
+            $reader = $this->myHrClockReader((int) $user->id);
+            abort_unless($this->canMyHrAttendanceClock($reader), 403);
+            $this->attendanceService->resolveSelfAttendanceSession($reader, (int) $identity['target']['id']);
+            return $this->unconfirmedMyHrClock($exception->blockers());
+        } catch (\Throwable $exception) {
+            if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
+                && in_array($exception->getStatusCode(), [403, 404], true)) {
+                throw $exception;
+            }
+            if ($exception instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                throw $exception;
+            }
+            return $this->unconfirmedMyHrClock();
+        }
+    }
+
+    private function myHrClockOutsideTransaction(): bool
+    {
+        $connection = DB::connection();
+        return $connection->transactionLevel() === 0 && ! $connection->getPdo()->inTransaction();
+    }
+
+    private function myHrClockReader(int $actorId): User
+    {
+        $reader = User::query()->staff()->whereNotNull('approved_at')->findOrFail($actorId);
+        abort_unless($this->currentStaff->isCurrent($reader), 404);
+        return $reader;
+    }
+
+    private function canMyHrAttendanceClock(User $user): bool
+    {
+        return $user->canDo('timesheets.create') || $user->canDo('shifts.viewAssigned')
+            || $user->canDo('shifts.update') || $user->canDo('shifts.manageAny');
+    }
+
+    private function assertMyHrOrphanResultReadable(User $reader, array $authority): void
+    {
+        $entry = HrTimeEntry::query()->whereKey($authority['id'])->where('user_id', $reader->id)
+            ->whereNull('attendance_session_id')->whereNull('source_id')
+            ->where(fn ($query) => $query->whereNull('source_type')->orWhere('source_type', '!=', 'attendance'))->firstOrFail();
+        foreach ($authority as $field => $value) {
+            $actual = $entry->getAttribute($field);
+            abort_unless(($actual === null ? null : (int) $actual) === $value, 404);
+        }
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $profiles = HrEmployeeProfile::query()->where('user_id', $reader->id)->where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('start_date')->orWhereDate('start_date', '<=', $today))
+            ->where(fn ($query) => $query->whereNull('end_date')->orWhereDate('end_date', '>=', $today))->get();
+        abort_unless($profiles->count() === 1, 404);
+        $profile = $profiles->first();
+        $sites = collect([$profile->primary_site_id, ...($profile->secondary_site_ids ?? [])])->map(fn ($id) => (int) $id);
+        abort_unless($sites->contains((int) $authority['site_id'])
+            && \App\Models\Site::query()->active()->notArchived()->whereNull('archived_at')->whereKey($authority['site_id'])->exists(), 404);
+        if ($authority['client_id'] !== null) {
+            abort_unless(\App\Models\Client::query()->whereKey($authority['client_id'])->where('site_id', $authority['site_id'])->exists(), 404);
+        }
+        if ($authority['shift_id'] !== null) {
+            abort_unless(Shift::query()->whereKey($authority['shift_id'])->where('user_id', $reader->id)
+                ->where('client_id', $authority['client_id'])
+                ->where(fn ($query) => $query->whereNull('site_id')->orWhere('site_id', $authority['site_id']))->exists(), 404);
+        }
+    }
+
+    private function unconfirmedMyHrClock(?array $blockers = null): JsonResponse
+    {
+        $data = ['code' => 'my_hr_clock_result_unconfirmed', 'message' => 'The clock result could not be confirmed. It may already have saved. Check your current attendance before trying again.'];
+        if ($blockers !== null) $data['clock_out_blockers'] = $blockers;
+        return $this->myHrClockJson($data, 409);
+    }
+
+    private function myHrClockJson(array $data, int $status = 200): JsonResponse
+    {
+        return response()->json($data, $status)->withHeaders([
+            'Cache-Control' => 'private, no-store', 'Pragma' => 'no-cache', 'Referrer-Policy' => 'no-referrer',
+        ]);
+    }
+
     /** Download a single roster shift as a calendar (.ics) event. */
     public function shiftCalendar(Request $request, Shift $shift)
     {
         $user = $this->currentMyHrUser($request);
-        $shift = Shift::query()
-            ->visibleToFrontline()
-            ->whereKey($shift->getKey())
-            ->where('user_id', $user->id)
-            ->firstOrFail();
-
-        $start = $shift->starts_at?->copy()->utc();
-        abort_unless($start, 404);
-        $end = $shift->ends_at?->copy()->utc() ?? $start->copy()->addHours(8);
-
-        $shift->loadMissing('serviceContext:id,name', 'client:id,first_name,last_name');
-        $summary = $shift->serviceContext?->name ?? $shift->location ?? 'Shift';
-        $client = trim(($shift->client?->first_name ?? '').' '.($shift->client?->last_name ?? ''));
-        if ($client !== '') {
-            $summary .= ' · '.$client;
-        }
-        $uid = 'shift-'.$shift->id.'@'.($request->getHost() ?: 'kauricare');
-        $stamp = now()->utc()->format('Ymd\THis\Z');
-
-        $lines = [
-            'BEGIN:VCALENDAR',
-            'VERSION:2.0',
-            'PRODID:-//Kauri Care//My HR//EN',
-            'BEGIN:VEVENT',
-            'UID:'.$uid,
-            'DTSTAMP:'.$stamp,
-            'DTSTART:'.$start->format('Ymd\THis\Z'),
-            'DTEND:'.$end->format('Ymd\THis\Z'),
-            'SUMMARY:'.$this->icsEscape($summary),
-        ];
-        if ($shift->location) {
-            $lines[] = 'LOCATION:'.$this->icsEscape($shift->location);
-        }
+        $shift = $this->myHrTimeShiftQuery($user)->whereKey($shift->getKey())->firstOrFail();
+        $data = $this->myHrTimeShiftData($user, $shift);
+        abort_unless($data, 404);
+        $start = Carbon::parse($data['starts_at_iso'])->utc();
+        $end = Carbon::parse($data['ends_at_iso'])->utc();
+        $summary = $data['service_context_name'] ?? $data['location'] ?? 'Shift';
+        if ($data['client_name'] !== '') $summary .= ' · '.$data['client_name'];
+        $uid = 'shift-'.$data['id'].'@'.($request->getHost() ?: 'kauricare');
+        $lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Kauri Care//My HR//EN', 'BEGIN:VEVENT',
+            'UID:'.$uid, 'DTSTAMP:'.now()->utc()->format('Ymd\THis\Z'),
+            'DTSTART:'.$start->format('Ymd\THis\Z'), 'DTEND:'.$end->format('Ymd\THis\Z'),
+            'SUMMARY:'.$this->icsEscape($summary)];
+        if ($data['location']) $lines[] = 'LOCATION:'.$this->icsEscape($data['location']);
         $lines[] = 'END:VEVENT';
         $lines[] = 'END:VCALENDAR';
-
         return response(implode("\r\n", $lines)."\r\n", 200, [
             'Content-Type' => 'text/calendar; charset=utf-8',
-            'Content-Disposition' => 'attachment; filename="shift-'.$shift->id.'.ics"',
+            'Content-Disposition' => 'attachment; filename="shift-'.$data['id'].'.ics"',
+            'Cache-Control' => 'private, no-store', 'Pragma' => 'no-cache', 'Referrer-Policy' => 'no-referrer',
         ]);
     }
 

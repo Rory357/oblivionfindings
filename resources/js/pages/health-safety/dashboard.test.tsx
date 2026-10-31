@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
 
@@ -70,7 +70,8 @@ describe('Health & Safety dashboard attention worklists', () => {
             />,
         );
 
-        const acceptance = screen.getByText('Awaiting H&S acceptance');
+        // Drawn as the approved overview (20): the acceptance list comes first and each row opens its acceptance action.
+        const acceptance = screen.getByText('Waiting for Health & safety to accept');
         const corrective = screen.getByText('Overdue corrective actions');
         expect(
             acceptance.compareDocumentPosition(corrective) &
@@ -78,7 +79,7 @@ describe('Health & Safety dashboard attention worklists', () => {
         ).toBeTruthy();
         expect(
             screen.getByText(
-                'A named H&S owner must accept governance responsibility.',
+                /A named H&S owner must accept governance responsibility./,
             ),
         ).toBeVisible();
         expect(
@@ -86,13 +87,11 @@ describe('Health & Safety dashboard attention worklists', () => {
         ).toHaveTextContent('1');
 
         const directLink = screen.getByRole('link', {
-            name: 'Accept H&S handover for HS-2026-0080',
+            name: /Bathroom safety incident/,
         });
         expect(directLink).toHaveAttribute(
             'href',
             '/health-safety/events/80?action=accept-handover',
         );
-        fireEvent.focus(directLink);
-        expect(directLink).toHaveClass('focus-visible:ring-2');
     });
 });

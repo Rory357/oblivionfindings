@@ -53,6 +53,8 @@ interface JobBoardHeroProps {
     onPostPosition?: () => void;
     onAlertMe?: () => void;
     alertsEnabled?: boolean;
+    /** A change to the alert setting is being saved. */
+    alertsBusy?: boolean;
     rail?: ReactNode;
     onScopeChange?: (scope: JobBoardScope) => void;
     canApprove?: boolean;
@@ -76,6 +78,7 @@ export function JobBoardHero({
     onPostPosition,
     onAlertMe,
     alertsEnabled = false,
+    alertsBusy = false,
     rail,
     onScopeChange,
     canApprove = false,
@@ -149,14 +152,21 @@ export function JobBoardHero({
                 icon={Bell}
                 data-test="job-board-alert-me"
                 active={alertsEnabled}
+                aria-pressed={alertsEnabled}
+                aria-busy={alertsBusy || undefined}
+                disabled={alertsBusy || !onAlertMe}
                 title={
                     alertsEnabled
-                        ? 'Notifications on — click to mute'
-                        : 'Get notified when matching shifts open'
+                        ? 'Alerts are on. Select to turn them off.'
+                        : 'Get an alert when matching shifts open'
                 }
                 onClick={onAlertMe}
             >
-                {alertsEnabled ? 'Alerts on' : 'Alert me'}
+                {alertsBusy
+                    ? 'Saving…'
+                    : alertsEnabled
+                      ? 'Alerts on'
+                      : 'Alert me'}
             </PageHeaderGlassButton>
         </>
     );
@@ -169,7 +179,7 @@ export function JobBoardHero({
                 className="m-0 min-w-0 border-0 p-0"
             >
                 <WorkforcePageHeader
-                    title="Job Board"
+                    title="Available shifts"
                     icon={Briefcase}
                     subline={
                         weekRange +

@@ -16,6 +16,7 @@ import {
     PageLayout,
 } from '@/components/page';
 import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -25,7 +26,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    rememberOverlayTrigger,
+    restoreOverlayFocus,
+} from '@/components/ui/overlay-focus-return';
 import {
     Select,
     SelectContent,
@@ -44,6 +50,8 @@ import { formatDateTime } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
+    AlertTriangle,
+    CalendarClock,
     Cpu,
     Edit,
     Eye,
@@ -60,11 +68,17 @@ import { useEffect, useRef, useState } from 'react';
 import {
     DeviceCard,
     domainLabel,
+    taxonomyWords,
     type DeviceListItem,
     type Paginated,
 } from '../devices/shared';
 import { GroupWizard, groupTypeLabel } from './_dialogs';
 import type { AutoRuleCondition, AutoRules } from './auto-rule-builder';
+import { autoRuleValueLabel } from './auto-rule-values';
+import MaintenancePolicyPreview, {
+    maintenanceMemberIdentity,
+    strictPreviewUtc,
+} from './maintenance-policy-preview';
 
 export type GroupDetail = {
     id: number;
@@ -83,6 +97,10 @@ export type AvailableDevice = {
     category: string;
 };
 export type GroupShowProps = {
+    actor_id: number;
+    as_of: string;
+    /** Server rule for the maintenance preview read (DeviceGroupMaintenancePreview::actorMayPreview). */
+    can_preview_maintenance: boolean;
     group: GroupDetail;
     members: Paginated<DeviceListItem>;
     availableDevices: AvailableDevice[];
@@ -99,7 +117,7 @@ export type AutoRulePreview = {
 };
 type ProfileView = 'members' | 'rules' | 'details';
 const label = (value: string | null) =>
-    value ? value.replaceAll('_', ' ') : 'Not recorded';
+    value ? taxonomyWords(value) : 'Not recorded';
 const ruleFieldLabel = (field: AutoRuleCondition['field']) =>
     ({
         domain: 'Area',
@@ -137,27 +155,126 @@ function MemberCard({
 export default function DeviceGroupShow(props: GroupShowProps) {
     const [layout, setLayout] = useState<'cards' | 'table'>('cards');
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+        auth?: {
+            user?: { id: number } | null;
+            can?: {
+                securityDevices?: {
+                    groupsManage?: boolean;
+                    monitoringManage?: boolean;
+                };
+            };
+        };
     }>().props;
+    const [sourceActor] = useState(props.actor_id);
+    const visible =
+        Number.isSafeInteger(sourceActor) &&
+        sourceActor > 0 &&
+        sourceActor === props.actor_id &&
+        auth?.user?.id === sourceActor &&
+        auth.can?.securityDevices?.groupsManage === true &&
+        typeof props.as_of === 'string' &&
+        strictPreviewUtc(props.as_of);
+    if (!visible)
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Home', href: '/dashboard' },
+                    { title: 'Security & Devices', href: '/security-devices' },
+                    {
+                        title: 'Device groups',
+                        href: '/security-devices/device-groups',
+                    },
+                    { title: 'Group access unavailable' },
+                ]}
+            >
+                <Head title="Group access unavailable" />
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            title="Group access unavailable"
+                            icon={Cpu}
+                            backHref="/security-devices/device-groups"
+                            subline="Refresh the group to review current access"
+                            actions={
+                                <PageHeaderGlassButton
+                                    icon={RefreshCw}
+                                    onClick={() =>
+                                        router.get(
+                                            '/security-devices/device-groups/' +
+                                                props.group.id,
+                                            {},
+                                            {
+                                                preserveState: false,
+                                                preserveScroll: true,
+                                            },
+                                        )
+                                    }
+                                >
+                                    Refresh group
+                                </PageHeaderGlassButton>
+                            }
+                        />
+                    }
+                >
+                    <div role="status">
+                        <EmptyState
+                            icon={Cpu}
+                            title="This group isn’t available to you right now"
+                            description="Your access or the group may have changed since the page opened. Refresh the group to see what you can open now."
+                        />
+                    </div>
+                </PageLayout>
+            </AppLayout>
+        );
     return (
         <GroupProfile
-            key={JSON.stringify([auth?.user?.id, auth?.can, props])}
+            // Stable identity: remount only for another actor or group, so an
+            // open dialog survives ordinary responses (validation errors,
+            // reloads). Authority changes are handled by `visible` above.
+            key={`${sourceActor}:${props.group.id}`}
             {...props}
+            sourceActor={sourceActor}
+            canPreview={
+                props.can_preview_maintenance === true &&
+                auth.can?.securityDevices?.monitoringManage === true
+            }
             layout={layout}
             setLayout={setLayout}
         />
     );
 }
 function GroupProfile({
+    actor_id,
+    as_of,
+    sourceActor,
+    canPreview,
     group,
     members,
     availableDevices,
     layout,
     setLayout,
 }: GroupShowProps & {
+    sourceActor: number;
+    canPreview: boolean;
     layout: 'cards' | 'table';
     setLayout: (value: 'cards' | 'table') => void;
 }) {
+    const maintenanceFocus = useRef<{
+        target: HTMLElement | null;
+        owner: HTMLElement | null;
+    }>({ target: null, owner: null });
+    const [maintenanceMember, setMaintenanceMember] = useState<{
+        id: number;
+        identity: string;
+    } | null>(null);
+    const currentPreviewMember = maintenanceMember
+        ? members.data.find(
+              (member) =>
+                  member.id === maintenanceMember.id &&
+                  maintenanceMemberIdentity(member) ===
+                      maintenanceMember.identity,
+          )
+        : undefined;
     const [editOpen, setEditOpen] = useState(false);
     const [edited, setEdited] = useState(false);
     const [view, setView] = useState<ProfileView>('members');
@@ -355,6 +472,33 @@ function GroupProfile({
         });
     };
     const actionsFor = (device: DeviceListItem): MenuItem[] => [
+        ...(canPreview
+            ? [
+                  {
+                      label: 'Preview maintenance policy',
+                      icon: CalendarClock,
+                      onClick: () => {
+                          const row = document
+                              .querySelector<HTMLAnchorElement>(
+                                  'a[href="/security-devices/devices/' +
+                                      device.id +
+                                      '"]',
+                              )
+                              ?.closest('article, [role="row"]');
+                          rememberOverlayTrigger(
+                              maintenanceFocus,
+                              row?.querySelector<HTMLElement>(
+                                  'button[aria-haspopup="menu"]',
+                              ) ?? null,
+                          );
+                          setMaintenanceMember({
+                              id: device.id,
+                              identity: maintenanceMemberIdentity(device),
+                          });
+                      },
+                  },
+              ]
+            : []),
         {
             label: 'Open device',
             icon: Eye,
@@ -568,7 +712,7 @@ function GroupProfile({
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
-                                    label="Need attention"
+                                    label="Needs attention"
                                     ariaLabel="View members needing attention on this page"
                                     onClick={() => selectMembers(true)}
                                 >
@@ -745,13 +889,19 @@ function GroupProfile({
                                                     condition.op,
                                                 )}{' '}
                                                 <span className="font-medium">
-                                                    {Array.isArray(
+                                                    {(Array.isArray(
                                                         condition.value,
                                                     )
-                                                        ? condition.value.join(
-                                                              ', ',
-                                                          )
-                                                        : condition.value}
+                                                        ? condition.value
+                                                        : [condition.value]
+                                                    )
+                                                        .map((value) =>
+                                                            autoRuleValueLabel(
+                                                                condition.field,
+                                                                value,
+                                                            ),
+                                                        )
+                                                        .join(', ')}
                                                 </span>
                                             </li>
                                         ),
@@ -863,12 +1013,10 @@ function GroupProfile({
                             </p>
                         ) : null}
                         {addError && (
-                            <p
-                                role="alert"
-                                className="text-sm text-destructive"
-                            >
-                                {addError}
-                            </p>
+                            <Alert variant="destructive">
+                                <AlertTriangle />
+                                <AlertDescription>{addError}</AlertDescription>
+                            </Alert>
                         )}
                         <DialogFooter>
                             <Button
@@ -936,10 +1084,13 @@ function GroupProfile({
                             </p>
                         )}
                         {autoPreviewError && (
-                            <div role="alert" className="space-y-3">
-                                <p className="text-sm text-destructive">
-                                    {autoPreviewError}
-                                </p>
+                            <div className="space-y-3">
+                                <Alert variant="destructive">
+                                    <AlertTriangle />
+                                    <AlertDescription>
+                                        {autoPreviewError}
+                                    </AlertDescription>
+                                </Alert>
                                 <Button
                                     variant="outline"
                                     onClick={reviewAutoRules}
@@ -1041,6 +1192,7 @@ function GroupProfile({
                         setAddError(null);
                         setAddOpen(false);
                     }}
+                    variant="destructive"
                     title="Discard this selection?"
                     description="The selected device has not been added to the group."
                     confirmText="Discard selection"
@@ -1053,6 +1205,7 @@ function GroupProfile({
                     }}
                     onConfirm={deleteGroup}
                     processing={deleting}
+                    variant="destructive"
                     title="Delete device group?"
                     description={
                         <>
@@ -1062,12 +1215,12 @@ function GroupProfile({
                                 Device records are not deleted.
                             </p>
                             {mutationError && (
-                                <p
-                                    role="alert"
-                                    className="mt-2 text-destructive"
-                                >
-                                    {mutationError}
-                                </p>
+                                <Alert variant="destructive" className="mt-2">
+                                    <AlertTriangle />
+                                    <AlertDescription>
+                                        {mutationError}
+                                    </AlertDescription>
+                                </Alert>
                             )}
                         </>
                     }
@@ -1080,6 +1233,7 @@ function GroupProfile({
                     }}
                     onConfirm={removeMember}
                     processing={removing}
+                    variant="destructive"
                     title="Remove device from group?"
                     description={
                         <>
@@ -1090,17 +1244,31 @@ function GroupProfile({
                                 again if it still matches the saved rule.
                             </p>
                             {mutationError && (
-                                <p
-                                    role="alert"
-                                    className="mt-2 text-destructive"
-                                >
-                                    {mutationError}
-                                </p>
+                                <Alert variant="destructive" className="mt-2">
+                                    <AlertTriangle />
+                                    <AlertDescription>
+                                        {mutationError}
+                                    </AlertDescription>
+                                </Alert>
                             )}
                         </>
                     }
                     confirmText="Remove device"
                 />
+                {currentPreviewMember && canPreview && (
+                    <MaintenancePolicyPreview
+                        group={group}
+                        member={currentPreviewMember}
+                        actorId={actor_id}
+                        sourceActor={sourceActor}
+                        asOf={as_of}
+                        onClose={() => setMaintenanceMember(null)}
+                        onCloseAutoFocus={(event) => {
+                            event.preventDefault();
+                            restoreOverlayFocus(maintenanceFocus);
+                        }}
+                    />
+                )}
                 <GroupWizard
                     open={editOpen}
                     group={group}

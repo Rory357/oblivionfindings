@@ -199,13 +199,13 @@ class WorkerParticipationTest extends TestCase
         $this->assertSame('inactive', $rep->fresh()->status);
     }
 
-    public function test_recording_initial_hsr_training_creates_a_tracked_staff_credential(): void
+    public function test_recording_reported_initial_hsr_training_preserves_date_without_asserting_staff_credential(): void
     {
         $user = User::factory()->create();
         $rep = $this->rep(['user_id' => $user->id, 'initial_training_completed_at' => null]);
         $type = 'HSR Initial Training (NZQA US 29315)';
 
-        // No credential until initial training (NZQA US 29315) is recorded.
+        // A reported H&S date is not an HR qualification acceptance.
         $this->assertDatabaseMissing('staff_credentials', ['user_id' => $user->id, 'type' => $type]);
 
         $this->actingAs($this->officer())
@@ -214,21 +214,17 @@ class WorkerParticipationTest extends TestCase
             ])
             ->assertRedirect();
 
-        // Cross-module: surfaced as a tracked HR credential on the rep's staff record.
-        $this->assertDatabaseHas('staff_credentials', [
-            'user_id' => $user->id,
-            'type' => $type,
-            'issuer' => 'NZQA',
-            'reference' => 'US 29315',
-        ]);
+        $this->assertSame(now()->subMonth()->toDateString(), $rep->fresh()->initial_training_completed_at->toDateString());
+        $this->assertDatabaseMissing('staff_credentials', ['user_id' => $user->id, 'type' => $type]);
 
-        // Idempotent — re-saving does not duplicate the credential.
+        // Re-saving preserves the reported date without manufacturing a credential.
         $this->actingAs($this->officer())
             ->put("/health-safety/worker-participation/representatives/{$rep->id}", [
                 'initial_training_completed_at' => now()->subMonth()->toDateString(),
             ])
             ->assertRedirect();
-        $this->assertSame(1, \App\Models\StaffCredential::where('user_id', $user->id)->where('type', $type)->count());
+        $this->assertSame(now()->subMonth()->toDateString(), $rep->fresh()->initial_training_completed_at->toDateString());
+        $this->assertSame(0, \App\Models\StaffCredential::where('user_id', $user->id)->where('type', $type)->count());
     }
 
     public function test_store_committee_flashes_created_committee_id_for_the_meeting_chain(): void
@@ -432,20 +428,21 @@ class WorkerParticipationTest extends TestCase
 
     public function test_provider_surfaces_meeting_consultation_and_rep_term(): void
     {
-        $site = Site::factory()->create();
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
         $c = $this->committee(['site_id' => $site->id]);
         HsCommitteeMeeting::create(['hs_committee_id' => $c->id, 'scheduled_at' => now()->addDays(10), 'status' => 'scheduled', 'created_by' => $this->actorId()]);
         $this->consultation(['site_id' => $site->id, 'consultation_date' => now()->addDays(3)]);
         $this->rep(['site_id' => $site->id, 'term_expires_at' => now()->addDays(20)]);
 
-        $items = (new WorkerParticipationObligationProvider())
-            ->obligations([$site->id], Carbon::now()->subMonth(), Carbon::now()->addMonths(2));
+        $read = (new WorkerParticipationObligationProvider())
+            ->readForViewer([$site->id], Carbon::now()->subMonth(), Carbon::now()->addMonths(2), $this->officer());
+        $this->assertSame('available', $read['source_access']['status']);
 
-        $sources = collect($items);
-        $this->assertTrue($sources->contains(fn ($i) => str_starts_with($i->id, 'participation-meeting-')));
-        $this->assertTrue($sources->contains(fn ($i) => str_starts_with($i->id, 'participation-consultation-')));
-        $this->assertTrue($sources->contains(fn ($i) => str_starts_with($i->id, 'participation-rep-term-')));
-        $this->assertTrue($sources->every(fn ($i) => $i->source === 'participation'));
+        $sources = collect($read['items']);
+        $this->assertTrue($sources->contains(fn ($i) => str_starts_with($i['id'], 'participation-meeting-')));
+        $this->assertTrue($sources->contains(fn ($i) => str_starts_with($i['id'], 'participation-consultation-')));
+        $this->assertTrue($sources->contains(fn ($i) => str_starts_with($i['id'], 'participation-rep-term-')));
+        $this->assertTrue($sources->every(fn ($i) => $i['source'] === 'participation'));
     }
 
     /* ---- permission gating ------------------------------------------ */

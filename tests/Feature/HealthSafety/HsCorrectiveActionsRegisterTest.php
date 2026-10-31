@@ -36,9 +36,11 @@ class HsCorrectiveActionsRegisterTest extends TestCase
         if ($role = Role::where('name', 'health_safety_officer')->first()) {
             $user->roles()->attach($role);
         }
+        // H&S reads need at least one approved Site; an all-Sites officer still works at a real one.
         HrEmployeeProfile::factory()->create([
             'tenant_id' => $user->organization_id,
             'user_id' => $user->id,
+            'primary_site_id' => Site::factory()->create()->id,
             'secondary_site_ids' => [],
         ]);
 

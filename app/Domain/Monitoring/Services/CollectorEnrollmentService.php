@@ -25,11 +25,14 @@ final readonly class CollectorEnrollmentService
         private DeviceRegistryService $devices,
     ) {}
 
+    /** @param list<int> $intendedCoveredSiteIds */
     public function issue(
         int $siteId,
         int $actorId,
         ?CarbonImmutable $expiresAt = null,
         ?int $replacesCollectorId = null,
+        ?string $intendedName = null,
+        array $intendedCoveredSiteIds = [],
     ): CollectorEnrollmentIssue {
         $site = Site::query()
             ->whereKey($siteId)
@@ -44,8 +47,20 @@ final readonly class CollectorEnrollmentService
         if ($expiresAt->lte(CarbonImmutable::now('UTC')) || $expiresAt->gt(CarbonImmutable::now('UTC')->addDay())) {
             throw new DomainException('Collector enrolment expiry is invalid.');
         }
+        $cleanName = $intendedName === null ? null : trim($intendedName);
+        if ($cleanName !== null && ($cleanName === '' || mb_strlen($cleanName) > 120 || preg_match('/[\x00-\x1F\x7F]/', $cleanName) === 1)) {
+            throw new DomainException('Collector name is invalid.');
+        }
+        $cleanCoveredSiteIds = $this->normaliseCoveredSiteIds($intendedCoveredSiteIds, (int) $site->id);
 
-        return DB::transaction(function () use ($site, $actor, $expiresAt, $replacesCollectorId): CollectorEnrollmentIssue {
+        return DB::transaction(function () use (
+            $site,
+            $actor,
+            $expiresAt,
+            $replacesCollectorId,
+            $cleanName,
+            $cleanCoveredSiteIds,
+        ): CollectorEnrollmentIssue {
             $replacement = $replacesCollectorId === null
                 ? null
                 : MonitoringCollector::query()
@@ -65,6 +80,8 @@ final readonly class CollectorEnrollmentService
                 'replacement_collector_id' => $replacement?->id,
                 'token_hash' => hash('sha256', $plainToken),
                 'expires_at' => $expiresAt,
+                'intended_name' => $cleanName,
+                'intended_covered_site_ids' => $cleanCoveredSiteIds === [] ? null : $cleanCoveredSiteIds,
             ]);
             AuditLogger::logOrFail('monitoring.collector.enrolment.issued', $enrollment, [
                 'actor_id' => $actor->id,
@@ -72,6 +89,7 @@ final readonly class CollectorEnrollmentService
                 'expires_at' => $expiresAt->toISOString(),
                 'purpose' => $replacement === null ? 'new_collector' : 'collector_re_enrolment',
                 ...($replacement === null ? [] : ['replaces_collector_id' => (int) $replacement->id]),
+                ...($cleanCoveredSiteIds === [] ? [] : ['covered_site_ids' => $cleanCoveredSiteIds]),
             ]);
 
             return new CollectorEnrollmentIssue($enrollment, $plainToken);
@@ -149,14 +167,37 @@ final readonly class CollectorEnrollmentService
                 throw new RuntimeException('Collector certificate issuance returned an invalid identity.');
             }
             $publicKeyFingerprint = hash('sha256', $publicKey);
+            $intendedName = is_string($enrollment->intended_name) && trim($enrollment->intended_name) !== ''
+                ? trim($enrollment->intended_name)
+                : null;
+            $coveredSiteIds = $this->normaliseCoveredSiteIds(
+                $enrollment->intended_covered_site_ids ?? [],
+                (int) $site->id,
+            );
             if ($collector === null) {
                 $collector = MonitoringCollector::query()->create([
                     'collector_uuid' => $collectorUuid,
-                    'name' => 'Remote collector '.substr($collectorUuid, 0, 8),
+                    'name' => $intendedName ?? ('Remote collector '.substr($collectorUuid, 0, 8)),
                     'site_id' => $site->id,
                     'status' => 'pending',
-                    'config' => [],
+                    'config' => $coveredSiteIds === [] ? [] : ['covered_site_ids' => $coveredSiteIds],
                 ]);
+            } elseif ($intendedName !== null || $enrollment->intended_covered_site_ids !== null) {
+                $existingConfig = is_array($collector->config) ? $collector->config : [];
+                if ($enrollment->intended_covered_site_ids !== null) {
+                    if ($coveredSiteIds === []) {
+                        unset($existingConfig['covered_site_ids']);
+                    } else {
+                        $existingConfig['covered_site_ids'] = $coveredSiteIds;
+                    }
+                }
+                $collector->forceFill([
+                    ...($intendedName === null ? [] : ['name' => $intendedName]),
+                    'config' => $existingConfig,
+                ]);
+                if ($intendedName !== null && $collector->collector_device_id !== null) {
+                    $collector->collectorDevice()->update(['name' => $intendedName]);
+                }
             }
             if ($collector->collector_device_id === null) {
                 $projection = $this->devices->registerDiscoveredDevice([
@@ -230,6 +271,92 @@ final readonly class CollectorEnrollmentService
 
             return $locked->fresh();
         }, 3);
+    }
+
+    /** @param list<int> $coveredSiteIds */
+    public function updateSettings(
+        MonitoringCollector $collector,
+        int $actorId,
+        string $name,
+        array $coveredSiteIds = [],
+    ): MonitoringCollector {
+        $cleanName = trim($name);
+        if (mb_strlen($cleanName) < 2 || mb_strlen($cleanName) > 120 || preg_match('/[\x00-\x1F\x7F]/', $cleanName) === 1) {
+            throw new DomainException('Collector name is invalid.');
+        }
+
+        return DB::transaction(function () use ($collector, $actorId, $cleanName, $coveredSiteIds): MonitoringCollector {
+            $actor = User::query()->whereKey($actorId)->whereNotNull('approved_at')->lockForUpdate()->first();
+            $locked = MonitoringCollector::query()->with('collectorDevice')->whereKey($collector->id)->lockForUpdate()->firstOrFail();
+            if ($actor === null) {
+                throw new DomainException('Collector update actor is unavailable.');
+            }
+            if ($locked->revoked_at !== null) {
+                throw new DomainException('Revoked collectors cannot be updated.');
+            }
+            $normalisedCovered = $this->normaliseCoveredSiteIds($coveredSiteIds, (int) $locked->site_id);
+            $config = is_array($locked->config) ? $locked->config : [];
+            if ($normalisedCovered === []) {
+                unset($config['covered_site_ids']);
+            } else {
+                $config['covered_site_ids'] = $normalisedCovered;
+            }
+            $locked->forceFill([
+                'name' => $cleanName,
+                'config' => $config,
+            ])->save();
+            if ($locked->collectorDevice !== null) {
+                $locked->collectorDevice->forceFill(['name' => $cleanName])->save();
+            }
+            AuditLogger::logOrFail('monitoring.collector.updated', $locked, [
+                'actor_id' => $actor->id,
+                'site_id' => (int) $locked->site_id,
+                'name' => $cleanName,
+                'covered_site_ids' => $normalisedCovered,
+            ]);
+
+            return $locked->fresh(['collectorDevice']);
+        }, 3);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function normaliseCoveredSiteIds(mixed $ids, int $homeSiteId): array
+    {
+        if (! is_array($ids) || $ids === []) {
+            return [];
+        }
+        $candidates = [];
+        foreach ($ids as $id) {
+            if (! is_int($id) && (! is_string($id) || ! ctype_digit($id))) {
+                throw new DomainException('One or more covered Sites are unavailable.');
+            }
+            $siteId = (int) $id;
+            if ($siteId <= 0) {
+                throw new DomainException('One or more covered Sites are unavailable.');
+            }
+            if ($siteId !== $homeSiteId) {
+                $candidates[$siteId] = $siteId;
+            }
+        }
+        if ($candidates === []) {
+            return [];
+        }
+        $candidateList = array_values($candidates);
+        $valid = Site::query()
+            ->whereIn('id', $candidateList)
+            ->where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('archived')->orWhere('archived', false))
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+        if (count($valid) !== count($candidateList)) {
+            throw new DomainException('One or more covered Sites are unavailable.');
+        }
+        sort($valid);
+
+        return array_values($valid);
     }
 
     private function centralSigningSecretKey(): string

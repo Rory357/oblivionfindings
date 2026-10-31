@@ -22,6 +22,7 @@ vi.mock('@/components/page', () => ({
     }) => (
         <div role="tablist">
             {items.map((item) => (
+                // eslint-disable-next-line no-restricted-syntax -- test double for the mocked PageHeaderRail; production uses the shared rail
                 <button
                     key={item.key}
                     role="tab"

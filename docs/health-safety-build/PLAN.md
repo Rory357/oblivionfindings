@@ -1,0 +1,483 @@
+# Health & safety build — plan (from 23 October 2026)
+
+Stephan approved the redesigned H&S drawings (design viewer v35,
+claude.ai/artifact/S2FWVebvqtxrVL5LHahzHy, "Health & safety — rebuilt · pages")
+and asked to build them. His choices (23 Oct):
+
+- **One merge at the end.** Everything is built and tested on branch
+  `claude/hs-workspace-build`. Main and the .com test site change only once
+  the whole H&S workspace passes tests and browser checks.
+- **Scope: H&S and incident pages.** The 48 drawn pages and the incident and
+  safeguarding code they need. Codex's Control Room, Workforce, devices/CCTV,
+  broadcast and staff-inbox changes stay out (they have their own snapshots).
+- Codex's holds stay held: incident source checks on investigation, corrective
+  action, evidence and WorkSafe writes; the Client response wrapper; annual
+  authority and meeting command repairs.
+
+## Where the code comes from
+
+`claude/hs-codex-snapshot-20261023` (f0e9b5c4a), squashed into the build
+branch as commit 85ec8e89f and limited to the scope above. Shared files take
+only their H&S parts:
+
+| File | What came in |
+| --- | --- |
+| `app/Services/Tasks/TaskAggregator.php` | H&S task providers, contextual H&S provider reads, event-page badge projection |
+| `app/Http/Middleware/HandleInertiaRequests.php` | event-page task badge projection |
+| `app/Services/UserSiteAccessService.php` | optional `CurrentAuthorizationReads` parameter |
+| `app/Services/AuditLogger.php` | optional explicit `recordedAt` |
+| `database/seeders/RbacSeeder.php` | incident owner permissions, `healthSafety.settings.manage`, `restraints.approve` (needs a grant migration) |
+| `bootstrap/app.php` | `ProtectIncidentRecordingCommands` |
+| `routes/console.php` | H&S delivery recovery jobs (not the broadcast one) |
+| `routes/web.php` | My Day meeting invitation route |
+
+Control Room read services brought in because the incident page shows the
+Control Room response: `ControlRoomHandoverReadAccessService`,
+`ControlRoomHandoverSummaryProtocol`, `ControlRoomOperatorNoteReadService`,
+`ControlRoomOriginalReadOuterQuery`, `ControlRoomGovernanceReadService`,
+`ControlRoomSourceContentService`.
+
+## Stages
+
+1. **Port and baseline.** Scoped port (done), then the H&S, incident,
+   safeguarding and task suites until green.
+2. **Shared H&S page parts** from the drawings: the record header (fact chips,
+   stage line with the next step) and list header (up to four numbers) on
+   `PageHeader`; body parts — story, timeline, ring with checks, tally,
+   people and places cards, stage dots, risk map, WorkSafe clock, flow,
+   choices, routes, evidence windows, know list, queue.
+3. **Pages, group by group**, each matched view for view against its drawing
+   (render a drawing with `oblivionfindings-design-kit/preview/hsx/prev.mjs`):
+
+   | Group | Drawings |
+   | --- | --- |
+   | Incidents | 1, 2, 3, 4 |
+   | Overview, reports, settings | 20, 24, 44, 45, 80 |
+   | Reviews and actions | 40, 41, 42, 43 |
+   | Risk and prevention | 60–66 |
+   | Safeguarding and participation | 21, 22, 23, 25, 104 |
+   | People safety | 81–88, 100–103 |
+   | Equipment and chemicals | 120–130 |
+
+4. **Release gate.** Full H&S/incident/task suites, `npm run lint`, full `tsc`
+   (8 GB heap, heavy-lock), Vitest for H&S, a browser walkthrough of every
+   page as the demo admin, then one merge with Stephan's go-ahead.
+
+Heavy commands (Pest, tsc, eslint, vitest, builds, installs) run only through
+`bash ~/.claude/heavy-lock.sh "<label>" -- <cmd>`.
+
+## Progress (23 Oct 2026, evening)
+
+Built and committed on `claude/hs-workspace-build` (local only): every group
+except Equipment and chemicals (120–130, a helper is porting it).
+
+| Group | Commits |
+| --- | --- |
+| Shared parts, Overview, hubs, Settings, Trends | 00d547291 … 376455c67 |
+| Reviews and actions (40–43) | ac0f259f7 |
+| Incidents (1–4) | f419de2ac |
+| Safeguarding and participation (21–25, 104) | ec7cc61cb, bb168f44b, 1c7c0f0c9 |
+| Restraints (100–103) | 1eea79418, 257c2fe80 |
+| Risk and prevention (60–66) | a0e8edc3f |
+| People safety (81–88) | f6351bc6e |
+| Port fixes | df39c9daf (upload guards), f480b1bb7 (shared-part merges), injury-form brace in f6351bc6e |
+
+Grant migrations for the new permissions are already in the port
+(`2026_10_07_190100_register_incident_ownership_permissions`,
+`2026_10_08_180510_register_health_safety_approval_policy_permissions`):
+incident-owner permissions to admin, provider_manager and coordinator
+(coordinator without holdRestricted); approval-workflow settings to admin;
+plan approval authority to nobody by default. Stephan confirms these before
+the merge.
+
+Still to do: Equipment and chemicals; backend gaps listed in
+DRAWING-CHANGES.md (incident_stages, register/hub status, risk map, …);
+baseline and full test runs (queued behind other sessions' heavy jobs);
+Prettier on changed files once `npm ci` has run; browser walkthrough as the
+demo admin; then ask Stephan before the single merge.
+
+## Overnight log (24–25 Oct 2026)
+
+Stephan approved merging and deploying overnight (relayed by the coordinator, 24 Oct 20:45). Choices made without him, safer option where safety or privacy was involved:
+
+- **Control Room fixes on main** (`d6b01d2c8`, PR #26): auto-start procedures need at least one alert type and severity; staff records open only within the viewer's Sites.
+  - Kept safer: HR's `hr.employees.viewAllSites` is **not** a bypass for `/staff` records (only `sites.viewAll`); staff with no HR profile (legacy only) open only for `sites.viewAll`.
+  - Follow-up on main (`1f3a1e855`, PR #27): the `/staff` list and the credentials/assignments pages follow the same Site rule.
+  - **Decision for Stephan:** `/staff/{user}/assignments` still lists, and accepts, clients from every Site. Scoping that to the viewer's Sites is a client-privacy change left for him.
+- **Exposure delivery panel**: Codex's panel called endpoints that were never built (a 404 hid the private record). It now reads the real `delivery-attempts` endpoint, read-only, "Destination not checked". Backend gap: destination proof, inspect and retry.
+- **Held (would loosen a rule):** Codex's `routes/sites.php` removed the `sites.viewAny` check from the Site hazards list and export, so `hazards.view` alone would open them. The export route is added, but inside the Site group's `sites.viewAny` check. Decision for Stephan.
+- **Port gaps closed** (Codex classes the ported H&S/incident code needed but the scoped port left out, copied unchanged): restraint Control Room alert bridge, four Control Room read services used by incident linked evidence, the CCTV recording-choice reader used by the incident recording preview, `TaskSearch::applyRecordPredicate`, and the respite restraint report route.
+- **Tests that fail the same way on main** (not touched by this build): client-profile family-chat test, device-group auto-rule tests. The incident journey status test also failed on main ("Target missed" vs "SLA breached"); fixed here.
+- **Test speed**: committing/concurrency tests force a full test-database rebuild (~446 migrations past the committed schema dump). Test runs use a local full dump swapped in only while Pest runs; nothing about it is committed.
+- **Overview speed (25 Oct, ~03:00–04:30)**: on demo data the H&S overview timed out (162 s, 9,725 queries). The menu's task badge, built on every page, re-checked each of ~250 incidents with a 530 KB query, and the H&S event rules repeated the viewer's permission checks in every linked-event block. Three changes rewrite the SQL into the same logical test, so access is unchanged and the same queries run: a one-incident re-check uses only that incident's admitted block (`IncidentIndependenceIntakeService::narrowedToIncident`, falling back to the full query if anything changed); the event parent no longer adds the same authority checks twice; and the list scopes check the viewer-wide facts once around all blocks (`A AND (X1 OR X2 …)`). Result: 16 s on first load locally, including the ~5 s badge (Redis on the .com caches it per user). The overview is still slow (~15 s); making it faster would mean redesigning Codex's per-query proof replay, so it's a follow-up.
+- **Overview without a current HR profile**: the Site comparison (`siteLeague`) refuses viewers who aren't current staff with approved Sites, and that took down the whole overview (main's tests expect it to open). The comparison is now withheld (empty) for them, the same way the PPE numbers already were. A refused Site choice still refuses.
+- **Walkthrough (demo admin, local)**: 70 H&S, incident, safeguarding and task pages swept through the real server with no server errors. A lone-worker session refused the demo admin (an access rule), and pages needing a URL key 404 without it. Spot-checked overview, incident register, event record and worker participation against the drawings.
+- **Old substance register tests retired**: `HazardousSubstanceControllerTest` tested the old register, but every `/health-safety/substances` route is now the drawn chemical workspace (`ChemicalPublicWorkspaceController`; Codex's snapshot kept the old test, which fails there too). Each old case maps to a stricter new test:
+  - register payload, SDS state, controlled/site-scoped counts and current-SDS filter → `ChemicalPublicWorkspaceControllerTest` (canonical register, Inertia shapes) and `ChemicalCatalogueStoragePrivacyTest`;
+  - create, status reason, SDS supersede, storage location → `ChemicalPublicWorkspaceControllerTest`, `ChemicalSdsPhysicalTest`, `ChemicalStorageCommandTest`;
+  - support worker can't create → permission-subgroup 403 and "create or manage never implies read";
+  - exposure → high severity with WorkSafe left for a qualified decision → since 25 Oct evening `ChemicalExposureHsEventCreationTest` (main's three observer cases restored, plus the signed-decision → WorkSafe queue path and no narrative in the event). `ChemicalExposureHsEventDeliveryTest` tests Codex's unmounted pipeline and is skipped until job 3.
+  The old `HazardousSubstanceController` is no longer routed. It stays until a cleanup because `NzsAssuranceStaticTruthBoundaryTest` lists its path.
+- **Control Room alert record**: Codex's `HsVisibilityService` dropped `forControlRoomAlert()`, which main's alert page still calls, so that page returned 500. It's restored through Codex's access-checked `forEvent()`: H&S readers get the same summary as before, and others see only the workflow state (no reference, names, WorkSafe details or link). That's stricter than live main.
+- **Stricter rule that main's tests trip over**: reading incident-linked or treatment-linked H&S data (first aid, injuries, restraints, chemical exposures, the Site comparison) now needs current staff, meaning an active HR profile with access to the Site, or a Site-wide bypass permission. Several of main's tests create an H&S officer with only a role and no HR profile; on this branch they see none of that data. Those fixtures are updated to give the officer a real HR profile; the rule is not loosened. **Decision for Stephan:** an H&S officer account on the .com without an HR profile will see an overview with those sections empty.
+- **Left failing, never passed on Codex's base**: `IncidentRoutingSettingsHttpTest` "settings only actor…". Shared middleware computes the job board count on every page and touches `clients`. It's outside H&S scope, so left for later.
+- **Test fixture decision**: `IncidentHandoverE2ESeeder` now removes its one synthetic person's routing, ownership, independence and saved-copy records before reseeding, the same way it already removes their medication evidence. This bypasses the models' retention guards, but only for that seeded demo fixture.
+- **Report menu on the overview**: restraint, drill, return-to-work and lone-worker items now open their drawn report pages (the in-place wizard's post lacked the request key the new commands require, so it was refused). Wizards themselves are unchanged.
+- **Helper B decisions left for Stephan** (tests left failing, not loosened):
+  - Respite restraint pieces: Codex's respite restraint recording action and workspace restraint lists only work with Codex's respite frontend; main's respite form and main's newer respite privacy test contradict them. Restraint recording from respite keeps main's working path. Porting Codex's respite restraint frontend + backend together is Stephan's call (2 `RespiteRestraintReadTest` cases).
+  - `SafeguardingCurrentReadHttpTest` (4): Codex's own docblock calls it an unapplied, unrun extraction; the register never mounts `SafeguardingConcernReadScope`, even in his snapshot.
+  - `HazardWorklistHeaderTest` (4): the held `sites.viewAny` decision above.
+- **Incident journey for alert-linked incidents**: the ported governance read passes its current-authorization reads to the Control Room alert scopes; main's copy ignored them, so every alert-linked incident showed "Journey needs review"/"blocked". The scopes now take the optional reads (Codex's change, backward compatible); checked on demo data ("Operational response active" → "Continue Control Room response").
+- **Helper A decisions left for Stephan** (tests left failing, not loosened):
+  - H&S officer client picker on the incident report (`health_safety_officer` has no client-read permission; passing would show client names without it or change RBAC).
+  - H&S tasks for HR-confidential incidents (would loosen "incident-linked events need incident read access").
+  - `HealthSafetyTaskContextTest` "exact task lookup" forbids any SQL naming `permission_user`; the query it catches is a deny-only equality check. Narrowing the assertion is a test-rule decision.
+  - `HsRiskIncidentSourceCompositionTest` "client final page": Codex marked the wrapper as not built.
+- **Behaviour change (Codex's, kept)**: an incident outside the viewer's scope now returns 404 (not found) instead of main's 403; missing permission is still 403.
+- **Known gap, same as live main**: Codex rewrote `ControlRoomNotificationService` (sanitised status codes, proof before copied incident text in notifications). It stays main's version (Control Room is out of this build's scope), so two `IncidentJourneyServiceTest` cases fail; notifications behave exactly as they do on live main today.
+- **Site calendar (live page) fixed before deploy**: the ported participation calendar provider refuses the plain `obligations()` call that main's aggregator made, so `/calendar` would have thrown. The aggregator now uses Codex's viewer read for participation and drill obligations (checked: 176 items incl. participation and drill).
+- **Whole-app sweep (25 Oct, ~07:20, demo admin, page data without the build)**: 759 parameter-free pages, one server error: `/hr/my/payslips` (`PayslipController` reads an unset `$feedService`). That file is unchanged from main, so it's an existing main bug, outside this build.
+- **Old injury register tests mapped (`InjuriesControllerTest`, 31 cases)**: `/health-safety/injuries` is now `ReturnToWorkController` on `WorkplaceInjurySourceService`. The file is kept; 20 cases are rewritten against the keyed commands (UUID key, `expected_version`, staff with a current HR profile at the Site) and 11 are retired:
+  - ported: register/export/record Site scope over HTTP (another Site's or a Site-less injury, `?injury=`, `?site_id=` and the export filter are 404, was 403); every nested command on another Site's injury 404; capture/update refusing another Site's worker (403), Site and incident (404); derived ACC and incident link; the WorkSafe seam (notifiable injury → pending `NotifiableIncident`, capture-only reporter escalates without signing the decision, downgrade retracts and resolves the alert, retraction keeps a serious alert, re-escalation keeps history, WorkSafe flip on a legacy injury with no `created_by`); Control Room projection failure rolls capture and update back; idempotent Site-linked journey; poisoned alert tuple (5) fails closed; illegal lifecycle jump; SVG upload refused. The three DB/model cases are unchanged.
+  - covered: index/counts → `InjuryWorkspaceControllerTest` (permanent pages) and `InjuryRegisterPrivacyTest`; detail → `…legacy_detail_bookmark_redirects…`; field edit and "status not via update" → `…factual_update…`, `…noncreate_write_requires_version…`; RTW plan, capacity, modified duty → `…existing_plan_update_and_duty_routes…`, `…capacity_endpoint…`; private evidence, sandbox CSP, wrong-parent 404, soft delete → `…private_upload_download_removal…`, `…download_refuses_factual_readers…`; export → `…export_uses_current_factual_scope…`.
+  - gone (drawn design): `/{id}` redirecting to a register modal (it is the record page now); "recovered" stamping `actual_return_date` (no invented return date, `…lifecycle_command_preserves_actual_return_uncertainty…`).
+  - Safety rules: WorkSafe in this file; Site isolation here plus `InjuryRegisterPrivacyTest`/`InjuryWorkspacePrivacyTest`; medical access in `InjuryWorkspaceControllerTest`/`InjuryWorkspacePrivacyTest`. Incident provenance that disagrees on Site still saves nothing, but now fails as a server error (`LogicException`), not 403.
+- **Old PPE register tests mapped (`PpeRegisterTest`, 24 cases)**: PPE is now the PPE workspace on `PpeCommandService`. The file is kept; 10 cases are rewritten against the keyed commands and 14 are retired:
+  - ported: inventory tab counts; unknown catalogue category refused; new stock `available` with its creator; return releases stock; a "condemned" inspection condemns the item; condemn needs a reason and no active issue; dispose only after condemn; no second condemnation (all now 422 `status`/`reason`, was a flash error); private evidence upload, download with the sandbox CSP header, reasoned removal (this one case uses the guarded physical-commit fixture); compliance reminders unchanged.
+  - covered: page shape → `PpeWorkspaceControllerTest::…permanent_inventory_allocation_and_inspection…`, `PpeRegisterReadPrivacyTest::…register_counts…`; RPE fit-test due → `…allocation_active_and_unacknowledged…`; detail → `…legacy_item_converges…`; retired types listed → `…catalogue_retirement…`; type edit/toggle → `…type_create_update_retire_and_restore…`; issue with acknowledgement → `PpeCommandLifecycleTest::…issue_owns_whole_record…`; acknowledge, return → `…manager_ack_and_return…`; condemn then dispose → `…condemnation_and_disposal…`; return never revives condemned → `…return_never_releases_condemned…`; wrong-parent download → `PpeEvidenceHttpTest::…download_requires_literal_parent_kind…`; view-only/no-permission → `…warmed_read_and_manage_permissions…`, `…auth_only_own_page_is_narrow…`; own acknowledgement and someone else's (404, was 403) → `…worker_acknowledgement_is_actor_bound…`, `…auth_only_own_page_denies_other_worker…`.
+  - Safety rules: Site isolation and privacy in `PpeAccessPrivacyTest`, `PpeWorkspaceControllerTest`, `PpeRegisterReadPrivacyTest`, `PpeEvidenceReadPrivacyTest`.
+- **Old restraint register tests mapped (`RestraintRegisterTest`, 22 cases)**: restraints are now `RestraintController@workspaceIndex`, `RestraintEventWorkspaceController` and `RestraintService`. The file is kept; 6 cases are rewritten and 16 are retired:
+  - ported: two-Site register counts, pickers and export (foreign `site_id`/`client_id` 403); another Site's summary, event, review, incident link, plan activate/review and evidence upload/download/removal all refused with nothing changed (403; main answered 404); the all-Sites H&S bypass (now needs the H&S bypass and an independent all-Sites Client read together; either alone, or manage alone, sees and changes nothing); capture refuses a missing trigger, de-escalation or restraint description, an out-of-plan event without a reason and an injury without details; an in-plan event links only to the Client's approved, published plan version (`verified`), never an unapproved draft; an incident of another Client cannot be linked (404, was a validation error).
+  - covered: register payload, plans lens, export, Client summary → `RestraintRegisterServiceTest` (`…register_pages_sources_counts…`, `…review_date_today_is_due…`, `…every_read_excludes_foreign…`, `…client_summary_is_five_recent_rows…`, `…http_register_and_client_summary…`); detail → `RestraintEntryParityTest::…legacy_event_and_plan_register_links_redirect…`; critical review and preserved first reviewer → `RestraintReviewOwnershipTest::…owner_is_distinct_from_first_historical_reviewer…`; link/unlink → `…current_review_capability_can_link_and_unlink…`; view/review/link/summary permissions → `…capture_only_and_review_only_pick_sources…`, `…fresh_rbac_client_and_hr_revocation…`, `RestraintEventAccessTest::…capture_only_incident_association…`; plan lifecycle (activation now waits for approval) → `BehaviourSupportPlanWorkspaceHttpTest::…submit_approve_activate_archive…`, `…requested_active_review_is_explicitly_pending…`; plan review → `…all_retained_review_outcomes…`; evidence (removal is now reasoned and kept, not a hard delete) → `RestraintEvidenceTest`.
+  - Safety rules: authorisation and approval chain in `BehaviourSupportPlanApprovalTest`/`BehaviourSupportPlanVersionTest`/this file; justification and least-restrictive record in this file; debrief in `RestraintMonitoringDebriefTest` (no test yet refuses a not-done debrief without a reason, though the code does); Site isolation in this file and `RestraintEventAccessTest`.
+- **Decision for Stephan: restraint refusals answer 403, not 404.** Codex's restraint access returns 403 for another Site's restraint records, where main answered 404. Access and content are still refused, but someone who already holds restraint permissions can tell that a record number exists at another Site. Injuries and PPE still answer 404. Switching restraints to 404 means changing Codex's access contract and its tests, so it's left as is for his call.
+- **Injury capture with mismatched Site/Client**: still saves nothing, but now fails with an internal error (500) instead of main's 403.
+- **Test gap (code enforces it)**: no test refuses a restraint debrief marked not done or declined without a reason; `RestraintService` enforces it.
+
+## Stephan's answers (25 Oct ~08:40, relayed by the coordinator)
+
+1. **Merge timing**: wait for a full pass. Every test passes or fails the same way on main; no known-failures merge.
+2. **Site hazards list/export**: keep the house check (`sites.viewAny`) on both. `HazardWorklistHeaderTest` expects it.
+3. **Restraint refusals**: keep Codex's 403 ("not allowed") for another Site's restraint records.
+4. **Staff Assignments clients**: `/staff/{user}/assignments` lists and accepts only clients at Sites the viewer can access (`sites.viewAll` bypass), following main's staff Site rule (1f3a1e855).
+5. **H&S data needs a current HR profile**: kept. The .com demo H&S officer accounts must have a current HR profile at their Sites (demo-only data step).
+6. **HealthSafetyTaskContextTest**: narrow the "no SQL naming permission_user" rule so it still blocks anything that could grant access but allows the deny-only equality check.
+7. **Respite restraint**: main's working respite restraint form stays for this merge; the 2 contradicting `RespiteRestraintReadTest` cases are updated to main's behaviour.
+   - **Follow-up (logged so it isn't lost):** Codex's dedicated "record a restraint for this stay" page and its workspace restraint lists, rebuilt later on top of main's newer respite privacy rules (`RespiteWorkspaceMedicationPrivacyTest`).
+   - **Stay report page unrouted (coordinator, 25 Oct ~11:00):** Codex's `/respite/stays/{stay}/restraints/report` (`RestraintEventWorkspaceController@reportStay`) is removed from `routes/respite.php` with its controller method, and the stay page's `restraints.report_href` is now null. Nothing linked to it, and its receipt recovery could not find a submission of main's form, so a reachable page that silently lost submissions was the less safe option. The stay page comes back with the follow-up; `RespiteRestraintReadService::reportContext` stays (with its service tests) for that rebuild. Generated Wayfinder files are left for the next build to regenerate.
+   - **Restraint tests that expected Codex's keyed stay recorder** (receipt, `capture_entry` 'respite', UUID replay, parity between the two entries, the stay report page) are rewritten against main's form; the few that tested only the keyed receipt or the unrouted page are removed (marked below):
+     - `RestraintEntryParityTest`: "both entries record…" keeps the shared entry's recorded tuple and now checks that main's form records the stay's own Client, Site and stay and still reaches H&S review (source-review delivery → H&S event). "Replays its exact UUID" is now the shared entry only; main's form keeps no receipt and sends its respite event once. "Same UUID cannot cross entries" is **removed** (there is no respite UUID to cross). "Other Client/Site/stay" is now: main's form ignores a forged Client/Site/stay in the payload and records the stay's own; another Site's stay is 404 on both entries. "Unapproved legacy plan": the shared entry still records it as `approval_unknown`; main's form refuses a plan past its review date (404). "Fresh revocation": main's form checks `respite.stays.manage` on the user loaded for each request.
+     - `RestraintEventWorkspaceHttpTest`: the two respite capture cases now check main's form: the stay's own Client/Site/stay, one respite event per submission, no receipt, trigger/de-escalation/restraint description required, 403 without the stay grant, a forged Client/stay ignored, and 404 for a coordinator without that Site.
+     - `RestraintReportRecoveryHttpTest`: "respite report is canonical…" is now "respite-only actor records through main's form": no shared capture, plan create, generic report or register, and the stay report URL is 404. "Respite permission cannot recover a former shared create" now checks the generic report (the only recovery entry) refuses. "Respite report rejects foreign Client/Site" and "explicit stay report never proves another stay's receipt" are **removed** with the page. "Stay-bound plan create" keeps its recorded stay, Client, no approval and no publication; its stay-report recovery is removed. "Generic report rejects stay context" now also checks the stay report URL is 404.
+     - `RespiteRestraintReadTest`: the stay page's `report_href` is null; the capture-only coordinator posts main's form directly (stay report URL 404, generic report 403); the query-spoof cases are removed with the page, and a foreign stay or archived Site still has no capabilities and the service capture context refuses.
+8. **H&S officers read incidents** (25 Oct ~08:55): `health_safety_officer` gets `incidents.viewAny` (grant migration `2026_10_25_090000_grant_health_safety_officer_incident_read` + RbacSeeder). It's still limited by the incident Site rule (the role's existing `healthSafety.viewAllSites` decides Sites, as for its other H&S work) and the privacy rule (HR-confidential incidents still need `hr.cases.view`). Covered by `HealthSafetyOfficerIncidentReadTest`. The .com demo H&S officers already have current HR profiles, so no demo data step is needed.
+9. **Incident-linked H&S events without incident read** (25 Oct ~10:55, option B, "event yes, incident no"): team leads (and any H&S viewer without incident read) keep seeing and acting on incident-linked H&S events at their Sites, as on main: close, accept handover, WorkSafe and the rest. They get no incident narrative, files or link; only incident readers do. There's no grant migration for team leads.
+   - How: the H&S event read admits an incident-linked event through a "restricted" incident check. That is the incident's Site boundary, its independence rule, its exact original facts and the viewer's authority snapshot, without the incident read permission. Incident content, including the HR-confidential rule, still needs the full incident read. The event page shows `linked_access.incident = restricted` and re-checks at the end whichever read it used.
+   - HR-confidential incidents: their H&S event shows, as on main (corrected 25 Oct afternoon from a first version that hid it). Hiding it would have kept H&S officers, who don't hold `hr.cases.view`, from WorkSafe-relevant events. The confidential narrative, files, follow-ups and incident page still need `hr.cases.view`.
+   - Still hidden: every event at Sites the viewer doesn't work at, and events whose incident requires independent handling away from the viewer. Incident counts on the Overview still need incident read.
+   - Handover owners: only people who can open the event (H&S view and manage, plus the event page's source read for incident, treatment, restraint and injury events).
+   - Covered by `HsTeamLeadIncidentLinkedEventTest`, `HsHandoverAcceptanceTest`, `HsEventRegisterTest` and `HealthSafetyOfficerIncidentReadTest`. This supersedes the earlier "incident-linked events need incident read" wording in the overnight log.
+- **Calendar PPE dates now need PPE access** (privacy tightening): the Site calendar listed PPE inspection/expiry dates for every requested Site without checking PPE access (main does the same today). They now come through Codex's PPE source read: PPE view access and the viewer's current Sites; no access shows no PPE items.
+- **Worker-calendar timezone**: an empty worker timezone falls back to the app timezone, then UTC, across the H&S and incident read paths.
+- **Overview client-name tests count only the H&S read** (`HsDashboardClientOptionsSourceReadTest`): Codex's collector counted every client name loaded in the request, so main's sidebar loads failed it: the portal user's own client list, and the task and meds badges for support workers. The collector now keeps loads from the shared sidebar props apart. Anything loaded by the option owner or the Overview controller still fails the test. No app code changed.
+  - **Follow-up for Stephan (main behaviour, unchanged here):** the sidebar's portal client list doesn't apply Codex's portal rule that someone with an HR profile (even archived) isn't treated as a portal member. A former staff member who is also a family contact still sees their linked client's name in the sidebar.
+- **Incident-linked H&S events were hidden and locked (fixed 25 Oct, `0e355ce90`)**: Codex's source scope refuses every incident-linked event unless the read runs inside the H&S read context. The two registers and every event command ran without it, so on demo data the admin saw 6 of 52 events and 1 of 6 actions. Close, closure exceptions, handover, WorkSafe, investigation, corrective-action and evidence commands all answered 404. Codex's controller is the same, and his tests for these paths were never run.
+  - Both registers now read inside one context, with a short retry if the read's no-wait locks meet a save in progress.
+  - Commands check the event through the event page's read and hold the event row for update first, so a double submit waits instead of deadlocking.
+  - Corrective-action owners must be able to read the event, through the same read.
+  - Rules unchanged: incident read and current staff are still required. Covered by `HsIncidentLinkedEventCommandsTest`.
+- **Decision for Stephan (asked 25 Oct ~11:00): team leads and incident-linked H&S events.** On the .com, 22 team leads have `hazards.manage` but no incident read. Under Codex's rule they lose every incident-linked H&S event; on main they see them, with the incident link shown only to incident readers. Codex's tests expect main's behaviour. The options:
+  - (A) a grant migration giving `team_lead` incident read, like decision 8;
+  - (B) build the restricted view, where the event is visible and actionable without the incident link or narrative (recommended);
+  - (C) keep Codex's rule.
+
+  Under A or C, handover owners should also be limited to people who can read the event. `HsHandoverAcceptanceTest` waits on this answer.
+- **Follow-up (performance)**:
+  - The sidebar task badge recomputes in about 6 s cold for the demo admin (7,700 queries; it's cached for 60 s).
+  - The H&S incident scope adds one SQL block per incident-linked event (about 4.7 KB each; the demo register query is about 218 KB). That's fine at demo scale but grows with the number of linked events.
+- **PPE and chemical file checks** (`32936eb6b`): MySQL's json column hands back `{size, digest}`, so every fresh PPE upload was marked "repair needed" and its download answered 404. Byte proofs now compare by key, still strict on values and types.
+- **Unapplied Codex extraction (same as main): the dashboard safeguarding count.** `HealthSafetyDashboardSafeguardingReadTest` expects the overview to withhold the open-safeguarding count from H&S viewers without `safeguarding.viewAny`, and to add a `safeguarding_source` link. Neither Codex's snapshot nor main has that code. The count stays as on main (open concerns at the viewer's H&S Sites). Withholding it is a privacy follow-up for Stephan, since it would hide the tile from H&S officers.
+- **Client profile H&S props** (Codex's two hunks ported into main's `ClientController`): the H&S summary is read as the signed-in viewer, so incident- and treatment-linked events are counted. The H&S risk list is read once inside one H&S read and lists only risks the viewer may read. Before, one risk copied from another client's private treatment made the whole client profile answer 404.
+  - **Follow-up (privacy, not ported):** Codex also narrowed the profile's recent-incidents list (`readableRecentIncidents`) and First Aid list (`FirstAidSourceProjectionService::forClient`). Both stay as on main.
+- **Privacy follow-up for Stephan (existing main behaviour, found by helper C):** in main's Control Room alert search, someone without `restraints.view` can type a restraint's H&S event reference and still get the linked alert back. The alert stays visible as an operational response by design; what leaks is the link between that reference and the alert. Codex's Control Room fix (search intersected with the source read) is not ported, so `RestraintDerivedWorkspacePrivacyTest`'s filtered-search case fails the same way main behaves.
+- **Restraint tests that need Codex's Control Room and Clinical changes (not ported):** 6 cases in `RestraintDerivedWorkspacePrivacyTest` and 3 in `RestraintDerivedSourcePrivacyTest`. In each, the restraint content stays hidden or the page shows main's wording; none discloses restraint content. They go on the list of tests for code this build doesn't include.
+- **Corrective-action page follows decision 5** (25 Oct): Codex's `HsCorrectiveActionWorkspace` read skipped the current-staff and approved-Site check that the event page applies, so a non-current account with H&S view could open an action page. It now uses the same `consumeViewer` check.
+- **Meeting writes, Site gap in main (found by helper D, not changed):** the worker participation meeting write routes check only `hazards.manage`, so a manager without `healthSafety.viewAllSites` can edit another Site's meeting. Stephan chose (A) "All participation": see the jobs after the merge below.
+- **TRIFR needs wellbeing read** (Codex's rule, kept): recordable-injury rates count medical treatment, so viewers without `hr.wellbeing.view` (including the H&S officer role) see TRIFR and the near-miss ratio as restricted.
+- **Option B follow-through** (25 Oct afternoon):
+  - **Accept handover in the restricted view:** the "Accept this H&S handover" action now shows to H&S managers who can't read the incident. Only the report's status and submitted time are read for that check, never the narrative.
+  - **Control Room evidence:** an unreadable linked alert now shows as "restricted" on the H&S event page, as on the incident page, instead of "absent".
+  - **HR-confidential correction, finished** (rerun-j): the restricted event check used the incident's Site boundary, but the independence step after it re-applied the HR-confidential rule, so a confidential incident's H&S event was still hidden. The independence step now takes the Site boundary only for this check (`siteBoundaryOnly`); every independence rule still applies, and incident content keeps the full rule.
+  - **No incident narrative loaded in the restricted view:** closure readiness loaded the whole linked incident row just to compare its alert link. It now selects only the id and alert link.
+  - **Refuse before reading:** the event page now runs its current-staff check before it reads the event row. A refused account (an external clinical account, for example) still gets 403, but no event text is loaded first. Another Site's event still answers 404.
+  - **Lone-worker Shift GPS (Stephan, 25 Oct ~14:55, "show it, with time, to GPS users"):** the Shift's GPS ping is never copied into the session record (Codex's change, kept; main copied it). Instead the session page's Location section shows the linked Shift's latest ping with its time, read live, only to viewers with `assets.telemetry.view` and the Shift's Site scope, only while the session is live, and only pings from the Shift's own time (`ShiftGpsAccessService::latestPingForSessionViewer`). A ping older than 15 minutes (the Shift GPS freshness window) reads "Old position · Shift GPS". Viewers without telemetry get no position in the props. Tests: `ShiftGpsLogSitePrivacyTest` (start case: no copy, the page reads the ping; telemetry viewer sees it with time and old marking; hazards-only viewer gets none; ended session shows none) and `session-panels.test.tsx`; Codex's "no copy" test in `LoneWorkerControllerTest` is kept.
+  - **Visible change for H&S officers (Codex's client-privacy rule, kept):** the Overview's client picker lists client names only to viewers with client read (`clients.viewAny` / `clients.viewAssigned`, or a client Site bypass). The `health_safety_officer` role has none, so officers see an empty picker where main listed their Sites' clients. Main's `IncidentControllerTest` picker case now expects that; reporting a remote-Site client is still refused. If officers should filter the Overview by client, the role needs client read (a permissions decision for Stephan).
+  - **Main's incident role tests follow decision 8:** the officer role's incident keys are now `incidents.create` and `incidents.viewAny`; the "create alone doesn't widen visibility" case removes `incidents.viewAny` from the role first, so it still tests that.
+  - **Codex's tests aligned to kept rules:** lagging incidents leave out near misses (main's rule since June); with no active Site left, the overview refuses an all-Sites viewer without a current HR profile (main's Site rule), so the client-picker case expects that refusal; the risk attachment and client-page cases now withdraw access a restricted H&S reader still depends on (independence, `hazards.view`) instead of incident read alone (decision 9); the eager-query case counts SQL from inside the later read, not that read's own viewer lookups.
+  - **PPE reads with a bad timezone setting:** every PPE read checks the configured zone first and refuses with its own message, before the shared current-staff check would fail on the same setting. Nothing is read either way.
+  - **Test fixtures aligned (no rule changed):** the lone-worker start sends its one-time key; the PPE calendar test's aggregator keeps the participation provider, as the real one does; the dashboard picker test starts its third request with fresh request-scoped services; a risk command on another Site's assessment is refused as not found (404), like the register.
+- **Journey wording (Codex's presenter, kept):** a viewer who can read neither the incident nor its alert now sees "Journey needs review" with "No action available for your role". On main they saw the live state ("Operational response active", "Journey closed"). No state is reported from records the viewer can't read. A softer label (for example "Not visible to you") is a possible drawing change.
+- **Restraint group fixes (25 Oct, helper C)**: one app fix and test fixtures that never matched the schema or PHP:
+  - App: the event page asked for the review-only pickers whenever the viewer could capture, so a reader with `restraints.view` + `restraints.create` (no review) got 403 on the whole page. Pickers are now built only for review authority; capture adds evidence without them. Read and command rules are unchanged.
+  - Fixtures: incident status `open` is not allowed (`chk_incident_status`; `submitted` instead); `audit_log_id` is NOT NULL with a restrict-on-delete key in Codex's schema too, so a lost audit is simulated with an unrelated audit row; H&S closes in fixtures go through `@hs_canonical_close_event_id`; a moved restraint goes to a real Site (foreign key); `external_clinical_account` is not mass-assignable (`forceFill`); a no-plan capture is `missing`, not `approval_unknown`; MySQL json reorders snapshot keys (`JsonEvidence::canonicalise`); arrow functions copied the escaped frame by value; the metric mutation now waits for the booking read it describes; a re-attach is idempotent; the handover fixture needs `submitted_at`; an out-of-scope incident page is 404 (kept Codex rule) as well as 403; the register redirect keeps the register as `return_to`.
+  - Narrowed (decision 6 style): the review-task navigation check refuses a top-level `select *` from `restraint_events` and narrative columns, but allows the Client Site `EXISTS (select * from clients …)` guard, which returns no columns.
+  - Decision 9 follow-through: handover and action owner fixtures in `RestraintDerivedWorkspacePrivacyTest` now hold `hazards.view` as well as `hazards.manage`, since owners must be able to open the event. The accept-handover check reads `handover_summary.next_action`.
+  - **Not ported (Control Room / Clinical are out of scope), skipped with reasons:** Codex's Control Room source-content and worklist changes (`restraint_content_access`, copied-note concealment as null, filtered reference search, alert journey state) and Codex's Clinical dashboard restraint lens (source-guarded `href`, current staff/Site recheck inside one read). Main's lens is unchanged and per request is fresh; it doesn't recheck a warmed user object.
+- **Injury group fixes (25 Oct, helper C)**: tests only, no app code changed. They now follow the kept rules and real fixtures:
+  - A Site outside the capturer's own Sites answers 404 (out-of-scope rule); the validation helper is the base class's `validation()`.
+  - `external_clinical_account` is set with `forceFill` (not mass-assignable on User).
+  - Capacity count with a missing receipt: the fixture's capacity receipt is also the injury's current proof, so under Codex's parent rule every private count (return-to-work too) is unavailable as `repair_required`.
+  - The risk register report lists each assessment's title, so the privacy marker is now in the title as well and the include/exclude checks test something.
+  - Days since the lost-time injury: 37 hours is 1 whole day on the app's UTC clock (main's count), not 2.
+  - Injury evidence uploads send real PDF bytes. `UploadedFile::fake()->create()` reports a size with no content, so the byte proof never matched and the download answered 404.
+  - Moving the Client splits the incident's Site from its Client's Site, and Codex's code reports that link as `unavailable` (no id, no private title, no capture options), not `restricted`.
+  - **Left failing (an invariant Codex's own code never met):** `InjuryDerivedWorkspacePrivacyTest` "current hazards read revocation overrides warmed viewer…". The no-context branch of `HsEventAccessService::applyReadableScope` checks `hazards.view` on the user object it's given (unchanged from Codex's snapshot), so a pre-loaded user whose grant was then revoked still passes. A real request loads the user fresh.
+- **Evening 25 Oct fixes (chemical, audit, BSP, Fleet)**:
+  - **Chemical exposures reach H&S and WorkSafe again (safety, option A, told the coordinator ~19:20):** Codex's observer only queued "delivery intents" for a consumer that was never mounted, so no new exposure became an H&S event. `SubstanceExposureRecordObserver` again creates the exposure H&S event on save with main's severity and preliminary WorkSafe trigger (main's three cases restored as `ChemicalExposureHsEventCreationTest`). Codex's unmounted delivery pipeline refuses an event it didn't create ("unproved legacy destination"), so its own tests now fail on that and are skipped as never wired. No mounted page calls that pipeline (checked: only the unrouted delivery workspace and the unwired risk acceptance use it).
+  - **Exposure audit rows keep no request details or clinical text (privacy):** Codex's exposure audit sanitiser in the shared `SafeOperationalData` wasn't in this build. It's now ported for the exposure record family. Their audit rows keep only the receipt IDs, versions and digests the writer checks, and drop the IP address, browser and any clinical text. Exposure H&S events are left out on purpose, so their WorkSafe and closure audits keep main's full metadata.
+  - **Test fixes, no rule changed:** the catalogue test set the external-account flag with `update()`, which silently drops it (not mass-assignable), so the external-account denial tested nothing; it now uses `forceFill`. BSP: a `RespiteStayFactory` (the model declared `HasFactory` with none), a real audit row for a receipt (`audit_log_id` is NOT NULL), the version test compares with the stored digest, the capture redirect is absolute, and two requests after a grant act as a freshly loaded user. Fleet register: requests after a grant or Site change act as a freshly loaded user (`UserSiteAccessService` keys its Site cache on the user object, which a real request never reuses), the picker compares only id and name (rows also carry the avatar fields), and the CSV fixture pins its address (Faker addresses can hold a line break).
+  - **Chemical exposure tests added for option A (Stephan, 25 Oct ~19:35, "Restore now, finish later"):** a new exposure creates its H&S event at the Site; a hospitalisation exposure lands undecided, high severity and needing investigation, can't close until a qualified H&S lead signs the WorkSafe decision, and a signed "notifiable" decision puts it in the WorkSafe pending queue (main's rule: the classifier's positive is only preliminary); the event row holds no circumstances, symptoms or treatment text.
+  - **Test runner note:** the 19:31 chemical lane ended without a summary because the coordinator stopped it by PID at 19:51 (free RAM under 3 GB while Stephan was gaming), not a crash. Its unfinished tail is in the next rerun.
+  - **Parallel lanes share the fake file disk:** `Storage::fake('private')` uses one folder per worktree (`storage/framework/testing/disks/private`) and empties it, so a test in one lane can wipe another lane's files mid-test. In the final gate that showed up as an extra file counted, a 404 on a download and "Select available supporting evidence" in tests that pass on their own (`EmergencyDrillLifecycleWorkspaceTest`, `FirstAidDerivedReportsPrivacyTest`, `HsRiskAssessmentLifecycleWorkspaceTest`, `WorkerParticipationEvidenceReadTest`). Files that fail in a parallel lane are rerun alone, and that result counts.
+  - **Physical-lane test fixes instead of skips (26 Oct), so their checks keep running:** PPE relocation compares the `{digest, size}` evidence key-order-free (MySQL reorders json keys), its shared-path fixture uses the column's real `'public'` disk (it was null, which the NOT NULL column refuses), and the PPE and exposure migration cases read the row back before checking database defaults. The PPE staging and exposure recovery SQL checks allow an `exists(select * …)` probe, which returns no columns, and still fail on any other `select *` of HR documents. The exposure workspace page's X-Inertia response is checked as JSON; the foreign-bookmark case assigns its follow-up to someone else, so the viewer's own task badge doesn't load it; the /tasks follow-up row expects no link, as Codex's provider gives none (logged below). The exposure original-context check picks direct client reads by their top-level FROM, so an incident query with a nested Site guard isn't mistaken for one.
+  - **The physical lane needs the RBAC-seeded dump** (`full-schema-rbac.sql`): with the plain dump every physical test re-seeds roles and permissions row by row, about 7 minutes a file. The coordinator spotted it; the lane was rerun on the seeded dump.
+  - **`FirstAidDeliveryTest` ended PHP silently** (exit 2, no output, empty JUnit), alone or in a lane, and took the rest of its lane with it (this morning's chunk 00 "crash"). Found with PHPUnit's event log: its review-failure case swaps in an `HsEventService` subclass whose `recordEvent(array $data)` drops the second parameter Codex's port added (`?IncidentResponseJourneyReadContext $responseSource = null`). PHP treats that as an incompatible declaration, a fatal error, which under Pest ended the process with no output. The test double now matches the parent's signature; no app code changed.
+
+## Release gate passed (26 Oct, code at `a0eda2e59`, latest main `1f3a1e855` merged in)
+
+- Frontend: tsc clean, lint clean on 356 changed files, build succeeds; vitest 5,699 passed, 4 failing the same way on main.
+- Pest final gate (about 390 files in seven lanes): 5,780 passed. Every failure is now failing the same way on main (5, listed below), skipped with its reason (294), fixed in its test, or a shared-fake-disk artefact that passes alone. Solo reruns of every changed file pass or skip as intended.
+- Browser walkthrough (private database, 1440 px): lone-worker Shift GPS shown with its time to a GPS viewer and withheld from the H&S officer (no position in the data); a chemical exposure recorded through the form creates its H&S event with "Record the WorkSafe decision" and no narrative; the team lead sees and acts on an incident-linked event without incident details (decision 9); registers and Overview load for admin and team lead.
+
+## Paused 26 Oct (Stephan: "please pause work safely now… will continue thursday") — resume here
+
+Stephan's answers on the open H&S items (26 Oct ~14:10, pop-ups in the coordinator session):
+- **Substance register exposure counts and the "awaiting WorkSafe" badge:** "Anyone who sees the list", as main. Bring them back for every substance register viewer.
+- **Overview safeguarding count:** "Hide it" unless the viewer holds safeguarding access (`safeguarding.viewAny`). This applies Codex's extraction; `HealthSafetyDashboardSafeguardingReadTest` expects it.
+- **Client profile recent incidents and First Aid:** "Yes, narrow them". Port Codex's `readableRecentIncidents` and `FirstAidSourceProjectionService::forClient` narrowing.
+- **Sidebar portal client list:** "Yes, apply it". Codex's rule: someone with an HR profile (even archived) isn't treated as a portal member.
+- **Respite "record a restraint for this stay" page:** "yes build it", rebuilt on main's newer respite privacy rules (`RespiteWorkspaceMedicationPrivacyTest`).
+- **Meeting delivery pipeline and participation inbox:** "Not now". Their tests stay skipped; re-word them as decided.
+- **Risk-assessment acceptance step:** "Yes, add it". Wire `RiskAssessmentAcceptanceService`; `HsRiskAssessmentAcceptanceTest` (13) is skipped today.
+- **Codex's changes in other modules (29 tests):** "Leave for those modules". These are outside "H&S complete"; list them for those owners: Control Room/Clinical restraint (9), Clinical restraint lens (5), S&D lone-worker links (2), Governance training reviewer settings (9), Control Room notification rewrite (2), Fleet incident date window (2).
+- No decision needed, so do them:
+  - #1 older exposures with a linked incident (mount Codex's legacy association recovery for exposure managers);
+  - #3 the /tasks exposure follow-up link (`/health-safety/chemical-exposures/{id}?section=followups&followup={child}`, and drop the "can't be opened here" note);
+  - #10 exposure evidence recovery-staging endpoints;
+  - #11 the safeguarding concern read-scope hardening;
+  - #13 Codex's unmet checks (late-withdrawal races and similar).
+- **#14 demo data** (9 .com incidents with incomplete data, the demo H&S officers' HR profiles) stays in the Part 3 clean-up. Ask before deleting or editing data.
+
+**Resume order (Thursday 29 Oct, after the usage reset at 18:59 NZ):**
+1. Ease-of-use clean-up **Part 1**: the H&S `vocabulary.md` and one shared labels file (server + client), plain wording, the dead ends, blocked reasons shown on the page, StatusBadge and standard headers, and POPUP-SYSTEM.md's "found while drawing" items. The brief is in the shared notes: `hs-ease-of-use-cleanup-brief-2026-10-26.md`.
+2. #1, #3, #10, #11, then the decided items above (substance counts, safeguarding count, client profile narrowing, portal rule, respite stay page, risk-assessment acceptance), then #13. Each is its own tested change.
+3. Ease-of-use **Part 2**: drawings in the app (Control Room style, realistic data) for Stephan's approval **before** building. Then Part 3 (demo data; ask first) and Part 4 (the user test, arranged by the coordinator).
+4. After "H&S complete": the slow pages (My Day, H&S Overview, Tasks, Clients, Incidents).
+
+Before any Pest run in a worktree that holds a local `npm run build`, move `public/build` aside: its manifest sets Inertia's asset version, and every X-Inertia test request then answers 409.
+
+## Resumed 29 Oct (branch `claude/hs-ease-of-use`)
+
+Stephan (29 Oct, via MASTER): "also you are in control of health and safety". MASTER decides on his behalf overnight; decisions go to MASTER as short options (no pop-ups).
+
+- **#9 re-checked, now "Not now" (MASTER, 29 Oct, for Stephan):** the 26 Oct question said "acceptance step", but Codex's `RiskAssessmentAcceptanceService` is not a sign-off step. Risk assessments already have their approval step and "Is the remaining risk acceptable?". Codex's piece is a tamper-proof change history: a sealed copy of every risk change with who and when. Today's audit log already records every change. The 13 `HsRiskAssessmentAcceptanceTest` skips are now `DECIDED` ("Change history: deferred, Stephan to confirm"). **Possible later job:** (A) change history for all risk assessments, about 2 days with the general audit-page recognition Codex's private cases need; or (B) only risk assessments not linked to a private record, about 1 day. Stephan may switch to A or B.
+- **#8:** the 13 meeting delivery and participation inbox skips are now `DECIDED` ("Not now").
+- **#12:** the 29 other-module tests are listed for their owners in the shared notes (`hs-other-module-tests-for-owners-2026-10-29.md`).
+- **Built (tests run per item):**
+  - #3 /tasks follow-up link;
+  - #5 Overview safeguarding count through Safeguarding's own read;
+  - #2 register exposure counts (`ChemicalRegisterExposureSummary`, counts only);
+  - #7 portal rule on the sidebar and the portal landing list (`ClientPortalMembershipService::treatsAsPortalMember`);
+  - #6 client profile incidents and First Aid narrowing;
+  - #4 respite stay restraint page (`/respite/stays/{stay}/restraints/report`, saving through its own keyed route `/restraints/record`; the workspace's quick form keeps main's direct save);
+  - #10 evidence recovery routes and Codex's recovery page (`/health-safety/chemical-exposures/recovery`);
+  - #11 safeguarding register read checks.
+- **Part 3 clean-up approved by MASTER (29 Oct):** take a full .com database dump first (outside `/var/www/oblivionfindings`), send MASTER the list and the dump path, then delete only test and demo-fixture records, then add realistic NZ data.
+  - **Done on the .com, 29 Oct ~10:40 UTC.** Dump: `/home/oblivion/env-backups/oblivion_findings-pre-part3-20261029T103217Z.sql.gz`. Manifest with every id and before-value: `/home/oblivion/env-backups/oblivion_findings-part3-manifest-20261029T103403Z.json`.
+    - G1: 3 "[TEST]" committees and 8 test H&S events soft-deleted; 11 test incidents deleted.
+    - G2: 7 test Sites archived; 29 clients soft-deleted; 33 test users unapproved (15 changed; the rest already were); 15 HR profiles ended.
+    - G3: 4 workplace injuries moved from family members or a test login to real demo staff; 7 demo incidents completed (immediate action, or the client's own Site).
+    - G4: "[H&S-DEMO-SEED]" stripped from 58 records.
+  - **Kept by design:** incidents INC-2026-0142 and INC-2026-0145 (ids 261, 264) have append-only lifecycle signals that a database trigger refuses to delete. Their H&S events are soft-deleted, and their Site and client are archived, but the Incidents list still shows them: it doesn't filter on archived Sites or deleted clients. Not forced (MASTER, 29 Oct). A later fix belongs to Incidents: hide incidents of archived Sites or deleted clients from the default list.
+  - **Follow-up (MASTER, 29 Oct):** the Control Room signal sync stopped at a later check for 4 completed demo incidents: closed incidents whose H&S reviews were still open.
+    - HS-2026-0005, 0010 and 0044 (low falls) were closed through the app's own path as "Demo H&S Officer": handover accepted, signed WorkSafe decision "not notifiable" with its reason, then the normal close. Before-rows are in the manifest (`g5_close_reviews`).
+    - HS-2026-0078 (high-severity behaviour) stays open. It has an undecided investigation recommendation and unverified actions, and closing it wouldn't be realistic, so its sync error stays logged (rate-limited).
+  - **Ease-of-use pass:** lists should hide archived Sites and deleted clients (the two kept incidents above still show).
+
+## Jobs after the H&S merge (each its own tested change, pushed and deploy-checked)
+
+1. ✅ **Participation Site checks on every write** (Stephan, option A "All participation"): committees (create), representatives (add, edit), consultations (add, edit, status, document upload) and meetings. Each write needs the record's Site among the manager's H&S Sites; `healthSafety.viewAllSites` covers every Site; a record with no Site needs all-Sites access. Tests per write type: own Site allowed, other Site refused, all-Sites allowed, Site-less without all-Sites refused. **Done 26 Oct:** every participation write route (13) checks the record's Site; another Site's record answers 404 like the register, creating at another Site 403; `WorkerParticipationSiteWriteTest` covers own, other, all-Sites and Site-less for each.
+2. ✅ **Control Room search:** typing a restraint's H&S event reference must not return the linked alert's link to someone without restraint access. **Done 26 Oct:** search, the worklist and journey rows and the close requirement keep a restraint's H&S reference, people and link for readers of that restraint only; the handover state stays. `ControlRoomRestraintHsReferenceTest`.
+3. ✅ **Finish Codex's exposure delivery pipeline** (Stephan, 25 Oct ~19:35, "Restore now, finish later"). Decide and record who the authorised consumer is, how pending or stuck deliveries are retried and worked, and how it takes over from the restored direct creation without double events. Design choices go to Stephan through the coordinator. Then un-skip the pipeline's tests. ⚠️ Mount the follow-up notice writer and Codex's notification-centre reader together: Codex's tests show that with the writer alone, an assignee who has lost wellbeing or Site access would still see and count their notice (title only). **Done 26 Oct, with Stephan's five choices (26 Oct ~07:40, "all five recommended choices"):**
+   - **Who delivers:** the system, straight after the save commits (`ChemicalExposureSystemDeliveryService`, called from the exposure observer). It checks the record, not a person: the delivery belongs to the current revision; every accepted version, receipt, intent and audit anchor is intact; the original incident context still matches; and the event still matches its last marker. It writes Codex's projection, response floor, marker and audit under its own action `chemical.exposure.deliver_health_safety_automatically`, with the command's actor recorded. Managers retry from the exposure's Connections tab through Codex's workspace (`/deliveries` index, detail and POST retry, now routed), which runs as the manager.
+   - **Stuck deliveries:** a failed attempt is kept. Lock clashes and errors retry from 30 s, doubling to 15 min (`chemical-exposures:recover-deliveries`, every minute, runs without the queue worker). An integrity refusal stops and waits for a manager. A failure, or anything still undelivered after 10 min, shows to exposure managers (hazards.manage plus exposure read) on the exposure page and in /tasks (`chemical_exposure_delivery`). The H&S Overview's "Needs attention" shows only the count.
+   - **Takeover without double events:** governed exposures get their event only from the pipeline. Old-style records (schema 0, nothing writes them) keep main's direct creation. `chemical-exposures:adopt-hs-events` (run with `--dry-run` first) adopts an event the restored observer made, only on an exact match with the first saved version; anything else is listed for repair and left alone. Corrections update the same event: severity and the investigation flag may rise, never fall; owner, status, handover and WorkSafe are kept.
+   - **Review flags** (`hs_event_review_flags`, on the event page and in /tasks `hs_event_review`): a correction accepted after a signed WorkSafe decision flags the event "Check the WorkSafe decision again". A severity rise on a closed event flags "Severity rose after this event was closed". The signed decision is never changed and the event is never reopened; a person with hazards.manage marks the flag reviewed with a note. Build choice: a closed event's severity still rises, as in Codex's pipeline, so the register stays truthful; it stays closed and carries the flag.
+   - **Follow-up notices stay off:** assignment still stages Codex's follow-up delivery row as the named receiver's record. Nothing sends it, a retry refuses it, and the panel shows "Notice not sent". The assignee sees the work in /tasks.
+   - **Exposure event visibility:** main's rule (H&S view at the event's Site).
+   - Tests: `ChemicalExposureAutomaticDeliveryTest` (17) plus the un-skipped Codex suites (below).
+   - **Where it stopped (26 Oct ~13:15, branch `claude/hs-exposure-pipeline`):** the gate passed so far. Exposure lane 436 passed (its one failure was fixed; that file passes 10/10). The H&S events, dashboard and Tasks lane: 370 passed. Physical lane: 285 passed. ESLint 0, vitest 572/572, tsc 0, and the build passes. Local walkthrough done, on the walkthrough DB: adopt worked on a real observer-made event; a correction delivered automatically; the flag was shown and marked reviewed; the stuck notice, Tasks row and Overview count all show. The remaining 119 related files passed too, apart from main's own failures (NzsAssurance 2, DismissedAlertScope 6); a first run's 409s came from a local build's Inertia version, not code. **Next:** fast-forward main, check the .com deploy, then run `php artisan chemical-exposures:adopt-hs-events --dry-run` on the .com (no exposures are expected there).
+4. ✅ **Hide the clinical notes in exposure audit rows** (Stephan, 25 Oct ~20:10): on the audit pages and in the CSV, hide the symptoms and treatment fields of exposure audit rows for everyone. Rows written by main still hold them; this build already stops writing them. Tests: a Finance or IT audit viewer sees the row but no clinical fields, on the page and in the CSV. **Done 26 Oct.** Correction: audit pages only ever showed values through a safe allow-list (status, state, timestamps), so the clinical values never showed, on main either; only the names of changed fields did. Exposure rows now stop listing the clinical field names too. The CSV never had values. `ExposureAuditClinicalFieldsHiddenTest`.
+
+**Live regression fixed 26 Oct (main `4e0590098`):** /incidents showed "500 Server Error" on the .com whenever a save held the viewer's user row. The merged register guard and the H&S read contexts take `FOR SHARE NOWAIT` on that row, which failed at once (MySQL 3572; none before 25 Oct). `LockConflictRetry` now retries a page read briefly: the incident register guard and reads, the H&S settings guard, and `HealthSafetyReadContext::within` on routed GETs only. Commands still fail fast. Also fixed: the Control Room incident lifecycle reconciliation retried 9 incomplete demo incidents every minute (about 12,900 errors a day since at least 20 Oct, not from the merge). A failed transition is now logged once and retried after 6 hours.
+
+**Regression from the merge, fixed 26 Oct:** before the merge, preparing a Control Room shift handover refused when an alert had conflicting H&S records (two events on one alert, or one from another Site). Codex's journey rewrite marks such an alert "unavailable" instead, and the handover didn't check that, so the alert looked settled and could be carried forward unreviewed. `ControlRoomShiftHandoverScopeTest` passes on pre-merge main and failed after. The handover now re-reads an unavailable alert with the strict single-alert read and refuses with the exact conflict; other pages keep Codex's per-alert handling.
+
+Follow-ups noted, no job yet (the build shows less than main; the .com has no exposures):
+- Nobody can open an older exposure that has a linked incident, because Codex's legacy recovery path isn't mounted.
+- The substance register no longer shows exposure counts or the WorkSafe-awaiting badge. WorkSafe review stays on the H&S register's WorkSafe tab.
+- An assigned exposure follow-up shows in /tasks with no link and the note "This assigned follow-up cannot be opened here until its protected workspace is available" (Codex's provider; the follow-up focus route isn't mounted). Main has no exposure follow-ups, so nothing regressed; the note is the kind of "not available yet" text to remove when the route is mounted.
+
+## Skipped: Codex tests for code not in this build (Stephan, 25 Oct ~13:25, option A "skip with reasons")
+
+Each case calls `markTestSkipped(Tests\Support\NotInThisBuild::reason(group, why, follow-up))`, 294 cases at the merge, 219 since job 3 (26 Oct). Job 3 un-skipped 93: the H&S consumer (34), reported-facts policy (24), the delivery workspace (27), marker proofs (8). Running them re-skipped 18, each checked: 8 "marker proofs" are really Codex's visibility guard (the register hiding an exposure event whose marker is missing, changed or behind), now **decided** with Stephan's "keep main's rule"; the deliveries still refuse a bad marker. 8 workspace cases send or reconcile follow-up inbox notices, now **decided** with "notices stay off". 1 joined the historical re-proof group. 1 is a Codex contradiction: its inspection reports a lowered severity as "response floor pending", the test expects "repair". Test-shape fixes, not skips: an arrow function that lost its by-reference flag, a created-versus-stored row comparison, a 403-versus-404 refusal code, main's incident read predicate naming hs_events, and the source-history migration test now reverses and re-applies job 3's column migration. The guard (19) and follow-up notice (48) skips now say they are Stephan's decisions (group `DECIDED`). Nothing in any of them shows anyone more than live main does.
+
+**1. Never built or wired up by Codex (216)**
+- `HsRiskAssessmentAcceptanceTest` (13): `RiskAssessmentAcceptanceService` is an unwired prospective foundation. Two of its cases also run Codex's unmounted exposure delivery pipeline in their fixture, which refuses the event the restored exposure observer creates. Follow-up: wire it with the general audit recognition patch.
+- `ChemicalExposureAuditProtectionTest` (1): exposure H&S events are left out of the ported exposure audit sanitiser on purpose (their WorkSafe and closure audits keep main's metadata). Follow-up: decide with the exposure delivery pipeline.
+- `ChemicalExposureEvidenceTransportTest` (3): the exposure evidence recovery-staging endpoints aren't routed anywhere. Follow-up: build them.
+- `WorkerParticipationMeetingDeliveryTest` (10): the meeting delivery pipeline was never built, and meetings keep main's `CommitteeMeetingScheduled` notice. Follow-up: build the pipeline.
+- `WorkerParticipationNotificationSourceReadTest` (3, plus the non-current-staff data set of the board-pack case): the participation inbox reader isn't mounted. Follow-up: mount it with the pipeline.
+- `SafeguardingCurrentReadHttpTest` (4): the `SafeguardingConcernReadScope` extraction was never applied, and these fail the same way on main. Follow-up: apply it.
+- `HealthSafetyDashboardSafeguardingReadTest` (4): the Overview's safeguarding source read was never built, so the count stays as on main. Follow-up: safeguarding count privacy.
+- Chemical exposure family, 25 Oct evening triage (helper + lead, every case checked against main; no case shows anyone more than main does):
+  - Codex's exposure H&S delivery consumer (34): `ChemicalExposureHsEventDeliveryTest` (24), `ChemicalExposureHsFamilyIntegrationTest` (9), `ChemicalExposureDeliveryContractTest` (1). No route, job or command runs it, and it refuses the event the restored observer creates. Follow-up: job 3 after the merge.
+  - Destination-marker and acceptance-digest proofs (8, `HsFamilyIntegration` 7, `DerivedSourcePrivacy` 1): markers are written only by that pipeline; these are tamper checks on rows edited in the database, not checks on who sees what. Follow-up: job 3.
+  - Legacy association recovery (4, `ChemicalExposureAssociationRecoveryTest`): no route or caller. Follow-up: mount recovery.
+  - Exposure source copy on H&S events (3, `DerivedSourcePrivacy`): only the unwired audit guard and risk acceptance call it; it shows less here.
+  - Exposure-guard candidate mechanics (2): the guard isn't applied; the test viewer holds every grant it asks for.
+  - **Stephan, 25 Oct ~20:10, "Keep today's rule"** (9: `DerivedSourcePrivacy` 2, `HsFamilyIntegration` 7): Codex's exposure source guard would hide exposure H&S events and their actions, investigations and risks from viewers without `hr.wellbeing.view`, which would also lock out the H&S officer role. Main's rule stays: H&S view at the event's Site. Follow-up: revisit with job 3.
+  - **Stephan, 25 Oct ~20:10, "Hide the clinical notes"** (5, `ChemicalExposureAuditPrivacyTest`): these test Codex's row-hiding audit guard. Stephan chose instead to hide the clinical fields for everyone (job 4).
+  - Physical lane, 26 Oct (106, final gate run on current code; helper + lead, no case shows more than main): Codex's exposure delivery workspace (13 HTTP cases, its `/deliveries` routes aren't registered; 14 service cases, most now refusing the observer-created event), `ChemicalExposureHsReportedFactsPolicyTest` (24, the same refusal), private follow-up notices (NotificationHttp 10, NotificationPrivacy 28, FollowupChildAdmission 1: nothing in the app writes them and the notification centre has no reader for them), recovery (4), the follow-up inbox delivery (1), the audit route successor (1), and the audit row-hiding guard Stephan chose not to apply (10). Follow-ups: jobs 3 and 4.
+  - Exposure audit page patch (1, `AuditLogViewService::materialize`) and recovery audit composition (5, `ChemicalExposureRecoveryAuditPrivacyTest`): not applied. The unmounted guard hides recovery audits even from their manager; those rows hold only IDs, revision and digests.
+
+**2. Codex's changes to modules outside this build (29)**
+- `RestraintDerivedWorkspacePrivacyTest` (6) and `RestraintDerivedSourcePrivacyTest` (3): Control Room and Clinical restraint changes.
+- `LoneWorkerSessionWorkProjectionTest` (2): people-location and tracking links (Security & Devices).
+- `WorkerParticipationTrainingReviewerSettingsTest` (9): the Governance settings controller and page.
+- `IncidentJourneyServiceTest` (2): the `ControlRoomNotificationService` rewrite. Notifications behave as on live main.
+- `ClinicalRestraintLensPrivacyTest` (5): Codex's Clinical dashboard restraint lens (recorded-context and booking-graph proofs, a source-guarded `href`, a narrowed read). Main's lens is unchanged here; its Site checks pass (H&S all-Sites access doesn't widen it).
+- `FleetIncidentCurrentReadHttpTest` (2): the Fleet register's `occurred_from`/`occurred_to` window and its validation exist only in Codex's unapplied `FleetIncidentReadScope` extraction; the register is main's, unchanged, and already withholds other Sites' rows. The file's other cases run.
+
+**3. Checks Codex's own code never met (25)**
+- `IncidentHsEventSourceDetailTest`, late withdrawal: the page answers 404, but one incident body is loaded in memory first.
+- `HsDashboardClientOptionsSourceReadTest`: a timezone change mid-read isn't caught before the name query compiles.
+- `InjuryDerivedWorkspacePrivacyTest`: hazards.view is checked on a warmed user object; real requests load the user fresh.
+- `BehaviourSupportPlanSignoffConcurrencyTest`: the second of two simultaneous identical sign-offs is refused rather than replayed; recorded once, nothing lost.
+- `ChemicalExposureEvidenceTest`, staged client access: the staging inspection refuses with a different status after an incident unlink; nothing is read.
+- Added 25 Oct afternoon, the same group (their code is identical to Codex's snapshot):
+  - `ChemicalExposurePrivacyTest` (3): Codex's reported-facts read withholds unconfirmed legacy answers. "Medical attention sought" shows as not reported, the awaiting-outcome count shows as unknown, and a record with an unproved legacy incident link is refused. The tests expect the legacy values. Follow-up: decide how unconfirmed legacy exposure answers are shown.
+  - `HsRiskIncidentSourceCompositionTest`, client page late withdrawal (1): a permission withdrawn during the client page's later picker read, after its H&S risk panel was read in the same request, isn't re-checked against that panel before the page returns. The next request applies it. Follow-up: re-prove the panel at the end of the request. **Fixed in R3 (31 Oct):** the client page reads the risk panel and its pickers in one H&S read, so the final check replays the panel after the picker read; the test runs.
+  - `HsIncidentReportConsumerTest`, late investigation change (1): a findings edit written by another request in the middle of the investigation-outcomes export isn't caught. The export returns the findings as first read, to a manager allowed to read them, and the next export shows the edit. It fails the same way on Codex's snapshot. Follow-up: re-prove the findings at the end of the export read. **Fixed in R3 (31 Oct), test only:** the final check already refuses an edit made after the findings were read (it replays the full read). The test fired its edit on the opening authority check, before any findings were read; it now fires at the investigator-name load and runs.
+  - `RestraintOperationalAlertBridgeConcurrencyTest`, same-UUID race (1, 26 Oct): the harness waits until both workers are blocked on the restraint event row lock; with the same delivery UUID they never both show there, so the test stops before its one-alert checks. It fails the same way on Codex's snapshot. The distinct-UUID race in the same file needs the same lock and passes with one alert. Follow-up: find where the second same-UUID worker waits and assert on that lock. **Fixed in R3 (31 Oct), test only:** both workers wait on that same row lock, inside the first statement's optimiser read, where innodb_trx can omit them; the harness also reads performance_schema's lock-wait graph (each worker blocked by the test's connection on restraint_events) and the test runs.
+  - `IncidentJourneyPresenterTest` (2): `IncidentJourneyPresenter::present()` isn't mounted on any page (pages use `journeyState()` only). Its H&S stage needs incident read, so an H&S manager without it gets "No action available for your role" there. The H&S event page follows decision 9. Follow-up: align the presenter's H&S stage with decision 9 before mounting it.
+  - Chemical exposure family, 25 Oct evening (10, the same on Codex's snapshot where it could run):
+    - Awaiting-outcome count unknown (5, `ChemicalExposureCollectionAdmissionTest` 4, `ChemicalExposureWorkspaceReadTest` 1): with an unconfirmed legacy answer, or "medical attention sought" left blank at capture, the count shows as unknown rather than 1. Nothing extra is shown. Follow-up: the same decision as `ChemicalExposurePrivacyTest`, covering blank answers too.
+    - Unproved legacy incident link (3, `WorkspaceRead` 1, `OriginalContext` 2): the record is refused, as in `ChemicalExposurePrivacyTest`.
+    - History proof after a correction (4, `ChemicalExposureHistoricalProofTest`): the build re-proves every historical receipt, so after a Site or association correction it refuses where the test expects the record to stay readable. It refuses more, not less. Follow-up: decide whether a corrected exposure stays readable for someone with only the new Site.
+
+**4. Test shape only: the rule each test checks is met (24, chemical family, 25–26 Oct)**
+- Tampered or rebound sources refused with an integrity error or a 422 "source" error rather than the expected "repair" response (8: `HistoricalProof` 2, `ReplayPrivacy` 3, `WorkspaceRead` 2, `OriginalContext` 1).
+- The source-scope building block called on its own; the mounted corrective-actions page adds the event's Site scope and soft-delete filter (3).
+- SQL checks that flag an `exists(select * from sites …)` Site guard, which returns no columns (2); MySQL json or `validate()` key order with the same keys and values (2); 403 instead of 404 for an archived or inactive Site, still denied (2).
+- An archived substance read refuses outright where the test expects an empty storage list (`ChemicalRegisterSourceProofTest`, 26 Oct); nothing is shown.
+- One each: X-Inertia JSON that the installed `assertInertia` can't read; a 422 whose only follow-up query is the actor's own sidebar badge; a simulated follow-up move that no code can make; the read context refusing raw models before the tamper check; a fixture deleting versions under a restrict-on-delete key; a fixture closing an event with a direct update, which main's closure trigger refuses.
+
+Still failing the same way on main (main's own tests, not skipped; same messages in a run on main `1f3a1e855`, 25 Oct evening): `ItSecuritySingleTenantBoundaryTest` (2), `NzsAssuranceStaticTruthBoundaryTest` (2: `tests/Architecture` isn't bound to the Laravel TestCase in `tests/Pest.php`, so `base_path()` fails), `HrCalendarFeedTest` reminder dispatch (1). Found by the job 1–4 runs, failing the same way on pre-merge main `1f3a1e855`: `MonitoringAvailabilityEpisodeTest` (3), `SettingsControllerTest` account deletion (1), `HrHubTabsRenderTest` (1, `PayslipController::$feedService`). Found by the job 3 runs, failing the same way on main `4e0590098` without job 3: `DismissedAlertScopeTest` lone-worker cases (6).
+
+## Found outside H&S (for after "H&S complete"; not fixed here)
+
+- **Sites list SSR error** (MASTER, 29 Oct): `/sites` logs `ReferenceError: window is not defined` from Inertia SSR on every render (seen since at least 21 Oct). The page still loads (client render). `/sites` imports nothing changed by the H&S branch. Owner: Sites/Assets.
+- **Incidents list shows incidents of archived Sites and deleted clients** (INC-2026-0142, INC-2026-0145 on the .com). Ease-of-use pass: lists hide archived Sites and deleted clients.
+- **Security & Devices** `device-profile-header.test.tsx` fails 2 cases on this branch and main alike (not touched here).
+- **Resolved by MASTER 30 Oct.** **Control Room lifecycle outbox: 4 failed jobs on the .com** (29 Oct 10:38 UTC, failed_jobs 1439–1442). `DispatchIncidentLifecycleSignalOutbox` throws "The canonical H&S event is no longer closed." Signals 14–20 were created at 10:38 for older demo incidents (effective Apr–Jul 2026) whose client incident is closed but whose H&S event is not. The guard is right to refuse. The data needs a decision: close those H&S events through the app, or drop the stale signals. Owner: Control Room. Not the demo command (that ran at 11:29).
+- **`DismissedAlertScopeTest` lone-worker cases (6) fail on this branch alone and in lanes (30 Oct).** The branch's committed PHP matches main, and none of the Part 2 PHP touches lone workers or the Control Room. Expected `ack` but got `open`; `tabCounts.alerts` 0 instead of 1. Owner: Control Room / lone worker.
+- **Main's own Pest failures seen during these gates:** `SecurityAccessControlTest` "incident update cannot escalate portal visibility" (403), `ClientProfileFoundationTest` 2 cases (medical section shown to an assigned worker) — both fail the same way with main's code.
+
+## Part 2 drawings — reviewed by MASTER (30 Oct, for Stephan)
+
+Drawings: `docs/health-safety-build/drawings/` (`63f658209`, updated after review). **Approved with changes**, all made in the drawings:
+- D3 (one accident record), privacy, must:
+  - a hidden linked record shows only "A health record — hidden, you don't have access", with no title;
+  - timeline entries from records the viewer can't read show only "Health record added — hidden", with no summary;
+  - build needs a test for both with a viewer without access.
+- D3, wording: "Moderate harm" instead of "Moderate · How bad".
+- D1 (Overview starts):
+  - the support worker's subline shows their own house;
+  - "You're about to work alone" (matches D2);
+  - the safeguarding choice "You're worried a person is being harmed" is on every start;
+  - Board reports only for board access;
+  - built lists use the standard row patterns (row click, kebab, right-click).
+- D2 (Report something): approved as drawn. After the decision below, it shows only the choices the person may use, but safeguarding and "A person was hurt" stay for everyone.
+- D4 (hubs):
+  - Safeguarding concerns is a tab in "Incidents and safety reviews";
+  - Working alone moves to "Risks and prevention" (a hazard control; seventh tab, under More); "People and participation" keeps representatives, committees and consultations.
+- **Decision (MASTER for Stephan to confirm in the morning):** support workers may **report** (create only) workplace injuries and restraints, because prompt reporting is safer and Ngā Paerewa expects every restraint recorded.
+  - They may not review, approve or close them.
+  - They see only what they reported, plus their own injury.
+  - It's built **last** in Part 2, in its own commit, so it can be vetoed.
+
+**Build order:** D2 Report something → D1 Overview header and role starts → D4 hubs with tabs → D3 one accident record → the support-worker create permission (own commit).
+
+## Part 2 build (30 Oct)
+
+- **D2 Report something:** one chooser in three plain-words groups. Each choice shows only to people allowed to use it (the same permission its page checks), and the main button names the form it opens.
+  - **Open question for MASTER:** "keep safeguarding and *A person was hurt* for everyone" can't be met by showing alone. On the .com, `team_lead` has neither `incidents.create` nor `safeguarding.create`, and `health_safety_officer` lacks `safeguarding.create`. Showing those choices would open a form that refuses them. Built as "permitted only" until MASTER decides whether to grant those create keys (a grant migration).
+- **D1 Overview:**
+  - The header is trimmed: "Health and safety", search, Board reports (only with board access), and Report something. The Lens switch and View analytics are gone.
+  - The start follows the role (`HealthSafetyDashboardController::startFor`): "Your queue" (all-sites H&S or board access), "Your site" (`hazards.manage`), "Your start" (everyone else).
+  - The frontline start lists what the person may report, opening the form directly. It has no number strip or filters. The subline names their own house when they can see only one.
+  - The safeguarding choice is on every start for anyone allowed to raise one.
+- **D4 six hubs:**
+  - The hubs are Overview · Incidents and safety reviews · Injuries and care · Risks and prevention · People and participation · Reports.
+  - Inside a hub, the sibling lists are tabs on the header rail. Each page's own status views sit in the second tier (`TierTwoTabs`).
+  - Breadcrumbs name the hub. `/health-safety/registers` stays as a directory of the three register hubs (`?view=care|prevention|participation`).
+  - Worker participation keeps its filters and counts when switching tabs.
+- **D3 one accident record, privacy part:**
+  - The incident page now lists a linked restraint's details only if the viewer can open that restraint (`restraints.view` plus the restraint's own client, Site and plan checks). Before this, any incident reader saw the reference, type, severity and injury.
+  - First aid already followed its own access check.
+  - Linked records the viewer can't open show only "A health record — hidden, you don't have access", and the timeline shows "Health record added — hidden". The payload carries only when each was added.
+  - Readable first aid and restraints now join the one timeline.
+  - Tests: `IncidentHiddenHealthRecordsTest` (viewer without access; viewer with restraint access) and `hidden-health-records.test.ts`.
+  - Tab regrouping for D3 is still to come.
+- **Incidental fix:** `attachment-remove-confirmation-contracts.test.ts` still listed five dialogs removed in Part 1 (`b3090e6bc`). Their replacement record pages ask before removing a file, through their own "Remove evidence" pop-ups.
+- **D3 tabs (30 Oct):**
+  - The tabs are Overview · Injury and first aid · Safety review · Follow-ups · Files · History · Linked records. Linked records is the seventh, so it sits under More.
+  - The Overview already tells what happened, so a separate "What happened" tab would only repeat it.
+  - "Safety review" keeps the agreed wording, rather than the drawing's "Investigation".
+- **My Day "Report something" (MASTER, option A):** an extra button beside "Report incident" that opens the same chooser.
+  - It shows only when the person can report more than an incident. Today that means support workers, through safeguarding.
+  - Report pages opened from it return to My Day.
+- **Held for Stephan's yes, on its own branch (not on main):** create-only reporting.
+  - New `restraints.report` and `injuries.report` for support_worker.
+  - `safeguarding.create` for team_lead and health_safety_officer.
+  - A grant migration and tests.
+  - **Not** `incidents.create` for team_lead. An incident report needs a client the reporter can read, and team leads hold no client read access, so it would only work by widening their reading. MASTER to decide.
+- **Follow-up after that yes:** a support worker can see their own workplace injury. This needs a new read path for injury records, so it's not in the held change.
+- **Follow-up:** `/incidents/create` and My Day's "Report incident" open the form on the incident register, so anyone allowed to report but not to read the register would be refused. A standalone report page would fix that for report-only roles.
+
+## Stephan's answers and follow-ups (30 Oct)
+
+Stephan answered directly in this session (pop-ups); MASTER was told.
+
+- **Create-only reporting merged** (`3a410363f`, Stephan: "Merge it"). Live on the .com: a demo support worker opens the restraint report and the workplace injury form; both registers stay closed (403).
+- **Team leads report incidents** (Stephan: "Let them read clients", "All at their sites", "Report-only page").
+  - `team_lead` gains `incidents.create` and `clients.viewAny` (ClientPolicy still limits it to their sites). Grant migration `2026_10_30_110000_grant_team_lead_incident_reporting`.
+  - The incident register stays closed to them: no `incidents.viewAny` or `incidents.viewAssigned`.
+  - Tests: `TeamLeadIncidentReportingTest`.
+  - Knock-on: client reading also lets team leads see client-assigned devices at their sites in Security & Devices (its client tab follows `clients.viewAny`). `HealthcareWorkspaceTest` used team_lead as "a role without client reading"; that case now removes the key inside the test.
+  - Seen on main, not from this change: `RestrictedIndependentAuthoritySeedingTest` (2 cases) finds `referrals.settings.governance` on admin.
+- **Standalone incident report page** `/incidents/report`:
+  - The same incident wizard laid out as a page, using the reporting page shell from "Raise a concern" (now shared as `WizardPageShell`).
+  - `/incidents/create` sends people who can't open the register there; people who can still report on the register as before.
+  - It lists only the people the register's form would offer them. It shows no "Open incident" button and no register crumb to people who can't open the register. Close returns to My Day.
+- **My injuries in My HR** `/hr/my/injuries` (Stephan: "My HR", "Facts, care and plan"):
+  - Read-only. Being the injured worker is the read rule; no H&S permission is involved, and nobody else's injury is reachable.
+  - Shown: what happened, dates, lost days, treatment, the ACC claim, the return-to-work plan and modified duties, and who is coordinating.
+  - Not shown: free-text notes (injury notes; plan review, clearance and agreement notes; duty notes), uploaded files, capacity assessments, or the linked incident (which can name a client).
+  - The Injuries tab shows only to someone with an injury on record. My Day shows "Your workplace injury" with a link while one is open.
+  - Tests: `MyInjuriesTest`, `injuries.test.tsx`.
+- **Fix: My Day "Report something" now actually shows.** The earlier button went into `my-day-hero.tsx`, which the My Day page doesn't render (only tests did). It now sits in the "Record care" card beside "Report incident", and the hero change is reverted.
+- **Control Room failed jobs on the .com: resolved by MASTER 30 Oct.** All 20 deliveries are sent; 0 failed jobs. Cause: demo incidents closed while their H&S events were open. MASTER closed 11 low events (HS-2026-0014/0018/0022/0027/0031/0035/0039/0048/0052/0074/0079) and finished HS-2026-0078 as a demo case (Stephan: "Finish the demo case"), then retried each delivery. Backup and manifests are in ~/env-backups on the .com.
+- **Demo-data notes (from MASTER, not urgent):** INC-2026-0139 still describes itself as a "Round-8 loop" test record; there are two "Demo H&S Officer" users (103 and 203); RELEASE and "MANUAL … Operator" test users are still approved with hazards.manage; at Kauri House only the team lead can own corrective actions (the owner check doesn't count all-Sites access, by design).
+- **Not ours (Stephan: first slowness job after H&S):** the daily overdue checks open a new Control Room alert every day for the same item (8,991 open, incl. 1,115 "Hs Corrective Action Overdue" and 493 "Hs Investigation Overdue").

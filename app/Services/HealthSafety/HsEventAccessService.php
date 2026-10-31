@@ -1,0 +1,524 @@
+<?php
+
+namespace App\Services\HealthSafety;
+
+use App\Models\FirstAidRecord;
+use App\Models\HsEvent;
+use App\Models\RestraintEvent;
+use App\Models\User;
+use App\Models\WorkplaceInjury;
+use App\Services\CurrentAuthorizationReads;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use App\Support\HealthSafety\ProofParity;
+use App\Support\HealthSafety\QueryPaging;
+
+/** The same read boundary for a direct H&S event and its linked projections.
+ * Source scopes are consumed and materialized inside the caller transaction.
+ */
+final class HsEventAccessService
+{
+    public function __construct(private readonly UserSiteAccessService $sites) {}
+
+    /** What an event read prepares: each H&S source's own read permissions (the event page prepares the same). */
+    public static function eventReadPermissionKeys(): array
+    {
+        return array_values(array_unique([...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS,
+            ...InjuryAccessService::PERMISSIONS, ...SafeWorkProcedureAccessService::PERMISSIONS, ...EmergencyDrillAccessService::PERMISSIONS]));
+    }
+
+    /**
+     * One H&S event through the same source read as the event page, so incident-linked events need incident read and
+     * First Aid, restraint and injury events keep their own source rules. Without a read context those events are always
+     * refused, so every command on an event goes through here. The command runs while the read holds and gets the event
+     * (and the context); whatever it returns (a response, a flag) is handed back. Unknown or unreadable events are 404.
+     *
+     * @param  \Closure(HsEvent, HealthSafetyReadContext): mixed  $command
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function withReadableEvent(User $viewer, int $eventId, \Closure $command,
+        array $bypassPermissions = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, array $permissionKeys = [], bool $forUpdate = false): mixed
+    {
+        $result = null;
+        if ($forUpdate) {
+            // A command writes the event: hold it for update first, so a repeated submit waits for the first instead of
+            // both taking the read's shared lock and deadlocking when they write. Locks only; nothing is read out.
+            if (\Illuminate\Support\Facades\DB::transactionLevel() < 1) { throw new \LogicException('An H&S event command must run inside a transaction.'); }
+            HsEvent::withTrashed()->whereKey($eventId)->lockForUpdate()->value('id');
+        }
+        HealthSafetyReadContext::within($viewer, array_values(array_unique([...self::eventReadPermissionKeys(), ...$permissionKeys])),
+            function (HealthSafetyReadContext $context) use ($viewer, $eventId, $command, $bypassPermissions, &$result): array {
+                $query = HsEvent::query()->whereKey($eventId);
+                $context->assertViewer($viewer);
+                $context->applyEventSiteScope($query, $bypassPermissions);
+                $this->applyFirstAidSourceScope($query, $viewer, $context);
+                // Only the command's own outcome leaves the read; the event model stays inside it.
+                $result = $command($query->firstOrFail(), $context);
+
+                return [];
+            });
+
+        return $result;
+    }
+
+    /**
+     * The event for a command that must be readable first (investigations, corrective actions, WorkSafe decisions).
+     * It is checked through the event read above (404 when unknown or unreadable) and then loaded fresh. The read's
+     * shared locks stay held until the caller's transaction commits, so the check still holds while the command writes.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function readableEventForCommand(User $viewer, int $eventId,
+        array $bypassPermissions = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, bool $forUpdate = true): HsEvent
+    {
+        if (\Illuminate\Support\Facades\DB::transactionLevel() < 1) {
+            throw new \LogicException('An H&S event command must run inside its transaction so the read stays locked.');
+        }
+        $this->withReadableEvent($viewer, $eventId, fn (): bool => true, $bypassPermissions, [], $forUpdate);
+
+        return HsEvent::query()->whereKey($eventId)->firstOrFail();
+    }
+
+    /** Whether this person may currently read the event (owner eligibility, notification recipients). Never throws a refusal. */
+    public function canReadEvent(User $person, HsEvent $event, array $bypassPermissions = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS): bool
+    {
+        try {
+            return $this->withReadableEvent($person, (int) $event->id, fn (): bool => true, $bypassPermissions) === true;
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return false;
+        } catch (HttpException $refused) {
+            if (! in_array($refused->getStatusCode(), [403, 404], true)) {
+                throw $refused;
+            }
+
+            return false;
+        }
+    }
+
+    public function applyReadableScope(Builder $query, User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
+    {
+        if ($context !== null) {
+            $context->assertViewer($viewer);
+
+            return $context->consumeSourceViewer(FirstAidAccessService::PERMISSIONS, function ($current) use ($query, $context, $sourceCandidates) {
+                if (! $current->canDo('hazards.view')) {
+                    return $context->query($query->whereRaw('1 = 0'));
+                }
+                $context->applyEventSiteScope($query, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
+
+                return $this->applyFirstAidSourceScope($query, $current, $context, $sourceCandidates);
+            });
+        }
+        if (! $viewer->canDo('hazards.view')) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $this->sites->applyHsEventScope(
+            $query,
+            $viewer,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
+
+        return $this->applyFirstAidSourceScope($query, $viewer, $context, $sourceCandidates);
+    }
+
+    /** @var \WeakMap<HealthSafetyReadContext, array<int, list<int>>>|null */
+    private static ?\WeakMap $provenSourceEventIds = null;
+
+    /**
+     * EXCEPTION to "never a detached ID admission list" (IncidentHsEventSourceReadService), approved by Stephan on
+     * 30 Oct 2026 (speed option B, relayed by MASTER): one H&S page ran dozens of counts, each re-embedding every
+     * linked review's full source proof (200–500 KB statements, 12–20 s pages).
+     *
+     * Inside a read context, the H&S event ids that the full unchanged source chain admits (first-aid, restraint,
+     * injury and incident source rules with their exact original facts: applyFirstAidSourceScopeEmbedded()) are proven
+     * ONCE, over all events, inside this request's locked read. Every later caller in the same read then gets "its own
+     * query AND id IN that set", which is the same rows the embedded chain would give it, because the chain decides
+     * each event on its own facts. Callers keep their own Site scope and filters.
+     *
+     * Conditions (Stephan): the set lives only in this HealthSafetyReadContext (one request, one transaction, one
+     * viewer); it is never cached across requests, stored, or handed to another user; who sees what is unchanged
+     * (role-by-role parity tests compare it with the embedded chain). The read's share locks keep the proven rows
+     * from changing underneath it.
+     *
+     * @return list<int>
+     */
+    private function provenSourceEventIds(User $viewer, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+        self::$provenSourceEventIds ??= new \WeakMap;
+        $known = self::$provenSourceEventIds[$context] ?? [];
+        if (array_key_exists((int) $viewer->id, $known)) { return $known[(int) $viewer->id]; }
+        $ids = $this->proveSourceEventIds($viewer, $context);
+        $known[(int) $viewer->id] = $ids;
+        self::$provenSourceEventIds[$context] = $known;
+        self::$provenViewers ??= new \WeakMap;
+        self::$provenViewers[$context] = $viewer;
+
+        return $ids;
+    }
+
+    /** @var \WeakMap<HealthSafetyReadContext, User>|null the viewer each proven set belongs to (one per context) */
+    private static ?\WeakMap $provenViewers = null;
+
+    /** @return list<int> */
+    private function proveSourceEventIds(User $viewer, HealthSafetyReadContext $context): array
+    {
+        return $this->applyFirstAidSourceScopeEmbedded(HsEvent::withTrashed(), $viewer, $context)
+            ->reorder()->pluck('hs_events.id')->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    /**
+     * The response barrier for the proven set: before a page-wide read hands back its result, the full embedded chain
+     * runs once more. If anything the set was proven on has changed since (a withdrawn permission, a moved source),
+     * the whole response is withheld (404), exactly as the embedded per-statement proof would have done.
+     */
+    public function recheckProvenSourceEventIds(HealthSafetyReadContext $context): void
+    {
+        $viewer = self::$provenViewers[$context] ?? null;
+        if ($viewer === null) { return; }
+        $proven = self::$provenSourceEventIds[$context][(int) $viewer->id] ?? null;
+        if ($proven !== null && $this->proveSourceEventIds($viewer, $context) !== $proven) {
+            throw new NotFoundHttpException;
+        }
+    }
+
+    /** Confidential treatment and restraint reviews intersect their source policy; unrelated sources retain theirs.
+     * Inside a read context this is "id IN the set proven once for this request" (see provenSourceEventIds()). */
+    public function applyFirstAidSourceScope(Builder $query, ?User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
+    {
+        // Named candidates bound the read to those rows (a row outside them is not admitted), and that bounded read is
+        // already small, so it keeps the embedded chain.
+        if ($context === null || $viewer === null || $sourceCandidates !== null || ! $context->provesPageWide()) {
+            return $this->applyFirstAidSourceScopeEmbedded($query, $viewer, $context, $sourceCandidates);
+        }
+        $context->assertViewer($viewer);
+        $original = ProofParity::$enabled ? clone $query : null;
+        $scoped = $context->query($query->whereIn('hs_events.id', $this->provenSourceEventIds($viewer, $context)));
+        if ($original !== null) {
+            ProofParity::assertSameRows($scoped, $this->applyFirstAidSourceScopeEmbedded($original, $viewer, $context, $sourceCandidates),
+                'hs_events.id', 'H&S event source scope');
+        }
+
+        return $scoped;
+    }
+
+    /** The full source chain, embedded in the query (the original scope; also what proves the per-request set). */
+    public function applyFirstAidSourceScopeEmbedded(Builder $query, ?User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
+    {
+        $types = array_unique([FirstAidRecord::class, (new FirstAidRecord)->getMorphClass()]);
+        if ($context !== null) {
+            if ($viewer === null) {
+                return $this->applyRestraintSourceScope($context->query($query->where(fn (Builder $source) => $source->whereNull('hs_events.source_type')->orWhereNotIn('hs_events.source_type', $types))), null, $context, $sourceCandidates);
+            }
+            $context->assertViewer($viewer);
+
+            return $this->applyRestraintSourceScope($context->applyFirstAidEventScope($query, $types, $sourceCandidates), $viewer, $context, $sourceCandidates);
+        }
+        $ids = [];
+        try {
+            $access = app(FirstAidAccessService::class);
+            if ($viewer !== null) {
+                $ids = $access->withCurrentViewer($viewer, fn ($current, $reads, $sites) => $this->readFirstAidEventIds($current, $reads, $sites, $types, null, $sourceCandidates));
+            }
+        } catch (HttpException $error) {
+            if ($error->getStatusCode() !== 403) {
+                throw $error;
+            }
+            $ids = [];
+        }
+
+        $query->where(function (Builder $sources) use ($types, $ids): void {
+            $sources->whereNull('hs_events.source_type')->orWhereNotIn('hs_events.source_type', $types)
+                ->orWhereIn('hs_events.id', $ids);
+        });
+
+        return $this->applyRestraintSourceScope($query, $viewer, $context, $sourceCandidates);
+    }
+
+    /** Confidential restraint facts never inherit permission from their derived H&S row. */
+    public function applyRestraintSourceScope(Builder $query, ?User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
+    {
+        $types = array_unique([RestraintEvent::class, (new RestraintEvent)->getMorphClass()]);
+        $ids = [];
+        // A correlated relation scope supplies independent candidates; final correlation remains intact.
+        // Discover only requested rows, but prove every matching source before final pagination.
+        $candidates = (clone ($sourceCandidates ?? $query))->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
+            ->whereIn('hs_events.source_type', $types)
+            ->select(['hs_events.id', 'hs_events.source_id', 'hs_events.client_id', 'hs_events.site_id', 'hs_events.staff_id', 'hs_events.event_category']);
+        $candidates = ($context ? $context->query($candidates) : $candidates)->get();
+        if ($viewer !== null && $candidates->isNotEmpty()) {
+            $ids = $this->readableRestraintEventIds($viewer, $candidates->pluck('id')->map(fn ($id): int => (int) $id)->all(), $context);
+        }
+        $query->where(function (Builder $sources) use ($types, $ids): void {
+            $sources->whereNull('hs_events.source_type')->orWhereNotIn('hs_events.source_type', $types)->orWhereIn('hs_events.id', $ids);
+        });
+
+        return $this->applyInjurySourceScope($query, $viewer, $context, $sourceCandidates);
+    }
+
+    /**
+     * Of the given H&S event ids, the restraint-sourced ones whose restraint the viewer may read now: hazards.view and
+     * restraints.view, the event still matching its restraint, and the restraint's own Site, stay and HR rules.
+     *
+     * @param  list<int>  $eventIds
+     * @return list<int>
+     */
+    public function readableRestraintEventIds(User $viewer, array $eventIds, ?HealthSafetyReadContext $context = null): array
+    {
+        if ($eventIds === []) {
+            return [];
+        }
+        $context?->assertViewer($viewer);
+        $types = array_unique([RestraintEvent::class, (new RestraintEvent)->getMorphClass()]);
+        $access = app(RestraintAccessService::class);
+        try {
+            $consume = function (User $current, CurrentAuthorizationReads $reads, array $sites) use ($access, $eventIds, $types): array {
+                if (! $current->canDo('hazards.view') || ! $current->canDo('restraints.view')) {
+                    return [];
+                }
+                $candidates = $reads->query(HsEvent::query())->whereKey($eventIds)->whereIn('source_type', $types)
+                    ->select(['id', 'source_id', 'client_id', 'site_id', 'staff_id', 'event_category'])->get();
+                $sources = $reads->query(RestraintEvent::query())->whereIn('id', $candidates->pluck('source_id'))
+                    ->select(['id', 'client_id', 'site_id', 'stay_id', 'created_by', 'source_schema_version', 'recorded_client_id', 'recorded_site_id', 'recorded_stay_id',
+                        'behaviour_support_plan_id', 'behaviour_support_plan_version_id'])->get()->keyBy('id');
+                $allowed = [];
+                foreach ($candidates as $event) {
+                    $source = $sources->get($event->source_id);
+                    if (! $source || $event->event_category !== HsEvent::CATEGORY_RESTRAINT
+                        || (int) $event->client_id !== (int) $source->client_id
+                        || ($event->site_id === null ? null : (int) $event->site_id) !== ($source->site_id === null ? null : (int) $source->site_id)
+                        || ($event->staff_id === null ? null : (int) $event->staff_id) !== ($source->created_by === null ? null : (int) $source->created_by)) {
+                        continue;
+                    }
+                    try {
+                        // Includes recorded and current stay provenance; HsEvent has no stay column.
+                        $access->assertEvent($source, $current, $reads, $sites, 'view');
+                        $allowed[] = (int) $event->id;
+                    } catch (HttpException $error) {
+                        if (! in_array($error->getStatusCode(), [403, 404], true)) {
+                            throw $error;
+                        }
+                    }
+                }
+
+                return $allowed;
+            };
+
+            return $context ? $access->withReadContext($context, $consume) : $access->withCurrentViewer($viewer, $consume);
+        } catch (HttpException $error) {
+            if (! in_array($error->getStatusCode(), [403, 404], true)) {
+                throw $error;
+            }
+
+            return [];
+        }
+    }
+
+    /** A governance row cannot grant access to the factual injury that produced it. */
+    public function applyInjurySourceScope(Builder $query, ?User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
+    {
+        $types = array_values(array_unique([WorkplaceInjury::class, (new WorkplaceInjury)->getMorphClass()]));
+        if ($viewer !== null && $context !== null) {
+            $context->assertViewer($viewer);
+
+            return $this->applyIncidentSourceScope($context->applyInjuryEventScope($query, $sourceCandidates), $viewer, $context, $sourceCandidates);
+        }
+        $ids = [];
+        if ($viewer !== null) {
+            $candidates = (clone ($sourceCandidates ?? $query))->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...));
+            try {
+                $ids = HealthSafetyReadContext::within($viewer, InjuryAccessService::PERMISSIONS,
+                    fn (HealthSafetyReadContext $reads): array => app(InjurySourceProjectionService::class)
+                        ->readableHsEventIdsInContext($viewer, $candidates, $reads));
+            } catch (HttpException $error) {
+                if (! in_array($error->getStatusCode(), [403, 404], true)) {
+                    throw $error;
+                }
+            }
+        }
+        $query->where(fn (Builder $sources) => $sources->whereNull('hs_events.source_type')
+            ->orWhereNotIn('hs_events.source_type', $types)->orWhereIn('hs_events.id', $ids));
+
+        return $this->applyIncidentSourceScope($query, $viewer, $context, $sourceCandidates);
+    }
+
+    /** Incident-derived HSEs never inherit their original source permission from hazards.view. */
+    public function applyIncidentSourceScope(Builder $query, ?User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
+    {
+        if ($context !== null && $viewer !== null) {
+            $context->assertViewer($viewer);
+            return $context->applyIncidentEventScope($query, $sourceCandidates);
+        }
+        // Standalone consumers must wrap actual materialisation in prepared evidence; no expired predicate or ID receipt is returned.
+        return app(\App\Services\Incidents\IncidentHsEventSourceReadService::class)->withoutIncidentSources($query);
+    }
+
+    private function deniedIncidentEvents(?User $viewer, ?HealthSafetyReadContext $context, Builder $sourceCandidates): Builder
+    {
+        $source = app(\App\Services\Incidents\IncidentHsEventSourceReadService::class);
+        $related = $source->incidentRelated(HsEvent::withTrashed());
+        if ($context === null || $viewer === null) { return $related->select('hs_events.id'); }
+        $context->assertViewer($viewer);
+        $candidateIds = (clone $sourceCandidates)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_events.id');
+        $allowed = $context->applyIncidentEventScope(HsEvent::query()->whereIn('hs_events.id', clone $candidateIds), $sourceCandidates);
+        // Retained SQL, not a plucked whitelist: late original-parent/authority changes still deny children.
+        $context->reconsumeIncidentPredicate($related, $allowed);
+
+        return $context->query($related->whereNotIn('hs_events.id', $allowed->select('hs_events.id'))->select('hs_events.id'));
+    }
+
+    /** Exact treatment/event tuple, shared by fresh public reads and bounded context reads. */
+    public function readFirstAidEventIds(User $current, CurrentAuthorizationReads $reads, array $sites, array $types, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): array
+    {
+        $reads->assertActive();
+        $context?->assertViewer($current);
+        $access = app(FirstAidAccessService::class);
+        $sources = $access->readableQuery($current, $reads, $sites, true, $context)
+            ->selectRaw('1')->whereColumn('first_aid_records.id', 'hs_events.source_id')
+            ->whereColumn('first_aid_records.site_id', 'hs_events.site_id')
+            ->where(function (Builder $subject): void {
+                $subject->where(function (Builder $client): void {
+                    $client->where('treated_person_type', 'client')->whereColumn('first_aid_records.client_id', 'hs_events.client_id')->whereNull('hs_events.staff_id');
+                })->orWhere(function (Builder $staff): void {
+                    $staff->where('treated_person_type', 'staff')->whereNull('hs_events.client_id')->where(function (Builder $identity): void {
+                        $identity->whereColumn('first_aid_records.treated_person_id', 'hs_events.staff_id')
+                            ->orWhere(fn (Builder $unlinked) => $unlinked->whereNull('first_aid_records.treated_person_id')->whereNull('hs_events.staff_id'));
+                    });
+                })->orWhere(function (Builder $other): void {
+                    $other->whereIn('treated_person_type', ['visitor', 'contractor'])->whereNull('hs_events.client_id')->whereNull('hs_events.staff_id');
+                });
+            });
+
+        $events = HsEvent::query()->whereIn('source_type', $types)->where('event_category', HsEvent::CATEGORY_INJURY);
+        if ($sourceCandidates !== null) {
+            // The caller supplies an independently executable query; keep its
+            // exact identity, Site and source filters before treatment proof.
+            $candidateIds = (clone $sourceCandidates)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_events.id');
+            $events->whereIn('hs_events.id', $candidateIds);
+        }
+
+        return $reads->query($events)->whereExists($sources->toBase())->pluck('hs_events.id')->all();
+    }
+
+    /** Preserve unrelated and orphan source rows while denying known confidential-source work. */
+    public function applyFirstAidChildSourceScope(Builder $query, string $eventColumn, ?User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
+    {
+        $sourceCandidates ??= $this->childSourceCandidates($query, $eventColumn);
+        $denied = $this->deniedFirstAidEvents($viewer, $context, $sourceCandidates);
+
+        $query->where(fn (Builder $source) => $source->whereNull($eventColumn)->orWhereNotIn($eventColumn, $denied));
+        $incidentDenied = $this->deniedIncidentEvents($viewer, $context, $sourceCandidates);
+        $query->where(fn (Builder $source) => $source->whereNull($eventColumn)->orWhereNotIn($eventColumn, $incidentDenied));
+        if ($context !== null) {
+            $context->reconsumeIncidentPredicate($query, $incidentDenied);
+        }
+
+        return $context !== null ? $context->query($query) : $query;
+    }
+
+    /** Both modern additional provenance and the retained legacy event attachment are binding. */
+    public function applyFirstAidRiskSourceScope(Builder $query, ?User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
+    {
+        $types = array_unique([HsEvent::class, (new HsEvent)->getMorphClass()]);
+        $sourceCandidates ??= $this->riskSourceCandidates($query, $types);
+        $denied = $this->deniedFirstAidEvents($viewer, $context, $sourceCandidates);
+        $eventColumn = $query->qualifyColumn('hs_event_id');
+        $query->where(fn (Builder $source) => $source->whereNull($eventColumn)->orWhereNotIn($eventColumn, clone $denied));
+
+        $incidentDenied = $this->deniedIncidentEvents($viewer, $context, $sourceCandidates);
+        if ($context !== null) {
+            $context->reconsumeIncidentPredicate($query, $incidentDenied);
+        }
+        $query->where(fn (Builder $source) => $source->whereNull($eventColumn)->orWhereNotIn($eventColumn, clone $incidentDenied));
+        $query->where(fn (Builder $source) => $source->whereNull($query->qualifyColumn('assessable_type'))->orWhereNotIn($query->qualifyColumn('assessable_type'), $types)->orWhereNotIn($query->qualifyColumn('assessable_id'), $incidentDenied));
+
+        $query->where(function (Builder $source) use ($query, $types, $denied): void {
+            $source->whereNull($query->qualifyColumn('assessable_type'))
+                ->orWhereNotIn($query->qualifyColumn('assessable_type'), $types)
+                ->orWhereNotIn($query->qualifyColumn('assessable_id'), $denied);
+        });
+
+        return $context !== null ? $context->query($query) : $query;
+    }
+
+    /** Standalone wrappers discover only event identities bound to their already filtered children. */
+    private function childSourceCandidates(Builder $query, string $eventColumn): Builder
+    {
+        $children = (clone $query)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
+            ->whereNotNull($eventColumn)->select($eventColumn);
+
+        return HsEvent::withTrashed()->whereIn('hs_events.id', $children);
+    }
+
+    /** Both retained event bindings are authoritative; unrelated morph IDs are not event IDs. */
+    private function riskSourceCandidates(Builder $query, array $types): Builder
+    {
+        $legacy = (clone $query)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
+            ->whereNotNull($query->qualifyColumn('hs_event_id'))->select($query->qualifyColumn('hs_event_id'));
+        $modern = (clone $query)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))
+            ->whereIn($query->qualifyColumn('assessable_type'), $types)
+            ->whereNotNull($query->qualifyColumn('assessable_id'))->select($query->qualifyColumn('assessable_id'));
+
+        return HsEvent::withTrashed()->where(fn (Builder $events) => $events
+            ->whereIn('hs_events.id', $legacy)->orWhereIn('hs_events.id', $modern));
+    }
+
+    private function deniedFirstAidEvents(?User $viewer, ?HealthSafetyReadContext $context, Builder $sourceCandidates): Builder
+    {
+        $types = array_unique([FirstAidRecord::class, (new FirstAidRecord)->getMorphClass(), RestraintEvent::class, (new RestraintEvent)->getMorphClass(),
+            WorkplaceInjury::class, (new WorkplaceInjury)->getMorphClass()]);
+        $candidateIds = (clone $sourceCandidates)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_events.id');
+        $allowed = $this->applyFirstAidSourceScope(HsEvent::query()->whereIn('hs_events.id', clone $candidateIds), $viewer, $context, $sourceCandidates)
+            ->whereIn('hs_events.source_type', $types)->pluck('hs_events.id')->all();
+
+        // Final SQL denial remains complete even if a supplied discovery candidate omits a binding.
+        // This subquery reads identities only; no unrelated private source models are materialized.
+        return HsEvent::withTrashed()->whereIn('hs_events.source_type', $types)
+            ->whereNotIn('hs_events.id', $allowed)->select('hs_events.id')->lock('for share nowait');
+    }
+
+    public function canView(HsEvent $event, User $viewer, ?HealthSafetyReadContext $context = null): bool
+    {
+        if ($context === null) {
+            try {
+                return HealthSafetyReadContext::within($viewer, [...FirstAidAccessService::PERMISSIONS,
+                    ...RestraintAccessService::PERMISSIONS, ...InjuryAccessService::PERMISSIONS],
+                    fn (HealthSafetyReadContext $reads): bool => $reads->consumeSourceViewer(FirstAidAccessService::PERMISSIONS,
+                        fn (User $current): bool => $this->canView($event, $current, $reads)));
+            } catch (HttpException $error) {
+                if (! in_array($error->getStatusCode(), [403, 404], true)) {
+                    throw $error;
+                }
+
+                return false;
+            }
+        }
+
+        $context->assertViewer($viewer);
+        $candidates = $context->applyEventSiteScope(HsEvent::query()->whereKey($event->id),
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
+        if ($context->provesPageWide()) {
+            // One row on a page-wide read (each task's linked review): the same Site and hazards.view checks as
+            // applyReadableScope(), then "is it in the set this read proved" instead of re-running the whole chain for
+            // this one row. The query is exactly the candidate, so no row outside the candidates can be admitted.
+            return $context->consumeSourceViewer(FirstAidAccessService::PERMISSIONS, function (User $current) use ($candidates, $context): bool {
+                if (! $current->canDo('hazards.view')) {
+                    return false;
+                }
+                $original = ProofParity::$enabled ? clone $candidates : null;
+                $scoped = $context->query((clone $candidates)->whereIn('hs_events.id', $this->provenSourceEventIds($current, $context)));
+                if ($original !== null) {
+                    ProofParity::assertSameRows($scoped, $this->applyFirstAidSourceScopeEmbedded(clone $original, $current, $context, $original),
+                        'hs_events.id', 'H&S event row check');
+                }
+
+                return $scoped->exists();
+            });
+        }
+
+        return $this->applyReadableScope(clone $candidates, $viewer, $context, $candidates)->exists();
+    }
+}

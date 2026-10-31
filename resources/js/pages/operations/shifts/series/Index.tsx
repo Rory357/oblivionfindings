@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
@@ -174,7 +175,7 @@ export default function ShiftSeriesIndex({ series, canManageAny }: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: '/operations/rostering' },
                 { title: 'Rostering', href: '/operations/rostering' },
                 {
                     title: 'Recurring series',
@@ -191,7 +192,7 @@ export default function ShiftSeriesIndex({ series, canManageAny }: Props) {
                         caption={`${shown.length} of ${rows.length} on this page shown`}
                     />
 
-                    <div className="grid gap-4">
+                    <div className="grid gap-5">
                         {shown.length > 0 ? (
                             shown.map((row) => (
                                 <Card key={row.id}>
@@ -340,36 +341,10 @@ export default function ShiftSeriesIndex({ series, canManageAny }: Props) {
                         )}
                     </div>
 
-                    {series.links && series.links.length > 3 ? (
-                        <div className="flex flex-wrap gap-2">
-                            {series.links.map((link, index) => (
-                                <Button
-                                    key={`shift-series-link-${index}`}
-                                    variant={
-                                        link.active ? 'default' : 'outline'
-                                    }
-                                    size="sm"
-                                    disabled={!link.url}
-                                    asChild={!!link.url}
-                                >
-                                    {link.url ? (
-                                        <Link
-                                            href={link.url}
-                                            dangerouslySetInnerHTML={{
-                                                __html: link.label,
-                                            }}
-                                        />
-                                    ) : (
-                                        <span
-                                            dangerouslySetInnerHTML={{
-                                                __html: link.label,
-                                            }}
-                                        />
-                                    )}
-                                </Button>
-                            ))}
-                        </div>
-                    ) : null}
+                    <LaravelPagination
+                        links={series.links ?? []}
+                        className="flex-wrap"
+                    />
                 </div>
             </PageLayout>
         </AppLayout>

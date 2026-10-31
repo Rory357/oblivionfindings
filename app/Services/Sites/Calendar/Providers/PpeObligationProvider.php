@@ -2,70 +2,26 @@
 
 namespace App\Services\Sites\Calendar\Providers;
 
-use App\Models\PpeInventory;
-use App\Services\Sites\Calendar\CalendarItem;
 use Illuminate\Support\Carbon;
 
 /**
- * PPE & Equipment obligations — inspection-due and expiry dates pulled from the PPE
- * inventory register so they surface on the Site Calendar without re-entry. One
- * register (/health-safety/ppe) stays the single write surface.
+ * PPE & Equipment obligations on the Site Calendar: inspection-due and expiry dates from the PPE register
+ * (/health-safety/ppe stays the single write surface). The dates come through the viewer's PPE source read
+ * (SiteCalendarAggregator::ppeForViewer → PpeSiteReadService::obligationsForViewer).
  */
 class PpeObligationProvider extends ObligationProvider
 {
-    /**
-     * Date column => human label. Each non-null date in range becomes its own occurrence.
-     *
-     * @var array<string, string>
-     */
-    private const DATE_FIELDS = [
-        'next_inspection_due' => 'PPE inspection due',
-        'expiry_date' => 'PPE expires',
-    ];
-
     public function sourceKey(): string
     {
         return 'ppe';
     }
 
+    /**
+     * The legacy viewer-less form has no one to check PPE access for, so it returns nothing rather than every
+     * Site's PPE dates.
+     */
     public function obligations(array $siteIds, Carbon $start, Carbon $end): array
     {
-        if ($siteIds === []) {
-            return [];
-        }
-
-        $items = [];
-
-        $inventory = PpeInventory::query()
-            ->whereIn('site_id', $siteIds)
-            ->whereNotIn('status', ['condemned', 'disposed'])
-            ->with(['site:id,name,type', 'ppeType:id,name'])
-            ->get();
-
-        foreach ($inventory as $item) {
-            $label = trim(($item->ppeType?->name ?? 'PPE item').($item->serial_number ? ' · '.$item->serial_number : ''));
-
-            foreach (self::DATE_FIELDS as $field => $suffix) {
-                $due = $item->{$field};
-                if (! $due instanceof Carbon || ! $this->inRange($due, $start, $end)) {
-                    continue;
-                }
-
-                $items[] = new CalendarItem(
-                    id: "ppe-{$item->id}-{$field}",
-                    source: 'ppe',
-                    group: 'auto',
-                    title: $label.' — '.$suffix,
-                    start: $this->isoDate($due),
-                    allDay: true,
-                    status: $this->dueStatus($due, false),
-                    ref: $item->serial_number,
-                    site: $this->siteArray($item->site),
-                    link: "/health-safety/ppe?item={$item->id}",
-                );
-            }
-        }
-
-        return $items;
+        return [];
     }
 }

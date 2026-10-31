@@ -3,12 +3,15 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Domain\Governance\Services\IncidentEscalationService;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetIncident;
 use App\Models\HsEvent;
+use App\Models\Permission;
 use App\Models\RestraintEvent;
+use App\Models\RestraintSourceDelivery;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
@@ -16,8 +19,11 @@ use App\Models\SiteHazard;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
+use App\Services\HealthSafety\RestraintSourceDeliveryService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -379,7 +385,8 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_restraint_with_injury_creates_high_alert(): void
     {
-        RestraintEvent::factory()->withInjury()->create();
+        $event = $this->createSiteBoundRestraint(['injury_occurred' => true, 'injury_details' => 'Actual injury recorded.']);
+        $this->deliverStagedRestraint($event);
 
         $this->assertDatabaseHas('control_room_alerts', [
             'source' => 'operations',
@@ -390,7 +397,8 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_restraint_outside_support_plan_creates_medium_alert(): void
     {
-        RestraintEvent::factory()->outsideSupportPlan()->create();
+        $event = $this->createSiteBoundRestraint(['within_support_plan' => false, 'deviation_reason' => 'Actual departure from plan.']);
+        $this->deliverStagedRestraint($event);
 
         $this->assertDatabaseHas('control_room_alerts', [
             'source' => 'operations',
@@ -401,18 +409,22 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_restraint_within_plan_no_injury_does_not_create_alert(): void
     {
-        RestraintEvent::factory()->withinSupportPlan()->create();
+        $event = $this->createSiteBoundRestraint();
+        $this->assertSame(0, RestraintSourceDelivery::where('restraint_event_id', $event->id)->where('purpose', 'operational_bridge')->count());
+        $this->deliverStagedRestraint($event);
 
         $this->assertDatabaseCount('control_room_alerts', 0);
     }
 
     public function test_restraint_injury_discovered_later_creates_alert(): void
     {
-        $event = RestraintEvent::factory()->withinSupportPlan()->create();
+        $event = $this->createSiteBoundRestraint();
+        $this->deliverStagedRestraint($event);
 
         $this->assertDatabaseCount('control_room_alerts', 0);
 
         $event->update(['injury_occurred' => true, 'injury_details' => 'Bruise discovered post-event']);
+        $this->deliverStagedRestraint($event);
 
         $this->assertDatabaseHas('control_room_alerts', [
             'source' => 'operations',
@@ -550,5 +562,34 @@ class ControlRoomBridgeWiringTest extends TestCase
             'client_id' => $client->id,
             'site_id' => $site->id,
         ], $attributes));
+    }
+
+    /** Real current staff and source scope; the observer stages before delivery. */
+    private function createSiteBoundRestraint(array $attributes = []): RestraintEvent
+    {
+        Queue::fake();
+        $this->seed(RbacSeeder::class);
+        $site = Site::factory()->create(['is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now(), 'external_clinical_account' => false]);
+        HrEmployeeProfile::factory()->create(['user_id' => $staff->id, 'primary_site_id' => $site->id,
+            'secondary_site_ids' => [], 'is_active' => true, 'start_date' => now('Pacific/Auckland')->subYear()->toDateString(), 'end_date' => null]);
+        foreach (['restraints.view', 'restraints.create', 'restraints.review', 'restraints.manage', 'clients.viewAny'] as $key) {
+            $staff->permissionOverrides()->attach(Permission::where('key', $key)->sole()->id, ['allowed' => true]);
+        }
+
+        return RestraintEvent::factory()->withinSupportPlan()->create([
+            'client_id' => $client->id, 'site_id' => $site->id, 'created_by' => $staff->id, ...$attributes,
+        ]);
+    }
+
+    private function deliverStagedRestraint(RestraintEvent $event): void
+    {
+        $pending = RestraintSourceDelivery::where('restraint_event_id', $event->id)->where('status', 'pending')->orderBy('created_at')->get();
+        $this->assertNotEmpty($pending, 'The committed observer must retain a durable source delivery intent.');
+        foreach ($pending as $intent) {
+            app(RestraintSourceDeliveryService::class)->deliver($intent->id);
+            $this->assertSame('delivered', $intent->fresh()->status);
+        }
     }
 }

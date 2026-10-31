@@ -21,6 +21,7 @@ class SeedAllPermissionsToAdminSeeder extends Seeder
         // product policy, so this backfill never gives them to admin.
         $allPermissionIds = Permission::query()
             ->whereNotIn('key', RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY)
+            ->where('key', 'not like', 'securityDevices.endpoints.script%')
             ->pluck('id')
             ->all();
         $existing = $adminRole->permissions()->pluck('permissions.id')->all();

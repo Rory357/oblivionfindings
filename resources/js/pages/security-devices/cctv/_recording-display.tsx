@@ -12,6 +12,7 @@ export function ReferenceUnavailable() {
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
             ]}
         >
             <ErrorState

@@ -22,19 +22,19 @@ const config: Record<
         label: 'Eligible',
         icon: CheckCircle2,
         badgeClass:
-            'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success',
+            'border-status-success/30 bg-status-success-bg text-status-success',
     },
     warnings: {
         label: 'Warnings',
         icon: AlertTriangle,
         badgeClass:
-            'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning',
+            'border-status-warning/30 bg-status-warning-bg text-status-warning',
     },
     blocked: {
         label: 'Blocked',
         icon: XCircle,
         badgeClass:
-            'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical',
+            'border-status-critical/30 bg-status-critical-bg text-status-critical',
     },
 };
 

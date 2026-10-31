@@ -17,32 +17,45 @@ import {
     type IntegrationView,
 } from '@/components/security-devices/integration-records';
 import type { IntegrationsProps } from '@/components/security-devices/integration-types';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, router, usePage } from '@inertiajs/react';
 import { LayoutGrid, List, Plug, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+
+type CurrentPermissions = {
+    securityDevices?: {
+        integrationsView?: boolean;
+        integrationsManage?: boolean;
+        devicesView?: boolean;
+    };
+};
+
 export type {
     Provider,
     ProviderException,
 } from '@/components/security-devices/integration-types';
 export default function IntegrationsHub(data: IntegrationsProps) {
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+        auth?: { user?: { id: number } | null; can?: CurrentPermissions };
     }>().props;
+    // Metadata-only partial changes cannot transfer ownership of retained DTOs.
+    // A complete read with a fresh page mount establishes the next source actor.
+    const [sourceActor] = useState(data.actor_id);
     const [layout, setLayout] = useState<'cards' | 'table'>('cards');
     const visible = Boolean(
         auth?.user?.id &&
         data.actor_id === auth.user.id &&
-        auth.can?.['securityDevices.integrations.view'] === true,
+        data.actor_id === sourceActor &&
+        auth.can?.securityDevices?.integrationsView === true,
     );
     const permission: IntegrationPermissions = {
         manage:
             visible &&
             data.can.manage &&
-            auth?.can?.['securityDevices.integrations.manage'] === true,
-        devices:
-            visible && auth?.can?.['securityDevices.devices.view'] === true,
+            auth?.can?.securityDevices?.integrationsManage === true,
+        devices: visible && auth?.can?.securityDevices?.devicesView === true,
     };
     return (
         <IntegrationsBody
@@ -124,6 +137,17 @@ function IntegrationsBody({
         if (refreshing.current) return;
         refreshing.current = true;
         setNotice('');
+        if (!visible) {
+            router.visit('/security-devices/integrations', {
+                method: 'get',
+                preserveState: false,
+                preserveScroll: true,
+                onFinish: () => {
+                    if (live.current) refreshing.current = false;
+                },
+            });
+            return;
+        }
         router.reload({
             only: [
                 'actor_id',
@@ -140,15 +164,14 @@ function IntegrationsBody({
                     actor_id?: number;
                     auth?: {
                         user?: { id?: number };
-                        can?: Record<string, unknown>;
+                        can?: CurrentPermissions;
                     };
                 };
                 if (
                     page.component === 'security-devices/integrations' &&
                     props.actor_id === actor &&
                     props.auth?.user?.id === actor &&
-                    props.auth.can?.['securityDevices.integrations.view'] ===
-                        true
+                    props.auth.can?.securityDevices?.integrationsView === true
                 )
                     setDenied(false);
                 else {
@@ -233,8 +256,8 @@ function IntegrationsBody({
             <div className="space-y-5">
                 <PageHeader
                     icon={Plug}
-                    title="Provider integrations"
-                    subline="Connection, Site mapping, collected health and supported capabilities."
+                    title="Integrations"
+                    subline="Connection, Site mapping, collected health and supported capabilities"
                     actions={
                         <>
                             <PageHeaderSearch
@@ -316,6 +339,12 @@ function IntegrationsBody({
                         />
                     }
                 />
+                {visible ? (
+                    <SecurityDevicesSectionTabs
+                        section="setup"
+                        activeTab="integrations"
+                    />
+                ) : null}
                 {!visible ? (
                     <p
                         role="status"

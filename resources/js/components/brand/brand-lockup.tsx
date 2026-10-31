@@ -43,12 +43,17 @@ export function JourneyWordmark({ className }: { className?: string }) {
 export function BrandLockup({
     surface,
     className,
+    name,
 }: {
     surface: 'dark' | 'light';
     className?: string;
+    /** The public website passes the provider's resolved name (branding or
+     *  referral settings), so a client site never reads "Oblivion Care". */
+    name?: string | null;
 }) {
     const { branding } = usePage<BrandingProps>().props;
-    const customName = useCustomBrandName();
+    const brandName = useCustomBrandName();
+    const customName = name === undefined ? brandName : name;
     const logo =
         surface === 'dark'
             ? (branding?.logoDarkUrl ?? null)

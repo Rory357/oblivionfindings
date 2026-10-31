@@ -28,6 +28,9 @@ test('revoke migration removes restricted independent authority from an already-
         'medications.external.manage', 'medications.transfers.manage',
         'medications.catalogue.manage', 'medications.backups.manage',
         'chat.investigate',
+        'securityDevices.endpoints.scriptUpload', 'securityDevices.endpoints.scriptReview',
+        'securityDevices.endpoints.scriptPolicyManage', 'securityDevices.endpoints.scriptRun',
+        'securityDevices.endpoints.scriptUnattended', 'securityDevices.endpoints.scriptOutputView',
     ];
     $leftBehind = array_values(array_diff($restricted, $laterKeys));
     expect(Permission::query()->whereIn('key', $laterKeys)->count())->toBe(count($laterKeys))

@@ -111,7 +111,7 @@ class LeaveService
             throw new \InvalidArgumentException("Unsupported leave type '{$leaveType}'.");
         }
         try {
-            $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+            $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
             $localStartsAt = Carbon::parse($data['starts_at'], $timezone)->startOfDay();
             $localEndsAt = Carbon::parse($data['ends_at'], $timezone)->endOfDay();
             $startsAt = $localStartsAt->copy()->utc();
@@ -242,7 +242,7 @@ class LeaveService
         }
 
         try {
-            $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+            $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
             $localStartsAt = Carbon::parse($data['starts_at'], $timezone)->startOfDay();
             $localEndsAt = Carbon::parse($data['ends_at'], $timezone)->endOfDay();
             $startsAt = $localStartsAt->copy()->utc();

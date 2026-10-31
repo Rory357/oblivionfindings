@@ -62,50 +62,55 @@ final class HsEventClosureService
         );
 
         $notifiable = $event->worksafe_notifiable === true;
-        $notificationOk = ! $notifiable || (
+        $notificationOk = $decisionOk && (! $notifiable || (
             in_array($event->worksafe_status, [HsEvent::WORKSAFE_NOTIFIED, HsEvent::WORKSAFE_ACKNOWLEDGED], true)
             && $event->worksafe_notified_at !== null
             && filled($event->worksafe_method)
-        );
+        ));
         $requirements[] = $this->requirement(
             'worksafe_notification',
             $notificationOk,
-            $notificationOk
+            ! $decisionOk
+                ? 'Record the signed WorkSafe decision before confirming notification requirements.'
+                : ($notificationOk
                 ? ($notifiable ? 'WorkSafe notification recorded' : 'WorkSafe notification not required by the recorded decision')
-                : 'Record the WorkSafe notification before closing this event.',
-            "/health-safety/events/{$event->id}?action=worksafe-notify",
+                : 'Record the WorkSafe notification before closing this event.'),
+            "/health-safety/events/{$event->id}?action=".($decisionOk ? 'worksafe-notify' : 'worksafe-decision'),
             HsClosureReadiness::HARD,
         );
 
-        $acknowledgementOk = ! $notifiable || (
+        $acknowledgementOk = $decisionOk && (! $notifiable || (
             $event->worksafe_status === HsEvent::WORKSAFE_ACKNOWLEDGED
             && $event->worksafe_acknowledged_at !== null
-        );
+        ));
         $requirements[] = $this->requirement(
             'worksafe_acknowledgement',
             $acknowledgementOk,
-            $acknowledgementOk
+            ! $decisionOk
+                ? 'Record the signed WorkSafe decision before confirming acknowledgement requirements.'
+                : ($acknowledgementOk
                 ? ($notifiable ? 'WorkSafe acknowledgement recorded' : 'WorkSafe acknowledgement not required by the recorded decision')
-                : 'Record WorkSafe acknowledgement before closing this event.',
-            "/health-safety/events/{$event->id}?action=worksafe-acknowledge",
+                : 'Record WorkSafe acknowledgement before closing this event.'),
+            "/health-safety/events/{$event->id}?action=".($decisionOk ? 'worksafe-acknowledge' : 'worksafe-decision'),
             HsClosureReadiness::HARD,
         );
 
-        $sitePreservationOk = ! $notifiable || in_array(
+        $sitePreservationOk = $decisionOk && (! $notifiable || in_array(
             $event->worksafe_site_preservation_status,
             [HsEvent::SITE_PRESERVATION_NOT_REQUIRED, HsEvent::SITE_PRESERVATION_RELEASED],
             true,
-        );
+        ));
         $sitePreservationLabel = match (true) {
+            ! $decisionOk => 'Record the signed WorkSafe decision before confirming Site-preservation requirements.',
             $sitePreservationOk && ! $notifiable => 'Site-preservation work not required by the recorded decision',
             $event->worksafe_site_preservation_status === HsEvent::SITE_PRESERVATION_NOT_REQUIRED => 'Site-preservation applicability reviewed and recorded as not required',
             $event->worksafe_site_preservation_status === HsEvent::SITE_PRESERVATION_RELEASED => 'Site-preservation release recorded',
             $event->worksafe_site_preservation_status === HsEvent::SITE_PRESERVATION_ACTIVE => 'Record the Site-preservation release before closing this event.',
             default => 'Review and record the Site-preservation obligation before closing this event.',
         };
-        $sitePreservationAction = $event->worksafe_site_preservation_status === HsEvent::SITE_PRESERVATION_ACTIVE
+        $sitePreservationAction = ! $decisionOk ? 'worksafe-decision' : ($event->worksafe_site_preservation_status === HsEvent::SITE_PRESERVATION_ACTIVE
             ? 'worksafe-site-release'
-            : 'worksafe-site-preservation';
+            : 'worksafe-site-preservation');
         $requirements[] = $this->requirement(
             'site_preservation',
             $sitePreservationOk,
@@ -240,7 +245,7 @@ final class HsEventClosureService
             $actionsOk
                 ? 'All corrective actions verified or closed'
                 : 'All corrective actions must be verified or closed before this event can be closed.',
-            "/health-safety/corrective-actions?event={$event->id}",
+            "/health-safety/events/{$event->id}?section=actions",
             HsClosureReadiness::EXCEPTIONAL,
         );
 
@@ -668,7 +673,9 @@ final class HsEventClosureService
 
     private function linkedClientIncident(HsEvent $event, bool $lock = false): ?ClientIncident
     {
-        $query = ClientIncident::query();
+        // Readiness and closing locks need only the incident's alert link. The H&S event page also builds readiness
+        // for viewers who can't read the incident (decision 9), so its narrative is never loaded here.
+        $query = ClientIncident::query()->select(['client_incidents.id', 'client_incidents.control_room_alert_id']);
         if ($lock) {
             $query->lockForUpdate();
         }

@@ -65,7 +65,9 @@ final class OpenSslCollectorCertificateIssuer implements CollectorCertificateIss
         );
         if ($certificate === false
             || ! openssl_x509_export($certificate, $certificatePem)
-            || ! openssl_pkey_export($privateKey, $privateKeyPem)) {
+            || ! openssl_pkey_export($privateKey, $privateKeyPem, null, [
+                'config' => base_path('resources/monitoring/collector-openssl.cnf'),
+            ])) {
             throw new RuntimeException('Collector certificate export failed.');
         }
         $fingerprint = openssl_x509_fingerprint($certificate, 'sha256');

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+import { StatusBadge } from '@/components/ui/status-badge';
 import { MicroStats, type MicroStat } from './micro-stats';
 
 export type OpenShiftCandidateEligibility = {
@@ -96,12 +97,12 @@ export function OpenShiftsPane({
                             <h3 className="text-sm font-bold tracking-tight">
                                 Eligibility watchlist
                             </h3>
-                            <div className="text-[11px] text-muted-foreground">
+                            <div className="text-xs text-muted-foreground">
                                 Shift-level blockers and warnings already
                                 returned by the eligibility service
                             </div>
                         </div>
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
                             {blockedAlerts.length + warningAlerts.length}
                         </span>
                     </div>
@@ -130,11 +131,11 @@ export function OpenShiftsPane({
                             <h3 className="text-sm font-bold tracking-tight">
                                 Replacement requests
                             </h3>
-                            <div className="text-[11px] text-muted-foreground">
+                            <div className="text-xs text-muted-foreground">
                                 Awaiting cover for assigned shifts
                             </div>
                         </div>
-                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
                             {replacementRequests.length}
                         </span>
                     </div>
@@ -167,7 +168,7 @@ export function OpenShiftsPane({
                                             ? `Current staff: ${req.current_staff}`
                                             : 'Current staff not set'}
                                     </div>
-                                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                                         {req.client ? (
                                             <span className="rounded bg-muted px-1.5 py-0.5">
                                                 {req.client}
@@ -179,9 +180,9 @@ export function OpenShiftsPane({
                                             </span>
                                         ) : null}
                                         {req.reason ? (
-                                            <span className="rounded bg-status-warning-bg px-1.5 py-0.5 text-status-warning">
+                                            <StatusBadge variant="warning">
                                                 {req.reason}
-                                            </span>
+                                            </StatusBadge>
                                         ) : null}
                                     </div>
                                 </div>
@@ -283,12 +284,12 @@ export function OpenShiftsPane({
                         </div>
 
                         <div className="mt-3 border-t border-dashed border-border pt-3">
-                            <div className="mb-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                            <div className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                 Suggested staff
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5">
                                 {sh.suggestions.length === 0 ? (
-                                    <span className="text-[11px] text-muted-foreground italic">
+                                    <span className="text-xs text-muted-foreground italic">
                                         No eligible candidates — broaden
                                         criteria
                                     </span>
@@ -338,7 +339,7 @@ export function OpenShiftsPane({
                                                             : 'border-border bg-background text-foreground hover:bg-accent',
                                                 )}
                                             >
-                                                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background/50 text-[9px] font-bold text-foreground uppercase">
+                                                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background/50 text-xs font-bold text-foreground uppercase">
                                                     {nm.name
                                                         .split(' ')
                                                         .map((w) => w[0])
@@ -352,7 +353,7 @@ export function OpenShiftsPane({
                                                     {meta ? (
                                                         <span
                                                             className={cn(
-                                                                'text-[10px] font-medium',
+                                                                'text-xs font-medium',
                                                                 isBest
                                                                     ? 'text-primary-foreground/75'
                                                                     : 'text-muted-foreground',
@@ -365,19 +366,19 @@ export function OpenShiftsPane({
                                                 {isBlocked ? (
                                                     <span
                                                         aria-hidden="true"
-                                                        className="rounded-full bg-status-critical px-1.5 py-0.5 text-[9px] font-bold text-white uppercase"
+                                                        className="rounded-full bg-status-critical px-1.5 py-0.5 text-xs font-bold text-white uppercase"
                                                     >
                                                         Blocked
                                                     </span>
                                                 ) : isWarning ? (
                                                     <span
                                                         aria-hidden="true"
-                                                        className="rounded-full bg-status-warning px-1.5 py-0.5 text-[9px] font-bold text-white uppercase"
+                                                        className="rounded-full bg-status-warning px-1.5 py-0.5 text-xs font-bold text-white uppercase"
                                                     >
                                                         Warn
                                                     </span>
                                                 ) : isBest ? (
-                                                    <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[9px] font-bold uppercase">
+                                                    <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-xs font-bold uppercase">
                                                         best
                                                     </span>
                                                 ) : null}
@@ -391,7 +392,7 @@ export function OpenShiftsPane({
                                     {sh.blocked.map((b, i) => (
                                         <div
                                             key={i}
-                                            className="text-[11px] text-status-critical"
+                                            className="text-xs text-status-critical"
                                         >
                                             × {b}
                                         </div>
@@ -428,7 +429,7 @@ function EligibilityAlertRow({
             <div className="flex flex-wrap items-center gap-2">
                 <span
                     className={cn(
-                        'rounded px-1.5 py-0.5 text-[10px] font-bold uppercase',
+                        'rounded px-1.5 py-0.5 text-xs font-bold uppercase',
                         blocked
                             ? 'bg-status-critical text-white'
                             : 'bg-status-warning text-white',
@@ -437,12 +438,12 @@ function EligibilityAlertRow({
                     {blocked ? 'Blocker' : 'Warning'}
                 </span>
                 <span className="text-xs font-semibold">{alert.staff}</span>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                     {fmtDay(alert.starts_at)} - {alert.site}
                 </span>
             </div>
             <div className="mt-1 text-xs text-foreground">{alert.reason}</div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold">
                 <Link
                     href={`/operations/shifts/${alert.id}`}
                     className="text-primary underline-offset-2 hover:underline"
@@ -525,7 +526,7 @@ function Stat({
             <div className={cn('text-base font-bold tabular-nums', c)}>
                 {value}
             </div>
-            <div className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+            <div className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 {label}
             </div>
         </div>

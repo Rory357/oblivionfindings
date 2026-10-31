@@ -1,22 +1,31 @@
-import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
-import { BroadcastWizard } from '@/components/control-room/broadcast-wizard';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
-import { Head, router } from '@inertiajs/react';
-import { CheckCircle, Megaphone, Users, XCircle } from 'lucide-react';
+    BROADCAST_TEMPLATE_LABELS,
+    BroadcastWizard,
+    broadcastDeliveryState,
+    channelList,
+} from '@/components/control-room/broadcast-wizard';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
+import {
+    ControlRoomRowActions,
+    type ControlRoomRowAction,
+} from '@/components/control-room/control-room-row-actions';
+import { PageHeaderPrimaryButton } from '@/components/page';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { Link, router } from '@inertiajs/react';
+import { ArrowUpRight, Copy, Megaphone, Plus } from 'lucide-react';
 import { useState } from 'react';
-
-// --- TypeScript Interfaces ---
 
 interface BroadcastInitiator {
     id: number;
@@ -32,6 +41,9 @@ interface BroadcastGroup {
     total_recipients: number;
     delivered_count: number;
     failed_count: number;
+    /** People who marked the in-app copy read, of those sent it in-app with tracking. */
+    read_count: number;
+    read_of: number;
     initiated_by: BroadcastInitiator | null;
 }
 
@@ -48,6 +60,8 @@ interface PaginatedBroadcasts {
     last_page: number;
     per_page: number;
     total: number;
+    from?: number | null;
+    to?: number | null;
 }
 
 interface Props {
@@ -60,45 +74,14 @@ interface Props {
     };
 }
 
-const CHANNEL_LABELS: Record<string, string> = {
-    in_app: 'In-App',
-    push: 'Push Notification',
-    sms: 'SMS',
-    email: 'Email',
-};
+const BASE_PATH = '/control-room/broadcast';
 
-function channelBadgeVariant(
-    channel: string,
-): 'default' | 'secondary' | 'outline' | 'destructive' {
-    switch (channel) {
-        case 'sms':
-            return 'default';
-        case 'email':
-            return 'secondary';
-        case 'push':
-            return 'outline';
-        default:
-            return 'outline';
-    }
-}
-
-function statusBadge(total: number, delivered: number, failed: number) {
-    if (failed > 0 && delivered === 0) {
-        return <Badge variant="destructive">Failed</Badge>;
-    }
-    if (failed > 0) {
-        return <Badge variant="destructive">Partial Failure</Badge>;
-    }
-    if (delivered === total) {
-        return (
-            <Badge className="bg-status-success-bg text-status-success-foreground hover:bg-status-success/90">
-                Delivered
-            </Badge>
-        );
-    }
-    return <Badge variant="secondary">Sending</Badge>;
-}
-
+/**
+ * Communications › Broadcasts — urgent messages sent to staff, newest first,
+ * with what each channel confirmed and how many have read it in the app.
+ * "New broadcast" opens the four-step wizard with its review step.
+ * Acknowledgement isn't recorded for broadcasts, so there is no column for it.
+ */
 export default function ControlRoomBroadcast({
     broadcasts,
     roles,
@@ -113,251 +96,90 @@ export default function ControlRoomBroadcast({
             new URLSearchParams(window.location.search).get('new') === '1',
     );
 
-    const handlePageChange = (url: string | null) => {
-        if (url) {
-            router.get(url, {}, { preserveState: true });
-        }
-    };
-
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'Broadcast Messages', href: '#' },
-            ]}
+        <ControlRoomPage
+            headTitle="Broadcasts"
+            header={{
+                subline:
+                    'Urgent messages to staff, with what was delivered on each channel',
+                actions: can.manage ? (
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setComposerOpen(true)}
+                    >
+                        New broadcast
+                    </PageHeaderPrimaryButton>
+                ) : undefined,
+            }}
         >
-            <Head title="Broadcast Messages" />
-            <PageShell>
-                <CommandCentrePage
-                    variant="compact"
-                    current="/control-room/broadcast"
-                    icon={Megaphone}
-                    title="Broadcasts"
-                    description="Send accountable urgent messages to the right staff across approved channels."
-                    status="Broadcast workspace"
-                    freshness={`${broadcasts.total} sent`}
-                    actions={
-                        can.manage ? (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setComposerOpen(true)}
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Megaphone className="mr-2 h-4 w-4" />
-                                New broadcast
-                            </Button>
-                        ) : undefined
-                    }
-                >
-                    {/* Broadcast History */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Broadcast History</CardTitle>
-                            <CardDescription>
-                                Previously sent broadcast messages and their
-                                delivery status.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {broadcasts.data.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-                                    <Megaphone className="mb-3 h-10 w-10 opacity-40" />
-                                    <p className="text-sm">
-                                        No broadcasts sent yet.
-                                    </p>
-                                    {can.manage ? (
-                                        <Button
-                                            size="sm"
-                                            className="mt-4"
-                                            onClick={() =>
-                                                setComposerOpen(true)
-                                            }
-                                        >
-                                            <Megaphone className="mr-2 h-4 w-4" />
-                                            Send your first broadcast
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b text-left">
-                                                    <th className="pr-4 pb-3 font-medium">
-                                                        Message
-                                                    </th>
-                                                    <th className="pr-4 pb-3 font-medium">
-                                                        Channels
-                                                    </th>
-                                                    <th className="pr-4 pb-3 font-medium">
-                                                        Sent At
-                                                    </th>
-                                                    <th className="pr-4 pb-3 text-right font-medium">
-                                                        Recipients
-                                                    </th>
-                                                    <th className="pr-4 pb-3 text-right font-medium">
-                                                        Delivered
-                                                    </th>
-                                                    <th className="pr-4 pb-3 text-right font-medium">
-                                                        Failed
-                                                    </th>
-                                                    <th className="pb-3 font-medium">
-                                                        Status
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {broadcasts.data.map(
-                                                    (broadcast) => (
-                                                        <tr
-                                                            key={
-                                                                broadcast.broadcast_group_id
-                                                            }
-                                                            className="cursor-pointer border-b last:border-0 hover:bg-muted/50"
-                                                            onClick={() =>
-                                                                router.get(
-                                                                    `/control-room/broadcast/${broadcast.broadcast_group_id}`,
-                                                                )
-                                                            }
-                                                        >
-                                                            <td className="max-w-xs truncate py-3 pr-4">
-                                                                <div className="truncate font-medium">
-                                                                    {broadcast.content?.slice(
-                                                                        0,
-                                                                        80,
-                                                                    )}
-                                                                    {(broadcast
-                                                                        .content
-                                                                        ?.length ??
-                                                                        0) > 80
-                                                                        ? '...'
-                                                                        : ''}
-                                                                </div>
-                                                                {broadcast.initiated_by && (
-                                                                    <div className="text-xs text-muted-foreground">
-                                                                        by{' '}
-                                                                        {
-                                                                            broadcast
-                                                                                .initiated_by
-                                                                                .name
-                                                                        }
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td className="py-3 pr-4">
-                                                                <div className="flex flex-wrap gap-1">
-                                                                    {broadcast.channels.map(
-                                                                        (
-                                                                            ch,
-                                                                        ) => (
-                                                                            <Badge
-                                                                                key={
-                                                                                    ch
-                                                                                }
-                                                                                variant={channelBadgeVariant(
-                                                                                    ch,
-                                                                                )}
-                                                                                className="text-xs"
-                                                                            >
-                                                                                {CHANNEL_LABELS[
-                                                                                    ch
-                                                                                ] ??
-                                                                                    ch}
-                                                                            </Badge>
-                                                                        ),
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                            <td className="py-3 pr-4 whitespace-nowrap text-muted-foreground">
-                                                                {formatDateTime(
-                                                                    broadcast.sent_at,
-                                                                )}
-                                                            </td>
-                                                            <td className="py-3 pr-4 text-right">
-                                                                <span className="flex items-center justify-end gap-1">
-                                                                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                                                                    {
-                                                                        broadcast.total_recipients
-                                                                    }
-                                                                </span>
-                                                            </td>
-                                                            <td className="py-3 pr-4 text-right">
-                                                                <span className="flex items-center justify-end gap-1 text-status-success">
-                                                                    <CheckCircle className="h-3.5 w-3.5" />
-                                                                    {
-                                                                        broadcast.delivered_count
-                                                                    }
-                                                                </span>
-                                                            </td>
-                                                            <td className="py-3 pr-4 text-right">
-                                                                <span
-                                                                    className={`flex items-center justify-end gap-1 ${broadcast.failed_count > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
-                                                                >
-                                                                    <XCircle className="h-3.5 w-3.5" />
-                                                                    {
-                                                                        broadcast.failed_count
-                                                                    }
-                                                                </span>
-                                                            </td>
-                                                            <td className="py-3">
-                                                                {statusBadge(
-                                                                    broadcast.total_recipients,
-                                                                    broadcast.delivered_count,
-                                                                    broadcast.failed_count,
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    ),
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+            <Card className="min-w-0 gap-0 overflow-hidden py-0">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+                    <div className="min-w-0">
+                        <h2 className="text-section-title">Broadcasts</h2>
+                        <p className="text-subtle mt-0.5">
+                            Delivered means the channel confirmed it. Read means the
+                            person opened it, or marked it read, in the app.
+                        </p>
+                    </div>
+                    <StatusBadge variant="neutral" className="tabular-nums">
+                        {broadcasts.total}{' '}
+                        {broadcasts.total === 1 ? 'broadcast' : 'broadcasts'}
+                    </StatusBadge>
+                </div>
 
-                                    {/* Pagination */}
-                                    {broadcasts.last_page > 1 && (
-                                        <div className="mt-4 flex items-center justify-between border-t pt-4">
-                                            <p className="text-sm text-muted-foreground">
-                                                Page {broadcasts.current_page}{' '}
-                                                of {broadcasts.last_page} (
-                                                {broadcasts.total} total)
-                                            </p>
-                                            <div className="flex gap-1">
-                                                {broadcasts.links.map(
-                                                    (link, idx) => (
-                                                        <Button
-                                                            key={idx}
-                                                            variant={
-                                                                link.active
-                                                                    ? 'default'
-                                                                    : 'outline'
-                                                            }
-                                                            size="sm"
-                                                            disabled={!link.url}
-                                                            onClick={() =>
-                                                                handlePageChange(
-                                                                    link.url,
-                                                                )
-                                                            }
-                                                            dangerouslySetInnerHTML={{
-                                                                __html: link.label,
-                                                            }}
-                                                        />
-                                                    ),
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </CardContent>
-                    </Card>
-                </CommandCentrePage>
-            </PageShell>
+                {broadcasts.data.length === 0 ? (
+                    <div className="px-5 py-10">
+                        <EmptyState
+                            icon={Megaphone}
+                            title="No broadcasts yet"
+                            description="Broadcasts sent to staff show here with what was delivered."
+                        />
+                    </div>
+                ) : (
+                    // Table owns its overflow-x-auto container.
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="pl-5">Message</TableHead>
+                                <TableHead>Audience</TableHead>
+                                <TableHead>Sent</TableHead>
+                                <TableHead>Delivery</TableHead>
+                                <TableHead>Read</TableHead>
+                                <TableHead className="w-12 pr-5">
+                                    <span className="sr-only">Actions</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {broadcasts.data.map((broadcast) => (
+                                <BroadcastRow
+                                    key={broadcast.broadcast_group_id}
+                                    broadcast={broadcast}
+                                />
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
 
-            {/* Guided composer — message → audience → channels → review & send.
-                Mounted only while open so every run starts fresh. */}
+                {broadcasts.last_page > 1 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+                        <p className="text-caption">
+                            Page {broadcasts.current_page} of {broadcasts.last_page} ·{' '}
+                            {broadcasts.total} broadcasts
+                        </p>
+                        <div className="max-w-full min-w-0 overflow-x-auto scrollbar-pretty">
+                            <div className="w-max">
+                                <LaravelPagination
+                                    links={broadcasts.links}
+                                    lastPage={broadcasts.last_page}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+            </Card>
+
+            {/* Mounted only while open so every run starts fresh. */}
             {can.manage && composerOpen ? (
                 <BroadcastWizard
                     open
@@ -367,6 +189,129 @@ export default function ControlRoomBroadcast({
                     totalStaff={totalStaff}
                 />
             ) : null}
-        </AppLayout>
+        </ControlRoomPage>
+    );
+}
+
+function BroadcastRow({ broadcast }: { broadcast: BroadcastGroup }) {
+    const href = `${BASE_PATH}/${broadcast.broadcast_group_id}`;
+    const total = broadcast.total_recipients;
+    const channelCount = Math.max(1, broadcast.channels.length);
+    // One record per person per channel, so people = sends ÷ channels.
+    const people = Math.round(total / channelCount);
+    const state = broadcastDeliveryState(
+        total,
+        broadcast.delivered_count,
+        broadcast.failed_count,
+    );
+    const template =
+        broadcast.template_used && broadcast.template_used !== 'custom'
+            ? BROADCAST_TEMPLATE_LABELS[broadcast.template_used] ?? null
+            : null;
+    const byline = [
+        broadcast.initiated_by ? `By ${broadcast.initiated_by.name}` : null,
+        template ? `${template} template` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    const items: ControlRoomRowAction[] = [
+        {
+            key: 'open',
+            label: 'Open broadcast',
+            icon: ArrowUpRight,
+            onSelect: () => router.visit(href),
+        },
+        {
+            key: 'copy',
+            label: 'Copy message',
+            icon: Copy,
+            onSelect: () => void navigator.clipboard?.writeText(broadcast.content),
+        },
+    ];
+
+    return (
+        <ControlRoomRowActions label="Actions for this broadcast" items={items}>
+            {({ rowProps, overflowButton }) => (
+                <TableRow
+                    onContextMenu={rowProps.onContextMenu}
+                    onClick={(event) => {
+                        if ((event.target as HTMLElement).closest('a,button')) return;
+                        router.visit(href);
+                    }}
+                    className="cursor-pointer"
+                >
+                    <TableCell className="max-w-[34rem] min-w-[16rem] pl-5 whitespace-normal">
+                        <Link
+                            href={href}
+                            title={broadcast.content}
+                            className="line-clamp-2 font-semibold text-foreground underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            {broadcast.content}
+                        </Link>
+                        {byline ? <span className="text-caption block">{byline}</span> : null}
+                    </TableCell>
+                    <TableCell className="whitespace-normal">
+                        <span className="block">
+                            {people} {people === 1 ? 'person' : 'people'}
+                        </span>
+                        {broadcast.channels.length ? (
+                            <span className="text-caption block">
+                                {channelList(broadcast.channels)}
+                            </span>
+                        ) : null}
+                    </TableCell>
+                    <TableCell>
+                        {broadcast.sent_at ? (
+                            <>
+                                <span className="block">{formatRelative(broadcast.sent_at)}</span>
+                                <span className="text-caption block tabular-nums">
+                                    {formatDateTime(broadcast.sent_at)}
+                                </span>
+                            </>
+                        ) : null}
+                    </TableCell>
+                    <TableCell className="whitespace-normal">
+                        <span className="grid gap-0.5">
+                            <StatusBadge
+                                variant={state.tone}
+                                size="sm"
+                                className="justify-self-start"
+                            >
+                                {state.label}
+                            </StatusBadge>
+                            <span className="text-caption tabular-nums">
+                                {broadcast.delivered_count} of {total} delivered
+                                {broadcast.failed_count > 0 ? (
+                                    <span className="font-semibold text-status-critical">
+                                        {' '}
+                                        · {broadcast.failed_count} not delivered
+                                    </span>
+                                ) : null}
+                            </span>
+                        </span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                        <ReadCell broadcast={broadcast} />
+                    </TableCell>
+                    <TableCell className="pr-5 text-right">{overflowButton}</TableCell>
+                </TableRow>
+            )}
+        </ControlRoomRowActions>
+    );
+}
+
+/** "11 of 18" people read the in-app copy; older broadcasts kept no read record. */
+function ReadCell({ broadcast }: { broadcast: BroadcastGroup }) {
+    if (broadcast.read_of > 0) {
+        return (
+            <span className="tabular-nums">
+                {broadcast.read_count} of {broadcast.read_of}
+            </span>
+        );
+    }
+    return (
+        <span className="text-caption">
+            {broadcast.channels.includes('in_app') ? 'Not recorded' : 'Not sent in-app'}
+        </span>
     );
 }

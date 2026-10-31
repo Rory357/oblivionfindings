@@ -374,7 +374,7 @@ it('projects only safe credential metadata for the administrators exact Site sco
         ->assertInertia(fn (Assert $page) => $page
             ->component('security-devices/settings')
             ->where('credentialReferences.visible', true)
-            ->where('credentialReferences.driver_state', 'unavailable')
+            ->where('credentialReferences.driver_state', 'configured')
             ->has('credentialReferences.sites', 1)
             ->where('credentialReferences.sites.0.id', $allowedSite->id)
             ->has('credentialReferences.rows', 0));

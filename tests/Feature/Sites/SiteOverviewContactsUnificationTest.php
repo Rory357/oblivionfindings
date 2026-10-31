@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Sites\SiteReadinessService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
@@ -127,6 +128,45 @@ test('show page exposes derived contact relations on the site payload', function
             ->where('site.after_hours_contact.name', 'On Call')
             ->where('site.primary_site_contact.name', 'Alice Manager')
         );
+});
+
+test('show page picks the same named contacts and overview list from one contacts read', function () {
+    $user = sitesOverviewContactsUser();
+    $site = Site::factory()->create();
+    // A Site has at most one primary contact (site_contacts_one_primary_uq).
+    foreach ([
+        ['maintenance', 'Maintenance', false],
+        ['manager', 'Older Manager', false],
+        ['emergency', 'Emergency Early', false],
+        ['manager', 'Primary Manager', true],
+        ['site_lead', 'Site Lead', false],
+        ['cleaner', 'Unlisted Type', false],
+        [null, 'No Type', false],
+        ['emergency', 'Emergency Late', false],
+    ] as [$type, $name, $primary]) {
+        SiteContact::create(['site_id' => $site->id, 'type' => $type, 'name' => $name, 'is_primary' => $primary]);
+    }
+
+    // What the four relations and the overview query chose before (one query each).
+    $named = Site::with(['managerContact', 'siteLeadContact', 'afterHoursContact', 'primarySiteContact'])->findOrFail($site->id);
+    $overview = $site->contacts()->orderByDesc('is_primary')
+        ->orderByRaw("FIELD(type, 'site_lead', 'manager', 'emergency', 'maintenance')")
+        ->orderBy('id')->limit(6)->pluck('id')->all();
+
+    $queries = 0;
+    DB::listen(function ($query) use (&$queries) {
+        // Reads straight from the table (the readiness counts only mention it inside a sub-select).
+        $queries += preg_match('/^select [^(]*? from `site_contacts`/i', $query->sql);
+    });
+    $props = $this->actingAs($user)->get(route('sites.show', $site))->assertOk()->viewData('page')['props'];
+
+    expect($props['site']['manager_contact']['id'])->toBe($named->managerContact->id)
+        ->and($props['site']['site_lead_contact']['id'])->toBe($named->siteLeadContact->id)
+        ->and($props['site']['after_hours_contact']['id'])->toBe($named->afterHoursContact->id)
+        ->and($props['site']['primary_site_contact']['id'])->toBe($named->primarySiteContact->id)
+        ->and(array_keys($props['site']['manager_contact']))->toBe(['id', 'name', 'role', 'phone', 'email', 'is_primary'])
+        ->and(collect($props['overview']['contacts'])->pluck('id')->all())->toBe($overview)
+        ->and($queries)->toBe(1);
 });
 
 test('readiness counts manager and emergency contacts instead of removed scalar columns', function () {

@@ -115,7 +115,11 @@ describe('shift show redesign navigation', () => {
             <ShiftTabStrip tabs={tabs} activeTab="tasks" onChange={onChange} />,
         );
 
-        fireEvent.click(screen.getByRole('tab', { name: /Medications 2/i }));
+        fireEvent.click(
+            screen.getByRole('tab', {
+                name: /Medications has 2 items needing attention/i,
+            }),
+        );
 
         expect(onChange).toHaveBeenCalledWith('medications');
     });

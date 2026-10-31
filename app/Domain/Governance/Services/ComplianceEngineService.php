@@ -13,6 +13,16 @@ use Carbon\Carbon;
 class ComplianceEngineService
 {
     /**
+     * Evidence validity is a civil date in the worker timezone, like obligation due dates
+     * (ComplianceObligation::nzToday()). The UTC today() is a day behind every NZ morning, so
+     * evidence dated "today" in NZ was refused as "not valid yet" until 1 pm.
+     */
+    private function evidenceToday(): Carbon
+    {
+        return Carbon::parse(ComplianceObligation::nzToday());
+    }
+
+    /**
      * Create a new compliance obligation
      */
     public function createObligation(
@@ -121,19 +131,57 @@ class ComplianceEngineService
         ?string $notes = null,
         ?int $expectedVersion = null
     ): void {
+        if (\Illuminate\Support\Facades\Schema::hasTable('hs_training_review_sources')
+            && \App\Models\HsTrainingReviewSource::query()->where('compliance_obligation_id', $obligation->id)->exists()) {
+            app(\App\Services\HealthSafety\WorkerParticipationTrainingReviewAccessService::class)->materialize($completedBy,
+                'governance.compliance.manage', function ($scope, $context) use ($obligation, $completedBy, $evidenceIds, $notes, $expectedVersion): array {
+                    $this->completeAdmittedObligation($obligation, $completedBy, $evidenceIds, $notes, $expectedVersion, $scope->obligations($context));
+
+                    return [];
+                });
+
+            return;
+        }
+        $this->completeAdmittedObligation($obligation, $completedBy, $evidenceIds, $notes, $expectedVersion);
+    }
+
+    private function completeAdmittedObligation(ComplianceObligation $obligation, User $completedBy,
+        ?array $evidenceIds, ?string $notes, ?int $expectedVersion,
+        ?\Illuminate\Database\Eloquent\Builder $admittedQuery = null): void
+    {
         \Illuminate\Support\Facades\DB::transaction(function () use (
             $obligation,
             $completedBy,
             $evidenceIds,
             $notes,
-            $expectedVersion
+            $expectedVersion,
+            $admittedQuery
         ) {
             /** @var ComplianceObligation $locked */
-            $locked = ComplianceObligation::whereKey($obligation->id)->lockForUpdate()->firstOrFail();
+            $locked = ($admittedQuery === null ? ComplianceObligation::query() : clone $admittedQuery)
+                ->whereKey($obligation->id)->lockForUpdate()->firstOrFail();
 
             // Idempotent completion replay: already complete is a no-op
             if ($locked->status === 'complete') {
                 return;
+            }
+
+            $review = \Illuminate\Support\Facades\Schema::hasTable('hs_training_review_sources')
+                ? \App\Models\HsTrainingReviewSource::query()->where('compliance_obligation_id', $locked->id)->lockForUpdate()->first() : null;
+            if ($review !== null) {
+                $reviewer = app(\App\Services\HealthSafety\WorkerParticipationTrainingReviewerResolver::class)->user($review->site_id);
+                $attestation = $review->attestation_evidence_id === null ? null : ComplianceEvidence::query()
+                    ->whereKey($review->attestation_evidence_id)->where('compliance_obligation_id', $locked->id)->where('evidence_type', 'attestation')->first();
+                if ($expectedVersion === null || $reviewer === null || (int) $reviewer->id !== (int) $completedBy->id
+                    || $attestation === null || trim((string) $attestation->description) === '' || $review->reviewed_on === null
+                    || $review->reviewed_on->toDateString() < $review->period_start->toDateString()
+                    || $review->reviewed_on->toDateString() > ComplianceObligation::nzToday()
+                    || (int) $review->reviewed_by !== (int) $completedBy->id
+                    || $attestation->valid_from?->toDateString() !== $review->reviewed_on->toDateString()
+                    || (int) $attestation->uploaded_by !== (int) $completedBy->id
+                    || ($evidenceIds !== null && ! in_array((int) $attestation->id, array_map('intval', $evidenceIds), true))) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['attestation' => 'Record a dated training-position review through the assigned reviewer before completing this requirement.']);
+                }
             }
 
             // Optimistic concurrency check
@@ -160,13 +208,13 @@ class ComplianceEngineService
                     }
 
                     // Check for future-dated or expired evidence
-                    if ($ev->valid_from && $ev->valid_from->gt(today())) {
+                    if ($ev->valid_from && $ev->valid_from->gt($this->evidenceToday())) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             'evidence_ids' => '“'.$ev->title.'” only becomes valid on '.\App\Domain\Governance\Support\GovernanceLabels::date($ev->valid_from->toDateString()).", so it can't be used yet.",
                         ]);
                     }
 
-                    if ($ev->valid_until && $ev->valid_until->lt(today())) {
+                    if ($ev->valid_until && $ev->valid_until->lt($this->evidenceToday())) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             'evidence_ids' => '“'.$ev->title.'” expired on '.\App\Domain\Governance\Support\GovernanceLabels::date($ev->valid_until->toDateString()).". It can't be used — upload current evidence.",
                         ]);
@@ -199,10 +247,10 @@ class ComplianceEngineService
 
             $hasValidEvidence = false;
             foreach ($evidenceQuery->get() as $ev) {
-                if ($ev->valid_from && $ev->valid_from->gt(today())) {
+                if ($ev->valid_from && $ev->valid_from->gt($this->evidenceToday())) {
                     continue;
                 }
-                if ($ev->valid_until && $ev->valid_until->lt(today())) {
+                if ($ev->valid_until && $ev->valid_until->lt($this->evidenceToday())) {
                     continue;
                 }
                 if ($ev->evidence_type === 'document') {
@@ -234,7 +282,7 @@ class ComplianceEngineService
 
             // Schedule next occurrence if recurring
             if ($locked->frequency !== 'ad_hoc' && $locked->frequency !== 'event_driven') {
-                $this->scheduleNextOccurrence($locked);
+                $this->scheduleNextOccurrence($locked, $admittedQuery);
             }
         });
     }
@@ -243,9 +291,14 @@ class ComplianceEngineService
      * Schedule next occurrence of a recurring obligation.
      * Idempotently creates exactly one next occurrence with lineage and reminder set.
      */
-    protected function scheduleNextOccurrence(ComplianceObligation $completed): ?ComplianceObligation
+    protected function scheduleNextOccurrence(ComplianceObligation $completed, ?\Illuminate\Database\Eloquent\Builder $admittedQuery = null): ?ComplianceObligation
     {
         $nextDueDate = $this->calculateNextDueDate($completed->frequency, $completed->due_date);
+        $review = \Illuminate\Support\Facades\Schema::hasTable('hs_training_review_sources')
+            ? \App\Models\HsTrainingReviewSource::query()->where('compliance_obligation_id', $completed->id)->first() : null;
+        $period = $review === null ? null : \App\Services\HealthSafety\WorkerParticipationTrainingReviewPeriod::next(
+            $completed->due_date->toDateString(), $review->anniversary_date->toDateString());
+        if ($period !== null) { $nextDueDate = Carbon::parse($period['due']); }
 
         if ($nextDueDate->lte($completed->due_date)) {
             $nextDueDate = $completed->due_date->copy()->addDay();
@@ -255,16 +308,22 @@ class ComplianceEngineService
         $cycleKey = "CYCLE-{$completed->framework}-{$code}-{$nextDueDate->toDateString()}";
 
         // Idempotency: series/cycle key unique
-        $existing = ComplianceObligation::where('recurrence_cycle_key', $cycleKey)->first();
+        $existing = ($admittedQuery === null ? ComplianceObligation::query() : clone $admittedQuery)->where('recurrence_cycle_key', $cycleKey)->first();
 
         if (! $existing) {
-            $existing = ComplianceObligation::where('framework', $completed->framework)
+            $existing = ($admittedQuery === null ? ComplianceObligation::query() : clone $admittedQuery)->where('framework', $completed->framework)
                 ->where('obligation_code', $completed->obligation_code)
                 ->whereDate('due_date', $nextDueDate)
                 ->first();
         }
 
         if ($existing) {
+            if ($review !== null && ! \App\Models\HsTrainingReviewSource::query()->where('compliance_obligation_id', $existing->id)
+                ->where('case_id', $review->case_id)->where('root_obligation_id', $review->root_obligation_id)->where('hs_representative_id', $review->hs_representative_id)
+                ->where('site_id', $review->site_id)->whereDate('anniversary_date', $review->anniversary_date->toDateString())
+                ->whereDate('period_start', $period['start'])->whereDate('period_end', $period['end'])->exists()) {
+                throw new \LogicException('A conflicting review recurrence exists; its lineage needs explicit review.');
+            }
             return $existing;
         }
 
@@ -279,7 +338,7 @@ class ComplianceEngineService
             'due_date' => $nextDueDate,
             'next_due_date' => $nextDueDate,
             'reminder_days' => $completed->reminder_days ?? [30, 14, 7],
-            'owner_id' => $completed->owner_id,
+            'owner_id' => $review === null ? $completed->owner_id : $completed->completed_by,
             'backup_owner_id' => $completed->backup_owner_id,
             'status' => 'not_due',
             'evidence_required' => $completed->evidence_required,
@@ -290,6 +349,13 @@ class ComplianceEngineService
             'recurrence_cycle_key' => $cycleKey,
             'version_number' => 1,
         ]);
+
+        if ($review !== null) {
+            \App\Models\HsTrainingReviewSource::create(['case_id' => $review->case_id, 'compliance_obligation_id' => $nextObligation->id,
+                'hs_representative_id' => $review->hs_representative_id, 'site_id' => $review->site_id,
+                'root_obligation_id' => $review->root_obligation_id, 'anniversary_date' => $review->anniversary_date->toDateString(),
+                'period_start' => $period['start'], 'period_end' => $period['end']]);
+        }
 
         $this->scheduleReminders($nextObligation);
 
@@ -329,7 +395,7 @@ class ComplianceEngineService
         $hasValidEvidence = $obligation->evidence()
             ->where(function ($q) {
                 $q->whereNull('valid_until')
-                  ->orWhereDate('valid_until', '>=', today());
+                  ->orWhereDate('valid_until', '>=', $this->evidenceToday());
             })
             ->exists();
 

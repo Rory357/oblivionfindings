@@ -9,12 +9,13 @@ final class EndpointRemoteRelay
     /** The deployment secret stays server-side; clients receive expiring TURN REST credentials. */
     public function grant(EndpointRemoteSession $session, string $role, string $participant): array
     {
-        $urls = config('endpoint_management.remote_support.relay_urls', []);
-        $secret = config('endpoint_management.remote_support.relay_secret');
+        $settings = app(EndpointRemoteSupportSettings::class);
+        $urls = $settings->relayUrls();
+        $secret = $settings->relaySecret();
         abort_unless(is_array($urls) && array_is_list($urls) && count($urls) >= 1 && count($urls) <= 4
             && is_string($secret) && strlen($secret) >= 32 && strlen($secret) <= 512, 503);
         foreach ($urls as $url) {
-            abort_unless(is_string($url) && $this->validUrl($url), 503);
+            abort_unless(is_string($url) && self::isValidRelayUrl($url), 503);
         }
         abort_unless(in_array($role, ['agent', 'technician'], true)
             && $session->session_expires_at->isFuture()
@@ -37,7 +38,7 @@ final class EndpointRemoteRelay
         ];
     }
 
-    private function validUrl(string $url): bool
+    public static function isValidRelayUrl(string $url): bool
     {
         if (strlen($url) > 512 || ! preg_match('/\A(turns?):(\[[0-9a-fA-F:]+\]|[a-zA-Z0-9.-]+):([0-9]{1,5})(?:\?transport=(udp|tcp))?\z/', $url, $parts)) {
             return false;

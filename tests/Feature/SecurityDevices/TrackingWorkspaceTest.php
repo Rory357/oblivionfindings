@@ -16,6 +16,7 @@ use App\Models\ConsentType;
 use App\Models\FleetTelemetryEvent;
 use App\Models\LoneWorkerSession;
 use App\Models\Permission;
+use App\Models\Queclink\QueclinkDevice;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -796,5 +797,56 @@ class TrackingWorkspaceTest extends TestCase
             'raw_payload' => ['private' => 'RAW-HISTORY-PAYLOAD-SENTINEL'],
             'consent_blocked' => $blocked,
         ]);
+    }
+
+    public function test_queclink_hub_link_uses_masked_last4_for_authorised_integration_managers_without_leaking_full_imei(): void
+    {
+        $site = Site::factory()->create(['name' => 'Harbour Fleet Base']);
+        $vehicle = Asset::factory()->vehicle()->create([
+            'site_id' => $site->id,
+            'name' => 'Harbour Community Van',
+        ]);
+        $tracker = Device::factory()->tracking()->create([
+            'name' => 'Queclink Van Tracker',
+            'subcategory' => 'vehicle_tracker',
+        ]);
+        $this->link($tracker, $vehicle);
+        QueclinkDevice::query()->create([
+            'imei' => '8675309111126789',
+            'device_id' => $tracker->id,
+            'status' => QueclinkDevice::STATUS_PAIRED,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/tracking?tab=fleet')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($tracker): void {
+                $workspace = $page->toArray()['props']['trackingWorkspace'];
+                $json = json_encode($workspace, JSON_THROW_ON_ERROR);
+                $row = collect($workspace['activeTab']['devices'])->firstWhere('id', $tracker->id);
+
+                $this->assertNotNull($row);
+                $this->assertSame(
+                    '/security-devices/integrations/queclink?device_search=6789',
+                    $row['queclinkHref'],
+                );
+                $this->assertStringNotContainsString('8675309111126789', $json);
+            });
+
+        $restrictedViewer = $this->viewerWithRole('admin');
+        $restrictedViewer->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'securityDevices.integrations.manage')->value('id') => ['allowed' => false],
+        ]);
+
+        $this->actingAs($restrictedViewer)
+            ->get('/security-devices/tracking?tab=fleet')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($tracker): void {
+                $row = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['devices'])
+                    ->firstWhere('id', $tracker->id);
+
+                $this->assertNotNull($row);
+                $this->assertNull($row['queclinkHref']);
+            });
     }
 }

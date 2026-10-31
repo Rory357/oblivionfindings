@@ -39,6 +39,8 @@ use App\Services\Fleet\FleetSignalService;
 use App\Services\HealthSafety\LoneWorkerSignalService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\ShiftSignalService;
+use App\Services\Tracking\ClientTrackerFallService;
+use App\Services\Tracking\ClientZoneMonitoringService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -57,6 +59,9 @@ class SignalProcessingService
     private const INCIDENT_CORRELATION_CAPABILITY = 'incident_correlation';
 
     private const TRUSTED_INCIDENT_SOURCE_SLUGS = ['medication'];
+
+    /** Normalized-data key naming a standing condition; see openConditionAlert(). */
+    public const CONDITION_KEY = 'condition_key';
 
     public function __construct(
         protected ControlRoomNotificationService $notifications,
@@ -162,8 +167,8 @@ class SignalProcessingService
                     throw new SafetySignalUnroutable('Client zone source evidence is unavailable.');
                 }
                 $projection = data_get($signal->normalized_data, 'client_tracker_fall') === true
-                    ? app(\App\Services\Tracking\ClientTrackerFallService::class)->projection($fleet)
-                    : app(\App\Services\Tracking\ClientZoneMonitoringService::class)->projection($fleet);
+                    ? app(ClientTrackerFallService::class)->projection($fleet)
+                    : app(ClientZoneMonitoringService::class)->projection($fleet);
                 foreach (['idempotency_key', 'signal_source_id', 'signal_type_code', 'client_id', 'site_id', 'asset_id'] as $field) {
                     if ((string) $signal->{$field} !== (string) $projection[$field]) {
                         throw new SafetySignalUnroutable('Client zone projection does not match canonical evidence.');
@@ -186,7 +191,7 @@ class SignalProcessingService
 
             $this->assertSignalRelationshipsAreCanonical($signal);
 
-            // Maintenance suppression applies to both operational and technical destinations.
+            // Technical maintenance never silently mutes a care-safety response.
             if ($this->isInMaintenanceWindow($signal)) {
                 $signal->markSuppressed('In maintenance window');
 
@@ -256,6 +261,22 @@ class SignalProcessingService
 
             // Find matching rules
             $rules = SignalRule::findMatchingRules($signal);
+
+            // A standing condition (an item that stays overdue) is one alert
+            // while that alert is open: each later check refreshes it rather
+            // than opening another. Once it is resolved, the next check alerts
+            // again. Applies with or without a rule; never across Sites,
+            // people, assets or devices.
+            if ($incident === null) {
+                $conditionAlert = $this->openConditionAlert($signal, $rules->first());
+                if ($conditionAlert !== null) {
+                    $this->assertAlertCanGroupSignal($signal, $conditionAlert);
+                    $signal->markCorrelated($conditionAlert);
+                    $this->addSignalToAlert($signal, $conditionAlert);
+
+                    return $conditionAlert;
+                }
+            }
 
             if ($rules->isEmpty()) {
                 // No rules match - create alert with defaults
@@ -1035,13 +1056,35 @@ class SignalProcessingService
     }
 
     /**
-     * Check if signal should be suppressed due to maintenance window.
+     * Check whether technical maintenance may suppress this signal.
+     * A deliberate safety-device test needs its own bounded, authorised
+     * workflow; a generic maintenance window is not that authority.
      */
     public function isInMaintenanceWindow(Signal $signal): bool
     {
         // D8 (eMAR audit, decided under Stephan's delegation): a maintenance
         // window never silences a medication alert.
         if (str_starts_with((string) $signal->signal_type_code, 'medication_')) {
+            return false;
+        }
+
+        // SD-02: technical maintenance never silences a care-safety signal
+        // (falls, panic/duress, fire, lone-worker emergencies).
+        if (in_array($signal->signalType?->category, [
+            SignalType::CATEGORY_PEOPLE_SAFETY,
+            SignalType::CATEGORY_MEDICAL_WELLBEING,
+        ], true) || in_array($signal->signal_type_code, [
+            'fall_detected',
+            'panic_sos_person',
+            'panic_sos_vehicle',
+            'fire_alarm',
+            'integration_sos_triggered',
+            'integration_panic_alarm',
+            'integration_duress_alarm',
+            LoneWorkerSignalService::TYPE_EMERGENCY,
+            LoneWorkerSignalService::TYPE_OVERDUE_CHECKIN,
+            LoneWorkerSignalService::TYPE_SESSION_OVERRUN,
+        ], true)) {
             return false;
         }
 
@@ -1062,6 +1105,43 @@ class SignalProcessingService
                     ->orWhere('asset_id', $signal->asset_id);
             })
             ->exists();
+    }
+
+    /**
+     * The key a producer puts in a signal's normalized data to say "this is
+     * the same standing condition as before" (for example one corrective
+     * action that is still overdue). See openConditionAlert().
+     */
+    public static function conditionKey(string $signalType, string $itemType, int|string $itemId): string
+    {
+        return $signalType.'|'.$itemType.':'.$itemId;
+    }
+
+    /**
+     * The open alert for the same standing condition as this signal: same
+     * condition key, source, alert type, Site, person, asset and device. The
+     * dedup window does not apply — a daily check must find yesterday's
+     * alert. A resolved, closed or dismissed alert is never reused.
+     */
+    protected function openConditionAlert(Signal $signal, ?SignalRule $rule): ?ControlRoomAlert
+    {
+        $key = data_get($signal->normalized_data, self::CONDITION_KEY);
+        if (! is_string($key) || $key === '' || strlen($key) > 255) {
+            return null;
+        }
+
+        $query = ControlRoomAlert::query()
+            ->unresolved()
+            ->where('source', $signal->signalSource?->slug ?? 'unknown')
+            ->where('alert_type', $this->resolveAlertType($signal, $rule))
+            ->where('context->normalized_data->'.self::CONDITION_KEY, $key);
+
+        foreach (['site_id', 'client_id', 'asset_id', 'device_id'] as $column) {
+            $id = $this->canonicalPositiveId($signal->{$column});
+            $id === null ? $query->whereNull($column) : $query->where($column, $id);
+        }
+
+        return $query->latest('triggered_at')->latest('id')->lockForUpdate()->first();
     }
 
     /**
@@ -1684,11 +1764,11 @@ class SignalProcessingService
      */
     public function ingestFromFleetSignal(FleetSignal $fleetSignal): Signal
     {
-        if ($fleetSignal->signal_type === \App\Services\Tracking\ClientTrackerFallService::SIGNAL) {
-            return $this->ingest(app(\App\Services\Tracking\ClientTrackerFallService::class)->projection($fleetSignal));
+        if ($fleetSignal->signal_type === ClientTrackerFallService::SIGNAL) {
+            return $this->ingest(app(ClientTrackerFallService::class)->projection($fleetSignal));
         }
-        if ($fleetSignal->signal_type === \App\Services\Tracking\ClientZoneMonitoringService::SIGNAL) {
-            return $this->ingest(app(\App\Services\Tracking\ClientZoneMonitoringService::class)->projection($fleetSignal));
+        if ($fleetSignal->signal_type === ClientZoneMonitoringService::SIGNAL) {
+            return $this->ingest(app(ClientZoneMonitoringService::class)->projection($fleetSignal));
         }
         // The canonical outbox worker owns the surrounding transaction. Keep the
         // source configuration stable until signal and alert publication finish.
@@ -1719,6 +1799,12 @@ class SignalProcessingService
                 throw new SafetySignalUnroutable('Fleet availability source Site changed or is unavailable; manual verification is required.');
             }
             $siteId = $recordedSiteId;
+        }
+        // A vehicle whose home Site no longer exists can't be routed to anyone
+        // at that Site. Say so once (unroutable, shown under delivery
+        // problems) instead of failing three times into the dead-letter queue.
+        if ($siteId !== null && ! Site::query()->whereKey($siteId)->exists()) {
+            throw new SafetySignalUnroutable('Fleet safety signal Site no longer exists; manual verification is required.');
         }
         $fleetContext = $isAvailability ? [] : $this->buildFleetContext($fleetSignal);
         $privacyBlocked = (bool) data_get($fleetSignal->payload, 'privacy_blocked', false);
@@ -1751,6 +1837,10 @@ class SignalProcessingService
                 'fleet_context' => $fleetContext,
             ],
         ];
+        $conditionKey = data_get($fleetSignal->payload, self::CONDITION_KEY);
+        if (! $isAvailability && is_string($conditionKey) && $conditionKey !== '') {
+            $data['normalized_data'][self::CONDITION_KEY] = $conditionKey;
+        }
 
         return $this->ingest($data);
     }

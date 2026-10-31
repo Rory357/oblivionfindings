@@ -75,6 +75,11 @@ class StaffLegacyStoreLifecycleTest extends TestCase
         ]);
         $permission = Permission::query()->firstOrCreate(['key' => 'staff.viewAny'], ['description' => 'View all staff', 'group' => 'test', 'module' => 'Test']);
         $admin->permissionOverrides()->attach($permission, ['allowed' => true]);
+        // A staff member known only to the legacy table has no Site, so only a
+        // viewer who sees every Site can open the record (24 Oct 2026: staff
+        // records are limited to the viewer's Sites — StaffRecordSiteScopeTest).
+        $allSites = Permission::query()->firstOrCreate(['key' => 'sites.viewAll'], ['description' => 'View and manage Sites across the application', 'group' => 'test', 'module' => 'Test']);
+        $admin->permissionOverrides()->attach($allSites, ['allowed' => true]);
 
         $employee = User::factory()->create(['name' => 'Legacy John']);
 

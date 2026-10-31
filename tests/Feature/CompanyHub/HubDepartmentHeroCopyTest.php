@@ -31,7 +31,10 @@ beforeEach(function () {
     Storage::disk('private')->put('company-hub/published-cover.png', 'published image');
     $this->cover = HubMedia::create(['hub_page_id' => $this->space->id, 'uploaded_by' => $this->editor->id, 'path' => 'company-hub/published-cover.png',
         'name' => 'Team photograph.png', 'mime' => 'image/png', 'size' => 15, 'alt' => 'Learning together', 'crop' => ['ratio' => '16:9', 'x' => 50, 'y' => 50], 'version' => 1]);
-    $this->space = $this->publisher->save($this->editor, $this->space, [...$this->space->draft, 'team_ids' => [$this->team->id], 'cover_id' => $this->cover->id,
+    // The team template starts with an empty introduction, which cannot be published.
+    $draft = $this->space->draft;
+    $draft['sections'][0]['blocks'][0]['body'] = 'What this team is learning together.';
+    $this->space = $this->publisher->save($this->editor, $this->space, [...$draft, 'team_ids' => [$this->team->id], 'cover_id' => $this->cover->id,
         'hero' => [...$this->space->draft['hero'], 'style' => 'image'], 'audience' => ['type' => 'sites', 'ids' => [$this->site->id]]], 1);
     $this->release = $this->publisher->publish($this->editor, $this->space, 2, null, null);
     $this->source = ['page_id' => $this->space->id, 'revision_id' => $this->release->id];

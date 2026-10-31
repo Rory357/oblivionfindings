@@ -17,9 +17,9 @@ use App\Services\Respite\RespiteShiftSync;
 use App\Services\Respite\RespiteStateTransitionService;
 use App\Services\Respite\RespiteStayScope;
 use App\Support\Respite\RespiteFundingSource;
+use App\Support\Respite\RespiteWallClock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -30,6 +30,9 @@ use Inertia\Response;
 class RespiteBookingController extends Controller
 {
     private const FUNDING_STATUSES = ['not_required', 'pending_approval', 'approved', 'declined', 'expired'];
+
+    /** Posted as NZ wall-clock (datetime-local or date); stored as UTC. */
+    private const WALL_CLOCK_INPUTS = ['start_at', 'end_at', 'funding_approved_at'];
 
     public function __construct(
         private readonly AccountsReceivableService $accountsReceivable,
@@ -120,6 +123,7 @@ class RespiteBookingController extends Controller
             'funding_approved_ref' => 'nullable|string|max:255',
             'funding_approved_at' => 'nullable|date',
         ]);
+        $validated = RespiteWallClock::inputsToUtc($validated, self::WALL_CLOCK_INPUTS);
 
         if (array_key_exists('location_id', $validated) && $validated['location_id'] !== null) {
             $this->states->assertAuthorizedSite($request, (int) $validated['location_id']);
@@ -271,6 +275,7 @@ class RespiteBookingController extends Controller
             'funding_approved_ref' => 'nullable|string|max:255',
             'funding_approved_at' => 'nullable|date',
         ]);
+        $validated = RespiteWallClock::inputsToUtc($validated, self::WALL_CLOCK_INPUTS);
 
         if (array_key_exists('location_id', $validated) && $validated['location_id'] !== null) {
             $this->states->assertAuthorizedSite($request, (int) $validated['location_id']);
@@ -284,9 +289,9 @@ class RespiteBookingController extends Controller
                 $this->states->assertBookingUpdate($booking->status, $targetStatus);
 
                 $scheduleChanged = (array_key_exists('start_at', $validated)
-                        && ! Carbon::parse($validated['start_at'])->equalTo($booking->start_at))
+                        && ! $validated['start_at']->equalTo($booking->start_at))
                     || (array_key_exists('end_at', $validated)
-                        && ! Carbon::parse($validated['end_at'])->equalTo($booking->end_at))
+                        && ! $validated['end_at']->equalTo($booking->end_at))
                     || (array_key_exists('location_id', $validated)
                         && (int) ($validated['location_id'] ?? 0) !== (int) ($booking->location_id ?? 0));
                 $endingBooking = in_array($targetStatus, ['cancelled', 'no_show'], true);
@@ -447,7 +452,7 @@ class RespiteBookingController extends Controller
             return;
         }
 
-        $nights = max(1, $booking->start_at->diffInDays($booking->end_at));
+        $nights = max(1, RespiteWallClock::nights($booking->start_at, $booking->end_at));
 
         try {
             $orgId = auth()->user()?->organization_id;

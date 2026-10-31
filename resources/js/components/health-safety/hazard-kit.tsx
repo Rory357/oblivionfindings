@@ -1,13 +1,20 @@
 /* Hazard kit — the single shared source of hazard domain data + presentational
  * primitives for every Hazards surface (global register, per-site register,
  * site-profile embed, client read-only panel, detail modal, create wizard).
- * Keeps the lifecycle labels, tones, the WorkSafe risk matrix and the chips in
+ * Keeps the lifecycle labels, tones, the hazard risk matrix and the chips in
  * ONE place so the surfaces can't drift. Semantic tokens only. NZ-only.
  *
  * The risk matrix mirrors app/Services/Sites/SiteHazardRiskCalculator.php — it
  * is needed client-side for the live create-wizard preview + the clickable
  * matrix; the server stays authoritative on save (it recomputes via the
  * calculator). Keep the two in lockstep. */
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    formatDateLong,
+    formatDateOnly,
+    formatDateTime,
+    formatDateTimeLong,
+} from '@/lib/datetime';
 import {
     TONE_BG,
     type Tone,
@@ -227,7 +234,7 @@ export const ACTION_TYPES: { value: string; label: string }[] = [
 ];
 
 export const WORKSAFE_BANNER =
-    'This hazard meets the threshold for notification to WorkSafe NZ (HSWA 2015). Preserve the scene where required and keep records for at least five years.';
+    'This hazard has an extreme risk rating or critical severity. Review the controls promptly. Assess any WorkSafe notification requirements separately and record the decision.';
 
 export function controlLabel(key: string): string {
     return CONTROL_LEVELS.find((c) => c.key === key)?.label ?? key;
@@ -271,6 +278,7 @@ export type HazardHistoryEntry = {
 };
 
 export type HazardDetail = {
+    connections?: import('./hazard-connections').HazardConnections;
     id: number;
     reference_number: string;
     site: { id: number; name: string; type: string } | null;
@@ -350,6 +358,7 @@ export type HazardSectionKey =
     | 'risk'
     | 'actions'
     | 'evidence'
+    | 'connections'
     | 'history';
 export type HazardActionKey =
     | 'assign'
@@ -374,58 +383,29 @@ export function siteTypeLabel(type?: string | null): string {
     return type ?? '';
 }
 
-/** Compact relative "when" — Today / Yesterday / Nd ago / DD Mon + HH:MM. */
+/** Instants display in NZ time; date-only deadlines never become instants. */
 export function fmtWhen(iso?: string | null): { main: string; title: string } {
-    if (!iso) return { main: '—', title: '' };
-    const d = new Date(iso.replace(' ', 'T'));
-    if (Number.isNaN(d.getTime())) return { main: '—', title: '' };
-    const now = new Date();
-    const startOf = (x: Date) =>
-        new Date(x.getFullYear(), x.getMonth(), x.getDate());
-    const days = Math.round(
-        (startOf(now).getTime() - startOf(d).getTime()) / 86400000,
-    );
-    const time = d.toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-    let label: string;
-    if (days <= 0) label = `Today ${time}`;
-    else if (days === 1) label = `Yesterday ${time}`;
-    else if (days < 7) label = `${days}d ago ${time}`;
-    else
-        label = `${d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })} ${time}`;
-    return { main: label, title: d.toLocaleString('en-NZ') };
+    return { main: formatDateTime(iso), title: formatDateTimeLong(iso) };
 }
 
 export function fmtDay(iso?: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso.replace(' ', 'T'));
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
+    return iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)
+        ? formatDateOnly(iso)
+        : formatDateLong(iso);
 }
 
 export function fmtDueShort(iso?: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso.replace(' ', 'T'));
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+    return fmtDay(iso);
 }
 
 /* ---------------------------------------------------------------- chips */
 
 export function SeverityChip({ severity }: { severity: string }) {
-    const s = SEV[severity] ?? SEV.low;
+    const s = SEV[severity];
     return (
-        <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[s.tone]}`}
-        >
-            {s.label}
-        </span>
+        <StatusBadge variant={s?.tone ?? 'neutral'}>
+            {s?.label ?? 'Severity unknown'}
+        </StatusBadge>
     );
 }
 
@@ -436,33 +416,28 @@ export function RiskChip({
     rating: string;
     suffix?: boolean;
 }) {
-    const r = RISK[rating] ?? RISK.low;
+    const r = RISK[rating];
     return (
-        <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[r.tone]}`}
-        >
-            {r.label}
-            {suffix ? ' risk' : ''}
-        </span>
+        <StatusBadge variant={r?.tone ?? 'neutral'}>
+            {r ? `${r.label}${suffix ? ' risk' : ''}` : 'Risk not assessed'}
+        </StatusBadge>
     );
 }
 
 export function StatusChip({ status }: { status: string }) {
-    const s = STATUS[status] ?? STATUS.open;
-    const Icon = s.icon;
+    const s = STATUS[status];
+    const Icon = s?.icon ?? AlertTriangle;
     return (
-        <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${s.chip}`}
-        >
-            <Icon className="h-3 w-3" /> {s.label}
-        </span>
+        <StatusBadge status={status}>
+            <Icon className="h-3 w-3" /> {s?.label ?? 'Status unknown'}
+        </StatusBadge>
     );
 }
 
 /* ---------------------------------------------------------------- matrix */
 
 /**
- * WorkSafe risk matrix — 4 severity rows (critical→low, top→bottom) × 5
+ * Hazard risk matrix — 4 severity rows (critical→low, top→bottom) × 5
  * likelihood cols. Display-only by default; pass `onPick` for the create
  * wizard's click-to-set-both behaviour. Highlights the current cell (solid
  * ring) and an optional residual cell (dashed ring).
@@ -485,7 +460,12 @@ export function HazardRiskMatrix({
         'flex h-8 items-center justify-center rounded-md text-[10px] font-semibold transition-colors';
 
     return (
-        <div className="overflow-x-auto">
+        <div
+            className="frontline-focus overflow-x-auto rounded-md"
+            role="region"
+            aria-label="Hazard risk matrix"
+            tabIndex={0}
+        >
             <div
                 className="inline-grid min-w-[420px] gap-1"
                 style={{

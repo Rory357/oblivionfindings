@@ -42,6 +42,56 @@ func protected(path string, private bool) error {
 	}
 	return nil
 }
+
+func resolvePhpRuntime(root string) (php string, workDir string, envPath string, arguments []string, bundled bool, err error) {
+	bundledPhp := filepath.Join(root, "runtime", "php")
+	if _, statErr := os.Lstat(bundledPhp); statErr == nil {
+		if protected(bundledPhp, false) != nil {
+			return "", "", "", nil, false, unavailable
+		}
+		runtimeDir := filepath.Join(root, "runtime")
+		caFile := filepath.Join(runtimeDir, "cacert.pem")
+		if protected(caFile, false) != nil {
+			return "", "", "", nil, false, unavailable
+		}
+		args := []string{"-n", "-d", "date.timezone=UTC", "-d", "log_errors=0", "-d", "display_errors=stderr"}
+		for _, ext := range []string{"curl", "openssl", "sodium", "sockets"} {
+			extPath := filepath.Join(runtimeDir, "ext", ext+".so")
+			if protected(extPath, false) != nil {
+				return "", "", "", nil, false, unavailable
+			}
+			args = append(args, "-d", "extension="+extPath)
+		}
+		args = append(args, "-d", "curl.cainfo="+caFile, "-d", "openssl.cafile="+caFile)
+		return bundledPhp, runtimeDir, runtimeDir, args, true, nil
+	}
+
+	for _, candidate := range []string{"/usr/bin/php8.4", "/usr/bin/php"} {
+		resolved, evalErr := filepath.EvalSymlinks(candidate)
+		if evalErr != nil || protected(resolved, false) != nil {
+			continue
+		}
+		caFile := filepath.Join(root, "cacert.pem")
+		if protected(caFile, false) != nil {
+			resolvedCa, caErr := filepath.EvalSymlinks("/etc/ssl/certs/ca-certificates.crt")
+			if caErr != nil || protected(resolvedCa, false) != nil {
+				return "", "", "", nil, false, unavailable
+			}
+			caFile = resolvedCa
+		}
+		args := []string{
+			"-d", "date.timezone=UTC",
+			"-d", "log_errors=0",
+			"-d", "display_errors=stderr",
+			"-d", "curl.cainfo=" + caFile,
+			"-d", "openssl.cafile=" + caFile,
+		}
+		return resolved, root, filepath.Dir(resolved), args, false, nil
+	}
+
+	return "", "", "", nil, false, unavailable
+}
+
 func run(ctx context.Context, args []string) error {
 	if os.Geteuid() != 0 || len(args) != 1 || !strings.HasPrefix(args[0], "--identity=") {
 		return unavailable
@@ -68,15 +118,16 @@ func run(ctx context.Context, args []string) error {
 	}) != nil {
 		return unavailable
 	}
-	php := filepath.Join(root, "runtime", "php")
+	php, workDir, envPath, baseArgs, bundled, resolveErr := resolvePhpRuntime(root)
+	if resolveErr != nil {
+		return unavailable
+	}
 	script := filepath.Join(root, "bin", "oblivion-collector")
 	worker := filepath.Join(root, "oblivion-media")
-	for _, p := range []string{php, script} {
-		if protected(p, false) != nil {
-			return unavailable
-		}
+	if protected(script, false) != nil {
+		return unavailable
 	}
-	environment := []string{"PATH=" + filepath.Join(root, "runtime"), "LANG=C.UTF-8", "TZ=UTC"}
+	environment := []string{"PATH=" + envPath, "LANG=C.UTF-8", "TZ=UTC"}
 	mediaContext, stopMedia := context.WithCancel(ctx)
 	mediaDone := make(chan struct{})
 	defer func() {
@@ -86,28 +137,28 @@ func run(ctx context.Context, args []string) error {
 		case <-time.After(4 * time.Second):
 		}
 	}()
-	if MediaRelease == "enabled" {
+	if MediaRelease == "enabled" && bundled {
 		if protected(worker, false) != nil {
 			close(mediaDone)
 			return unavailable
 		}
 		go func() {
 			defer close(mediaDone)
-			_ = cctv.Supervise(mediaContext, php, script, worker, identity, filepath.Join(root, "runtime"), environment)
+			_ = cctv.Supervise(mediaContext, php, script, worker, identity, workDir, environment)
 		}()
 	} else {
 		close(mediaDone)
 	}
-	runtime := filepath.Join(root, "runtime")
-	arguments := []string{"-n", "-d", "date.timezone=UTC", "-d", "log_errors=0", "-d", "display_errors=stderr"}
-	for _, ext := range []string{"curl", "openssl", "sodium", "sockets"} {
-		arguments = append(arguments, "-d", "extension="+filepath.Join(runtime, "ext", ext+".so"))
-	}
-	arguments = append(arguments, "-d", "curl.cainfo="+filepath.Join(runtime, "cacert.pem"), "-d", "openssl.cafile="+filepath.Join(runtime, "cacert.pem"), "-f", script, "--", "run", "--identity="+identity, "--config="+filepath.Join(filepath.Dir(identity), "collector.json"))
+	arguments := append(
+		append([]string{}, baseArgs...),
+		"-f", script, "--", "run",
+		"--identity="+identity,
+		"--config="+filepath.Join(filepath.Dir(identity), "collector.json"),
+	)
 	for {
 		cycle, cancel := context.WithTimeout(ctx, 10*time.Minute)
 		command := exec.CommandContext(cycle, php, arguments...)
-		command.Dir = runtime
+		command.Dir = workDir
 		command.Env = environment
 		command.Stdout = io.Discard
 		command.Stderr = io.Discard

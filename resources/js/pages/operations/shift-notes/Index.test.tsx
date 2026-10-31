@@ -279,7 +279,12 @@ it('keeps note actions in a labelled group and does not invent a linked incident
     const group = screen.getByRole('group', {
         name: 'Note #1 for Aroha Example',
     });
-    fireEvent.click(within(group).getByRole('button', { name: 'Open' }));
+    expect(
+        within(group).getByRole('button', {
+            name: 'Actions for the note for Aroha Example',
+        }),
+    ).toBeVisible();
+    fireEvent.click(group);
     expect(detail.mock.lastCall?.[0].note.id).toBe(1);
     expect(within(group).getByText('Incident note')).toBeVisible();
     expect(within(group).queryByText('1 incident')).not.toBeInTheDocument();

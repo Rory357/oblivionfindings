@@ -23,6 +23,7 @@ use App\Http\Requests\Hr\UpdateTrainingCourseRequest;
 use App\Models\Site;
 use App\Models\StaffTrainingRecord;
 use App\Models\User;
+use App\Services\Assurance\NzsAssuranceResolver;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -72,6 +73,7 @@ class TrainingController extends Controller
                 });
             })
             ->withCount(['sessions' => fn ($q) => $q->upcoming()])
+            ->with('complianceRequirement:id,code,is_active')
             ->get()
             ->map(function (HrCourse $c) use ($metrics) {
                 $m = $metrics[$c->id] ?? ['enrol' => 0, 'completion' => 0, 'expiring' => 0];
@@ -87,6 +89,10 @@ class TrainingController extends Controller
                     'cost' => $c->cost !== null ? (float) $c->cost : null,
                     'is_mandatory' => (bool) $c->is_mandatory,
                     'is_active' => (bool) $c->is_active,
+                    // Certificates from this course prove first-aid cover
+                    // (NzsAssuranceResolver), so the archive dialog warns.
+                    'counts_for_first_aid' => $c->complianceRequirement?->code === NzsAssuranceResolver::FIRST_AID_REQUIREMENT_CODE
+                        && (bool) $c->complianceRequirement?->is_active,
                     'requires_renewal' => (bool) $c->requires_renewal,
                     'validity_period_months' => $c->validity_period_months,
                     'cpd_points' => $c->cpd_points,
@@ -298,9 +304,11 @@ class TrainingController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
-        $this->trainingService->setCourseActive($course, ! $course->is_active);
+        // Word the message from the saved state: setCourseActive() updates
+        // $course in place, so its is_active is already the new value.
+        $course = $this->trainingService->setCourseActive($course, ! $course->is_active);
 
-        return redirect()->back()->with('success', $course->is_active ? 'Course archived.' : 'Course activated.');
+        return redirect()->back()->with('success', $course->is_active ? 'Course activated.' : 'Course archived.');
     }
 
     public function bulkArchiveCourses(Request $request)

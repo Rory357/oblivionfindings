@@ -17,7 +17,19 @@ final class HikvisionDiscoveryContractTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        require_once dirname(__DIR__, 3).'/collector/vendor/autoload.php';
+        $autoload = dirname(__DIR__, 3).'/collector/vendor/autoload.php';
+        if (is_file($autoload)) {
+            require_once $autoload;
+        } else {
+            spl_autoload_register(static function (string $class): void {
+                if (str_starts_with($class, 'Oblivion\\Collector\\')) {
+                    $file = dirname(__DIR__, 3).'/collector/src/'.str_replace('\\', '/', substr($class, strlen('Oblivion\\Collector\\'))).'.php';
+                    if (is_file($file)) {
+                        require_once $file;
+                    }
+                }
+            });
+        }
     }
 
     private function fixture(): array

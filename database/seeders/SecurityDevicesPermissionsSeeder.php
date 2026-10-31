@@ -81,7 +81,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             );
         }
 
-        $allPermIds = Permission::where('key', 'like', 'securityDevices.%')->pluck('id');
+        $allPermIds = Permission::where('key', 'like', 'securityDevices.%')->where('key', 'not like', 'securityDevices.endpoints.script%')->pluck('id');
 
         // ── 2. Admin gets everything (already via sync in RbacSeeder,
         //       but also attach here for standalone seeder use) ─────
@@ -92,7 +92,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
         // ── 3. Role assignments ───────────────────────────────────
 
         // Historical reference grants are explicit; an IT role or live-view grant alone is insufficient.
-        $this->attachToRole('it_manager', Permission::where('key', 'like', 'securityDevices.%')->whereNotIn('key', ['securityDevices.cctv.recordingReferences.view', 'securityDevices.cctv.recordingReferences.create'])->pluck('id')->toArray());
+        $this->attachToRole('it_manager', Permission::where('key', 'like', 'securityDevices.%')->where('key', 'not like', 'securityDevices.endpoints.script%')->whereNotIn('key', ['securityDevices.cctv.recordingReferences.view', 'securityDevices.cctv.recordingReferences.create'])->pluck('id')->toArray());
 
         $this->attachToRole('facilities_manager', [
             'securityDevices.viewAny',

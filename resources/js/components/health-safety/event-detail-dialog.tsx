@@ -1,26 +1,17 @@
-/* H&S Event detail — the governance workspace MODAL (HsEventDialog).
- *
- * The Events register's detail-as-modal, built on the Add-Client `WizardShell`
- * read-only chrome (rail = sections, footer = Options bar) — the governance twin
- * of the Incidents / Safeguarding / Fleet detail dialogs. Opens *over* the
- * register (and from a source module's "Open in Health & Safety") and never
- * navigates away; `/health-safety/events/{id}` renders the same content on a thin
- * shell as a deep-link fallback.
- *
- * The `EventDetail` type is the contract — it mirrors
- * `HsEventController::buildEventDetail()`. Tokens are semantic only; every flag
- * pairs an icon + `title` (never colour-only); WCAG AA + keyboard + focus-trap
- * come from `WizardShell`. NZ-only (WorkSafe NZ / HSWA 2015). Web-only.
- *
- * Write actions (close / WorkSafe / investigation / corrective actions) are added
- * to the Options bar as their backend lands — an action appears only when it can
- * actually run (no stubs). */
+/* Permanent safety review and compatibility dialog share canonical records and
+ * workflow commands. EventDetail mirrors the permission-shaped server payload;
+ * a URL selects a view, never grants permission or changes a record. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     CorrectiveActionHandoverPane,
     type CorrectiveActionHandover,
 } from '@/components/health-safety/corrective-action-handover-pane';
-import { EventTimeline } from '@/components/health-safety/event-timeline';
+import {
+    EventTimeline,
+    timelineMilestones,
+} from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
+import { SourceProcedureRequests } from '@/components/health-safety/procedures/source-procedure-requests';
 import {
     JourneyGateList,
     type JourneyGateData,
@@ -30,10 +21,71 @@ import {
     type LinkedOperationalEvidenceData,
 } from '@/components/incidents/linked-operational-evidence';
 import { JourneyTermHelp } from '@/components/journey-term-help';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import {
+    PageHeaderFacts,
+    PageHeaderStages,
+    type PageHeaderNextStep,
+    type PageHeaderStage,
+    type PageHeaderStripTone,
+} from '@/components/page/page-header-strip';
+import {
+    ShiftContextMenu,
+    type ShiftCtxItem,
+    type ShiftCtxState,
+} from '@/components/rostering';
+import {
+    FactRows,
+    JourneyLine,
+    KnowList,
+    Log,
+    PeopleCards,
+    PersonChip,
+    PlaceCards,
+    QuietLine,
+    RISK_CONSEQUENCE,
+    RISK_LIKELIHOOD,
+    Ring,
+    RingCard,
+    RiskMap,
+    RowList,
+    SideColumn,
+    StageDots,
+    Story,
+    Surface,
+    DutyClock,
+    riskBand,
+    type CheckItem,
+    type SgTone,
+    type StoryFact,
+} from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { formatFileSize } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { EventReviewFlags, type EventReviewFlag } from '@/components/health-safety/event-review-flags';
 import {
     Field,
     InfoCard,
@@ -46,8 +98,22 @@ import {
     WizardShell,
     type WizardStep,
 } from '@/components/wizard/shell';
-import { formatDateOnly, formatDateTime } from '@/lib/datetime';
-import { Link, router, useForm, usePage } from '@inertiajs/react';
+import {
+    SafetyFormDraftContext,
+    useSafetyForm as useForm,
+    useSafetyDraftState,
+    useSafetyWorkspaceDrafts,
+} from '@/hooks/use-safety-workspace-drafts';
+import {
+    formatDate,
+    formatDateOnly,
+    formatDateTime,
+    toDateInput,
+} from '@/lib/datetime';
+import { correctiveActionHref } from '@/lib/health-safety/navigation';
+import { incidentWorkspaceHref } from '@/lib/incidents/navigation';
+import { cn } from '@/lib/utils';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -57,9 +123,14 @@ import {
     ExternalLink,
     FileText,
     History,
+    Link2,
     LinkIcon,
     ListChecks,
     Loader2,
+    Lock,
+    MapPin,
+    MoreHorizontal,
+    MoreVertical,
     Paperclip,
     Play,
     Plus,
@@ -70,7 +141,9 @@ import {
     ShieldAlert,
     ShieldCheck,
     Trash2,
+    TriangleAlert,
     User as UserIcon,
+    Wrench,
     X,
     type LucideIcon,
 } from 'lucide-react';
@@ -165,7 +238,8 @@ export type EventCorrectiveAction = {
               title: string;
           }
         | { type: 'new_responsibility'; reason: string | null }
-        | { type: 'standalone' };
+        | { type: 'standalone' }
+        | { type: 'restricted' | 'unavailable' };
     source_task: {
         id: number;
         reference: string;
@@ -379,6 +453,8 @@ export type ClosureException = {
 export type EventDetail = {
     id: number;
     reference_number: string;
+    /** Source changes a person must review (job 3): open flags only. */
+    review_flags?: EventReviewFlag[];
     event_category: string;
     severity: string;
     status: string;
@@ -410,6 +486,10 @@ export type EventDetail = {
     lifecycle: EventLifecycle;
     handover_summary: EventHandoverSummary;
     linked_operational_evidence: LinkedOperationalEvidenceData | null;
+    linked_access?: {
+        incident: 'absent' | 'readable' | 'restricted';
+        control_room: 'absent' | 'readable' | 'restricted';
+    };
     incident_followups: Array<{
         id: number;
         notes: string | null;
@@ -430,6 +510,8 @@ export type EventDetail = {
     action_handover: CorrectiveActionHandover;
     can: {
         manage: boolean;
+        request_procedure_review?: boolean;
+        view_procedure_requests?: boolean;
         close: boolean;
         request_closure_exception: boolean;
         approve_closure_exception: boolean;
@@ -640,7 +722,7 @@ function fmtSize(bytes: number | null): string {
 /** A workflow form that replaces the body + owns its buttons. Event-level panes
  *  are launched from the Options bar / row menu; per-item ones from inside the
  *  Investigation / Corrective-actions sections. */
-type ActivePane =
+export type SafetyReviewPane =
     | { kind: 'close' }
     | { kind: 'accept_handover' }
     | { kind: 'worksafe_decision' }
@@ -661,6 +743,53 @@ type ActivePane =
     | { kind: 'ca_complete'; actionId: number }
     | { kind: 'ca_verify'; actionId: number }
     | { kind: 'ca_return'; actionId: number };
+
+type ActivePane = SafetyReviewPane;
+
+/** UI eligibility mirrors the existing commands; the server reauthorizes writes. */
+function canOpenPane(pane: ActivePane, detail: EventDetail): boolean {
+    if (detail.status === 'closed') return false;
+    if ('investigationId' in pane) {
+        const inv = detail.investigations.find(
+            (item) => item.id === pane.investigationId,
+        );
+        if (!detail.can.manage || !inv) return false;
+        if (pane.kind === 'inv_findings') return inv.status === 'in_progress';
+        if (pane.kind === 'inv_complete')
+            return ['under_review', 'reviewed'].includes(inv.status);
+        if (pane.kind === 'inv_return') return inv.status === 'under_review';
+        return (
+            inv.status === 'completed' &&
+            !!inv.recommendations?.[pane.recommendationIndex]
+        );
+    }
+    if ('actionId' in pane) {
+        const action = detail.corrective_actions.find(
+            (item) => item.id === pane.actionId,
+        );
+        if (
+            !detail.can.manage ||
+            !detail.can.manage_corrective_action_lifecycle ||
+            !action
+        )
+            return false;
+        if (pane.kind === 'ca_complete') return action.status === 'in_progress';
+        if (pane.kind === 'ca_return') return action.status === 'completed';
+        return (
+            action.status === 'completed' &&
+            detail.can.verify_corrective_actions &&
+            action.can_verify &&
+            action.evidence.load_state === 'loaded'
+        );
+    }
+    if (pane.kind === 'inv_start')
+        return (
+            detail.can.manage &&
+            !detail.investigations.some((inv) => inv.status !== 'completed')
+        );
+    if (pane.kind === 'ca_add') return detail.can.manage;
+    return paneFromAction(pane.kind, detail) !== null;
+}
 
 function paneFromAction(
     action: EventActionKey | null,
@@ -698,9 +827,13 @@ function paneFromAction(
                 ? { kind: 'worksafe_site_release' }
                 : null;
         case 'investigation':
-            return { kind: 'inv_start' };
+            return detail.can.manage && detail.status !== 'closed'
+                ? { kind: 'inv_start' }
+                : null;
         case 'add_action':
-            return { kind: 'ca_add' };
+            return detail.can.manage && detail.status !== 'closed'
+                ? { kind: 'ca_add' }
+                : null;
         default:
             return null;
     }
@@ -714,15 +847,7 @@ const CA_TARGET_PANE = {
     return: 'ca_return',
 } as const;
 
-export function EventDetailDialog({
-    detail,
-    open,
-    onClose,
-    initialSection = 'overview',
-    initialAction = null,
-    initialActionTarget = null,
-    openedFrom = null,
-}: {
+type EventWorkspaceProps = {
     detail: EventDetail;
     open: boolean;
     onClose: () => void;
@@ -736,24 +861,83 @@ export function EventDetailDialog({
     } | null;
     /** Set when arrived via a source module's "Open in Health & Safety" jump. */
     openedFrom?: string | null;
-}) {
+    presentation?: 'dialog' | 'page';
+    returnHref?: string;
+    onSectionChange?: (section: EventSectionKey) => void;
+    initialPane?: SafetyReviewPane | null;
+    onPaneChange?: (
+        pane: SafetyReviewPane | null,
+        section: EventSectionKey,
+    ) => void;
+};
+
+export function EventDetailDialog(props: EventWorkspaceProps) {
+    return <EventWorkspace {...props} />;
+}
+
+export function EventRecordWorkspace(
+    props: Omit<EventWorkspaceProps, 'open' | 'onClose' | 'presentation'>,
+) {
+    return (
+        <EventWorkspace
+            {...props}
+            open
+            presentation="page"
+            onClose={() =>
+                router.visit(props.returnHref ?? '/health-safety/events')
+            }
+        />
+    );
+}
+
+function EventWorkspace({
+    detail,
+    open,
+    onClose,
+    initialSection = 'overview',
+    initialAction = null,
+    initialActionTarget = null,
+    openedFrom = null,
+    presentation = 'dialog',
+    returnHref = '/health-safety/events',
+    onSectionChange,
+    initialPane = null,
+    onPaneChange,
+}: EventWorkspaceProps) {
+    const drafts = useSafetyWorkspaceDrafts();
     const [section, setSection] = useState<EventSectionKey>(
         initialActionTarget ? 'actions' : initialSection,
     );
-    const [pane, setPane] = useState<ActivePane | null>(() =>
-        initialActionTarget
-            ? {
-                  kind: CA_TARGET_PANE[initialActionTarget.pane],
-                  actionId: initialActionTarget.actionId,
-              }
-            : paneFromAction(initialAction, detail),
+    const [pane, setActivePane] = useState<ActivePane | null>(
+        () =>
+            initialPane ??
+            (initialActionTarget
+                ? {
+                      kind: CA_TARGET_PANE[initialActionTarget.pane],
+                      actionId: initialActionTarget.actionId,
+                  }
+                : paneFromAction(initialAction, detail)),
     );
     /** Briefly ring the deep-linked action card once its section is on screen. */
     const [highlightActionId, setHighlightActionId] = useState<number | null>(
         initialActionTarget?.actionId ?? null,
     );
-    const actionRowRefs = useRef<Record<number, HTMLDivElement | null>>({});
+    const actionRowRefs = useRef<Record<number, HTMLElement | null>>({});
+    const initialPaneKey = JSON.stringify(initialPane);
     const d = detail;
+    const finishPane = (next: ActivePane | null = null) => {
+        setActivePane(next);
+        onPaneChange?.(next, section);
+    };
+    const setPane = (next: ActivePane | null) =>
+        drafts.request(() => finishPane(next));
+    const selectSection = (next: EventSectionKey) =>
+        drafts.request(() => {
+            setActivePane(null);
+            if (presentation === 'page' && onSectionChange)
+                onSectionChange(next);
+            else setSection(next);
+        });
 
     useEffect(() => {
         const targetId = initialActionTarget?.actionId;
@@ -774,16 +958,19 @@ export function EventDetailDialog({
     // would stay stale and the lifecycle action would silently do nothing. Depends
     // only on incoming prop VALUES, so it never overrides the user's in-dialog nav.
     useEffect(() => {
-        if (initialActionTarget) {
+        if (initialPane) {
+            setSection(initialSection);
+            setActivePane(initialPane);
+        } else if (initialActionTarget) {
             setSection('actions');
-            setPane({
+            setActivePane({
                 kind: CA_TARGET_PANE[initialActionTarget.pane],
                 actionId: initialActionTarget.actionId,
             });
             setHighlightActionId(initialActionTarget.actionId);
         } else {
             setSection(initialSection);
-            setPane(paneFromAction(initialAction, detail));
+            setActivePane(paneFromAction(initialAction, detail));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on incoming prop-value changes; the local setters are stable and intentionally excluded
     }, [
@@ -791,12 +978,9 @@ export function EventDetailDialog({
         initialActionTarget?.pane,
         initialSection,
         initialAction,
-        detail.worksafe.can_decide,
-        detail.worksafe.can_notify,
-        detail.worksafe.can_acknowledge,
-        detail.worksafe.can_review_site_preservation,
-        detail.worksafe.can_release_site_preservation,
-        detail.handover.can_accept,
+        // Permission refreshes must not silently reset a form. PaneRenderer
+        // checks current authority and gives a clear unavailable state instead.
+        initialPaneKey,
     ]);
 
     const cat =
@@ -864,7 +1048,10 @@ export function EventDetailDialog({
         {
             key: 'evidence',
             label: 'Evidence',
-            blurb: `${d.attachments.length} file${d.attachments.length === 1 ? '' : 's'}`,
+            blurb:
+                d.linked_access?.incident === 'restricted'
+                    ? 'Access restricted'
+                    : `${d.attachments.length} file${d.attachments.length === 1 ? '' : 's'}`,
             icon: Paperclip,
         },
     ];
@@ -872,7 +1059,6 @@ export function EventDetailDialog({
         0,
         SECTIONS.findIndex((s) => s.key === section),
     );
-
     const footerStart = (
         <div className="flex flex-wrap items-center gap-2 text-xs">
             <span
@@ -912,12 +1098,14 @@ export function EventDetailDialog({
     // action workflows live inline in their sections (and the row menu).
     const footerEnd = pane ? null : (
         <div className="flex flex-wrap items-center gap-2">
-            <Link
-                href={`/health-safety/events/${d.id}`}
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
-            >
-                <ExternalLink className="h-4 w-4" /> Open full page
-            </Link>
+            {presentation === 'dialog' ? (
+                <Link
+                    href={`/health-safety/events/${d.id}`}
+                    className="frontline-tap frontline-focus inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+                >
+                    <ExternalLink className="h-4 w-4" /> Open full page
+                </Link>
+            ) : null}
             {d.handover.can_accept ? (
                 <Button
                     size="sm"
@@ -1011,65 +1199,2157 @@ export function EventDetailDialog({
         </div>
     );
 
-    return (
-        <WizardShell
-            open={open}
-            onClose={onClose}
-            title={`Event ${d.reference_number}`}
-            description={`${cat} — ${stage.label}`}
-            railIcon={ShieldAlert}
-            railTitle={d.reference_number}
-            railSub={`${cat} · ${sev.label}`}
-            steps={SECTIONS as readonly WizardStep[]}
-            stepIndex={stepIndex}
-            onStepClick={(i) => setSection(SECTIONS[i].key)}
-            headerLabel={SECTIONS[stepIndex]?.label ?? 'Overview'}
-            pct={null}
-            footerStart={footerStart}
-            footerEnd={footerEnd}
-        >
-            {pane ? (
-                <PaneRenderer pane={pane} d={d} onDone={() => setPane(null)} />
-            ) : (
-                <>
-                    {openedFrom ? (
-                        <div className="mb-4">
-                            <InfoCard icon={LinkIcon} tone="info">
-                                Opened from {openedFrom}. This is the Health
-                                &amp; Safety governance record — investigation,
-                                corrective actions and closure are managed here.
-                            </InfoCard>
-                        </div>
-                    ) : null}
+    const body = pane ? (
+        <PaneRenderer
+            pane={pane}
+            d={d}
+            onDone={() => finishPane()}
+            onCancel={() => setPane(null)}
+        />
+    ) : (
+        <>
+            {openedFrom ? (
+                <div className="mb-4">
+                    <InfoCard icon={LinkIcon} tone="info">
+                        Opened from {openedFrom}. This is the Health &amp;
+                        Safety governance record — investigation, corrective
+                        actions and closure are managed here.
+                    </InfoCard>
+                </div>
+            ) : null}
 
-                    {section === 'overview' ? (
-                        <OverviewSection d={d} cat={cat} stage={stage} />
-                    ) : null}
-                    {section === 'handover' ? <HandoverSection d={d} /> : null}
-                    {section === 'investigation' ? (
-                        <InvestigationSection
-                            d={d}
-                            canAct={canAct}
-                            onPane={setPane}
-                        />
-                    ) : null}
-                    {section === 'actions' ? (
-                        <ActionsSection
-                            d={d}
-                            openActions={openActions}
-                            awaitingVerification={awaitingVerification}
-                            canAct={canAct}
-                            onPane={setPane}
-                            rowRefs={actionRowRefs}
-                            highlightActionId={highlightActionId}
-                        />
-                    ) : null}
-                    {section === 'risk' ? <RiskSection d={d} /> : null}
-                    {section === 'timeline' ? <TimelineSection d={d} /> : null}
-                    {section === 'evidence' ? <EvidenceSection d={d} /> : null}
+            {d.review_flags?.length ? (
+                <div className="mb-4">
+                    <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
+                </div>
+            ) : null}
+            {section === 'overview' ? (
+                <OverviewSection d={d} cat={cat} stage={stage} />
+            ) : null}
+            {section === 'handover' ? <HandoverSection d={d} /> : null}
+            {section === 'investigation' ? (
+                <InvestigationSection d={d} canAct={canAct} onPane={setPane} />
+            ) : null}
+            {section === 'actions' ? (
+                <>
+                <ActionsSection
+                    d={d}
+                    openActions={openActions}
+                    awaitingVerification={awaitingVerification}
+                    canAct={canAct}
+                    onPane={setPane}
+                    rowRefs={actionRowRefs}
+                    highlightActionId={highlightActionId}
+                />
+                {(d.can.view_procedure_requests || d.can.request_procedure_review) && <SourceProcedureRequests eventId={d.id} requestDiscard={drafts.request} />}
                 </>
+            ) : null}
+            {section === 'risk' ? <RiskSection d={d} /> : null}
+            {section === 'timeline' ? <TimelineSection d={d} /> : null}
+            {section === 'evidence' ? <EvidenceSection d={d} /> : null}
+        </>
+    );
+    return (
+        <SafetyFormDraftContext.Provider value={drafts.register}>
+            {presentation === 'page' ? (
+                <SafetyReviewPage
+                    d={d}
+                    section={section}
+                    pane={pane}
+                    returnHref={returnHref}
+                    openActions={openActions}
+                    canAct={canAct}
+                    canClose={canClose}
+                    canReviewClosureExceptions={canReviewClosureExceptions}
+                    onSection={selectSection}
+                    onPane={setPane}
+                    onPaneDone={() => finishPane()}
+                    rowRefs={actionRowRefs}
+                    highlightActionId={highlightActionId}
+                    requestDiscard={drafts.request}
+                />
+            ) : (
+                <WizardShell
+                    open={open}
+                    frontline
+                    sequential={false}
+                    onClose={() => drafts.request(onClose)}
+                    title={`Event ${d.reference_number}`}
+                    description={`${cat} — ${stage.label}`}
+                    railIcon={ShieldAlert}
+                    railTitle={d.reference_number}
+                    railSub={`${cat} · ${sev.label}`}
+                    steps={SECTIONS as readonly WizardStep[]}
+                    stepIndex={stepIndex}
+                    onStepClick={(i) => selectSection(SECTIONS[i].key)}
+                    headerLabel={SECTIONS[stepIndex]?.label ?? 'Overview'}
+                    pct={null}
+                    footerStart={footerStart}
+                    footerEnd={footerEnd}
+                >
+                    {body}
+                </WizardShell>
             )}
-        </WizardShell>
+            {drafts.confirmation}
+        </SafetyFormDraftContext.Provider>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Record page — the approved Health & safety drawing pg-hsn-41       */
+/*  (Stephan, 23 Oct 2026): fact chips, the stage line with the next   */
+/*  step, one rail of tabs, then signature blocks in a main + side     */
+/*  layout. The dialog presentation keeps its own sections below; the  */
+/*  workflow panes (and what they submit) are shared unchanged.        */
+/* ------------------------------------------------------------------ */
+
+const REVIEW_SECTIONS: { key: EventSectionKey; label: string }[] = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'handover', label: 'Handover' },
+    { key: 'investigation', label: 'Investigation' },
+    { key: 'actions', label: 'Corrective actions' },
+    { key: 'risk', label: 'Risk' },
+    { key: 'evidence', label: 'Evidence' },
+    { key: 'timeline', label: 'Timeline' },
+];
+
+/**
+ * "Injury — Mere Tane": the category with the person (or Site) it concerns — the hurt or exposed worker for a
+ * workplace injury or exposure, otherwise the client. The reference stays in the sub-line.
+ */
+export function safetyReviewTitle(
+    d: Pick<EventDetail, 'event_category' | 'client' | 'staff' | 'site'>,
+): string {
+    const category =
+        EVENT_CATEGORY_LABELS[d.event_category] ?? titleCase(d.event_category);
+    const worker = ['injury', 'exposure'].includes(d.event_category);
+    const who =
+        (worker
+            ? (d.staff?.name ?? d.client?.name)
+            : (d.client?.name ?? d.staff?.name)) ?? d.site?.name;
+    return who ? `${category} — ${who}` : category;
+}
+
+const LEVEL_VARIANT: Record<string, StatusVariant> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'critical',
+    critical: 'critical',
+};
+
+function levelTone(level: string): PageHeaderStripTone | 'neutral' {
+    const variant = LEVEL_VARIANT[level];
+    return variant === 'critical' ||
+        variant === 'warning' ||
+        variant === 'success'
+        ? variant
+        : 'neutral';
+}
+
+/** "17 Oct 2026" — the worker calendar day of an instant. */
+function dayLabel(iso: string | null | undefined): string | undefined {
+    if (!iso) return undefined;
+    return formatDateOnly(toDateInput(iso), '') || undefined;
+}
+
+function isAwaitingHandover(status: string): boolean {
+    return (
+        status === 'awaiting_acceptance' || status === 'awaiting_hs_acceptance'
+    );
+}
+
+/** The tone of where the review is up to follows the duty it is waiting on. */
+function reviewTone(d: EventDetail): PageHeaderStripTone | undefined {
+    if (
+        d.worksafe.notifiable === true &&
+        (!d.worksafe.status || d.worksafe.status === 'pending')
+    )
+        return 'critical';
+    if (
+        d.investigations.some(
+            (inv) => inv.is_overdue && inv.status !== 'completed',
+        )
+    )
+        return 'critical';
+    if (
+        isAwaitingHandover(d.handover.status) ||
+        d.worksafe.notifiable === null ||
+        d.worksafe.decision_signed === false
+    )
+        return 'warning';
+    return undefined;
+}
+
+function reviewStages(
+    d: EventDetail,
+    openActions: number,
+): PageHeaderStage[] {
+    const rank = Math.max(
+        0,
+        STAGE_ORDER.indexOf(d.status as (typeof STAGE_ORDER)[number]),
+    );
+    const startedAt =
+        d.investigations
+            .map((inv) => inv.started_at)
+            .filter((value): value is string => !!value)
+            .sort()[0] ?? null;
+    const tone = reviewTone(d);
+    return STAGE_ORDER.map((key, index) => {
+        const state: PageHeaderStage['state'] =
+            index < rank || d.status === 'closed'
+                ? 'done'
+                : index === rank
+                  ? 'now'
+                  : 'todo';
+        const meta =
+            key === 'open'
+                ? dayLabel(d.reported_at ?? d.occurred_at)
+                : key === 'investigating' && startedAt && state !== 'todo'
+                  ? `Since ${formatDate(startedAt)}`
+                  : key === 'corrective_action' && d.corrective_actions.length
+                    ? `${openActions} open`
+                    : key === 'closed'
+                      ? dayLabel(d.closed_at)
+                      : undefined;
+        return {
+            label: STAGE[key].label,
+            meta,
+            state,
+            tone: state === 'now' ? tone : undefined,
+        };
+    });
+}
+
+/** Who does what next, from the server's permission-shaped next action. */
+function reviewNextStep(d: EventDetail): PageHeaderNextStep | null {
+    const next = d.handover_summary.next_action;
+    if (!next || d.status === 'closed') return null;
+    const owner = d.handover.owner?.name ?? null;
+    const awaiting = isAwaitingHandover(d.handover.status);
+    const worksafe = /worksafe/i.test(next.label);
+    const tone = reviewTone(d);
+    return {
+        label:
+            awaiting && !owner
+                ? `Needs an owner${d.reported_at ? ` · waiting since ${formatDate(d.reported_at)}` : ''}`
+                : worksafe
+                  ? 'Next step · WorkSafe NZ'
+                  : 'Next step',
+        text: next.label,
+        meta:
+            awaiting && d.worksafe.decision_signed === false
+                ? 'Then a qualified person makes the WorkSafe decision'
+                : [
+                      owner
+                          ? `${owner} · safety review owner`
+                          : 'No safety review owner yet',
+                      worksafe ? worksafeLabel(d.worksafe) : d.journey_state,
+                  ].join(' · '),
+        tone: awaiting ? 'critical' : tone,
+    };
+}
+
+type ReviewHeaderAction = {
+    key: string;
+    label: string;
+    icon: LucideIcon;
+    pane: SafetyReviewPane;
+    title?: string;
+    /** Kept, but listed under More (the drawing doesn't show it). */
+    more?: boolean;
+};
+
+/** Event-level actions in priority order — only those the viewer can run now. */
+function reviewHeaderActions(
+    d: EventDetail,
+    canClose: boolean,
+    canReviewClosureExceptions: boolean,
+): ReviewHeaderAction[] {
+    const items: ReviewHeaderAction[] = [];
+    const blockers = d.close_readiness.requirements.filter(
+        (requirement) => !requirement.complete,
+    );
+    if (d.handover.can_accept)
+        items.push({
+            key: 'accept',
+            label: 'Accept handover',
+            icon: ShieldCheck,
+            pane: { kind: 'accept_handover' },
+        });
+    if (d.worksafe.can_decide && !d.worksafe.decision_signed)
+        items.push({
+            key: 'decision',
+            label: 'Record WorkSafe decision',
+            icon: ShieldAlert,
+            pane: { kind: 'worksafe_decision' },
+        });
+    if (d.worksafe.can_notify)
+        items.push({
+            key: 'notify',
+            label: 'Record WorkSafe notification',
+            icon: ShieldAlert,
+            pane: { kind: 'worksafe_notify' },
+        });
+    else if (d.worksafe.can_acknowledge)
+        items.push({
+            key: 'acknowledge',
+            label: 'Record acknowledgement',
+            icon: ShieldCheck,
+            pane: { kind: 'worksafe_acknowledge' },
+        });
+    if (d.worksafe.can_release_site_preservation)
+        items.push({
+            key: 'site-release',
+            label: 'Record Site release',
+            icon: ShieldCheck,
+            pane: { kind: 'worksafe_site_release' },
+        });
+    else if (d.worksafe.can_review_site_preservation)
+        items.push({
+            key: 'site-preservation',
+            label: 'Review Site preservation',
+            icon: ShieldAlert,
+            pane: { kind: 'worksafe_site_preservation' },
+        });
+    if (canClose)
+        items.push({
+            key: 'close',
+            label: 'Close safety review',
+            icon: CheckCircle2,
+            pane: { kind: 'close' },
+            title: blockers.length
+                ? `Closure blocked: ${blockers.map((requirement) => requirement.label).join(' ')}`
+                : undefined,
+        });
+    else if (canReviewClosureExceptions)
+        items.push({
+            key: 'exception',
+            label: 'Review closure exception',
+            icon: ShieldCheck,
+            pane: { kind: 'close' },
+        });
+    if (d.worksafe.can_decide && d.worksafe.decision_signed)
+        items.push({
+            key: 'decision-update',
+            label: 'Update WorkSafe decision',
+            icon: ShieldCheck,
+            pane: { kind: 'worksafe_decision' },
+            more: true,
+        });
+    return items;
+}
+
+function SafetyReviewPage({
+    d,
+    section,
+    pane,
+    returnHref,
+    openActions,
+    canAct,
+    canClose,
+    canReviewClosureExceptions,
+    onSection,
+    onPane,
+    onPaneDone,
+    rowRefs,
+    highlightActionId,
+    requestDiscard,
+}: {
+    d: EventDetail;
+    section: EventSectionKey;
+    pane: ActivePane | null;
+    returnHref: string;
+    openActions: number;
+    canAct: boolean;
+    canClose: boolean;
+    canReviewClosureExceptions: boolean;
+    onSection: (section: EventSectionKey) => void;
+    onPane: (pane: ActivePane | null) => void;
+    onPaneDone: () => void;
+    rowRefs: MutableRefObject<Record<number, HTMLElement | null>>;
+    highlightActionId: number | null;
+    requestDiscard: (action: () => void) => void;
+}) {
+    const sev = SEV[d.severity] ?? SEV.low;
+    const stage = STAGE[d.status] ?? STAGE.open;
+    const owner = d.handover.owner?.name ?? null;
+    const awaiting = isAwaitingHandover(d.handover.status);
+    const actions = reviewHeaderActions(d, canClose, canReviewClosureExceptions);
+    const [primary, ...secondary] = actions.filter((action) => !action.more);
+    const glass = secondary.slice(0, 2);
+    const overflow = [
+        ...secondary.slice(2),
+        ...actions.filter((action) => action.more),
+    ];
+    const viewerCanAct = canAct || actions.length > 0;
+    const next = reviewNextStep(d);
+    const sectionLabel =
+        REVIEW_SECTIONS.find((item) => item.key === section)?.label ??
+        'Overview';
+    const nextRows: [ReactNode, ReactNode][] = [
+        ['Status', d.journey_state],
+        ['Safety review owner', owner ?? 'Not assigned'],
+        ['Handover', handoverStatusLabel(d.handover.status)],
+    ];
+
+    const headerActions = actions.length ? (
+        <>
+            {glass.map((action) => (
+                <PageHeaderGlassButton
+                    key={action.key}
+                    title={action.title}
+                    onClick={() => onPane(action.pane)}
+                >
+                    {action.label}
+                </PageHeaderGlassButton>
+            ))}
+            {overflow.length ? (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <PageHeaderGlassButton
+                            icon={MoreHorizontal}
+                            aria-label="More safety review actions"
+                        />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        {overflow.map((action) => (
+                            <DropdownMenuItem
+                                key={action.key}
+                                onSelect={() => onPane(action.pane)}
+                            >
+                                <action.icon className="size-4" />
+                                {action.label}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            ) : null}
+            {primary ? (
+                <PageHeaderPrimaryButton
+                    icon={
+                        ['close', 'exception'].includes(primary.key)
+                            ? primary.icon
+                            : Plus
+                    }
+                    title={primary.title}
+                    onClick={() => onPane(primary.pane)}
+                >
+                    {primary.label}
+                </PageHeaderPrimaryButton>
+            ) : null}
+        </>
+    ) : null;
+
+    const main = pane ? (
+        <Surface aria-label="Current safety review action">
+            <div className="p-5">
+                <PaneRenderer
+                    pane={pane}
+                    d={d}
+                    onDone={onPaneDone}
+                    onCancel={() => onPane(null)}
+                />
+            </div>
+        </Surface>
+    ) : section === 'handover' ? (
+        <ReviewHandover d={d} />
+    ) : section === 'investigation' ? (
+        <ReviewInvestigation d={d} canAct={canAct} onPane={onPane} />
+    ) : section === 'actions' ? (
+        <>
+            <ReviewCorrectiveActions
+                d={d}
+                canAct={canAct}
+                onPane={onPane}
+                rowRefs={rowRefs}
+                highlightActionId={highlightActionId}
+            />
+            {d.can.view_procedure_requests ||
+            d.can.request_procedure_review ? (
+                <SourceProcedureRequests
+                    eventId={d.id}
+                    requestDiscard={requestDiscard}
+                />
+            ) : null}
+        </>
+    ) : section === 'risk' ? (
+        <ReviewRisk d={d} />
+    ) : section === 'evidence' ? (
+        <ReviewEvidence d={d} />
+    ) : section === 'timeline' ? (
+        <ReviewTimeline d={d} />
+    ) : (
+        <ReviewOverview d={d} />
+    );
+
+    const ring = <ClosureRing d={d} />;
+    const side = pane ? (
+        <>
+            <FactRows
+                title="Next step"
+                sub="Finish or cancel the current action before choosing another."
+                rows={nextRows}
+            />
+            {pane.kind !== 'close' ? ring : null}
+        </>
+    ) : !viewerCanAct ? (
+        <>
+            <FactRows
+                title="Next step"
+                sub="You can read this review. Specialist decisions show here if you’re allowed to make them."
+                rows={nextRows}
+            />
+            {ring}
+        </>
+    ) : (
+        <>
+            {owner ? (
+                <PeopleCards
+                    title="Owner"
+                    cols={1}
+                    items={[
+                        {
+                            name: owner,
+                            sub: 'Safety review owner',
+                            foot: d.handover.accepted_by
+                                ? `Accepted by ${d.handover.accepted_by.name}${d.handover.accepted_at ? ` · ${formatDateTime(d.handover.accepted_at)}` : ''}`
+                                : handoverStatusLabel(d.handover.status),
+                        },
+                    ]}
+                />
+            ) : (
+                <QuietLine
+                    title="Owner"
+                    text={
+                        awaiting
+                            ? 'No owner yet — waiting for Health & safety to accept it.'
+                            : 'No safety review owner is recorded.'
+                    }
+                    action={
+                        d.handover.can_accept
+                            ? {
+                                  label: 'Assign someone',
+                                  onClick: () =>
+                                      onPane({ kind: 'accept_handover' }),
+                              }
+                            : null
+                    }
+                />
+            )}
+            {ring}
+        </>
+    );
+
+    return (
+        <PageLayout
+            hero={
+                <PageHeader
+                    variant="profile"
+                    wrapTitle
+                    backHref={returnHref}
+                    icon={ShieldAlert}
+                    title={safetyReviewTitle(d)}
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={d.status === 'closed' ? 'success' : 'info'}
+                        >
+                            {stage.label}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={[
+                        d.reference_number,
+                        d.site?.name ?? 'Site not recorded',
+                        d.occurred_at
+                            ? formatDateTime(d.occurred_at)
+                            : 'Occurrence time not recorded',
+                        owner ? `Owner ${owner}` : null,
+                    ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    actions={pane ? undefined : headerActions}
+                    facts={
+                        <PageHeaderFacts
+                            items={[
+                                {
+                                    value: sev.label,
+                                    label: 'Severity',
+                                    tone: levelTone(d.severity),
+                                },
+                                owner || !awaiting
+                                    ? {
+                                          value: String(openActions),
+                                          label:
+                                              openActions === 1
+                                                  ? 'Open action'
+                                                  : 'Open actions',
+                                          tone: openActions
+                                              ? 'warning'
+                                              : undefined,
+                                      }
+                                    : {
+                                          value: 'Needs an owner',
+                                          label: 'Owner',
+                                          tone: 'warning',
+                                      },
+                            ]}
+                        />
+                    }
+                    strip={
+                        !pane && (next || d.status === 'closed') ? (
+                            <PageHeaderStages
+                                steps={reviewStages(d, openActions)}
+                                next={next}
+                                ariaLabel="Safety review stage"
+                            />
+                        ) : undefined
+                    }
+                    rail={
+                        <PageHeaderRail
+                            items={REVIEW_SECTIONS}
+                            value={section}
+                            onSelect={onSection}
+                            ariaLabel="Safety review sections"
+                        />
+                    }
+                />
+            }
+        >
+            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+                <div
+                    id="safety-review-panel"
+                    role="tabpanel"
+                    aria-label={pane ? 'Current action' : sectionLabel}
+                    className="grid min-w-0 gap-5"
+                >
+                    {!pane ? (
+                        <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
+                    ) : null}
+                    {main}
+                </div>
+                <aside
+                    className="min-w-0"
+                    aria-label="Safety review owner and closure"
+                >
+                    <SideColumn>{side}</SideColumn>
+                </aside>
+            </div>
+        </PageLayout>
+    );
+}
+
+/** Closure checks that can only be met once the WorkSafe decision is recorded. */
+const WORKSAFE_DECISION_DEPENDENTS = [
+    'worksafe_notification',
+    'worksafe_acknowledgement',
+    'site_preservation',
+];
+
+/** The closure checks as a ring: done of total, every blocker in the server's words (an open one links to its step). */
+function ClosureRing({ d }: { d: EventDetail }) {
+    const requirements = d.close_gate.requirements;
+    const done = requirements.filter((requirement) => requirement.complete)
+        .length;
+    // While the WorkSafe decision is missing, its three dependent steps say the same thing, so they show as one
+    // plain line (MASTER for Stephan, 30 Oct). Every check still counts and still blocks closing exactly as before.
+    const decision = requirements.find(
+        (requirement) => requirement.key === 'worksafe_decision',
+    );
+    const waitingOnDecision = !!decision && !decision.complete;
+    const shown = waitingOnDecision
+        ? requirements
+              .filter(
+                  (requirement) =>
+                      !WORKSAFE_DECISION_DEPENDENTS.includes(requirement.key),
+              )
+              .map((requirement) =>
+                  requirement.key === 'worksafe_decision'
+                      ? {
+                            ...requirement,
+                            label: 'Record the WorkSafe decision first. The other WorkSafe steps depend on it.',
+                        }
+                      : requirement,
+              )
+        : requirements;
+    const checks: CheckItem[] = shown.map((requirement) => ({
+        state: requirement.complete ? 'success' : 'critical',
+        label:
+            !requirement.complete && requirement.href ? (
+                <Link
+                    href={requirement.href}
+                    className="rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    {requirement.label}
+                </Link>
+            ) : (
+                requirement.label
+            ),
+    }));
+    return (
+        <RingCard
+            value={requirements.length ? done : 1}
+            of={requirements.length || 1}
+            label={
+                d.status === 'closed'
+                    ? 'Closed'
+                    : requirements.length
+                      ? `To close: ${done} of ${requirements.length} done`
+                      : 'Nothing blocks closing'
+            }
+            sub="Resolving the response, closing the incident and closing this review are separate steps"
+            checks={checks}
+        />
+    );
+}
+
+/* ---- Overview ---- */
+
+function ReviewOverview({ d }: { d: EventDetail }) {
+    // A notifiable event leads with its WorkSafe clock; otherwise the story comes first.
+    const clockFirst = d.worksafe.notifiable === true && d.worksafe.decision_signed !== false;
+    return (
+        <>
+            {clockFirst ? <WorksafeDuty d={d} /> : null}
+            <ReviewWhatHappened d={d} />
+            {clockFirst ? null : <WorksafeDuty d={d} />}
+            <ReviewHowItGotHere d={d} />
+        </>
+    );
+}
+
+/** The WorkSafe duty: undecided, not notifiable, or a clock since it was decided notifiable (HSWA wording kept). */
+function WorksafeDuty({ d }: { d: EventDetail }) {
+    const worksafe = d.worksafe;
+    const label = worksafeLabel(worksafe);
+    const recorded =
+        worksafe.decided_by || worksafe.decided_at ? (
+            <>
+                Recorded
+                {worksafe.decided_by ? (
+                    <>
+                        {' '}
+                        by <b>{worksafe.decided_by.name}</b>
+                    </>
+                ) : null}
+                {worksafe.decided_at
+                    ? ` · ${formatDateTime(worksafe.decided_at)}`
+                    : ''}
+            </>
+        ) : null;
+
+    if (worksafe.notifiable === null || worksafe.decision_signed === false) {
+        return (
+            <QuietLine
+                title={`WorkSafe decision · ${label}`}
+                text="Complete qualified H&S sign-off against the current WorkSafe decision tree before notification or closure."
+            />
+        );
+    }
+
+    if (worksafe.notifiable === false) {
+        const source = decisionSourceLabel(worksafe.decision_source);
+        return (
+            <Story
+                title="WorkSafe decision"
+                sub={recorded ?? undefined}
+                facts={[
+                    { icon: ShieldCheck, text: label },
+                    ...(source ? [{ icon: FileText, text: source }] : []),
+                ]}
+                paras={
+                    worksafe.decision_reason
+                        ? [{ h: 'Why', t: worksafe.decision_reason }]
+                        : []
+                }
+            />
+        );
+    }
+
+    const notified =
+        worksafe.status === 'notified' || worksafe.status === 'acknowledged';
+    const acknowledged = worksafe.status === 'acknowledged';
+    const statusKnown =
+        !worksafe.status ||
+        ['pending', 'notified', 'acknowledged'].includes(worksafe.status);
+    const methodLabel = worksafe.method
+        ? (WORKSAFE_METHOD_LABELS[worksafe.method] ??
+          worksafe.method.replace(/_/g, ' '))
+        : null;
+    const since = worksafe.decided_at
+        ? Math.max(
+              0,
+              Math.floor(
+                  (Date.now() - new Date(worksafe.decided_at).getTime()) /
+                      86_400_000,
+              ),
+          )
+        : null;
+    const sitePreservation = worksafe.site_preservation_status;
+
+    return (
+        <DutyClock
+            tone={acknowledged ? 'success' : notified ? 'warning' : 'critical'}
+            big={since === null ? '—' : String(since)}
+            unit={since === null ? undefined : since === 1 ? 'day' : 'days'}
+            kicker="WorkSafe NZ notifiable event (HSWA 2015)"
+            title={
+                acknowledged
+                    ? `Acknowledged by WorkSafe${worksafe.acknowledged_at ? ` ${formatDateTime(worksafe.acknowledged_at)}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''}.`
+                    : notified
+                      ? `Notified${worksafe.notified_at ? ` ${formatDateTime(worksafe.notified_at)}` : ''}${methodLabel ? ` by ${methodLabel}` : ''}${worksafe.reference ? ` · ref ${worksafe.reference}` : ''} — awaiting acknowledgement.`
+                      : statusKnown
+                        ? 'Notification to WorkSafe NZ is still pending.'
+                        : 'The stored WorkSafe status is not recognised and needs review before this record can be trusted.'
+            }
+            sub={
+                <>
+                    {recorded}
+                    {worksafe.decision_reason ? (
+                        <>
+                            {recorded ? ' – ' : ''}
+                            {worksafe.decision_reason}
+                        </>
+                    ) : null}
+                </>
+            }
+            lines={[
+                {
+                    state: notified ? 'success' : 'critical',
+                    text: 'Notify ASAP',
+                },
+                {
+                    state:
+                        sitePreservation === 'released' ||
+                        sitePreservation === 'not_required'
+                            ? 'success'
+                            : 'warning',
+                    text:
+                        sitePreservation === 'released'
+                            ? 'Site release recorded'
+                            : sitePreservation === 'not_required'
+                              ? 'Site preservation reviewed — not required'
+                              : sitePreservation === 'active'
+                                ? 'Site preservation active — release required'
+                                : 'Review Site preservation',
+                },
+                { state: 'none', text: 'Keep records ≥ 5 years' },
+            ]}
+        />
+    );
+}
+
+function OriginLink({ d }: { d: EventDetail }) {
+    const source = d.source;
+    if (!source) return null;
+    if (source.url && !source.unwired) {
+        return (
+            <Link
+                href={
+                    source.type === 'ClientIncident' &&
+                    Number.isSafeInteger(source.id) &&
+                    source.id > 0 &&
+                    source.url === '/incidents/' + source.id
+                        ? incidentWorkspaceHref(
+                              source.id,
+                              '/health-safety/events/' +
+                                  d.id +
+                                  '?section=overview',
+                          )
+                        : source.url
+                }
+                className="rounded-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                From {source.label}
+            </Link>
+        );
+    }
+    return (
+        <span
+            title={
+                source.unwired
+                    ? 'This category has no originating module yet.'
+                    : undefined
+            }
+        >
+            From {source.label}
+        </span>
+    );
+}
+
+function ReviewWhatHappened({ d }: { d: EventDetail }) {
+    const facts: StoryFact[] = [];
+    if (d.site)
+        facts.push({
+            icon: MapPin,
+            text: (
+                <Link
+                    href={`/sites/${d.site.id}`}
+                    className="rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    {d.site.name}
+                </Link>
+            ),
+        });
+    if (d.occurred_at)
+        facts.push({ icon: Clock, text: formatDateTime(d.occurred_at) });
+    if (d.client)
+        facts.push({
+            icon: UserIcon,
+            text: (
+                <Link
+                    href={`/operations/clients/${d.client.id}/care`}
+                    className="rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    {d.client.name} (client)
+                </Link>
+            ),
+        });
+    if (d.staff) facts.push({ icon: UserIcon, text: `${d.staff.name} (staff)` });
+    if (d.asset) facts.push({ icon: Wrench, text: d.asset.name });
+    if (d.control_room_alert)
+        facts.push({
+            icon: RadioTower,
+            text: d.control_room_alert.url ? (
+                <Link
+                    href={d.control_room_alert.url}
+                    className="rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    {d.control_room_alert.reference_number}
+                </Link>
+            ) : (
+                d.control_room_alert.reference_number
+            ),
+        });
+    if (d.source) facts.push({ icon: Link2, text: <OriginLink d={d} /> });
+
+    const paras: { h: string; t: ReactNode }[] = [];
+    if (d.description) paras.push({ h: 'What happened', t: d.description });
+    if (!d.source)
+        paras.push({
+            h: 'Where it came from',
+            t:
+                d.linked_access?.incident === 'restricted'
+                    ? 'The originating incident is linked. Your access does not include its details.'
+                    : 'No originating record linked.',
+        });
+    if (d.closed_at)
+        paras.push({
+            h: 'How it was closed',
+            t: `${formatDateTime(d.closed_at)}${d.closure_summary ? ` – ${d.closure_summary}` : ''}`,
+        });
+
+    return (
+        <Story
+            title="What happened"
+            sub={[
+                d.reported_at
+                    ? `Reported ${formatDateTime(d.reported_at)}`
+                    : null,
+                d.created_by_name ? `logged by ${d.created_by_name}` : null,
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            facts={facts}
+            paras={paras}
+        />
+    );
+}
+
+const LIFECYCLE_DONE = [
+    'accepted',
+    'acknowledged',
+    'closed',
+    'completed',
+    'resolved',
+    'reviewed',
+];
+
+function ReviewHowItGotHere({ d }: { d: EventDetail }) {
+    const life = d.lifecycle;
+    if (!life.control_room && !life.incident) return null;
+    const stateOf = (status: string | null) =>
+        !status
+            ? ('todo' as const)
+            : LIFECYCLE_DONE.some((value) => status.includes(value))
+              ? ('done' as const)
+              : ('now' as const);
+    return (
+        <Surface
+            title="How it got here"
+            sub="Control room, incident and Health & safety each keep their own status"
+        >
+            <div className="sg-journey">
+                <JourneyLine
+                    label="Control room, incident and Health & safety lifecycle"
+                    steps={[
+                        {
+                            label: 'Control room',
+                            meta: lifecycleStatusLabel(life.control_room),
+                            state: stateOf(life.control_room),
+                        },
+                        {
+                            label: 'Incident',
+                            meta: lifecycleStatusLabel(life.incident),
+                            state: stateOf(life.incident),
+                        },
+                        {
+                            label: 'Health & safety',
+                            meta:
+                                STAGE[life.health_safety]?.label ??
+                                lifecycleStatusLabel(life.health_safety),
+                            state:
+                                life.health_safety === 'closed'
+                                    ? 'done'
+                                    : 'now',
+                        },
+                    ]}
+                />
+            </div>
+        </Surface>
+    );
+}
+
+/* ---- Handover ---- */
+
+/** Download rows (plain links — a file is not an Inertia visit). */
+function FileRows({
+    title,
+    sub,
+    files,
+    empty,
+}: {
+    title: string;
+    sub?: ReactNode;
+    files: EventAttachment[];
+    empty: ReactNode;
+}) {
+    return (
+        <Surface title={title} sub={sub}>
+            {files.length ? (
+                <ul className="sg-list mt-2">
+                    {files.map((file) => (
+                        <li key={file.id}>
+                            <a href={file.download_url} className="sg-li">
+                                <span className="sg-li-lead" aria-hidden="true">
+                                    <FileText className="size-4" />
+                                </span>
+                                <span className="sg-li-t">
+                                    <b>{file.name}</b>
+                                    <small>
+                                        {[
+                                            fmtSize(file.size),
+                                            file.uploaded_by,
+                                            file.created_at
+                                                ? formatDateTime(
+                                                      file.created_at,
+                                                  )
+                                                : null,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    </small>
+                                </span>
+                                <span className="sg-li-time inline-flex items-center gap-1 font-semibold text-primary">
+                                    <ExternalLink
+                                        aria-hidden="true"
+                                        className="size-3.5"
+                                    />
+                                    Open
+                                </span>
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>{empty}</span>
+                </p>
+            )}
+        </Surface>
+    );
+}
+
+/** Rows with their own buttons on the right (row lists whose rows are not links). */
+function ActionRows({
+    title,
+    sub,
+    rows,
+}: {
+    title: string;
+    sub?: ReactNode;
+    rows: {
+        key: string | number;
+        title: ReactNode;
+        sub?: ReactNode;
+        badge?: ReactNode;
+        actions?: ReactNode;
+    }[];
+}) {
+    return (
+        <Surface title={title} sub={sub}>
+            <ul className="sg-list mt-2">
+                {rows.map((row) => (
+                    <li key={row.key}>
+                        <div className="sg-li flex-wrap">
+                            <span className="sg-li-t">
+                                <b>{row.title}</b>
+                                {row.sub ? (
+                                    <small className="!whitespace-normal">
+                                        {row.sub}
+                                    </small>
+                                ) : null}
+                            </span>
+                            {row.badge ?? null}
+                            {row.actions ?? null}
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </Surface>
+    );
+}
+
+function splitPeople(value: string | null): string[] {
+    if (!value) return [];
+    const parts = value
+        .split(/[,;]|\band\b/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+    return parts.length <= 4 && parts.every((part) => part.length <= 40)
+        ? parts
+        : [value];
+}
+
+function ReviewHandover({ d }: { d: EventDetail }) {
+    const summary = d.handover_summary;
+    const handover = d.handover;
+    const incidentRestricted = d.linked_access?.incident === 'restricted';
+    const responseRestricted = d.linked_access?.control_room === 'restricted';
+    const restricted: { tone: SgTone; text: ReactNode }[] = [];
+    if (incidentRestricted)
+        restricted.push(
+            {
+                tone: 'none',
+                text: (
+                    <>
+                        <b>Handover notes</b> — A linked incident is recorded.
+                        Your access does not include its account or evidence.
+                    </>
+                ),
+            },
+            {
+                tone: 'none',
+                text: (
+                    <>
+                        <b>Incident files</b> — Incident attachments are
+                        restricted.
+                    </>
+                ),
+            },
+            {
+                tone: 'none',
+                text: (
+                    <>
+                        <b>Incident follow-ups</b> — Incident follow-ups are
+                        restricted.
+                    </>
+                ),
+            },
+        );
+    if (responseRestricted)
+        restricted.push(
+            {
+                tone: 'none',
+                text: (
+                    <>
+                        <b>From the Control room</b> — This incident has a
+                        linked Control Room record. Your access does not
+                        include its notes or files.
+                    </>
+                ),
+            },
+            {
+                tone: 'none',
+                text: (
+                    <>
+                        <b>Control room playbook</b> — Control Room response
+                        details are restricted.
+                    </>
+                ),
+            },
+        );
+
+    const accepted = handover.status === 'accepted';
+    const storyFacts: StoryFact[] = [
+        summary.incident_reference
+            ? { icon: Link2, text: summary.incident_reference }
+            : null,
+        summary.alert_reference
+            ? { icon: RadioTower, text: summary.alert_reference }
+            : null,
+        summary.source_label
+            ? { icon: FileText, text: summary.source_label }
+            : null,
+        summary.site_name ? { icon: MapPin, text: summary.site_name } : null,
+        summary.potential_consequence
+            ? {
+                  icon: TriangleAlert,
+                  text: `Could have caused: ${summary.potential_consequence}`,
+              }
+            : null,
+    ].filter((fact) => fact !== null);
+    const storyParas = [
+        summary.narrative ? { h: 'What happened', t: summary.narrative } : null,
+        summary.immediate_controls
+            ? { h: 'Done straight away', t: summary.immediate_controls }
+            : null,
+        handover.notes ? { h: 'Acceptance notes', t: handover.notes } : null,
+    ].filter((para): para is { h: string; t: string } => para !== null);
+    const people = [
+        ...(summary.reporter
+            ? [{ name: summary.reporter, sub: 'Reported it' }]
+            : []),
+        ...splitPeople(summary.witnesses).map((name) => ({
+            name,
+            sub: 'Witness',
+        })),
+    ];
+
+    return (
+        <>
+            {restricted.length ? (
+                <KnowList
+                    title="What your access doesn’t include"
+                    sub="You can read this review; linked records stay restricted"
+                    items={restricted}
+                />
+            ) : null}
+            {!incidentRestricted ? (
+                storyFacts.length || storyParas.length ? (
+                    <Story
+                        title="Handover notes"
+                        sub={
+                            accepted
+                                ? `Accepted by ${handover.accepted_by?.name ?? 'Health & safety'}${handover.accepted_at ? ` · ${formatDateTime(handover.accepted_at)}` : ''}`
+                                : handoverStatusLabel(handover.status)
+                        }
+                        facts={storyFacts}
+                        paras={storyParas}
+                    />
+                ) : (
+                    <QuietLine
+                        title="Handover notes"
+                        text="No incident handover is linked to this review."
+                    />
+                )
+            ) : null}
+            {!incidentRestricted && people.length ? (
+                <PeopleCards
+                    title="People"
+                    cols={Math.min(2, people.length)}
+                    items={people}
+                />
+            ) : null}
+            {!responseRestricted ? (
+                <LinkedOperationalEvidence
+                    evidence={d.linked_operational_evidence}
+                />
+            ) : null}
+            {!responseRestricted && summary.playbook ? (
+                <FactRows
+                    title="Control room playbook"
+                    rows={[
+                        [
+                            'Playbook',
+                            summary.playbook.name ?? 'Operational playbook',
+                        ],
+                        ['Status', titleCase(summary.playbook.status)],
+                        ...(summary.playbook.outcome
+                            ? ([['Outcome', summary.playbook.outcome]] as [
+                                  ReactNode,
+                                  ReactNode,
+                              ][])
+                            : []),
+                    ]}
+                />
+            ) : null}
+            {!incidentRestricted ? (
+                <RowList
+                    title="Incident follow-ups"
+                    empty="No incident follow-ups were recorded."
+                    items={d.incident_followups.map((followup) => ({
+                        key: followup.id,
+                        title: followup.notes || 'Incident follow-up',
+                        sub: [
+                            followup.assigned_to ?? 'Unassigned',
+                            followup.due_at
+                                ? `due ${formatDateTime(followup.due_at)}`
+                                : null,
+                        ]
+                            .filter(Boolean)
+                            .join(' · '),
+                        badge: followup.completed_at ? (
+                            <StatusBadge variant="success">
+                                Done {formatDateTime(followup.completed_at)}
+                            </StatusBadge>
+                        ) : (
+                            <StatusBadge variant="warning">Open</StatusBadge>
+                        ),
+                    }))}
+                />
+            ) : null}
+            {!incidentRestricted ? (
+                <FileRows
+                    title="Incident files"
+                    files={summary.attachments}
+                    empty="No attachments were handed over."
+                />
+            ) : null}
+        </>
+    );
+}
+
+/* ---- Investigation ---- */
+
+function ReviewInvestigation({
+    d,
+    canAct,
+    onPane,
+}: {
+    d: EventDetail;
+    canAct: boolean;
+    onPane: (pane: ActivePane) => void;
+}) {
+    if (!d.investigations.length) {
+        return (
+            <QuietLine
+                title="Investigation"
+                text={
+                    d.investigation_required
+                        ? 'An investigation is required for this event.'
+                        : 'No investigation has been opened.'
+                }
+                action={
+                    canAct
+                        ? {
+                              label: 'Start investigation',
+                              onClick: () => onPane({ kind: 'inv_start' }),
+                          }
+                        : null
+                }
+            />
+        );
+    }
+    return (
+        <>
+            {d.investigations.map((inv) => (
+                <InvestigationBlocks
+                    key={inv.id}
+                    d={d}
+                    inv={inv}
+                    canAct={canAct}
+                    onPane={onPane}
+                />
+            ))}
+        </>
+    );
+}
+
+function InvestigationBlocks({
+    d,
+    inv,
+    canAct,
+    onPane,
+}: {
+    d: EventDetail;
+    inv: EventInvestigation;
+    canAct: boolean;
+    onPane: (pane: ActivePane) => void;
+}) {
+    const rank = INV_ORDER.indexOf(inv.status as (typeof INV_ORDER)[number]);
+    const byline = [
+        inv.submitted_by_name ? `Submitted by ${inv.submitted_by_name}` : null,
+        inv.reviewed_by_name ? `Reviewed by ${inv.reviewed_by_name}` : null,
+        inv.approved_by_name ? `Approved by ${inv.approved_by_name}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    const causeCards = [
+        {
+            name: 'What went wrong',
+            sub: 'Immediate cause',
+            causes: inv.immediate_causes,
+            tone: 'critical' as const,
+        },
+        {
+            name: 'Why it could happen',
+            sub: 'Root causes',
+            causes: inv.root_causes,
+            tone: 'warning' as const,
+        },
+        {
+            name: 'What made it worse',
+            sub: 'Contributing factor',
+            causes: inv.contributing_factors,
+            tone: 'info' as const,
+        },
+    ]
+        .filter((card) => card.causes?.length)
+        .map((card) => ({
+            name: card.name,
+            sub: card.sub,
+            facts: (card.causes ?? []).map((cause) => ({
+                tone: card.tone,
+                text: cause.description ?? '',
+            })),
+        }));
+    const recommendations = inv.recommendations ?? [];
+
+    return (
+        <>
+            <Surface
+                title={`Investigation ${inv.reference_number}`}
+                sub={[
+                    methodologyLabel(inv.methodology) ??
+                        titleCase(inv.investigation_type),
+                    inv.lead_investigator_name
+                        ? `lead ${inv.lead_investigator_name}`
+                        : null,
+                    inv.target_completion_date
+                        ? `due ${formatDateOnly(inv.target_completion_date)}`
+                        : null,
+                    inv.is_overdue ? 'overdue' : null,
+                ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                tone={inv.is_overdue ? 'critical' : undefined}
+            >
+                <div className="sg-journey">
+                    <JourneyLine
+                        label="Investigation lifecycle"
+                        steps={INV_ORDER.map((key, index) => ({
+                            label: INV_STAGE[key],
+                            meta:
+                                key === 'in_progress' && inv.started_at
+                                    ? `From ${formatDate(inv.started_at)}`
+                                    : key === 'completed' && inv.completed_at
+                                      ? formatDate(inv.completed_at)
+                                      : undefined,
+                            state:
+                                index < rank ||
+                                (index === rank && key === 'completed')
+                                    ? 'done'
+                                    : index === rank
+                                      ? 'now'
+                                      : 'todo',
+                            tone:
+                                index === rank && inv.is_overdue
+                                    ? 'critical'
+                                    : undefined,
+                        }))}
+                    />
+                    {byline ? (
+                        <p className="mt-3 text-caption text-muted-foreground">
+                            {byline}
+                        </p>
+                    ) : null}
+                    {canAct ? (
+                        <InvestigationControls
+                            d={d}
+                            inv={inv}
+                            onPane={onPane}
+                        />
+                    ) : null}
+                </div>
+            </Surface>
+            {inv.has_findings && causeCards.length ? (
+                <PlaceCards
+                    title="Findings"
+                    sub={inv.findings_summary ?? undefined}
+                    cols={causeCards.length}
+                    items={causeCards}
+                />
+            ) : inv.has_findings && inv.findings_summary ? (
+                <Story
+                    title="Findings"
+                    paras={[{ h: 'Summary', t: inv.findings_summary }]}
+                />
+            ) : null}
+            {inv.has_findings && recommendations.length ? (
+                <ActionRows
+                    title="Recommendations"
+                    sub="Each needs an outcome before this review closes"
+                    rows={recommendations.map((recommendation, index) => {
+                        const disposition = recommendation.disposition;
+                        return {
+                            key: index,
+                            title: recommendation.description ?? 'Recommendation',
+                            sub: disposition ? (
+                                <>
+                                    {recommendationOutcomeLabel(
+                                        disposition.disposition,
+                                    )}
+                                    {disposition.corrective_action ? (
+                                        <>
+                                            {' · '}
+                                            <Link
+                                                href={`/health-safety/corrective-actions?event=${d.id}&action=${disposition.corrective_action.id}`}
+                                                className="font-medium text-primary underline-offset-4 hover:underline"
+                                            >
+                                                {
+                                                    disposition
+                                                        .corrective_action
+                                                        .reference_number
+                                                }{' '}
+                                                ·{' '}
+                                                {titleCase(
+                                                    disposition
+                                                        .corrective_action
+                                                        .status,
+                                                )}
+                                            </Link>
+                                        </>
+                                    ) : null}
+                                    {disposition.reason
+                                        ? ` · ${disposition.reason}`
+                                        : ''}
+                                    {` · Decided by ${disposition.decided_by_name ?? 'H&S team'}`}
+                                    {disposition.decided_at
+                                        ? ` · ${formatDateTime(disposition.decided_at)}`
+                                        : ''}
+                                </>
+                            ) : (
+                                'Outcome needed before H&S closure'
+                            ),
+                            badge: recommendation.priority ? (
+                                <StatusBadge
+                                    variant={
+                                        LEVEL_VARIANT[
+                                            recommendation.priority
+                                        ] ?? 'neutral'
+                                    }
+                                >
+                                    {titleCase(recommendation.priority)}
+                                </StatusBadge>
+                            ) : null,
+                            actions:
+                                canAct && inv.status === 'completed' ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            onPane({
+                                                kind: 'inv_disposition',
+                                                investigationId: inv.id,
+                                                recommendationIndex: index,
+                                            })
+                                        }
+                                    >
+                                        {disposition
+                                            ? 'Change outcome'
+                                            : 'Choose outcome'}
+                                    </Button>
+                                ) : null,
+                        };
+                    })}
+                />
+            ) : null}
+            {inv.has_findings && inv.lessons_learned ? (
+                <Story
+                    title="Lessons learned"
+                    paras={[{ h: 'What we learned', t: inv.lessons_learned }]}
+                />
+            ) : null}
+        </>
+    );
+}
+
+/* ---- Corrective actions ---- */
+
+/** Where a corrective action is up to: Agreed › Owner › Done › Checked › Closed. */
+export function correctiveActionStage(action: {
+    status: string;
+    owner?: { id: number; name: string } | null;
+    assigned_to_name?: string | null;
+    is_overdue?: boolean;
+}): {
+    stage: number;
+    label: string;
+    tone?: 'critical' | 'warning' | 'success';
+} {
+    const hasOwner = !!(action.owner ?? action.assigned_to_name);
+    switch (action.status) {
+        case 'closed':
+            return { stage: 5, label: 'Closed', tone: 'success' };
+        case 'verified':
+            return { stage: 5, label: 'Checked' };
+        case 'completed':
+            return { stage: 4, label: 'Checked', tone: 'warning' };
+        case 'in_progress':
+            return {
+                stage: 3,
+                label: 'In progress',
+                tone: action.is_overdue ? 'critical' : undefined,
+            };
+        default:
+            return hasOwner
+                ? {
+                      stage: 3,
+                      label: 'Not started',
+                      tone: action.is_overdue ? 'critical' : undefined,
+                  }
+                : { stage: 2, label: 'Owner', tone: 'critical' };
+    }
+}
+
+function ReviewCorrectiveActions({
+    d,
+    canAct,
+    onPane,
+    rowRefs,
+    highlightActionId,
+}: {
+    d: EventDetail;
+    canAct: boolean;
+    onPane: (pane: ActivePane) => void;
+    rowRefs: MutableRefObject<Record<number, HTMLElement | null>>;
+    highlightActionId: number | null;
+}) {
+    const [menu, setMenu] = useState<ShiftCtxState | null>(null);
+    const [confirm, setConfirm] = useState<{
+        action: EventCorrectiveAction;
+        command: 'start' | 'close';
+    } | null>(null);
+    const returnTo = `/health-safety/events/${d.id}?section=actions`;
+    const strict = d.can.manage_corrective_action_lifecycle;
+    const writable = d.can.manage && d.status !== 'closed';
+    const open = (action: EventCorrectiveAction) =>
+        router.visit(correctiveActionHref(action.id, { returnTo }));
+
+    // The same guards as the per-action controls in the dialog.
+    const menuItems = (action: EventCorrectiveAction): ShiftCtxItem[] => {
+        const items: ShiftCtxItem[] = [];
+        if (writable) {
+            if (action.status === 'open')
+                items.push({
+                    icon: <Play className="h-3.5 w-3.5" />,
+                    label: 'Start action…',
+                    tone: 'primary',
+                    onClick: () => setConfirm({ action, command: 'start' }),
+                });
+            if (action.status === 'in_progress' && strict)
+                items.push({
+                    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+                    label: 'Mark complete',
+                    tone: 'primary',
+                    onClick: () =>
+                        onPane({ kind: 'ca_complete', actionId: action.id }),
+                });
+            if (action.status === 'completed' && strict) {
+                if (
+                    d.can.verify_corrective_actions &&
+                    action.can_verify &&
+                    action.evidence.load_state === 'loaded'
+                )
+                    items.push({
+                        icon: <ShieldCheck className="h-3.5 w-3.5" />,
+                        label: 'Verify action',
+                        tone: 'primary',
+                        onClick: () =>
+                            onPane({ kind: 'ca_verify', actionId: action.id }),
+                    });
+                items.push({
+                    icon: <RotateCcw className="h-3.5 w-3.5" />,
+                    label: 'Return for rework',
+                    tone: 'critical',
+                    onClick: () =>
+                        onPane({ kind: 'ca_return', actionId: action.id }),
+                });
+            }
+            if (action.status === 'verified' && strict)
+                items.push({
+                    icon: <Lock className="h-3.5 w-3.5" />,
+                    label: 'Close action…',
+                    onClick: () => setConfirm({ action, command: 'close' }),
+                });
+        }
+        const tail: ShiftCtxItem[] = [
+            {
+                icon: <ListChecks className="h-3.5 w-3.5" />,
+                label: 'Open corrective action',
+                sub: action.reference_number,
+                tone: items.length ? undefined : 'primary',
+                onClick: () => open(action),
+            },
+        ];
+        return items.length ? [...items, { sep: true }, ...tail] : tail;
+    };
+    const showMenu = (
+        action: EventCorrectiveAction,
+        x: number,
+        y: number,
+    ) =>
+        setMenu({
+            x,
+            y,
+            tag: titleCase(action.priority).toUpperCase(),
+            meta: `${action.reference_number} · ${action.title}`,
+            items: menuItems(action),
+        });
+
+    if (!d.corrective_actions.length) {
+        return (
+            <QuietLine
+                title="Corrective actions"
+                text="Corrective actions are raised from investigation recommendations or added directly, then driven to verified."
+                action={
+                    canAct
+                        ? {
+                              label: 'Add corrective action',
+                              onClick: () => onPane({ kind: 'ca_add' }),
+                          }
+                        : null
+                }
+            />
+        );
+    }
+
+    return (
+        <Surface
+            title="Corrective actions"
+            sub="Separation of duties: a corrective action must be verified by someone other than its owner or the person who completed it."
+            action={
+                canAct
+                    ? {
+                          label: 'Add corrective action',
+                          onClick: () => onPane({ kind: 'ca_add' }),
+                      }
+                    : null
+            }
+        >
+            <div className="mt-3">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                            {['Action', 'Owner', 'Due', 'Priority'].map(
+                                (label) => (
+                                    <TableHead
+                                        key={label}
+                                        className="h-auto bg-muted/60 px-4 py-2.5 font-semibold tracking-wide text-muted-foreground uppercase"
+                                    >
+                                        <span className="text-caption">{label}</span>
+                                    </TableHead>
+                                ),
+                            )}
+                            <TableHead className="h-auto bg-muted/60 px-4 py-2.5 font-semibold tracking-wide text-muted-foreground uppercase">
+                                <span className="text-caption">Where it’s up to</span>
+                            </TableHead>
+                            <TableHead className="h-auto w-12 bg-muted/60 px-2 py-2.5">
+                                <span className="sr-only">Options</span>
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {d.corrective_actions.map((action) => {
+                            const stage = correctiveActionStage(action);
+                            const owner =
+                                action.owner?.name ?? action.assigned_to_name;
+                            const overdue =
+                                action.is_overdue &&
+                                action.status !== 'verified' &&
+                                action.status !== 'closed';
+                            const note =
+                                action.status === 'completed'
+                                    ? action.evidence.load_state !== 'loaded'
+                                        ? 'Completion evidence could not be loaded.'
+                                        : action.can_verify
+                                          ? 'Waiting for an independent check'
+                                          : 'A different person must verify this action.'
+                                    : action.verified_at
+                                      ? `Verified${action.verified_by_name ? ` by ${action.verified_by_name}` : ''} · ${action.effectiveness_confirmed ? 'effective' : 'not yet effective'}`
+                                      : !owner
+                                        ? 'Needs an owner'
+                                        : overdue
+                                          ? 'Overdue'
+                                          : undefined;
+                            return (
+                                <TableRow
+                                    key={action.id}
+                                    ref={(node) => {
+                                        rowRefs.current[action.id] = node;
+                                    }}
+                                    onClick={() => open(action)}
+                                    onContextMenu={(event) => {
+                                        event.preventDefault();
+                                        showMenu(
+                                            action,
+                                            event.clientX,
+                                            event.clientY,
+                                        );
+                                    }}
+                                    className={cn(
+                                        'cursor-pointer align-top',
+                                        highlightActionId === action.id &&
+                                            'ring-2 ring-ring ring-inset',
+                                    )}
+                                >
+                                    <TableCell className="max-w-[22rem] px-4 py-3 whitespace-normal">
+                                        <Link
+                                            href={correctiveActionHref(
+                                                action.id,
+                                                { returnTo },
+                                            )}
+                                            onClick={(event) =>
+                                                event.stopPropagation()
+                                            }
+                                            className="rounded-sm font-semibold [overflow-wrap:anywhere] text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                        >
+                                            {action.title}
+                                        </Link>
+                                        <p className="mt-0.5 text-caption text-muted-foreground">
+                                            {action.reference_number} ·{' '}
+                                            {titleCase(
+                                                action.action_type,
+                                            ).toLowerCase()}
+                                        </p>
+                                        {action.rework.latest_reason ? (
+                                            <p className="mt-0.5 text-caption text-status-warning-foreground">
+                                                Returned for rework:{' '}
+                                                {action.rework.latest_reason}
+                                            </p>
+                                        ) : null}
+                                        {action.recommendation ? (
+                                            <p className="mt-0.5 text-caption text-muted-foreground">
+                                                Recommendation:{' '}
+                                                {action.recommendation}
+                                            </p>
+                                        ) : null}
+                                        {action.source.type ===
+                                        'control_room_task' ? (
+                                            <p className="mt-0.5 text-caption text-muted-foreground">
+                                                Transferred from Control Room
+                                                task: {action.source.reference}{' '}
+                                                · {action.source.title}
+                                            </p>
+                                        ) : action.source.type ===
+                                          'new_responsibility' ? (
+                                            <p className="mt-0.5 text-caption text-muted-foreground">
+                                                New responsibility:{' '}
+                                                {action.source.reason ??
+                                                    'Reason not recorded'}
+                                            </p>
+                                        ) : null}
+                                    </TableCell>
+                                    <TableCell className="px-4 py-3">
+                                        {owner ? (
+                                            <PersonChip name={owner} />
+                                        ) : (
+                                            <StatusBadge variant="warning">
+                                                Needs an owner
+                                            </StatusBadge>
+                                        )}
+                                    </TableCell>
+                                    <TableCell
+                                        className={cn(
+                                            'px-4 py-3',
+                                            overdue &&
+                                                'font-semibold text-status-critical',
+                                        )}
+                                    >
+                                        {formatDateOnly(action.due_date)}
+                                    </TableCell>
+                                    <TableCell className="px-4 py-3">
+                                        <StatusBadge
+                                            variant={
+                                                LEVEL_VARIANT[action.priority] ??
+                                                'neutral'
+                                            }
+                                        >
+                                            {titleCase(action.priority)}
+                                        </StatusBadge>
+                                    </TableCell>
+                                    <TableCell className="px-4 py-3">
+                                        <StageDots
+                                            stage={stage.stage}
+                                            of={5}
+                                            label={stage.label}
+                                            note={note}
+                                            tone={stage.tone}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="px-2 py-3 text-right">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="frontline-hit size-8 text-muted-foreground"
+                                            aria-label={`Options for ${action.reference_number}`}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                const rect =
+                                                    event.currentTarget.getBoundingClientRect();
+                                                showMenu(
+                                                    action,
+                                                    rect.left,
+                                                    rect.bottom,
+                                                );
+                                            }}
+                                        >
+                                            <MoreVertical className="size-4" />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </div>
+            {menu ? (
+                <ShiftContextMenu ctx={menu} onClose={() => setMenu(null)} />
+            ) : null}
+            <ConfirmDialog
+                open={confirm !== null}
+                onClose={() => setConfirm(null)}
+                variant="default"
+                title={
+                    confirm?.command === 'start'
+                        ? 'Start this action?'
+                        : 'Close this verified action?'
+                }
+                description={
+                    confirm?.command === 'start'
+                        ? 'Record that work on this corrective action is underway.'
+                        : 'This closes the corrective action. Incident and safety review closure remain separate decisions.'
+                }
+                confirmText={
+                    confirm?.command === 'start'
+                        ? 'Start action'
+                        : 'Close action'
+                }
+                onConfirm={() => {
+                    if (!confirm) return;
+                    router.post(
+                        `/health-safety/events/${d.id}/corrective-actions/${confirm.action.id}/${confirm.command}`,
+                        {},
+                        { preserveScroll: true, preserveState: true },
+                    );
+                    setConfirm(null);
+                }}
+            />
+        </Surface>
+    );
+}
+
+/* ---- Risk ---- */
+
+function ReviewRisk({ d }: { d: EventDetail }) {
+    const register = {
+        label: 'View in register',
+        href: `/health-safety/risk-assessments?hs_event_id=${d.id}`,
+    };
+    if (!d.risk_assessments.length) {
+        return (
+            <QuietLine
+                title="Risk"
+                text="5×5 likelihood × consequence assessments linked to this event appear here. Open the register to create one for this event."
+                action={register}
+            />
+        );
+    }
+    return (
+        <>
+            {d.risk_assessments.map((assessment) => (
+                <RiskAssessmentBlocks
+                    key={assessment.id}
+                    assessment={assessment}
+                    register={register}
+                />
+            ))}
+        </>
+    );
+}
+
+function riskCell(
+    likelihood: number | null | undefined,
+    consequence: number | null | undefined,
+): [number, number] | null {
+    if (!likelihood || !consequence) return null;
+    const row = RISK_LIKELIHOOD.length - likelihood;
+    const col = consequence - 1;
+    return row >= 0 && row < 5 && col >= 0 && col < 5 ? [row, col] : null;
+}
+
+function RiskAssessmentBlocks({
+    assessment,
+    register,
+}: {
+    assessment: EventRiskAssessment;
+    register: { label: string; href: string };
+}) {
+    const before = riskCell(assessment.likelihood, assessment.consequence);
+    const after = riskCell(
+        assessment.residual_likelihood,
+        assessment.residual_consequence,
+    );
+    const [view, setView] = useState(0);
+    const mark = view === 1 && after ? after : before;
+    const cells = Array.from({ length: 5 }, (_, row) =>
+        Array.from({ length: 5 }, (_, col) =>
+            mark && mark[0] === row && mark[1] === col ? 1 : 0,
+        ),
+    );
+    const words = (cell: [number, number] | null) =>
+        cell
+            ? `${RISK_LIKELIHOOD[cell[0]]} × ${RISK_CONSEQUENCE[cell[1]]}`
+            : null;
+    const level = (value: string | null | undefined) =>
+        value ? value.toLowerCase() : null;
+    const toneOf = (score: number | null): SgTone => {
+        if (score === null) return 'none';
+        const band = riskBand(score);
+        return band === 'extreme' || band === 'high'
+            ? 'critical'
+            : band === 'medium'
+              ? 'warning'
+              : 'success';
+    };
+    const markScore =
+        view === 1 && after
+            ? assessment.residual_risk_score
+            : assessment.risk_score;
+    const markLevel =
+        view === 1 && after
+            ? (assessment.residual_risk_level ?? assessment.risk_level)
+            : assessment.risk_level;
+    const items = [
+        {
+            time:
+                assessment.likelihood && assessment.consequence
+                    ? `${assessment.likelihood} × ${assessment.consequence}`
+                    : 'Before',
+            tone: toneOf(assessment.risk_score),
+            title: `${assessment.risk_score} · ${level(assessment.risk_level)} before controls`,
+            sub: words(before) ?? undefined,
+        },
+        ...(assessment.residual_risk_score != null
+            ? [
+                  {
+                      time:
+                          assessment.residual_likelihood &&
+                          assessment.residual_consequence
+                              ? `${assessment.residual_likelihood} × ${assessment.residual_consequence}`
+                              : 'After',
+                      tone: toneOf(assessment.residual_risk_score),
+                      title: `${assessment.residual_risk_score} · ${level(assessment.residual_risk_level ?? assessment.risk_level)} after controls`,
+                      sub:
+                          [
+                              words(after),
+                              assessment.risk_acceptable === true
+                                  ? 'acceptable'
+                                  : assessment.risk_acceptable === false
+                                    ? 'not acceptable'
+                                    : null,
+                          ]
+                              .filter(Boolean)
+                              .join(' · ') || undefined,
+                  },
+              ]
+            : []),
+        ...(assessment.review_due_at
+            ? [
+                  {
+                      time: 'Review',
+                      tone: (assessment.is_due_for_review
+                          ? 'warning'
+                          : 'info') as SgTone,
+                      title: assessment.is_due_for_review
+                          ? `Review due ${dayLabel(assessment.review_due_at) ?? ''}`.trim()
+                          : `Next review ${dayLabel(assessment.review_due_at) ?? ''}`.trim(),
+                      sub: assessment.assessed_by_name ?? undefined,
+                  },
+              ]
+            : []),
+    ];
+    return (
+        <>
+            {before ? (
+                <RiskMap
+                    title={assessment.title}
+                    sub={`${assessment.reference_number} · linked risk assessment`}
+                    views={after ? ['Before controls', 'After controls'] : ['Before controls']}
+                    view={view}
+                    onView={setView}
+                    cells={cells}
+                    mark={mark}
+                    note={
+                        mark ? (
+                            <>
+                                <b>{words(mark)}</b> = {markScore},{' '}
+                                {level(markLevel)}
+                            </>
+                        ) : null
+                    }
+                />
+            ) : null}
+            <Log
+                title={before ? 'Before and after controls' : assessment.title}
+                sub={
+                    before
+                        ? 'Likelihood × consequence, each out of 5'
+                        : `${assessment.reference_number} · linked risk assessment`
+                }
+                action={register}
+                items={items}
+            />
+        </>
+    );
+}
+
+/* ---- Evidence and timeline ---- */
+
+function ReviewEvidence({ d }: { d: EventDetail }) {
+    if (d.linked_access?.incident === 'restricted') {
+        return (
+            <QuietLine
+                title="Incident evidence restricted"
+                text="Your access does not include the linked incident's photos, documents or reports."
+            />
+        );
+    }
+    return (
+        <FileRows
+            title="Evidence"
+            sub="Photos, documents and reports attached to this event"
+            files={d.attachments}
+            empty="No evidence attached"
+        />
+    );
+}
+
+function ReviewTimeline({ d }: { d: EventDetail }) {
+    const entries = timelineMilestones({
+        reportedAt: d.reported_at,
+        occurredAt: d.occurred_at,
+        closedAt: d.closed_at,
+        investigations: d.investigations,
+        correctiveActions: d.corrective_actions,
+    });
+    if (!entries.length) {
+        return <QuietLine title="Timeline" text="No timeline events yet." />;
+    }
+    return (
+        <Log
+            title="Timeline"
+            sub="From the review, its investigation and its corrective actions"
+            limit={entries.length}
+            items={entries.map((entry) => ({
+                time: formatDateTime(entry.date),
+                tone: entry.tone,
+                title: entry.label,
+                sub: entry.detail,
+            }))}
+        />
     );
 }
 
@@ -1077,7 +3357,15 @@ export function EventDetailDialog({
 /*  Workflow action panes                                              */
 /* ------------------------------------------------------------------ */
 
-function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
+function CloseEventPane({
+    d,
+    onDone,
+    onCancel = onDone,
+}: {
+    d: EventDetail;
+    onDone: () => void;
+    onCancel?: () => void;
+}) {
     const hardBlockers = d.close_readiness.hard_blockers;
     const exceptionalBlockers = d.close_readiness.exceptional_blockers;
     const now = Date.now();
@@ -1196,7 +3484,7 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={onDone}
+                            onClick={onCancel}
                         >
                             Cancel
                         </Button>
@@ -1488,9 +3776,11 @@ function ClosureExceptionRecord({
 function AcceptHandoverPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{ owner_user_id: string; acceptance_notes: string }>({
         owner_user_id: '',
@@ -1542,7 +3832,7 @@ function AcceptHandoverPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -1556,9 +3846,11 @@ function AcceptHandoverPane({
 function WorksafeDecisionPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const revising = d.worksafe.decision_signed;
     const completedNotification =
@@ -1792,7 +4084,7 @@ function WorksafeDecisionPane({
             </Field>
 
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={!canSubmit}>
@@ -1823,9 +4115,11 @@ function todayInput(): string {
 function WorksafeNotifyPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         notified_at: string;
@@ -1913,7 +4207,7 @@ function WorksafeNotifyPane({
             </label>
 
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -1927,9 +4221,11 @@ function WorksafeNotifyPane({
 function WorksafeAcknowledgePane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{ acknowledged_at: string }>({
         acknowledged_at: todayInput(),
@@ -1969,7 +4265,7 @@ function WorksafeAcknowledgePane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -1983,9 +4279,11 @@ function WorksafeAcknowledgePane({
 function WorksafeSitePreservationPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm({
         required:
@@ -2044,7 +4342,7 @@ function WorksafeSitePreservationPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button
@@ -2065,9 +4363,11 @@ function WorksafeSitePreservationPane({
 function WorksafeSiteReleasePane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm({
         released_at: todayInput(),
@@ -2117,7 +4417,7 @@ function WorksafeSiteReleasePane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button
@@ -2139,10 +4439,12 @@ function PaneRenderer({
     pane,
     d,
     onDone,
+    onCancel = onDone,
 }: {
     pane: ActivePane;
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const inv =
         'investigationId' in pane
@@ -2154,44 +4456,97 @@ function PaneRenderer({
             ? (d.corrective_actions.find((a) => a.id === pane.actionId) ?? null)
             : null;
 
+    if (!canOpenPane(pane, d)) {
+        return (
+            <div className="space-y-4">
+                <InfoCard icon={ShieldAlert} tone="warn">
+                    This action is unavailable for the current record or your
+                    access. Review its current status before continuing.
+                </InfoCard>
+                <Button variant="outline" onClick={onCancel}>
+                    Return to review
+                </Button>
+            </div>
+        );
+    }
+
     switch (pane.kind) {
         case 'close':
-            return <CloseEventPane d={d} onDone={onDone} />;
+            return <CloseEventPane d={d} onDone={onDone} onCancel={onCancel} />;
         case 'accept_handover':
-            return <AcceptHandoverPane d={d} onDone={onDone} />;
+            return (
+                <AcceptHandoverPane d={d} onDone={onDone} onCancel={onCancel} />
+            );
         case 'worksafe_decision':
             return d.worksafe.can_decide ? (
-                <WorksafeDecisionPane d={d} onDone={onDone} />
+                <WorksafeDecisionPane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'worksafe_notify':
             return d.worksafe.can_notify ? (
-                <WorksafeNotifyPane d={d} onDone={onDone} />
+                <WorksafeNotifyPane d={d} onDone={onDone} onCancel={onCancel} />
             ) : null;
         case 'worksafe_acknowledge':
             return d.worksafe.can_acknowledge ? (
-                <WorksafeAcknowledgePane d={d} onDone={onDone} />
+                <WorksafeAcknowledgePane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'worksafe_site_preservation':
             return d.worksafe.can_review_site_preservation ? (
-                <WorksafeSitePreservationPane d={d} onDone={onDone} />
+                <WorksafeSitePreservationPane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'worksafe_site_release':
             return d.worksafe.can_release_site_preservation ? (
-                <WorksafeSiteReleasePane d={d} onDone={onDone} />
+                <WorksafeSiteReleasePane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'inv_start':
-            return <StartInvestigationPane d={d} onDone={onDone} />;
+            return (
+                <StartInvestigationPane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
+            );
         case 'inv_findings':
             return inv ? (
-                <RecordFindingsPane d={d} inv={inv} onDone={onDone} />
+                <RecordFindingsPane
+                    d={d}
+                    inv={inv}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'inv_complete':
             return inv ? (
-                <CompleteInvestigationPane d={d} inv={inv} onDone={onDone} />
+                <CompleteInvestigationPane
+                    d={d}
+                    inv={inv}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'inv_return':
             return inv ? (
-                <ReturnInvestigationPane d={d} inv={inv} onDone={onDone} />
+                <ReturnInvestigationPane
+                    d={d}
+                    inv={inv}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'inv_disposition':
             return inv ? (
@@ -2200,21 +4555,43 @@ function PaneRenderer({
                     inv={inv}
                     recommendationIndex={pane.recommendationIndex}
                     onDone={onDone}
+                    onCancel={onCancel}
                 />
             ) : null;
         case 'ca_add':
-            return <AddCorrectiveActionPane d={d} onDone={onDone} />;
+            return (
+                <AddCorrectiveActionPane
+                    d={d}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
+            );
         case 'ca_complete':
             return ca ? (
-                <CompleteActionPane d={d} ca={ca} onDone={onDone} />
+                <CompleteActionPane
+                    d={d}
+                    ca={ca}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'ca_verify':
             return ca ? (
-                <VerifyActionPane d={d} ca={ca} onDone={onDone} />
+                <VerifyActionPane
+                    d={d}
+                    ca={ca}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
         case 'ca_return':
             return ca ? (
-                <ReturnActionPane d={d} ca={ca} onDone={onDone} />
+                <ReturnActionPane
+                    d={d}
+                    ca={ca}
+                    onDone={onDone}
+                    onCancel={onCancel}
+                />
             ) : null;
     }
 }
@@ -2404,9 +4781,11 @@ function RecommendationEditor({
 function StartInvestigationPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         methodology: string;
@@ -2472,7 +4851,7 @@ function StartInvestigationPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -2487,10 +4866,12 @@ function RecordFindingsPane({
     d,
     inv,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     inv: EventInvestigation;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         findings_summary: string;
@@ -2607,7 +4988,7 @@ function RecordFindingsPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -2622,10 +5003,12 @@ function CompleteInvestigationPane({
     d,
     inv,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     inv: EventInvestigation;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm({});
     const isReviewDecision = inv.status === 'under_review';
@@ -2668,7 +5051,7 @@ function CompleteInvestigationPane({
                     : 'Approval records your authenticated decision. You must be different from the investigation submitter, team and recorded reviewer.'}
             </InfoCard>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -2685,10 +5068,12 @@ function ReturnInvestigationPane({
     d,
     inv,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     inv: EventInvestigation;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{ review_notes: string }>({ review_notes: '' });
 
@@ -2731,7 +5116,7 @@ function ReturnInvestigationPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -2852,11 +5237,13 @@ function RecommendationDispositionPane({
     inv,
     recommendationIndex,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     inv: EventInvestigation;
     recommendationIndex: number;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const recommendation = inv.recommendations?.[recommendationIndex];
     const current = recommendation?.disposition;
@@ -2926,6 +5313,7 @@ function RecommendationDispositionPane({
                     recommendation={recommendation}
                     handover={d.action_handover}
                     onDone={onDone}
+                    onCancel={onCancel}
                 />
             ) : (
                 <form onSubmit={submit} className="flex flex-col gap-4">
@@ -2950,7 +5338,7 @@ function RecommendationDispositionPane({
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={onDone}
+                            onClick={onCancel}
                         >
                             Cancel
                         </Button>
@@ -2969,7 +5357,7 @@ function RecommendationDispositionPane({
             )}
             {raisesAction && current?.corrective_action ? (
                 <div className="flex justify-end">
-                    <Button type="button" variant="outline" onClick={onDone}>
+                    <Button type="button" variant="outline" onClick={onCancel}>
                         Done
                     </Button>
                 </div>
@@ -2989,9 +5377,11 @@ const ACTION_TYPES = [
 function AddCorrectiveActionPane({
     d,
     onDone,
+    onCancel = onDone,
 }: {
     d: EventDetail;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         title: string;
@@ -3108,7 +5498,7 @@ function AddCorrectiveActionPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button
@@ -3130,15 +5520,18 @@ function AddCorrectiveActionPane({
     );
 }
 
-function CompleteActionPane({
+export function CompleteActionPane({
     d,
     ca,
     onDone,
+    onCancel = onDone,
 }: {
-    d: EventDetail;
+    d: Pick<EventDetail, 'id'>;
     ca: EventCorrectiveAction;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
+    const [evidenceBusy, setEvidenceBusy] = useState(false);
     const form = useForm<{ completion_notes: string }>({
         completion_notes: '',
     });
@@ -3182,19 +5575,25 @@ function CompleteActionPane({
                     placeholder="Describe the evidence that this action is complete."
                 />
             </Field>
-            <ActionEvidencePanel d={d} ca={ca} allowUpload />
+            <ActionEvidencePanel
+                d={d}
+                ca={ca}
+                allowUpload
+                onBusyChange={setEvidenceBusy}
+            />
             <InfoCard icon={ShieldCheck} tone="info">
                 A different person must verify this action — separation of
                 duties.
             </InfoCard>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button
                     type="submit"
                     disabled={
                         form.processing ||
+                        evidenceBusy ||
                         (!form.data.completion_notes.trim() &&
                             ca.evidence.attachments.length === 0 &&
                             ca.evidence.legacy_paths.length === 0)
@@ -3216,19 +5615,40 @@ type EvidenceUploadState = {
     status: 'queued' | 'uploading' | 'uploaded' | 'failed';
 };
 
-function ActionEvidencePanel({
+export function ActionEvidencePanel({
     d,
     ca,
     allowUpload = false,
     allowRemove = true,
+    onBusyChange,
 }: {
-    d: EventDetail;
+    d: Pick<EventDetail, 'id'>;
     ca: EventCorrectiveAction;
     allowUpload?: boolean;
     allowRemove?: boolean;
+    onBusyChange?: (busy: boolean) => void;
 }) {
     const [description, setDescription] = useState('');
     const [uploads, setUploads] = useState<EvidenceUploadState[]>([]);
+    const mounted = useRef(true);
+    const busy = uploads.some((upload) =>
+        ['queued', 'uploading'].includes(upload.status),
+    );
+    useSafetyDraftState({
+        dirty:
+            description !== '' ||
+            uploads.some((upload) => upload.status !== 'uploaded'),
+        busy,
+    });
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
+    useEffect(() => {
+        onBusyChange?.(busy);
+    }, [onBusyChange, busy]);
     const evidence = ca.evidence;
     const base = `/health-safety/events/${d.id}/corrective-actions/${ca.id}/evidence`;
 
@@ -3244,6 +5664,9 @@ function ActionEvidencePanel({
     };
 
     const uploadFiles = (files: File[]) => {
+        if (!files.length || busy) return;
+        let cancelled = false;
+        let batchFailed = false;
         const selectionId = `${Date.now()}-${Math.random()}`;
         const queue = files.map((file, index) => ({
             file,
@@ -3260,8 +5683,15 @@ function ActionEvidencePanel({
         ]);
 
         const uploadNext = (index: number) => {
+            if (!mounted.current || cancelled) return;
             const item = queue[index];
-            if (!item) return;
+            if (!item) {
+                if (!batchFailed)
+                    setDescription((current) =>
+                        current === description ? '' : current,
+                    );
+                return;
+            }
             updateUpload(item.key, 'uploading');
 
             router.post(
@@ -3279,9 +5709,29 @@ function ActionEvidencePanel({
                             (page.props as { flash?: { error?: string } }).flash
                                 ?.error,
                         );
+                        batchFailed ||= failed;
                         updateUpload(item.key, failed ? 'failed' : 'uploaded');
                     },
-                    onError: () => updateUpload(item.key, 'failed'),
+                    onError: () => {
+                        batchFailed = true;
+                        updateUpload(item.key, 'failed');
+                    },
+                    onCancel: () => {
+                        cancelled = true;
+                        if (mounted.current)
+                            setUploads((current) =>
+                                current.map((upload) =>
+                                    queue.some(
+                                        (item) => item.key === upload.key,
+                                    ) &&
+                                    ['queued', 'uploading'].includes(
+                                        upload.status,
+                                    )
+                                        ? { ...upload, status: 'failed' }
+                                        : upload,
+                                ),
+                            );
+                    },
                     onFinish: () => uploadNext(index + 1),
                 },
             );
@@ -3326,10 +5776,10 @@ function ActionEvidencePanel({
                     {evidence.attachments.map((attachment) => (
                         <li
                             key={attachment.id}
-                            className="flex items-start justify-between gap-3 rounded-lg border border-border bg-background/70 p-2.5"
+                            className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background/70 p-2.5"
                         >
                             <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold">
+                                <p className="text-sm font-semibold [overflow-wrap:anywhere]">
                                     {attachment.original_name}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
@@ -3339,16 +5789,16 @@ function ActionEvidencePanel({
                                         : ''}
                                 </p>
                                 {attachment.description ? (
-                                    <p className="mt-1 text-xs text-foreground">
+                                    <p className="mt-1 text-xs [overflow-wrap:anywhere] text-foreground">
                                         {attachment.description}
                                     </p>
                                 ) : null}
                             </div>
-                            <div className="flex shrink-0 items-center gap-1">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <a
                                     href={attachment.download_url}
                                     aria-label={`Download ${attachment.original_name}`}
-                                    className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2 text-xs font-semibold text-primary hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                    className="frontline-tap inline-flex items-center gap-1 rounded-md border border-border px-2 text-xs font-semibold text-primary hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                                 >
                                     <ExternalLink className="h-3.5 w-3.5" />
                                     Download
@@ -3399,6 +5849,7 @@ function ActionEvidencePanel({
                         <input
                             aria-label="Add completion evidence"
                             type="file"
+                            disabled={busy}
                             accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
                             multiple
                             className="sr-only"
@@ -3442,14 +5893,18 @@ function ActionEvidencePanel({
     );
 }
 
-function VerifyActionPane({
+export function VerifyActionPane({
     d,
     ca,
     onDone,
+    onCancel = onDone,
 }: {
-    d: EventDetail;
+    d: Pick<EventDetail, 'id'> & {
+        can: Pick<EventDetail['can'], 'verify_corrective_actions'>;
+    };
     ca: EventCorrectiveAction;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{
         evidence_reviewed: boolean;
@@ -3592,7 +6047,7 @@ function VerifyActionPane({
                 ) : null}
             </VerificationSection>
             <VerificationSection title="Verifier decision">
-                <label className="flex items-start gap-2 text-sm text-foreground">
+                <label className="frontline-tap flex cursor-pointer items-start gap-2 text-sm text-foreground">
                     <input
                         type="checkbox"
                         checked={form.data.evidence_reviewed}
@@ -3608,7 +6063,7 @@ function VerifyActionPane({
                         Is the action effective?
                     </legend>
                     <div className="mt-2 flex flex-wrap gap-3">
-                        <label className="flex items-center gap-2 text-sm text-foreground">
+                        <label className="frontline-tap flex cursor-pointer items-center gap-2 text-sm text-foreground">
                             <input
                                 type="radio"
                                 name={`corrective-action-${ca.id}-effective`}
@@ -3618,7 +6073,7 @@ function VerifyActionPane({
                             />
                             Effective
                         </label>
-                        <label className="flex items-center gap-2 text-sm text-foreground">
+                        <label className="frontline-tap flex cursor-pointer items-center gap-2 text-sm text-foreground">
                             <input
                                 type="radio"
                                 name={`corrective-action-${ca.id}-effective`}
@@ -3652,7 +6107,7 @@ function VerifyActionPane({
                 </div>
             </VerificationSection>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing || !canVerify}>
@@ -3681,14 +6136,16 @@ function VerificationSection({
     );
 }
 
-function ReturnActionPane({
+export function ReturnActionPane({
     d,
     ca,
     onDone,
+    onCancel = onDone,
 }: {
-    d: EventDetail;
+    d: Pick<EventDetail, 'id'>;
     ca: EventCorrectiveAction;
     onDone: () => void;
+    onCancel?: () => void;
 }) {
     const form = useForm<{ reason: string }>({ reason: '' });
 
@@ -3726,7 +6183,7 @@ function ReturnActionPane({
                 />
             </Field>
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
@@ -4174,7 +6631,11 @@ function OverviewSection({
                 </ReviewCard>
             </div>
 
-            <OriginatingRecordCard source={d.source} />
+            <OriginatingRecordCard
+                source={d.source}
+                eventId={d.id}
+                restricted={d.linked_access?.incident === 'restricted'}
+            />
 
             {d.description ? (
                 <ReviewCard icon={FileText} title="What happened" span>
@@ -4203,6 +6664,8 @@ function OverviewSection({
 
 function HandoverSection({ d }: { d: EventDetail }) {
     const summary = d.handover_summary;
+    const incidentRestricted = d.linked_access?.incident === 'restricted';
+    const responseRestricted = d.linked_access?.control_room === 'restricted';
     return (
         <div className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -4210,31 +6673,59 @@ function HandoverSection({ d }: { d: EventDetail }) {
                 <ReviewCard icon={LinkIcon} title="Official references">
                     <ReviewRow
                         label="Incident"
-                        value={summary.incident_reference}
+                        value={
+                            incidentRestricted
+                                ? 'Access restricted'
+                                : summary.incident_reference
+                        }
                     />
                     <ReviewRow
                         label="Control Room alert"
-                        value={summary.alert_reference}
+                        value={
+                            responseRestricted
+                                ? 'Access restricted'
+                                : summary.alert_reference
+                        }
                     />
                     <ReviewRow label="Source" value={summary.source_label} />
                     <ReviewRow label="Site" value={summary.site_name} />
                 </ReviewCard>
-                <ReviewCard icon={UserIcon} title="People & consequence">
-                    <ReviewRow label="Reported by" value={summary.reporter} />
-                    <ReviewRow label="Witnesses" value={summary.witnesses} />
-                    <ReviewRow
-                        label="Potential consequence"
-                        value={summary.potential_consequence}
-                    />
-                </ReviewCard>
+                {!incidentRestricted ? (
+                    <ReviewCard icon={UserIcon} title="People & consequence">
+                        <ReviewRow
+                            label="Reported by"
+                            value={summary.reporter}
+                        />
+                        <ReviewRow
+                            label="Witnesses"
+                            value={summary.witnesses}
+                        />
+                        <ReviewRow
+                            label="Potential consequence"
+                            value={summary.potential_consequence}
+                        />
+                    </ReviewCard>
+                ) : null}
             </div>
 
             <ReviewCard icon={FileText} title="Handover narrative" span>
-                <HandoverText label="What happened" value={summary.narrative} />
-                <HandoverText
-                    label="Immediate controls"
-                    value={summary.immediate_controls}
-                />
+                {incidentRestricted ? (
+                    <p className="text-sm text-muted-foreground">
+                        A linked incident is recorded. Your access does not
+                        include its account or evidence.
+                    </p>
+                ) : (
+                    <>
+                        <HandoverText
+                            label="What happened"
+                            value={summary.narrative}
+                        />
+                        <HandoverText
+                            label="Immediate controls"
+                            value={summary.immediate_controls}
+                        />
+                    </>
+                )}
             </ReviewCard>
 
             {summary.next_action ? (
@@ -4269,7 +6760,9 @@ function HandoverSection({ d }: { d: EventDetail }) {
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        No attachments were handed over.
+                        {incidentRestricted
+                            ? 'Incident attachments are restricted.'
+                            : 'No attachments were handed over.'}
                     </p>
                 )}
             </ReviewCard>
@@ -4305,7 +6798,9 @@ function HandoverSection({ d }: { d: EventDetail }) {
                     ))
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        No incident follow-ups were recorded.
+                        {incidentRestricted
+                            ? 'Incident follow-ups are restricted.'
+                            : 'No incident follow-ups were recorded.'}
                     </p>
                 )}
             </ReviewCard>
@@ -4333,7 +6828,9 @@ function HandoverSection({ d }: { d: EventDetail }) {
                         </>
                     ) : (
                         <p className="text-sm text-muted-foreground">
-                            No playbook run was linked.
+                            {responseRestricted
+                                ? 'Control Room response details are restricted.'
+                                : 'No playbook run was linked.'}
                         </p>
                     )}
                 </ReviewCard>
@@ -4391,11 +6888,21 @@ function AttachmentRow({ attachment }: { attachment: EventAttachment }) {
 
 /** E-Gap 4 — two-way convergence. The resolver lands in Step 5; until then the
  *  card shows the origin reference as read-only information (never a broken jump). */
-function OriginatingRecordCard({ source }: { source: EventSource | null }) {
+function OriginatingRecordCard({
+    source,
+    eventId,
+    restricted = false,
+}: {
+    source: EventSource | null;
+    eventId: number;
+    restricted?: boolean;
+}) {
     if (!source) {
         return (
             <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                No originating record linked.
+                {restricted
+                    ? 'The originating incident is linked. Your access does not include its details.'
+                    : 'No originating record linked.'}
             </div>
         );
     }
@@ -4420,7 +6927,10 @@ function OriginatingRecordCard({ source }: { source: EventSource | null }) {
     if (source.url && !source.unwired) {
         return (
             <Link
-                href={source.url}
+                href={source.type === 'ClientIncident' && Number.isSafeInteger(source.id)
+                    && source.id > 0 && source.url === '/incidents/' + source.id
+                    ? incidentWorkspaceHref(source.id, '/health-safety/events/' + eventId + '?section=overview')
+                    : source.url}
                 className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50"
             >
                 {body}
@@ -4940,7 +7450,7 @@ function ActionsSection({
     canAct: boolean;
     onPane: (p: ActivePane) => void;
     /** Refs keyed by action id so a deep-linked card can be scrolled into view. */
-    rowRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
+    rowRefs: MutableRefObject<Record<number, HTMLElement | null>>;
     /** The action id to ring transiently after a deep-link (prompt E). */
     highlightActionId: number | null;
 }) {
@@ -5008,9 +7518,14 @@ function ActionsSection({
                         >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div className="min-w-0">
-                                    <p className="text-sm font-medium text-foreground">
+                                    <Link
+                                        href={correctiveActionHref(a.id, {
+                                            returnTo: `/health-safety/events/${d.id}?section=actions`,
+                                        })}
+                                        className="frontline-tap inline-flex items-center text-sm font-medium [overflow-wrap:anywhere] text-primary"
+                                    >
                                         {a.reference_number} · {a.title}
-                                    </p>
+                                    </Link>
                                     <p className="mt-0.5 text-xs text-muted-foreground">
                                         {a.assigned_to_name ?? 'Unassigned'}
                                         {a.due_date
@@ -5241,6 +7756,15 @@ function TimelineSection({ d }: { d: EventDetail }) {
 }
 
 function EvidenceSection({ d }: { d: EventDetail }) {
+    if (d.linked_access?.incident === 'restricted') {
+        return (
+            <EmptyState
+                icon={Paperclip}
+                title="Incident evidence restricted"
+                blurb="Your access does not include the linked incident's photos, documents or reports."
+            />
+        );
+    }
     if (!d.attachments.length) {
         return (
             <EmptyState

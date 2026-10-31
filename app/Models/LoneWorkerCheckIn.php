@@ -15,6 +15,8 @@ class LoneWorkerCheckIn extends Model
     protected $fillable = [
         'lone_worker_session_id',
         'checked_in_at',
+        'received_at',
+        'recorded_by_user_id',
         'location_lat',
         'location_lng',
         'status',
@@ -23,6 +25,7 @@ class LoneWorkerCheckIn extends Model
 
     protected $casts = [
         'checked_in_at' => 'datetime',
+        'received_at' => 'datetime',
         'location_lat' => 'decimal:7',
         'location_lng' => 'decimal:7',
     ];

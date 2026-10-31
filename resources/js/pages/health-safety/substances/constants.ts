@@ -2,6 +2,7 @@
  * Single source for the wizard, detail panes, register rows and site panel so
  * the field contracts never drift. NZ framing: HSNO classification, GHS
  * pictograms, WES exposure limits, Hazardous Substances Regulations 2017. */
+import { humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import {
     AlertTriangle,
     Ban,
@@ -142,7 +143,7 @@ export const SDS_STATE_META: Record<
     expiring: { label: 'Expiring', tone: 'warning', icon: Clock },
     expired: { label: 'Expired', tone: 'critical', icon: AlertTriangle },
     missing: { label: 'Missing', tone: 'critical', icon: Ban },
-    superseded: { label: 'Superseded', tone: 'neutral', icon: History },
+    superseded: { label: 'Replaced', tone: 'neutral', icon: History },
 };
 
 export const STATUS_META: Record<string, { label: string; tone: Tone }> = {
@@ -159,4 +160,20 @@ export function substanceRiskTone(
     if (sdsState === 'expired' || sdsState === 'missing') return 'critical';
     if (isControlled || sdsState === 'expiring') return 'warning';
     return 'success';
+}
+
+/* ── Chemical register and record (approved H&S drawings pg-hsn-125, 126 — Stephan 23 Oct 2026) ── */
+
+/** A reference's sheet state in plain words. A current sheet reads green; anything needing a person reads amber. */
+export const CHEMICAL_SHEET_LABELS: Record<string, string> = {
+    current: 'Current', expiring: 'Review due soon', expired: 'Review overdue', missing: 'No current sheet', unknown: 'Review date unknown',
+    ambiguous: 'Not sure which sheet is current', unavailable: 'File missing', not_yet_effective: 'Starts later', repair_required: 'Needs fixing',
+    superseded: 'Replaced',
+};
+export const chemicalSheetLabel = (state: string | null | undefined) => CHEMICAL_SHEET_LABELS[state ?? ''] ?? 'Status unknown';
+export const chemicalSheetTone = (state: string | null | undefined): Tone => (state === 'current' ? 'success' : state === 'superseded' ? 'neutral' : 'warning');
+/** A saved option value in its label ("liquid" → "Liquid"); an unlisted saved value is made readable, never snake_case. */
+export function optionLabel(options: Opt[], value: string | null | undefined, fallback = 'Not recorded'): string {
+    if (value === null || value === undefined || value === '') return fallback;
+    return options.find((option) => option.value === value)?.label ?? humaniseHsValue(value);
 }

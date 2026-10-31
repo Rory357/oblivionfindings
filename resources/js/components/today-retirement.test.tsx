@@ -49,7 +49,8 @@ const roles: {
     can: Record<string, unknown>;
     overview: boolean;
 }[] = [
-    { role: 'support_worker', can: {}, overview: false },
+    // Every role has an Overview workspace now (role Overview, Oct 2026).
+    { role: 'support_worker', can: {}, overview: true },
     {
         role: 'provider_manager',
         can: { shifts: { manageAny: true } },

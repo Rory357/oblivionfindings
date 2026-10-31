@@ -19,15 +19,17 @@ use Illuminate\Validation\ValidationException;
 class CoverageReservationService
 {
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_RELEASED = 'released';
+
     public const STATUS_FULFILLED = 'fulfilled';
+
     public const STATUS_EXPIRED = 'expired';
 
     public function __construct(
         protected ShiftCoverageService $coverage,
         protected UserSiteAccessService $siteAccess,
-    ) {
-    }
+    ) {}
 
     public function createQuickFillReservation(
         User $actor,
@@ -161,13 +163,14 @@ class CoverageReservationService
         return $reservation;
     }
 
-    public function fulfill(?CoverageReservation $reservation, ?Shift $shift = null, ?ShiftOpenPosition $position = null): void
+    public function fulfill(?CoverageReservation $reservation, ?Shift $shift = null, ?ShiftOpenPosition $position = null, ?\Closure $checkedUpdate = null): void
     {
         if (! $reservation) {
             return;
         }
 
-        $reservation->update([
+        $write = $checkedUpdate ?? static fn (CoverageReservation $model, array $values) => $model->update($values);
+        $write($reservation, [
             'status' => self::STATUS_FULFILLED,
             'shift_id' => $shift?->id ?? $reservation->shift_id,
             'shift_open_position_id' => $position?->id ?? $reservation->shift_open_position_id,
@@ -234,9 +237,9 @@ class CoverageReservationService
             ]);
     }
 
-    public function reserveForAssignment(Shift $shift, User $actor, string $reason = 'assignment'): ?CoverageReservation
+    public function reserveForAssignment(Shift $shift, User $actor, string $reason = 'assignment', ?\Closure $checkedCreate = null): ?CoverageReservation
     {
-        return $this->currentReservationMutation(function (CurrentAuthorizationReads $reads) use ($shift, $actor, $reason): ?CoverageReservation {
+        return $this->currentReservationMutation(function (CurrentAuthorizationReads $reads) use ($shift, $actor, $reason, $checkedCreate): ?CoverageReservation {
             $shift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
             $shift->setRelation('client', $reads->query(Client::query()->whereKey($shift->client_id))->first());
             $coverage = $this->coverage->coverageStatusForShift($shift, current: true);
@@ -265,7 +268,9 @@ class CoverageReservationService
                 ]);
             }
 
-            return CoverageReservation::create([
+            $create = $checkedCreate ?? static fn (array $values) => CoverageReservation::create($values);
+
+            return $create([
                 'site_id' => $coverage['site_id'],
                 'coverage_requirement_id' => $coverage['rule_id'] ?? null,
                 'shift_id' => $shift->id,
@@ -393,7 +398,7 @@ class CoverageReservationService
     }
 
     /**
-     * @param array<string, mixed> $window
+     * @param  array<string, mixed>  $window
      */
     protected function availableSlotsForWindow(array $window, ?string $roleKey, ?CurrentAuthorizationReads $reads = null): int
     {
@@ -464,7 +469,7 @@ class CoverageReservationService
     }
 
     /**
-     * @param array<string, mixed> $window
+     * @param  array<string, mixed>  $window
      */
     protected function nextAvailableSlotKey(array $window, ?string $roleKey): ?string
     {

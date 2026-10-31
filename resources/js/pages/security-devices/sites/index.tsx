@@ -281,7 +281,7 @@ function SiteTechnologyList({
                 <PageHeader
                     icon={Building2}
                     title="Sites"
-                    subline="Technology health, monitoring coverage, findings, service work and collector state across your approved Sites."
+                    subline="Technology health, monitoring coverage, findings, service work and collector state across your approved Sites"
                     mobileSummary={`${summary.total} Sites · ${summary.requiring_attention} need attention`}
                     actions={
                         <PageHeaderSearch

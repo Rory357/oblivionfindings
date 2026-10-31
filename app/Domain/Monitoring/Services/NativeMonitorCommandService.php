@@ -3,6 +3,7 @@
 namespace App\Domain\Monitoring\Services;
 
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\NativeMonitorCommandReceipt;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -32,7 +33,7 @@ final readonly class NativeMonitorCommandService
         $uuid = strtolower((string) ($input['request_uuid'] ?? Str::uuid()));
         $expectedActor = (int) ($input['expected_actor_id'] ?? $claimed->id);
         $attributes = Arr::except($input, ['request_uuid', 'expected_actor_id', 'expected_site_id', 'expected_device_id', 'review_token']);
-        foreach (['device_id', 'profile_id', 'port', 'warn_days'] as $key) {
+        foreach (['device_id', 'collector_id', 'profile_id', 'port', 'warn_days'] as $key) {
             if (isset($attributes[$key])) {
                 $attributes[$key] = (int) $attributes[$key];
             }
@@ -150,7 +151,7 @@ final readonly class NativeMonitorCommandService
     {
         return DB::transaction(fn () => CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($claimed, $expectedActor, $monitorId, $deviceId, $action): array {
             $monitor = $monitorId === null ? null : Monitor::query()->useWritePdo()->whereKey($monitorId)
-                ->whereNull('collector_id')->whereIn('kind', NativeMonitoringDefinitionService::directKindValues())->lockForUpdate()->firstOrFail();
+                ->whereIn('kind', NativeMonitoringDefinitionService::directKindValues())->lockForUpdate()->firstOrFail();
             $device = Device::query()->useWritePdo()->whereKey($monitor?->device_id ?? $deviceId)->lockForUpdate()->firstOrFail();
             $actor = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting((int) $claimed->id, ['*']);
             $this->assertManager($actor, $expectedActor);
@@ -159,6 +160,12 @@ final readonly class NativeMonitorCommandService
             $site = $this->sites->forCurrentEvidence($reads)->resolve((int) $device->id);
             abort_unless($site, 404, 'unavailable');
             $scope->assertCanViewSite($actor, $site);
+            if ($monitor?->collector_id !== null) {
+                $collector = $reads->query(MonitoringCollector::query()->useWritePdo())->whereKey($monitor->collector_id)->first();
+                if ($collector !== null) {
+                    $scope->assertCanViewSite($actor, (int) $collector->site_id);
+                }
+            }
 
             return $action($actor, $reads, $device, $monitor, $site);
         }), 3);
@@ -181,7 +188,12 @@ final readonly class NativeMonitorCommandService
         if (! $monitor || (int) $monitor->id !== $receipt->monitor_id) {
             $monitor = $reads->query(Monitor::query()->useWritePdo())->whereKey($receipt->monitor_id)->firstOrFail();
         }
-        abort_unless((int) $monitor->device_id === (int) $device->id && $monitor->collector_id === null, 404, 'unavailable');
+        abort_unless(
+            (int) $monitor->device_id === (int) $device->id
+            && in_array($monitor->kind?->value ?? (string) $monitor->kind, NativeMonitoringDefinitionService::directKindValues(), true),
+            404,
+            'unavailable',
+        );
 
         return ['monitor' => $receipt->saved_snapshot, 'current_monitor' => [...$this->safeMonitor($monitor), 'review_token' => $this->reviewToken($monitor, $site)],
             'receipt' => ['schema_version' => 1, 'owner' => 'Native monitoring', 'request_uuid' => $receipt->request_uuid,
@@ -195,10 +207,17 @@ final readonly class NativeMonitorCommandService
 
     public function safeMonitor(Monitor $monitor): array
     {
-        return ['id' => (int) $monitor->id, 'name' => $monitor->name,
-            'kind' => $monitor->kind?->value ?? (string) $monitor->kind, 'device_id' => (int) $monitor->device_id,
-            'profile_id' => (int) $monitor->profile_id, 'collection_mode' => 'central_direct',
-            'enabled' => (bool) $monitor->is_enabled, 'affects_availability' => (bool) $monitor->affects_availability];
+        return [
+            'id' => (int) $monitor->id,
+            'name' => $monitor->name,
+            'kind' => $monitor->kind?->value ?? (string) $monitor->kind,
+            'device_id' => (int) $monitor->device_id,
+            'profile_id' => (int) $monitor->profile_id,
+            'collection_mode' => $monitor->collector_id === null ? 'central_direct' : 'remote_collector',
+            ...($monitor->collector_id === null ? [] : ['collector_id' => (int) $monitor->collector_id]),
+            'enabled' => (bool) $monitor->is_enabled,
+            'affects_availability' => (bool) $monitor->affects_availability,
+        ];
     }
 
     /** Opaque optimistic token. It is never an authorization credential or a public definition hash. */

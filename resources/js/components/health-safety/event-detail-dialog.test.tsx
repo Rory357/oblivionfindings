@@ -4,6 +4,7 @@ import {
     fireEvent,
     render,
     screen,
+    within,
 } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +13,9 @@ const inertia = vi.hoisted(() => ({
     post: vi.fn(),
     routerPost: vi.fn(),
     routerDelete: vi.fn(),
+    visit: vi.fn(),
+    on: vi.fn(() => vi.fn()),
+    outcome: 'success' as 'success' | 'validation-error' | 'flash-error',
 }));
 
 vi.mock('@inertiajs/react', async () => {
@@ -33,18 +37,26 @@ vi.mock('@inertiajs/react', async () => {
         router: {
             post: inertia.routerPost,
             delete: inertia.routerDelete,
+            on: inertia.on,
+            visit: inertia.visit,
         },
         usePage: () => ({ props: { flash: {} } }),
         useForm: <T extends Record<string, unknown>>(initial: T) => {
             const [data, setDataState] = React.useState(initial);
+            const defaults = React.useRef(initial);
+            const [errors, setErrors] = React.useState<Record<string, string>>(
+                {},
+            );
             const transform = React.useRef<
                 ((current: T) => Record<string, unknown>) | null
             >(null);
 
             return {
                 data,
-                errors: {},
+                errors,
                 processing: false,
+                isDirty:
+                    JSON.stringify(defaults.current) !== JSON.stringify(data),
                 transform: (
                     callback: (current: T) => Record<string, unknown>,
                 ) => {
@@ -60,7 +72,23 @@ vi.mock('@inertiajs/react', async () => {
                         url,
                         transform.current ? transform.current(data) : data,
                     );
-                    options.onSuccess?.({ props: { flash: {} } });
+                    if (inertia.outcome === 'validation-error') {
+                        setErrors({
+                            acceptance_notes:
+                                'The review changed. Refresh its status before retrying.',
+                        });
+                    } else {
+                        options.onSuccess?.({
+                            props: {
+                                flash:
+                                    inertia.outcome === 'flash-error'
+                                        ? {
+                                              error: 'Review could not be saved.',
+                                          }
+                                        : {},
+                            },
+                        });
+                    }
                 },
                 reset: vi.fn(),
                 clearErrors: vi.fn(),
@@ -114,6 +142,7 @@ vi.mock('@/components/wizard/shell', async () => {
 
 import {
     EventDetailDialog,
+    EventRecordWorkspace,
     type EventActionKey,
     type EventDetail,
 } from './event-detail-dialog';
@@ -538,10 +567,556 @@ beforeEach(() => {
     inertia.post.mockReset();
     inertia.routerPost.mockReset();
     inertia.routerDelete.mockReset();
+    inertia.visit.mockReset();
+    inertia.on.mockClear();
+    inertia.outcome = 'success';
 });
 afterEach(cleanup);
 
+describe('Permanent safety review workspace', () => {
+    it('shows one plain WorkSafe line while the decision is missing, keeping every check in the count', () => {
+        const blocked = (key: string, label: string) => ({
+            key,
+            complete: false,
+            label,
+            href: '/health-safety/events/17?action=worksafe-decision',
+        });
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    close_gate: {
+                        allowed: false,
+                        requirements: [
+                            {
+                                key: 'hs_acceptance',
+                                complete: true,
+                                label: 'H&S handover accepted where required',
+                                href: '/health-safety/events/17?action=accept-handover',
+                            },
+                            blocked('worksafe_decision', 'Record the WorkSafe notifiability decision before closing this event.'),
+                            blocked('worksafe_notification', 'Record the signed WorkSafe decision before confirming notification requirements.'),
+                            blocked('worksafe_acknowledgement', 'Record the signed WorkSafe decision before confirming acknowledgement requirements.'),
+                            blocked('site_preservation', 'Record the signed WorkSafe decision before confirming Site-preservation requirements.'),
+                        ],
+                    },
+                })}
+                returnHref="/health-safety/events"
+            />,
+        );
+        // All five checks still count …
+        expect(
+            screen.getByRole('heading', { name: 'To close: 1 of 5 done' }),
+        ).toBeInTheDocument();
+        // … but the three that depend on the decision show as one plain line.
+        expect(
+            screen.getByRole('link', {
+                name: 'Record the WorkSafe decision first. The other WorkSafe steps depend on it.',
+            }),
+        ).toHaveAttribute('href', '/health-safety/events/17?action=worksafe-decision');
+        expect(screen.queryByText(/before confirming/)).toBeNull();
+    });
+
+    it('renders a real record page with linked summaries and section navigation', () => {
+        const onSectionChange = vi.fn();
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail()}
+                returnHref="/health-safety/events?site_id=3"
+                onSectionChange={onSectionChange}
+            />,
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        // The record header (pg-hsn-41): the category and who it concerns, the reference in the sub-line.
+        expect(
+            screen.getByRole('heading', {
+                level: 1,
+                name: 'Incident — Kauri House',
+            }),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/HS-2026-0017 · Kauri House/)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /Back/ })).toHaveAttribute(
+            'href',
+            '/health-safety/events?site_id=3',
+        );
+        expect(
+            screen.getByRole('tabpanel', { name: 'Overview' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { name: 'Owner' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { name: 'To close: 3 of 5 done' }),
+        ).toBeInTheDocument();
+        // Every closure blocker keeps its server wording and its direct link.
+        expect(
+            screen.getByRole('link', {
+                name: 'Accept the H&S handover before closing this event.',
+            }),
+        ).toHaveAttribute(
+            'href',
+            '/health-safety/events/17?action=accept-handover',
+        );
+        fireEvent.click(screen.getByRole('tab', { name: 'Investigation' }));
+        expect(onSectionChange).toHaveBeenCalledWith('investigation');
+        expect(inertia.post).not.toHaveBeenCalled();
+    });
+
+    it('offers each event action once in the record header and opens its pane without posting', () => {
+        const onPaneChange = vi.fn();
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail()}
+                onPaneChange={onPaneChange}
+            />,
+        );
+        // Accept handover is the one primary; the signed decision update stays reachable under More.
+        expect(
+            screen.getAllByRole('button', { name: 'Accept handover' }),
+        ).toHaveLength(1);
+        expect(
+            screen.getByRole('button', { name: 'Close safety review' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', {
+                name: 'More safety review actions',
+            }),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Accept handover' }),
+        );
+        expect(
+            screen.getByRole('textbox', { name: /Acceptance notes/ }),
+        ).toBeInTheDocument();
+        expect(onPaneChange).toHaveBeenCalledWith(
+            { kind: 'accept_handover' },
+            'overview',
+        );
+        expect(inertia.post).not.toHaveBeenCalled();
+    });
+
+    it('tells a read-only viewer the next step without offering decisions', () => {
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    can: {
+                        manage: false,
+                        close: false,
+                        request_closure_exception: false,
+                        approve_closure_exception: false,
+                        manage_corrective_action_lifecycle: false,
+                        verify_corrective_actions: false,
+                    },
+                    worksafe: { can_decide: false },
+                    handover: {
+                        status: 'accepted',
+                        owner: { id: 8, name: 'Moana Rangi' },
+                        accepted_by: { id: 9, name: 'Tama Lewis' },
+                        accepted_at: '2026-07-14T02:15:00Z',
+                        notes: null,
+                        can_accept: false,
+                    },
+                } as EventDetailOverrides)}
+            />,
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Next step' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'You can read this review. Specialist decisions show here if you’re allowed to make them.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Accept handover' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Close safety review' }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('drives a corrective action from the review table menu through its pane, never in one click', () => {
+        const onPaneChange = vi.fn();
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    corrective_actions: [
+                        {
+                            id: 62,
+                            reference_number: 'CA-2026-0062',
+                            title: 'Fit the new bathroom rail.',
+                            action_type: 'corrective',
+                            priority: 'high',
+                            status: 'in_progress',
+                            assigned_to_name: 'Moana Rangi',
+                            owner: { id: 8, name: 'Moana Rangi' },
+                            due_date: '2026-07-21',
+                            is_overdue: false,
+                            completed_at: null,
+                            completed_by_user_id: null,
+                            completed_by_name: null,
+                            can_verify: false,
+                            verified_at: null,
+                            verified_by_name: null,
+                            effectiveness_confirmed: null,
+                            hs_investigation_id: null,
+                            recommendation_index: null,
+                            recommendation: null,
+                            source: { type: 'standalone' },
+                            source_task: null,
+                            evidence: {
+                                can_upload: true,
+                                completion_notes: null,
+                                legacy_paths: [],
+                                completed_by: null,
+                                completed_at: null,
+                                load_state: 'loaded',
+                                attachments: [],
+                            },
+                            rework: { latest_reason: null },
+                            history: [],
+                        },
+                    ],
+                })}
+                initialSection="actions"
+                onPaneChange={onPaneChange}
+            />,
+        );
+        expect(
+            screen.getByRole('link', { name: 'Fit the new bathroom rail.' }),
+        ).toHaveAttribute(
+            'href',
+            expect.stringContaining('/health-safety/corrective-actions/62'),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Options for CA-2026-0062' }),
+        );
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: /Mark complete/ }),
+        );
+        expect(onPaneChange).toHaveBeenCalledWith(
+            { kind: 'ca_complete', actionId: 62 },
+            'actions',
+        );
+        expect(
+            screen.getByRole('textbox', { name: /What was done/ }),
+        ).toBeInTheDocument();
+        expect(inertia.post).not.toHaveBeenCalled();
+        expect(inertia.routerPost).not.toHaveBeenCalled();
+    });
+
+    it('keeps entered acceptance notes when the user cancels leaving, then discards only on confirmation', () => {
+        const onPaneChange = vi.fn();
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail()}
+                initialAction="accept_handover"
+                onPaneChange={onPaneChange}
+            />,
+        );
+        const notes = screen.getByRole('textbox', { name: /Acceptance notes/ });
+        fireEvent.change(notes, {
+            target: { value: 'Keep this unsaved handover.' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        const confirmation = screen.getByRole('alertdialog');
+        expect(
+            within(confirmation).getByText('Discard unsaved safety work?'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            within(confirmation).getByRole('button', { name: 'Cancel' }),
+        );
+        expect(notes).toHaveValue('Keep this unsaved handover.');
+        expect(onPaneChange).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard and continue' }),
+        );
+        expect(
+            screen.queryByRole('textbox', { name: /Acceptance notes/ }),
+        ).not.toBeInTheDocument();
+        expect(onPaneChange).toHaveBeenCalledWith(null, 'overview');
+        expect(inertia.post).not.toHaveBeenCalled();
+    });
+
+    it('protects a dirty form when changing sections or leaving through a link', () => {
+        const onSectionChange = vi.fn();
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail()}
+                initialAction="accept_handover"
+                onSectionChange={onSectionChange}
+            />,
+        );
+        fireEvent.change(
+            screen.getByRole('textbox', { name: /Acceptance notes/ }),
+            { target: { value: 'A draft for the incoming reviewer.' } },
+        );
+        fireEvent.click(screen.getByRole('tab', { name: 'Handover' }));
+        expect(onSectionChange).not.toHaveBeenCalled();
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Cancel',
+            }),
+        );
+        const before = inertia.on.mock.calls
+            .filter((call) => (call as unknown[])[0] === 'before')
+            .at(-1) as unknown as [string, (event: unknown) => void];
+        const event = {
+            preventDefault: vi.fn(),
+            detail: { visit: { method: 'get', url: '/incidents/42' } },
+        };
+        act(() => before[1](event));
+        expect(event.preventDefault).toHaveBeenCalled();
+        expect(inertia.visit).not.toHaveBeenCalled();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard and continue' }),
+        );
+        expect(inertia.visit).toHaveBeenCalledWith(
+            '/incidents/42',
+            event.detail.visit,
+        );
+    });
+
+    it('retains notes after validation fails and permits a successful retry without a discard prompt', () => {
+        const onPaneChange = vi.fn();
+        inertia.outcome = 'validation-error';
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail()}
+                initialAction="accept_handover"
+                onPaneChange={onPaneChange}
+            />,
+        );
+        fireEvent.change(
+            screen.getByRole('textbox', { name: /Acceptance notes/ }),
+            { target: { value: 'Accepted for follow-up by the safety lead.' } },
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Accept handover' }),
+        );
+        expect(
+            screen.getByText(
+                'The review changed. Refresh its status before retrying.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('textbox', { name: /Acceptance notes/ }),
+        ).toHaveValue('Accepted for follow-up by the safety lead.');
+        expect(onPaneChange).not.toHaveBeenCalled();
+        inertia.outcome = 'success';
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Accept handover' }),
+        );
+        expect(onPaneChange).toHaveBeenCalledWith(null, 'overview');
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('textbox', { name: /Acceptance notes/ }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('allows an inbox-only background refresh but protects record reloads and navigation', () => {
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail()}
+                initialAction="accept_handover"
+            />,
+        );
+        fireEvent.change(
+            screen.getByRole('textbox', { name: /Acceptance notes/ }),
+            {
+                target: {
+                    value: 'Keep my review draft while the inbox polls.',
+                },
+            },
+        );
+        const before = inertia.on.mock.calls
+            .filter((call) => (call as unknown[])[0] === 'before')
+            .at(-1) as unknown as [string, (event: unknown) => void];
+        const inbox = {
+            method: 'get',
+            url: new URL(window.location.href),
+            only: ['inbox'],
+            reset: [],
+            preserveState: true,
+            async: true,
+        };
+        const poll = { preventDefault: vi.fn(), detail: { visit: inbox } };
+        act(() => before[1](poll));
+        expect(poll.preventDefault).not.toHaveBeenCalled();
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        for (const changes of [
+            { only: ['detail'] },
+            { reset: ['detail'] },
+            { preserveState: false },
+            { url: new URL('/incidents/42', window.location.href) },
+        ]) {
+            const attempt = {
+                preventDefault: vi.fn(),
+                detail: { visit: { ...inbox, ...changes } },
+            };
+            act(() => before[1](attempt));
+            expect(attempt.preventDefault).toHaveBeenCalled();
+            fireEvent.click(
+                within(screen.getByRole('alertdialog')).getByRole('button', {
+                    name: 'Cancel',
+                }),
+            );
+        }
+        expect(
+            screen.getByRole('textbox', { name: /Acceptance notes/ }),
+        ).toHaveValue('Keep my review draft while the inbox polls.');
+    });
+
+    it('does not discard another workflow draft when unrelated capabilities refresh', () => {
+        const detail = eventDetail();
+        const { rerender } = render(
+            <EventRecordWorkspace
+                detail={detail}
+                initialAction="accept_handover"
+            />,
+        );
+        fireEvent.change(
+            screen.getByRole('textbox', { name: /Acceptance notes/ }),
+            { target: { value: 'Retain while other facts refresh.' } },
+        );
+        rerender(
+            <EventRecordWorkspace
+                detail={{
+                    ...detail,
+                    worksafe: { ...detail.worksafe, can_decide: false },
+                }}
+                initialAction="accept_handover"
+            />,
+        );
+        expect(
+            screen.getByRole('textbox', { name: /Acceptance notes/ }),
+        ).toHaveValue('Retain while other facts refresh.');
+    });
+
+    it.each([
+        { kind: 'inv_findings', investigationId: 999 },
+        { kind: 'ca_verify', actionId: 999 },
+    ] as const)(
+        'shows a truthful unavailable state for an unrelated target: $kind',
+        (pane) => {
+            render(
+                <EventRecordWorkspace
+                    detail={eventDetail()}
+                    initialPane={pane}
+                />,
+            );
+            expect(
+                screen.getByText(
+                    /This action is unavailable for the current record or your access/,
+                ),
+            ).toBeInTheDocument();
+            expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Return to review' }),
+            );
+            expect(
+                screen.queryByText(/This action is unavailable/),
+            ).not.toBeInTheDocument();
+            expect(inertia.post).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(['investigation', 'add_action'] as const)(
+        'does not expose a manager form through the %s URL',
+        (action) => {
+            render(
+                <EventRecordWorkspace
+                    detail={eventDetail({ can: { manage: false } })}
+                    initialAction={action}
+                />,
+            );
+            expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+            expect(inertia.post).not.toHaveBeenCalled();
+        },
+    );
+});
+
 describe('EventDetailDialog control-room handover', () => {
+    it('shows restricted source states instead of claiming the incident or its evidence is missing', () => {
+        const detail = eventDetail();
+        detail.source = null;
+        detail.description = null;
+        detail.control_room_alert = null;
+        detail.attachments = [];
+        detail.incident_followups = [];
+        detail.linked_access = {
+            incident: 'restricted',
+            control_room: 'restricted',
+        };
+        detail.linked_operational_evidence = {
+            label: 'Linked Control Room evidence',
+            read_only: true,
+            access: 'restricted',
+            source: null,
+            notes: [],
+            tasks: [],
+            evidence_packs: [],
+            communications: [],
+        };
+        Object.assign(detail.handover_summary, {
+            incident_reference: null,
+            alert_reference: null,
+            narrative: null,
+            immediate_controls: null,
+            witnesses: null,
+            potential_consequence: null,
+            reporter: null,
+            source_label: null,
+            attachments: [],
+            control_room_evidence: [],
+            playbook: null,
+            communications: [],
+            operational_tasks: [],
+            next_action: null,
+        });
+        renderDialog(detail);
+        expect(
+            screen.getByText(/originating incident is linked/),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('No originating record linked.'),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /Handover/ }));
+        expect(
+            screen.getByText(
+                /Your access does not include its account or evidence/,
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Incident attachments are restricted.'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Incident follow-ups are restricted.'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Control Room response details are restricted.'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('No incident follow-ups were recorded.'),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText('INC-2026-0042')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('loading-bay-photo.jpg'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: /ALT-2026-0011/ }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Evidence Access restricted' }),
+        );
+        expect(
+            screen.getByText('Incident evidence restricted'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('No evidence attached'),
+        ).not.toBeInTheDocument();
+    });
+
     it('opens the acceptance pane from the server requirement deep link', () => {
         renderDialog(eventDetail(), 'accept_handover');
 
@@ -1599,6 +2174,24 @@ describe('EventDetailDialog corrective-action provenance', () => {
         );
 
         fireEvent.click(screen.getByRole('button', { name: /Mark complete/ }));
+        const evidenceDescription = screen.getByRole('textbox', {
+            name: /Evidence description/,
+        });
+        fireEvent.change(evidenceDescription, {
+            target: { value: 'Synthetic description before choosing a file.' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByRole('alertdialog')).toHaveTextContent(
+            'Discard unsaved safety work?',
+        );
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Cancel',
+            }),
+        );
+        expect(evidenceDescription).toHaveValue(
+            'Synthetic description before choosing a file.',
+        );
         const notes = screen.getByRole('textbox', { name: /What was done/ });
         fireEvent.change(notes, {
             target: { value: 'Installed and photographed the new rail.' },
@@ -1619,6 +2212,18 @@ describe('EventDetailDialog corrective-action provenance', () => {
         expect(
             screen.getByText('Queued contractor-sign-off.pdf'),
         ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Mark complete' }),
+        ).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByRole('alertdialog')).toHaveTextContent(
+            'Leave while safety work is saving?',
+        );
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Cancel',
+            }),
+        );
         expect(inertia.routerPost).toHaveBeenCalledWith(
             '/health-safety/events/17/corrective-actions/61/evidence',
             expect.objectContaining({ file }),
@@ -1628,13 +2233,31 @@ describe('EventDetailDialog corrective-action provenance', () => {
             }),
         );
         const uploadOptions = inertia.routerPost.mock.calls[0]?.[2] as
-            | { onError?: () => void }
+            | {
+                  onError?: () => void;
+                  onCancel?: () => void;
+                  onFinish?: () => void;
+              }
             | undefined;
         act(() => uploadOptions?.onError?.());
         expect(
             screen.getByText('Upload failed for wide-angle.jpg'),
         ).toBeInTheDocument();
         expect(notes).toHaveValue('Installed and photographed the new rail.');
+        act(() => {
+            uploadOptions?.onCancel?.();
+            uploadOptions?.onFinish?.();
+        });
+        expect(inertia.routerPost).toHaveBeenCalledTimes(1);
+        expect(
+            screen.queryByText('Queued contractor-sign-off.pdf'),
+        ).not.toBeInTheDocument();
+        expect(evidenceDescription).toHaveValue(
+            'Synthetic description before choosing a file.',
+        );
+        expect(
+            screen.getByRole('button', { name: 'Mark complete' }),
+        ).toBeEnabled();
     });
 
     it('lets an assigned non-manager owner reach the uploader without lifecycle controls', () => {
@@ -1913,5 +2536,18 @@ describe('EventDetailDialog corrective-action provenance', () => {
         expect(
             screen.queryByRole('button', { name: 'Return for rework' }),
         ).not.toBeInTheDocument();
+    });
+});
+
+describe('Safety review originating incident return', () => {
+    it('opens the canonical incident and returns to the actual safety review overview', () => {
+        const detail = eventDetail();
+        detail.source = { type: 'ClientIncident', id: 42, label: 'INC-2026-0042', url: '/incidents/42', unwired: false };
+        render(<EventRecordWorkspace detail={detail} initialSection="overview" />);
+        const origin = screen.getByRole('link', { name: /From INC-2026-0042/ });
+        const target = new URL(origin.getAttribute('href')!, 'https://example.invalid');
+        expect(target.pathname).toBe('/incidents/42');
+        expect(target.searchParams.get('return_to')).toBe(`/health-safety/events/${detail.id}?section=overview`);
+        expect(inertia.post).not.toHaveBeenCalled();
     });
 });

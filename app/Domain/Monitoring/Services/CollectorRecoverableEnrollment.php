@@ -115,7 +115,17 @@ final readonly class CollectorRecoverableEnrollment
             if ($site === null) {
                 throw new DomainException('Collector enrolment Site is unavailable.');
             }
-            $this->access->forCurrentEvidence($reads, 0)->assertCanViewSite($actor, (int) $site->id);
+            $access = $this->access->forCurrentEvidence($reads, 0);
+            $access->assertCanViewSite($actor, (int) $site->id);
+            $coveredIds = is_array($enrollment->intended_covered_site_ids) ? $enrollment->intended_covered_site_ids : [];
+            foreach ($coveredIds as $coveredSiteId) {
+                $coveredSite = $reads->query(Site::query())->whereKey((int) $coveredSiteId)->where('is_active', true)
+                    ->where(fn ($query) => $query->whereNull('archived')->orWhere('archived', false))->first();
+                if ($coveredSite === null) {
+                    throw new DomainException('Collector enrolment covered Site is unavailable.');
+                }
+                $access->assertCanViewSite($actor, (int) $coveredSite->id);
+            }
         });
     }
 

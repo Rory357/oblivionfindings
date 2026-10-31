@@ -31,8 +31,10 @@ vi.mock('@inertiajs/react', () => ({
         post: mocks.routerPost,
         visit: mocks.routerVisit,
         patch: mocks.routerPatch,
+        on: vi.fn(() => () => {}),
+        reload: vi.fn(),
     },
-    usePage: () => ({ props: mocks.props }),
+    usePage: () => ({ props: mocks.props, url: '/my-day' }),
 }));
 
 vi.mock('sonner', () => ({
@@ -92,7 +94,8 @@ vi.mock('./components/day-work-list', () => ({
     DayWorkList: () => <section data-testid="day-work" />,
 }));
 
-vi.mock('./components/digest-panel', () => ({
+vi.mock('./components/digest-panel', async (importOriginal) => ({
+    ...await importOriginal<typeof import('./components/digest-panel')>(),
     DigestPanel: () => <section data-testid="digest" />,
 }));
 

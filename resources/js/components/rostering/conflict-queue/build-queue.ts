@@ -582,7 +582,7 @@ export function buildQueue(
                 shift.location ?? shift.client_name ?? 'Open shift',
                 formatWindow(shift.starts_at, shift.ends_at, zone),
                 shifts,
-                'Open the shift to assign an eligible, available colleague or review its Job Board options. It remains open until a saved assignment is confirmed.',
+                'Open the shift to assign an eligible, available colleague or check it in Available shifts. It remains open until a saved assignment is confirmed.',
                 rosterAction(shifts),
             ),
         );
@@ -599,7 +599,7 @@ export function buildQueue(
             [
                 ...link(
                     'board',
-                    'Review Job Board',
+                    'Review in Available shifts',
                     row.can.view_job_board ? row.urls.job_board : null,
                 ),
                 ...rosterAction(shifts),

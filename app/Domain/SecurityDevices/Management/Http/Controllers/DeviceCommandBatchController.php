@@ -61,8 +61,16 @@ class DeviceCommandBatchController extends Controller
         DeviceCommandBatch $batch,
         DeviceCommandBatchPresenter $presenter,
     ): Response {
+        $asOf = now()->toImmutable();
+        $user = $request->user();
+
         return Inertia::render('security-devices/command-batches/show', [
-            'batch' => $presenter->present($request->user(), $batch),
+            'batch' => [
+                ...$presenter->present($user, $batch),
+                'actor_id' => (int) $user->id,
+                'as_of' => $asOf->toISOString(),
+                'requestedById' => (int) $batch->requested_by_user_id,
+            ],
         ]);
     }
 

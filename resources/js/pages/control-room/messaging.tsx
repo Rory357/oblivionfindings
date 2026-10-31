@@ -1,42 +1,52 @@
-import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
 import { ChatLauncher } from '@/components/chat/chat-launcher';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import { ControlRoomPage } from '@/components/control-room/control-room-page';
+import {
+    ControlRoomRowActions,
+    type ControlRoomRowAction,
+} from '@/components/control-room/control-room-row-actions';
+import {
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+} from '@/components/page';
+import { PopupCallout, PopupField, PopupForm } from '@/components/popup';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
-import { formatRelative, formatTime } from '@/lib/datetime';
-import { Head } from '@inertiajs/react';
+import { LoadingState } from '@/components/ui/loading-state';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Textarea } from '@/components/ui/textarea';
+import { SelectInput } from '@/components/wizard/primitives';
+import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Bell,
     Check,
     CheckCheck,
     MessageSquare,
     MessageSquarePlus,
+    MessagesSquare,
+    Plus,
     Send,
-    User,
 } from 'lucide-react';
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-
-// --- TypeScript Interfaces ---
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type FormEvent,
+    type KeyboardEvent,
+} from 'react';
 
 interface StaffMember {
     id: number;
@@ -73,29 +83,78 @@ interface Props {
     };
 }
 
-// --- Helpers ---
+type View = 'all' | 'alert' | 'direct';
 
-function getInitial(name: string): string {
-    return name.charAt(0).toUpperCase();
+function csrfToken(): string {
+    return (
+        document
+            .querySelector('meta[name="csrf-token"]')
+            ?.getAttribute('content') ?? ''
+    );
 }
 
-// --- Component ---
+function initials(name: string): string {
+    return name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('');
+}
 
+const SEND_FAILED = "The message wasn't sent. Check it and try again.";
+const SEND_UNCONFIRMED =
+    "We couldn't confirm the message was sent — the connection may have dropped. The conversation has been refreshed; check it before sending again.";
+
+/**
+ * Communications › Conversations — Control Room's messages to field staff,
+ * direct or linked to an alert, until the shared Chat becomes the place for
+ * them (Stephan, 23 Oct 2026). When the shared Chat is on, "Open Chat" goes
+ * there; this page never creates a second inbox for it.
+ */
 export default function ControlRoomMessaging({ threads, staff, can }: Props) {
+    const { chatSharedExperience } = usePage<{ chatSharedExperience?: boolean }>()
+        .props;
+
+    const [view, setView] = useState<View>('all');
+    const [unreadOnly, setUnreadOnly] = useState(false);
+    const [search, setSearch] = useState('');
+
     const [activeThread, setActiveThread] = useState<Thread | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [composeText, setComposeText] = useState('');
+    const [sendTo, setSendTo] = useState('');
     const [sending, setSending] = useState(false);
-    const [newConvoOpen, setNewConvoOpen] = useState(false);
-    const [newConvoUser, setNewConvoUser] = useState('');
-    const [newConvoAlertId, setNewConvoAlertId] = useState('');
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const [sendError, setSendError] = useState<string | null>(null);
 
-    const scrollToBottom = useCallback(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, []);
+    const [newOpen, setNewOpen] = useState(false);
+    const [newUser, setNewUser] = useState('');
+    const [newAlertId, setNewAlertId] = useState('');
+
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    const counts = useMemo(
+        () => ({
+            all: threads.length,
+            unread: threads.reduce((sum, thread) => sum + thread.unread_count, 0),
+            alert: threads.filter((thread) => thread.type === 'alert').length,
+            direct: threads.filter((thread) => thread.type === 'direct').length,
+        }),
+        [threads],
+    );
+
+    const visibleThreads = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return threads.filter(
+            (thread) =>
+                (view === 'all' || thread.type === view) &&
+                (!unreadOnly || thread.unread_count > 0) &&
+                (!q ||
+                    thread.title.toLowerCase().includes(q) ||
+                    thread.last_message.toLowerCase().includes(q)),
+        );
+    }, [threads, view, unreadOnly, search]);
 
     const fetchMessages = useCallback(
         async (thread: Thread) => {
@@ -116,93 +175,74 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                         },
                     },
                 );
-                if (response.ok) {
-                    const data = await response.json();
-                    setMessages(data.messages);
+                if (!response.ok) return;
+                const data = (await response.json()) as { messages: Message[] };
+                setMessages(data.messages);
 
-                    // Mark inbound unread messages as read
-                    if (can.manage) {
-                        for (const msg of data.messages) {
-                            if (
-                                msg.direction === 'inbound' &&
-                                !msg.delivered_at
-                            ) {
-                                fetch(
-                                    `/control-room/messaging/${msg.id}/read`,
-                                    {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            'X-Requested-With':
-                                                'XMLHttpRequest',
-                                            'X-CSRF-TOKEN':
-                                                document
-                                                    .querySelector(
-                                                        'meta[name="csrf-token"]',
-                                                    )
-                                                    ?.getAttribute('content') ??
-                                                '',
-                                        },
-                                    },
-                                );
-                            }
-                        }
-                    }
+                // Mark inbound unread messages as read.
+                if (can.manage) {
+                    const unread = data.messages.filter(
+                        (msg) => msg.direction === 'inbound' && !msg.delivered_at,
+                    );
+                    await Promise.all(
+                        unread.map((msg) =>
+                            fetch(`/control-room/messaging/${msg.id}/read`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'X-CSRF-TOKEN': csrfToken(),
+                                },
+                            }).catch(() => undefined),
+                        ),
+                    );
+                    if (unread.length)
+                        router.reload({ only: ['threads'], async: true });
                 }
             } catch {
-                // Silently fail on network errors for auto-refresh
+                // A failed background refresh keeps what is on screen.
             }
         },
         [can.manage],
     );
 
-    const selectThread = useCallback(
-        (thread: Thread) => {
+    const openThread = useCallback(
+        (thread: Thread, load = true) => {
             setActiveThread(thread);
             setMessages([]);
+            setSendError(null);
+            setSendTo(thread.user_id ? String(thread.user_id) : '');
+            if (!load) return;
             setLoadingMessages(true);
             fetchMessages(thread).finally(() => setLoadingMessages(false));
         },
         [fetchMessages],
     );
 
-    // Auto-refresh messages every 15 seconds for active thread
+    // Refresh the open conversation every 15 seconds.
     useEffect(() => {
-        if (refreshTimerRef.current) {
-            clearInterval(refreshTimerRef.current);
-            refreshTimerRef.current = null;
-        }
-
-        if (activeThread) {
-            refreshTimerRef.current = setInterval(() => {
-                fetchMessages(activeThread);
-            }, 15000);
-        }
-
-        return () => {
-            if (refreshTimerRef.current) {
-                clearInterval(refreshTimerRef.current);
-            }
-        };
+        if (!activeThread) return;
+        const timer = window.setInterval(() => {
+            if (!document.hidden) fetchMessages(activeThread);
+        }, 15000);
+        return () => window.clearInterval(timer);
     }, [activeThread, fetchMessages]);
 
-    // Scroll to bottom when messages change
+    // Keep the newest message in view inside the pane (never scroll the page).
     useEffect(() => {
-        scrollToBottom();
-    }, [messages, scrollToBottom]);
+        const pane = scrollRef.current;
+        if (pane) pane.scrollTop = pane.scrollHeight;
+    }, [messages]);
 
-    const handleSend = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!composeText.trim() || !activeThread || sending) return;
+    const recipientId = activeThread?.user_id ?? (sendTo ? Number(sendTo) : null);
+
+    const send = async (event?: FormEvent) => {
+        event?.preventDefault();
+        const content = composeText.trim();
+        if (!content || !activeThread || !recipientId || sending) return;
 
         setSending(true);
-
-        const payload: Record<string, unknown> = {
-            content: composeText.trim(),
-            target_user_id: activeThread.user_id,
-            alert_id: activeThread.alert_id,
-        };
-
+        setSendError(null);
         try {
             const response = await fetch('/control-room/messaging/send', {
                 method: 'POST',
@@ -210,508 +250,532 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN':
-                        document
-                            .querySelector('meta[name="csrf-token"]')
-                            ?.getAttribute('content') ?? '',
+                    'X-CSRF-TOKEN': csrfToken(),
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({
+                    content,
+                    target_user_id: recipientId,
+                    alert_id: activeThread.alert_id,
+                }),
             });
 
             if (response.ok) {
-                const data = await response.json();
+                const data = (await response.json()) as { message: Message };
                 setMessages((prev) => [...prev, data.message]);
                 setComposeText('');
+                router.reload({ only: ['threads'], async: true });
+            } else {
+                setSendError(SEND_FAILED);
             }
         } catch {
-            // Handle error silently
+            setSendError(SEND_UNCONFIRMED);
+            fetchMessages(activeThread);
         } finally {
             setSending(false);
         }
     };
 
-    const handleNewConversation = (e: FormEvent) => {
-        e.preventDefault();
-        if (!newConvoUser) return;
-
-        const userId = parseInt(newConvoUser);
-        const alertId = newConvoAlertId ? parseInt(newConvoAlertId) : null;
-        const selectedStaff = staff.find((s) => s.id === userId);
-
-        const threadId = alertId ? `alert-${alertId}` : `user-${userId}`;
-
-        // Check if thread already exists
-        const existingThread = threads.find((t) => t.id === threadId);
-        if (existingThread) {
-            selectThread(existingThread);
-            setNewConvoOpen(false);
-            setNewConvoUser('');
-            setNewConvoAlertId('');
-            return;
+    const onComposeKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            void send();
         }
-
-        // Create a virtual thread for new conversation
-        const newThread: Thread = {
-            id: threadId,
-            type: alertId ? 'alert' : 'direct',
-            alert_id: alertId,
-            user_id: userId,
-            title: selectedStaff?.name ?? 'Unknown',
-            last_message: '',
-            last_message_at: null,
-            unread_count: 0,
-            message_count: 0,
-        };
-
-        setActiveThread(newThread);
-        setMessages([]);
-        setNewConvoOpen(false);
-        setNewConvoUser('');
-        setNewConvoAlertId('');
     };
 
-    return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'Messaging', href: '#' },
-            ]}
+    const alertIdInvalid = newAlertId.trim() !== '' && !/^[1-9]\d*$/.test(newAlertId.trim());
+
+    const closeNew = () => {
+        setNewOpen(false);
+        setNewUser('');
+        setNewAlertId('');
+    };
+
+    const startConversation = () => {
+        if (!newUser || alertIdInvalid) return;
+        const userId = Number(newUser);
+        const alertId = newAlertId.trim() ? Number(newAlertId.trim()) : null;
+        const person = staff.find((s) => s.id === userId);
+        const threadId = alertId ? `alert-${alertId}` : `user-${userId}`;
+
+        const existing = threads.find((t) => t.id === threadId);
+        if (existing) {
+            openThread(existing);
+        } else {
+            // A conversation that has no messages yet.
+            openThread(
+                {
+                    id: threadId,
+                    type: alertId ? 'alert' : 'direct',
+                    alert_id: alertId,
+                    user_id: userId,
+                    title: alertId ? `Alert #${alertId}` : (person?.name ?? 'Staff member'),
+                    last_message: '',
+                    last_message_at: null,
+                    unread_count: 0,
+                    message_count: 0,
+                },
+                false,
+            );
+        }
+        // An alert conversation goes to the person just chosen.
+        setSendTo(String(userId));
+        closeNew();
+    };
+
+    const meter = (
+        label: string,
+        count: number,
+        caption: string,
+        pressed: boolean,
+        onClick: () => void,
+        tone: 'brand' | 'warning' = 'brand',
+    ) => (
+        <PageHeaderMeterBlock
+            label={label}
+            tone={count > 0 ? tone : 'brand'}
+            onClick={onClick}
+            pressed={pressed}
+            ariaLabel={`Show ${label.toLowerCase()}`}
         >
-            <Head title="Messaging - Control Room" />
-            <PageShell>
-                <CommandCentrePage
-                    variant="compact"
-                    current="/control-room/messaging"
-                    icon={MessageSquare}
-                    title="Messaging"
-                    description="Message field staff and keep alert-linked conversations attached to the operational record."
-                    status="Communications workspace"
-                    freshness={`${threads.reduce((sum, thread) => sum + thread.unread_count, 0)} unread`}
-                >
-                    <Card className="overflow-hidden">
-                        <div className="flex h-[calc(100vh-16rem)]">
-                            {/* Left Panel - Thread List */}
-                            <div className="flex w-80 flex-shrink-0 flex-col border-r">
-                                <div className="flex items-center justify-between border-b p-4">
-                                    <h3 className="text-sm font-semibold">
-                                        Conversations
-                                    </h3>
-                                    {can.manage && (
-                                        <Dialog
-                                            open={newConvoOpen}
-                                            onOpenChange={setNewConvoOpen}
+            <PageHeaderMeterBig>{count}</PageHeaderMeterBig>
+            <PageHeaderMeterCaption>{caption}</PageHeaderMeterCaption>
+        </PageHeaderMeterBlock>
+    );
+
+    return (
+        <ControlRoomPage
+            headTitle="Conversations"
+            header={{
+                subline:
+                    'Message field staff · Alert-linked conversations stay with their alert',
+                actions: (
+                    <>
+                        <PageHeaderSearch
+                            value={search}
+                            onChange={setSearch}
+                            placeholder="Search conversations"
+                        />
+                        {chatSharedExperience ? (
+                            <PageHeaderGlassButton icon={MessagesSquare} asChild>
+                                <Link href="/chat">Open Chat</Link>
+                            </PageHeaderGlassButton>
+                        ) : null}
+                        {can.manage ? (
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={() => setNewOpen(true)}
+                            >
+                                New conversation
+                            </PageHeaderPrimaryButton>
+                        ) : null}
+                    </>
+                ),
+                meters: (
+                    <>
+                        {meter('Conversations', counts.all, 'direct and alert-linked', view === 'all' && !unreadOnly, () => {
+                            setView('all');
+                            setUnreadOnly(false);
+                        })}
+                        {meter('Unread', counts.unread, 'messages from staff', unreadOnly, () => setUnreadOnly(true), 'warning')}
+                        {meter('Alert-linked', counts.alert, 'kept with the alert', view === 'alert', () => setView('alert'))}
+                        {meter('Direct', counts.direct, 'with one staff member', view === 'direct', () => setView('direct'))}
+                    </>
+                ),
+                filters: (
+                    <>
+                        <PageHeaderFilterSelect
+                            icon={MessageSquare}
+                            label="All conversations"
+                            value={view}
+                            onChange={(value) => setView(value as View)}
+                            options={[
+                                { value: 'all', label: 'All conversations' },
+                                { value: 'alert', label: 'Alert-linked' },
+                                { value: 'direct', label: 'Direct' },
+                            ]}
+                        />
+                        <PageHeaderFilterCheck
+                            label="Unread only"
+                            checked={unreadOnly}
+                            onChange={setUnreadOnly}
+                        />
+                    </>
+                ),
+            }}
+        >
+            <div
+                className={
+                    threads.length === 0
+                        ? 'grid min-w-0 gap-5'
+                        : 'grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(320px,0.42fr)_minmax(0,1fr)]'
+                }
+            >
+                <Card className="min-w-0 gap-0 overflow-hidden py-0">
+                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+                        <div className="min-w-0">
+                            <h2 className="text-section-title">Conversations</h2>
+                            <p className="text-subtle mt-0.5">Newest message first.</p>
+                        </div>
+                        <StatusBadge variant="neutral" className="tabular-nums">
+                            {visibleThreads.length} of {threads.length}
+                        </StatusBadge>
+                    </div>
+                    {visibleThreads.length === 0 ? (
+                        <div className="px-5 py-10">
+                            <EmptyState
+                                icon={MessageSquarePlus}
+                                title={threads.length ? 'No conversations match' : 'No conversations yet'}
+                                description={
+                                    threads.length
+                                        ? 'Clear the search or a filter to see more.'
+                                        : can.manage
+                                          ? 'Start a new conversation to message a staff member.'
+                                          : 'Conversations with field staff show here.'
+                                }
+                            />
+                        </div>
+                    ) : (
+                        <ol className="max-h-[640px] divide-y divide-border overflow-y-auto scrollbar-pretty">
+                            {visibleThreads.map((thread) => (
+                                <ThreadRow
+                                    key={thread.id}
+                                    thread={thread}
+                                    selected={activeThread?.id === thread.id}
+                                    onOpen={() => openThread(thread)}
+                                />
+                            ))}
+                        </ol>
+                    )}
+                </Card>
+
+                {/* No conversations at all: one message, not two empty boxes. */}
+                {threads.length > 0 ? (
+                <Card className="flex h-[640px] min-w-0 flex-col gap-0 overflow-hidden py-0">
+                    {activeThread ? (
+                        <>
+                            <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-4">
+                                <ThreadMark thread={activeThread} />
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h2 className="text-section-title truncate">
+                                            {activeThread.title}
+                                        </h2>
+                                        <StatusBadge
+                                            variant={activeThread.type === 'alert' ? 'warning' : 'neutral'}
+                                            size="sm"
                                         >
-                                            <DialogTrigger asChild>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    <MessageSquarePlus className="mr-1 h-4 w-4" />
-                                                    New
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="sm:max-w-md">
-                                                <form
-                                                    onSubmit={
-                                                        handleNewConversation
-                                                    }
-                                                >
-                                                    <DialogHeader>
-                                                        <DialogTitle>
-                                                            New Conversation
-                                                        </DialogTitle>
-                                                        <DialogDescription>
-                                                            Start a new direct
-                                                            message or
-                                                            alert-linked
-                                                            conversation.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <div className="space-y-4 py-4">
-                                                        <div>
-                                                            <Label htmlFor="new-convo-user">
-                                                                Staff Member
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    newConvoUser
-                                                                }
-                                                                onValueChange={
-                                                                    setNewConvoUser
-                                                                }
-                                                            >
-                                                                <SelectTrigger
-                                                                    id="new-convo-user"
-                                                                    className="mt-1"
-                                                                >
-                                                                    <SelectValue placeholder="Select staff member..." />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {staff.map(
-                                                                        (s) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    s.id
-                                                                                }
-                                                                                value={String(
-                                                                                    s.id,
-                                                                                )}
-                                                                            >
-                                                                                {
-                                                                                    s.name
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <div>
-                                                            <Label htmlFor="new-convo-alert">
-                                                                Alert ID
-                                                                (optional)
-                                                            </Label>
-                                                            <Input
-                                                                id="new-convo-alert"
-                                                                type="number"
-                                                                placeholder="Link to alert #"
-                                                                value={
-                                                                    newConvoAlertId
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setNewConvoAlertId(
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className="mt-1"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <DialogFooter>
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                setNewConvoOpen(
-                                                                    false,
-                                                                )
-                                                            }
-                                                        >
-                                                            Cancel
-                                                        </Button>
-                                                        <Button
-                                                            type="submit"
-                                                            disabled={
-                                                                !newConvoUser
-                                                            }
-                                                        >
-                                                            Start Conversation
-                                                        </Button>
-                                                    </DialogFooter>
-                                                </form>
-                                            </DialogContent>
-                                        </Dialog>
-                                    )}
+                                            {activeThread.type === 'alert' ? 'Alert-linked' : 'Direct'}
+                                        </StatusBadge>
+                                    </div>
+                                    {activeThread.alert_id ? (
+                                        <Link
+                                            href={`/control-room/alerts/${activeThread.alert_id}`}
+                                            className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+                                        >
+                                            Open alert #{activeThread.alert_id}
+                                        </Link>
+                                    ) : null}
                                 </div>
-
-                                {/* Thread List */}
-                                <div className="flex-1 overflow-y-auto">
-                                    {threads.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-                                            <MessageSquarePlus className="mb-2 h-8 w-8" />
-                                            <p className="text-sm">
-                                                No conversations yet
-                                            </p>
-                                            <p className="text-xs">
-                                                Start a new conversation to
-                                                begin messaging.
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        threads.map((thread) => (
-                                            <Button
-                                                key={thread.id}
-                                                type="button"
-                                                variant="ghost"
-                                                onClick={() =>
-                                                    selectThread(thread)
-                                                }
-                                                className={`h-auto w-full justify-start rounded-none border-b px-4 py-3 text-left ${
-                                                    activeThread?.id ===
-                                                    thread.id
-                                                        ? 'bg-accent'
-                                                        : ''
-                                                } ${
-                                                    thread.type === 'alert'
-                                                        ? 'border-l-4 border-l-orange-400'
-                                                        : 'border-l-4 border-l-blue-400'
-                                                }`}
-                                            >
-                                                <div className="flex items-start gap-3">
-                                                    {/* Avatar */}
-                                                    <div
-                                                        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-medium text-white ${
-                                                            thread.type ===
-                                                            'alert'
-                                                                ? 'bg-status-warning'
-                                                                : 'bg-status-info'
-                                                        }`}
-                                                    >
-                                                        {thread.type ===
-                                                        'alert' ? (
-                                                            <AlertTriangle className="h-4 w-4" />
-                                                        ) : (
-                                                            getInitial(
-                                                                thread.title,
-                                                            )
-                                                        )}
-                                                    </div>
-
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="truncate text-sm font-medium">
-                                                                {thread.title}
-                                                            </span>
-                                                            <span className="ml-2 flex-shrink-0 text-xs text-muted-foreground">
-                                                                {formatRelative(
-                                                                    thread.last_message_at,
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between">
-                                                            <p className="truncate text-xs text-muted-foreground">
-                                                                {thread.last_message ||
-                                                                    'No messages'}
-                                                            </p>
-                                                            {thread.unread_count >
-                                                                0 && (
-                                                                <span className="ml-2 inline-flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-status-critical px-1.5 text-[10px] font-bold text-white">
-                                                                    {
-                                                                        thread.unread_count
-                                                                    }
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </Button>
-                                        ))
-                                    )}
-                                </div>
+                                {activeThread.type === 'direct' && activeThread.user_id ? (
+                                    <ChatLauncher
+                                        key={activeThread.user_id}
+                                        personId={activeThread.user_id}
+                                        label="Open staff Chat"
+                                        outline
+                                    />
+                                ) : null}
                             </div>
 
-                            {/* Right Panel - Messages */}
-                            <div className="flex flex-1 flex-col">
-                                {activeThread ? (
-                                    <>
-                                        {/* Thread Header */}
-                                        <div className="flex items-center gap-3 border-b px-6 py-3">
-                                            <div
-                                                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white ${
-                                                    activeThread.type ===
-                                                    'alert'
-                                                        ? 'bg-status-warning'
-                                                        : 'bg-status-info'
-                                                }`}
-                                            >
-                                                {activeThread.type ===
-                                                'alert' ? (
-                                                    <AlertTriangle className="h-4 w-4" />
-                                                ) : (
-                                                    getInitial(
-                                                        activeThread.title,
-                                                    )
-                                                )}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="truncate text-sm font-semibold">
-                                                        {activeThread.title}
-                                                    </h3>
-                                                    <Badge
-                                                        variant={
-                                                            activeThread.type ===
-                                                            'alert'
-                                                                ? 'default'
-                                                                : 'secondary'
-                                                        }
-                                                        className="text-[10px]"
-                                                    >
-                                                        {activeThread.type ===
-                                                        'alert'
-                                                            ? 'Alert'
-                                                            : 'Direct'}
-                                                    </Badge>
-                                                </div>
-                                                {activeThread.alert_id && (
-                                                    <a
-                                                        href={`/control-room/alerts/${activeThread.alert_id}`}
-                                                        className="text-xs text-status-info hover:underline"
-                                                    >
-                                                        View linked alert #
-                                                        {activeThread.alert_id}
-                                                    </a>
-                                                )}
-                                            </div>
-                                            {activeThread.type === 'direct' && activeThread.user_id && (
-                                                <ChatLauncher key={activeThread.user_id} personId={activeThread.user_id} label="Open staff Chat" outline />
-                                            )}
-                                        </div>
-
-                                        {/* Messages Area */}
-                                        <div className="flex-1 overflow-y-auto px-6 py-4">
-                                            {loadingMessages ? (
-                                                <div className="flex h-full items-center justify-center text-muted-foreground">
-                                                    <p className="text-sm">
-                                                        Loading messages...
-                                                    </p>
-                                                </div>
-                                            ) : messages.length === 0 ? (
-                                                <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-                                                    <MessageSquarePlus className="mb-2 h-8 w-8" />
-                                                    <p className="text-sm">
-                                                        No messages yet
-                                                    </p>
-                                                    <p className="text-xs">
-                                                        Send a message to start
-                                                        the conversation.
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-4">
-                                                    {messages.map((msg) => (
-                                                        <div
-                                                            key={msg.id}
-                                                            className={`flex ${
-                                                                msg.direction ===
-                                                                'outbound'
-                                                                    ? 'justify-end'
-                                                                    : 'justify-start'
-                                                            }`}
-                                                        >
-                                                            <div
-                                                                className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                                                                    msg.direction ===
-                                                                    'outbound'
-                                                                        ? 'bg-primary-fill text-primary-fill-foreground'
-                                                                        : 'bg-muted'
-                                                                }`}
-                                                            >
-                                                                <p className="text-sm whitespace-pre-wrap">
-                                                                    {
-                                                                        msg.content
-                                                                    }
-                                                                </p>
-                                                                <div
-                                                                    className={`mt-1 flex items-center gap-1.5 ${
-                                                                        msg.direction ===
-                                                                        'outbound'
-                                                                            ? 'justify-end'
-                                                                            : 'justify-start'
-                                                                    }`}
-                                                                >
-                                                                    <span
-                                                                        className={`text-[10px] ${
-                                                                            msg.direction ===
-                                                                            'outbound'
-                                                                                ? 'text-primary-foreground/70'
-                                                                                : 'text-muted-foreground'
-                                                                        }`}
-                                                                    >
-                                                                        {
-                                                                            msg.sender_name
-                                                                        }
-                                                                    </span>
-                                                                    <span
-                                                                        className={`text-[10px] ${
-                                                                            msg.direction ===
-                                                                            'outbound'
-                                                                                ? 'text-primary-foreground/70'
-                                                                                : 'text-muted-foreground'
-                                                                        }`}
-                                                                    >
-                                                                        {formatTime(
-                                                                            msg.sent_at,
-                                                                        )}
-                                                                    </span>
-                                                                    {msg.direction ===
-                                                                        'outbound' && (
-                                                                        <span
-                                                                            className="text-primary-foreground/70"
-                                                                            title={
-                                                                                msg.delivered_at
-                                                                                    ? 'Delivered'
-                                                                                    : 'Sent'
-                                                                            }
-                                                                        >
-                                                                            {msg.delivered_at ? (
-                                                                                <CheckCheck className="h-3 w-3" />
-                                                                            ) : (
-                                                                                <Check className="h-3 w-3" />
-                                                                            )}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                    <div ref={messagesEndRef} />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Compose Bar */}
-                                        {can.manage && (
-                                            <div className="border-t p-4">
-                                                <form
-                                                    onSubmit={handleSend}
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <Input
-                                                        value={composeText}
-                                                        onChange={(e) =>
-                                                            setComposeText(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Type a message..."
-                                                        className="flex-1"
-                                                        maxLength={2000}
-                                                        disabled={sending}
-                                                    />
-                                                    <Button
-                                                        type="submit"
-                                                        size="sm"
-                                                        disabled={
-                                                            !composeText.trim() ||
-                                                            sending
-                                                        }
-                                                    >
-                                                        <Send className="mr-1 h-4 w-4" />
-                                                        Send
-                                                    </Button>
-                                                </form>
-                                            </div>
-                                        )}
-                                    </>
+                            <div
+                                ref={scrollRef}
+                                className="min-h-0 flex-1 overflow-y-auto px-5 py-4 scrollbar-pretty"
+                            >
+                                {loadingMessages ? (
+                                    <LoadingState message="Loading messages…" />
+                                ) : messages.length === 0 ? (
+                                    <EmptyState
+                                        icon={MessageSquarePlus}
+                                        title="No messages yet"
+                                        description={
+                                            can.manage
+                                                ? 'Send a message to start the conversation.'
+                                                : 'Messages in this conversation show here.'
+                                        }
+                                    />
                                 ) : (
-                                    <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-                                        <User className="mb-3 h-12 w-12" />
-                                        <p className="text-lg font-medium">
-                                            Select a conversation
-                                        </p>
-                                        <p className="text-sm">
-                                            Choose a conversation from the left
-                                            panel or start a new one.
-                                        </p>
-                                    </div>
+                                    <ol className="grid gap-4" aria-label="Messages">
+                                        {messages.map((msg) => (
+                                            <MessageBubble key={msg.id} message={msg} />
+                                        ))}
+                                    </ol>
                                 )}
                             </div>
+
+                            {can.manage ? (
+                                <form
+                                    onSubmit={send}
+                                    className="grid gap-2.5 border-t border-border px-5 py-4"
+                                >
+                                    {sendError ? (
+                                        <PopupCallout
+                                            tone={sendError === SEND_FAILED ? 'critical' : 'warning'}
+                                        >
+                                            {sendError}
+                                        </PopupCallout>
+                                    ) : null}
+                                    {activeThread.user_id ? null : (
+                                        <PopupField label="Send to" required>
+                                            <SelectInput
+                                                value={sendTo}
+                                                onChange={setSendTo}
+                                                placeholder="Choose a staff member"
+                                                ariaLabel="Send to"
+                                                options={staff.map((person) => ({
+                                                    value: String(person.id),
+                                                    label: person.name,
+                                                }))}
+                                            />
+                                        </PopupField>
+                                    )}
+                                    <div className="flex items-end gap-2">
+                                        <Textarea
+                                            value={composeText}
+                                            onChange={(e) => setComposeText(e.target.value)}
+                                            onKeyDown={onComposeKeyDown}
+                                            placeholder="Type a message… (Enter sends, Shift+Enter adds a line)"
+                                            aria-label="Message"
+                                            rows={2}
+                                            maxLength={2000}
+                                            disabled={sending}
+                                            className="min-h-0 flex-1 resize-none"
+                                        />
+                                        <Button
+                                            type="submit"
+                                            disabled={!composeText.trim() || !recipientId || sending}
+                                        >
+                                            <Send aria-hidden="true" />
+                                            {sending ? 'Sending…' : 'Send'}
+                                        </Button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <p className="text-caption border-t border-border px-5 py-3">
+                                    You can read these conversations. Sending messages needs
+                                    Control Room manage access — ask a Control Room manager.
+                                </p>
+                            )}
+                        </>
+                    ) : (
+                        <div className="flex flex-1 items-center justify-center px-5 py-10">
+                            <EmptyState
+                                icon={MessageSquare}
+                                title="Choose a conversation"
+                                description={
+                                    can.manage
+                                        ? 'Pick one from the list, or start a new conversation.'
+                                        : 'Pick one from the list to read it.'
+                                }
+                            />
                         </div>
-                    </Card>
-                </CommandCentrePage>
-            </PageShell>
-        </AppLayout>
+                    )}
+                </Card>
+                ) : null}
+            </div>
+
+            {can.manage ? (
+                <PopupForm
+                    open={newOpen}
+                    onClose={closeNew}
+                    size="sm"
+                    icon={MessageSquarePlus}
+                    title="New conversation"
+                    description="Message a staff member directly, or link the conversation to an alert."
+                    dirty={Boolean(newUser || newAlertId.trim())}
+                    submitLabel="Start conversation"
+                    submitDisabled={!newUser || alertIdInvalid}
+                    onSubmit={startConversation}
+                >
+                    <PopupField label="Staff member" required>
+                        <SelectInput
+                            value={newUser}
+                            onChange={setNewUser}
+                            placeholder="Choose a staff member"
+                            ariaLabel="Staff member"
+                            options={staff.map((person) => ({
+                                value: String(person.id),
+                                label: person.name,
+                            }))}
+                        />
+                    </PopupField>
+                    <PopupField
+                        label="Link to an alert"
+                        htmlFor="new-conversation-alert"
+                        hint="Optional. Leave empty for a direct message."
+                        error={alertIdInvalid ? 'Enter the alert number, for example 418.' : undefined}
+                    >
+                        <Input
+                            id="new-conversation-alert"
+                            inputMode="numeric"
+                            placeholder="Alert number, for example 418"
+                            value={newAlertId}
+                            onChange={(e) => setNewAlertId(e.target.value)}
+                            aria-invalid={alertIdInvalid || undefined}
+                        />
+                    </PopupField>
+                </PopupForm>
+            ) : null}
+        </ControlRoomPage>
+    );
+}
+
+function ThreadMark({ thread }: { thread: Thread }) {
+    if (thread.type === 'alert')
+        return (
+            <span
+                aria-hidden="true"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-status-warning-bg text-status-warning"
+            >
+                <AlertTriangle className="size-4" />
+            </span>
+        );
+    return (
+        <Avatar className="size-9" aria-hidden="true">
+            <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
+                {initials(thread.title)}
+            </AvatarFallback>
+        </Avatar>
+    );
+}
+
+function ThreadRow({
+    thread,
+    selected,
+    onOpen,
+}: {
+    thread: Thread;
+    selected: boolean;
+    onOpen: () => void;
+}) {
+    const items: ControlRoomRowAction[] = [
+        {
+            key: 'open',
+            label: 'Open conversation',
+            icon: MessageSquare,
+            onSelect: onOpen,
+        },
+    ];
+    if (thread.alert_id)
+        items.push({
+            key: 'alert',
+            label: 'Open alert',
+            icon: Bell,
+            onSelect: () => router.visit(`/control-room/alerts/${thread.alert_id}`),
+        });
+
+    return (
+        <ControlRoomRowActions label={`Actions for ${thread.title}`} items={items}>
+            {({ rowProps, overflowButton }) => (
+                <li
+                    onContextMenu={rowProps.onContextMenu}
+                    className={cn(
+                        'flex items-start gap-3 px-5 py-3 transition-colors',
+                        selected
+                            ? 'bg-primary-fill/10 shadow-[inset_3px_0_0_var(--primary)]'
+                            : 'hover:bg-muted/40',
+                    )}
+                >
+                    <ThreadMark thread={thread} />
+                    <Button
+                        unstyled
+                        type="button"
+                        onClick={onOpen}
+                        aria-current={selected ? 'true' : undefined}
+                        className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <span className="flex items-start justify-between gap-3">
+                            <span className="min-w-0 truncate font-semibold text-foreground">
+                                {thread.title}
+                            </span>
+                            {thread.last_message_at ? (
+                                <span
+                                    className="text-caption shrink-0 tabular-nums"
+                                    title={formatDateTime(thread.last_message_at)}
+                                >
+                                    {formatRelative(thread.last_message_at)}
+                                </span>
+                            ) : null}
+                        </span>
+                        <span className="mt-1 flex items-center justify-between gap-2">
+                            <span className="text-caption min-w-0 truncate">
+                                {thread.last_message || 'No messages yet'}
+                            </span>
+                            {thread.unread_count > 0 ? (
+                                <StatusBadge variant="critical" size="sm" className="shrink-0 tabular-nums">
+                                    {thread.unread_count} unread
+                                </StatusBadge>
+                            ) : null}
+                        </span>
+                        <span className="mt-1.5 flex flex-wrap gap-1.5">
+                            <StatusBadge
+                                variant={thread.type === 'alert' ? 'warning' : 'neutral'}
+                                size="sm"
+                            >
+                                {thread.type === 'alert' ? 'Alert-linked' : 'Direct'}
+                            </StatusBadge>
+                        </span>
+                    </Button>
+                    <div className="shrink-0">{overflowButton}</div>
+                </li>
+            )}
+        </ControlRoomRowActions>
+    );
+}
+
+function MessageBubble({ message }: { message: Message }) {
+    const outbound = message.direction === 'outbound';
+    return (
+        <li className={cn('flex', outbound ? 'justify-end' : 'justify-start')}>
+            <div
+                className={cn(
+                    'max-w-[75%] rounded-xl px-4 py-2.5',
+                    outbound
+                        ? 'bg-primary-fill text-primary-fill-foreground'
+                        : 'bg-muted text-foreground',
+                )}
+            >
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <p
+                    className={cn(
+                        'mt-1 flex items-center gap-1.5 text-xs',
+                        outbound
+                            ? 'justify-end text-primary-fill-foreground/80'
+                            : 'text-muted-foreground',
+                    )}
+                >
+                    <span>{message.sender_name}</span>
+                    {message.sent_at ? (
+                        <>
+                            <span aria-hidden="true">·</span>
+                            <span title={formatDateTime(message.sent_at)}>
+                                {formatRelative(message.sent_at)}
+                            </span>
+                        </>
+                    ) : null}
+                    {outbound ? (
+                        message.delivered_at ? (
+                            <>
+                                <CheckCheck className="size-3.5" aria-hidden="true" />
+                                <span className="sr-only">Delivered</span>
+                            </>
+                        ) : (
+                            <>
+                                <Check className="size-3.5" aria-hidden="true" />
+                                <span className="sr-only">Sent</span>
+                            </>
+                        )
+                    ) : null}
+                </p>
+            </div>
+        </li>
     );
 }

@@ -12,8 +12,12 @@ use App\Models\RestraintEvent;
 use App\Models\RestraintEventAttachment;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\HealthSafety\BehaviourSupportPlanWorkspaceService;
+use App\Services\HealthSafety\RestraintRegisterService;
+use App\Services\HealthSafety\RestraintSourceProjectionService;
 use App\Services\Respite\RespiteStayScope;
 use App\Services\UserSiteAccessService;
+use App\Support\HealthSafety\RestraintReturn;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -40,6 +44,67 @@ class RestraintController extends Controller
     private const SEVERITIES = ['low', 'medium', 'high', 'critical'];
 
     private const PLAN_STATUSES = ['draft', 'active', 'under_review', 'archived'];
+
+    /** Guarded register adapter; former handlers remain intact until parity verification. */
+    public function workspaceIndex(Request $request): Response|RedirectResponse
+    {
+        $origin = RestraintReturn::fromRegister($request->query());
+        if ($request->has('event')) {
+            $event = RestraintEvent::findOrFail($this->workspaceId($request->input('event')));
+            app(RestraintSourceProjectionService::class)->event($event, $request->user());
+
+            return redirect(RestraintReturn::event($event->id, $origin));
+        }
+        if ($request->has('plan')) {
+            $plan = BehaviourSupportPlan::findOrFail($this->workspaceId($request->input('plan')));
+            app(BehaviourSupportPlanWorkspaceService::class)->detail($plan, $request->user(), 'view', $origin);
+
+            return redirect(RestraintReturn::plan($plan->id, $origin));
+        }
+
+        return Inertia::render('health-safety/restraints/workspace-index', app(RestraintRegisterService::class)->register($request->user(), $request->query()));
+    }
+
+    public function workspaceClientSummary(Request $request, Client $client): JsonResponse
+    {
+        return response()->json(app(RestraintRegisterService::class)->summary($request->user(), $client));
+    }
+
+    public function workspaceExport(Request $request): StreamedResponse
+    {
+        // Complete authority checks before headers; large results spill to local temporary storage.
+        $stream = fopen('php://temp/maxmemory:2097152', 'w+');
+        abort_unless(is_resource($stream), 503);
+        try {
+            app(RestraintRegisterService::class)->export($request->user(), $request->query(), function (array $row) use ($stream): void {
+                $cells = array_map(function ($value): string {
+                    $text = (string) ($value ?? '');
+
+                    return preg_match('/^[\x00-\x20]*[=+@-]/', $text) === 1 ? "'".$text : $text;
+                }, $row);
+                abort_unless(fputcsv($stream, $cells, ',', '"', '') !== false, 503);
+            });
+            rewind($stream);
+        } catch (\Throwable $error) {
+            fclose($stream);
+            throw $error;
+        }
+
+        return response()->streamDownload(function () use ($stream): void {
+            try {
+                fpassthru($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, 'restrictive-interventions-'.now('Pacific/Auckland')->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
+    }
+
+    private function workspaceId(mixed $value): int
+    {
+        abort_unless((is_int($value) || is_string($value)) && preg_match('/^[1-9]\d*$/D', (string) $value) === 1 && strlen((string) $value) <= 16 && (float) $value <= 9007199254740991, 404);
+
+        return (int) $value;
+    }
 
     /* ================================================================== */
     /*  Register (hero + lenses + detail-as-modal) */

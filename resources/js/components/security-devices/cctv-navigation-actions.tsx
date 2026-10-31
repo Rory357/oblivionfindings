@@ -1,6 +1,7 @@
+import { PageHeaderGlassButton } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
-import { Bookmark, Camera, Settings2 } from 'lucide-react';
+import { Bookmark, Camera, Settings2, type LucideIcon } from 'lucide-react';
 
 export type CctvNavigation = {
     live_href: string | null;
@@ -13,56 +14,55 @@ export type CctvNavigation = {
 export function CctvNavigationActions({
     cameraId,
     navigation,
+    onDark = false,
 }: {
     cameraId: number;
     navigation?: CctvNavigation | null;
+    /** Inside the PageHeader band the links use the header's glass buttons. */
+    onDark?: boolean;
 }) {
     if (!Number.isSafeInteger(cameraId) || cameraId < 1) return null;
     const base = `/security-devices/devices/${cameraId}/live`;
+    const action = (href: string, Icon: LucideIcon, label: string) =>
+        onDark ? (
+            <PageHeaderGlassButton asChild>
+                <Link href={href}>
+                    <Icon className="size-4" aria-hidden="true" />
+                    {label}
+                </Link>
+            </PageHeaderGlassButton>
+        ) : (
+            <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="frontline-hit"
+            >
+                <Link href={href}>
+                    <Icon className="size-4" aria-hidden="true" />
+                    {label}
+                </Link>
+            </Button>
+        );
     return (
         <>
-            {navigation?.live_href === base && (
-                <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="frontline-hit"
-                >
-                    <Link href={base}>
-                        <Camera className="size-4" aria-hidden="true" />
-                        Live view
-                    </Link>
-                </Button>
-            )}
-            {navigation?.setup_href === `${base}/source` && (
-                <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="frontline-hit"
-                >
-                    <Link href={`${base}/source`}>
-                        <Settings2 className="size-4" aria-hidden="true" />
-                        {navigation.setup_kind === 'recorder'
-                            ? 'Recorder information'
-                            : 'Camera setup'}
-                    </Link>
-                </Button>
-            )}
+            {navigation?.live_href === base &&
+                action(base, Camera, 'Live view')}
+            {navigation?.setup_href === `${base}/source` &&
+                action(
+                    `${base}/source`,
+                    Settings2,
+                    navigation.setup_kind === 'recorder'
+                        ? 'Recorder information'
+                        : 'Camera setup',
+                )}
             {navigation?.reference_href ===
-                `/security-devices/devices/${cameraId}/recording-references` && (
-                <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="frontline-hit"
-                >
-                    <Link href={navigation.reference_href}>
-                        <Bookmark className="size-4" aria-hidden="true" />
-                        Recording references
-                    </Link>
-                </Button>
-            )}
+                `/security-devices/devices/${cameraId}/recording-references` &&
+                action(
+                    navigation.reference_href,
+                    Bookmark,
+                    'Recording references',
+                )}
         </>
     );
 }

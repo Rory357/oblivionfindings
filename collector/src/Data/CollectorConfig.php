@@ -27,6 +27,17 @@ final readonly class CollectorConfig
         public array $commands = [],
     ) {}
 
+    /** @return list<int> */
+    public function allowedSiteIds(): array
+    {
+        $covered = $this->scope['covered_site_ids'] ?? [];
+        $validCovered = is_array($covered)
+            ? array_values(array_filter($covered, static fn (mixed $id): bool => is_int($id) && $id > 0))
+            : [];
+
+        return array_values(array_unique([$this->siteId, ...$validCovered]));
+    }
+
     /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): self
     {
@@ -40,7 +51,9 @@ final readonly class CollectorConfig
             $protocols = self::stringList($scope['protocols'] ?? null, 'protocol scope');
             $version = self::positiveInt($payload, 'version');
             $siteId = self::positiveInt($payload, 'site_id');
-            $discoveryRuns = self::discoveryRuns($payload['discovery_runs'] ?? [], $version, $siteId);
+            $coveredSiteIds = self::coveredSiteIds($scope['covered_site_ids'] ?? [], $siteId);
+            $allowedSiteIds = array_values(array_unique([$siteId, ...$coveredSiteIds]));
+            $discoveryRuns = self::discoveryRuns($payload['discovery_runs'] ?? [], $version, $allowedSiteIds);
             $commands = self::commands($payload['commands'] ?? [], $version);
             $devices = $scope['devices'] ?? null;
             if (! is_array($devices) || (array_is_list($devices) && $devices !== []) || count($devices) > 4096
@@ -100,6 +113,7 @@ final readonly class CollectorConfig
                         'max_checks_per_run' => $rateLimits['max_checks_per_run'],
                         'packets_per_second' => $rateLimits['packets_per_second'],
                     ],
+                    ...($coveredSiteIds === [] ? [] : ['covered_site_ids' => $coveredSiteIds]),
                 ],
                 checks: array_values($checks),
                 discoveryRuns: $discoveryRuns,
@@ -152,8 +166,31 @@ final readonly class CollectorConfig
         return $value;
     }
 
-    /** @return list<array<string, mixed>> */
-    private static function discoveryRuns(mixed $value, int $version, int $siteId): array
+    /** @return list<int> */
+    private static function coveredSiteIds(mixed $value, int $homeSiteId): array
+    {
+        if (! is_array($value) || ! array_is_list($value) || count($value) > 256) {
+            throw new ConfigurationRejected('Configuration covered Sites are invalid.');
+        }
+
+        $ids = [];
+        foreach ($value as $item) {
+            if (! is_int($item) || $item < 1) {
+                throw new ConfigurationRejected('Configuration covered Sites are invalid.');
+            }
+            if ($item !== $homeSiteId) {
+                $ids[] = $item;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param  list<int>  $allowedSiteIds
+     * @return list<array<string, mixed>>
+     */
+    private static function discoveryRuns(mixed $value, int $version, array $allowedSiteIds): array
     {
         if (! is_array($value) || ! array_is_list($value) || count($value) > 16) {
             throw new ConfigurationRejected('Configuration discovery runs are invalid.');
@@ -167,15 +204,17 @@ final readonly class CollectorConfig
         foreach ($value as $run) {
             $allowed = [
                 'id', 'site_id', 'cidrs', 'protocols', 'exclusions', 'port_bounds',
-                'packets_per_second', 'targets',
+                'packets_per_second', 'targets', 'snmp_lease', 'unifi_lease',
             ];
             if (! is_array($run) || array_is_list($run) || array_diff(array_keys($run), $allowed) !== []) {
                 throw new ConfigurationRejected('Configuration discovery run is invalid.');
             }
             $id = $run['id'] ?? null;
+            $runSiteId = $run['site_id'] ?? null;
             if (! is_string($id)
                 || preg_match('/\A[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/i', $id) !== 1
-                || ($run['site_id'] ?? null) !== $siteId) {
+                || ! is_int($runSiteId)
+                || ! in_array($runSiteId, $allowedSiteIds, true)) {
                 throw new ConfigurationRejected('Configuration discovery identity is invalid.');
             }
             $cidrs = self::stringList($run['cidrs'] ?? null, 'discovery network scope');
@@ -184,6 +223,14 @@ final readonly class CollectorConfig
             $ports = self::portBounds($run['port_bounds'] ?? []);
             $rate = $run['packets_per_second'] ?? null;
             $targets = $run['targets'] ?? null;
+            $snmpLease = $run['snmp_lease'] ?? null;
+            if ($snmpLease !== null && (! is_array($snmpLease) || array_is_list($snmpLease))) {
+                throw new ConfigurationRejected('Configuration discovery SNMP lease is invalid.');
+            }
+            $unifiLease = $run['unifi_lease'] ?? null;
+            if ($unifiLease !== null && (! is_array($unifiLease) || array_is_list($unifiLease))) {
+                throw new ConfigurationRejected('Configuration discovery UniFi lease is invalid.');
+            }
             if (! is_int($rate) || $rate < 1 || $rate > 1000
                 || ! is_array($targets) || ! array_is_list($targets) || $targets === [] || count($targets) > 512) {
                 throw new ConfigurationRejected('Configuration discovery bounds are invalid.');
@@ -202,9 +249,9 @@ final readonly class CollectorConfig
             if ($targetCount > 512) {
                 throw new ConfigurationRejected('Configuration discovery target limit is exceeded.');
             }
-            $runs[] = [
+            $normalisedRun = [
                 'id' => strtolower($id),
-                'site_id' => $siteId,
+                'site_id' => $runSiteId,
                 'cidrs' => $cidrs,
                 'protocols' => $protocols,
                 'exclusions' => $exclusions,
@@ -212,6 +259,13 @@ final readonly class CollectorConfig
                 'packets_per_second' => $rate,
                 'targets' => $normalisedTargets,
             ];
+            if (is_array($snmpLease)) {
+                $normalisedRun['snmp_lease'] = $snmpLease;
+            }
+            if (is_array($unifiLease)) {
+                $normalisedRun['unifi_lease'] = $unifiLease;
+            }
+            $runs[] = $normalisedRun;
         }
 
         return $runs;
@@ -235,14 +289,17 @@ final readonly class CollectorConfig
     /** @return array<string, list<int>> */
     private static function portBounds(mixed $value): array
     {
-        if (! is_array($value) || (array_is_list($value) && $value !== []) || count($value) > 9) {
+        if (! is_array($value) || (array_is_list($value) && $value !== []) || count($value) > 16) {
             throw new ConfigurationRejected('Configuration discovery ports are invalid.');
         }
         $normalised = [];
         $count = 0;
+        $allowedProtocols = [
+            'tcp', 'dns', 'http', 'tls', 'snmp', 'mdns', 'ssdp', 'onvif', 'syslog', 'flow', 'provider',
+        ];
         foreach ($value as $protocol => $ports) {
             if (! is_string($protocol)
-                || ! in_array($protocol, ['tcp', 'dns', 'http', 'tls', 'snmp', 'syslog', 'flow', 'provider'], true)
+                || ! in_array($protocol, $allowedProtocols, true)
                 || ! is_array($ports) || ! array_is_list($ports)) {
                 throw new ConfigurationRejected('Configuration discovery ports are invalid.');
             }

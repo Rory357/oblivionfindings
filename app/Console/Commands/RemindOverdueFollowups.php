@@ -49,11 +49,16 @@ class RemindOverdueFollowups extends Command
                     'body' => 'An incident follow-up is overdue and needs attention.',
                     'url' => url("/incidents/{$incident->id}"),
                     'target_user_ids' => $assignedId,
+                    // Daily check: while a person's reminder for this follow-up
+                    // is unread, it is refreshed (and moved to the top) rather
+                    // than sent again; once read, the next run sends a new one.
+                    'refresh_unread_copy' => true,
                     'context' => [
                         'Client' => trim($client->first_name.' '.$client->last_name),
                         'Incident' => 'ClientIncident #'.$incident->id,
                         'Severity' => (string) ($incident->severity ?? ''),
                         'Due' => $f->due_at?->format('Y-m-d H:i'),
+                        'Overdue by' => $f->due_at ? RemindHighUnreviewedIncidents::waitingFor($f->due_at) : null,
                         'Assigned to' => $f->assignedTo?->name,
                     ],
                 ]

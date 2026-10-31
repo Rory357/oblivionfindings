@@ -5,7 +5,7 @@
  * (raw <button>/<div>), not shadcn <Button>/<Card> cases. Colours stay
  * token-based (primary / primary-foreground; amber injected as a CSS var) so
  * tenant white-label theming still propagates. */
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import {
     CalendarClock,
     CalendarDays,
@@ -24,8 +24,11 @@ import {
 import { useEffect, useState, type CSSProperties } from 'react';
 
 import { guardMedicationSignOut } from '@/lib/offline-queue';
+import { formatDateOnly, formatDateTimeInZone, toDateInput, toDatetimeLocal, WORKER_TIMEZONE } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
+import type { SharedData } from '@/types';
 
+import { readMyHrAttendance } from './my-hr-attendance';
 import { MyHrCalendar } from './my-hr-calendar';
 import { MyHrClockCard } from './my-hr-clock-card';
 import type { MyHrShellData } from './my-hr-types';
@@ -55,15 +58,9 @@ function greetingFor(hour: number): { greeting: string; wave: string } {
     return { greeting: 'Pō mārie', wave: '🌙' };
 }
 
-function formatNextShift(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    const weekday = d.toLocaleDateString('en-NZ', { weekday: 'short' });
-    const h = d.getHours();
-    const m = d.getMinutes();
-    const ampm = h < 12 ? 'a' : 'p';
-    const h12 = h % 12 === 0 ? 12 : h % 12;
-    return `${weekday} ${h12}:${String(m).padStart(2, '0')}${ampm}`;
+function formatNextShift(iso: string | null, timezone: string): string {
+    if (!iso || !/(?:Z|[+-]\d{2}:\d{2})$/.test(iso)) return '—';
+    return formatDateTimeInZone(iso, timezone);
 }
 
 /**
@@ -82,13 +79,15 @@ export function MyHrHero({
     handlers?: MyHrHeroHandlers;
 }) {
     const { profile, counts, weekly, nextShift, calendar } = myHr;
-    const { greeting, wave } = greetingFor(new Date().getHours());
-    const dateLabel = new Date().toLocaleDateString('en-NZ', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-    });
+    const { auth } = usePage<SharedData>().props;
+    const workTimezone = readMyHrAttendance(myHr.attendance, auth?.user?.id)?.timezone ?? WORKER_TIMEZONE;
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 30_000);
+        return () => clearInterval(timer);
+    }, []);
+    const { greeting, wave } = greetingFor(Number(toDatetimeLocal(now, workTimezone).slice(11, 13)));
+    const dateLabel = formatDateOnly(toDateInput(now, workTimezone));
 
     const [avatarOpen, setAvatarOpen] = useState(false);
     const [calOpen, setCalOpen] = useState(false);
@@ -257,9 +256,10 @@ export function MyHrHero({
                                 <span className="text-[22px]">{wave}</span>
                             </h1>
                             <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-primary-foreground/75">
-                                <span className="inline-flex items-center gap-1.5 font-semibold">
+                                <span className="inline-flex flex-wrap items-center gap-1.5 font-semibold">
                                     <CalendarDays className="h-[13px] w-[13px]" />
                                     {dateLabel}
+                                    <span className="font-normal">{workTimezone}</span>
                                 </span>
                                 {profile.position_title ? (
                                     <>
@@ -287,7 +287,7 @@ export function MyHrHero({
                     {/* stats */}
                     <div className="mt-5 -ml-3 flex flex-wrap gap-0.5">
                         <HeroStat
-                            label="This week"
+                            label="Weekly recorded hours"
                             value={`${weekly.total_hours.toFixed(1)}h`}
                             onClick={() => router.visit('/hr/my/time')}
                         />
@@ -295,6 +295,7 @@ export function MyHrHero({
                             label="Next shift"
                             value={formatNextShift(
                                 nextShift?.starts_at ?? null,
+                                workTimezone,
                             )}
                             onClick={() => router.visit('/hr/my/time')}
                         />
@@ -333,8 +334,7 @@ export function MyHrHero({
 
                 {/* ── right column: glass clock panel ── */}
                 <MyHrClockCard
-                    activeClock={myHr.activeClock}
-                    todayTotal={myHr.todayTotal}
+                    attendance={myHr.attendance}
                     siteName={profile.site_name}
                     nextShift={nextShift}
                 />

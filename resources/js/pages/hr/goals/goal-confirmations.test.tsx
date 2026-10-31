@@ -13,7 +13,8 @@ import GoalShow from './show';
 
 // Deleting an objective, deleting a key result and archiving an objective
 // used browser confirm(). Each now opens the shared ConfirmDialog and only
-// its confirm button sends the request.
+// its confirm button sends the request. Archive in the Goals hub row menu and
+// bulk bar used to send straight away; they now ask first too.
 
 type VisitOptions = { onStart?: () => void; onFinish?: () => void };
 
@@ -25,7 +26,9 @@ const router = vi.hoisted(() => {
     return {
         visit: vi.fn(),
         get: vi.fn(),
-        post: vi.fn(),
+        post: vi.fn((_url: string, _data: unknown, options?: VisitOptions) =>
+            settle(options),
+        ),
         patch: vi.fn(),
         delete: vi.fn((_url: string, options?: VisitOptions) =>
             settle(options),
@@ -73,75 +76,81 @@ const dialog = () => screen.getByRole('alertdialog');
 beforeEach(() => {
     router.delete.mockClear();
     router.put.mockClear();
+    router.post.mockClear();
 });
 
-describe('Goals hub: delete an objective', () => {
-    const objective: Objective = {
-        id: 5,
-        title: 'Reduce agency shifts',
-        description: null,
-        goal_type: 'team',
-        category: null,
-        status: 'active',
-        confidence: 'on_track',
-        priority: 'medium',
-        tags: [],
-        progress_percentage: 40,
-        target_value: null,
-        current_value: null,
-        unit: null,
-        start_date: '2026-07-01',
-        due_date: '2026-12-31',
-        checkin_frequency: 'fortnightly',
-        last_checkin_at: null,
-        last_checkin_days: null,
-        user: { id: 2, name: 'Hemi Walker' },
-        parent_goal_id: null,
-        parent_goal: null,
-        cycle: null,
-        cycle_id: null,
-        key_results_count: 0,
-        development_count: 0,
-        key_results: [],
-    };
+const hubObjective: Objective = {
+    id: 5,
+    title: 'Reduce agency shifts',
+    description: null,
+    goal_type: 'team',
+    category: null,
+    status: 'active',
+    confidence: 'on_track',
+    priority: 'medium',
+    tags: [],
+    progress_percentage: 40,
+    target_value: null,
+    current_value: null,
+    unit: null,
+    start_date: '2026-07-01',
+    due_date: '2026-12-31',
+    checkin_frequency: 'fortnightly',
+    last_checkin_at: null,
+    last_checkin_days: null,
+    user: { id: 2, name: 'Hemi Walker' },
+    parent_goal_id: null,
+    parent_goal: null,
+    cycle: null,
+    cycle_id: null,
+    key_results_count: 0,
+    development_count: 0,
+    key_results: [],
+};
 
+const renderHub = () =>
+    render(
+        <GoalsHub
+            objectives={[hubObjective]}
+            developmentPlans={[]}
+            users={[{ id: 2, name: 'Hemi Walker' }]}
+            parentGoals={[]}
+            cycles={[]}
+            templates={[]}
+            allTags={[]}
+            competencies={[]}
+            selectedCycleId={null}
+            currentCycleId={null}
+            analytics={{
+                total: 1,
+                active: 1,
+                completed: 0,
+                draft: 0,
+                overdue: 0,
+                on_track: 1,
+                at_risk: 0,
+                off_track: 0,
+                avg_progress: 40,
+                completion_rate: 0,
+                progress_by_type: [],
+            }}
+            cascadeTree={[]}
+            can={{ manage: true }}
+            defaultTab={null}
+        />,
+    );
+
+const chooseFromRowMenu = (name: string) => {
+    fireEvent.click(screen.getByRole('button', { name: 'Row actions' }));
+    fireEvent.click(
+        within(screen.getByRole('menu')).getByRole('button', { name }),
+    );
+};
+
+describe('Goals hub: delete an objective', () => {
     const openDelete = () => {
-        render(
-            <GoalsHub
-                objectives={[objective]}
-                developmentPlans={[]}
-                users={[{ id: 2, name: 'Hemi Walker' }]}
-                parentGoals={[]}
-                cycles={[]}
-                templates={[]}
-                allTags={[]}
-                competencies={[]}
-                selectedCycleId={null}
-                currentCycleId={null}
-                analytics={{
-                    total: 1,
-                    active: 1,
-                    completed: 0,
-                    draft: 0,
-                    overdue: 0,
-                    on_track: 1,
-                    at_risk: 0,
-                    off_track: 0,
-                    avg_progress: 40,
-                    completion_rate: 0,
-                    progress_by_type: [],
-                }}
-                cascadeTree={[]}
-                can={{ manage: true }}
-                defaultTab={null}
-            />,
-        );
-        fireEvent.click(screen.getByRole('button', { name: 'Row actions' }));
-        fireEvent.click(
-            within(screen.getByRole('menu')).getByRole('button', {
-                name: 'Delete',
-            }),
-        );
+        renderHub();
+        chooseFromRowMenu('Delete');
     };
 
     it('asks before deleting and sends nothing from the menu', () => {
@@ -181,6 +190,114 @@ describe('Goals hub: delete an objective', () => {
         expect(router.delete).toHaveBeenCalledTimes(1);
         expect(router.delete).toHaveBeenCalledWith(
             '/hr/goals/5',
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+    });
+});
+
+describe('Goals hub: archive from the row menu', () => {
+    const openArchive = () => {
+        renderHub();
+        chooseFromRowMenu('Archive');
+    };
+
+    it('asks before archiving and sends nothing from the menu', () => {
+        openArchive();
+
+        expect(router.put).not.toHaveBeenCalled();
+        expect(
+            within(dialog()).getByText('Archive this objective?'),
+        ).toBeInTheDocument();
+        expect(dialog()).toHaveTextContent(
+            '“Reduce agency shifts” is marked cancelled. Its key results and check-in history are kept.',
+        );
+    });
+
+    it('Cancel archives nothing', async () => {
+        openArchive();
+
+        fireEvent.click(
+            within(dialog()).getByRole('button', { name: 'Cancel' }),
+        );
+
+        expect(router.put).not.toHaveBeenCalled();
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+    });
+
+    it('archives the objective (status cancelled) once confirmed', async () => {
+        openArchive();
+
+        fireEvent.click(
+            within(dialog()).getByRole('button', {
+                name: 'Archive objective',
+            }),
+        );
+
+        expect(router.put).toHaveBeenCalledTimes(1);
+        expect(router.put).toHaveBeenCalledWith(
+            '/hr/goals/5',
+            { status: 'cancelled' },
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+    });
+});
+
+describe('Goals hub: archive from the bulk bar', () => {
+    const openBulkArchive = () => {
+        renderHub();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Select objective' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    };
+
+    it('asks before archiving the selection and sends nothing yet', () => {
+        openBulkArchive();
+
+        expect(router.post).not.toHaveBeenCalled();
+        expect(
+            within(dialog()).getByText('Archive 1 objective?'),
+        ).toBeInTheDocument();
+        expect(dialog()).toHaveTextContent(
+            'The selected objective is marked cancelled.',
+        );
+    });
+
+    it('Cancel archives nothing and keeps the selection', async () => {
+        openBulkArchive();
+
+        fireEvent.click(
+            within(dialog()).getByRole('button', { name: 'Cancel' }),
+        );
+
+        expect(router.post).not.toHaveBeenCalled();
+        await waitFor(() =>
+            expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+        );
+        expect(screen.getByText('1 selected')).toBeInTheDocument();
+    });
+
+    it('sends the same bulk archive request once confirmed', async () => {
+        openBulkArchive();
+
+        fireEvent.click(
+            within(dialog()).getByRole('button', {
+                name: 'Archive objective',
+            }),
+        );
+
+        expect(router.post).toHaveBeenCalledTimes(1);
+        expect(router.post).toHaveBeenCalledWith(
+            '/hr/goals/bulk',
+            { action: 'archive', ids: [5] },
             expect.objectContaining({ preserveScroll: true }),
         );
         await waitFor(() =>

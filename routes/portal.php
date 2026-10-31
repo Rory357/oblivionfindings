@@ -37,6 +37,9 @@ use App\Http\Controllers\TimelineInteractionController;
 use App\Models\Announcement;
 use App\Models\Client;
 use App\Models\FamilyVisitRequest;
+use App\Notifications\ControlRoom\BroadcastRecipientNotice;
+use App\Services\ControlRoom\BroadcastRecipientReadContext;
+use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\SsoConfigurationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -221,6 +224,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('inbox.notifications.ack');
     Route::post('/inbox/notifications/read-all', [NotificationInboxController::class, 'markAllRead'])
         ->name('inbox.notifications.readAll');
+    // Staff broadcast read commands: lost-response reconciliation (JSON only; the
+    // POST single/bulk commands share the existing read routes above).
+    Route::get('/inbox/notifications/broadcast-read-commands/{command_id}', [NotificationInboxController::class, 'reconcileBroadcastRead'])
+        ->name('inbox.notifications.broadcastReadCommand');
 
     Route::post('/inbox/announcements/{announcement}/read', [AnnouncementInboxController::class, 'markRead'])
         ->name('inbox.announcements.read');
@@ -228,42 +235,69 @@ Route::middleware(['auth'])->group(function () {
         ->name('inbox.announcements.readAll');
 
     // Notification Centre (full page)
-    Route::get('/notifications', function (Request $request, BoardPackAccessService $boardPackAccess) {
+    Route::get('/notifications', function (Request $request, BoardPackAccessService $boardPackAccess, BroadcastRecipientReadService $broadcasts) {
         $user = $request->user();
-        $query = $boardPackAccess->visibleNotificationQuery($user);
+        abort_unless($user, 403);
 
-        $filter = $request->query('filter', 'all');
-        if ($filter === 'unread') {
-            $query->whereNull('read_at');
+        // ?notification={uuid} opens one staff message, independent of the list's
+        // filters and page. Inspect the raw query so duplicate or array selectors
+        // can't be collapsed by PHP into a valid-looking value.
+        $selectedId = null;
+        foreach (explode('&', (string) $request->server('QUERY_STRING', '')) as $pair) {
+            [$key, $value] = array_pad(explode('=', $pair, 2), 2, '');
+            $decodedKey = urldecode($key);
+            if ($decodedKey !== 'notification' && ! str_starts_with($decodedKey, 'notification[')) {
+                continue;
+            }
+            abort_unless($key === 'notification' && $selectedId === null, 404);
+            abort_unless(preg_match('/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/D', $value) === 1, 404);
+            $selectedId = $value;
         }
-        if ($filter === 'read') {
-            $query->whereNotNull('read_at');
-        }
+        abort_if($request->query->has('notification') && $selectedId === null, 404);
 
-        $type = $request->query('type', 'all');
-        if ($type !== 'all') {
-            $query->where('data->module', $type);
-        }
+        return $broadcasts->respond($user, $request, function (BroadcastRecipientReadContext $context) use ($user, $request, $boardPackAccess, $selectedId) {
+            $query = $boardPackAccess->visibleNotificationQuery($user, broadcastContext: $context);
+            $filter = $request->query('filter', 'all');
+            if ($filter === 'unread') {
+                $query->whereNull('read_at');
+            }
+            if ($filter === 'read') {
+                $query->whereNotNull('read_at');
+            }
 
-        return inertia('notifications/index', [
-            'notifications' => $query->orderByDesc('created_at')->paginate(50)->through(fn ($n) => [
-                'id' => $n->id,
-                'type' => class_basename($n->type),
-                'data' => $n->data,
-                'read_at' => $n->read_at,
-                'acknowledged_at' => $n->acknowledged_at,
-                'created_at' => $n->created_at,
-            ]),
-            'unread_count' => $boardPackAccess->visibleNotificationQuery($user, unreadOnly: true)->count(),
-            'filters' => ['filter' => $filter, 'type' => $type],
-            'announcements' => Announcement::query()
-                ->where('is_active', true)
-                ->where(fn ($q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
-                ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', now()))
-                ->orderByDesc('created_at')
-                ->limit(20)
-                ->get(),
-        ]);
+            $type = $request->query('type', 'all');
+            if ($type !== 'all') {
+                $query->where(function ($module) use ($type) {
+                    $module->where('data->module', $type);
+                    if ($type === 'control_room') {
+                        // Still inside every scope above: only admitted own staff messages.
+                        $module->orWhere('type', BroadcastRecipientNotice::class);
+                    }
+                });
+            }
+
+            return inertia('notifications/index', [
+                'notifications' => $query->orderByDesc('created_at')->paginate(50)->through(fn ($n) => $context->project($n) ?? [
+                    'id' => $n->id,
+                    'type' => class_basename($n->type),
+                    'data' => $n->data,
+                    'read_at' => $n->read_at,
+                    'acknowledged_at' => $n->acknowledged_at,
+                    'created_at' => $n->created_at,
+                ]),
+                'unread_count' => $boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, broadcastContext: $context)->count(),
+                'broadcast_reader' => $context->envelope(),
+                'selected_broadcast_notification' => $selectedId === null ? null : $context->selected($selectedId),
+                'filters' => ['filter' => $filter, 'type' => $type],
+                'announcements' => Announcement::query()
+                    ->where('is_active', true)
+                    ->where(fn ($q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+                    ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', now()))
+                    ->orderByDesc('created_at')
+                    ->limit(20)
+                    ->get(),
+            ]);
+        });
     })->name('notifications.index');
 
     // Global RAG endpoints (header query bar)

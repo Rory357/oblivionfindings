@@ -71,3 +71,21 @@ describe('Camera navigation authority', () => {
         ).not.toBeInTheDocument();
     });
 });
+
+describe('Camera navigation inside the page header', () => {
+    it('uses the header glass buttons on the dark band', () => {
+        render(
+            <CctvNavigationActions
+                cameraId={42}
+                onDark
+                navigation={{
+                    live_href: '/security-devices/devices/42/live',
+                    setup_href: null,
+                }}
+            />,
+        );
+        const live = screen.getByRole('link', { name: 'Live view' });
+        expect(live).toHaveClass('bg-band-foreground/10');
+        expect(live).not.toHaveClass('frontline-hit');
+    });
+});

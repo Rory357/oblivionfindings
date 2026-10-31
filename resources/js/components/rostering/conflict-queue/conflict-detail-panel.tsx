@@ -17,7 +17,7 @@ import {
 const SEV_TILE: Record<Severity, string> = {
     critical: 'bg-status-critical-bg text-status-critical',
     warning: 'bg-status-warning-bg text-status-warning',
-    info: 'bg-accent text-primary',
+    info: 'bg-primary-fill/10 text-primary',
 };
 
 const SEV_BADGE: Record<Severity, string> = {
@@ -136,19 +136,19 @@ function DetailBody({
                 </span>
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                        <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                             {meta.label}
                         </span>
                         <span
                             className={cn(
-                                'rounded-full px-2 py-0.5 text-[10.5px] font-semibold',
+                                'rounded-full px-2 py-0.5 text-xs font-semibold',
                                 SEV_BADGE[meta.severity],
                             )}
                         >
                             {SEVERITY_BADGE_LABEL[meta.severity]}
                         </span>
                     </div>
-                    <h2 className="mt-1 text-[19px] leading-tight font-bold break-words">
+                    <h2 className="text-section-title mt-1 leading-tight break-words">
                         {item.who}
                     </h2>
                     <p className="mt-0.5 text-sm break-words text-muted-foreground">
@@ -160,7 +160,7 @@ function DetailBody({
             {item.context && ContextIcon ? (
                 <div
                     className={cn(
-                        'mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px] font-medium',
+                        'mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium',
                         CONTEXT_TONE[item.context.tone],
                     )}
                 >
@@ -181,21 +181,21 @@ function DetailBody({
                     ))}
                 </div>
             ) : item.type === 'coverage_gap' ? (
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
                     <Layers className="h-4 w-4 shrink-0" />
                     No contributing duties returned in this view.
                 </div>
             ) : null}
 
             <div className="mt-3 flex items-start gap-2.5 rounded-xl bg-[color-mix(in_oklch,var(--primary)_6%,transparent)] p-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-fill/10 text-primary">
                     <Zap className="h-3.5 w-3.5" />
                 </span>
                 <div className="min-w-0">
-                    <span className="block text-[10.5px] font-semibold tracking-wider text-primary uppercase">
+                    <span className="block text-xs font-semibold tracking-wider text-primary uppercase">
                         Recommended
                     </span>
-                    <span className="mt-0.5 block text-[13px] text-foreground">
+                    <span className="mt-0.5 block text-sm text-foreground">
                         {item.recommended}
                     </span>
                 </div>
