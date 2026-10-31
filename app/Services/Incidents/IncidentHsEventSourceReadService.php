@@ -317,10 +317,12 @@ final class IncidentHsEventSourceReadService
             $entry['chunks'][] = ['ids' => $ids, 'query' => $query];
             foreach ($ids as $id) { $seen[$id] = array_key_last($entry['chunks']); }
             foreach ($part as $root) {
+                // The facts the per-root guards pinned first (or pin now for them): a root changed since is never a new original.
+                $facts = $this->pinnedRootFacts($root, $current, $reads, false);
                 $exact = ClientIncident::query()->whereKey($root->id);
-                $this->exact($exact, array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META)), 'client_incidents');
+                $this->exact($exact, $facts, 'client_incidents');
                 $exact = $this->authorityScoped($exact, $current, $reads,
-                    $root->site_id === null ? null : (int) $root->site_id, $root->client_id === null ? null : (int) $root->client_id);
+                    ($facts['site_id'] ?? null) === null ? null : (int) $facts['site_id'], ($facts['client_id'] ?? null) === null ? null : (int) $facts['client_id']);
                 $entry['exact'][(int) $root->id] = $this->protect($exact, $reads);
             }
         }
@@ -383,13 +385,32 @@ final class IncidentHsEventSourceReadService
         $query = $this->rootAccessQuery(ClientIncident::query()->whereKey($root->id), $current, $reads, $restricted);
         $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read', siteBoundaryOnly: $restricted,
             prefetched: [$this->identityKey($current, $restricted), (int) $root->id]);
-        $this->exact($query, array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META)), 'client_incidents');
-        $base = ['query' => $query, 'site_id' => $root->site_id === null ? null : (int) $root->site_id,
-            'client_id' => $root->client_id === null ? null : (int) $root->client_id];
+        $facts = $this->pinnedRootFacts($root, $current, $reads, $restricted);
+        $this->exact($query, $facts, 'client_incidents');
+        $base = ['query' => $query, 'site_id' => ($facts['site_id'] ?? null) === null ? null : (int) $facts['site_id'],
+            'client_id' => ($facts['client_id'] ?? null) === null ? null : (int) $facts['client_id']];
         $parents = $this->rootParents[$reads] ?? [];
         $parents[$baseKey][$root->id] = $base;
         $this->rootParents[$reads] = $parents;
         return $base;
+    }
+
+    /**
+     * A root's facts as first seen in this reads/actor lifetime, shared by rootBase() and the grouped guards so that
+     * whichever builds a guard first pins them for the other. Later reads of a changed row get the pinned facts.
+     *
+     * @return array<string, mixed>
+     */
+    private function pinnedRootFacts(ClientIncident $root, User $current, CurrentAuthorizationReads $reads, bool $restricted): array
+    {
+        $key = $current->id.'/facts'.($restricted ? '/restricted' : '');
+        $parents = $this->rootParents[$reads] ?? [];
+        if (! isset($parents[$key][$root->id])) {
+            $parents[$key][$root->id] = array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META));
+            $this->rootParents[$reads] = $parents;
+        }
+
+        return $parents[$key][$root->id];
     }
 
     /**
