@@ -38,6 +38,12 @@ final class ChatPersonalPreferences
 
     public function update(User $actor, array $changes, string $version): array
     {
+        if (array_key_exists('sound_enabled', $changes)) {
+            // Made before the lock: an insert inside it would share-lock the row and then need it
+            // exclusively, deadlocking with an availability save (ChatCallController::preference()).
+            DB::table('chat_preferences')->insertOrIgnore(['user_id' => $actor->id, 'created_at' => now(), 'updated_at' => now()]);
+        }
+
         return DB::transaction(function () use ($actor, $changes, $version) {
             $actor = User::whereKey($actor->id)->lockForUpdate()->firstOrFail();
             $current = $this->read($actor);
@@ -52,7 +58,6 @@ final class ChatPersonalPreferences
                 $actor->update(['theme' => $changes['theme']]);
             }
             if (array_key_exists('sound_enabled', $changes)) {
-                DB::table('chat_preferences')->insertOrIgnore(['user_id' => $actor->id, 'created_at' => now(), 'updated_at' => now()]);
                 DB::table('chat_preferences')->where('user_id', $actor->id)->update(['sound_enabled' => $changes['sound_enabled'], 'updated_at' => now()]);
             }
 

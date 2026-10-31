@@ -249,11 +249,13 @@ final class HsIncidentReportConsumerTest extends IncidentIndependenceTestCase
 
     public function test_late_investigation_body_change_is_withheld_without_rebasing_still_valid_source_authority(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::UNMET_CHECK, 'A findings edit written by another request in the middle of the investigation-outcomes export is not caught: the export returns the findings as first read, to a manager allowed to read them, and the next export shows the edit. It fails the same way on Codex\'s snapshot.', 're-prove the findings at the end of the export read.'));
         $event = $this->bundle($this->incident(['client_id' => $this->client->id]), 'original-private-findings');
         $state = (object) ['armed' => true, 'fired' => false];
         DB::connection()->beforeExecuting(function (string $sql) use ($state, $event): void {
-            if (! $state->armed || ! preg_match('/^select .* from `users` /s', $sql) || ! str_contains($sql, '`name`')) { return; }
+            // Fire at the eager load of the investigator names, which runs after the findings were read. (A looser
+            // "any users query naming `name`" used to fire on the opening authority check, before any findings were
+            // read, so the export just emitted the edited text and the late race was never exercised.)
+            if (! $state->armed || ! str_starts_with($sql, 'select `id`, `name` from `users` where `users`.`id` in')) { return; }
             $state->armed = false; $state->fired = true;
             DB::table('hs_investigations')->where('hs_event_id', $event->id)->where('status', HsInvestigation::STATUS_COMPLETED)
                 ->update(['findings_summary' => 'changed-after-original-private-body']);
@@ -264,6 +266,10 @@ final class HsIncidentReportConsumerTest extends IncidentIndependenceTestCase
                 $this->fail('Exact emitted findings must remain bound even when source permissions stay valid.');
             } catch (HttpException $failure) { $this->assertSame(404, $failure->getStatusCode()); }
             $this->assertTrue($state->fired);
+            // The edit was made on the export's own connection here, so the 404 rolled it back with the export. In use
+            // it comes from another, already-committed request; put it back and the next export shows it.
+            DB::table('hs_investigations')->where('hs_event_id', $event->id)->where('status', HsInvestigation::STATUS_COMPLETED)
+                ->update(['findings_summary' => 'changed-after-original-private-body']);
             $fresh = app(HsComplianceExportService::class)->investigationOutcomes(viewer: $this->manager, siteId: $this->site->id);
             $this->assertStringContainsString('changed-after-original-private-body', json_encode($fresh, JSON_THROW_ON_ERROR));
         } finally { $state->armed = false; }

@@ -19,6 +19,7 @@ use App\Services\Chat\SelfHostedCalling;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
 use App\Services\Operations\OpsMessageVisibilityService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -74,13 +75,10 @@ final class ChatCallController extends Controller
     {
         $data = $request->validate(['availability' => ['sometimes', Rule::in(ChatAvailability::VALUES)], 'sound_enabled' => ['sometimes', 'boolean']]);
         abort_if(($data['availability'] ?? null) === 'off_duty' && ! app(HrCurrentStaffService::class)->isCurrent($request->user()), 403, 'Off duty is only available to current staff.');
-        DB::transaction(function () use ($request, $data) {
-            // Call starts lock the same person before checking availability.
-            // A confirmed off-duty save must not race a later invitation.
-            User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
-            DB::table('chat_preferences')->insertOrIgnore(['user_id' => $request->user()->id, 'created_at' => now(), 'updated_at' => now()]);
-            DB::table('chat_preferences')->where('user_id', $request->user()->id)->update([...$data, 'last_seen_at' => now(), 'updated_at' => now()]);
-        });
+        $this->ensurePreferenceRow($request->user());
+        // Call starts lock this row before checking availability (lockPeople()).
+        // A confirmed off-duty save must not race a later invitation.
+        DB::table('chat_preferences')->where('user_id', $request->user()->id)->update([...$data, 'last_seen_at' => now(), 'updated_at' => now()]);
 
         return response()->noContent();
     }
@@ -120,6 +118,7 @@ final class ChatCallController extends Controller
     {
         $data = $this->startData($request);
         $this->access->authorize($request->user(), $conversation, true);
+        $this->ensurePreferenceRow($request->user());
         $receipt = DB::transaction(function () use ($request, $conversation, $data) {
             $mode = $data['routing_mode'] ?? 'invited';
             $audience = app(ChatCallAudience::class);
@@ -130,7 +129,7 @@ final class ChatCallController extends Controller
                 $ids = collect($data['participant_ids']);
             }
             $ids = $ids->push($request->user()->id)->unique()->sort()->values();
-            $users = User::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            $users = $this->lockPeople($ids);
             if ($existing = DB::table('chat_call_start_commands')->where('actor_id', $request->user()->id)->where('mutation_id', $data['mutation_id'])->first()) {
                 $this->assertStartReceipt($existing, $conversation, $data);
 
@@ -195,10 +194,11 @@ final class ChatCallController extends Controller
         $data = $this->startData($request);
         abort_unless($data['mutation_id'] === $mutation, 409);
         $this->access->authorize($request->user(), $conversation, true);
+        $this->ensurePreferenceRow($request->user());
         $call = DB::transaction(function () use ($request, $conversation, $data) {
-            // The same actor row is locked by start: cancellation wins either before
+            // Start locks the same actor: cancellation wins either before
             // creation (a tombstone), or after it (the original invitation is denied).
-            User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            $this->lockPeople(collect([$request->user()->id]));
             $receipt = DB::table('chat_call_start_commands')->where('actor_id', $request->user()->id)->where('mutation_id', $data['mutation_id'])->first();
             if (! $receipt) {
                 abort_if(ChatCall::where('started_by', $request->user()->id)->where('mutation_id', $data['mutation_id'])->exists(), 409);
@@ -235,6 +235,27 @@ final class ChatCallController extends Controller
         }
 
         return response()->json(['attempt_state' => 'cancelled', 'call' => null, 'can_join' => false])->header('Cache-Control', 'private, no-store');
+    }
+
+    /**
+     * Starts, answers, cancels and availability saves take each person's Chat row, never an
+     * exclusive lock on their users row: other modules read that row with FOR SHARE NOWAIT and
+     * failed while Chat held it (test server, 30 Oct 2026). The users rows are only share-locked,
+     * so a DND or quiet-hours save still waits for the availability check. Users first, then
+     * chat_preferences, both in id order, as ChatPersonalPreferences::update() does.
+     */
+    private function lockPeople(Collection $ids): Collection
+    {
+        $users = User::whereIn('id', $ids)->orderBy('id')->sharedLock()->get();
+        DB::table('chat_preferences')->whereIn('user_id', $ids)->orderBy('user_id')->lockForUpdate()->pluck('user_id');
+
+        return $users;
+    }
+
+    /** Made before any lock is taken, so two first saves can't deadlock on the insert. A default row reads as no row. */
+    private function ensurePreferenceRow(User $user): void
+    {
+        DB::table('chat_preferences')->insertOrIgnore(['user_id' => $user->id, 'created_at' => now(), 'updated_at' => now()]);
     }
 
     private function startData(Request $request): array
@@ -291,9 +312,10 @@ final class ChatCallController extends Controller
     public function join(Request $request, ChatCall $call)
     {
         $data = $request->validate(['device_id' => ['required', 'uuid'], 'invitation_id' => ['nullable', 'uuid']]);
+        $this->ensurePreferenceRow($request->user());
 
         return DB::transaction(function () use ($request, $call, $data) {
-            User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            $this->lockPeople(collect([$request->user()->id]));
             $locked = ChatCall::whereKey($call->id)->lockForUpdate()->firstOrFail();
             $this->assertCalling($request->user(), $locked->conversation, $locked->status === 'active');
             abort_if($locked->ended_at || ($locked->status === 'ringing' && $locked->ring_until->lte(now())), 409, 'This call has ended.');

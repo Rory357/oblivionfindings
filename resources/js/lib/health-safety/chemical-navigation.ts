@@ -7,15 +7,18 @@ export type ChemicalSection = (typeof CHEMICAL_SECTIONS)[number];
 export const CHEMICAL_ACTIONS = ['edit', 'status', 'add_sds', 'edit_sds', 'current_sds', 'add_storage', 'edit_storage', 'audit_storage', 'archive_storage', 'restore_storage'] as const;
 export type ChemicalAction = (typeof CHEMICAL_ACTIONS)[number];
 const origin = 'https://chemical-navigation.invalid';
+// Each pattern on its own line so the disable stays on it after Prettier rewraps the checks below.
+// eslint-disable-next-line no-control-regex -- refuses control characters and spaces in a return link on purpose (link safety).
+const UNSAFE_LINK_CHARACTER = /[\\#\u0000-\u0020\u007f]/;
+// eslint-disable-next-line no-control-regex -- refuses decoded control characters in a return link on purpose (link safety).
+const UNSAFE_DECODED_CHARACTER = /[\\\u0000-\u001f\u007f]/;
 const positive = (value: string | null) => value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
 const single = (query: URLSearchParams, key: string) => query.getAll(key).length === 1 ? query.get(key) : null;
 function parsed(value: string | null | undefined): URL | null {
-    // eslint-disable-next-line no-control-regex -- refuses control characters and spaces in a return link on purpose (link safety).
-    if (!value || new TextEncoder().encode(value).length > 1500 || !value.startsWith('/') || value.startsWith('//') || /[\\#\u0000-\u0020\u007f]/.test(value)) return null;
+    if (!value || new TextEncoder().encode(value).length > 1500 || !value.startsWith('/') || value.startsWith('//') || UNSAFE_LINK_CHARACTER.test(value)) return null;
     try {
         const target = new URL(value, origin);
-        // eslint-disable-next-line no-control-regex -- refuses decoded control characters in a return link on purpose (link safety).
-        if (target.origin !== origin || target.pathname !== value.split('?')[0] || /[\\\u0000-\u001f\u007f]/.test(decodeURIComponent(value))) return null;
+        if (target.origin !== origin || target.pathname !== value.split('?')[0] || UNSAFE_DECODED_CHARACTER.test(decodeURIComponent(value))) return null;
         return target;
     } catch { return null; }
 }

@@ -1020,8 +1020,9 @@ class RespiteScopeIntegrityTest extends TestCase
     private function restraintPayload(array $overrides = []): array
     {
         return [
-            'started_at' => now()->subHour()->format('Y-m-d H:i:s'),
-            'ended_at' => now()->subMinutes(45)->format('Y-m-d H:i:s'),
+            // NZ wall-clock with its offset, as the restraint form sends it.
+            'started_at' => now()->subHour()->timezone('Pacific/Auckland')->toIso8601String(),
+            'ended_at' => now()->subMinutes(45)->timezone('Pacific/Auckland')->toIso8601String(),
             'restraint_type' => 'physical',
             'severity' => 'medium',
             'trigger_description' => 'Resident moved toward an unsafe exit.',

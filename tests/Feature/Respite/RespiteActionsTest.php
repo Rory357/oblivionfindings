@@ -170,8 +170,9 @@ test('recording a within-plan restraint auto-links the clients active behaviour 
 
     $this->actingAs($this->admin)
         ->post("/respite/stays/{$stay->id}/restraints", [
-            'started_at' => now()->subHours(2)->format('Y-m-d H:i:s'),
-            'ended_at' => now()->subHour()->format('Y-m-d H:i:s'),
+            // NZ wall-clock with its offset, as the restraint form sends it.
+            'started_at' => now()->subHours(2)->timezone('Pacific/Auckland')->toIso8601String(),
+            'ended_at' => now()->subHour()->timezone('Pacific/Auckland')->toIso8601String(),
             'restraint_type' => 'physical',
             'severity' => 'medium',
             'trigger_description' => 'Client moved toward an unsafe exit.',

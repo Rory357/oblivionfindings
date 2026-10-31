@@ -5,6 +5,7 @@ namespace App\Services\Respite;
 use App\Models\Client;
 use App\Models\ClientRespiteAllocation;
 use App\Models\RespiteBooking;
+use App\Support\WorkerClock;
 use Carbon\CarbonImmutable;
 
 class ClientRespiteAllocationSummary
@@ -14,7 +15,7 @@ class ClientRespiteAllocationSummary
      */
     public function forClient(Client $client): ?array
     {
-        $today = CarbonImmutable::today();
+        $today = WorkerClock::today()->toDateString();
 
         $allocation = ClientRespiteAllocation::query()
             ->where('client_id', $client->id)
@@ -27,11 +28,12 @@ class ClientRespiteAllocationSummary
             return null;
         }
 
+        // The period is NZ calendar dates; booking times are UTC instants.
         $bookings = RespiteBooking::query()
             ->where('client_id', $client->id)
             ->whereIn('status', ['confirmed', 'in_progress', 'completed'])
-            ->where('end_at', '>=', $allocation->period_start)
-            ->where('start_at', '<=', $allocation->period_end)
+            ->where('end_at', '>=', WorkerClock::dayStartUtc($allocation->period_start->toDateString()))
+            ->where('start_at', '<=', WorkerClock::dayEndUtc($allocation->period_end->toDateString()))
             ->get(['id', 'start_at', 'end_at', 'status']);
 
         $used = 0;
@@ -39,10 +41,10 @@ class ClientRespiteAllocationSummary
 
         foreach ($bookings as $booking) {
             $nights = $this->nightsWithinPeriod(
-                CarbonImmutable::instance($booking->start_at),
-                CarbonImmutable::instance($booking->end_at),
-                CarbonImmutable::instance($allocation->period_start),
-                CarbonImmutable::instance($allocation->period_end),
+                $this->calendarDay(WorkerClock::localDate($booking->start_at)),
+                $this->calendarDay(WorkerClock::localDate($booking->end_at)),
+                $this->calendarDay($allocation->period_start->toDateString()),
+                $this->calendarDay($allocation->period_end->toDateString()),
             );
 
             if ($booking->status === 'completed' || $booking->end_at?->isPast()) {
@@ -68,6 +70,13 @@ class ClientRespiteAllocationSummary
         ];
     }
 
+    /** A Y-m-d calendar date as UTC midnight, so day sums ignore daylight saving. */
+    private function calendarDay(string $date): CarbonImmutable
+    {
+        return CarbonImmutable::parse($date, 'UTC');
+    }
+
+    /** Each argument is a calendar day; booking days are their NZ dates. */
     private function nightsWithinPeriod(
         CarbonImmutable $start,
         CarbonImmutable $end,
@@ -77,6 +86,6 @@ class ClientRespiteAllocationSummary
         $windowStart = $start->greaterThan($periodStart) ? $start : $periodStart;
         $windowEnd = $end->lessThan($periodEnd->addDay()) ? $end : $periodEnd->addDay();
 
-        return max(0, $windowStart->startOfDay()->diffInDays($windowEnd->startOfDay()));
+        return max(0, (int) $windowStart->diffInDays($windowEnd));
     }
 }

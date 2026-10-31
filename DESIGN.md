@@ -471,7 +471,12 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
 - **Icons** — lucide-react only, no second icon set and no emoji-as-icon.
   Sizes: `size-4` (16px) in buttons/menus/inputs, 15px in nav pills,
   `size-3.5` in dense chrome; default stroke. Icon-only controls always
-  carry an `aria-label`.
+  carry an `aria-label`. **Emoji are content, not icons** (clarified
+  2026-10-22, Chat): they belong in messages, reactions, the emoji picker
+  and stickers, drawn with the computer's own emoji font, and never as a
+  button label, menu icon, status marker or decoration ("👍 Acknowledge",
+  "🎙️ Voice note" are the anti-pattern). ESLint `design/no-emoji-icon`
+  checks the chat folders.
 - **Stat/KPI cards** — `components/ops-stat-card.tsx` / `fleet-stat-card.tsx`.
 - **Health & safety pages: one strip and signature blocks (approved by
   Stephan 2026-10-23 with the H&S drawings, design viewer v35).** The
@@ -512,6 +517,39 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
   the overview is whole NZ dollars: charts set `unit: 'NZD'` (monthly
   series add `interval: 'month'`), and rows, breakdowns and bars carry a
   formatted `display` value such as "$1,960" instead of a raw number.
+- **Chat — the Chat v3 boards (approved by Stephan 2026-10-22).** Chat,
+  the family portal conversation, calls and every place chat appears are
+  built to the six boards in `docs/chat-experience/v3/` (the "Chat v3 —
+  proposed rebuild" page of the design viewer), view for view. The rules
+  behind them:
+  - `/chat` is the page kit's **Workspace** template at full height with
+    the breadcrumb strip only: no Event Horizon band (a deliberate
+    exception to the page header contract, decision D14). Side sheets and
+    drawers show **one** conversation, never the two-pane workspace.
+  - **Messages own the screen.** Above them sit the conversation header
+    (photo with ring, name, one status line, Chat · Files · Pinned · Notes
+    tabs, call, video, search, people) and at most one slim context bar
+    (family: who can read it, owner, reply due, hand over). Status notices
+    share one slot; nothing else stacks above the messages.
+  - **Bubbles:** your own on the right in the brand-fill tint, others on
+    the left on the card surface; consecutive messages from one sender
+    grouped under one photo and name; time inline; reactions under the
+    bubble; photos as pictures (grid with "+N"); voice notes as a waveform
+    player; Oblivion links as care cards.
+  - **Message actions** come from one `MenuItem` set offered by a hover
+    bar, the ⋯ button, right-click and Shift+F10, never a pop-up per
+    action. Destructive items use the destructive tone.
+  - **Composer:** one auto-growing line with + (attach menu), emoji,
+    stickers and GIFs, "Aa" formatting, and a microphone that turns into
+    Send; voice notes record inline. Compact desktop controls, with
+    `.frontline-hit` where a bigger target is needed.
+  - **Read status:** staff see per-person read rings and Message info;
+    family see only "Seen by care team" (D8). Delivery rings always carry
+    a word (Sending, Sent, Delivered, Read).
+  - **Calls:** one click to start; Answer in the primary colour with a
+    phone icon, Decline in the destructive red (D13, D15).
+  - Plain NZ English everywhere: no "audience", "publication",
+    "eligible", "policy scope" or send-checking jargon on screen.
 - **Multi-step flows** — `WizardShell` (see entity add/edit above).
   `components/wizard-stepper.tsx` is **legacy** — do not use it in new work.
 - **Forms** — shadcn `<Input>`/`<Select>`/`<Textarea>`; dense native-element
@@ -850,7 +888,8 @@ before.
   search/filter bar sitting BELOW the header, instead of the fixed
   contract in `design_styles/PAGE_HEADER_STYLE_GUIDE.md` (search and
   filters live in the header; lists get no sub-bar; individuals add
-  the tier-2 sub-nav strip).
+  the tier-2 sub-nav strip). The one exception is `/chat`, a full-height
+  Workspace (see "Chat — the Chat v3 boards").
 - **Bespoke entity cards or list tables** — hand-rolled card
   anatomies, per-page table styling, or invented table cells instead
   of the contracts in `design_styles/LIST_STYLE_GUIDE.md` (status
@@ -1080,6 +1119,30 @@ before.
   forever when the load fails, and drops back to the fallback on every full
   refresh (My Day refreshes every 60 s). Use `<DeferredPanel>` (see "Skeleton
   vs loader"). ESLint blocks importing `Deferred` from `@inertiajs/react`.
+
+- **A conversation buried under its own chrome** (corrected 2026-10-22,
+  Chat: "the UI looks really bad"). On a 1440 × 900 screen the family
+  conversation gave its messages 191 px: a privacy banner, an owner row
+  with three buttons, a reply-status row and a floating Callbacks button
+  stacked above them, a 200 px composer below, and each one-line message
+  took about 150 px (name row, bordered bubble, time row, an always-shown
+  ⋯ row). Follow "Chat — the Chat v3 boards": one slim context bar, one
+  notice slot, grouped bubbles with inline times, a one-line composer.
+- **A pop-up for every message action** (corrected 2026-10-22, Chat).
+  Reacting, replying, pinning and saving each opened a 480 px dialog of
+  outline buttons. Message actions are a hover bar plus one menu
+  (⋯, right-click, Shift+F10) fed by one `MenuItem` set; pop-ups are for
+  work that needs a form (share, turn into a task, report a concern).
+- **A fake emoji button** (corrected 2026-10-22, Chat: "limited
+  emoticons"). The composer's smiley appended " 🙂" and the only
+  reaction was 👍. An emoji control opens the shared emoji picker (search,
+  categories, recent, skin tones); reactions take any emoji, with a quick
+  bar of six.
+- **Blanket descendant tap sizes in chat dialogs** — `[&_button]:min-h-[44px]`
+  on a dialog (non-negotiable 5) turned every control, including
+  switches, into 44 px blocks on a desktop-only screen. ESLint
+  `design/no-blanket-descendant-size` checks the chat folders; the three
+  existing chat dialogs are rebuilt in the Chat rebuild.
 
 ## File viewing and downloading (approved by Stephan 2026-09-27)
 
