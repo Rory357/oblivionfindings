@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 class PrepareTestingSchema extends Command
@@ -12,17 +13,46 @@ class PrepareTestingSchema extends Command
     protected $signature = 'testing:prepare-schema
         {--database=mysql : The database connection to prepare}
         {--seed= : Optional seeder class to run after migrate:fresh before dumping the schema}
-        {--output= : Optional repository-relative output path for a disposable schema cache}';
+        {--output= : Optional repository-relative output path for a disposable schema cache}
+        {--from-scratch : Migrate an empty database and dump structure only, instead of building on the current dump}';
 
     protected $description = 'Prepare a reusable testing schema dump for faster PHPUnit bootstrapping';
 
+    /**
+     * By default the dump is brought forward: load the current dump, run the
+     * migrations it doesn't have, and dump the structure plus every row the
+     * database then holds. That is exactly the database each test process used
+     * to build for itself (load the dump, migrate the rest), so refreshing it
+     * changes no test's starting rows. A dump from --from-scratch holds no rows
+     * besides the migrations table: rows that data migrations insert are gone.
+     */
     public function handle(): int
     {
         $database = (string) $this->option('database');
         $seeder = $this->option('seed');
+        $fromScratch = (bool) $this->option('from-scratch');
         $schemaPath = $this->schemaPath($database, $this->option('output'));
         $backupPath = is_file($schemaPath) ? $schemaPath.'.bak' : null;
 
+        // db:wipe below drops every table. Without a .env.testing, --env=testing
+        // falls back to .env and would name the developer's own database.
+        $databaseName = (string) DB::connection($database)->getDatabaseName();
+        if (! app()->environment('testing') || ! str_contains($databaseName, 'test')) {
+            $this->components->error(sprintf(
+                'Refusing to wipe [%s]: run with --env=testing against a database whose name contains "test".',
+                $databaseName,
+            ));
+
+            return self::FAILURE;
+        }
+
+        if (! $fromScratch && $backupPath === null) {
+            $this->components->error(sprintf('There is no dump at %s to build on; run with --from-scratch.', $schemaPath));
+
+            return self::FAILURE;
+        }
+
+        $this->ensureDatabaseExists(DB::connection($database));
         $this->configureMysqlClientPath();
         $this->components->info(sprintf('Preparing schema dump for [%s].', $database));
 
@@ -36,8 +66,14 @@ class PrepareTestingSchema extends Command
             '--force' => true,
         ];
 
+        $succeeded = false;
+
         try {
             if ($this->call('db:wipe', $wipeOptions) !== self::SUCCESS) {
+                return self::FAILURE;
+            }
+
+            if (! $fromScratch && ! $this->loadDump(DB::connection($database), (string) $backupPath)) {
                 return self::FAILURE;
             }
 
@@ -53,20 +89,53 @@ class PrepareTestingSchema extends Command
                 return self::FAILURE;
             }
 
-            if (! $this->dumpSchema(DB::connection($database), $schemaPath)) {
+            $dumped = $fromScratch
+                ? $this->dumpSchema(DB::connection($database), $schemaPath)
+                : $this->dumpSchemaWithRows(DB::connection($database), $schemaPath);
+
+            if (! $dumped) {
                 return self::FAILURE;
             }
+
+            $this->removeDefiners($schemaPath);
+            $succeeded = true;
         } finally {
-            if ($backupPath && is_file($backupPath) && ! is_file($schemaPath)) {
-                rename($backupPath, $schemaPath);
-            } elseif ($backupPath && is_file($backupPath)) {
-                @unlink($backupPath);
+            // A failed run puts the previous dump back, over any partial one.
+            if ($backupPath && is_file($backupPath)) {
+                if ($succeeded) {
+                    @unlink($backupPath);
+                } else {
+                    @unlink($schemaPath);
+                    rename($backupPath, $schemaPath);
+                }
             }
         }
 
         $this->components->info(sprintf('Testing schema dump is ready at %s', $schemaPath));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * `composer test:prepare` builds in a scratch database of its own, which
+     * may not exist yet; db:wipe can't connect to a missing one.
+     */
+    protected function ensureDatabaseExists(Connection $connection): void
+    {
+        $config = $connection->getConfig();
+        $dsn = ! empty($config['unix_socket'])
+            ? sprintf('mysql:unix_socket=%s', $config['unix_socket'])
+            : sprintf('mysql:host=%s;port=%s', is_array($config['host']) ? $config['host'][0] : $config['host'], $config['port'] ?? 3306);
+        $pdo = new \PDO($dsn, (string) $config['username'], (string) ($config['password'] ?? ''), [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+        ]);
+
+        $pdo->exec(sprintf(
+            'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET %s COLLATE %s',
+            str_replace('`', '``', $connection->getDatabaseName()),
+            $config['charset'] ?? 'utf8mb4',
+            $config['collation'] ?? 'utf8mb4_unicode_ci',
+        ));
     }
 
     protected function configureMysqlClientPath(): void
@@ -158,6 +227,178 @@ class PrepareTestingSchema extends Command
         }
 
         return true;
+    }
+
+    /**
+     * Structure, then every row, then triggers: loaded in that order, no
+     * trigger fires while the rows go in.
+     */
+    protected function dumpSchemaWithRows(Connection $connection, string $schemaPath): bool
+    {
+        $dumpBinary = $this->resolveMysqlDumpBinary();
+        if ($dumpBinary === null) {
+            $this->components->error('Unable to locate mysqldump for schema preparation.');
+
+            return false;
+        }
+
+        $this->ensureSchemaDirectoryExists($schemaPath);
+
+        if (! $this->runDumpProcess(
+            binary: $dumpBinary,
+            connection: $connection,
+            path: $schemaPath,
+            extraArgs: ['--routines', '--skip-triggers', sprintf('--result-file=%s', $schemaPath), '--no-data'],
+        )) {
+            return false;
+        }
+
+        $this->removeAutoIncrementingState($schemaPath);
+
+        $sections = [
+            'rows' => [
+                'objects' => $this->tablesWithRows($connection),
+                'args' => ['--no-create-info', '--skip-triggers', '--skip-routines', '--compact', '--complete-insert', '--skip-extended-insert', '--order-by-primary'],
+                // --compact leaves out the session settings the rows need: UTC
+                // timestamps, and any table order despite foreign keys.
+                'before' => "-- Rows: the migrations table and the rows data migrations wrote.\n"
+                    ."/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;\n/*!40103 SET TIME_ZONE='+00:00' */;\n"
+                    ."/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;\n"
+                    ."/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;\n",
+                'after' => "/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;\n/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;\n"
+                    ."/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n",
+            ],
+            'triggers' => [
+                'objects' => [],
+                'args' => ['--no-create-info', '--no-data', '--triggers', '--skip-routines', '--compact'],
+                'before' => "-- Triggers\n",
+                'after' => '',
+            ],
+        ];
+
+        foreach ($sections as $name => $section) {
+            if ($name === 'rows' && $section['objects'] === []) {
+                continue;
+            }
+
+            $sectionPath = $schemaPath.'.'.$name.'.tmp';
+
+            try {
+                if (! $this->runDumpProcess(
+                    binary: $dumpBinary,
+                    connection: $connection,
+                    path: $sectionPath,
+                    extraArgs: $section['args'],
+                    databaseObjects: $section['objects'],
+                )) {
+                    return false;
+                }
+
+                file_put_contents(
+                    $schemaPath,
+                    PHP_EOL.$section['before'].file_get_contents($sectionPath).$section['after'],
+                    FILE_APPEND,
+                );
+            } finally {
+                if (is_file($sectionPath)) {
+                    @unlink($sectionPath);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function tablesWithRows(Connection $connection): array
+    {
+        $tables = array_map(
+            static fn (object $row): string => (string) array_values((array) $row)[0],
+            $connection->select("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'"),
+        );
+
+        return array_values(array_filter(
+            $tables,
+            fn (string $table): bool => (int) $connection->selectOne(sprintf(
+                'SELECT EXISTS(SELECT 1 FROM `%s`) AS has_rows',
+                str_replace('`', '``', $table),
+            ))->has_rows === 1,
+        ));
+    }
+
+    /**
+     * Load the current dump into the wiped database with the mysql client:
+     * the dump's triggers need its DELIMITER handling.
+     */
+    protected function loadDump(Connection $connection, string $path): bool
+    {
+        $binary = $this->resolveClientBinaryFromEnvironment(['MYSQL_BINARY', 'MYSQL_CLIENT_BIN'], DIRECTORY_SEPARATOR === '\\' ? 'mysql.exe' : 'mysql');
+
+        foreach ($binary === null ? $this->mysqlClientDirectories() : [] as $directory) {
+            if (is_file($directory.DIRECTORY_SEPARATOR.'mysql.exe')) {
+                $binary = $directory.DIRECTORY_SEPARATOR.'mysql.exe';
+                break;
+            }
+        }
+
+        $binary ??= (new ExecutableFinder)->find('mysql');
+
+        if ($binary === null) {
+            $this->components->error('Unable to locate the mysql client to load the current dump.');
+
+            return false;
+        }
+
+        $config = $connection->getConfig();
+        $arguments = [$binary, sprintf('--user=%s', $config['username'])];
+        $arguments[] = ! empty($config['unix_socket'])
+            ? sprintf('--socket=%s', $config['unix_socket'])
+            : sprintf('--host=%s', is_array($config['host']) ? $config['host'][0] : $config['host']);
+
+        if (empty($config['unix_socket'])) {
+            $arguments[] = sprintf('--port=%s', $config['port'] ?? 3306);
+        }
+
+        $process = new Process([...$arguments, $config['database']], env: ['MYSQL_PWD' => (string) ($config['password'] ?? '')]);
+        $handle = fopen($path, 'r');
+        $process->setInput($handle);
+        $process->setTimeout(null);
+
+        try {
+            $process->run();
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+        }
+
+        if (! $process->isSuccessful()) {
+            $this->components->error(sprintf('Loading the current dump failed: %s', trim($process->getErrorOutput())));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Triggers record the user who created them; without that clause they
+     * load as whoever loads the dump, so any test database user can.
+     */
+    protected function removeDefiners(string $schemaPath): void
+    {
+        $schema = file_get_contents($schemaPath);
+
+        if ($schema === false) {
+            return;
+        }
+
+        file_put_contents(
+            $schemaPath,
+            preg_replace('#/\*!50017 DEFINER=`[^`]*`@`[^`]*`\*/ ?#', '', $schema) ?? $schema,
+        );
     }
 
     protected function schemaPath(string $database, mixed $output): string
@@ -303,7 +544,8 @@ class PrepareTestingSchema extends Command
             }
         }
 
-        return null;
+        // Linux and macOS keep the client on PATH.
+        return (new ExecutableFinder)->find('mysqldump');
     }
 
     /**
