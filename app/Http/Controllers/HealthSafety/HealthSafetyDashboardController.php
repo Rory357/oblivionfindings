@@ -101,6 +101,7 @@ class HealthSafetyDashboardController extends Controller
                                 'work' => $this->overviewWork($request, $context),
                                 'detail' => $this->overviewDetail($request, $context, $proof),
                                 'boxes' => $this->overviewBoxes($request, $context),
+                                'chart_severity', 'chart_over_time', 'chart_due', 'chart_types' => $this->overviewChart($group, $request, $context),
                             };
                         }
 
@@ -143,6 +144,11 @@ class HealthSafetyDashboardController extends Controller
         'detail' => ['incidents_by_category', 'site_league', 'frequency_operands', 'hazard_burndown', 'open_hazards_list', 'first_aid', 'restraints'],
         // G2 (Stephan's header): the four boxes, with their trend and weekly bars, in their own background request.
         'boxes' => ['header_boxes'],
+        // G2: each header chart in its own background request, so a slow chart never holds up the others.
+        'chart_severity' => ['header_chart_severity'],
+        'chart_over_time' => ['header_chart_over_time'],
+        'chart_due' => ['header_chart_due'],
+        'chart_types' => ['header_chart_types'],
     ];
 
     /** Runs $build at most once per request (the parts above are shared by several props). */
@@ -445,6 +451,16 @@ class HealthSafetyDashboardController extends Controller
 
         return ['header_boxes' => app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class)
             ->boxes($user, $f['siteScope'] === null ? null : array_map('intval', (array) $f['siteScope']), $f['now'], $context, $checksDue, $drillsDue)];
+    }
+
+    /** Background parts "chart_*" (G2): one header chart, counted like the boxes. */
+    private function overviewChart(string $group, Request $request, HealthSafetyReadContext $context): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        $chart = substr($group, strlen('chart_'));
+
+        return ['header_'.$group => app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class)
+            ->chart($chart, $f['user'], $f['siteScope'] === null ? null : array_map('intval', (array) $f['siteScope']), $f['now'], $context)];
     }
 
     /** Background part "detail": the charts and lists on the Prevention and Harm tabs and the Site comparison. */

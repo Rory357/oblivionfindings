@@ -97,6 +97,37 @@ class HsOverviewHeaderBoxesTest extends TestCase
         $this->assertSame(array_fill(0, 8, null), $box['weeks']);
     }
 
+    public function test_each_chart_arrives_on_its_own_and_counts_only_what_the_viewer_can_open(): void
+    {
+        $this->overdueAction($this->own, 'CA-SOON', createdDaysAgo: 2, dueDaysAgo: -5);  // due in 5 days
+        $this->overdueAction($this->other, 'CA-ELSEWHERE', createdDaysAgo: 2, dueDaysAgo: -5);
+        $lead = $this->viewer('team_lead');
+        $officer = $this->viewer('health_safety_officer');
+
+        $due = $this->chartFor($lead, 'due');
+        $this->assertSame('actions', $due['kind']);
+        $this->assertCount(30, $due['days']);
+        $this->assertSame(1, $due['total'], 'Only their own Site.');
+        $this->assertSame(1, $due['days'][5]['count']);
+        $this->assertSame(2, $this->chartFor($officer, 'due')['total'], 'All Sites.');
+
+        foreach (['severity' => 'items', 'over_time' => 'days', 'types' => 'items'] as $chart => $key) {
+            $this->assertArrayHasKey($key, $this->chartFor($officer, $chart), $chart);
+        }
+        $this->assertSame(['critical', 'high', 'medium', 'low'], array_column($this->chartFor($officer, 'severity')['items'], 'key'));
+        $this->assertCount(30, $this->chartFor($officer, 'over_time')['days']);
+    }
+
+    private function chartFor(User $viewer, string $chart): array
+    {
+        return $this->actingAs($viewer)->get('/health-safety', [
+            'X-Inertia' => 'true',
+            'X-Inertia-Version' => (string) app(HandleInertiaRequests::class)->version(request()),
+            'X-Inertia-Partial-Component' => 'health-safety/dashboard',
+            'X-Inertia-Partial-Data' => 'header_chart_'.$chart,
+        ])->assertOk()->json('props.header_chart_'.$chart);
+    }
+
     private function overdueAction(Site $site, string $reference, int $createdDaysAgo, int $dueDaysAgo, string $status = HsCorrectiveAction::STATUS_OPEN): void
     {
         $creator = User::factory()->create();

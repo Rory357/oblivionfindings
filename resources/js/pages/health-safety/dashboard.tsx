@@ -32,6 +32,7 @@ import {
     type HeroLeadingLagging,
 } from './components/command-centre-hero';
 import type { HeaderBoxes } from './components/overview-header-boxes';
+import { OverviewHeaderCharts } from './components/overview-header-charts';
 import { searchDashboardWorklists } from './components/dashboard-search';
 import {
     buildHsTabItems,
@@ -362,6 +363,11 @@ export default function HealthSafetyDashboard({
                         orgName={org_name}
                         search={{ value: search, onChange: setSearch }}
                         boxSet={header_box_set}
+                        charts={
+                            header_box_set ? (
+                                <OverviewHeaderCharts hazards={header_box_set === 'hazards'} link={destination} />
+                            ) : undefined
+                        }
                         rail={
                             <PageHeaderRail
                                 items={tabItems.map((item) => ({

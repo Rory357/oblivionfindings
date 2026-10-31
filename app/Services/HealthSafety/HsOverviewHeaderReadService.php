@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\Incidents\IncidentOwnershipService;
 use App\Services\UserSiteAccessService;
+use App\Support\HealthSafety\HsLabels;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\CarbonInterface as Carbon;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -144,6 +145,103 @@ final class HsOverviewHeaderReadService
 
             return ['set' => $set, 'since' => $since->toDateString(), 'boxes' => array_map($box, $keys)];
         });
+    }
+
+    /**
+     * G2: one of the header's four charts, with the same scopes as the boxes. People who can't open incidents (the
+     * hazards set) get the hazard version of each chart. Every count is a count of records this person can open.
+     *
+     * @param  'severity'|'over_time'|'due'|'types'  $chart
+     */
+    public function chart(string $chart, User $viewer, ?array $siteIds, Carbon $now, HealthSafetyReadContext $context): array
+    {
+        $kind = self::setFor($viewer) === self::SET_HAZARDS ? 'hazards' : 'incidents';
+
+        return HealthSafetyReadMaterialisationProof::within($context, function (HealthSafetyReadMaterialisationProof $proof) use ($chart, $kind, $viewer, $siteIds, $now, $context): array {
+            $source = fn (): Builder => $kind === 'hazards' ? $this->hazards($siteIds) : $this->incidents($siteIds, $context, $proof);
+            $openNow = fn (): Builder => $kind === 'hazards'
+                ? $source()->whereIn('site_hazards.status', ['open', 'in_progress'])
+                : $source()->whereNotIn('client_incidents.status', ['draft', 'closed']);
+            $table = $kind === 'hazards' ? 'site_hazards' : 'client_incidents';
+
+            return match ($chart) {
+                'severity' => ['kind' => $kind, 'items' => $this->tally(
+                    $openNow(), $kind === 'hazards' ? 'site_hazards.risk_rating' : 'client_incidents.severity', ['critical', 'high', 'medium', 'low'])],
+                'types' => ['kind' => $kind, ...$this->topTypes($openNow(), $kind === 'hazards' ? 'site_hazards.hazard_type' : 'client_incidents.type')],
+                'over_time' => $this->overTime($source(), $kind === 'hazards' ? "{$table}.created_at" : 'COALESCE(client_incidents.submitted_at, client_incidents.created_at)', $now, $kind,
+                    $kind === 'hazards' ? null : "client_incidents.status <> 'draft'"),
+                'due' => $kind === 'hazards'
+                    ? $this->dueDays($this->hazards($siteIds)->whereIn('site_hazards.status', ['open', 'in_progress']), 'site_hazards.due_date', $now, 'hazards')
+                    : $this->dueDays($proof->protect(HsCorrectiveAction::query()
+                        ->whereIn('hs_corrective_actions.hs_event_id', $this->events($viewer, $siteIds, $context, $proof)->select('hs_events.id'))
+                        ->whereNotIn('hs_corrective_actions.status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])),
+                        'hs_corrective_actions.due_date', $now, 'actions'),
+            };
+        });
+    }
+
+    /** Counts for fixed keys, in order (missing keys count 0; other values are left out). */
+    private function tally(Builder $query, string $column, array $keys): array
+    {
+        $counts = (clone $query)->withoutEagerLoads()->reorder()->toBase()
+            ->selectRaw("{$column} AS k, COUNT(*) AS n")->groupBy('k')->pluck('n', 'k')->all();
+
+        return array_map(fn (string $key): array => ['key' => $key, 'label' => ucfirst($key), 'count' => (int) ($counts[$key] ?? 0)], $keys);
+    }
+
+    /** The four most common types, then everything else as "Other". */
+    private function topTypes(Builder $query, string $column): array
+    {
+        $rows = (clone $query)->withoutEagerLoads()->reorder()->toBase()
+            ->selectRaw("{$column} AS k, COUNT(*) AS n")->groupBy('k')->orderByDesc('n')->orderBy('k')->get();
+        $top = $rows->take(4)->map(fn ($row): array => ['key' => (string) $row->k, 'label' => HsLabels::humanise((string) $row->k), 'count' => (int) $row->n])->values()->all();
+
+        return ['items' => $top, 'other' => (int) $rows->slice(4)->sum('n')];
+    }
+
+    /** Reported each day for the last 30 days (worker calendar), the total, and the change on the 30 days before. */
+    private function overTime(Builder $query, string $dateSql, Carbon $now, string $kind, ?string $where): array
+    {
+        $zone = $this->workerOffset($now);
+        $start = $now->copy()->subDays(60);
+        $q = (clone $query)->withoutEagerLoads()->reorder()->toBase();
+        if ($where !== null) {
+            $q->whereRaw($where);
+        }
+        $counts = $q->whereRaw("{$dateSql} >= ?", [$start->copy()->utc()->format('Y-m-d H:i:s')])
+            ->selectRaw("DATE(CONVERT_TZ({$dateSql}, '+00:00', '{$zone}')) AS d, COUNT(*) AS n")->groupBy('d')->pluck('n', 'd')->all();
+        $today = $now->copy()->setTimezone((string) (config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC'))->startOfDay();
+        $days = [];
+        $previous = 0;
+        for ($i = 59; $i >= 0; $i--) {
+            $date = $today->copy()->subDays($i)->toDateString();
+            $n = (int) ($counts[$date] ?? 0);
+            if ($i >= 30) {
+                $previous += $n;
+            } else {
+                $days[] = ['date' => $date, 'count' => $n];
+            }
+        }
+        $total = array_sum(array_column($days, 'count'));
+
+        return ['kind' => $kind, 'days' => $days, 'total' => $total, 'previous_total' => $previous,
+            'change_pct' => $previous > 0 ? (int) round(($total - $previous) / $previous * 100) : null];
+    }
+
+    /** Due each day for the next 30 days (worker calendar), from today. */
+    private function dueDays(Builder $query, string $column, Carbon $now, string $kind): array
+    {
+        $today = $now->copy()->setTimezone((string) (config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC'))->startOfDay();
+        $counts = (clone $query)->withoutEagerLoads()->reorder()->toBase()
+            ->whereBetween($column, [$today->toDateString(), $today->copy()->addDays(29)->toDateString()])
+            ->selectRaw("DATE({$column}) AS d, COUNT(*) AS n")->groupBy('d')->pluck('n', 'd')->all();
+        $days = [];
+        for ($i = 0; $i < 30; $i++) {
+            $date = $today->copy()->addDays($i)->toDateString();
+            $days[] = ['date' => $date, 'count' => (int) ($counts[$date] ?? 0)];
+        }
+
+        return ['kind' => $kind, 'days' => $days, 'total' => array_sum(array_column($days, 'count'))];
     }
 
     /** The same H&S event scope as the Overview's lists (HsDashboardService::hsEventQuery). */
