@@ -100,6 +100,7 @@ class HealthSafetyDashboardController extends Controller
                                 'headline' => $this->overviewHeadline($request, $context),
                                 'work' => $this->overviewWork($request, $context),
                                 'detail' => $this->overviewDetail($request, $context, $proof),
+                                'boxes' => $this->overviewBoxes($request, $context),
                             };
                         }
 
@@ -140,6 +141,8 @@ class HealthSafetyDashboardController extends Controller
         'headline' => ['kpis', 'incident_trends', 'safeguarding_source', 'workplace_injury_state', 'ppe_kpi_state', 'leading_lagging', 'frequency_trends'],
         'work' => ['worklists', 'backbone', 'exposure_delivery_problems'],
         'detail' => ['incidents_by_category', 'site_league', 'frequency_operands', 'hazard_burndown', 'open_hazards_list', 'first_aid', 'restraints'],
+        // G2 (Stephan's header): the four boxes, with their trend and weekly bars, in their own background request.
+        'boxes' => ['header_boxes'],
     ];
 
     /** Runs $build at most once per request (the parts above are shared by several props). */
@@ -424,6 +427,22 @@ class HealthSafetyDashboardController extends Controller
                 'ppe_expiring_state' => $expiringProjection['ppe'],
             ],
         ];
+    }
+
+    /** Background part "boxes" (G2): the header's four boxes for this viewer, counted like the lists, with proven history. */
+    private function overviewBoxes(Request $request, HealthSafetyReadContext $context): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        $user = $f['user'];
+        [$checksDue, $drillsDue] = [0, 0];
+        if (\App\Services\HealthSafety\HsOverviewHeaderReadService::setFor($user) === \App\Services\HealthSafety\HsOverviewHeaderReadService::SET_HAZARDS) {
+            $due = collect($this->dashboardService->expiringFeedProjection($f['siteScope'], viewer: $user, context: $context)['items'])
+                ->filter(fn (array $item): bool => $item['days_until'] !== null && $item['days_until'] <= 0);
+            [$checksDue, $drillsDue] = [$due->where('type', '!=', 'drill')->count(), $due->where('type', 'drill')->count()];
+        }
+
+        return ['header_boxes' => app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class)
+            ->boxes($user, $f['siteScope'] === null ? null : array_map('intval', (array) $f['siteScope']), $f['now'], $context, $checksDue, $drillsDue)];
     }
 
     /** Background part "detail": the charts and lists on the Prevention and Harm tabs and the Site comparison. */

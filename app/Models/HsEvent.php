@@ -347,6 +347,29 @@ class HsEvent extends Model
         return $query->where('worksafe_notifiable', true);
     }
 
+    /** SQL twin of hasSignedWorksafeDecision(). */
+    public const SIGNED_WORKSAFE_DECISION_SQL = "(hs_events.worksafe_notifiable IS NOT NULL AND hs_events.worksafe_decided_at IS NOT NULL"
+        ." AND hs_events.worksafe_decided_by_user_id IS NOT NULL AND COALESCE(hs_events.worksafe_decision_reason, '') <> ''"
+        ." AND hs_events.worksafe_decision_source IN ('manual', 'incident_report', 'classifier')"
+        ." AND COALESCE(hs_events.worksafe_decision_tree_version, '') <> '' AND hs_events.worksafe_source_effective_date IS NOT NULL)";
+
+    /**
+     * G2 (B2.2/IR10) "WorkSafe: decide or tell": open reviews that still need the WorkSafe decision (no signed decision,
+     * and flagged notifiable or High/Critical), or that were decided notifiable and WorkSafe hasn't been told yet.
+     */
+    public function scopeWorksafeDecideOrTell($query)
+    {
+        return $query->where('hs_events.status', '!=', self::STATUS_CLOSED)->where(function ($q): void {
+            $q->where(function ($decide): void {
+                $decide->whereRaw('NOT '.self::SIGNED_WORKSAFE_DECISION_SQL)
+                    ->where(fn ($flag) => $flag->where('hs_events.worksafe_notifiable', true)->orWhereIn('hs_events.severity', ['high', 'critical']));
+            })->orWhere(function ($tell): void {
+                $tell->whereRaw(self::SIGNED_WORKSAFE_DECISION_SQL)
+                    ->where('hs_events.worksafe_notifiable', true)->whereNull('hs_events.worksafe_notified_at');
+            });
+        });
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Helpers */
     /* ------------------------------------------------------------------ */
