@@ -21,7 +21,8 @@ class HsEventRecordAbilitiesTest extends RestraintEventCommandTestCase
         'team_lead' => ['hazards.view', 'hazards.manage', 'healthSafety.events.close', 'healthSafety.closureExceptions.request'],
         'health_safety_officer' => ['hazards.view', 'hazards.manage', 'healthSafety.events.close', 'healthSafety.events.closeAny', 'healthSafety.closureExceptions.request'],
         'admin' => ['hazards.view', 'hazards.manage', 'healthSafety.events.close', 'healthSafety.events.closeAny', 'healthSafety.closureExceptions.request', 'healthSafety.closureExceptions.approve'],
-        'provider_manager' => ['hazards.view'],
+        // Q4 (Stephan, 31 Oct): + hazards.manage at their sites, still no close or restraint keys.
+        'provider_manager' => ['hazards.view', 'hazards.manage'],
         'compliance_lead' => ['hazards.view', 'healthSafety.closureExceptions.approve'],
     ];
 
@@ -176,9 +177,10 @@ class HsEventRecordAbilitiesTest extends RestraintEventCommandTestCase
         $this->assertSame('worksafe_decision', $forOwner['key']);
         $this->assertTrue($forOwner['can']);
 
-        $forManager = $this->detail($this->as('provider_manager'), $event)['next_step'];
-        $this->assertSame('worksafe_decision', $forManager['key']);
-        $this->assertFalse($forManager['can']);
-        $this->assertStringContainsString('Jordan Peri, the owner', $forManager['who']);
+        // A reader who can't manage H&S (the compliance lead) is told who does it.
+        $forReader = $this->detail($this->as('compliance_lead'), $event)['next_step'];
+        $this->assertSame('worksafe_decision', $forReader['key']);
+        $this->assertFalse($forReader['can']);
+        $this->assertStringContainsString('Jordan Peri, the owner', $forReader['who']);
     }
 }
