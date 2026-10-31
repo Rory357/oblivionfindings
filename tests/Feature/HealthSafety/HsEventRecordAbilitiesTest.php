@@ -125,6 +125,7 @@ class HsEventRecordAbilitiesTest extends RestraintEventCommandTestCase
         $this->assertTrue($detail['can']['close']);
         $this->assertSame('anyone_at_site', $detail['close_authority']['who']);
         $this->assertStringContainsString('No owner yet', $detail['close_authority']['text']);
+        $this->assertStringContainsString('must choose an owner before it can close', $detail['close_authority']['text'], 'Decision 3: an owner is needed to close.');
         $this->assertStringContainsString($this->site->name, $detail['close_authority']['text']);
     }
 

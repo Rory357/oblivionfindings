@@ -577,9 +577,13 @@ class HsEventController extends Controller
     }
 
     /**
-     * Q2 (Stephan, 31 Oct; G3 boards approved 1 Nov 2026): change the owner of a safety review that already has one.
-     * The same people may be chosen as for taking it on (handover owner rules), a reason is always needed, each change
-     * is kept in hs_event_owner_changes and the audit log, and the previous and new owners are told.
+     * Q2 (Stephan, 31 Oct; G3 boards approved 1 Nov 2026): change the owner of a safety review, with a reason. The same
+     * people may be chosen as for taking it on (handover owner rules), each change is kept in hs_event_owner_changes and
+     * the audit log, and the previous and new owners are told.
+     *
+     * Decision 3 (a review needs an owner before it can close): a review that has no owner and isn't waiting for its
+     * handover to be accepted (handover not required) gets its first owner here too, with the same checks; the reason
+     * is optional only for that first choice. A review waiting for acceptance keeps the Accept handover path.
      */
     public function changeOwner(Request $request, int $hsEvent)
     {
@@ -588,17 +592,21 @@ class HsEventController extends Controller
 
     private function changeOwnerWithinSourceAuthority(Request $request, HsEvent $hsEvent)
     {
+        $firstOwner = $hsEvent->owner_user_id === null;
         $data = $request->validate([
             'owner_user_id' => ['required', 'integer', 'min:1'],
-            'reason' => ['required', 'string', 'min:10', 'max:2000'],
+            'reason' => $firstOwner ? ['nullable', 'string', 'max:2000'] : ['required', 'string', 'min:10', 'max:2000'],
         ]);
         $actor = $request->user();
 
         if (! $hsEvent->isOpen()) {
             throw ValidationException::withMessages(['owner_user_id' => 'A closed safety review keeps its owner.']);
         }
-        if ($hsEvent->owner_user_id === null) {
-            throw ValidationException::withMessages(['owner_user_id' => 'Take it on or choose the owner first.']);
+        if ($firstOwner && $hsEvent->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE) {
+            throw ValidationException::withMessages(['owner_user_id' => 'This safety review is waiting for its handover to be accepted. Choose the owner when you accept it.']);
+        }
+        if ($firstOwner && $hsEvent->handover_status === HsEvent::HANDOVER_NOT_READY) {
+            throw ValidationException::withMessages(['owner_user_id' => 'The incident hasn\'t been handed over yet, so no owner can be chosen.']);
         }
         if ((int) $hsEvent->owner_user_id === (int) $data['owner_user_id']) {
             throw ValidationException::withMessages(['owner_user_id' => 'This person already owns the safety review.']);
@@ -608,8 +616,8 @@ class HsEventController extends Controller
             throw ValidationException::withMessages(['owner_user_id' => 'Choose someone who manages health and safety at this site and can open this safety review.']);
         }
 
-        $previous = User::query()->find($hsEvent->owner_user_id);
-        $reason = trim((string) $data['reason']);
+        $previous = $firstOwner ? null : User::query()->find($hsEvent->owner_user_id);
+        $reason = trim((string) ($data['reason'] ?? '')) ?: null;
         $change = \App\Models\HsEventOwnerChange::create([
             'hs_event_id' => $hsEvent->id,
             'previous_owner_user_id' => $previous?->id,
@@ -633,7 +641,7 @@ class HsEventController extends Controller
                 continue;
             }
             $recipient->notify(new \App\Notifications\AppEventNotification([
-                'title' => 'Safety review owner changed',
+                'title' => $firstOwner ? 'Safety review owner chosen' : 'Safety review owner changed',
                 'message' => $role === 'incoming'
                     ? 'You now own safety review '.$hsEvent->reference_number.'.'
                     : 'Safety review '.$hsEvent->reference_number.' now has a new owner.',
@@ -644,7 +652,7 @@ class HsEventController extends Controller
             ]));
         }
 
-        return back()->with('success', 'Owner changed.');
+        return back()->with('success', $firstOwner ? 'Owner chosen.' : 'Owner changed.');
     }
 
     /**
@@ -1392,7 +1400,7 @@ class HsEventController extends Controller
                 'who' => $hsEvent->owner_user_id !== null ? 'owner_or_close_any' : 'anyone_at_site',
                 'text' => $hsEvent->owner_user_id !== null
                     ? 'Only '.($hsEvent->owner?->name ?? 'the owner').', the owner, or someone who can close any safety review can close this.'
-                    : 'No owner yet — anyone who can close safety reviews at '.($hsEvent->site?->name ?? 'this site').' can close it.',
+                    : 'No owner yet — someone who can close safety reviews at '.($hsEvent->site?->name ?? 'this site').' must choose an owner before it can close.',
             ],
             'assignable_staff' => $assignableStaff,
             'action_handover' => [

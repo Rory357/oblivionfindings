@@ -70,8 +70,10 @@ final class HsEventActivityService
             $entries = $entries->reject(fn (array $e): bool => ($e['change_id'] ?? null) === $change->id)->values();
             $entries->push([
                 'at' => $change->created_at->toIso8601String(), 'who' => $change->actor_name,
-                'what' => 'changed the owner from '.($change->previous_owner_name ?: 'no one').' to '.$change->owner_name,
-                'step' => 'assigned', 'kind' => 'owner', 'detail' => ['why' => $change->reason],
+                'what' => $change->previous_owner_user_id === null && $change->previous_owner_name === null
+                    ? 'chose '.$change->owner_name.' as the owner'
+                    : 'changed the owner from '.($change->previous_owner_name ?: 'someone no longer listed').' to '.$change->owner_name,
+                'step' => 'assigned', 'kind' => 'owner', 'detail' => $change->reason !== null ? ['why' => $change->reason] : null,
             ]);
         }
 
