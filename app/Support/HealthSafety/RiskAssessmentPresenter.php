@@ -53,6 +53,89 @@ class RiskAssessmentPresenter
             }
             $ra = self::firstOrRefuse(self::guardEagerQuery($query, $viewer, $context), $ra->id);
 
+            return self::rowPayload($ra, $viewer, $context);
+        });
+    }
+
+    /**
+     * A row of the risk assessment register (speed R2, 31 Oct 2026; the same method as speed option B that Stephan
+     * approved on 30 Oct). The register's page query already loaded each assessment and its links through
+     * guardEagerQuery(). row() would fetch every one of them again through that same guard (four guarded queries per
+     * row, each about a second on real data). Instead, the readable assessments of the register query are proved
+     * ONCE in the same locked read, keyed by id with the same pinned links, and each row must be in that set with the
+     * same links. The proof query is tracked, so the read's final barrier replays it before the response leaves (any
+     * change withholds the page, 404). A row that arrives without its guarded links takes row() as before. With
+     * ProofParity on (tests), row() also runs and the two payloads must be identical.
+     */
+    public static function registerRow(HsRiskAssessment $ra, User $viewer, HealthSafetyReadContext $context, Builder $registerQuery): array
+    {
+        foreach (['assessable', 'hsEvent', 'assessedBy'] as $relation) {
+            if (! $ra->relationLoaded($relation)) {
+                return self::row($ra, $viewer, $context, $registerQuery);
+            }
+        }
+        if (! array_key_exists('attachments_count', $ra->getAttributes())) {
+            return self::row($ra, $viewer, $context, $registerQuery);
+        }
+        $expected = ProofParity::$enabled ? self::row($ra, $viewer, $context, $registerQuery) : null;
+
+        $payload = self::materialise($viewer, $context, function (User $viewer, $reads, HealthSafetyReadContext $context) use ($ra, $registerQuery): array {
+            $proven = self::provenRegisterRows($registerQuery, $viewer, $context);
+            $raw = $ra->getRawOriginal();
+            $pins = [$raw['assessable_type'] ?? null, isset($raw['assessable_id']) ? (int) $raw['assessable_id'] : null,
+                isset($raw['hs_event_id']) ? (int) $raw['hs_event_id'] : null];
+            if (($proven[(int) $ra->id] ?? null) !== $pins) {
+                throw (new \Illuminate\Database\Eloquent\ModelNotFoundException)->setModel(HsRiskAssessment::class, [$ra->id]);
+            }
+
+            return self::rowPayload($ra, $viewer, $context);
+        });
+        if ($expected !== null && $expected !== $payload) {
+            throw new \LogicException("Risk assessment register row {$ra->id}: the proven-set row differs from the per-row proof.");
+        }
+
+        return $payload;
+    }
+
+    /** @var \WeakMap<Builder, array{context: HealthSafetyReadContext, viewer: int, rows: array<int, array{0: ?string, 1: ?int, 2: ?int}>}>|null */
+    private static ?\WeakMap $provenRegisterRows = null;
+
+    /**
+     * The register query's readable assessments, proved once per register query and read context. row() proves a row
+     * as "in the register query, with its incident predicate, through guardEagerQuery()". The register query already
+     * carries guardEagerQuery() (the controller taps it) and its incident predicate, and both only add conditions, so
+     * running the register query itself, unpaged, admits exactly those rows. Its read stays tracked (the clone keeps
+     * the materialisation proof's hooks), so the final barrier replays it.
+     *
+     * @return array<int, array{0: ?string, 1: ?int, 2: ?int}> id => [assessable_type, assessable_id, hs_event_id]
+     */
+    private static function provenRegisterRows(Builder $registerQuery, User $viewer, HealthSafetyReadContext $context): array
+    {
+        self::$provenRegisterRows ??= new \WeakMap;
+        $known = self::$provenRegisterRows[$registerQuery] ?? null;
+        if ($known !== null && $known['context'] === $context && $known['viewer'] === (int) $viewer->id) {
+            return $known['rows'];
+        }
+        $context->assertViewer($viewer);
+        $context->assertActive();
+        $rows = [];
+        // The base query keeps the register query's read locks and the proof's replay hooks; only the columns change.
+        $base = (clone $registerQuery)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->toBase()
+            ->cloneWithout(['columns'])->cloneWithoutBindings(['select'])
+            ->select(['hs_risk_assessments.id', 'hs_risk_assessments.assessable_type', 'hs_risk_assessments.assessable_id', 'hs_risk_assessments.hs_event_id']);
+        foreach ($base->get() as $row) {
+            $raw = (array) $row;
+            $rows[(int) $raw['id']] = [$raw['assessable_type'] ?? null, isset($raw['assessable_id']) ? (int) $raw['assessable_id'] : null,
+                isset($raw['hs_event_id']) ? (int) $raw['hs_event_id'] : null];
+        }
+        self::$provenRegisterRows[$registerQuery] = ['context' => $context, 'viewer' => (int) $viewer->id, 'rows' => $rows];
+
+        return $rows;
+    }
+
+    /** The register row's fields, from an assessment that has already passed its proof. */
+    private static function rowPayload(HsRiskAssessment $ra, User $viewer, HealthSafetyReadContext $context): array
+    {
             return [
                 'id' => $ra->id,
                 'reference_number' => $ra->reference_number,
@@ -74,10 +157,13 @@ class RiskAssessmentPresenter
                 'review_state' => self::reviewState($ra),
                 'is_due_for_review' => in_array(self::reviewState($ra)['kind'], ['today', 'overdue'], true),
                 'attachments_count' => $ra->attachments_count ?? 0,
-                'superseded_by_id' => app(RiskAssessmentWorkspaceConnectionsService::class)->nextForViewer($ra, $viewer, null, $context)['id'] ?? null,
+                // nextForViewer() answers null unless the assessment is superseded or archived and points at another
+                // version; this row was read in the same locked read, so only those rows need the guarded lookup.
+                'superseded_by_id' => $ra->superseded_by_id && (int) $ra->superseded_by_id !== (int) $ra->id
+                    && in_array($ra->status, [HsRiskAssessment::STATUS_SUPERSEDED, HsRiskAssessment::STATUS_ARCHIVED], true)
+                    ? (app(RiskAssessmentWorkspaceConnectionsService::class)->nextForViewer($ra, $viewer, null, $context)['id'] ?? null)
+                    : null,
             ];
-
-        });
     }
 
     /** Additive JSON and permanent-page detail; every connected destination is reauthorized. */

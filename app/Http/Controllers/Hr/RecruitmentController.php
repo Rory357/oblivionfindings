@@ -18,6 +18,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -677,7 +678,9 @@ class RecruitmentController extends Controller
 
         $positions = HrPosition::query()
             ->where('is_active', true)
-            ->with(['requisitions' => fn (Builder $requisitions): Builder => $requisitions
+            // An eager-load constraint receives the relation (HasMany), not a Builder: typing it Builder made the hub
+            // 500 whenever an active position existed (.com, 30 Oct).
+            ->with(['requisitions' => fn (HasMany $requisitions): HasMany => $requisitions
                 ->whereIn('id', $scope['requisition_ids'])
                 ->select('id', 'position_id', 'status', 'openings')])
             ->orderBy('title')

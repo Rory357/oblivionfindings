@@ -119,7 +119,7 @@ class HsRiskAssessmentController extends Controller
             ->orderByDesc('created_at')
             ->paginate(25)
             ->withQueryString()
-            ->through(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra, $request->user(), $context, $list))->toArray();
+            ->through(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::registerRow($ra, $request->user(), $context, $list))->toArray();
 
         return [
             'assessments' => $assessments,
