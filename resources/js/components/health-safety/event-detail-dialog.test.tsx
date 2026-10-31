@@ -1412,6 +1412,72 @@ describe('EventDetailDialog WorkSafe governance', () => {
         can_accept: false,
     };
 
+    it('K1a: an approver who asked for it sees why someone else decides, and no Approve', () => {
+        const blocker = {
+            key: 'hs_investigation',
+            complete: false,
+            label: 'Complete the required investigation before closing this event.',
+            href: '/health-safety/events/17?action=investigation',
+            classification: 'exceptional' as const,
+        };
+        renderDialog(
+            eventDetail({
+                close_gate: { allowed: false, requirements: [blocker] },
+                close_readiness: {
+                    ordinary_allowed: false,
+                    requirements: [blocker],
+                    hard_blockers: [],
+                    exceptional_blockers: [blocker],
+                },
+                closure_exceptions: [
+                    {
+                        id: 44,
+                        status: 'pending',
+                        category: 'investigation_record',
+                        reason: 'The external evidence has a documented delivery delay.',
+                        evidence_reference: 'BOARD-2026-44',
+                        scope: ['hs_investigation'],
+                        requester: { id: 8, name: 'Moana Rangi' },
+                        approver: null,
+                        decision_reason: null,
+                        created_at: '2026-08-14T01:00:00Z',
+                        requested_at: '2026-08-14T01:00:00Z',
+                        decided_at: null,
+                        review_at: '2099-08-18T02:00:00Z',
+                        expires_at: '2099-08-21T02:00:00Z',
+                        provenance_hash: 'b'.repeat(64),
+                        can_decide: false,
+                        decide_blocked_reason: 'You asked for this, so someone else decides it.',
+                    },
+                ],
+                can: {
+                    manage: false,
+                    close: false,
+                    request_closure_exception: false,
+                    approve_closure_exception: true,
+                    manage_corrective_action_lifecycle: false,
+                    verify_corrective_actions: false,
+                },
+            }),
+        );
+
+        expect(
+            screen.queryByRole('button', { name: 'Close event' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Review closure exception' }),
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Review closure exception' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/You asked for this, so someone else decides it./),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Approve exception' }),
+        ).not.toBeInTheDocument();
+    });
+
     it('shows an undecided state and records an explicit reasoned choice', () => {
         renderDialog(
             eventDetail({
@@ -2549,5 +2615,34 @@ describe('Safety review originating incident return', () => {
         expect(target.pathname).toBe('/incidents/42');
         expect(target.searchParams.get('return_to')).toBe(`/health-safety/events/${detail.id}?section=overview`);
         expect(inertia.post).not.toHaveBeenCalled();
+    });
+});
+describe('K1a: who can close (B1.5)', () => {
+    it('tells a viewer who cannot close who can, once', () => {
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                close_authority: {
+                    who: 'owner_or_close_any',
+                    text: 'Only Jordan Peri, the owner, or someone who can close any safety review can close this.',
+                },
+                can: {
+                    manage: true,
+                    close: false,
+                    request_closure_exception: false,
+                    approve_closure_exception: false,
+                    manage_corrective_action_lifecycle: false,
+                    verify_corrective_actions: false,
+                },
+            })}
+                returnHref="/health-safety/events"
+            />,
+        );
+        expect(
+            screen.getAllByText(/Only Jordan Peri, the owner/),
+        ).toHaveLength(1);
+        expect(
+            screen.queryByRole('button', { name: 'Close event' }),
+        ).not.toBeInTheDocument();
     });
 });

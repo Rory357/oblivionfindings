@@ -687,6 +687,79 @@ final class HsEventClosureService
         return $query->where('hs_event_id', $event->id)->orderBy('id')->first();
     }
 
+    /**
+     * K1a (H&S plan B1.5): may this viewer close the review now? The same permission, Site and ownership checks
+     * closeEvent() runs, without locks or exceptions, so the page shows Close only where the server would accept it.
+     *
+     * @return array{allowed: bool, reason: ?string}
+     */
+    public function closeAuthority(User $actor, HsEvent $event): array
+    {
+        return $this->authority($actor, $event, 'healthSafety.events.close');
+    }
+
+    /** K1a: may this viewer ask to close anyway? The checks requestException() runs. @return array{allowed: bool, reason: ?string} */
+    public function requestAuthority(User $actor, HsEvent $event): array
+    {
+        return $this->authority($actor, $event, 'healthSafety.closureExceptions.request');
+    }
+
+    /**
+     * K1a: may this viewer approve or reject this close-anyway request now? decideException()'s checks (the
+     * approve permission, Site, open review, not their own request, undecided, still current), without locks.
+     *
+     * @param  bool  $decided  whether the request already has a decision
+     * @return array{allowed: bool, reason: ?string}
+     */
+    public function decideAuthority(User $actor, HsEvent $event, HsClosureException $exception, bool $decided): array
+    {
+        try {
+            $this->assertPermission($actor, 'healthSafety.closureExceptions.approve');
+            $this->assertSiteAccess($actor, $event);
+            $this->assertOpen($event);
+        } catch (\DomainException $refused) {
+            return ['allowed' => false, 'reason' => $refused->getMessage()];
+        }
+        if ((int) $exception->requested_by_user_id === (int) $actor->id) {
+            return ['allowed' => false, 'reason' => 'You asked for this, so someone else decides it.'];
+        }
+        if ($decided) {
+            return ['allowed' => false, 'reason' => 'This request has already been decided.'];
+        }
+        if (! $exception->expires_at?->isFuture() || ! $exception->review_at?->isFuture()) {
+            return ['allowed' => false, 'reason' => 'This request is no longer current.'];
+        }
+
+        return ['allowed' => true, 'reason' => null];
+    }
+
+    /** K1a: may this viewer revoke this approval? revokeException()'s checks (approve permission, Site, a current approval). */
+    public function revokeAuthority(User $actor, HsEvent $event, HsClosureException $exception): bool
+    {
+        try {
+            $this->assertPermission($actor, 'healthSafety.closureExceptions.approve');
+            $this->assertSiteAccess($actor, $event);
+        } catch (\DomainException) {
+            return false;
+        }
+
+        return $exception->status() === HsClosureException::STATUS_APPROVED;
+    }
+
+    /** @return array{allowed: bool, reason: ?string} */
+    private function authority(User $actor, HsEvent $event, string $permission): array
+    {
+        try {
+            $this->assertPermission($actor, $permission);
+            $this->assertSiteAccessAndOwnership($actor, $event);
+            $this->assertOpen($event);
+        } catch (\DomainException $refused) {
+            return ['allowed' => false, 'reason' => $refused->getMessage()];
+        }
+
+        return ['allowed' => true, 'reason' => null];
+    }
+
     private function assertPermission(User $actor, string $permission): void
     {
         if (! $actor->canDo($permission)) {

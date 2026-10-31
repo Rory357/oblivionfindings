@@ -830,7 +830,9 @@ class HsEventController extends Controller
         return [...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS,
             ...\App\Services\HealthSafety\InjuryAccessService::PERMISSIONS,
             ...SafeWorkProcedureAccessService::PERMISSIONS, ...EmergencyDrillAccessService::PERMISSIONS,
-            'healthSafety.events.close', 'healthSafety.closureExceptions.request', 'healthSafety.closureExceptions.approve'];
+            'healthSafety.events.close', 'healthSafety.closureExceptions.request', 'healthSafety.closureExceptions.approve',
+            // K1a (B1.5): the close answer checks "close any"; B7's title checks wellbeing access for exposures.
+            'healthSafety.events.closeAny', 'hr.wellbeing.view'];
     }
 
     /**
@@ -1137,6 +1139,13 @@ class HsEventController extends Controller
                 'expires_at' => $exception->expires_at?->toIso8601String(),
                 'review_at' => $exception->review_at?->toIso8601String(),
                 'provenance_hash' => $exception->provenance_hash,
+                // K1a (B1.5): Approve/Reject and Revoke only where the server would accept them for this viewer.
+                ...(function () use ($exception, $hsEvent, $currentUser): array {
+                    $decide = $this->closures->decideAuthority($currentUser, $hsEvent, $exception, $exception->latestDecision !== null);
+
+                    return ['can_decide' => $decide['allowed'], 'decide_blocked_reason' => $decide['allowed'] ? null : $decide['reason'],
+                        'can_revoke' => $this->closures->revokeAuthority($currentUser, $hsEvent, $exception)];
+                })(),
             ])
             ->values()
             ->all();
@@ -1267,6 +1276,13 @@ class HsEventController extends Controller
             'close_gate' => $closureReadiness->toJourneyGate()->toArray(),
             'close_readiness' => $closureReadiness->toArray(),
             'closure_exceptions' => $closureExceptions,
+            // K1a (B1.5): who can close, said once on the page for viewers who can't (no other names until B3.4).
+            'close_authority' => [
+                'who' => $hsEvent->owner_user_id !== null ? 'owner_or_close_any' : 'anyone_at_site',
+                'text' => $hsEvent->owner_user_id !== null
+                    ? 'Only '.($hsEvent->owner?->name ?? 'the owner').', the owner, or someone who can close any safety review can close this.'
+                    : 'No owner yet — anyone who can close safety reviews at '.($hsEvent->site?->name ?? 'this site').' can close it.',
+            ],
             'assignable_staff' => $assignableStaff,
             'action_handover' => [
                 'eligible_owners' => $assignableStaff,
@@ -1275,8 +1291,10 @@ class HsEventController extends Controller
             'review_flags' => app(HsEventReviewFlagService::class)->present($hsEvent, $canManage),
             'can' => [
                 'manage' => $canManage,
-                'close' => $currentUser->canDo('healthSafety.events.close'),
-                'request_closure_exception' => $currentUser->canDo('healthSafety.closureExceptions.request'),
+                // K1a (B1.5): the real answer (permission, Site, ownership, open), not the permission alone, so a team
+                // lead who doesn't own the review gets no Close the server would refuse.
+                'close' => $this->closures->closeAuthority($currentUser, $hsEvent)['allowed'],
+                'request_closure_exception' => $this->closures->requestAuthority($currentUser, $hsEvent)['allowed'],
                 'approve_closure_exception' => $currentUser->canDo('healthSafety.closureExceptions.approve'),
                 ...app(SafeWorkProcedureAccessService::class)->sourceCan($hsEvent, $currentUser, $context),
                 'manage_corrective_action_lifecycle' => $canManage

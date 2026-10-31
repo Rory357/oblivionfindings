@@ -449,6 +449,10 @@ export type ClosureException = {
     expires_at: string | null;
     review_at: string | null;
     provenance_hash: string;
+    /** K1a: the server's answer for this viewer (older payloads fall back to the permission). */
+    can_decide?: boolean;
+    decide_blocked_reason?: string | null;
+    can_revoke?: boolean;
 };
 
 export type EventDetail = {
@@ -508,6 +512,8 @@ export type EventDetail = {
         exceptional_blockers: ClosureRequirement[];
     };
     closure_exceptions: ClosureException[];
+    /** K1a: who can close this review (said to viewers who can't). */
+    close_authority?: { who: 'owner_or_close_any' | 'anyone_at_site'; text: string };
     journey_state: string;
     assignable_staff: Array<{ id: number; name: string }>;
     action_handover: CorrectiveActionHandover;
@@ -1895,7 +1901,12 @@ function ClosureRing({ d }: { d: EventDetail }) {
                       ? `To close: ${done} of ${requirements.length} done`
                       : 'Nothing blocks closing'
             }
-            sub="Resolving the response, closing the incident and closing this review are separate steps"
+            sub={
+                // K1a (B1.5): a viewer who can't close is told once, here, who can.
+                !d.can.close && d.status !== 'closed' && d.close_authority
+                    ? d.close_authority.text
+                    : 'Resolving the response, closing the incident and closing this review are separate steps'
+            }
             checks={checks}
         />
     );
@@ -3706,7 +3717,19 @@ function ClosureExceptionRecord({
                 Provenance {exception.provenance_hash.slice(0, 16)}
             </p>
 
-            {d.can.approve_closure_exception &&
+            {exception.status === 'pending' &&
+            exception.can_decide === false &&
+            exception.decide_blocked_reason ? (
+                <p className="mt-3 border-t pt-3 text-sm text-muted-foreground">
+                    {exception.decide_blocked_reason}
+                    {exception.expires_at
+                        ? ` It needs a decision before ${formatDateTime(exception.expires_at)}.`
+                        : null}
+                </p>
+            ) : null}
+
+            {(exception.can_decide ??
+                d.can.approve_closure_exception) &&
             exception.status === 'pending' ? (
                 <div className="mt-3 space-y-2 border-t pt-3">
                     <Field label="Independent decision reason" required>
@@ -3738,7 +3761,7 @@ function ClosureExceptionRecord({
                 </div>
             ) : null}
 
-            {d.can.approve_closure_exception &&
+            {(exception.can_revoke ?? d.can.approve_closure_exception) &&
             exception.status === 'approved' ? (
                 <form
                     className="mt-3 space-y-2 border-t pt-3"
