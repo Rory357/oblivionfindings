@@ -320,9 +320,12 @@ export function CommandCentreHero({
             title="Health and safety"
             subline={[
                 siteLabel,
-                formatDateOnly(filters.from) +
-                    ' – ' +
-                    formatDateOnly(filters.to),
+                // G2 (B2.6): one privacy line replaces the disclaimer sentences; the Period chip carries the dates.
+                boxSet
+                    ? 'counts only records you can open'
+                    : formatDateOnly(filters.from) +
+                      ' – ' +
+                      formatDateOnly(filters.to),
             ]
                 .filter(Boolean)
                 .join(' · ')}

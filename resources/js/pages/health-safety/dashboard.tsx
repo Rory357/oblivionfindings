@@ -399,7 +399,7 @@ export default function HealthSafetyDashboard({
                             for your shift, medicines and reporting tasks.
                         </p>
                     )}
-                    {source_completeness === 'unknown' && (
+                    {source_completeness === 'unknown' && !header_box_set && (
                         <p className="text-subtle" role="status">
                             These measures cover records you can access. The
                             full picture may be incomplete.
