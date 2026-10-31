@@ -90,7 +90,7 @@ class HsEventProvider implements ContextualHealthSafetyTaskProvider, HasModelCla
                 : 'controlRoomAlert:id,reference_number',
             $includeSearchContext
                 ? 'clientIncident:id,client_id,site_id,hs_event_id,investigation_assigned_to,reference_number,source,occurred_at,title,description,immediate_action_taken,immediate_action,witnesses,potential_consequence'
-                : 'clientIncident:id,client_id,site_id,hs_event_id,reference_number,source,occurred_at',
+                : 'clientIncident:id,client_id,site_id,hs_event_id,reference_number,source,occurred_at,title',
             'clientIncident.client:id,first_name,last_name',
             'clientIncident.site:id,name',
         ];
@@ -183,8 +183,13 @@ class HsEventProvider implements ContextualHealthSafetyTaskProvider, HasModelCla
                     source: $this->sourceKey(),
                     sourceLabel: $this->label(),
                     ref: $event->reference_number,
-                    title: ucfirst(str_replace('_', ' ', (string) $event->event_category)).' event',
+                    // B1.1/B7: the same title as the record. The incident's words only with a journey (the viewer can read
+                    // the incident); exposures and safeguarding say kind and site here (the person shows on the record to readers).
+                    title: \App\Support\HealthSafety\HsReviewTitle::make((string) $event->event_category,
+                        $journey !== null || ! in_array(class_basename((string) $event->source_type), ['ClientIncident', 'SubstanceExposureRecord', 'SafeguardingConcern'], true),
+                        $journey !== null ? $event->clientIncident?->title : null, $client['name'] ?? null, null, $site['name'] ?? null),
                     status: (string) $event->status,
+                    displayState: \App\Support\HealthSafety\HsLabels::label('review_status', (string) $event->status),
                     bucket: match ($event->status) {
                         HsEvent::STATUS_CLOSED => TaskItem::BUCKET_DONE,
                         HsEvent::STATUS_INVESTIGATING,

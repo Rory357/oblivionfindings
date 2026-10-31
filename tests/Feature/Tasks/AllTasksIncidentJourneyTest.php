@@ -272,9 +272,9 @@ it('keeps completed corrective actions active with truthful independent verifica
 
     expect($item)->not->toBeNull()
         ->and($item->status)->toBe(HsCorrectiveAction::STATUS_COMPLETED)
-        ->and($item->displayState)->toBe('Awaiting independent verification')
+        ->and($item->displayState)->toBe('Done — waiting to be checked')
         ->and($item->bucket)->toBe(TaskItem::BUCKET_IN_PROGRESS)
-        ->and($verifiedItem?->displayState)->toBe('Verified — ready to close')
+        ->and($verifiedItem?->displayState)->toBe('Checked — it worked')
         ->and($verifiedItem?->bucket)->toBe(TaskItem::BUCKET_IN_PROGRESS);
 });
 
@@ -390,7 +390,7 @@ it('finds the incident journey by people place source work narrative references 
 
     $verificationResults = collect((new TaskAggregator)->arrayFor(
         $viewer,
-        ['q' => 'awaiting independent verification'],
+        ['q' => 'waiting to be checked'],
     ));
     expect($verificationResults->pluck('id'))
         ->toContain('corrective_action-'.$journey['action']->id)

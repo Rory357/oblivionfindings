@@ -785,6 +785,28 @@ class HsEventController extends Controller
         ];
     }
 
+    /**
+     * The review's title for this viewer: the incident's own words only when they can open the incident; chemical
+     * exposures and safeguarding say whose only to people who can read them; first aid never names the person to a
+     * non-reader (the same rule as the client field below).
+     */
+    private function reviewTitle(HsEvent $event, ?ClientIncident $readableIncident, ?array $source, User $viewer): string
+    {
+        $firstAid = app(FirstAidSourceProjectionService::class)->isFirstAidSource($event->source_type);
+        $basename = class_basename((string) $event->source_type);
+        $readable = match (true) {
+            $basename === 'ClientIncident' => $readableIncident !== null,
+            $basename === 'SubstanceExposureRecord' => app(\App\Services\HealthSafety\ChemicalExposureAccessService::class)->canRead($viewer),
+            $basename === 'SafeguardingConcern' => ($concern = SafeguardingConcern::query()->find($event->source_id)) !== null && $viewer->can('view', $concern),
+            default => $source !== null,
+        };
+        $client = $event->client ? trim($event->client->first_name.' '.$event->client->last_name) : null;
+
+        return \App\Support\HealthSafety\HsReviewTitle::make((string) $event->event_category, $readable,
+            $basename === 'ClientIncident' ? $readableIncident?->title : null,
+            $firstAid && $source === null ? null : $client, $event->staff?->name, $event->site?->name, $firstAid);
+    }
+
     private function resolveSubstanceExposureSource(int $sourceId, ?Collection $map = null): array
     {
         $substanceId = $map !== null
@@ -1122,6 +1144,8 @@ class HsEventController extends Controller
         $detail = [
             'id' => $hsEvent->id,
             'reference_number' => $hsEvent->reference_number,
+            // B1.1/B7: the one server-made title (HsReviewTitle); the client shows it as is.
+            'title' => $this->reviewTitle($hsEvent, $readableIncident, $source, $currentUser),
             'event_category' => $hsEvent->event_category,
             'severity' => $hsEvent->severity,
             'status' => $hsEvent->status,

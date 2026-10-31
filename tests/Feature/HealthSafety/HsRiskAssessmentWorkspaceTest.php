@@ -158,7 +158,7 @@ class HsRiskAssessmentWorkspaceTest extends TestCase
         $this->assertSame($event->id, $connections['safety_review']['id']);
         $this->assertSame($action->id, $connections['corrective_actions'][0]['id']);
         $this->assertSame('2026-10-15', $connections['corrective_actions'][0]['due_date']);
-        $this->assertSame('Awaiting independent verification', $connections['corrective_actions'][0]['display_state']);
+        $this->assertSame('Done — waiting to be checked', $connections['corrective_actions'][0]['display_state']);
         $this->assertSame(['hs_event-'.$event->id, 'corrective_action-'.$action->id], array_column($connections['tasks'], 'id'));
         $expectedReturn = RiskAssessmentReturn::REGISTER.'/'.$assessment->id.'?section=connections&return_to='.rawurlencode($origin);
         foreach ([$connections['safety_review'], ...$connections['corrective_actions'], ...$connections['tasks']] as $work) {

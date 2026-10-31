@@ -89,13 +89,8 @@ final class TaskSearch
             preg_split('/\s+/', $needle) ?: [],
             fn (string $word) => $word !== '',
         ));
-        $correctiveActionStatuses = self::matchingStatuses($needle, [
-            'open' => 'Not started',
-            'in_progress' => 'In progress',
-            'completed' => 'Awaiting independent verification',
-            'verified' => 'Verified — ready to close',
-            'closed' => 'Closed',
-        ]);
+        // B1.1: the action words the rows show (HsLabels), so a search for "waiting to be checked" finds those actions.
+        $correctiveActionStatuses = self::matchingStatuses($needle, \App\Support\HealthSafety\HsLabels::LABELS['action_status']);
         $alertStatuses = self::matchingStatuses($needle, [
             'open' => 'Awaiting response',
             'ack' => 'Acknowledged',
