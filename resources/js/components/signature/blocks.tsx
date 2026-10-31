@@ -49,7 +49,7 @@ export interface SgAction {
     ariaLabel?: string;
 }
 
-function ActionLink({ action, className }: { action: SgAction; className?: string }) {
+export function ActionLink({ action, className }: { action: SgAction; className?: string }) {
     if (action.href) {
         return (
             <Link href={action.href} aria-label={action.ariaLabel} className={cn('sg-act', className)} onClick={action.onClick}>

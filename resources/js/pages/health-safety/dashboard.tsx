@@ -33,6 +33,7 @@ import {
 } from './components/command-centre-hero';
 import type { HeaderBoxes } from './components/overview-header-boxes';
 import { OverviewHeaderCharts } from './components/overview-header-charts';
+import { OverviewQueue, ReviewStages, type OverviewQueueData } from './components/overview-queue';
 import { searchDashboardWorklists } from './components/dashboard-search';
 import {
     buildHsTabItems,
@@ -413,7 +414,67 @@ export default function HealthSafetyDashboard({
                         </p>
                     )}
 
-                    {tab === 'overview' && (
+                    {tab === 'overview' && header_box_set && filters.lens !== 'frontline' && (
+                        // G2 (B2.2, approved boards M1/M3): one queue in D1's blocks, where reviews are up to, then the
+                        // side column. The person's own numbers sit in the header.
+                        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+                            <div className="grid min-w-0 gap-5">
+                                <DeferredPanel<WorkValues & { queue: OverviewQueueData }>
+                                    data={[...WORK_KEYS, 'queue']}
+                                    label="Your queue"
+                                    fallback={<SkeletonCard rows={6} />}
+                                >
+                                    {({ worklists: lists, queue }) => (
+                                        <OverviewQueue
+                                            queue={queue}
+                                            lists={visible(lists)}
+                                            link={destination}
+                                            title={header_box_set === 'queue' && filters.lens === 'governance' ? 'Your queue' : 'Your sites'}
+                                        />
+                                    )}
+                                </DeferredPanel>
+                                {header_box_set === 'queue' || header_box_set === 'compliance' ? (
+                                    <DeferredPanel<{ queue: OverviewQueueData }> data="queue" label="Where safety reviews are up to" fallback={<SkeletonStats count={5} />}>
+                                        {({ queue }) => <ReviewStages stages={queue.stages} link={destination} />}
+                                    </DeferredPanel>
+                                ) : null}
+                            </div>
+                            <SideColumn>
+                                {header_box_set === 'queue' ? (
+                                    <DeferredPanel<{ leading_lagging: HeroLeadingLagging }> data="leading_lagging" label="Days since a lost-time injury" fallback={<SkeletonStats count={1} />}>
+                                        {({ leading_lagging }) =>
+                                            leading_lagging.lagging.days_since_lti === null ? null : (
+                                                <Tally
+                                                    keepZeros
+                                                    items={[
+                                                        {
+                                                            value: String(leading_lagging.lagging.days_since_lti),
+                                                            label: 'Days since a lost-time injury',
+                                                            sub: 'Rates are on "Harm and injuries"',
+                                                            href: destination('/health-safety/analytics'),
+                                                        },
+                                                    ]}
+                                                />
+                                            )
+                                        }
+                                    </DeferredPanel>
+                                ) : null}
+                                {worklist(['expiring'], 'Checks due')}
+                                <DeferredPanel<{ site_league: SiteLeague }>
+                                    data="site_league"
+                                    label="Sites"
+                                    fallback={<SkeletonCard rows={4} />}
+                                >
+                                    {({ site_league }) =>
+                                        // B2.7: a side-by-side table only with two or more Sites.
+                                        site_league.length >= 2 ? <SiteSafetyComparisonCard data={visibleSites(site_league)} /> : null
+                                    }
+                                </DeferredPanel>
+                            </SideColumn>
+                        </div>
+                    )}
+
+                    {tab === 'overview' && !(header_box_set && filters.lens !== 'frontline') && (
                         <>
                             <RoleStart lens={filters.lens} onWorkflow={openWorkflow} />
                             {filters.lens !== 'governance' && incident_stages ? (

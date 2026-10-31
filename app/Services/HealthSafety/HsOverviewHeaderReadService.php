@@ -304,6 +304,53 @@ final class HsOverviewHeaderReadService
         });
     }
 
+    /**
+     * G2 (M3): the incident register's own "Needs an owner" rows, oldest first, in the same current reads. Titles come
+     * from incidents this person can open, so nothing hidden is shown.
+     *
+     * @return array{count: int, rows: list<array<string, mixed>>}|null  null without incident read
+     */
+    public function incidentsNeedingOwnerQueue(User $viewer, ?array $siteIds, HealthSafetyReadContext $context, int $limit = 5): ?array
+    {
+        if (! $viewer->canDo('incidents.viewAny') && ! $viewer->canDo('incidents.viewAssigned')) {
+            return null;
+        }
+
+        return $context->consumeSourceViewer([], function (User $current, CurrentAuthorizationReads $reads) use ($siteIds, $limit): array {
+            try {
+                $query = app(IncidentOwnershipService::class)
+                    ->applyOwnerFilter($this->applySiteIds(ClientIncident::query(), $siteIds), $current, 'needs_owner', $reads)
+                    ->with('site:id,name');
+                $count = (clone $query)->count();
+                $rows = $query->orderBy('client_incidents.occurred_at')->limit($limit)->get()->map(fn (ClientIncident $incident): array => [
+                    'id' => $incident->id,
+                    'reference' => $incident->reference_number,
+                    'title' => $incident->title ?: HsLabels::humanise((string) $incident->type),
+                    'type' => $incident->type,
+                    'severity' => $incident->severity,
+                    'site' => $incident->site?->name,
+                    'occurred_at' => $incident->occurred_at?->toIso8601String(),
+                ])->values()->all();
+
+                return ['count' => $count, 'rows' => $rows];
+            } catch (HttpExceptionInterface $denial) {
+                if ($denial->getStatusCode() !== 403) {
+                    throw $denial;
+                }
+
+                return ['count' => 0, 'rows' => []];
+            }
+        });
+    }
+
+    /** Pending close-anyway requests on reviews this person can open. */
+    public function closeAnywayCount(User $viewer, ?array $siteIds, HealthSafetyReadContext $context): int
+    {
+        return HealthSafetyReadMaterialisationProof::within($context, fn (HealthSafetyReadMaterialisationProof $proof): int => $proof->protect(
+            HsClosureException::query()->whereIn('hs_closure_exceptions.hs_event_id', $this->events($viewer, $siteIds, $context, $proof)->select('hs_events.id'))
+                ->where('hs_closure_exceptions.status', HsClosureException::STATUS_PENDING))->count());
+    }
+
     /** B2.3: "Actions to check" counts only actions this viewer may check: not one they added, own or did. */
     private function checkableBy(Builder $actions, User $viewer): Builder
     {

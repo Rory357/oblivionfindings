@@ -387,6 +387,89 @@ class HsDashboardService
         });
     }
 
+    /**
+     * G2 (B2.2, IR10) "WorkSafe: decide or tell": open reviews still needing the WorkSafe decision, or decided notifiable
+     * and not yet told, most severe first. The count is the whole list; rows are the first $limit.
+     *
+     * @return array{count: int, rows: list<array<string, mixed>>}
+     */
+    public function worksafeQueue(int|array|null $siteId, ?User $viewer, int $limit = 10, ?HealthSafetyReadContext $context = null): array
+    {
+        return $this->withSourceRead($viewer, $context, function (?User $viewer, ?HealthSafetyReadContext $context) use ($siteId, $limit) {
+            $query = $this->hsEventQuery($siteId, $viewer, $context)->worksafeDecideOrTell()
+                ->with(['clientIncident:id,hs_event_id,title,description,type', 'client:id,first_name,last_name', 'site:id,name', 'owner:id,name'])
+                ->tap(fn (Builder $q) => $this->protectIncidentEagerLoads($q, $viewer, $context))
+                ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")->orderBy('reported_at');
+            $count = (clone $query)->count();
+
+            return ['count' => $count, 'rows' => $query->limit($limit)->get()->map(fn (HsEvent $event) => [
+                'id' => $event->id,
+                'reference' => $event->reference_number,
+                'title' => $this->reviewTitle($event),
+                'severity' => $event->severity,
+                'site' => $event->site?->name,
+                'owner' => $event->owner?->name,
+                'reported_at' => $event->reported_at?->toIso8601String(),
+                // Decided notifiable but WorkSafe not told yet, or still to decide.
+                'step' => $event->hasSignedWorksafeDecision() ? 'tell' : 'decide',
+                'awaiting_owner' => $event->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+            ])->values()->all()];
+        });
+    }
+
+    /**
+     * G2 (B2.2/B2.3) "Actions to check": actions marked done that this viewer may check (not one they added, own or did),
+     * oldest first. The count is the whole list; rows are the first $limit.
+     *
+     * @return array{count: int, rows: list<array<string, mixed>>}
+     */
+    public function checkQueue(int|array|null $siteId, User $viewer, int $limit = 10, ?HealthSafetyReadContext $context = null): array
+    {
+        return $this->withSourceRead($viewer, $context, function (?User $viewer, ?HealthSafetyReadContext $context) use ($siteId, $limit) {
+            $query = HsCorrectiveAction::query()->where('hs_corrective_actions.status', HsCorrectiveAction::STATUS_COMPLETED)
+                ->with(['completedBy:id,name', 'hsEvent:id,site_id,reference_number']);
+            foreach (['created_by', 'assigned_to_user_id', 'completed_by_user_id'] as $column) {
+                $query->where(fn (Builder $q) => $q->whereNull('hs_corrective_actions.'.$column)->orWhere('hs_corrective_actions.'.$column, '!=', $viewer->id));
+            }
+            $this->applyRelatedSiteScope($query, 'hsEvent', $siteId);
+            $this->applyRelatedSourceScope($query, $viewer, $context);
+            $query = $this->protectSourceEagerLoads($query)->orderBy('completed_at');
+            $count = (clone $query)->count();
+
+            return ['count' => $count, 'rows' => $query->limit($limit)->get()->map(fn (HsCorrectiveAction $action) => [
+                'id' => $action->id,
+                'reference' => $action->reference_number,
+                'title' => $action->title,
+                'completed_by' => $action->completedBy?->name,
+                'completed_at' => $action->completed_at?->toIso8601String(),
+                'event_reference' => $action->hsEvent?->reference_number,
+            ])->values()->all()];
+        });
+    }
+
+    /**
+     * G2 (B2.2) "Where safety reviews are up to": open reviews by stage now, and reviews closed in the last 30 days.
+     *
+     * @return array<string, int>
+     */
+    public function reviewStages(int|array|null $siteId, ?User $viewer, ?HealthSafetyReadContext $context = null): array
+    {
+        return $this->withSourceRead($viewer, $context, function (?User $viewer, ?HealthSafetyReadContext $context) use ($siteId) {
+            $byStatus = $this->hsEventQuery($siteId, $viewer, $context)->where('hs_events.status', '!=', HsEvent::STATUS_CLOSED)
+                ->toBase()->selectRaw('hs_events.status AS s, COUNT(*) AS n')->groupBy('s')->pluck('n', 's')->all();
+            $closed = $this->hsEventQuery($siteId, $viewer, $context)->where('hs_events.status', HsEvent::STATUS_CLOSED)
+                ->where('hs_events.closed_at', '>=', now()->subDays(30))->count();
+
+            return [
+                'open' => (int) ($byStatus[HsEvent::STATUS_OPEN] ?? 0),
+                'investigating' => (int) ($byStatus[HsEvent::STATUS_INVESTIGATING] ?? 0),
+                'corrective_action' => (int) ($byStatus[HsEvent::STATUS_CORRECTIVE_ACTION] ?? 0),
+                'monitoring' => (int) ($byStatus[HsEvent::STATUS_MONITORING] ?? 0),
+                'closed_30d' => $closed,
+            ];
+        });
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Unified expiring feed (G5) */
     /* ------------------------------------------------------------------ */

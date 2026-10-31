@@ -101,6 +101,7 @@ class HealthSafetyDashboardController extends Controller
                                 'work' => $this->overviewWork($request, $context),
                                 'detail' => $this->overviewDetail($request, $context, $proof),
                                 'boxes' => $this->overviewBoxes($request, $context),
+                                'queue' => $this->overviewQueue($request, $context),
                                 'chart_severity', 'chart_over_time', 'chart_due', 'chart_types' => $this->overviewChart($group, $request, $context),
                             };
                         }
@@ -144,6 +145,8 @@ class HealthSafetyDashboardController extends Controller
         'detail' => ['incidents_by_category', 'site_league', 'frequency_operands', 'hazard_burndown', 'open_hazards_list', 'first_aid', 'restraints'],
         // G2 (Stephan's header): the four boxes, with their trend and weekly bars, in their own background request.
         'boxes' => ['header_boxes'],
+        // G2 (B2.2, M1/M3): the blocks of "Your queue" that the work lists don't carry, and where reviews are up to.
+        'queue' => ['queue'],
         // G2: each header chart in its own background request, so a slow chart never holds up the others.
         'chart_severity' => ['header_chart_severity'],
         'chart_over_time' => ['header_chart_over_time'],
@@ -462,6 +465,33 @@ class HealthSafetyDashboardController extends Controller
         return response()->json(HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
             fn (HealthSafetyReadContext $context): array => app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class)
                 ->railCounts($context->consumeSourceViewer([], fn (User $current): User => $current), $context)));
+    }
+
+    /**
+     * Background part "queue" (G2, B2.2): WorkSafe to decide or tell, actions this person may check, incidents needing an
+     * owner (provider managers), close-anyway requests (approvers) and where reviews are up to. A block the person can't
+     * act on or read is null, so the page leaves it out rather than showing a 0.
+     */
+    private function overviewQueue(Request $request, HealthSafetyReadContext $context): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        [$user, $scope] = [$f['user'], $f['siteScope']];
+        $header = app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class);
+        $set = $header::setFor($user);
+        $manages = $user->canDo('hazards.manage');
+        $closeAnyway = $user->canDo('healthSafety.closureExceptions.approve')
+            ? $header->closeAnywayCount($user, $scope === null ? null : array_map('intval', (array) $scope), $context) : null;
+
+        return ['queue' => [
+            'set' => $set,
+            'can_manage' => $manages,
+            'worksafe' => $this->dashboardService->worksafeQueue($scope, $user, 10, $context),
+            'to_check' => $manages ? $this->dashboardService->checkQueue($scope, $user, 10, $context) : null,
+            'incidents_need_owner' => $set === $header::SET_INCIDENTS
+                ? $header->incidentsNeedingOwnerQueue($user, $scope === null ? null : array_map('intval', (array) $scope), $context) : null,
+            'close_anyway' => $closeAnyway,
+            'stages' => $this->dashboardService->reviewStages($scope, $user, $context),
+        ]];
     }
 
     /** Background parts "chart_*" (G2): one header chart, counted like the boxes. */
