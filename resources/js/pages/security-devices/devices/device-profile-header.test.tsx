@@ -163,7 +163,8 @@ describe('Device profile shared header', () => {
         ['active', 'Active', 'bg-status-success-bg'],
         ['degraded', 'Degraded', 'bg-status-warning-bg'],
         ['offline', 'Offline', 'bg-status-critical-bg'],
-        ['maintenance', 'Maintenance', 'bg-status-info-bg'],
+        // S3 (H&S plan B1.8): an info chip on the header band is an opaque card pill with brand text.
+        ['maintenance', 'Maintenance', 'bg-card'],
         [null, 'Device state not recorded', 'bg-muted'],
     ])(
         'tones the title chip for the recorded %s device state',

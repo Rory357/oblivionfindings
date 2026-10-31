@@ -145,6 +145,11 @@ export interface PageHeaderNextStep {
     /** One quieter line under it — who owns it, what it unlocks. */
     meta?: ReactNode;
     tone?: PageHeaderStripTone;
+    /**
+     * S1 (H&S plan B1.4): the one button for this step, only when the server allows this viewer to do it now.
+     * Optional; without it the line looks as before.
+     */
+    action?: ReactNode;
 }
 
 /**
@@ -178,6 +183,7 @@ export function PageHeaderStages({
                         {next.label ?? 'Next step'}
                     </span>
                     <b>{next.text}</b>
+                    {next.action ? <span className="eh-next-action">{next.action}</span> : null}
                     {next.meta ? <small>{next.meta}</small> : null}
                 </div>
             ) : null}

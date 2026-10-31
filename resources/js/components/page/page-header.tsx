@@ -367,7 +367,13 @@ export function PageHeaderStatusChip({
     return (
         <StatusBadge
             variant={variant}
-            className={cn('rounded-[8px] font-semibold', className)}
+            className={cn(
+                'rounded-[8px] font-semibold',
+                // S3 (H&S plan B1.8): bg-status-info-bg is --accent, a 15% brand tint under an org brand, so brand
+                // text on it sat on the brand band near 1:1. An opaque card pill with brand text, as page-hero-badges.
+                variant === 'info' && 'border-status-info/30 bg-card text-primary',
+                className,
+            )}
         >
             {Icon ? <Icon className="size-3" /> : null}
             {children}
