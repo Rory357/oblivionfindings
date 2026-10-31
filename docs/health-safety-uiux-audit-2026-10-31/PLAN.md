@@ -179,6 +179,24 @@ closes underneath, so B3 departs from "closed once" and "one line": see **Q10**.
 | Q7 | Support workers see other people's draft incidents for their clients | Only their own drafts · Keep |
 | Q13 | Any H&S manager can start or finish anyone's action today | Only the owner (or a lead acting for them) · Keep |
 
+## Stephan's answers (31 Oct 2026, in pop-ups)
+
+| # | Answer | What it changes |
+|---|---|---|
+| Packages | **All 10, in build order** | Each still starts with its mockups approved; one gate and one merge request per package. B9 needs MASTER's go-ahead |
+| Q2 | Site H&S managers **who can read the review's source** set or change the owner | K3 builds it; the dashed Q2 buttons become real. Chemical exposures need wellbeing access (an admin today) |
+| Q8 | **Repair the data (MASTER, dump first) and add a guard** | B1.2 and K8 |
+| Q9 | **Allow S1–S4** | Each lands with its package |
+| Q10 | **Each page its own track, the other record in a card, both closes named; the support worker start on My Day** | B3 as drawn (M5, M14, M10) |
+| Q11 | **Block closing until a new action is added** after "Checked — it didn't work" | B4.4 and the close readiness check (server change, with tests) |
+| Q12 | **The seeder follows live** for restraints; **admin keeps** close, close any and "close anyway" approval, as live | Seeder change only; live grants unchanged |
+| Q1 | Team leads **see the incident's "what happened" and "what we did"**, except HR-confidential and independently handled incidents | B3.6 and M5b change from "Hidden" to the story; a server read path for team leads at their sites, with tests |
+| Q3 | **Status only, own reports** (Draft · Sent · Being followed up · Closed); never safeguarding, restraint, restricted, HR-confidential or independently handled | B6.3 and K7; the dashed Q3 cards become real |
+| Q4 | Provider managers **can take on and act on H&S items at their sites**, **H&S items only, no restraint access** | A grant migration for `provider_manager` (H&S manage at their sites), with the seeder's restraint copy rule split for this role; M3 is redrawn with row buttons before B2 starts |
+| Q6 | The top bar's "Report incident" **opens "Report something"** | App-wide shell change, with B6 |
+| Q7 | **Keep**: support workers still see other people's drafts for their clients | No change |
+| Q13 | **Keep**: any H&S manager can start or finish any action | No change; the dashed Q13 markers are dropped |
+
 ## Build order
 B9 → B5 → B1 (with B7's labels) → B2 → B3 → B4 → B6 → B10 → B8. Each starts with its mockups approved. Decisions Q2, Q8,
 Q9, Q10, Q11 and Q12 come before B1; Q1, Q3, Q4, Q6, Q7 and Q13 before B2 and B6.
