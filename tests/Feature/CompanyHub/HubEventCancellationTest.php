@@ -41,7 +41,8 @@ beforeEach(function () {
     ensureCanonicalHrStaffProfile($this->reader, $this->site);
     $this->event = HrCalendarEvent::create(['created_by' => $this->editor->id, 'title' => 'A private shared invitation', 'description' => 'The retained original invitation.',
         'event_type' => 'company', 'site_id' => $this->site->id, 'starts_at' => now()->addDays(2)->setTime(2, 0), 'ends_at' => now()->addDays(2)->setTime(3, 0),
-        'hub_content' => ['agenda' => 'Keep the original agenda', 'cover_alt' => 'Original cover description', 'cover_id' => null, 'gallery_ids' => []]]);
+        // Same shape HrCalendarHubContent stores, including its photo_details list.
+        'hub_content' => ['agenda' => 'Keep the original agenda', 'cover_alt' => 'Original cover description', 'cover_id' => null, 'gallery_ids' => [], 'photo_details' => []]]);
     $this->event->forceFill(['hub_managed' => true])->save();
     $this->event->attendees()->create(['audience_type' => 'org', 'rsvp_status' => 'none']);
     Storage::disk('private')->put('calendar/cancellation-guide.pdf', 'Retained private information');

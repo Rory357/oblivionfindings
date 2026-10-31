@@ -150,7 +150,7 @@ test.describe('Facilities & IoT specialist workspace', () => {
         await tabs.getByRole('link', { name: 'History', exact: true }).click();
         await expect(
             page.getByRole('heading', {
-                name: 'Canonical facility history',
+                name: 'Facility history',
                 level: 2,
             }),
         ).toBeVisible();

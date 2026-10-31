@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\HsAttachment;
+use App\Models\ProcedureAcknowledgementReceipt;
 use App\Models\Role;
 use App\Models\SafeWorkProcedure;
 use App\Models\Site;
-use App\Models\SafeWorkProcedureVersion;
 use App\Models\User;
+use App\Support\HealthSafety\SafeWorkProcedureReturn;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -37,6 +39,8 @@ class SafeWorkProcedureTest extends TestCase
         if ($r = Role::where('name', $role)->first()) {
             $user->roles()->attach($r);
         }
+
+        HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => Site::factory()->create()->id]);
 
         return $user;
     }
@@ -87,20 +91,10 @@ class SafeWorkProcedureTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->has('procedures.data', 2)->where('tabCounts.review_due', 2));
     }
 
-    public function test_detail_loads_over_list_when_procedure_param_present(): void
+    public function test_legacy_detail_redirects_to_canonical_procedure(): void
     {
         $procedure = SafeWorkProcedure::factory()->approved()->create();
-
-        $this->actingAs($this->hsOfficer())
-            ->get("/health-safety/procedures?procedure={$procedure->id}")
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('detail.id', $procedure->id)
-                ->has('detail.versions')
-                ->has('detail.attachments')
-                ->has('detail.form')
-                ->has('detail.can.manage')
-            );
+        $this->actingAs($this->hsOfficer())->get('/health-safety/procedures?procedure='.$procedure->id)->assertRedirect(SafeWorkProcedureReturn::href($procedure->id, '/health-safety/procedures'));
     }
 
     public function test_category_filter_scopes_results(): void
@@ -125,7 +119,7 @@ class SafeWorkProcedureTest extends TestCase
                 'purpose' => 'Protect workers',
                 'steps' => [['step_number' => 1, 'description' => 'Assess the load', 'safety_notes' => 'Check footing']],
                 'ppe_required' => ['Gloves'],
-                'applicable_sites' => [],
+                'applicable_sites' => [], 'applicable_roles' => [],
                 'review_frequency_months' => 6,
             ])
             ->assertSessionHas('created_procedure_id');
@@ -146,7 +140,7 @@ class SafeWorkProcedureTest extends TestCase
                 'title' => 'Updated title',
                 'reference_number' => 'SWP-901',
                 'category' => $procedure->category,
-                'change_summary' => 'Clarified step 2',
+                'change_summary' => 'Clarified step 2', ...$this->guards($procedure),
             ])
             ->assertSessionHas('success');
 
@@ -175,7 +169,7 @@ class SafeWorkProcedureTest extends TestCase
     {
         $procedure = SafeWorkProcedure::factory()->draft()->create();
 
-        $this->actingAs($this->hsOfficer())->post("/health-safety/procedures/{$procedure->id}/submit-for-review")->assertSessionHas('success');
+        $this->actingAs($this->hsOfficer())->post("/health-safety/procedures/{$procedure->id}/submit-for-review", $this->guards($procedure))->assertSessionHas('success');
 
         $this->assertSame('under_review', $procedure->fresh()->status);
     }
@@ -185,7 +179,7 @@ class SafeWorkProcedureTest extends TestCase
         $procedure = SafeWorkProcedure::factory()->underReview()->create(['review_frequency_months' => 6, 'review_date' => null]);
         $officer = $this->hsOfficer();
 
-        $this->actingAs($officer)->post("/health-safety/procedures/{$procedure->id}/approve")->assertSessionHas('success');
+        $this->actingAs($officer)->post("/health-safety/procedures/{$procedure->id}/approve", $this->guards($procedure))->assertSessionHas('success');
 
         $procedure->refresh();
         $this->assertSame('approved', $procedure->status);
@@ -199,7 +193,7 @@ class SafeWorkProcedureTest extends TestCase
         $procedure = SafeWorkProcedure::factory()->approved()->create();
 
         $this->actingAs($this->hsOfficer())
-            ->post("/health-safety/procedures/{$procedure->id}/request-changes", ['note' => 'Needs more detail'])
+            ->post("/health-safety/procedures/{$procedure->id}/request-changes", ['note' => 'Needs more detail', ...$this->guards($procedure)])
             ->assertSessionHas('success');
 
         $this->assertSame('draft', $procedure->fresh()->status);
@@ -211,11 +205,11 @@ class SafeWorkProcedureTest extends TestCase
         $before = $procedure->versions()->count();
 
         $this->actingAs($this->hsOfficer())
-            ->post("/health-safety/procedures/{$procedure->id}/record-review", ['review_date' => now()->addMonths(6)->toDateString()])
+            ->post("/health-safety/procedures/{$procedure->id}/record-review", ['review_date' => now()->addMonths(6)->toDateString(), 'review_note' => 'Review completed for approval.', ...$this->guards($procedure)])
             ->assertSessionHas('success');
 
         $procedure->refresh();
-        $this->assertSame('approved', $procedure->status); // unchanged
+        $this->assertSame('under_review', $procedure->status); // Prior publication remains available pending explicit approval
         $this->assertTrue($procedure->review_date->isFuture());
         $this->assertSame($before + 1, $procedure->versions()->count());
     }
@@ -224,14 +218,15 @@ class SafeWorkProcedureTest extends TestCase
     {
         $procedure = SafeWorkProcedure::factory()->approved()->create();
 
-        $this->actingAs($this->hsOfficer())->post("/health-safety/procedures/{$procedure->id}/archive")->assertSessionHas('success');
+        $this->actingAs($this->hsOfficer())->post("/health-safety/procedures/{$procedure->id}/archive", $this->guards($procedure))->assertSessionHas('success');
         $procedure->refresh();
         $this->assertSame('archived', $procedure->status);
         $this->assertSame('approved', $procedure->previous_status);
 
-        $this->actingAs($this->hsOfficer())->post("/health-safety/procedures/{$procedure->id}/restore")->assertSessionHas('success');
+        $this->actingAs($this->hsOfficer())->post("/health-safety/procedures/{$procedure->id}/restore", $this->guards($procedure))->assertSessionHas('success');
         $procedure->refresh();
-        $this->assertSame('approved', $procedure->status);
+        $this->assertSame('draft', $procedure->status);
+        $this->assertNull($procedure->published_version_id);
         $this->assertNull($procedure->previous_status);
     }
 
@@ -245,13 +240,13 @@ class SafeWorkProcedureTest extends TestCase
         $this->actingAs($this->hsOfficer())
             ->post("/health-safety/procedures/{$procedure->id}/attachments", [
                 'file' => UploadedFile::fake()->create('swms.pdf', 120, 'application/pdf'),
-                'description' => 'Master SWMS',
+                'description' => 'Master SWMS', ...$this->guards($procedure),
             ])
             ->assertSessionHas('success');
 
         $attachment = $procedure->attachments()->firstOrFail();
         $this->assertSame('swms.pdf', $attachment->original_name);
-        $this->assertSame(3, $attachment->version_at_upload);
+        $this->assertSame(4, $attachment->version_at_upload);
         $this->assertSame('private', $attachment->disk);
         Storage::disk('private')->assertExists($attachment->path);
     }
@@ -276,7 +271,7 @@ class SafeWorkProcedureTest extends TestCase
             ->assertNotFound();
 
         $this->actingAs($this->hsOfficer())
-            ->delete("/health-safety/procedures/{$b->id}/attachments/{$attachment->id}")
+            ->delete("/health-safety/procedures/{$b->id}/attachments/{$attachment->id}", $this->guards($b))
             ->assertNotFound();
     }
 
@@ -343,24 +338,31 @@ class SafeWorkProcedureTest extends TestCase
         $worker = $this->userWithRole('support_worker'); // now holds procedures.view
 
         $this->actingAs($worker)
-            ->post("/health-safety/procedures/{$procedure->id}/acknowledge")
+            ->post("/health-safety/procedures/{$procedure->id}/acknowledge", ['published_version_id' => $procedure->published_version_id])
             ->assertSessionHas('success');
 
-        $this->assertDatabaseHas('procedure_acknowledgements', [
+        $this->assertDatabaseHas('procedure_acknowledgement_receipts', [
             'safe_work_procedure_id' => $procedure->id,
             'user_id' => $worker->id,
-            'version_acknowledged' => 2,
+            'version_id' => $procedure->published_version_id,
         ]);
 
         // Re-acknowledging updates in place, never duplicates (unique procedure+user).
-        $this->actingAs($worker)->post("/health-safety/procedures/{$procedure->id}/acknowledge");
-        $this->assertSame(1, \App\Models\ProcedureAcknowledgement::query()
+        $this->actingAs($worker)->post("/health-safety/procedures/{$procedure->id}/acknowledge", ['published_version_id' => $procedure->published_version_id]);
+        $this->assertSame(1, ProcedureAcknowledgementReceipt::query()
             ->where('safe_work_procedure_id', $procedure->id)->where('user_id', $worker->id)->count());
 
         // The detail payload reflects the current user's acknowledgement.
         $this->actingAs($worker)
-            ->get("/health-safety/procedures?procedure={$procedure->id}")
-            ->assertInertia(fn (Assert $page) => $page->where('detail.acknowledged', true)->where('detail.acknowledged_count', 1));
+            ->get("/health-safety/procedures/{$procedure->id}")
+            ->assertInertia(fn (Assert $page) => $page->where('detail.acknowledged', true)->where('detail.acknowledged_count', null));
+    }
+
+    private function guards(SafeWorkProcedure $procedure): array
+    {
+        $procedure = $procedure->fresh();
+
+        return ['expected_version' => $procedure->current_version, 'expected_lock_version' => $procedure->lock_version];
     }
 
     /* ---------------- Hazard-type mapping (#4) + export (#7) ---------------- */

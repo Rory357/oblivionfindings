@@ -244,7 +244,7 @@ test('resuming a still-failed monitor after maintenance reuses its episode beyon
     [$monitor, $site] = episodeMonitor();
     $failure = episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent;
     deliverEpisodeSource($failure);
-    MonitoringMaintenanceWindow::query()->create([
+    episodeMaintenance([
         'site_id' => $site->id, 'monitor_id' => $monitor->id, 'name' => 'Isolated long maintenance',
         'reason' => 'Isolated episode continuity verification',
         'starts_at' => now()->addSeconds(2), 'ends_at' => now()->addHours(2),
@@ -473,7 +473,7 @@ test('technical checks retain confirmation and maintenance suppression before au
     expect(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent)->toBeNull();
     $failure = episodeObservation($monitor, $site, MonitorState::Failed, 2)->deviceEvent;
     deliverEpisodeSource($failure);
-    MonitoringMaintenanceWindow::query()->create([
+    episodeMaintenance([
         'site_id' => $site->id, 'monitor_id' => $monitor->id, 'name' => 'Isolated check maintenance',
         'reason' => 'Confirm suppression', 'starts_at' => now()->addSeconds(3), 'ends_at' => now()->addSeconds(6),
         'timezone' => 'UTC', 'policy' => 'suppress_notifications_and_ticketing', 'status' => 'active',
@@ -816,7 +816,7 @@ test('resumed evidence for a settled episode does not create or reopen technical
     deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
     $ticket = ItTicket::query()->sole();
     $ticket->update(['status' => 'closed', 'status_reason' => null, 'closed_at' => now()]);
-    MonitoringMaintenanceWindow::query()->create([
+    episodeMaintenance([
         'site_id' => $site->id, 'monitor_id' => $monitor->id, 'name' => 'Isolated settled-episode maintenance',
         'reason' => 'Verify retained settled work', 'starts_at' => now()->addSeconds(2), 'ends_at' => now()->addSeconds(5),
         'timezone' => 'UTC', 'policy' => 'suppress_notifications_and_ticketing', 'status' => 'active',

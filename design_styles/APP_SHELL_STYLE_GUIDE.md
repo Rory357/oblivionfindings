@@ -16,6 +16,18 @@ structure). Known deliberate gap: the workspace/site switcher chip is
 not built — the app has no "current site" concept in shared props yet;
 add the backend concept before adding the chip.
 
+**Slate amendment (approved by Stephan 2026-10-20).** The structure below
+is unchanged; the colours change. The chrome (sidebar **and** top bar) is
+slate-800 `#1E293B` in both light and dark mode — not the `#15151f` ink.
+The page ground is `#F8FAFC` (dark `#0F172A`), cards are white (dark
+`#1E293B`) with a `#E2E8F0` border, and nested sections, inactive tabs
+and grouped information use `#F1F5F9` (dark `#273449`). On the chrome:
+nav text `#94A3B8` (5.7:1), selected item `#334155` with white text,
+borders `#334155`, search input `#0F172A`. Where §1–§4 quote the old ink,
+grey-ground or violet-grey reference values, read the Slate values; see
+DESIGN.md "The Slate look" and DESIGN_TOKENS.md "Slate palette". Rollout:
+tokens in `app.css` change first.
+
 All hex values below are mockup reference values. Implementation is
 **tokens-only** (DESIGN.md non-negotiable #1): each hex maps to a token
 so the shell retints with branding and dark mode stays automatic.
@@ -136,19 +148,22 @@ shipped a 56px-left/64px-top stack (layout `px-8 py-10` + PageLayout
 - Migration of pre-rule pages is tracked as DESIGN.md conformance
   probe 17.
 
-- Light-mode `--background` is a **neutral mid-light grey** — ref
-  `#dcdde0`, i.e. chroma ~0 (drop the violet tint). Chosen after
-  iterating: `#f7f8fd` (old, too white/tinted) → `#eff0f2` → `#e8e9eb`
-  → charcoal `#313237` (**rejected: too dark**) → `#dcdde0` (final).
-  Do not creep back toward tinted white, and do not go dark.
-- `--card` stays white. Cards on the grey ground: hairline border (ref
-  `#cfd0d5`) + soft shadow (`0 1px 3px rgba(16,17,26,.06)`).
+- Light-mode `--background` is **Slate `#F8FAFC`** (approved
+  2026-10-20; dark `#0F172A`). History: `#f7f8fd` → `#eff0f2` →
+  `#e8e9eb` → charcoal `#313237` (rejected: too dark) → neutral grey
+  `#dcdde0` (shipped 2026-09-05, retired 2026-10-20: "feels dated") →
+  lavender `#F3F1F8` (mocked, also dated) → Slate. Don't go back to the
+  grey, a tinted ground or a dark light-mode ground.
+- `--card` stays white. Cards on the Slate ground: hairline border
+  `#E2E8F0` + soft shadow (`0 1px 2px rgb(15 23 42 / .05), 0 1px 3px
+  rgb(15 23 42 / .04)`) — the border is required, because white on
+  `#F8FAFC` is only 1.05:1. Nested sections inside a card use `#F1F5F9`.
 - Page context: the page **title** lives in the page. The **day +
   date** moved into the header at the sidebar seam (2026-09-06 — see
-  §2); pages must not duplicate the full date line. Muted text sitting
-  directly on the grey ground needs the darker muted step (ref
-  `#55566a`) to hold ≥4.5:1 — re-check `--muted-foreground` usage on
-  ground-level surfaces during implementation.
+  §2); pages must not duplicate the full date line. Muted text is
+  slate-600 `#475569` everywhere (7.2:1 on the ground, 6.9:1 on
+  `#F1F5F9`; dark `#94A3B8` is 4.9:1 on `#273449`); slate-500 fails on
+  the secondary surface.
 
 ## 5. Implementation notes (when asked to build it)
 

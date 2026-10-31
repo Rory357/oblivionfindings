@@ -14,6 +14,10 @@ import {
     PageHeaderViewToggle,
 } from '@/components/page';
 import {
+    MonitorHistoryDialog,
+    type MonitorHistoryTarget,
+} from '@/components/security-devices/monitor-history-dialog';
+import {
     CapacityRecords,
     CollectionRecords,
     CoverageRecords,
@@ -41,6 +45,9 @@ import {
     ControlRoomAlertAccessRequired,
     type ControlRoomAlertAccess,
 } from '@/components/security-devices/permission-destinations';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { ReviewCard } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -56,6 +63,13 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
+
+type CurrentPermissions = {
+    securityDevices?: {
+        eventsView?: boolean;
+        devicesView?: boolean;
+    };
+};
 
 type NamedLink = { id: number; name: string; href: string };
 
@@ -100,6 +114,9 @@ export type MonitorRow = {
     freshness_state: string;
     device: NamedLink & { domain: string | null; category: string | null };
     site: NamedLink | null;
+    collector_id?: number | null;
+    collector_name?: string | null;
+    runs_from?: string;
     collection:
         | {
               mode: 'remote_collector';
@@ -123,6 +140,24 @@ export type MonitorRow = {
         latency_ms: number | null;
         observed_at: string | null;
     } | null;
+    maintenance?: {
+        active_window: {
+            id: number;
+            name: string;
+            starts_at: string | null;
+            ends_at: string | null;
+            timezone: string;
+            life_safety_protected: boolean;
+        } | null;
+        upcoming_window: {
+            id: number;
+            name: string;
+            starts_at: string | null;
+            ends_at: string | null;
+            timezone: string;
+            life_safety_protected: boolean;
+        } | null;
+    };
 };
 
 export type CollectionPath = {
@@ -406,7 +441,18 @@ export function MonitoringContent({
     view?: MonitoringView;
     owners?: MonitoringOwners;
 }) {
+    const [historyTarget, setHistoryTarget] =
+        useState<MonitorHistoryTarget | null>(null);
     const shared = { view, owners };
+    const dialog = (
+        <MonitorHistoryDialog
+            target={historyTarget}
+            open={historyTarget !== null}
+            onOpenChange={(open) => {
+                if (!open) setHistoryTarget(null);
+            }}
+        />
+    );
     if (workspace.active_tab === 'findings')
         return (
             <div className="space-y-5">
@@ -424,7 +470,9 @@ export function MonitoringContent({
                     description="Collection-path symptoms are grouped separately."
                     onEdit={onEditMonitor}
                     onDeactivate={onDeactivateMonitor}
+                    onViewHistory={setHistoryTarget}
                 />
+                {dialog}
             </div>
         );
     if (workspace.active_tab === 'coverage')
@@ -495,7 +543,7 @@ export function MonitoringContent({
                                     .canonical_model_available ? (
                                     <MonitoringState
                                         value="available"
-                                        label="Canonical dependency model active"
+                                        label="Dependency model active"
                                     />
                                 ) : (
                                     <MonitoringState
@@ -524,7 +572,11 @@ export function MonitoringContent({
     if (workspace.active_tab === 'trends')
         return (
             <div className="space-y-5">
-                <TrendRecords {...shared} rows={workspace.trends} />
+                <TrendRecords
+                    {...shared}
+                    rows={workspace.trends}
+                    onViewHistory={setHistoryTarget}
+                />
                 <ReviewCard icon={Gauge} title="Retained history scope">
                     <p className="text-sm text-muted-foreground">
                         {workspace.storage.retention.explanation}
@@ -571,6 +623,7 @@ export function MonitoringContent({
                     view={view}
                     rows={workspace.storage.retention.policies}
                 />
+                {dialog}
             </div>
         );
     if (workspace.active_tab === 'collection')
@@ -620,6 +673,7 @@ export function MonitoringContent({
                 total={workspace.inventory.total}
                 onEdit={onEditMonitor}
                 onDeactivate={onDeactivateMonitor}
+                onViewHistory={setHistoryTarget}
             />
             {workspace.inventory.truncated ? (
                 <p
@@ -633,6 +687,7 @@ export function MonitoringContent({
             ) : null}
             <RuntimeRecords runtime={workspace.runtime} view={view} />
             <QueueRecords view={view} queues={workspace.runtime.queues} />
+            {dialog}
         </div>
     );
 }
@@ -643,7 +698,7 @@ export default function Monitoring({
     workspace: MonitoringWorkspace;
 }) {
     const { auth } = usePage<{
-        auth: { user?: { id: number }; can?: Record<string, boolean> };
+        auth: { user?: { id: number }; can?: CurrentPermissions };
     }>().props;
     const [view, setView] = useState<MonitoringView>(() => {
         try {
@@ -654,9 +709,12 @@ export default function Monitoring({
             return 'cards';
         }
     });
+    const [sourceActor] = useState(workspace.actor_id);
     if (
+        !sourceActor ||
+        sourceActor !== workspace.actor_id ||
         workspace.actor_id !== auth?.user?.id ||
-        auth?.can?.['securityDevices.events.view'] !== true
+        auth?.can?.securityDevices?.eventsView !== true
     )
         return (
             <AppLayout
@@ -670,23 +728,31 @@ export default function Monitoring({
                 ]}
             >
                 <Head title="Monitoring - Security & Devices" />
-                <PageHeader
-                    icon={Activity}
-                    title="Monitoring"
-                    subline="Refresh to load evidence for your current approved access."
-                    actions={
-                        <PageHeaderGlassButton
-                            onClick={() =>
-                                router.reload({ only: ['workspace'] })
-                            }
-                        >
-                            Refresh monitoring
-                        </PageHeaderGlassButton>
-                    }
-                />
-                <p role="alert" className="text-sm text-muted-foreground">
-                    Monitoring is being refreshed for your current access.
-                </p>
+                <div className="space-y-5">
+                    <PageHeader
+                        icon={Activity}
+                        title="Monitoring"
+                        subline="Refresh to load evidence for your current approved access"
+                        actions={
+                            <PageHeaderGlassButton
+                                onClick={() =>
+                                    router.visit(
+                                        '/security-devices/monitoring',
+                                        {
+                                            preserveState: false,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
+                            >
+                                Refresh monitoring
+                            </PageHeaderGlassButton>
+                        }
+                    />
+                    <p role="alert" className="text-sm text-muted-foreground">
+                        Monitoring is being refreshed for your current access.
+                    </p>
+                </div>
             </AppLayout>
         );
     const scope = JSON.stringify([auth?.user?.id, auth?.can, workspace]);
@@ -704,7 +770,7 @@ export default function Monitoring({
                 }
             }}
             owners={{
-                profiles: auth?.can?.['securityDevices.devices.view'] === true,
+                profiles: auth?.can?.securityDevices?.devicesView === true,
             }}
         />
     );
@@ -741,6 +807,11 @@ function MonitoringScreen({
         kind: monitor.kind,
         enabled: monitor.enabled,
         affects_availability: monitor.affects_availability,
+        collector_id:
+            monitor.collector_id ??
+            (monitor.collection.mode === 'remote_collector'
+                ? monitor.collection.collector_id
+                : null),
         profile: monitor.profile ?? null,
         device: {
             id: monitor.device.id,
@@ -785,6 +856,14 @@ function MonitoringScreen({
             </PageHeaderMeterCaption>
         </PageHeaderMeterBlock>
     );
+    const canAddCheck = Boolean(
+        management.can_add_check ??
+        (management.can_manage &&
+            management.create_url ===
+                '/security-devices/monitoring/native-monitors' &&
+            management.devices.length > 0 &&
+            management.profiles.length > 0),
+    );
     return (
         <AppLayout
             breadcrumbs={[
@@ -798,7 +877,7 @@ function MonitoringScreen({
                 <PageHeader
                     icon={Activity}
                     title="Monitoring"
-                    subline="Device checks, coverage and retained evidence across your permitted Sites."
+                    subline="Device checks, coverage and retained evidence across your permitted Sites"
                     mobileSummary={`${workspace.summary.total_monitors} checks · ${workspace.summary.active_findings} findings`}
                     actions={
                         <>
@@ -829,21 +908,16 @@ function MonitoringScreen({
                                     Saved monitor changes
                                 </PageHeaderGlassButton>
                             ) : null}
-                            {management.can_manage &&
-                            management.create_url ===
-                                '/security-devices/monitoring/native-monitors' &&
-                            management.devices.length > 0 &&
-                            management.profiles.length > 0 ? (
-                                <PageHeaderPrimaryButton
-                                    onClick={() => {
-                                        setEditingMonitor(null);
-                                        setMonitorDialogOpen(true);
-                                    }}
-                                >
-                                    <Plus className="size-4" />
-                                    Create direct monitor
-                                </PageHeaderPrimaryButton>
-                            ) : null}
+                            <PageHeaderPrimaryButton
+                                disabled={!canAddCheck}
+                                onClick={() => {
+                                    setEditingMonitor(null);
+                                    setMonitorDialogOpen(true);
+                                }}
+                            >
+                                <Plus className="size-4" />
+                                Add check
+                            </PageHeaderPrimaryButton>
                             {workspace.can.view_control_room ? (
                                 <PageHeaderGlassButton asChild>
                                     <Link href="/control-room">
@@ -990,7 +1064,7 @@ function MonitoringScreen({
                                     ) : null}
                                 </>
                             ) : (
-                                <span className="text-[11.5px] text-band-foreground/70">
+                                <span className="text-xs text-band-foreground/70">
                                     These evidence views use the full permitted
                                     scope. Monitor search opens Overview.
                                 </span>
@@ -1034,6 +1108,24 @@ function MonitoringScreen({
                         />
                     }
                 />
+                <SecurityDevicesSectionTabs
+                    section="alerts-upkeep"
+                    activeTab="monitoring"
+                />
+                {!canAddCheck && management.missing_reason && (
+                    <Alert>
+                        <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                            <span>{management.missing_reason}</span>
+                            {management.fix_href && management.fix_label && (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={management.fix_href}>
+                                        {management.fix_label}
+                                    </Link>
+                                </Button>
+                            )}
+                        </AlertDescription>
+                    </Alert>
+                )}
                 <ReviewCard icon={ShieldCheck} title={workspace.boundary.title}>
                     <p className="text-sm text-muted-foreground">
                         {workspace.boundary.description}

@@ -69,6 +69,11 @@ class EscalateOverdueTasks extends Command
                     );
 
                     foreach ($overdue as $item) {
+                        // Source-owned private delivery must prove its current audience/tuple/version.
+                        // Generic task notifications cannot retain privately governed deadlines or fan to managers.
+                        if ($item->identitySource() === 'chemical_exposure_followup') {
+                            continue;
+                        }
                         if ($item->bucket === TaskItem::BUCKET_DONE) {
                             continue;
                         }

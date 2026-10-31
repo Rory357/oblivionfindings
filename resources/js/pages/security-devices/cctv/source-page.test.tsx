@@ -13,7 +13,28 @@ import { sourceFixture } from './source-test-fixtures';
 const mocks = vi.hoisted(() => ({ json: vi.fn() }));
 vi.mock('./live-transport', () => ({ cctvSourceJson: mocks.json }));
 vi.mock('@/layouts/app-layout', () => ({
-    default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
+    default: ({
+        breadcrumbs = [],
+        children,
+    }: {
+        breadcrumbs?: { title: string; href?: string }[];
+        children: ReactNode;
+    }) => (
+        <main>
+            <nav aria-label="Breadcrumbs">
+                {breadcrumbs.map((crumb) =>
+                    crumb.href ? (
+                        <a key={crumb.title} href={crumb.href}>
+                            {crumb.title}
+                        </a>
+                    ) : (
+                        <span key={crumb.title}>{crumb.title}</span>
+                    ),
+                )}
+            </nav>
+            {children}
+        </main>
+    ),
 }));
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
@@ -34,6 +55,24 @@ function openReview() {
         target: { value: 'Verify the recorder and network before viewing.' },
     });
 }
+describe('CCTV source setup placement', () => {
+    it('roots the trail at Home and follows the sidebar to All devices and the camera', () => {
+        render(<CctvSourcePage {...sourceFixture()} />);
+        const trail = screen.getByRole('navigation', { name: 'Breadcrumbs' });
+        expect(
+            [...trail.children].map((crumb) => [
+                crumb.textContent,
+                crumb.getAttribute('href'),
+            ]),
+        ).toEqual([
+            ['Home', '/dashboard'],
+            ['Security & Devices', '/security-devices'],
+            ['All devices', '/security-devices/devices'],
+            ['Main entrance', '/security-devices/devices/42'],
+            ['Camera setup', null],
+        ]);
+    });
+});
 describe('CCTV source setup workflow', () => {
     it('separates saved connection from unavailable vendor stream and needs explicit review', () => {
         render(<CctvSourcePage {...sourceFixture()} />);

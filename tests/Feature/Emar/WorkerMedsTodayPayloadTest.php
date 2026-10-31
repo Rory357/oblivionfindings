@@ -360,9 +360,12 @@ class WorkerMedsTodayPayloadTest extends TestCase
             // Keep the original two fixed board/badge reads, and account for
             // independent canonical evidence by its actual top-level purpose.
             $this->assertSame(2, count($reads['board_day']) + count($reads['scheduled_window']));
+            // The sidebar's All Tasks count (its medication follow-up and PRN task reads)
+            // loads after the page since 30 Oct, so the page itself makes one PRN read and
+            // no follow-up read.
             $this->assertSame([
-                'scheduled_window' => 1, 'board_day' => 1, 'prn_unresolved' => 2,
-                'administration_batch' => 0, 'followup_scope' => 1, 'refusal_scope' => 1, 'unexpected' => 0,
+                'scheduled_window' => 1, 'board_day' => 1, 'prn_unresolved' => 1,
+                'administration_batch' => 0, 'followup_scope' => 0, 'refusal_scope' => 1, 'unexpected' => 0,
                 'second_person_scope' => 1,
             ], MedicationReadQueryInventory::counts($reads), MedicationReadQueryInventory::describe($reads));
             $confirmationRead = $reads['second_person_scope'][0];

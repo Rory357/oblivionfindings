@@ -24,29 +24,31 @@ export default function DeviceGroupForm({
                     title: 'Device groups',
                     href: '/security-devices/device-groups',
                 },
-                { title: isEdit ? 'Edit group' : 'Create group' },
+                { title: isEdit ? 'Edit device group' : 'Add device group' },
             ]}
         >
             <Head
-                title={`${isEdit ? 'Edit' : 'Create'} group - Security & Devices`}
+                title={`${isEdit ? 'Edit' : 'Add'} device group - Security & Devices`}
             />
-            <PageHeader
-                icon={GitBranch}
-                title="Device groups"
-                subline="Group details and optional automatic membership rules."
-                actions={
-                    <PageHeaderGlassButton asChild>
-                        <Link href={destination}>
-                            Back to {isEdit ? 'group' : 'device groups'}
-                        </Link>
-                    </PageHeaderGlassButton>
-                }
-            />
-            <GroupWizard
-                open
-                group={isEdit ? group : undefined}
-                onClose={() => router.visit(destination)}
-            />
+            <div className="space-y-5">
+                <PageHeader
+                    icon={GitBranch}
+                    title={isEdit ? 'Edit device group' : 'Add device group'}
+                    subline="Group details and optional automatic membership rules"
+                    actions={
+                        <PageHeaderGlassButton asChild>
+                            <Link href={destination}>
+                                Back to {isEdit ? 'group' : 'device groups'}
+                            </Link>
+                        </PageHeaderGlassButton>
+                    }
+                />
+                <GroupWizard
+                    open
+                    group={isEdit ? group : undefined}
+                    onClose={() => router.visit(destination)}
+                />
+            </div>
         </AppLayout>
     );
 }

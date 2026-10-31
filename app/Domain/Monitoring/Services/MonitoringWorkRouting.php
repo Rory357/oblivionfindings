@@ -2,6 +2,7 @@
 
 namespace App\Domain\Monitoring\Services;
 
+use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalRule;
@@ -66,6 +67,34 @@ final class MonitoringWorkRouting
             throw new DomainException('source_scope_changed');
         }
         $rule = SignalRule::findMatchingRules($signal)->first();
+        $monitorId = data_get($event->payload, 'monitor_id');
+        $monitor = is_int($monitorId) ? Monitor::query()->find($monitorId) : null;
+        $customRoute = $event->device !== null
+            ? app(EffectiveMonitoringPolicyResolver::class)->findWinningAlertRoute($event->device, $monitor, (int) $signal->site_id)
+            : null;
+
+        if ($customRoute !== null) {
+            $isWarning = data_get($event->payload, 'to_state') === 'degraded';
+            $openTicket = $isWarning
+                ? (bool) $customRoute->warning_open_it_ticket
+                : (bool) $customRoute->critical_open_it_ticket;
+            $escalate = ! $isWarning && (bool) $customRoute->critical_escalate_control_room;
+            $effectiveSeverity = $escalate ? 'high' : ($isWarning ? 'low' : 'medium');
+
+            return [
+                'version' => 1,
+                'destination' => ($recovered || ! $escalate) ? 'it' : 'control_room',
+                'reason' => $recovered
+                    ? 'recovered_before_delivery'
+                    : (! $escalate ? 'nonurgent_technical' : 'operational_coordination'),
+                'severity' => $effectiveSeverity,
+                'rule_id' => $rule?->id,
+                'alert_route_id' => (int) $customRoute->id,
+                'open_it_ticket' => $openTicket,
+                'episode_key' => MonitoringIssueEpisode::fromEvent($event, (int) $signal->site_id)['key'],
+            ];
+        }
+
         // An absent operational assessment preserves Control Room's existing fallback.
         // A transport hint is never sufficient to bypass operational coordination.
         $severity = $rule?->output_severity;

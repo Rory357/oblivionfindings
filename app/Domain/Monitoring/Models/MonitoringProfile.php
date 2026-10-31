@@ -15,6 +15,8 @@ class MonitoringProfile extends Model
 {
     use HasFactory, WritesLegacyStorageContext;
 
+    public const DEFAULT_AVAILABILITY_NAME = 'Standard availability';
+
     protected static function newFactory(): MonitoringProfileFactory
     {
         return MonitoringProfileFactory::new();
@@ -31,6 +33,9 @@ class MonitoringProfile extends Model
         'stale_after_seconds',
         'rising_threshold',
         'falling_threshold',
+        'warning_rising_threshold',
+        'warning_falling_threshold',
+        'threshold_direction',
         'baseline_window_seconds',
         'baseline_minimum_samples',
         'baseline_deviation_multiplier',
@@ -55,6 +60,9 @@ class MonitoringProfile extends Model
         'stale_after_seconds' => 'integer',
         'rising_threshold' => 'decimal:6',
         'falling_threshold' => 'decimal:6',
+        'warning_rising_threshold' => 'decimal:6',
+        'warning_falling_threshold' => 'decimal:6',
+        'threshold_direction' => 'string',
         'baseline_window_seconds' => 'integer',
         'baseline_minimum_samples' => 'integer',
         'baseline_deviation_multiplier' => 'decimal:3',

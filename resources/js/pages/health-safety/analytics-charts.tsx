@@ -8,8 +8,9 @@
  *
  * NZ-only: LTIFR / TRIFR, WorkSafe notifiable, Nga Paerewa, ACC.
  */
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import type { SharedData } from '@/types';
+import { usePage } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import {
@@ -32,6 +33,12 @@ import {
     YAxis,
 } from 'recharts';
 import type { RootCauseRow, TrendPoint } from './analytics-types';
+import {
+    participationAccessForViewer,
+    participationSourceMatches,
+    participationValue,
+    participationViewer,
+} from './participation-source-state';
 
 export const TOKEN = {
     primary: 'var(--primary)',
@@ -104,21 +111,13 @@ export function ChartCard({
     className?: string;
 }) {
     return (
-        <Card className={cn('rounded-xl shadow-sm', className)}>
-            <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-1">
-                <div className="min-w-0">
-                    <CardTitle className="text-sm font-bold tracking-tight">
-                        {title}
-                    </CardTitle>
-                    {subtitle ? (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            {subtitle}
-                        </p>
-                    ) : null}
-                </div>
-                {action}
-            </CardHeader>
-            <CardContent className="pt-2">
+        <section className={cn('sg-surface', className)}>
+            <div className="sg-head">
+                <h3>{title}</h3>
+                {subtitle ? <p>{subtitle}</p> : null}
+                {action ? <div className="ml-auto">{action}</div> : null}
+            </div>
+            <div className="px-[18px] pt-2 pb-4">
                 <figure className="m-0" role="group" aria-label={aria}>
                     {children}
                     {table ? (
@@ -143,8 +142,8 @@ export function ChartCard({
                         </table>
                     ) : null}
                 </figure>
-            </CardContent>
-        </Card>
+            </div>
+        </section>
     );
 }
 
@@ -333,7 +332,7 @@ export function SingleAreaChart({
         <ResponsiveContainer width="100%" height={height}>
             <ComposedChart
                 data={trends}
-                margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
+                margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
             >
                 <defs>
                     <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -366,6 +365,7 @@ export function SingleAreaChart({
                     axisLine={false}
                     tickLine={false}
                     width={34}
+                    tickFormatter={(v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))}
                 />
                 <Tooltip content={<ChartTooltip />} />
                 <Area
@@ -590,20 +590,63 @@ export function WorkerParticipationChart({
     trends: TrendPoint[];
     height?: number;
 }) {
+    const viewer = participationViewer(usePage<SharedData>().props.auth);
+    const points = trends.map((point) => ({
+        ...point,
+        worker_participation_source_access: participationAccessForViewer(
+            point.worker_participation_source_access,
+            point.worker_participation_viewer_id,
+            viewer,
+        ),
+        worker_engagement: participationValue(
+            point.worker_engagement,
+            point.worker_participation_source_access,
+            point.worker_participation_viewer_id,
+            viewer,
+        ),
+        worker_consultation: participationValue(
+            point.worker_consultation,
+            point.worker_participation_source_access,
+            point.worker_participation_viewer_id,
+            viewer,
+        ),
+    }));
     if (
-        !trends.some(
+        !points.some(
             (t) =>
                 t.worker_engagement !== null || t.worker_consultation !== null,
         )
     ) {
         return (
-            <NeedsData label="No worker-participation records (HSR/committee meetings, consultations) for this period." />
+            <NeedsData
+                label={
+                    !viewer.canView ||
+                    points.some(
+                        (point) =>
+                            point.worker_participation_source_access ===
+                            'restricted',
+                    )
+                        ? 'Worker-participation access is restricted.'
+                        : points.length === 0 ||
+                            points.some(
+                                (point) =>
+                                    point.worker_participation_source_access !==
+                                        'readable' ||
+                                    !participationSourceMatches(
+                                        point.worker_participation_viewer_id,
+                                        viewer,
+                                    ),
+                            )
+                          ? 'Worker-participation information is not confirmed.'
+                          : 'No readable worker-participation records for this period.'
+                }
+            />
         );
     }
     return (
         <ResponsiveContainer width="100%" height={height}>
             <LineChart
-                data={trends}
+                data={points}
                 margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
             >
                 <CartesianGrid
@@ -620,7 +663,12 @@ export function WorkerParticipationChart({
                 <YAxis
                     domain={[
                         (min: number) =>
-                            Math.min(50, Math.floor((min || 50) / 10) * 10),
+                            Math.min(
+                                50,
+                                Math.floor(
+                                    (Number.isFinite(min) ? min : 0) / 10,
+                                ) * 10,
+                            ),
                         100,
                     ]}
                     tick={{ fontSize: 11, fill: TOKEN.axis }}
@@ -633,10 +681,10 @@ export function WorkerParticipationChart({
                 <Line
                     type="monotone"
                     dataKey="worker_engagement"
-                    name="Engagement"
+                    name="Meetings completed"
                     stroke={TOKEN.primary}
                     strokeWidth={2.5}
-                    connectNulls
+                    connectNulls={false}
                     dot={{ r: 3 }}
                     activeDot={{ r: 5 }}
                     isAnimationActive={false}
@@ -648,7 +696,7 @@ export function WorkerParticipationChart({
                     stroke={TOKEN.c2}
                     strokeWidth={2}
                     strokeDasharray="5 4"
-                    connectNulls
+                    connectNulls={false}
                     dot={{ r: 3 }}
                     activeDot={{ r: 5 }}
                     isAnimationActive={false}

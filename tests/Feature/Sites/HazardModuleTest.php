@@ -78,7 +78,7 @@ class HazardModuleTest extends TestCase
         Storage::disk('private')->put($path, 'x');
         $hazard->update(['photo_paths' => [$path]]);
 
-        $response = $this->actingAs($this->admin)->get("/compliance/hazards?hazard={$hazard->id}");
+        $response = $this->actingAs($this->admin)->get("/hazards/{$hazard->id}");
         $response->assertOk();
 
         $url = data_get($response->viewData('page'), 'props.detail.photo_paths.0');
@@ -111,7 +111,7 @@ class HazardModuleTest extends TestCase
                 ->has('tabCounts')
                 ->has('hero.live')
                 ->has('hero.attention')
-                ->has('nzBadges')
+                ->missing('nzBadges')
                 ->has('sites')
                 ->has('assignees')
                 ->has('can.manage')
@@ -171,19 +171,61 @@ class HazardModuleTest extends TestCase
         ]);
     }
 
-    public function test_detail_payload_loads_only_when_hazard_param_present(): void
+    public function test_permanent_page_contains_the_full_authorized_detail_without_raw_storage_paths(): void
     {
         $hazard = $this->makeHazard();
 
         $this->actingAs($this->admin)
-            ->get("/compliance/hazards?hazard={$hazard->id}")
+            ->get("/hazards/{$hazard->id}")
             ->assertInertia(fn ($page) => $page
+                ->component('sites/hazards/show')
+                ->missing('hazard')
+                ->missing('users')
                 ->where('detail.id', $hazard->id)
                 ->where('detail.reference_number', $hazard->reference_number)
                 ->has('detail.history')
                 ->has('detail.close_gate')
                 ->where('detail.can.manage', true)
             );
+    }
+
+    public function test_old_global_and_site_links_open_the_same_record_and_preserve_bounded_filter_context(): void
+    {
+        $hazard = $this->makeHazard();
+        foreach (['/compliance/hazards', "/sites/{$this->site->id}/hazards"] as $base) {
+            $filters = ['q' => 'Needle', 'tab' => 'overdue', 'page' => 2];
+            $response = $this->actingAs($this->admin)->get($base.'?'.http_build_query([
+                ...$filters, 'hazard' => $hazard->id, 'section' => 'actions', 'action' => 'add_action', 'return_to' => '//outside.example',
+            ]));
+            $response->assertRedirect('/hazards/'.$hazard->id.'?'.http_build_query([
+                'return_to' => $base.'?'.http_build_query($filters), 'section' => 'actions', 'action' => 'add-action',
+            ]));
+            $this->get($response->headers->get('Location'))->assertOk()->assertInertia(fn ($page) => $page
+                ->component('sites/hazards/show')->where('detail.id', $hazard->id)->has('detail.actions')->has('detail.history'));
+        }
+        $foreignSite = Site::factory()->create(['type' => 'house']);
+        $this->get("/sites/{$foreignSite->id}/hazards?hazard={$hazard->id}")->assertNotFound();
+    }
+
+    public function test_a_stale_action_form_cannot_add_work_to_a_closed_hazard(): void
+    {
+        $hazard = $this->makeHazard(['status' => 'closed']);
+        $this->actingAs($this->admin)->postJson("/hazards/{$hazard->id}/actions", ['title' => 'Stale new action'])
+            ->assertUnprocessable()->assertJsonValidationErrors('title');
+        $this->assertSame(0, $hazard->actions()->count());
+        $this->assertSame('closed', $hazard->fresh()->status);
+    }
+
+    public function test_start_progress_preserves_the_supplied_note_in_the_record_history(): void
+    {
+        $hazard = $this->makeHazard();
+        $this->actingAs($this->admin)->post("/hazards/{$hazard->id}/status", [
+            'status' => 'in_progress', 'note' => 'Synthetic barrier installed while the floor is repaired.',
+        ])->assertRedirect();
+        $this->get("/hazards/{$hazard->id}?section=history")->assertInertia(fn ($page) => $page
+            ->where('detail.status', 'in_progress')
+            ->where('detail.history', fn ($entries) => collect($entries)->contains(fn ($entry) => $entry['title'] === 'Progress note recorded' && $entry['note'] === 'Synthetic barrier installed while the floor is repaired.')));
+        $this->getJson('/compliance/hazards?hazard[]=1')->assertUnprocessable();
     }
 
     public function test_lifecycle_open_to_in_progress_to_mitigated(): void
@@ -294,6 +336,6 @@ class HazardModuleTest extends TestCase
         $response = $this->actingAs($this->admin)->get('/compliance/hazards/export');
         $response->assertOk();
         $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
-        $this->assertStringContainsString('Reference', $response->getContent());
+        $this->assertStringContainsString('Reference', $response->streamedContent());
     }
 }

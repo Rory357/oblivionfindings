@@ -12,6 +12,11 @@ import {
     PageHeaderViewToggle,
     PageLayout,
 } from '@/components/page';
+import { AddHubWizard } from '@/components/security-devices/add-hub-wizard';
+import {
+    EditHubDialog,
+    type EditHubTarget,
+} from '@/components/security-devices/edit-hub-dialog';
 import {
     CoverageIndicator,
     formatCoverage,
@@ -32,9 +37,11 @@ import {
     SiteMonitors,
     technologyLabel,
 } from '@/components/security-devices/site-technology-records';
+import { SiteTopologyTreeCard } from '@/components/security-devices/site-topology-tree';
+import { Button } from '@/components/ui/button';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     BellRing,
@@ -44,10 +51,11 @@ import {
     LayoutGrid,
     List,
     Network,
+    Plus,
     RadioTower,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { SiteTechnologyProps } from './_types';
+import type { Collector, SiteTechnologyProps } from './_types';
 export type { SiteTechnologyProps } from './_types';
 type ProfileView =
     | 'overview'
@@ -102,6 +110,7 @@ function SiteTechnologyProfile(props: SiteTechnologyProps) {
         itWork,
         maintenance,
         collectors,
+        hub_wizard: hubWizard,
         changes,
         contacts,
         can,
@@ -109,6 +118,25 @@ function SiteTechnologyProfile(props: SiteTechnologyProps) {
     const [view, setView] = useState<ProfileView>(hashView);
     const [layout, setLayout] = useState<'cards' | 'table'>('cards');
     const [search, setSearch] = useState('');
+    const [hubWizardOpen, setHubWizardOpen] = useState(false);
+    const [editingHub, setEditingHub] = useState<EditHubTarget | null>(null);
+    const canManageCollectors = Boolean(can.manage_collectors && hubWizard);
+    const refreshSite = () => router.reload({ preserveScroll: true });
+    const openEditHub = (collector: Collector) => {
+        if (!collector.update_url) return;
+        setEditingHub({
+            id: collector.id,
+            name: collector.name,
+            site: collector.home_site
+                ? {
+                      id: collector.home_site.id,
+                      name: collector.home_site.name,
+                  }
+                : { id: site.id, name: site.name },
+            covered_site_ids: collector.covered_site_ids ?? [],
+            update_url: collector.update_url,
+        });
+    };
     const [failedOnly, setFailedOnly] = useState(
         () =>
             typeof window !== 'undefined' &&
@@ -228,6 +256,14 @@ function SiteTechnologyProfile(props: SiteTechnologyProps) {
                                     ariaLabel="Search devices at this Site"
                                     placeholder="Search Site devices…"
                                 />
+                                {canManageCollectors ? (
+                                    <PageHeaderGlassButton
+                                        icon={Plus}
+                                        onClick={() => setHubWizardOpen(true)}
+                                    >
+                                        Add a hub
+                                    </PageHeaderGlassButton>
+                                ) : null}
                                 {can.view_site_profile ? (
                                     <PageHeaderGlassButton asChild>
                                         <Link
@@ -454,10 +490,49 @@ function SiteTechnologyProfile(props: SiteTechnologyProps) {
                                     />
                                 </ReviewCard>
                             </div>
+                            {topology.tree &&
+                            (topology.tree.roots.length > 0 ||
+                                topology.tree.unplaced.length > 0) ? (
+                                <ReviewCard
+                                    icon={Network}
+                                    title="Site network map"
+                                >
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <p className="text-sm text-muted-foreground">
+                                            {topology.tree.tier_counts.gateways}{' '}
+                                            gateways ·{' '}
+                                            {topology.tree.tier_counts.switches}{' '}
+                                            switches ·{' '}
+                                            {
+                                                topology.tree.tier_counts
+                                                    .access_points
+                                            }{' '}
+                                            access points ·{' '}
+                                            {topology.tree.tier_counts.devices}{' '}
+                                            connected devices
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                selectView('network')
+                                            }
+                                        >
+                                            Open Site network map
+                                        </Button>
+                                    </div>
+                                </ReviewCard>
+                            ) : null}
                             {monitoringReadable ? (
                                 <SiteCollectors
                                     rows={collectors}
                                     view={layout}
+                                    onEditHub={
+                                        canManageCollectors
+                                            ? openEditHub
+                                            : undefined
+                                    }
                                 />
                             ) : (
                                 permission(
@@ -469,6 +544,10 @@ function SiteTechnologyProfile(props: SiteTechnologyProps) {
                     ) : null}
                     {view === 'network' ? (
                         <>
+                            <SiteTopologyTreeCard
+                                tree={topology.tree}
+                                siteName={site.name}
+                            />
                             <div className="grid gap-5 lg:grid-cols-2">
                                 <ReviewCard icon={Network} title="WAN context">
                                     <ReviewRow
@@ -629,6 +708,27 @@ function SiteTechnologyProfile(props: SiteTechnologyProps) {
                     ) : null}
                 </section>
             </PageLayout>
+            {canManageCollectors && hubWizard ? (
+                <>
+                    <AddHubWizard
+                        open={hubWizardOpen}
+                        onClose={() => setHubWizardOpen(false)}
+                        onConnected={refreshSite}
+                        defaultSiteId={site.id}
+                        optionsUrl={hubWizard.options_url}
+                        issueUrl={hubWizard.issue_url}
+                    />
+                    <EditHubDialog
+                        open={editingHub !== null}
+                        onOpenChange={(open) => {
+                            if (!open) setEditingHub(null);
+                        }}
+                        hub={editingHub}
+                        sites={hubWizard.sites}
+                        onSaved={refreshSite}
+                    />
+                </>
+            ) : null}
         </AppLayout>
     );
 }

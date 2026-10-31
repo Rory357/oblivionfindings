@@ -8,6 +8,7 @@ use App\Models\FamilyVisitRequest;
 use App\Models\RespiteBooking;
 use App\Models\Shift;
 use App\Services\Portal\PortalClientSectionAccess;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 
 class PortalScheduleController extends Controller
@@ -21,8 +22,11 @@ class PortalScheduleController extends Controller
         $sectionAccess = app(PortalClientSectionAccess::class)->for($user, $client);
         $showShifts = $sectionAccess['show_shift_schedule'];
         $showRespite = $sectionAccess['show_respite'];
-        $rangeStart = now()->startOfDay();
-        $rangeEnd = now()->addDays(30);
+        // Thirty NZ calendar days from today. Queries get the UTC instants,
+        // because a Carbon binds in its own timezone.
+        $today = WorkerClock::today();
+        $rangeStart = $today->utc();
+        $rangeEnd = $today->addDays(30)->utc();
 
         $shifts = collect();
         $respiteStays = collect();
@@ -49,7 +53,7 @@ class PortalScheduleController extends Controller
                         'name' => $shift->serviceContext->name,
                         'type' => $shift->serviceContext->type?->value,
                     ] : null,
-                    'date' => $shift->starts_at?->format('Y-m-d'),
+                    'date' => $shift->starts_at ? WorkerClock::localDate($shift->starts_at) : null,
                     'staff' => $shift->staff ? [
                         'id' => $shift->staff->id,
                         'name' => $shift->staff->name,
@@ -73,7 +77,7 @@ class PortalScheduleController extends Controller
                     'ends_at' => $booking->end_at?->toISOString(),
                     'status' => $booking->status,
                     'stay_status' => $booking->stays->first()?->status,
-                    'date' => $booking->start_at?->format('Y-m-d'),
+                    'date' => $booking->start_at ? WorkerClock::localDate($booking->start_at) : null,
                     'cancellation_reason' => $booking->cancellation_reason,
                 ]);
         }

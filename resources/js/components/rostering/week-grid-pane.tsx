@@ -750,7 +750,7 @@ export function WeekGridPane({
                         </div>
                     ) : null}
                 </div>
-                <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <LegendDot color="var(--primary)" label="Scheduled" />
                     <LegendDot color="var(--status-info)" label="In progress" />
                     <LegendDot
@@ -761,7 +761,7 @@ export function WeekGridPane({
                     <LegendDot color="var(--muted)" label="Leave" />
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="hidden text-[11px] text-muted-foreground/80 italic md:inline">
+                    <span className="hidden text-xs text-muted-foreground/80 italic md:inline">
                         Right-click any shift for quick actions
                     </span>
                     {canManage && onCreateShift ? (
@@ -816,10 +816,10 @@ export function WeekGridPane({
                             {listGroups.map(([dayKey, items]) => (
                                 <div key={dayKey}>
                                     <div className="flex items-center justify-between bg-muted/50 px-4 py-2">
-                                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                        <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                             {fmtListDay(dayKey)}
                                         </span>
-                                        <span className="text-[11px] text-muted-foreground tabular-nums">
+                                        <span className="text-xs text-muted-foreground tabular-nums">
                                             {items.length} shift
                                             {items.length === 1 ? '' : 's'}
                                         </span>
@@ -859,7 +859,7 @@ export function WeekGridPane({
                             minWidth: gridMinWidth,
                         }}
                     >
-                        <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                        <div className="px-3 py-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                             {groupedBySite
                                 ? `Sites · ${activeRows.length}`
                                 : `Staff · ${activeRows.filter((r) => !r.open).length} rostered`}
@@ -871,7 +871,7 @@ export function WeekGridPane({
                                 <div
                                     key={i}
                                     className={cn(
-                                        'px-2 py-2 text-center text-[11px]',
+                                        'px-2 py-2 text-center text-xs',
                                         isToday && 'bg-primary/10 text-primary',
                                     )}
                                 >
@@ -928,7 +928,7 @@ export function WeekGridPane({
                                             />
                                         </div>
                                         {row.role ? (
-                                            <div className="truncate text-[11px] text-muted-foreground">
+                                            <div className="truncate text-xs text-muted-foreground">
                                                 {row.role}
                                             </div>
                                         ) : null}
@@ -1000,7 +1000,7 @@ function ComplianceChip({ badge }: { badge?: ComplianceBadgeState | null }) {
     return (
         <span
             className={cn(
-                'inline-flex max-w-full items-center rounded-full border px-1.5 py-0.5 text-[10px] leading-none font-semibold',
+                'inline-flex max-w-full items-center rounded-full border px-1.5 py-0.5 text-xs leading-none font-semibold',
                 isExpired
                     ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
                     : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
@@ -1022,7 +1022,7 @@ function ShiftBlock({
     const inner = (
         <div
             className={cn(
-                'group relative rounded-md border px-2 py-1.5 text-[11.5px] leading-tight',
+                'group relative rounded-md border px-2 py-1.5 text-sm leading-tight',
                 STATUS_CLASS[s.status],
                 s.conflict && 'ring-1 ring-status-critical',
             )}
@@ -1035,7 +1035,7 @@ function ShiftBlock({
                 <span className="flex items-center gap-1">
                     {s.conflict ? (
                         <span
-                            className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-status-critical text-[9px] font-bold text-white"
+                            className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-status-critical text-xs font-bold text-white"
                             title="Overlap conflict"
                         >
                             !
@@ -1043,7 +1043,7 @@ function ShiftBlock({
                     ) : null}
                     {s.incident ? (
                         <span
-                            className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-status-warning text-[9px] font-bold text-white"
+                            className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-status-warning text-xs font-bold text-white"
                             title="Incident recorded"
                         >
                             i
@@ -1051,7 +1051,7 @@ function ShiftBlock({
                     ) : null}
                     {s.blocked ? (
                         <span
-                            className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-status-critical px-1 text-[9px] font-bold text-white"
+                            className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-status-critical px-1 text-xs font-bold text-white"
                             title="Blocked candidates"
                         >
                             ×{s.blocked}
@@ -1135,20 +1135,20 @@ function ShiftListRow({
                 <div className="truncate text-sm font-medium">
                     {s.client ?? 'Shift'}
                 </div>
-                <div className="truncate text-[11px] text-muted-foreground">
+                <div className="truncate text-xs text-muted-foreground">
                     {staffName}
                 </div>
             </div>
             {s.conflict ? (
                 <span
-                    className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-status-critical text-[9px] font-bold text-white"
+                    className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-status-critical text-xs font-bold text-white"
                     title="Overlap conflict"
                 >
                     !
                 </span>
             ) : null}
             <span
-                className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold"
                 style={{ background: tone.bg, color: tone.color }}
             >
                 {STATUS_LABELS[s.status]}

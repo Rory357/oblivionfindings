@@ -20,12 +20,14 @@ import {
     MonitoringPolicySettings,
     type MonitoringPolicyWorkspace,
 } from '@/components/security-devices/monitoring-policy-settings';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
+import { readableKey, readablePhrase } from '@/lib/security-devices-labels';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -94,9 +96,83 @@ const actionLabels: Record<string, string> = {
     'monitoring.profile.created': 'Monitoring profile created',
     'monitoring.profile.updated': 'Monitoring profile changed',
     'monitoring.profile.deactivated': 'Monitoring profile turned off',
+    'monitoring.threshold.created': 'Threshold rule added',
+    'monitoring.threshold.updated': 'Threshold rule changed',
+    'monitoring.threshold.deactivated': 'Threshold rule turned off',
+    'monitoring.threshold.reactivated': 'Threshold rule turned on',
+    'monitoring.alert_route.created': 'Alert route added',
+    'monitoring.alert_route.updated': 'Alert route changed',
+    'monitoring.alert_route.deactivated': 'Alert route turned off',
+    'monitoring.alert_route.reactivated': 'Alert route turned on',
 };
-const words = (value: string) =>
-    value.replaceAll('_', ' ').replaceAll('.', ' · ');
+/** Plain sentence-case names for settings keys; the keys stay for logic. */
+const settingLabels: Record<string, string> = {
+    // Supported features
+    classification_taxonomy: 'Classification',
+    monitoring_profiles: 'Monitoring profiles',
+    integration_site_mapping: 'Site mapping for integrations',
+    discovery_candidates: 'Discovery results',
+    monitoring_retention: 'Monitoring data retention',
+    provider_capabilities: 'Provider capabilities',
+    credential_leases: 'Credential leases',
+    database_audit_immutability: 'Audit log protection',
+    // Monitoring service states and queues
+    operational: 'Operational',
+    attention: 'Needs attention',
+    not_observed: 'Not observed',
+    scope_restricted: 'Restricted',
+    events: 'Device events',
+    checks: 'Monitoring checks',
+    discovery: 'Discovery',
+    provider: 'Provider sync',
+    topology: 'Topology',
+    maintenance: 'Maintenance',
+    orchestration: 'Task scheduling',
+    commands: 'Device commands',
+    // Source defaults
+    refresh_interval_minutes: 'Refresh interval (minutes)',
+    alert_motion_events: 'Alert on motion events',
+    alert_device_offline: 'Alert when a device goes offline',
+    quiet_hours_start: 'Quiet hours start',
+    quiet_hours_end: 'Quiet hours end',
+    // Sources
+    unifi: 'UniFi',
+    hikvision: 'Hikvision',
+    hikvision_recorder: 'Hikvision recorder',
+    milesight: 'Milesight',
+    queclink: 'Queclink',
+};
+const settingLabel = (key: string) => settingLabels[key] ?? readableKey(key);
+const recordTypeLabels: Record<string, string> = {
+    DeviceAssetLink: 'Device asset link',
+    DeviceMaintenanceRecord: 'Maintenance record',
+    MonitoringThresholdRule: 'Threshold rule',
+    MonitoringAlertRoute: 'Alert route',
+    MonitoringCoverageExpectation: 'Coverage expectation',
+    MonitoringMaintenanceWindow: 'Maintenance window',
+    MonitoringRetentionPolicy: 'Retention policy',
+    IntegrationProviderConnection: 'Provider connection',
+    IntegrationSiteConfig: 'Site integration settings',
+    IntegrationSiteSecret: 'Site integration credential',
+    IntegrationSyncLog: 'Sync log',
+};
+const recordTypeLabel = (type: string) =>
+    recordTypeLabels[type] ?? readableKey(type);
+/** Changed-field names, read mid-sentence ("Changed: name, Site"). */
+const fieldLabels: Record<string, string> = {
+    site_id: 'Site',
+    device_id: 'device',
+    monitor_id: 'monitor',
+    upstream_monitor_id: 'upstream monitor',
+    downstream_monitor_id: 'downstream monitor',
+    assignable_id: 'assigned record',
+    assignable_type: 'assigned record type',
+    is_active: 'active',
+    is_enabled: 'enabled',
+    secret_last4: 'secret ending',
+    mapped_external_site_name: 'provider Site name',
+};
+const fieldLabel = (key: string) => fieldLabels[key] ?? readablePhrase(key);
 
 export function AuditEvidence({
     visible,
@@ -136,13 +212,14 @@ export function AuditEvidence({
                     }
                     chips={
                         <StatusBadge variant="neutral">
-                            {words(entry.record_type)}
+                            {recordTypeLabel(entry.record_type)}
                         </StatusBadge>
                     }
                     footer={{
                         primary: entry.record_reference ?? 'Recorded change',
                         secondary: entry.fields.length
-                            ? 'Changed: ' + entry.fields.map(words).join(', ')
+                            ? 'Changed: ' +
+                              entry.fields.map(fieldLabel).join(', ')
                             : 'No changed-field details recorded',
                     }}
                 />
@@ -333,6 +410,8 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
     }, []);
     const policyCount =
         workspace.profiles.length +
+        (workspace.thresholds?.length ?? 0) +
+        (workspace.alert_routes?.length ?? 0) +
         workspace.coverage.length +
         workspace.dependencies.length +
         workspace.maintenance.length +
@@ -359,14 +438,17 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
-                { title: 'Settings', href: '/security-devices/settings' },
+                {
+                    title: 'Settings & audit',
+                    href: '/security-devices/settings',
+                },
             ]}
         >
-            <Head title="Settings - Security & Devices" />
+            <Head title="Settings & audit - Security & Devices" />
             <div className="space-y-5">
                 <PageHeader
                     icon={Settings2}
-                    title="Settings"
+                    title="Settings & audit"
                     subline="Security & Devices · monitoring, source access and change history"
                     titleChip={
                         draftOpen ? (
@@ -457,6 +539,10 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
                         />
                     }
                 />
+                <SecurityDevicesSectionTabs
+                    section="setup"
+                    activeTab="settings"
+                />
                 {view === 'overview' && (
                     <>
                         <div className="grid gap-5 md:grid-cols-2">
@@ -528,7 +614,7 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
                                 />
                                 <ReviewRow
                                     label="Monitoring service"
-                                    value={words(runtime.state)}
+                                    value={settingLabel(runtime.state)}
                                 />
                                 {review('change history', 'audit')}
                             </ReviewCard>
@@ -652,7 +738,9 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
                                             <ReviewCard
                                                 key={source.provider}
                                                 icon={RadioTower}
-                                                title={words(source.provider)}
+                                                title={settingLabel(
+                                                    source.provider,
+                                                )}
                                             >
                                                 <ReviewRow
                                                     label="Recorded state"
@@ -669,7 +757,9 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
                                                 ).map(([key, value]) => (
                                                     <ReviewRow
                                                         key={key}
-                                                        label={words(key)}
+                                                        label={settingLabel(
+                                                            key,
+                                                        )}
                                                         value={
                                                             typeof value ===
                                                             'boolean'
@@ -760,7 +850,7 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
                                         ([key, feature]) => (
                                             <ReviewRow
                                                 key={key}
-                                                label={words(key)}
+                                                label={settingLabel(key)}
                                                 value={
                                                     <StatusBadge
                                                         status={feature.state}
@@ -779,10 +869,10 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
                                 entries={audit.entries.filter((entry) =>
                                     matches(
                                         actionLabels[entry.action] ??
-                                            entry.action,
+                                            'Configuration changed',
                                         entry.actor,
-                                        entry.record_type,
-                                        ...entry.fields,
+                                        recordTypeLabel(entry.record_type),
+                                        ...entry.fields.map(fieldLabel),
                                     ),
                                 )}
                             />
@@ -798,7 +888,7 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
                                             <ReviewCard
                                                 key={name}
                                                 icon={RadioTower}
-                                                title={words(name)}
+                                                title={settingLabel(name)}
                                             >
                                                 <ReviewRow
                                                     label="State"
@@ -827,7 +917,7 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
                                                 />
                                                 <ReviewRow
                                                     label="Worker"
-                                                    value={words(
+                                                    value={settingLabel(
                                                         queue.worker_state,
                                                     )}
                                                 />

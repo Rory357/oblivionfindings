@@ -210,7 +210,7 @@ function AmendmentReview({
         <>
             <Dialog open onOpenChange={(open) => !open && close()}>
                 <DialogContent
-                    className="max-h-[90vh] overflow-y-auto [&_button]:min-h-[44px]"
+                    className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
                     style={{
                         width: 'min(92vw, 720px)',
                         maxWidth: 'min(92vw, 720px)',
@@ -466,7 +466,17 @@ export default function PayrollAdjustmentsPending({
         }
     };
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/timesheets' },
+                { title: 'Timesheets', href: '/operations/timesheets' },
+                {
+                    title: 'Payroll adjustments',
+                    href: '/operations/timesheets/payroll-adjustments',
+                },
+            ]}
+        >
             <Head title="Payroll adjustments" />
             <PageShell>
                 <PageHeader

@@ -303,7 +303,7 @@ class SiteTechnologyProjectionTest extends TestCase
 
     private function partialTechnology(User $viewer, Site $site)
     {
-        $version = app(HandleInertiaRequests::class)->version(request());
+        $version = (string) app(HandleInertiaRequests::class)->version(request());
 
         return $this->actingAs($viewer)->get("/sites/{$site->id}", [
             'X-Inertia' => 'true',

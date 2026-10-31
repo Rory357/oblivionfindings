@@ -10,12 +10,13 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Detect risk assessments past their review due date.
  *
- * Runs daily. Finds active risk assessments with review_due_at in the past.
+ * Runs daily. Finds active or under-review assessments before the NZ calendar day.
  */
 class CheckRiskAssessmentReviewsJob implements ShouldQueue
 {
@@ -23,9 +24,7 @@ class CheckRiskAssessmentReviewsJob implements ShouldQueue
 
     public function handle(HsSignalService $signalService, UserSiteAccessService $siteAccess): void
     {
-        $query = HsRiskAssessment::query()
-            ->active()
-            ->dueForReview();
+        $query = HsRiskAssessment::query()->overdueForReview();
         $siteAccess->applyHsRiskAssessmentApplicationScope($query);
 
         $overdueAssessments = $query
@@ -35,7 +34,9 @@ class CheckRiskAssessmentReviewsJob implements ShouldQueue
         $count = 0;
 
         foreach ($overdueAssessments as $assessment) {
-            $daysOverdue = (int) $assessment->review_due_at->diffInDays(now());
+            $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
+            $due = Carbon::parse($assessment->review_due_at->toDateString(), config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
+            $daysOverdue = (int) $due->diffInDays($today);
             $siteId = $siteAccess->effectiveHsRiskAssessmentSiteId($assessment);
 
             $signalService->emitRiskReviewOverdue(

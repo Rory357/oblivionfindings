@@ -9,6 +9,7 @@ use App\Domain\Obli\ObliStaffAccess;
 use App\Domain\SecurityDevices\Endpoints\Models\EndpointAgent;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointAgentIdentity;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteAccess;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteSupportSettings;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\ItTicket;
 use App\Models\User;
@@ -25,7 +26,7 @@ final readonly class ItObliDiagnosticSource
 
     public function ready(): bool
     {
-        return config('endpoint_management.enabled') === true && config('endpoint_management.obli.technician_enabled', false) === true
+        return app(EndpointRemoteSupportSettings::class)->obliTechnicianEnabled()
             && Schema::hasTable('endpoint_agents') && Schema::hasColumns('endpoint_agents', ['uuid', 'device_id', 'site_id', 'platform', 'enrolled_at', 'revoked_at', 'credential_hash', 'assignment_fingerprint', 'heartbeat_hash', 'sequence', 'inventory', 'observed_at', 'last_seen_at']);
     }
 

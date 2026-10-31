@@ -5,9 +5,14 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use LogicException;
+use PDO;
 
 /**
  * Canonical Site and sensitivity boundary for retained employee documents.
@@ -37,6 +42,40 @@ class HrDocumentAccessService
         );
 
         return $query;
+    }
+
+    /**
+     * H&S injury restrictions: the document must be readable by the current viewer AND belong to the injured
+     * worker's own HR profile (retained profiles included), inside the caller's current-authorization reads.
+     */
+    public function assertReadableDocumentForCurrentReads(User $viewer, int $documentId, int $expectedWorkerId, CurrentAuthorizationReads $reads): void
+    {
+        $reads->assertActive();
+        $connection = DB::connection();
+        $pdo = $connection->getPdo();
+        $level = $connection->transactionLevel();
+        if ($viewer->getConnection() !== $connection || ! $pdo instanceof PDO || ! $pdo->inTransaction()) {
+            throw new LogicException('Current document access requires the caller physical transaction connection.');
+        }
+        abort_unless($documentId > 0 && $expectedWorkerId > 0 && (int) $viewer->getKey() > 0, 404);
+        $current = (new AuthorizationEvidenceLockService)->lockForUserWithoutWaiting($viewer, [
+            'hr.documents.view', 'hr.documents.manage', ...UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        ]);
+        abort_unless($reads->query((new HrCurrentStaffService)->currentUsersQuery())->whereKey($current->id)->exists(), 403);
+        abort_unless($current->canDo('hr.documents.view'), 403);
+
+        // Constrain the document to the injured worker before any private hydration.
+        $expectedProfiles = HrEmployeeProfile::withTrashed()->select('hr_employee_profiles.id')->where('user_id', $expectedWorkerId);
+        $reads->query($expectedProfiles);
+        $document = $this->applyReadableDocumentScope(HrDocument::query()->select('hr_documents.id'), $current)
+            ->whereKey($documentId)
+            ->whereIn('employee_profile_id', $expectedProfiles);
+        abort_unless($reads->query($document)->exists(), 404);
+        $reads->assertActive();
+        if ($connection !== DB::connection() || $connection->getPdo() !== $pdo
+            || $connection->transactionLevel() !== $level || ! $pdo->inTransaction()) {
+            throw new LogicException('Current document access left its caller physical transaction.');
+        }
     }
 
     /** @return Builder<HrDocument> */

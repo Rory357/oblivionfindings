@@ -169,6 +169,7 @@ export type FacilitiesWorkspaceData = {
         label: string;
         description: string;
         inventoryTruncated: boolean;
+        attentionFilter?: { key: string; label: string } | null;
         devices: FacilityDevice[];
         environment: FacilityDevice[];
         buildingSystems: FacilityDevice[];
@@ -289,10 +290,63 @@ function Boundary({ data }: { data: FacilitiesWorkspaceData['boundary'] }) {
     );
 }
 
+function AttentionFilterBanner({
+    tabKey,
+    filter,
+}: {
+    tabKey: string;
+    filter: { key: string; label: string } | null | undefined;
+}) {
+    if (!filter) return null;
+
+    return (
+        <Card>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                <p>
+                    Filtered to:{' '}
+                    <span className="font-semibold">{filter.label}</span>
+                </p>
+                <Link
+                    href={`/security-devices/facilities-iot?tab=${encodeURIComponent(tabKey)}`}
+                    className="frontline-focus inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium text-primary hover:underline"
+                >
+                    Clear attention filter
+                </Link>
+            </CardContent>
+        </Card>
+    );
+}
+
 function Overview({ data }: { data: FacilitiesWorkspaceData }) {
-    const { overview } = data;
+    const { overview, activeTab } = data;
     return (
         <div className="space-y-5">
+            <AttentionFilterBanner
+                tabKey="overview"
+                filter={activeTab.attentionFilter}
+            />
+            {activeTab.attentionFilter ? (
+                <section className="space-y-3">
+                    <h2 className="text-lg font-semibold">
+                        {activeTab.attentionFilter.label}
+                    </h2>
+                    {activeTab.devices.length === 0 ? (
+                        <Empty text="No facility devices match this attention filter." />
+                    ) : (
+                        <div className="grid min-w-0 gap-3 xl:grid-cols-2">
+                            {activeTab.devices.map((device) => (
+                                <article
+                                    key={device.id}
+                                    className="min-w-0 space-y-3 rounded-xl border bg-card p-4"
+                                >
+                                    <DeviceHeading device={device} />
+                                    <EvidenceDetails device={device} />
+                                </article>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            ) : null}
             <section>
                 <h2 className="text-lg font-semibold">
                     Facilities operations at a glance
@@ -355,12 +409,12 @@ function Overview({ data }: { data: FacilitiesWorkspaceData }) {
                     <CardHeader>
                         <h3 className="font-semibold">Required action</h3>
                         <p className="text-sm text-muted-foreground">
-                            Evidence-backed items only.
+                            Confirmed issues only.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {overview.requiredActions.length === 0 ? (
-                            <Empty text="No current evidence-backed actions." />
+                            <Empty text="No current actions needed." />
                         ) : (
                             overview.requiredActions.map((action) => (
                                 <Link
@@ -591,7 +645,7 @@ function BuildingPanel({ rows, gap }: { rows: FacilityDevice[]; gap: number }) {
     return (
         <Panel
             title="Building systems and safety equipment"
-            description="Canonical device condition with maintenance kept in the shared maintenance register."
+            description="Recorded device condition with maintenance kept in the shared maintenance register."
             icon={<Building2 className="h-5 w-5" />}
         >
             {gap > 0 ? (
@@ -775,7 +829,7 @@ function AutomationsPanel({
             icon={<Settings2 className="h-5 w-5" />}
         >
             <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm">
-                Automation controls remain read-only until governed command
+                Automation controls remain read-only until approved command
                 workflows are available.
             </div>
             {gap > 0 ? (
@@ -933,7 +987,7 @@ function HistoryPanel({
 }) {
     return (
         <Panel
-            title="Canonical facility history"
+            title="Facility history"
             description="Filtered append-only device events and retained native observations."
             icon={<History className="h-5 w-5" />}
             action={
@@ -1085,11 +1139,14 @@ export function FacilitiesWorkspacePanels({
     return (
         <div className="space-y-5">
             <Boundary data={data.boundary} />
+            <AttentionFilterBanner
+                tabKey={activeTab.key}
+                filter={activeTab.attentionFilter}
+            />
             {activeTab.inventoryTruncated ? (
                 <Gap>
                     This workspace shows the first 100 authorised facility
-                    devices. Narrow the canonical inventory before relying on
-                    counts.
+                    devices. Filter the device list before relying on counts.
                 </Gap>
             ) : null}
             {activeTab.key === 'environment' ? (

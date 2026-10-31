@@ -17,7 +17,7 @@ class HrCurrentStaffService
     /** @return Builder<User> */
     public function currentUsersQuery(): Builder
     {
-        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))->toDateString();
+        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'))->toDateString();
 
         return User::query()
             ->staff()

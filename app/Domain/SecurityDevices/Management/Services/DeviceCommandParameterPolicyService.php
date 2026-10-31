@@ -3,6 +3,8 @@
 namespace App\Domain\SecurityDevices\Management\Services;
 
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartContract;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptContract;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptRequestParameters;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCatalogue;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareContract;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePackages;
@@ -15,11 +17,29 @@ final class DeviceCommandParameterPolicyService
 {
     public function __construct(
         private readonly QueclinkConfigurationProfileService $queclinkProfiles,
+        private readonly NetworkDeviceCommandPolicyService $networkPolicy,
     ) {}
 
     /** @param array<string, mixed> $parameters */
     public function assertAllowed(Device $device, CommandCapabilityDefinition $capability, array $parameters): void
     {
+        if ($this->networkPolicy->isPortCapability($capability->key)) {
+            $this->networkPolicy->assertInterfaceAllowed(
+                $device,
+                (string) ($parameters['interface'] ?? ''),
+            );
+
+            return;
+        }
+        if ($capability->key === EndpointScriptContract::CAPABILITY) {
+            try {
+                EndpointScriptRequestParameters::inputs($parameters);
+            } catch (\InvalidArgumentException) {
+                throw ValidationException::withMessages(['parameters' => 'Invalid reviewed script request.']);
+            }
+
+            return;
+        }
         if ($capability->key === 'endpoint.software.install') {
             EndpointSoftwareContract::parameters($parameters);
             app(EndpointSoftwarePackages::class)->published($parameters['package_uuid']);

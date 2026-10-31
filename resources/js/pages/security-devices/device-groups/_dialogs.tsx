@@ -30,6 +30,7 @@ import {
     normaliseAutoRules,
     type AutoRules,
 } from './auto-rule-builder';
+import { autoRuleValueLabel } from './auto-rule-values';
 
 export type WizardGroup = {
     id: number;
@@ -362,10 +363,10 @@ function GroupWizardBody({
             <WizardShell
                 open
                 onClose={close}
-                title={group ? 'Edit device group' : 'Create device group'}
+                title={group ? 'Edit device group' : 'Add device group'}
                 description="Group details and optional automatic membership rule."
                 railIcon={GitBranch}
-                railTitle={group ? 'Edit group' : 'Create group'}
+                railTitle={group ? 'Edit device group' : 'Add device group'}
                 railSub={group?.name ?? 'New device group'}
                 steps={steps}
                 stepIndex={step}
@@ -419,14 +420,14 @@ function GroupWizardBody({
                                 ? 'Saving…'
                                 : group
                                   ? 'Save changes'
-                                  : 'Create group'}
+                                  : 'Add device group'}
                         </Button>
                     )
                 }
                 success={
                     saved ? (
                         <WizardSuccessPane
-                            title={group ? 'Group updated' : 'Group created'}
+                            title={group ? 'Group updated' : 'Group added'}
                             blurb="The details and rule were saved. Saving a rule does not change membership; review and apply it from the group profile."
                             actions={
                                 <div className="flex max-w-full min-w-0 flex-wrap justify-center gap-2">
@@ -450,7 +451,7 @@ function GroupWizardBody({
                                                 setStep(0);
                                             }}
                                         >
-                                            Create another
+                                            Add another
                                         </Button>
                                     )}
                                     <Button variant="outline" onClick={onClose}>
@@ -650,10 +651,19 @@ function GroupWizardBody({
                                                         rule.op,
                                                     )}{' '}
                                                     ·{' '}
-                                                    {Array.isArray(rule.value)
-                                                        ? rule.value.join(', ')
-                                                        : rule.value ||
-                                                          'Value needed'}
+                                                    {(Array.isArray(rule.value)
+                                                        ? rule.value
+                                                        : [rule.value]
+                                                    )
+                                                        .filter(Boolean)
+                                                        .map((value) =>
+                                                            autoRuleValueLabel(
+                                                                rule.field,
+                                                                value,
+                                                            ),
+                                                        )
+                                                        .join(', ') ||
+                                                        'Value needed'}
                                                 </li>
                                             ))}
                                         </ul>

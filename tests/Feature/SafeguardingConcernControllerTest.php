@@ -104,6 +104,31 @@ class SafeguardingConcernControllerTest extends TestCase
             );
     }
 
+    public function test_dashboard_open_concerns_destination_keeps_the_selected_site_and_all_nonterminal_stages(): void
+    {
+        $site = Site::factory()->create();
+        $open = [];
+        // withoutEvents() skips the model's creating hook, so the NOT NULL unique
+        // reference_number it normally generates is supplied here.
+        foreach (['reported', 'investigating', 'action_plan', 'monitoring'] as $status) {
+            $open[] = SafeguardingConcern::withoutEvents(fn () => SafeguardingConcern::factory()->create([
+                'site_id' => $site->id, 'status' => $status, 'reference_number' => 'SG-TEST-OPEN-'.$status,
+            ]))->id;
+        }
+        foreach (['closed', 'no_action_required'] as $status) {
+            SafeguardingConcern::withoutEvents(fn () => SafeguardingConcern::factory()->create([
+                'site_id' => $site->id, 'status' => $status, 'reference_number' => 'SG-TEST-DONE-'.$status,
+            ]));
+        }
+        SafeguardingConcern::withoutEvents(fn () => SafeguardingConcern::factory()->create([
+            'site_id' => Site::factory()->create()->id, 'status' => 'reported', 'reference_number' => 'SG-TEST-FOREIGN',
+        ]));
+        $this->actingAs($this->admin)->get('/safeguarding?tab=open&site_id='.$site->id)->assertOk()
+            ->assertInertia(fn ($page) => $page->where('tab', 'open')->where('filters.site_id', $site->id)
+                ->where('tabCounts.open', 4)->where('tabCounts.all', 6)->has('rows.data', 4)
+                ->where('rows.data', fn ($rows) => collect($rows)->pluck('id')->sort()->values()->all() === collect($open)->sort()->values()->all()));
+    }
+
     public function test_safeguarding_index_shows_hero_counts(): void
     {
         // Pin severities — the factory randomises severity, which would otherwise
@@ -208,19 +233,20 @@ class SafeguardingConcernControllerTest extends TestCase
         $this->get('/safeguarding/create')->assertRedirect('/login');
     }
 
-    public function test_safeguarding_create_redirects_to_raise_wizard(): void
+    public function test_safeguarding_create_opens_the_reporting_page(): void
     {
-        // The full-page create form is retired — raising is a modal wizard on the list.
         $this->actingAs($this->admin)
             ->get('/safeguarding/create')
-            ->assertRedirect('/safeguarding?raise=1');
+            ->assertOk()->assertInertia(fn ($page) => $page
+            ->component('safeguarding/create')->where('returnUrl', '/safeguarding')
+            ->missing('rows')->missing('hero'));
     }
 
     public function test_safeguarding_create_accessible_by_support_worker(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/safeguarding/create')
-            ->assertRedirect();
+            ->assertOk()->assertInertia(fn ($page) => $page->component('safeguarding/create'));
     }
 
     // ──────────────────────────────────────
@@ -611,7 +637,8 @@ class SafeguardingConcernControllerTest extends TestCase
             );
             $this->fail('An incomplete WorkSafe decision must prevent H&S closure.');
         } catch (\DomainException $exception) {
-            $this->assertSame('Record the WorkSafe notifiability decision before closing this event.', $exception->getMessage());
+            // The canonical closure gate can report other blocked requirements too.
+            $this->assertStringContainsString('Record the WorkSafe notifiability decision before closing this event.', $exception->getMessage());
         }
 
         $this->assertSame($eventBefore, $event->fresh()->getRawOriginal());

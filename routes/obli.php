@@ -12,4 +12,6 @@ Route::middleware(['auth', 'verified', 'throttle:20,1'])->group(function (): voi
 Route::middleware(['auth', 'verified', 'throttle:20,1'])->group(function (): void {
     Route::get('/settings/obli', [ObliSettingsController::class, 'index'])->name('settings.obli.index');
     Route::put('/settings/obli', [ObliSettingsController::class, 'update'])->name('settings.obli.update');
+    Route::put('/settings/obli/remote-support', [ObliSettingsController::class, 'updateRemoteSupport'])->name('settings.obli.remote-support.update');
+    Route::post('/settings/obli/remote-support/verify-relay', [ObliSettingsController::class, 'verifyRelay'])->name('settings.obli.remote-support.verify-relay');
 });

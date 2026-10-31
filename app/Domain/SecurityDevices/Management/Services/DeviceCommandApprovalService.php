@@ -2,14 +2,21 @@
 
 namespace App\Domain\SecurityDevices\Management\Services;
 
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteAccess;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptContract;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptIdentity;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptPolicy;
 use App\Domain\SecurityDevices\Management\Data\CommandDecisionInput;
 use App\Domain\SecurityDevices\Management\Enums\CommandApprovalDecision;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Enums\ManagementLevel;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandApproval;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
+use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -26,6 +33,45 @@ final class DeviceCommandApprovalService
     ) {}
 
     public function decide(
+        DeviceCommandRequest $request,
+        User $approver,
+        CommandDecisionInput $input,
+    ): DeviceCommandRequest {
+        if ($request->capability === EndpointScriptContract::CAPABILITY) {
+            abort_unless($input->expectedActorId === (int) $approver->id, 409);
+
+            return DB::transaction(function () use ($request, $approver, $input): DeviceCommandRequest {
+                $locked = DeviceCommandRequest::query()->whereKey($request->id)->lock('for update nowait')->firstOrFail();
+                $locked->setRelation('device', Device::query()->whereKey($locked->device_id)->lock('for update nowait')->firstOrFail());
+                $decide = function () use ($locked, $approver, $input): DeviceCommandRequest {
+                    app(AuthorizationEvidenceLockService::class)->lockForUsersWithoutWaiting([(int) $approver->id], ['*']);
+                    $current = app(EndpointRemoteAccess::class)->actor((int) $approver->id, $locked->device, 'securityDevices.commands.approve');
+                    abort_unless($current->two_factor_confirmed_at && app(EndpointScriptIdentity::class)->confirmed($current), 403);
+
+                    return $this->decideCanonical($locked, $current, $input);
+                };
+                // Rejection must remain possible after publication/runtime withdrawal.
+                if ($input->decision === CommandApprovalDecision::Rejected) {
+                    return $decide();
+                }
+                if (! app(EndpointScriptPolicy::class)->available()) {
+                    throw ValidationException::withMessages(['command' => 'Reviewed script execution is not available.']);
+                }
+                $requester = User::query()->findOrFail($locked->requested_by_user_id);
+
+                return app(EndpointScriptAuthority::class)->withBinding($locked->device, $requester, $locked->encrypted_parameters,
+                    function (User $current, Device $device, array $binding) use ($locked, $decide): DeviceCommandRequest {
+                        app(EndpointScriptAuthority::class)->assertBinding($locked, $binding);
+
+                        return $decide();
+                    });
+            });
+        }
+
+        return $this->decideCanonical($request, $approver, $input);
+    }
+
+    private function decideCanonical(
         DeviceCommandRequest $request,
         User $approver,
         CommandDecisionInput $input,
@@ -90,7 +136,8 @@ final class DeviceCommandApprovalService
                 true,
             );
             abort_unless($authorization->allowed, $authorization->concealed ? 404 : 403);
-            if ($capability->requiresChange) {
+            if ($capability->requiresChange || ($locked->capability === EndpointScriptContract::CAPABILITY
+                && $locked->it_change_id !== null && $input->decision === CommandApprovalDecision::Approved)) {
                 $changeCanBeReviewed = $locked->it_change_id !== null
                     && $locked->requestedBy !== null
                     && $this->changeEligibility->isEligible(

@@ -65,6 +65,15 @@ final class ReferralServiceAgreements
         'provider_manager' => ['service_agreements.viewAny', 'service_agreements.create', 'service_agreements.update'],
     ];
 
+    /**
+     * Finance reads agreements so the "draft needs review" notice it receives opens (Stephan, 23 Oct 2026).
+     * Read-only: no create or update. Kept apart from ROLE_GRANTS so the already-deployed provider-manager
+     * grant migration keeps its exact behaviour; 2026_10_23_090000 applies this one.
+     */
+    public const READ_ONLY_ROLE_GRANTS = [
+        'finance' => ['service_agreements.viewAny'],
+    ];
+
     /** The canonical agreement keys (OperationsPermissionsSeeder), so a grant never depends on seed order. */
     public const PERMISSION_DEFINITIONS = [
         ['key' => 'service_agreements.viewAny', 'description' => 'View Service Agreements'],

@@ -1,6 +1,6 @@
+import { Ring } from '@/components/signature/blocks';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
-import { CheckCircle2, CircleAlert } from 'lucide-react';
 
 export type JourneyGateRequirement = {
     key: string;
@@ -14,74 +14,65 @@ export type JourneyGateData = {
     requirements: JourneyGateRequirement[];
 };
 
+/**
+ * The server-owned requirements before a transition, read by their rings
+ * (signature Checks): a filled ring for done, a three-quarter warning ring for
+ * still required. Unmet requirements link to where they are finished when the
+ * viewer can open that module; labels stay exactly as the server sends them.
+ */
 export function JourneyGateList({ gate }: { gate: JourneyGateData }) {
     return (
         <section
             aria-label="Transition requirements"
-            className="space-y-2 rounded-xl border border-border bg-card/70 p-3"
+            className="rounded-xl border border-border bg-card px-3.5 pt-3 pb-1.5"
         >
             <p
                 className={cn(
-                    'text-sm font-semibold',
+                    'flex items-center gap-2 text-sm font-semibold',
                     gate.allowed
                         ? 'text-status-success-foreground'
-                        : 'text-status-critical-foreground',
+                        : 'text-status-warning-foreground',
                 )}
             >
+                <Ring tone={gate.allowed ? 'success' : 'warning'} />
                 {gate.allowed
                     ? 'Ready to continue'
                     : 'Complete these requirements'}
             </p>
-            <ul className="space-y-2">
-                {gate.requirements.map((requirement) => {
-                    const Icon = requirement.complete
-                        ? CheckCircle2
-                        : CircleAlert;
-                    const content = (
-                        <>
-                            <Icon
-                                aria-hidden
-                                className={cn(
-                                    'mt-0.5 h-4 w-4 shrink-0',
-                                    requirement.complete
-                                        ? 'text-status-success'
-                                        : 'text-status-critical',
-                                )}
-                            />
-                            <span className="min-w-0 flex-1">
-                                {requirement.label}
-                            </span>
-                            <span
-                                className={cn(
-                                    'shrink-0 text-xs font-semibold',
-                                    requirement.complete
-                                        ? 'text-status-success-foreground'
-                                        : 'text-status-critical-foreground',
-                                )}
-                            >
-                                {requirement.complete ? 'Complete' : 'Required'}
-                            </span>
-                        </>
-                    );
-
-                    return (
-                        <li key={requirement.key}>
+            <ul className="mt-1 divide-y divide-border/60">
+                {gate.requirements.map((requirement) => (
+                    <li
+                        key={requirement.key}
+                        className="flex items-center gap-2.5 py-2 text-sm"
+                    >
+                        <Ring
+                            tone={requirement.complete ? 'success' : 'warning'}
+                        />
+                        <span className="min-w-0 flex-1">
                             {requirement.complete || !requirement.href ? (
-                                <div className="flex items-start gap-2 rounded-lg border border-border/70 px-3 py-2 text-sm">
-                                    {content}
-                                </div>
+                                requirement.label
                             ) : (
                                 <Link
                                     href={requirement.href}
                                     aria-label={requirement.label}
-                                    className="flex items-start gap-2 rounded-lg border border-status-critical/30 px-3 py-2 text-sm transition-colors hover:bg-status-critical-bg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                 >
-                                    {content}
+                                    {requirement.label}
                                 </Link>
                             )}
-                        </li>
-                    );
-                })}
+                        </span>
+                        <small
+                            className={cn(
+                                'shrink-0 text-xs font-semibold',
+                                requirement.complete
+                                    ? 'text-status-success-foreground'
+                                    : 'text-status-warning-foreground',
+                            )}
+                        >
+                            {requirement.complete ? 'Complete' : 'Required'}
+                        </small>
+                    </li>
+                ))}
             </ul>
         </section>
     );

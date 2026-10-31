@@ -391,16 +391,14 @@ class HsCorrectiveActionService
                 ->firstOrFail();
             $this->assertTransition($action, HsCorrectiveAction::STATUS_IN_PROGRESS);
 
+            if (! $action->assigned_to_user_id || ($assigneeId && (int) $action->assigned_to_user_id !== $assigneeId)) {
+                throw new InvalidArgumentException('Assign the accountable owner on the action page before starting work.');
+            }
+
             $updates = [
                 'status' => HsCorrectiveAction::STATUS_IN_PROGRESS,
                 'updated_by' => auth()->id(),
             ];
-
-            if ($assigneeId && ! $action->assigned_to_user_id) {
-                $updates['assigned_to_user_id'] = $assigneeId;
-                $updates['assigned_by_user_id'] = auth()->id();
-                $updates['assigned_at'] = now();
-            }
 
             $action->update($updates);
 
@@ -511,7 +509,7 @@ class HsCorrectiveActionService
             $eventCreatorId = $action->hsEvent?->created_by;
 
             if ($verifierId && (
-                $verifierId === $action->assigned_to_user_id
+                $action->hasBeenOwnedBy((int) $verifierId)
                 || $verifierId === $action->completed_by_user_id
                 || ($actionCreatorId && $verifierId === $actionCreatorId)
                 || ($eventCreatorId && $verifierId === $eventCreatorId)
@@ -857,7 +855,7 @@ class HsCorrectiveActionService
             'hs_corrective_action_id' => $action->id,
             'hs_event_id' => $action->hs_event_id,
             'due_date' => $action->due_date?->toDateString(),
-            'url' => "/health-safety/corrective-actions?event={$action->hs_event_id}&action={$action->id}",
+            'url' => "/health-safety/corrective-actions/{$action->id}",
         ]));
     }
 

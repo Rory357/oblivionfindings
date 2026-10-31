@@ -19,6 +19,10 @@ final class PublicProviderWebsite
             'name' => $configuration['public']['provider_name'],
             'phone' => $configuration['public']['contact_phone'] ?? '',
             'response_hours' => $configuration['public']['response_hours'],
+            // Contact us page details (Settings › Referrals › Intake); blank when not set.
+            'email' => (string) ($configuration['public']['contact_email'] ?? ''),
+            'address' => (string) ($configuration['public']['office_address'] ?? ''),
+            'opening_hours' => (string) ($configuration['public']['opening_hours'] ?? ''),
             'intake_enabled' => (bool) $configuration['public']['enabled'],
             'notice' => $configuration['public']['notice'] ?? '',
             'notice_version' => $configuration['public']['notice_version'],

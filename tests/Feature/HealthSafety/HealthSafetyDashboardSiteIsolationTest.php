@@ -25,9 +25,9 @@ use App\Models\Permission;
 use App\Models\PpeAllocation;
 use App\Models\PpeInventory;
 use App\Models\RestraintEvent;
-use App\Models\SafeWorkProcedure;
 use App\Models\SafeguardingConcern;
 use App\Models\SafetyDataSheet;
+use App\Models\SafeWorkProcedure;
 use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\SubstanceStorageLocation;
@@ -40,6 +40,8 @@ use Tests\TestCase;
 
 class HealthSafetyDashboardSiteIsolationTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -53,7 +55,9 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view'], 'H&S Viewer');
+        // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
+        // The safeguarding count needs safeguarding access (Stephan, 26 Oct: "Hide it" otherwise).
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'fleet.viewAny', 'incidents.viewAny', 'safeguarding.viewAny'], 'H&S Viewer');
 
         $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id]);
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
@@ -141,7 +145,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.site', $visibleSite->id)
@@ -250,7 +254,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('worklists.overdue_corrective_actions', 1)
@@ -298,7 +302,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $this->makeOpenHazard($foreignSite, $viewer, 'Foreign hazard');
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('site_league', 1)
@@ -315,7 +319,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view'], 'Dashboard Viewer');
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'clients.viewAssigned'], 'Dashboard Viewer');
         $visibleWorker = $this->siteBoundUser($visibleSite, [], 'Accessible Worker');
         $foreignWorker = $this->siteBoundUser($foreignSite, [], 'Foreign Worker');
         $visibleClient = Client::factory()->create([
@@ -329,10 +333,12 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
             'last_name' => 'Client',
         ]);
 
+        $viewer->assignedClients()->attach($visibleClient->id);
+
         $expectedStaffIds = collect([$viewer->id, $visibleWorker->id])->sort()->values()->all();
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('clients', 1)
@@ -347,7 +353,8 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view'], 'Dashboard Viewer');
+        // Incident counts need incident read; restraint metrics need restraint read and read of the restraints' clients (kept rules).
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'incidents.viewAny', 'restraints.view', 'clients.viewAny'], 'Dashboard Viewer');
         $foreignWorker = $this->siteBoundUser($foreignSite, [], 'Foreign Worker');
 
         HsRiskAssessment::factory()->active()->forSite($visibleSite->id)->create([
@@ -443,7 +450,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('backbone.risk_assessments.active_assessments', 1)
@@ -467,7 +474,8 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view']);
+        // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'incidents.viewAny']);
         $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id]);
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
         ClientIncident::factory()->create([
@@ -539,7 +547,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $viewer = $this->userWithPermissions(['hazards.view', 'healthSafety.viewAllSites'], 'Global H&S Viewer');
 
         $this->actingAs($viewer)
-            ->get('/health-safety?site='.$secondSite->id)
+            ->getOverview('/health-safety?site='.$secondSite->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('sites', 2)
@@ -568,8 +576,11 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $primarySite = Site::factory()->create(['name' => 'Primary Site']);
         $secondarySite = Site::factory()->create(['name' => 'Secondary Site']);
         $remoteSite = Site::factory()->create(['name' => 'Remote Site']);
+        // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
+        // The safeguarding count follows Safeguarding's own read: safeguarding access, and its own all-Sites permission
+        // (reports.viewAny); H&S all-Sites access doesn't widen it (Stephan, 26 Oct, Overview safeguarding count).
         $viewer = $this->userWithPermissions(
-            ['hazards.view', 'healthSafety.viewAllSites'],
+            ['hazards.view', 'healthSafety.viewAllSites', 'fleet.viewAny', 'fleet.manage', 'incidents.viewAny', 'safeguarding.viewAny', 'reports.viewAny'],
             'Application H&S lead',
         );
         HrEmployeeProfile::factory()->create([
@@ -653,7 +664,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.site', null)
@@ -712,7 +723,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $this->assertStringContainsString('Remote Site', $exportContent);
 
         $this->actingAs($viewer)
-            ->get('/health-safety?site='.$remoteSite->id)
+            ->getOverview('/health-safety?site='.$remoteSite->id)
             ->assertOk();
         $this->actingAs($viewer)
             ->get('/health-safety/analytics?site_id='.$remoteSite->id)

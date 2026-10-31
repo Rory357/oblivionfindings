@@ -148,20 +148,18 @@ describe('Read-only permitted device event stream', () => {
         expect(
             screen.getByRole('tab', { name: 'Filtered history' }),
         ).toHaveAttribute('aria-selected', 'true');
-        expect(screen.getByRole('tab', { name: /^Critical\s*7$/ })).toHaveAttribute(
-            'aria-selected',
-            'false',
-        );
+        expect(
+            screen.getByRole('tab', { name: /^Critical\s*7$/ }),
+        ).toHaveAttribute('aria-selected', 'false');
         rerender(
             <AlertsEvents
                 {...props}
                 filters={{ window: '24h', severity: 'critical' }}
             />,
         );
-        expect(screen.getByRole('tab', { name: /^Critical\s*7$/ })).toHaveAttribute(
-            'aria-selected',
-            'true',
-        );
+        expect(
+            screen.getByRole('tab', { name: /^Critical\s*7$/ }),
+        ).toHaveAttribute('aria-selected', 'true');
         fireEvent.click(screen.getByRole('tab', { name: 'Filtered history' }));
         expect(mocks.get).toHaveBeenLastCalledWith(
             '/security-devices/alerts-events',
@@ -234,12 +232,17 @@ describe('Read-only permitted device event stream', () => {
         expect(within(table).getAllByRole('row')).toHaveLength(4);
         expect(within(table).queryByRole('link')).not.toBeInTheDocument();
         const opener = screen.getByRole('button', {
-            name: 'View evidence for alarm trigger',
+            name: 'View evidence for Alarm trigger',
         });
         fireEvent.click(opener);
         const detail = screen.getByRole('dialog');
         expect(within(detail).getByText('#11')).toBeInTheDocument();
-        expect(within(detail).getByText('alarm_trigger')).toBeInTheDocument();
+        expect(
+            within(detail).getAllByText('Alarm trigger').length,
+        ).toBeGreaterThan(0);
+        expect(
+            within(detail).queryByText('alarm_trigger'),
+        ).not.toBeInTheDocument();
         expect(within(detail).getByText('CAM-0041')).toBeInTheDocument();
         expect(
             within(detail).getByText('No processing time recorded'),
@@ -271,7 +274,7 @@ describe('Read-only permitted device event stream', () => {
         expect(screen.queryByText(/PRIVATE-/)).not.toBeInTheDocument();
         fireEvent.click(
             screen.getByRole('button', {
-                name: 'View evidence for alarm trigger',
+                name: 'View evidence for Alarm trigger',
             }),
         );
         expect(screen.queryByText(/PRIVATE-/)).not.toBeInTheDocument();
@@ -296,7 +299,7 @@ describe('Read-only permitted device event stream', () => {
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('radio', { name: 'Table' }));
         fireEvent.click(
-            screen.getByRole('button', { name: 'View evidence for heartbeat' }),
+            screen.getByRole('button', { name: 'View evidence for Heartbeat' }),
         );
         expect(
             screen.queryByRole('link', { name: 'Open device profile' }),
@@ -318,7 +321,7 @@ describe('Read-only permitted device event stream', () => {
         fireEvent.click(screen.getByRole('radio', { name: 'Table' }));
         fireEvent.click(
             screen.getByRole('button', {
-                name: 'View evidence for alarm trigger',
+                name: 'View evidence for Alarm trigger',
             }),
         );
         expect(
@@ -329,7 +332,7 @@ describe('Read-only permitted device event stream', () => {
         render(<AlertsEvents {...eventsFixture()} />);
         fireEvent.click(screen.getByRole('radio', { name: 'Table' }));
         fireEvent.keyDown(
-            screen.getAllByRole('button', { name: 'Actions for heartbeat' })[0],
+            screen.getAllByRole('button', { name: 'Actions for Heartbeat' })[0],
             { key: 'ArrowDown' },
         );
         fireEvent.click(
@@ -352,7 +355,7 @@ describe('Read-only permitted device event stream', () => {
         expect(mocks.visit).toHaveBeenCalledTimes(2);
         fireEvent.click(
             screen.getAllByRole('button', {
-                name: 'View evidence for heartbeat',
+                name: 'View evidence for Heartbeat',
             })[1],
         );
         expect(screen.getByRole('dialog')).toHaveTextContent('#13');
@@ -366,7 +369,7 @@ describe('Read-only permitted device event stream', () => {
         fireEvent.click(screen.getByRole('radio', { name: 'Table' }));
         fireEvent.click(
             screen.getByRole('button', {
-                name: 'View evidence for alarm trigger',
+                name: 'View evidence for Alarm trigger',
             }),
         );
         mocks.actor = 8;
@@ -379,26 +382,54 @@ describe('Read-only permitted device event stream', () => {
             screen.getByText('No permitted device events'),
         ).toBeInTheDocument();
     });
-    it('keeps the explicit UTC date panel open through filtered responses and ends a rolling window when a date is chosen', () => {
-        const props = eventsFixture();
-        props.filters = { window: '24h' };
-        const view = render(<AlertsEvents {...props} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Date range' }));
-        fireEvent.change(screen.getByLabelText('From date (UTC)'), {
-            target: { value: '2026-10-10' },
-        });
-        expect(mocks.get).toHaveBeenLastCalledWith(
-            '/security-devices/alerts-events',
-            { window: '', from: '2026-10-10', page: '1' },
-            { preserveState: true },
-        );
-        const next = eventsFixture();
-        next.filters = { from: '2026-10-10', window: '' };
-        view.rerender(<AlertsEvents {...next} />);
-        expect(screen.getByLabelText('From date (UTC)')).toHaveValue(
-            '2026-10-10',
-        );
-        expect(screen.getByLabelText('To date (UTC)')).toBeInTheDocument();
+    it('picks New Zealand calendar days in the shared range calendar and ends a rolling window when the dates apply', () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-12T00:00:00Z'));
+        try {
+            const props = eventsFixture();
+            props.filters = { window: '24h' };
+            const view = render(<AlertsEvents {...props} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Date range' }));
+            const applyDates = screen.getByRole('button', {
+                name: 'Apply dates',
+            });
+            expect(applyDates).toBeDisabled();
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Sat 10 October 2026' }),
+            );
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Mon 12 October 2026' }),
+            );
+            expect(
+                screen.getByText('10 Oct 2026 – 12 Oct 2026'),
+            ).toBeInTheDocument();
+            fireEvent.click(applyDates);
+            expect(mocks.get).toHaveBeenLastCalledWith(
+                '/security-devices/alerts-events',
+                {
+                    window: '',
+                    from: '2026-10-10',
+                    to: '2026-10-12',
+                    page: '1',
+                },
+                { preserveState: true },
+            );
+            const next = eventsFixture();
+            next.filters = {
+                from: '2026-10-10',
+                to: '2026-10-12',
+                window: '',
+            };
+            view.rerender(<AlertsEvents {...next} />);
+            expect(
+                screen.getByRole('button', {
+                    name: '10 Oct 2026 – 12 Oct 2026',
+                }),
+            ).toBeInTheDocument();
+            expect(screen.queryByText(/UTC/)).not.toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
     });
     it('preserves the legacy page metadata variant and avoids inventing processing or occurrence times', () => {
         const props = eventsFixture();

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import JobBoardHero from './job-board-hero';
 import JobCard from './job-card';
+import { SmartMatchesStrip } from './smart-matches-strip';
 import type { JobBoardStats, JobBoardWeek, JobPost } from './types';
 
 vi.mock('@inertiajs/react', () => ({
@@ -99,7 +100,7 @@ describe('job board audit fixes', () => {
             />,
         );
         expect(
-            screen.getByRole('heading', { name: 'Job Board' }),
+            screen.getByRole('heading', { name: 'Available shifts' }),
         ).toBeVisible();
         expect(
             screen.queryByText(/Your compliance is current|refreshed just now/),
@@ -169,5 +170,109 @@ describe('job board audit fixes', () => {
         expect(screen.getByText('Your schedule')).toBeVisible();
         expect(screen.getByText('Schedule unknown')).toBeVisible();
         expect(screen.queryByText('—')).not.toBeInTheDocument();
+    });
+});
+
+describe('action controls are permission-gated (default deny)', () => {
+    const open = job({
+        status: 'open',
+        viewer_eligibility: {
+            is_eligible: true,
+            blocked_reasons: [],
+            warning_count: 0,
+            first_warning: null,
+        },
+        your_schedule: {
+            conflict: null,
+            time_off: null,
+            fatigue: null,
+            free: true,
+        },
+    });
+
+    it('shows no Claim or Approve button without a handler, and never posts by itself', () => {
+        const { rerender } = render(<JobCard job={open} />);
+        expect(
+            screen.queryByRole('button', { name: /Claim shift/ }),
+        ).toBeNull();
+        rerender(<JobCard job={job({ status: 'claimed' })} />);
+        expect(screen.queryByRole('button', { name: /Approve/ })).toBeNull();
+    });
+
+    it('hands the card to the page owner when the viewer may act', () => {
+        const claim = vi.fn();
+        const approve = vi.fn();
+        const { rerender } = render(<JobCard job={open} onClaim={claim} />);
+        fireEvent.click(screen.getByRole('button', { name: /Claim shift/ }));
+        expect(claim).toHaveBeenCalledWith(open);
+        const claimed = job({ status: 'claimed' });
+        rerender(<JobCard job={claimed} onApprove={approve} />);
+        fireEvent.click(screen.getByRole('button', { name: /Approve/ }));
+        expect(approve).toHaveBeenCalledWith(claimed);
+    });
+
+    it('keeps an ineligible claim disabled with the reason visible', () => {
+        const claim = vi.fn();
+        render(
+            <JobCard
+                job={job({
+                    status: 'open',
+                    viewer_eligibility: {
+                        is_eligible: false,
+                        blocked_reasons: ['Hoist training is out of date.'],
+                        warning_count: 0,
+                        first_warning: null,
+                    },
+                })}
+                onClaim={claim}
+            />,
+        );
+        const button = screen.getByRole('button', { name: /Not eligible/ });
+        expect(button).toBeDisabled();
+        expect(
+            screen.getByText('Hoist training is out of date.'),
+        ).toBeVisible();
+        expect(claim).not.toHaveBeenCalled();
+    });
+
+    it('shows smart matches for information only when the viewer cannot claim', () => {
+        const { rerender } = render(
+            <SmartMatchesStrip jobs={[open]} totalMatches={1} />,
+        );
+        expect(screen.getByText('Smart matches')).toBeVisible();
+        expect(screen.queryByRole('button')).toBeNull();
+        expect(screen.queryByText('Quick claim')).toBeNull();
+        const claim = vi.fn();
+        rerender(
+            <SmartMatchesStrip
+                jobs={[open]}
+                totalMatches={1}
+                onQuickClaim={claim}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: /Quick claim/ }));
+        expect(claim).toHaveBeenCalledWith(open);
+    });
+});
+
+describe('replacement cover privacy', () => {
+    it('says only that cover is needed, never why the rostered person is away', () => {
+        render(
+            <JobCard
+                job={job({
+                    status: 'open',
+                    // Even a stale payload that still carried a reason must not show it.
+                    replacement: {
+                        id: 5,
+                        status: 'requested',
+                        reason: 'Sick leave',
+                    } as unknown as JobPost['replacement'],
+                })}
+            />,
+        );
+        expect(
+            document.querySelector('[data-test="job-board-replacement-cover"]'),
+        ).toHaveTextContent(/^Replacement cover$/);
+        expect(screen.queryByText(/Sick leave/)).toBeNull();
     });
 });

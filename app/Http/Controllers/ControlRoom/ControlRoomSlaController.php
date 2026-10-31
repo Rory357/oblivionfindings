@@ -134,7 +134,7 @@ class ControlRoomSlaController extends Controller
             'name' => $sla->name,
         ]);
 
-        return back()->with('success', 'SLA definition created.');
+        return back()->with('success', 'Response target added.');
     }
 
     /**
@@ -179,7 +179,7 @@ class ControlRoomSlaController extends Controller
             'name' => $sla->name,
         ]);
 
-        return back()->with('success', 'SLA definition updated.');
+        return back()->with('success', 'Response target saved.');
     }
 
     /**
@@ -197,7 +197,7 @@ class ControlRoomSlaController extends Controller
             'is_active' => $sla->is_active,
         ]);
 
-        return back()->with('success', $sla->is_active ? 'SLA activated.' : 'SLA deactivated.');
+        return back()->with('success', $sla->is_active ? 'Response target turned on.' : 'Response target turned off.');
     }
 
     /**

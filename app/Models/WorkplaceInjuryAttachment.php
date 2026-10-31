@@ -17,6 +17,8 @@ class WorkplaceInjuryAttachment extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'source_schema_version',
+        'source_revision',
         'workplace_injury_id',
         'uploaded_by',
         'disk',
@@ -30,6 +32,8 @@ class WorkplaceInjuryAttachment extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
         'size' => 'integer',
     ];
 

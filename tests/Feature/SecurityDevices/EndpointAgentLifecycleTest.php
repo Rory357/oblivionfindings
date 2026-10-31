@@ -3,6 +3,10 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Endpoints\Models\EndpointAgent;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointAgentIdentity;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptPolicy;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptReadiness;
+use App\Domain\SecurityDevices\Management\Services\CommandExecutionRouteResolver;
+use App\Domain\SecurityDevices\Management\Services\DeclaredDeviceCommandCapabilities;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -10,10 +14,13 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function () {
     $this->seed([RbacSeeder::class, SecurityDevicesPermissionsSeeder::class]);
@@ -69,6 +76,139 @@ function endpointEnrolledFixture($test): array
 
     return [$issue, $credential];
 }
+
+function endpointScriptReadinessWire(string $name): string
+{
+    $path = getenv('OBLI_SCRIPT_READINESS_CORPUS') ?: base_path('tests/fixtures/endpoint-script-readiness-go.json');
+    $corpus = json_decode(file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
+    foreach ($corpus['documents'] as $row) {
+        if ($row['name'] === $name) {
+            return $row['request_json'];
+        }
+    }
+    throw new LogicException('Original Go heartbeat fixture is missing.');
+}
+
+/**
+ * The committed Go heartbeat corpus carries fixed observed_at times, so these
+ * tests run at the corpus time. beforeEach has already assigned the device to
+ * its Site at the real "now", which would then lie in the future and leave the
+ * device with no current Site, so the assignment is re-dated to the test clock.
+ */
+function endpointScriptReadinessClock($test): void
+{
+    $test->travelTo(CarbonImmutable::parse('2026-10-21T00:00:00Z'));
+    DeviceAssignment::query()->where('device_id', $test->endpointDevice->id)
+        ->update(['assigned_at' => now()->subMinute()]);
+}
+
+function endpointScriptReadinessPost($test, string $credential, string $raw)
+{
+    return $test->call('POST', 'https://localhost/api/endpoints/agent/heartbeat', [], [], [], [
+        'CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '.$credential,
+    ], $raw);
+}
+
+function endpointScriptReadinessDeny(callable $action, int $status): void
+{
+    try {
+        $action();
+        test()->fail('Expected script readiness denial.');
+    } catch (HttpException $error) {
+        expect($error->getStatusCode())->toBe($status);
+    }
+}
+
+it('stores original Go script readiness without enabling routes and clears it on a newer omitted report', function () {
+    endpointScriptReadinessClock($this);
+    [, $credential] = endpointEnrolledFixture($this);
+    $ready = endpointScriptReadinessWire('ready');
+    $absent = endpointScriptReadinessWire('absent');
+    endpointScriptReadinessPost($this, $credential, $ready)->assertOk()->assertJsonPath('acknowledged_sequence', 1);
+    $read = fn () => DB::transaction(fn () => app(EndpointScriptReadiness::class)->current($this->endpointDevice));
+    $agent = $read();
+    expect($agent->script_actions)->toEqual(['version' => 1, 'installed_service' => true, 'release_enabled' => true, 'executor' => 'reviewed_script']);
+    $seen = $agent->last_seen_at->toISOString();
+    $this->travel(10)->seconds();
+    endpointScriptReadinessPost($this, $credential, $ready)->assertOk();
+    expect($read()->last_seen_at->toISOString())->toBe($seen);
+    config()->set('endpoint_management.scripts.release_enabled', true);
+    $this->endpointDevice->forceFill(['config' => ['management' => ['capabilities' => ['endpoint.script.run']]]])->save();
+    expect(app(EndpointScriptPolicy::class)->available())->toBeFalse()
+        ->and(app(DeclaredDeviceCommandCapabilities::class)->supports($this->endpointDevice, 'endpoint.script.run'))->toBeFalse()
+        ->and(app(CommandExecutionRouteResolver::class)->resolve($this->endpointDevice, (int) $this->endpointSite->id, 'endpoint.script.run')->available)->toBeFalse();
+    endpointScriptReadinessPost($this, $credential, $absent)->assertOk()->assertJsonPath('acknowledged_sequence', 2);
+    expect(EndpointAgent::query()->sole()->script_actions)->toBeNull();
+    endpointScriptReadinessDeny($read, 409);
+    endpointScriptReadinessPost($this, $credential, $ready)->assertConflict();
+    expect(EndpointAgent::query()->sole()->script_actions)->toBeNull()
+        ->and(DB::table('device_command_requests')->count())->toBe(0)
+        ->and(DB::table('endpoint_deliveries')->count())->toBe(0);
+});
+
+it('rejects malformed and ambiguous script readiness before accepting a heartbeat sequence', function () {
+    endpointScriptReadinessClock($this);
+    [, $credential] = endpointEnrolledFixture($this);
+    $raw = endpointScriptReadinessWire('ready');
+    $base = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
+    $valid = $base['script_actions'];
+    foreach ([
+        null, [], 'reviewed_script', [...$valid, 'version' => '1'], [...$valid, 'version' => 1.5],
+        [...$valid, 'installed_service' => 1], [...$valid, 'installed_service' => false],
+        [...$valid, 'release_enabled' => 'true'], [...$valid, 'release_enabled' => false],
+        [...$valid, 'executor' => 'windows_msi'], [...$valid, 'extra' => true],
+        array_diff_key($valid, ['installed_service' => true]),
+    ] as $invalid) {
+        endpointScriptReadinessPost($this, $credential, json_encode([...$base, 'script_actions' => $invalid], JSON_THROW_ON_ERROR))->assertUnprocessable();
+    }
+    foreach ([
+        str_replace('"version":1', '"version":0,"version":1', $raw),
+        str_replace('"version":1', '"vers\\u0069on":0,"version":1', $raw),
+        str_replace('"version":1', '"version":1.0', $raw),
+        substr($raw, 0, -1).',"script_actions":'.json_encode($valid, JSON_THROW_ON_ERROR).'}',
+        $raw.'{}', '[]', '{"script_actions":',
+        str_replace('SYNTHETIC-SCRIPT-PC', "\xFF", $raw),
+    ] as $invalid) {
+        endpointScriptReadinessPost($this, $credential, $invalid)->assertUnprocessable();
+    }
+    $this->withToken($credential)->postJson('/api/endpoints/agent/heartbeat?extra=1', $base)->assertStatus(400);
+    $this->withToken($credential)->post('/api/endpoints/agent/heartbeat', $base, ['Accept' => 'application/json'])->assertStatus(415);
+    expect(EndpointAgent::query()->sole()->sequence)->toBe(0)
+        ->and(EndpointAgent::query()->sole()->script_actions)->toBeNull();
+});
+
+it('rechecks script readiness freshness architecture assignment revocation and replacement', function () {
+    endpointScriptReadinessClock($this);
+    [$issue, $credential] = endpointEnrolledFixture($this);
+    $raw = endpointScriptReadinessWire('ready');
+    endpointScriptReadinessPost($this, $credential, $raw)->assertOk();
+    $read = fn () => DB::transaction(fn () => app(EndpointScriptReadiness::class)->current($this->endpointDevice));
+    $agent = $read();
+    $original = $agent->getRawOriginal();
+    foreach ([
+        ['last_seen_at' => now()->subSeconds(180)], ['last_seen_at' => now()->addSecond()],
+        ['observed_at' => now()->subSeconds(120)], ['observed_at' => now()->addSeconds(31)],
+        ['inventory' => json_encode([...$agent->inventory, 'architecture' => '386'], JSON_THROW_ON_ERROR)],
+        ['boot_id' => 'invalid'], ['heartbeat_hash' => null], ['sequence' => 0],
+        ['script_actions' => json_encode([...$agent->script_actions, 'installed_service' => false], JSON_THROW_ON_ERROR)],
+    ] as $changed) {
+        DB::table('endpoint_agents')->where('id', $agent->id)->update($changed);
+        endpointScriptReadinessDeny($read, 409);
+        DB::table('endpoint_agents')->where('id', $agent->id)->update(array_intersect_key($original, $changed));
+    }
+    $assignment = $this->endpointDevice->assignments()->firstOrFail();
+    $assignment->update(['released_at' => now()]);
+    DeviceAssignment::create(['device_id' => $this->endpointDevice->id, 'assignable_type' => 'site',
+        'assignable_id' => $this->endpointSite->id, 'assignment_type' => 'permanent', 'assigned_at' => now()]);
+    endpointScriptReadinessDeny($read, 401);
+    app(EndpointAgentIdentity::class)->revoke($this->endpointOperator, $this->endpointDevice, 'Synthetic changed computer assignment.', $issue['agent_uuid']);
+    endpointScriptReadinessDeny($read, 409);
+    $replacement = app(EndpointAgentIdentity::class)->issue($this->endpointOperator, $this->endpointDevice, 'windows');
+    expect($replacement['agent_uuid'])->not->toBe($issue['agent_uuid'])
+        ->and(EndpointAgent::query()->sole()->script_actions)->toBeNull();
+    endpointScriptReadinessPost($this, $credential, $raw)->assertUnauthorized();
+    endpointScriptReadinessDeny($read, 409);
+});
 
 it('issues site-scoped enrolment with no plaintext credentials in persistent records', function () {
     $response = $this->actingAs($this->endpointOperator)->postJson(

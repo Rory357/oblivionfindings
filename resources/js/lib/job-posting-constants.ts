@@ -109,3 +109,44 @@ export const sourceChannelOptions = [
     { value: 'social', label: 'Social media' },
     { value: 'other', label: 'Other' },
 ] as const;
+
+/* ------------------------------------------------------------------ */
+/*  Work readiness (the public apply wizard; staff see these labels)   */
+/*  Values match HrApplication::YEARS_OF_EXPERIENCE etc.               */
+/* ------------------------------------------------------------------ */
+
+export const yearsOfExperienceOptions = [
+    { value: 'none', label: 'None yet' },
+    { value: 'under_1', label: 'Less than a year' },
+    { value: '1_to_3', label: '1 to 3 years' },
+    { value: '3_plus', label: 'More than 3 years' },
+] as const;
+
+export const rightToWorkOptions = [
+    {
+        value: 'citizen_or_resident',
+        label: 'Citizen or resident (NZ or Australian)',
+    },
+    { value: 'work_visa', label: 'On a work visa' },
+    { value: 'not_yet', label: 'Not yet' },
+] as const;
+
+export const driverLicenceOptions = [
+    { value: 'full', label: 'Full licence' },
+    { value: 'restricted', label: 'Restricted licence' },
+    { value: 'none', label: 'Learner or none' },
+] as const;
+
+export type YearsOfExperience =
+    (typeof yearsOfExperienceOptions)[number]['value'];
+export type RightToWorkStatus = (typeof rightToWorkOptions)[number]['value'];
+export type DriverLicenceClass = (typeof driverLicenceOptions)[number]['value'];
+
+/** The label for a stored option value, or the raw value if it's unknown. */
+export function optionLabel(
+    options: readonly { value: string; label: string }[],
+    value: string | null | undefined,
+): string | null {
+    if (!value) return null;
+    return options.find((option) => option.value === value)?.label ?? value;
+}

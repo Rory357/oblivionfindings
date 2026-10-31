@@ -9,13 +9,16 @@ import {
     Bell,
     BookOpen,
     CalendarDays,
+    Clock,
     FileText,
     Gauge,
     GitBranch,
     History,
     MapPin,
+    Monitor,
     Network,
     Radar,
+    Satellite,
     Settings,
     Terminal,
     Ticket,
@@ -37,7 +40,7 @@ const groupDefinitions: Array<{
     { key: 'status', label: 'Status', icon: Activity },
     { key: 'technical', label: 'Technology', icon: Network },
     { key: 'operations', label: 'Operations', icon: Wrench },
-    { key: 'records', label: 'Records & governance', icon: BookOpen },
+    { key: 'records', label: 'History & files', icon: BookOpen },
 ];
 
 const sectionIcons: Record<DeviceProfileSectionKey, LucideIcon> = {
@@ -46,17 +49,28 @@ const sectionIcons: Record<DeviceProfileSectionKey, LucideIcon> = {
     topology: GitBranch,
     'interfaces-sensors': Gauge,
     configuration: Settings,
+    endpoint: Monitor,
+    console: Satellite,
     management: Terminal,
     assignments: MapPin,
     tickets: Ticket,
     events: Bell,
     maintenance: CalendarDays,
+    history: Clock,
     documents: FileText,
     audit: History,
 };
 
+const passiveEmptyTabKeys = new Set<DeviceProfileSectionKey>([
+    'interfaces-sensors',
+    'events',
+    'tickets',
+    'audit',
+]);
+
 function navigationGroups(
     sections: DeviceProfileSection[],
+    activeSection: DeviceProfileSectionKey,
 ): GroupedProfileNavGroup[] {
     return groupDefinitions
         .map((group) => ({
@@ -64,7 +78,15 @@ function navigationGroups(
             label: group.label,
             icon: group.icon,
             tabs: sections
-                .filter((section) => section.group === group.key)
+                .filter(
+                    (section) =>
+                        section.group === group.key &&
+                        !(
+                            passiveEmptyTabKeys.has(section.key) &&
+                            section.count === 0 &&
+                            section.key !== activeSection
+                        ),
+                )
                 .map((section) => ({
                     key: section.key,
                     label: section.label,
@@ -99,7 +121,10 @@ export function DeviceProfileGroupNavigation({
     onSectionChange: (section: DeviceProfileSectionKey) => void;
     onSearch: () => void;
 }) {
-    const groups = useMemo(() => navigationGroups(sections), [sections]);
+    const groups = useMemo(
+        () => navigationGroups(sections, activeSection),
+        [sections, activeSection],
+    );
 
     return (
         <GroupPillRail
@@ -129,7 +154,10 @@ export function DeviceProfileNavigation({
     searchOpen: boolean;
     onSearchClose: () => void;
 }) {
-    const groups = useMemo(() => navigationGroups(sections), [sections]);
+    const groups = useMemo(
+        () => navigationGroups(sections, activeSection),
+        [sections, activeSection],
+    );
     const activeGroup = groups.find(
         (group) => group.key === activeGroupKey(groups, activeSection),
     );

@@ -108,7 +108,7 @@ describe('corrective actions responsive register', () => {
         const controls = within(card).getAllByRole('button');
         expect(controls).toHaveLength(2);
         expect(controls[0]).toHaveAccessibleName(
-            'Open parent event for action CA-2026-0042',
+            'Open corrective action CA-2026-0042',
         );
         expect(controls[0]).toHaveClass('min-h-11');
         expect(controls[1]).toHaveAccessibleName(
@@ -117,7 +117,7 @@ describe('corrective actions responsive register', () => {
         expect(controls[1]).toHaveClass('frontline-tap');
 
         fireEvent.click(controls[0]);
-        expect(onOpen).toHaveBeenCalledWith(77, { section: 'actions' });
+        expect(onOpen).toHaveBeenCalledWith(42);
 
         fireEvent.click(controls[1]);
         expect(onMenu).toHaveBeenCalledWith(action, 0, 0);

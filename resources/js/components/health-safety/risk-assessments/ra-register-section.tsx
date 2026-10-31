@@ -1,13 +1,19 @@
-/* Embeddable Risk Assessments register — reused on the Client profile (risk_management
- * tab) and the Site profile (Risk Assessments tab). Self-contained: manages the context
- * menu, the seven workflow modals and the detail dialog (fetched on demand from the JSON
- * `show` endpoint), so a host page only passes the scoped rows + pickers + can + the
- * locked assessable. Create pre-attaches that entity. */
+/* Site and Client registers link to the permanent assessment workspace.
+ * Creation remains pre-attached to the host entity; its unsaved work is guarded. */
 import { ShiftContextMenu, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import {
+    SafetyFormDraftContext,
+    useSafetyWorkspaceDrafts,
+} from '@/hooks/use-safety-workspace-drafts';
+import {
+    riskHref,
+    riskReturn,
+    type RiskCommand,
+} from '@/lib/health-safety/risk-navigation';
+import { router, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { RaDetailDialog } from './ra-detail-dialog';
 import { statusMeta } from './ra-kit';
 import { buildRaCtxItems, RaTable, type RaCtxHandlers } from './ra-table';
 import { RaWizardDialog } from './ra-wizard-dialog';
@@ -37,7 +43,9 @@ export function RaRegisterSection({
         kind: RaModalKind;
         detail: RaDetail | null;
     } | null>(null);
-    const [detail, setDetail] = useState<RaDetail | null>(null);
+    const returnTo = riskReturn(usePage().url);
+    const drafts = useSafetyWorkspaceDrafts();
+    const hrefFor = (id: number) => riskHref(id, { returnTo });
 
     const fetchDetail = async (id: number): Promise<RaDetail | null> => {
         try {
@@ -53,20 +61,25 @@ export function RaRegisterSection({
         }
     };
 
-    const openDetail = async (id: number) => {
+    const openDetail = (id: number) => {
         setCtx(null);
-        const d = await fetchDetail(id);
-        if (d) setDetail(d);
+        router.visit(hrefFor(id));
     };
 
     const openAction = async (kind: RaModalKind, id: number) => {
         setCtx(null);
+        if (kind !== 'edit' && kind !== 'supersede' && kind !== 'new') {
+            router.visit(
+                riskHref(id, { returnTo, command: kind as RiskCommand }),
+            );
+            return;
+        }
         const d = await fetchDetail(id);
         if (d) setModal({ kind, detail: d });
     };
 
     const copyLink = (r: RaRow) => {
-        const url = `${window.location.origin}/health-safety/risk-assessments?assessment=${r.id}`;
+        const url = `${window.location.origin}${hrefFor(r.id)}`;
         void navigator.clipboard?.writeText(url);
         setCtx(null);
     };
@@ -106,53 +119,42 @@ export function RaRegisterSection({
     );
 
     return (
-        <div className="flex flex-col gap-3">
-            {canManage ? (
-                <div className="flex justify-end">{newBtn}</div>
-            ) : null}
+        <SafetyFormDraftContext.Provider value={drafts.register}>
+            <div className="flex flex-col gap-3">
+                {canManage ? (
+                    <div className="flex justify-end">{newBtn}</div>
+                ) : null}
 
-            <RaTable
-                rows={assessments}
-                title={title}
-                countLabel={`${assessments.length} assessment${assessments.length === 1 ? '' : 's'}`}
-                onOpen={openDetail}
-                onCtx={onCtx}
-                emptyCta={canManage ? newBtn : undefined}
-            />
-
-            {ctx ? (
-                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
-            ) : null}
-
-            {modal ? (
-                <RaWizardDialog
-                    kind={modal.kind}
-                    detail={modal.detail}
-                    pickers={pickers}
-                    lockedAssessable={lockedAssessable}
-                    onClose={() => setModal(null)}
-                    onSuccess={(id) => {
-                        setModal(null);
-                        if (id) void openDetail(id);
-                    }}
+                <RaTable
+                    rows={assessments}
+                    title={title}
+                    countLabel={`${assessments.length} assessment${assessments.length === 1 ? '' : 's'}`}
+                    onOpen={openDetail}
+                    hrefFor={hrefFor}
+                    onCtx={onCtx}
+                    emptyCta={canManage ? newBtn : undefined}
                 />
-            ) : null}
 
-            {detail ? (
-                <RaDetailDialog
-                    detail={detail}
-                    open
-                    onClose={() => setDetail(null)}
-                    onAction={(kind) => {
-                        setModal({ kind, detail });
-                        setDetail(null);
-                    }}
-                    onOpenAssessment={(id) => {
-                        setDetail(null);
-                        void openDetail(id);
-                    }}
-                />
-            ) : null}
-        </div>
+                {ctx ? (
+                    <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+                ) : null}
+
+                {modal ? (
+                    <RaWizardDialog
+                        kind={modal.kind}
+                        detail={modal.detail}
+                        pickers={pickers}
+                        lockedAssessable={lockedAssessable}
+                        onClose={() => drafts.request(() => setModal(null))}
+                        onSuccess={(id) => {
+                            setModal(null);
+                            if (id) void openDetail(id);
+                        }}
+                    />
+                ) : null}
+
+                {drafts.confirmation}
+            </div>
+        </SafetyFormDraftContext.Provider>
     );
 }

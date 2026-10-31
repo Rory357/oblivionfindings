@@ -35,7 +35,9 @@ final class DashboardController extends Controller
         $layout = $preference['value']['blocks'] !== null ? array_column($preference['value']['blocks'], 'id') : $defaultLayout;
 
         return inertia('dashboard', [
-            'overview' => app(OverviewData::class)->build($user, $role, $range, $site, $layout),
+            // Built only when asked for, so the background fill of the shared header
+            // data (inbox, task count) does not build the whole overview again.
+            'overview' => fn () => app(OverviewData::class)->build($user, $role, $range, $site, $layout),
             'role' => $role, 'roles' => $this->access->roles($user), 'defaultRole' => $this->access->defaultRole($user),
             'sites' => $this->access->sites($user, $role), 'filters' => ['range' => $range, 'site' => $site],
             'preference' => $preference, 'defaultLayout' => $defaultLayout,

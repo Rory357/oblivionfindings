@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Http\Controllers\HealthSafety\HealthSafetyDashboardController;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -15,6 +17,8 @@ use Tests\TestCase;
  */
 class HealthSafetyDashboardControllerTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     protected Site $site;
@@ -42,8 +46,9 @@ class HealthSafetyDashboardControllerTest extends TestCase
 
     public function test_dashboard_renders_command_centre_payload(): void
     {
-        $this->actingAs($this->hsOfficer())
-            ->get('/health-safety')
+        $officer = $this->hsOfficer();
+        $this->actingAs($officer)
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-safety/dashboard')
@@ -55,7 +60,8 @@ class HealthSafetyDashboardControllerTest extends TestCase
                 ->has('worklists.notifiable_events')
                 ->has('worklists.expiring')
                 ->has('sites')
-                ->where('filters.lens', 'manager')
+                // The start follows the role (approved drawing D1).
+                ->where('filters.lens', HealthSafetyDashboardController::startFor($officer))
             );
     }
 
@@ -64,7 +70,7 @@ class HealthSafetyDashboardControllerTest extends TestCase
         $site = Site::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->hsOfficer())
-            ->get('/health-safety?lens=governance&site='.$site->id)
+            ->getOverview('/health-safety?lens=governance&site='.$site->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.lens', 'governance')
@@ -73,12 +79,26 @@ class HealthSafetyDashboardControllerTest extends TestCase
             );
     }
 
-    public function test_invalid_lens_falls_back_to_manager(): void
+    public function test_invalid_lens_falls_back_to_the_role_start(): void
     {
-        $this->actingAs($this->hsOfficer())
-            ->get('/health-safety?lens=bogus')
+        $officer = $this->hsOfficer();
+        $this->actingAs($officer)
+            ->getOverview('/health-safety?lens=bogus')
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('filters.lens', 'manager'));
+            ->assertInertia(fn (Assert $page) => $page->where('filters.lens', HealthSafetyDashboardController::startFor($officer)));
+    }
+
+    public function test_the_start_follows_the_role(): void
+    {
+        $start = fn (array $keys) => HealthSafetyDashboardController::startFor(tap(User::factory()->create(['approved_at' => now()]), function (User $u) use ($keys): void {
+            // governance.view is seeded by the governance seeder, not RbacSeeder.
+            $ids = collect($keys)->map(fn (string $key) => Permission::firstOrCreate(['key' => $key], ['description' => $key])->id);
+            $u->permissionOverrides()->sync($ids->mapWithKeys(fn ($id) => [$id => ['allowed' => true]]));
+        })->fresh());
+        $this->assertSame('governance', $start(['hazards.view', 'healthSafety.viewAllSites']));
+        $this->assertSame('governance', $start(['hazards.view', 'governance.view']));
+        $this->assertSame('manager', $start(['hazards.view', 'hazards.manage']));
+        $this->assertSame('frontline', $start(['hazards.view']));
     }
 
     public function test_dashboard_requires_hazards_view_permission(): void
@@ -92,6 +112,6 @@ class HealthSafetyDashboardControllerTest extends TestCase
             $user->roles()->attach($role);
         }
 
-        $this->actingAs($user)->get('/health-safety')->assertForbidden();
+        $this->actingAs($user)->getOverview('/health-safety')->assertForbidden();
     }
 }

@@ -1,56 +1,53 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Models\Permission;
 use App\Models\ProcedureAcknowledgement;
+use App\Models\ProcedureAcknowledgementReceipt;
 use App\Models\SafeWorkProcedure;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\HealthSafety\SafeWorkProcedureService;
+use App\Support\HealthSafety\SafeWorkProcedurePresenter;
+use App\Support\HealthSafety\SafeWorkProcedureReturn;
+use Database\Seeders\RbacSeeder;
 
 /**
- * Seam S16 — Safe Work Procedures (H&S-owned) ↔ HR compliance/training.
- *
- * Source-audited relationship: H&S OWNS Safe Work Procedures and their
- * acknowledgements (`SafeWorkProcedure` / `ProcedureAcknowledgement` /
- * `SafeWorkProcedureController`, `procedures.*` permission). HR FEDERATES the
- * procedure DISPLAY read-only — `MyHrController::index` (/hr/my) and
- * `EmployeeProfileController::employeeProcedures` (the employee profile) both
- * surface `SafeWorkProcedure::applicableToRoles(...)` + the viewer's ack status
- * from `ProcedureAcknowledgement`, gated on the H&S `procedures.view` permission,
- * deep-linking to the H&S register to actually acknowledge. HR never writes an ack.
- *
- * Procedure acks do NOT feed HR compliance: `LiveComplianceValidator` dispatches on
- * check_types `training_course` / `credential` / `background_check` /
- * `policy_attestation` / `driver_licence` / `manual` — there is no `procedure`
- * type. So procedure compliance is tracked by H&S; HR compliance is a separate
- * owner. One owner per fact; a clean read-only federation (like S2 Assets /
- * S4 Injuries), not a fork or a broken link.
- *
- * This test guards both halves of the boundary. Whether a mandatory safe-work
- * procedure ack SHOULD also count toward HR role compliance / rostering hard-stops
- * is Decision D-11 for Chane — not wired unilaterally (cross-module + policy).
+ * HR displays source-owned exact publication reading receipts. These receipts do
+ * not imply training competence, role compliance, or a rostering clearance.
  */
-test('S16 seam: a Safe Work Procedure ack is H&S-owned, federates read-only into HR, and never writes HR compliance', function () {
-    $procedure = SafeWorkProcedure::factory()->create();
-    $staff = User::factory()->create();
+test('S16 seam: an exact procedure reading receipt federates into HR without writing HR compliance', function () {
+    $this->seed(RbacSeeder::class);
+    $site = Site::factory()->create(['type' => 'house']);
+    $staff = User::factory()->frontlineWorker()->create(['approved_at' => now()]);
+    $permission = Permission::where('key', 'procedures.view')->firstOrFail();
+    $staff->permissionOverrides()->sync([$permission->id => ['allowed' => true]]);
+    HrEmployeeProfile::factory()->create(['user_id' => $staff->id, 'primary_site_id' => $site->id,
+        'secondary_site_ids' => [], 'is_active' => true, 'start_date' => '2020-01-01', 'end_date' => null]);
+    $procedure = SafeWorkProcedure::factory()->approved()->create([
+        'applicable_roles' => [], 'applicable_sites' => [$site->id],
+    ])->refresh();
 
-    // What SafeWorkProcedureController writes when the worker acknowledges (H&S path).
-    ProcedureAcknowledgement::create([
-        'safe_work_procedure_id' => $procedure->id,
-        'user_id' => $staff->id,
-        'version_acknowledged' => 1,
-        'acknowledged_at' => now(),
-    ]);
+    // Preserve old evidence, but an old numeric stamp cannot prove this exact copy was read.
+    ProcedureAcknowledgement::create(['safe_work_procedure_id' => $procedure->id,
+        'user_id' => $staff->id, 'version_acknowledged' => $procedure->current_version,
+        'acknowledged_at' => now()->subDay()]);
+    $before = SafeWorkProcedurePresenter::applicableRows($staff, '/hr/my', null, $staff)->firstWhere('id', $procedure->id);
+    expect($before['acknowledged'])->toBeFalse()
+        ->and($before['href'])->toBe(SafeWorkProcedureReturn::href($procedure->id, '/hr/my'));
 
-    // The ack lives entirely in H&S…
-    expect(ProcedureAcknowledgement::where('user_id', $staff->id)->count())->toBe(1);
+    $service = app(SafeWorkProcedureService::class);
+    $receipt = $service->acknowledge($procedure, $staff, ['published_version_id' => $procedure->published_version_id]);
+    $retry = $service->acknowledge($procedure, $staff, ['published_version_id' => $procedure->published_version_id]);
+    expect($retry->id)->toBe($receipt->id)
+        ->and(ProcedureAcknowledgementReceipt::where('user_id', $staff->id)->count())->toBe(1)
+        ->and($receipt->version_id)->toBe($procedure->published_version_id)
+        ->and($receipt->provenance)->toBe('controlled');
 
-    // …HR federates it read-only via the exact query its two surfaces use
-    // (pluck version_acknowledged keyed by procedure id) — the shared H&S ack row…
-    $ackedVersions = ProcedureAcknowledgement::query()
-        ->where('user_id', $staff->id)
-        ->pluck('version_acknowledged', 'safe_work_procedure_id');
-    expect($ackedVersions[$procedure->id] ?? null)->toBe(1);
-
-    // …and the ack never created an HR compliance status. 'procedure' is not an HR
-    // compliance check_type, so procedure acks are H&S-tracked, not HR compliance.
-    expect(HrStaffComplianceStatus::where('user_id', $staff->id)->count())->toBe(0);
+    $row = SafeWorkProcedurePresenter::applicableRows($staff, '/hr/my', null, $staff)->firstWhere('id', $procedure->id);
+    expect($row['acknowledged'])->toBeTrue()
+        ->and($row['published_version_id'])->toBe($receipt->version_id)
+        ->and(ProcedureAcknowledgement::where('user_id', $staff->id)->count())->toBe(1)
+        ->and(HrStaffComplianceStatus::where('user_id', $staff->id)->count())->toBe(0);
 });

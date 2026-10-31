@@ -10,6 +10,7 @@ import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InstallationProfileDialog } from './_installation-dialog';
 import {
+    encodeComputerSetupCode,
     installationJSON,
     installationOptions,
     installationProfile,
@@ -274,5 +275,54 @@ describe('installation profile review', () => {
         ).not.toBeInTheDocument();
         expect(screen.getByText(/This profile has expired/)).toBeVisible();
         expect(installationJSON).toHaveBeenCalledTimes(2);
+    });
+    it('encodes and copies an ofc1_ one-time setup code without rendering secrets in DOM text', async () => {
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', {
+            value: { writeText },
+            configurable: true,
+        });
+        const issued = {
+            ...profile(),
+            organisation: 'Kauri Care — Ōtautahi',
+            server_url: options.server_url!,
+        };
+        const expectedCode = encodeComputerSetupCode(issued);
+        expect(expectedCode.startsWith('ofc1_')).toBe(true);
+
+        const base64 = expectedCode
+            .slice(5)
+            .replace(/-/gu, '+')
+            .replace(/_/gu, '/');
+        const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+        const binary = atob(padded);
+        const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+        expect(JSON.parse(new TextDecoder().decode(bytes))).toEqual(issued);
+
+        vi.mocked(installationJSON)
+            .mockResolvedValueOnce({
+                ...options,
+                organisation: issued.organisation,
+            })
+            .mockResolvedValueOnce(issued);
+        render(<InstallationProfileDialog {...props} />);
+        fireEvent.click(
+            await screen.findByRole('button', {
+                name: 'Create installation profile',
+            }),
+        );
+        const copyButton = await screen.findByRole('button', {
+            name: 'Copy one-time setup code',
+        });
+        expect(document.body.textContent).not.toContain(issued.enrolment_token);
+        expect(document.body.textContent).not.toContain(expectedCode);
+
+        fireEvent.click(copyButton);
+        await waitFor(() =>
+            expect(writeText).toHaveBeenCalledWith(expectedCode),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Setup code copied' }),
+        ).toBeVisible();
     });
 });

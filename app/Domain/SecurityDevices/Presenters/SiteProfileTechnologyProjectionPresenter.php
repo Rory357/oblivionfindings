@@ -67,6 +67,7 @@ final class SiteProfileTechnologyProjectionPresenter
                 'name',
                 'kind',
                 'state',
+                'runs_from',
                 'last_observation_at',
             ])->all())
             ->values();

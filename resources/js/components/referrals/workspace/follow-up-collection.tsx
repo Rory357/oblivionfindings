@@ -21,6 +21,7 @@ import { ReferralStageBadge } from '../stage-badge';
 import {
     label,
     referralHref,
+    shownReference,
     type Page,
     type Permissions,
     type WorkspaceFollowUpRow,
@@ -246,7 +247,7 @@ export function FollowUpCollection({
                                             row.owner_name ?? 'No named owner',
                                         secondary: row.ends_at
                                             ? `Until ${formatDate(row.ends_at)}`
-                                            : row.referral.reference,
+                                            : shownReference(row.referral),
                                     }}
                                 />
                             ))}

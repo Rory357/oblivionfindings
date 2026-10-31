@@ -17,6 +17,7 @@ class BehaviourSupportPlan extends Model
     public const REFERENCE_PREFIX = 'BSP';
 
     protected $fillable = [
+        'lock_version', 'creation_key', 'creation_fingerprint', 'source_schema_version', 'source_site_id', 'source_stay_id', 'version_sequence', 'current_candidate_version_id', 'current_published_version_id',
         'reference_number',
         'client_id',
         'title',
@@ -37,6 +38,7 @@ class BehaviourSupportPlan extends Model
     ];
 
     protected $casts = [
+        'lock_version' => 'integer', 'source_schema_version' => 'integer', 'source_site_id' => 'integer', 'source_stay_id' => 'integer', 'version_sequence' => 'integer', 'current_candidate_version_id' => 'integer', 'current_published_version_id' => 'integer',
         'developed_at' => 'date',
         'review_date' => 'date',
         'status_changed_at' => 'datetime',
@@ -45,6 +47,36 @@ class BehaviourSupportPlan extends Model
     /* ------------------------------------------------------------------ */
     /*  Relationships */
     /* ------------------------------------------------------------------ */
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(BehaviourSupportPlanVersion::class);
+    }
+
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(BehaviourSupportPlanApproval::class);
+    }
+
+    public function candidateVersion(): BelongsTo
+    {
+        return $this->belongsTo(BehaviourSupportPlanVersion::class, 'current_candidate_version_id');
+    }
+
+    public function publishedVersion(): BelongsTo
+    {
+        return $this->belongsTo(BehaviourSupportPlanVersion::class, 'current_published_version_id');
+    }
+
+    public function sourceSite(): BelongsTo
+    {
+        return $this->belongsTo(Site::class, 'source_site_id');
+    }
+
+    public function sourceStay(): BelongsTo
+    {
+        return $this->belongsTo(RespiteStay::class, 'source_stay_id');
+    }
 
     public function client(): BelongsTo
     {

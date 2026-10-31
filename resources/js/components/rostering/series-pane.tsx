@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
+import { StatusBadge } from '@/components/ui/status-badge';
 import { MicroStats, type MicroStat } from './micro-stats';
 
 /* ------------------------------------------------------------------ */
@@ -78,7 +79,7 @@ function WeekStrip({ weekdays }: { weekdays: string[] }) {
                         key={day.code}
                         title={day.label}
                         className={cn(
-                            'flex h-8 flex-1 items-center justify-center rounded-md border text-[10px] font-semibold tracking-wide uppercase',
+                            'flex h-8 flex-1 items-center justify-center rounded-md border text-xs font-semibold tracking-wide uppercase',
                             on
                                 ? 'border-primary/30 bg-primary/10 text-primary'
                                 : 'border-border bg-muted/40 text-muted-foreground',
@@ -135,14 +136,14 @@ function SeriesCard({
                     <h3 className="truncate text-sm font-bold tracking-tight">
                         {seriesTitle(row)}
                     </h3>
-                    <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
                         {timeLabel(row)}
                         {row.location ? ` · ${row.location}` : ''}
                     </p>
                 </div>
                 <span
                     className={cn(
-                        'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize',
+                        'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize',
                         cancelled
                             ? 'bg-status-critical-bg text-status-critical'
                             : 'bg-status-success-bg text-status-success',
@@ -154,7 +155,7 @@ function SeriesCard({
 
             <WeekStrip weekdays={row.weekdays} />
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span>
                     Staff:{' '}
                     <span className="font-medium text-foreground">
@@ -169,26 +170,26 @@ function SeriesCard({
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
                     {row.active_occurrences_count} active
                 </span>
                 {row.open_occurrences_count > 0 ? (
-                    <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[11px] font-semibold text-status-warning tabular-nums">
+                    <StatusBadge variant="warning" className="tabular-nums">
                         {row.open_occurrences_count} open
-                    </span>
+                    </StatusBadge>
                 ) : null}
                 {row.replacement_occurrences_count > 0 ? (
-                    <span className="rounded-full bg-status-info-bg px-2 py-0.5 text-[11px] font-semibold text-status-info tabular-nums">
+                    <StatusBadge variant="info" className="tabular-nums">
                         {row.replacement_occurrences_count} replacement
-                    </span>
+                    </StatusBadge>
                 ) : null}
                 {row.is_sleepover ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
                         Sleepover
                     </span>
                 ) : null}
                 {row.is_on_call ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
                         On-call
                     </span>
                 ) : null}
@@ -301,7 +302,7 @@ export function SeriesPane({
                                 aria-pressed={activeOnly === opt.key}
                                 onClick={() => setActiveOnly(opt.key)}
                                 className={cn(
-                                    'rounded-md px-3 py-1 text-[13px] font-semibold transition-colors',
+                                    'rounded-md px-3 py-1 text-sm font-semibold transition-colors',
                                     activeOnly === opt.key
                                         ? 'bg-card text-foreground shadow-sm'
                                         : 'text-muted-foreground hover:text-foreground',
@@ -340,7 +341,7 @@ export function SeriesPane({
                                 ? 'No recurring series yet'
                                 : 'No series match your filters'}
                         </p>
-                        <p className="mt-0.5 text-[13px] text-muted-foreground">
+                        <p className="mt-0.5 text-sm text-muted-foreground">
                             {list.length === 0
                                 ? 'Create a recurring shift to generate a weekly pattern of occurrences.'
                                 : 'Try clearing the search or the Active filter.'}

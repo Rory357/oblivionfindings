@@ -19,9 +19,11 @@ class DeviceCommandApprovalController extends Controller
         DeviceCommandApprovalService $approvals,
     ): RedirectResponse {
         $validated = $request->validated();
+        abort_if(isset($validated['expected_actor_id']) && $validated['expected_actor_id'] !== (int) $request->user()->id, 409);
         $command = $approvals->decide($command, $request->user(), new CommandDecisionInput(
             decision: CommandApprovalDecision::from($validated['decision']),
             comment: $validated['comment'],
+            expectedActorId: $validated['expected_actor_id'] ?? null,
         ));
 
         return back()->with(

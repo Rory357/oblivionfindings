@@ -480,7 +480,7 @@ export default function Review({ period, summary, shifts }: Props) {
             />
 
             <PageLayout hero={header}>
-                <div data-test="publish-review-page" className="space-y-4">
+                <div data-test="publish-review-page" className="space-y-5">
                     {view === 'blockers' ? (
                         <>
                             <ListCaption

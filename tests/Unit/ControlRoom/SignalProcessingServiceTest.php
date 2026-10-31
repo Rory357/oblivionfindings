@@ -20,6 +20,7 @@ use App\Services\Incidents\IncidentJourneyService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SignalProcessingServiceTest extends TestCase
@@ -248,6 +249,68 @@ class SignalProcessingServiceTest extends TestCase
         // Depending on implementation, may create default alert or skip
         $signal->refresh();
         $this->assertContains($signal->status, ['processed', 'skipped']);
+    }
+
+    #[DataProvider('maintenanceSafetySignals')]
+    public function test_technical_maintenance_preserves_safety_responses_but_can_suppress_technical_faults(
+        string $code,
+        string $category,
+        string $severity,
+        bool $mustRespond,
+    ): void {
+        $site = Site::factory()->create();
+        $source = SignalSource::create([
+            'name' => 'Maintenance boundary fixture',
+            'slug' => 'maintenance-boundary-fixture',
+            'status' => 'active',
+        ]);
+        $type = SignalType::query()->updateOrCreate(['code' => $code], [
+            'name' => 'Maintenance boundary signal',
+            'category' => $category,
+            'default_severity' => $severity,
+            'is_active' => true,
+        ]);
+        MaintenanceWindow::create([
+            'name' => 'Technical maintenance at the site',
+            'site_id' => $site->id,
+            'signal_source_id' => $source->id,
+            'starts_at' => now()->subMinute(),
+            'ends_at' => now()->addHour(),
+            'status' => 'active',
+        ]);
+        $signal = $this->service->ingest([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => $type->code,
+            'site_id' => $site->id,
+            'idempotency_key' => 'maintenance-boundary-'.$code,
+            'severity_hint' => $severity,
+            'payload' => [],
+        ]);
+
+        $alert = $this->service->process($signal);
+
+        if ($mustRespond) {
+            $this->assertNotNull($alert);
+            $this->assertSame('processed', $signal->refresh()->status);
+            $this->assertSame($site->id, $alert->site_id);
+            $this->assertSame($severity, $alert->severity);
+        } else {
+            $this->assertNull($alert);
+            $this->assertSame('suppressed', $signal->refresh()->status);
+        }
+    }
+
+    public static function maintenanceSafetySignals(): array
+    {
+        return [
+            'fall' => ['fall_detected', SignalType::CATEGORY_PEOPLE_SAFETY, 'critical', true],
+            'panic' => ['integration_panic_alarm', SignalType::CATEGORY_PEOPLE_SAFETY, 'critical', true],
+            'vehicle SOS' => ['panic_sos_vehicle', SignalType::CATEGORY_FLEET, 'critical', true],
+            'fire' => ['fire_alarm', SignalType::CATEGORY_HOME_FACILITY, 'critical', true],
+            'care wellbeing' => ['bed_absence_prolonged', SignalType::CATEGORY_MEDICAL_WELLBEING, 'medium', true],
+            'lone worker' => ['lone_worker_emergency', SignalType::CATEGORY_PEOPLE_SAFETY, 'critical', true],
+            'technical critical fault' => ['network_offline', SignalType::CATEGORY_SECURITY, 'critical', false],
+        ];
     }
 
     public function test_incident_tagged_signals_correlate_only_to_the_exact_incident(): void

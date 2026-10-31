@@ -1,11 +1,23 @@
 import {
-    ClientProfileAccessRequired,
-    FleetTechnologyAccessRequired,
-    HrEmployeeEquipmentAccessRequired,
+    ConfigurationDiffDialog,
+    type ConfigurationDiffTarget,
+} from '@/components/security-devices/configuration-diff-dialog';
+import {
+    MonitorHistoryDialog,
+    type MonitorHistoryTarget,
+} from '@/components/security-devices/monitor-history-dialog';
+import {
+    NativeMonitorDialog,
+    type NativeMonitorManagement,
+} from '@/components/security-devices/native-monitor-dialogs';
+import {
+    shortHash,
+    snapshotDiffLabel,
+} from '@/components/security-devices/network-evidence-display';
+import {
     ItChangeDestination,
     ItWorkspaceAccessRequired,
 } from '@/components/security-devices/permission-destinations';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -24,6 +36,15 @@ import {
 } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { Switch } from '@/components/ui/switch';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
 import { formatReadableOperationalState } from '@/lib/readable-operational-state';
 import { RestartRequestState } from '@/pages/it/remote-support/restart-request-state';
@@ -32,39 +53,61 @@ import { SoftwareRequestState } from '@/pages/it/remote-support/software-request
 import { uuidPattern } from '@/pages/security-devices/software/_contracts';
 import { SoftwarePackagePicker } from '@/pages/security-devices/software/_package-picker';
 import { Link, router } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Activity,
-    AlertTriangle,
     ArrowRight,
+    Bell,
     Cable,
-    CheckCircle2,
     ClipboardList,
-    Clock3,
     Cpu,
     Download,
     FileClock,
+    FileDiff,
     HardDrive,
-    MapPin,
+    History,
+    Loader2,
+    Plus,
+    Power,
+    PowerOff,
     RadioTower,
+    RotateCcw,
+    Save,
     Settings2,
     ShieldCheck,
     TicketCheck,
+    Wifi,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DeviceProfile, DeviceProfileSectionKey } from './device-profile';
+import type { DeviceMaintenanceNotice, DeviceProfile } from './device-profile';
 
-function stateBadgeVariant(
-    state: string | null,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
+function stateStatusVariant(state: string | null): StatusVariant {
     if (
-        ['critical', 'failed', 'offline', 'rejected', 'mismatch'].includes(
-            state ?? '',
-        )
+        [
+            'critical',
+            'failed',
+            'offline',
+            'rejected',
+            'mismatch',
+            'high',
+            'urgent',
+        ].includes(state ?? '')
     ) {
-        return 'destructive';
+        return 'critical';
     }
-    if (['healthy', 'active', 'fresh', 'aligned'].includes(state ?? '')) {
-        return 'default';
+    if (
+        [
+            'healthy',
+            'active',
+            'fresh',
+            'aligned',
+            'available',
+            'reconciled',
+            'completed',
+            'resolved',
+        ].includes(state ?? '')
+    ) {
+        return 'success';
     }
     if (
         [
@@ -78,11 +121,46 @@ function stateBadgeVariant(
             'awaiting_step_up',
             'awaiting_change',
             'blocked',
+            'medium',
+            'open',
+            'in_progress',
         ].includes(state ?? '')
     ) {
-        return 'outline';
+        return 'warning';
     }
-    return 'secondary';
+    if (['ready', 'queued', 'dispatched', 'info'].includes(state ?? '')) {
+        return 'info';
+    }
+    return 'neutral';
+}
+
+function DeviceMaintenancePills({
+    maintenance,
+}: {
+    maintenance?: DeviceMaintenanceNotice;
+}) {
+    if (!maintenance) return null;
+    if (maintenance.activeWindow) {
+        return (
+            <StatusBadge variant="info">
+                In maintenance: {maintenance.activeWindow.name}
+                {maintenance.activeWindow.endsAt
+                    ? ` · until ${formatDateTime(maintenance.activeWindow.endsAt)}`
+                    : ''}
+            </StatusBadge>
+        );
+    }
+    if (maintenance.upcomingWindow) {
+        return (
+            <StatusBadge variant="neutral">
+                Planned maintenance: {maintenance.upcomingWindow.name}
+                {maintenance.upcomingWindow.startsAt
+                    ? ` · starts ${formatDateTime(maintenance.upcomingWindow.startsAt)}`
+                    : ''}
+            </StatusBadge>
+        );
+    }
+    return null;
 }
 
 type ManagementAction = DeviceProfile['management']['actions'][number];
@@ -179,6 +257,11 @@ function DeviceManagementWorkspace({
     );
     const [breakGlassReviewSummary, setBreakGlassReviewSummary] = useState('');
     const deepLinkHandled = useRef(false);
+    const selectedBounceProtectionReason =
+        selectedAction?.key === 'network.port.bounce' && parameters.interface
+            ? (selectedAction.protectedInterfaces?.[parameters.interface] ??
+              null)
+            : null;
 
     const openAction = useCallback(
         (
@@ -498,7 +581,7 @@ function DeviceManagementWorkspace({
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Settings2 className="h-4 w-4" /> Governed actions
+                        <Settings2 className="h-4 w-4" /> Device actions
                     </CardTitle>
                     <CardDescription>
                         Only exact capabilities declared by this Device and an
@@ -532,7 +615,7 @@ function DeviceManagementWorkspace({
                                             <h3 className="text-sm font-semibold">
                                                 {group.label}
                                             </h3>
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className="text-caption">
                                                 {group.description}
                                             </p>
                                         </div>
@@ -547,7 +630,7 @@ function DeviceManagementWorkspace({
                                                             <p className="font-semibold">
                                                                 {action.label}
                                                             </p>
-                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                            <p className="mt-1 text-caption">
                                                                 {humanise(
                                                                     action.level,
                                                                 )}{' '}
@@ -563,11 +646,14 @@ function DeviceManagementWorkspace({
                                                                       's request window'}
                                                             </p>
                                                         </div>
-                                                        <Badge
+                                                        <StatusBadge
                                                             variant={
                                                                 action.available
-                                                                    ? 'default'
-                                                                    : 'outline'
+                                                                    ? action.requiresStepUp &&
+                                                                      !management.stepUpCurrent
+                                                                        ? 'warning'
+                                                                        : 'success'
+                                                                    : 'neutral'
                                                             }
                                                         >
                                                             {action.available
@@ -578,12 +664,12 @@ function DeviceManagementWorkspace({
                                                                 : humanise(
                                                                       action.state,
                                                                   )}
-                                                        </Badge>
+                                                        </StatusBadge>
                                                     </div>
                                                     <p className="mt-3 text-sm text-muted-foreground">
                                                         {action.impact}
                                                     </p>
-                                                    <p className="mt-2 text-xs text-muted-foreground">
+                                                    <p className="mt-2 text-caption">
                                                         {action.reason}
                                                     </p>
                                                     <div className="mt-3 rounded-lg border bg-muted/40 p-3 text-xs">
@@ -606,7 +692,7 @@ function DeviceManagementWorkspace({
                                                             }
                                                         </p>
                                                     </div>
-                                                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                    <div className="mt-3 flex flex-wrap gap-2 text-caption">
                                                         {action.requiresStepUp && (
                                                             <span>
                                                                 Identity
@@ -652,7 +738,7 @@ function DeviceManagementWorkspace({
                                                                 .breakGlassReviewers
                                                                 .length > 0 && (
                                                                 <span>
-                                                                    Governed
+                                                                    Emergency
                                                                     break glass
                                                                 </span>
                                                             )}
@@ -721,8 +807,7 @@ function DeviceManagementWorkspace({
                         </p>
                     ) : management.history.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            No governed command has been requested for this
-                            Device.
+                            No command has been requested for this Device.
                         </p>
                     ) : (
                         management.history.map((command) => (
@@ -735,7 +820,7 @@ function DeviceManagementWorkspace({
                                         <p className="font-semibold">
                                             {command.label}
                                         </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
+                                        <p className="mt-1 text-caption">
                                             Requested by{' '}
                                             {command.requestedBy ?? 'System'} ·{' '}
                                             {formatDateTime(
@@ -743,17 +828,30 @@ function DeviceManagementWorkspace({
                                             )}
                                         </p>
                                     </div>
-                                    <Badge
-                                        variant={stateBadgeVariant(
+                                    <StatusBadge
+                                        variant={stateStatusVariant(
                                             command.status,
                                         )}
                                     >
                                         {humanise(command.status)}
-                                    </Badge>
+                                    </StatusBadge>
                                 </div>
                                 <p className="mt-3 text-sm">{command.reason}</p>
                                 <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
-                                    {command.restart ? (
+                                    {command.service ? (
+                                        <CommandDetail
+                                            label="Expected result"
+                                            value={
+                                                (command.service.serviceLabel ??
+                                                    command.service
+                                                        .serviceName ??
+                                                    'Approved Windows service') +
+                                                (command.service.operation
+                                                    ? ` · ${humanise(command.service.operation)}`
+                                                    : '')
+                                            }
+                                        />
+                                    ) : command.restart ? (
                                         <CommandDetail
                                             label="Expected result"
                                             value="Computer restarts and checks in"
@@ -796,7 +894,8 @@ function DeviceManagementWorkspace({
                                     <CommandDetail
                                         label="Execution route"
                                         value={
-                                            (command.restart ||
+                                            (command.service ||
+                                                command.restart ||
                                                 command.software) &&
                                             command.executionRoute ===
                                                 'endpoint'
@@ -822,9 +921,64 @@ function DeviceManagementWorkspace({
                                         )}
                                 </dl>
                                 {command.approvedBy && (
-                                    <p className="mt-2 text-xs text-muted-foreground">
+                                    <p className="mt-2 text-caption">
                                         Approved by {command.approvedBy}
                                     </p>
+                                )}
+                                {command.service && (
+                                    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-3 text-xs">
+                                        <span className="font-medium">
+                                            Windows SCM:{' '}
+                                            {command.service.serviceName ??
+                                                'Service'}
+                                        </span>
+                                        {command.service.beforeState &&
+                                            command.service.afterState && (
+                                                <span className="text-muted-foreground">
+                                                    {humanise(
+                                                        command.service
+                                                            .beforeState,
+                                                    )}{' '}
+                                                    →{' '}
+                                                    {humanise(
+                                                        command.service
+                                                            .afterState,
+                                                    )}
+                                                </span>
+                                            )}
+                                        {command.service.reasonCode && (
+                                            <StatusBadge variant="neutral">
+                                                {humanise(
+                                                    command.service.reasonCode,
+                                                )}
+                                            </StatusBadge>
+                                        )}
+                                        {command.service.readbackState && (
+                                            <StatusBadge
+                                                variant={
+                                                    command.service
+                                                        .readbackState ===
+                                                    'running'
+                                                        ? 'success'
+                                                        : command.service
+                                                                .readbackState ===
+                                                            'stopped'
+                                                          ? 'info'
+                                                          : 'warning'
+                                                }
+                                            >
+                                                Readback:{' '}
+                                                {humanise(
+                                                    command.service
+                                                        .readbackState,
+                                                )}
+                                                {command.service
+                                                    .readbackObservedAt
+                                                    ? ` (${formatDateTime(command.service.readbackObservedAt)})`
+                                                    : ''}
+                                            </StatusBadge>
+                                        )}
+                                    </div>
                                 )}
                                 {command.restart && (
                                     <RestartRequestState
@@ -910,9 +1064,9 @@ function DeviceManagementWorkspace({
                                         }`}
                                     >
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant="destructive">
+                                            <StatusBadge variant="critical">
                                                 Break glass
-                                            </Badge>
+                                            </StatusBadge>
                                             <span className="font-medium">
                                                 Post-use review{' '}
                                                 {command.breakGlass.reviewedAt
@@ -972,7 +1126,7 @@ function DeviceManagementWorkspace({
                                     <div className="mt-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                                         <p>{command.safeFailureReason}</p>
                                         {command.blockedReasonCode && (
-                                            <p className="mt-1 text-xs text-muted-foreground">
+                                            <p className="mt-1 text-caption">
                                                 Governance code:{' '}
                                                 {humanise(
                                                     command.blockedReasonCode,
@@ -1135,7 +1289,13 @@ function DeviceManagementWorkspace({
                 open={selectedAction !== null}
                 onOpenChange={(open) => !open && setSelectedAction(null)}
             >
-                <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto">
+                <DialogContent
+                    className="max-h-[calc(100vh-2rem)] overflow-y-auto"
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>{selectedAction?.label}</DialogTitle>
                         <DialogDescription>
@@ -1185,7 +1345,9 @@ function DeviceManagementWorkspace({
                                                 : null,
                                             selectedAction.requiresApproval
                                                 ? 'Independent approval'
-                                                : null,
+                                                : selectedBounceProtectionReason
+                                                  ? 'Independent approval (protected port)'
+                                                  : null,
                                             selectedAction.requiresChange
                                                 ? 'IT Change window'
                                                 : null,
@@ -1233,15 +1395,15 @@ function DeviceManagementWorkspace({
                                 }`}
                             >
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <Badge
+                                    <StatusBadge
                                         variant={
                                             selectedAction?.risk === 'critical'
-                                                ? 'destructive'
-                                                : 'outline'
+                                                ? 'critical'
+                                                : 'warning'
                                         }
                                     >
                                         {humanise(selectedAction?.risk ?? '')}
-                                    </Badge>
+                                    </StatusBadge>
                                     <span className="text-sm font-semibold">
                                         Confirm impact before requesting
                                     </span>
@@ -1252,7 +1414,7 @@ function DeviceManagementWorkspace({
                                 <p className="mt-1 text-sm">
                                     {selectedAction?.impact}
                                 </p>
-                                <p className="mt-2 text-xs text-muted-foreground">
+                                <p className="mt-2 text-caption">
                                     Expected safe result:{' '}
                                     {selectedAction?.expectedResult}
                                 </p>
@@ -1298,7 +1460,7 @@ function DeviceManagementWorkspace({
                                             }
                                             autoComplete="off"
                                         />
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-caption">
                                             Critical actions require the exact
                                             Device name. This text is checked by
                                             the server and is not stored.
@@ -1338,26 +1500,37 @@ function DeviceManagementWorkspace({
                                         }
                                     />
                                 ) : parameter.options.length > 0 ? (
-                                    <select
-                                        id={`command-${parameter.name}`}
-                                        value={parameters[parameter.name] ?? ''}
-                                        onChange={(event) =>
+                                    <Select
+                                        value={
+                                            parameters[parameter.name] ??
+                                            parameter.options[0] ??
+                                            ''
+                                        }
+                                        onValueChange={(value) =>
                                             setParameters((current) => ({
                                                 ...current,
-                                                [parameter.name]:
-                                                    event.target.value,
+                                                [parameter.name]: value,
                                             }))
                                         }
-                                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                     >
-                                        {parameter.options.map((option) => (
-                                            <option key={option} value={option}>
-                                                {parameter.optionLabels?.[
-                                                    option
-                                                ] ?? humanise(option)}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger
+                                            id={`command-${parameter.name}`}
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {parameter.options.map((option) => (
+                                                <SelectItem
+                                                    key={option}
+                                                    value={option}
+                                                >
+                                                    {parameter.optionLabels?.[
+                                                        option
+                                                    ] ?? humanise(option)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 ) : (
                                     <Input
                                         id={`command-${parameter.name}`}
@@ -1382,6 +1555,26 @@ function DeviceManagementWorkspace({
                                 )}
                             </div>
                         ))}
+                        {selectedBounceProtectionReason && !useBreakGlass && (
+                            <div
+                                role="note"
+                                className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-xs"
+                            >
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <StatusBadge variant="warning">
+                                        Independent approval required
+                                    </StatusBadge>
+                                    <span className="font-semibold text-foreground">
+                                        Protected network port
+                                    </span>
+                                </div>
+                                <p className="mt-2 text-muted-foreground">
+                                    {selectedBounceProtectionReason}. Submitting
+                                    this request places it in awaiting approval
+                                    for a second authorised operator.
+                                </p>
+                            </div>
+                        )}
                         {selectedAction?.requiresChange && !useBreakGlass && (
                             <div className="space-y-1.5">
                                 <label
@@ -1390,28 +1583,31 @@ function DeviceManagementWorkspace({
                                 >
                                     Approved IT Change
                                 </label>
-                                <select
-                                    id="command-it-change"
+                                <Select
                                     value={itChangeId}
-                                    onChange={(event) =>
-                                        setItChangeId(event.target.value)
-                                    }
-                                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    onValueChange={setItChangeId}
                                 >
-                                    {management.changeOptions.map((change) => (
-                                        <option
-                                            key={change.id}
-                                            value={String(change.id)}
-                                        >
-                                            {change.reference} · {change.title}{' '}
-                                            · window ends{' '}
-                                            {formatDateTime(
-                                                change.maintenanceEndsAt,
-                                            )}
-                                        </option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-muted-foreground">
+                                    <SelectTrigger id="command-it-change">
+                                        <SelectValue placeholder="Choose an approved IT Change" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {management.changeOptions.map(
+                                            (change) => (
+                                                <SelectItem
+                                                    key={change.id}
+                                                    value={String(change.id)}
+                                                >
+                                                    {change.reference} ·{' '}
+                                                    {change.title} · window ends{' '}
+                                                    {formatDateTime(
+                                                        change.maintenanceEndsAt,
+                                                    )}
+                                                </SelectItem>
+                                            ),
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-caption">
                                     Only changes linked to this Device and Site,
                                     in an approved execution state and current
                                     maintenance window, are listed.
@@ -1465,30 +1661,33 @@ function DeviceManagementWorkspace({
                                             >
                                                 Designated post-use reviewer
                                             </label>
-                                            <select
-                                                id="command-break-glass-reviewer"
+                                            <Select
                                                 value={breakGlassReviewerId}
-                                                onChange={(event) =>
-                                                    setBreakGlassReviewerId(
-                                                        event.target.value,
-                                                    )
+                                                onValueChange={
+                                                    setBreakGlassReviewerId
                                                 }
-                                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                             >
-                                                {management.breakGlassReviewers.map(
-                                                    (reviewer) => (
-                                                        <option
-                                                            key={reviewer.id}
-                                                            value={String(
-                                                                reviewer.id,
-                                                            )}
-                                                        >
-                                                            {reviewer.name}
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </select>
-                                            <p className="text-xs text-muted-foreground">
+                                                <SelectTrigger id="command-break-glass-reviewer">
+                                                    <SelectValue placeholder="Choose a reviewer" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {management.breakGlassReviewers.map(
+                                                        (reviewer) => (
+                                                            <SelectItem
+                                                                key={
+                                                                    reviewer.id
+                                                                }
+                                                                value={String(
+                                                                    reviewer.id,
+                                                                )}
+                                                            >
+                                                                {reviewer.name}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-caption">
                                                 This person is notified
                                                 immediately and must record a
                                                 permanent post-use review.
@@ -1589,7 +1788,12 @@ function DeviceManagementWorkspace({
                 open={decisionCommand !== null}
                 onOpenChange={(open) => !open && setDecisionCommand(null)}
             >
-                <DialogContent>
+                <DialogContent
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>Review command request</DialogTitle>
                         <DialogDescription>
@@ -1709,7 +1913,12 @@ function DeviceManagementWorkspace({
                     !open && setBreakGlassReviewCommand(null)
                 }
             >
-                <DialogContent>
+                <DialogContent
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>Post-use break-glass review</DialogTitle>
                         <DialogDescription>
@@ -1774,26 +1983,25 @@ function DeviceManagementWorkspace({
                             >
                                 Review outcome
                             </label>
-                            <select
-                                id="command-break-glass-review-outcome"
+                            <Select
                                 value={breakGlassReviewOutcome}
-                                onChange={(event) =>
-                                    setBreakGlassReviewOutcome(
-                                        event.target.value,
-                                    )
-                                }
-                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                onValueChange={setBreakGlassReviewOutcome}
                             >
-                                <option value="confirmed_appropriate">
-                                    Confirmed appropriate
-                                </option>
-                                <option value="follow_up_required">
-                                    Follow-up required
-                                </option>
-                                <option value="incident_required">
-                                    Incident required
-                                </option>
-                            </select>
+                                <SelectTrigger id="command-break-glass-review-outcome">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="confirmed_appropriate">
+                                        Confirmed appropriate
+                                    </SelectItem>
+                                    <SelectItem value="follow_up_required">
+                                        Follow-up required
+                                    </SelectItem>
+                                    <SelectItem value="incident_required">
+                                        Incident required
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="space-y-1.5">
                             <label
@@ -1841,7 +2049,9 @@ function DeviceManagementWorkspace({
 
 function humanise(value: string | null | undefined): string {
     if (!value) return 'Not recorded';
-    return value.replace(/[._-]+/g, ' ');
+    const spaced = value.replace(/[._-]+/g, ' ').trim();
+    if (!spaced) return 'Not recorded';
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 function formatSafeState(state: Record<string, unknown>): string {
@@ -1943,9 +2153,7 @@ function CommandDetail({
             <dt className="font-medium text-muted-foreground">{label}</dt>
             <dd className="mt-1">{value}</dd>
             {detail && (
-                <dd className="mt-1 text-[11px] text-muted-foreground">
-                    {detail}
-                </dd>
+                <dd className="mt-1 text-caption">{detail}</dd>
             )}
         </div>
     );
@@ -1970,177 +2178,125 @@ function Metric({
                 {value ?? 'Not recorded'}
             </p>
             {detail && (
-                <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+                <p className="mt-1 text-caption">{detail}</p>
             )}
         </div>
     );
 }
 
-export function DeviceProfileHeader({
-    profile,
-    onOpenSection,
+type LivePingResult = {
+    reachable: boolean;
+    target: string | null;
+    resolved_address: string | null;
+    latency_ms: number | null;
+    latency_label: string | null;
+    reason_code: string | null;
+    message: string;
+    checked_at: string;
+};
+
+function DeviceAddCheckAction({
+    management,
+    onOpenWizard,
+    onEditDevice,
 }: {
-    profile: DeviceProfile;
-    onOpenSection: (section: DeviceProfileSectionKey) => void;
+    management?: NativeMonitorManagement;
+    onOpenWizard: () => void;
+    onEditDevice?: () => void;
 }) {
-    const { header } = profile;
-    const ActionIcon =
-        header.requiredAction.state === 'none'
-            ? CheckCircle2
-            : header.requiredAction.state === 'critical'
-              ? AlertTriangle
-              : Clock3;
+    const canAddCheck = Boolean(management?.can_add_check);
+    const missingReason = management?.missing_reason ?? null;
+    const fixHref = management?.fix_href ?? null;
+    const fixLabel = management?.fix_label ?? null;
 
     return (
-        <Card data-testid="device-profile-header" className="overflow-hidden">
-            <CardContent className="space-y-4 p-4 md:p-5">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                    <div className="sm:col-span-2 xl:col-span-1">
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Identity
-                        </p>
-                        <p className="mt-1 font-semibold">
-                            {header.identity.type || 'Registered device'}
-                        </p>
-                        <p className="font-mono text-xs text-muted-foreground">
-                            {header.identity.uid}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Location
-                        </p>
-                        {header.location?.href ? (
-                            <Link
-                                href={header.location.href}
-                                className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-                            >
-                                <MapPin className="h-3.5 w-3.5" />
-                                {header.location.name}
-                            </Link>
-                        ) : (
-                            <div className="mt-1 space-y-1">
-                                <p className="text-sm font-semibold">
-                                    {header.location?.name ?? 'Unassigned'}
-                                </p>
-                                {header.location?.access?.state ===
-                                'restricted' ? (
-                                    header.location.type === 'staff' ? (
-                                        <HrEmployeeEquipmentAccessRequired
-                                            label={header.location.access.label}
-                                            className="min-h-0 text-xs"
-                                        />
-                                    ) : header.location.type === 'vehicle' ? (
-                                        <FleetTechnologyAccessRequired
-                                            label={header.location.access.label}
-                                            className="min-h-0 text-xs"
-                                        />
-                                    ) : (
-                                        <ClientProfileAccessRequired
-                                            label={header.location.access.label}
-                                            className="min-h-0 text-xs"
-                                        />
-                                    )
-                                ) : null}
-                            </div>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                            {header.assignment
-                                ? `${humanise(header.assignment.type)} assignment`
-                                : 'No current assignment'}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Health
-                        </p>
-                        <div className="mt-1 flex flex-wrap gap-1.5">
-                            <Badge
-                                variant={stateBadgeVariant(header.health.state)}
-                            >
-                                {header.health.label}
-                            </Badge>
-                            <Badge variant="outline">
-                                {humanise(header.health.deviceState)}
-                            </Badge>
-                        </div>
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Freshness
-                        </p>
-                        <div className="mt-1 flex items-center gap-2">
-                            <Badge
-                                variant={stateBadgeVariant(
-                                    header.freshness.state,
-                                )}
-                            >
-                                {humanise(header.freshness.state)}
-                            </Badge>
-                            <span
-                                className="text-xs text-muted-foreground"
-                                title={formatDateTime(
-                                    header.freshness.observedAt,
-                                )}
-                            >
-                                {formatRelative(
-                                    header.freshness.observedAt,
-                                    Date.now(),
-                                    'Never observed',
-                                )}
-                            </span>
-                        </div>
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Observation source
-                        </p>
-                        <p className="mt-1 text-sm font-semibold">
-                            {header.providerObservation.label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            {humanise(header.providerObservation.source)}
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    className={`flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${
-                        header.requiredAction.state === 'critical'
-                            ? 'border-destructive/30 bg-destructive/5'
-                            : 'bg-muted/30'
-                    }`}
-                >
-                    <div className="flex min-w-0 gap-3">
-                        <ActionIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                        <div>
-                            <p className="text-sm font-semibold">
-                                {header.requiredAction.label}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                {header.requiredAction.description}
-                            </p>
-                        </div>
-                    </div>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0"
-                        onClick={() =>
-                            onOpenSection(header.requiredAction.section)
-                        }
-                    >
-                        Open details <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
+        <div className="flex flex-wrap items-center gap-2">
+            <Button
+                type="button"
+                size="sm"
+                onClick={onOpenWizard}
+                disabled={!canAddCheck}
+            >
+                <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                Add check
+            </Button>
+            {!canAddCheck && missingReason && (
+                <>
+                    <span className="text-caption">
+                        {missingReason}
+                    </span>
+                    {fixLabel === 'Edit device' && onEditDevice ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={onEditDevice}
+                        >
+                            Edit device
+                        </Button>
+                    ) : fixHref && fixLabel ? (
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={fixHref}>{fixLabel}</Link>
+                        </Button>
+                    ) : null}
+                </>
+            )}
+        </div>
     );
 }
 
-export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
+export function DeviceHealthSection({
+    profile,
+    onEditDevice,
+}: {
+    profile: DeviceProfile;
+    onEditDevice?: () => void;
+}) {
     const monitoring = profile.health.monitoring;
+    const [pinging, setPinging] = useState(false);
+    const [pingResult, setPingResult] = useState<LivePingResult | null>(null);
+    const [togglingOffline, setTogglingOffline] = useState(false);
+    const [addCheckOpen, setAddCheckOpen] = useState(false);
+
+    const runPing = async () => {
+        if (!profile.ping?.url || pinging) return;
+        setPinging(true);
+        try {
+            const response = await axios.post<LivePingResult>(profile.ping.url);
+            setPingResult(response.data);
+        } catch (error: unknown) {
+            let message = 'Could not reach the server to test this device.';
+            if (axios.isAxiosError(error) && error.response?.data) {
+                const payload = error.response.data as { message?: string };
+                if (payload.message) message = payload.message;
+            }
+            setPingResult({
+                reachable: false,
+                target: profile.ping.target,
+                resolved_address: null,
+                latency_ms: null,
+                latency_label: null,
+                reason_code: 'request_failed',
+                message,
+                checked_at: new Date().toISOString(),
+            });
+        } finally {
+            setPinging(false);
+        }
+    };
+
+    const toggleOfflineAlert = (enabled: boolean) => {
+        if (!profile.offlineAlert?.url || togglingOffline) return;
+        setTogglingOffline(true);
+        router.post(
+            profile.offlineAlert.url,
+            { enabled },
+            {
+                preserveScroll: true,
+                onFinish: () => setTogglingOffline(false),
+            },
+        );
+    };
 
     return (
         <div className="space-y-4">
@@ -2189,16 +2345,196 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
                 />
             </div>
 
+            {(profile.ping || profile.offlineAlert) && (
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {profile.ping && (
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="space-y-1">
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <Wifi className="h-4 w-4" />
+                                            Connection test
+                                        </CardTitle>
+                                        <CardDescription>
+                                            {profile.ping.target ? (
+                                                <>
+                                                    Target:{' '}
+                                                    <span className="font-mono text-foreground">
+                                                        {profile.ping.target}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                'No IP address or hostname saved yet.'
+                                            )}
+                                        </CardDescription>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void runPing()}
+                                        disabled={
+                                            !profile.ping.canPing || pinging
+                                        }
+                                    >
+                                        {pinging && (
+                                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                        )}
+                                        Ping now
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2 pt-0">
+                                {!profile.ping.canPing &&
+                                    profile.ping.missingReason && (
+                                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 p-3 text-xs">
+                                            <span className="text-muted-foreground">
+                                                {profile.ping.missingReason}
+                                            </span>
+                                            {onEditDevice && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={onEditDevice}
+                                                >
+                                                    Edit device
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                {pingResult && (
+                                    <div className="space-y-1.5 rounded-lg bg-muted/30 p-3 text-xs">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <StatusBadge
+                                                variant={
+                                                    pingResult.reachable
+                                                        ? 'success'
+                                                        : 'critical'
+                                                }
+                                            >
+                                                {pingResult.reachable
+                                                    ? (pingResult.latency_label ??
+                                                      'Reachable')
+                                                    : 'No reply'}
+                                            </StatusBadge>
+                                            <span className="text-muted-foreground">
+                                                Checked{' '}
+                                                {formatDateTime(
+                                                    pingResult.checked_at,
+                                                )}
+                                            </span>
+                                        </div>
+                                        <p className="text-foreground">
+                                            {pingResult.message}
+                                        </p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {profile.offlineAlert && (
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="space-y-1">
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <Bell className="h-4 w-4" />
+                                            Alert me if this goes offline
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Checks this device every minute and
+                                            raises an alert after 3 missed
+                                            replies.
+                                        </CardDescription>
+                                    </div>
+                                    <Switch
+                                        id="device-offline-alert-switch"
+                                        aria-label="Alert me if this goes offline"
+                                        checked={profile.offlineAlert.enabled}
+                                        disabled={
+                                            !profile.offlineAlert.canToggle ||
+                                            togglingOffline
+                                        }
+                                        onCheckedChange={toggleOfflineAlert}
+                                    />
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2 pt-0">
+                                {profile.offlineAlert.enabled ? (
+                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 p-3 text-xs">
+                                        <span className="text-foreground">
+                                            Offline alerts are on
+                                            {profile.offlineAlert.target
+                                                ? ` for ${profile.offlineAlert.target}`
+                                                : ''}
+                                            .
+                                        </span>
+                                        {profile.offlineAlert.state && (
+                                            <StatusBadge
+                                                variant={stateStatusVariant(
+                                                    profile.offlineAlert.state,
+                                                )}
+                                            >
+                                                {humanise(
+                                                    profile.offlineAlert.state,
+                                                )}
+                                            </StatusBadge>
+                                        )}
+                                    </div>
+                                ) : profile.offlineAlert.missingReason ? (
+                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 p-3 text-xs">
+                                        <span className="text-muted-foreground">
+                                            {profile.offlineAlert.missingReason}
+                                        </span>
+                                        {onEditDevice &&
+                                            profile.offlineAlert.missingReason.includes(
+                                                'first',
+                                            ) && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={onEditDevice}
+                                                >
+                                                    Edit device
+                                                </Button>
+                                            )}
+                                    </div>
+                                ) : null}
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            )}
+
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Activity className="h-4 w-4" /> Native monitoring
-                        summary
-                    </CardTitle>
-                    <CardDescription>
-                        Current retained checks for this device. Missing
-                        evidence is shown honestly as not collected.
-                    </CardDescription>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Activity className="h-4 w-4" /> Checks summary
+                            </CardTitle>
+                            <CardDescription>
+                                Active checks assigned to this device. Anything
+                                not collected is shown honestly.
+                            </CardDescription>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <DeviceMaintenancePills
+                                maintenance={profile.health.maintenance}
+                            />
+                            {profile.monitorManagement && (
+                                <DeviceAddCheckAction
+                                    management={profile.monitorManagement}
+                                    onOpenWizard={() => setAddCheckOpen(true)}
+                                    onEditDevice={onEditDevice}
+                                />
+                            )}
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {monitoring ? (
@@ -2223,7 +2559,7 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
                     ) : (
                         <p className="text-sm text-muted-foreground">
                             You can see this device record, but your role cannot
-                            open monitoring evidence.
+                            open check results.
                         </p>
                     )}
                 </CardContent>
@@ -2234,79 +2570,170 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
                     <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
                     <div>
                         <p className="text-sm font-semibold">
-                            Governed management boundary
+                            Management boundary
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-caption">
                             {profile.capabilities.control.reason}
                         </p>
                     </div>
                 </CardContent>
             </Card>
+
+            {profile.monitorManagement && (
+                <NativeMonitorDialog
+                    open={addCheckOpen}
+                    onOpenChange={setAddCheckOpen}
+                    management={profile.monitorManagement}
+                    monitor={null}
+                    onSaved={() => router.reload()}
+                />
+            )}
         </div>
     );
 }
 
-export function DeviceMonitorsSection({ profile }: { profile: DeviceProfile }) {
-    if (profile.monitors.length === 0) {
-        return (
-            <EmptyState
-                icon={RadioTower}
-                title="No monitoring coverage"
-                description="No native checks are assigned to this device. Add coverage from Monitoring when the device capability and your role allow it."
-                variant="compact"
-            />
-        );
-    }
+export function DeviceMonitorsSection({
+    profile,
+    deviceName,
+    onEditDevice,
+}: {
+    profile: DeviceProfile;
+    deviceName?: string;
+    onEditDevice?: () => void;
+}) {
+    const [historyTarget, setHistoryTarget] =
+        useState<MonitorHistoryTarget | null>(null);
+    const [addCheckOpen, setAddCheckOpen] = useState(false);
+    const resolvedDeviceName = deviceName ?? profile.header.identity.name;
 
     return (
-        <div className="grid gap-3 lg:grid-cols-2">
-            {profile.monitors.map((monitor) => (
-                <Card key={monitor.id}>
-                    <CardContent className="space-y-3 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="truncate font-semibold">
-                                    {monitor.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {monitor.kindLabel}
-                                    {monitor.affectsAvailability
-                                        ? ' · affects availability'
-                                        : ''}
-                                </p>
-                            </div>
-                            <Badge variant={stateBadgeVariant(monitor.state)}>
-                                {monitor.enabled
-                                    ? humanise(monitor.state)
-                                    : 'disabled'}
-                            </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                            <Metric
-                                label="Last observation"
-                                value={formatRelative(
-                                    monitor.lastObservationAt,
-                                    Date.now(),
-                                    'Never observed',
-                                )}
-                            />
-                            <Metric
-                                label="Monitoring profile"
-                                value={monitor.profile?.name ?? 'Not assigned'}
-                            />
-                        </div>
-                        {monitor.collector && (
-                            <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
-                                <span>{monitor.collector.name}</span>
-                                <span className="text-muted-foreground">
-                                    Collector{' '}
-                                    {humanise(monitor.collector.status)}
-                                </span>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            ))}
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">
+                    {profile.monitors.length === 0
+                        ? 'No checks are running on this device yet.'
+                        : `${profile.monitors.length} ${profile.monitors.length === 1 ? 'check' : 'checks'} configured for this device.`}
+                </p>
+                <DeviceAddCheckAction
+                    management={profile.monitorManagement}
+                    onOpenWizard={() => setAddCheckOpen(true)}
+                    onEditDevice={onEditDevice}
+                />
+            </div>
+
+            {profile.monitors.length === 0 ? (
+                <EmptyState
+                    icon={RadioTower}
+                    title="No checks yet"
+                    description="Turn on offline alerts from Overview or add a check above to monitor this device."
+                    variant="compact"
+                />
+            ) : (
+                <div className="grid gap-3 lg:grid-cols-2">
+                    {profile.monitors.map((monitor) => (
+                        <Card key={monitor.id}>
+                            <CardContent className="space-y-3 p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="truncate font-semibold">
+                                            {monitor.name}
+                                        </p>
+                                        <p className="text-caption">
+                                            {monitor.kindLabel}
+                                            {monitor.affectsAvailability
+                                                ? ' · affects availability'
+                                                : ''}
+                                        </p>
+                                    </div>
+                                    <StatusBadge
+                                        variant={
+                                            monitor.enabled
+                                                ? stateStatusVariant(
+                                                      monitor.state,
+                                                  )
+                                                : 'neutral'
+                                        }
+                                    >
+                                        {monitor.enabled
+                                            ? humanise(monitor.state)
+                                            : 'disabled'}
+                                    </StatusBadge>
+                                </div>
+                                <DeviceMaintenancePills
+                                    maintenance={monitor.maintenance}
+                                />
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <Metric
+                                        label="Last observation"
+                                        value={formatRelative(
+                                            monitor.lastObservationAt,
+                                            Date.now(),
+                                            'Never observed',
+                                        )}
+                                    />
+                                    <Metric
+                                        label="Check schedule"
+                                        value={
+                                            monitor.profile?.name ??
+                                            'Not assigned'
+                                        }
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
+                                    <span>
+                                        {monitor.runsFrom ??
+                                            (monitor.collector
+                                                ? `Runs from: hub ${monitor.collector.name}`
+                                                : 'Runs from: server')}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                        {monitor.collector
+                                            ? `Hub ${humanise(monitor.collector.status)}`
+                                            : 'Direct when routable'}
+                                    </span>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setHistoryTarget({
+                                                monitorId: monitor.id,
+                                                monitorName: monitor.name,
+                                                deviceName: resolvedDeviceName,
+                                            })
+                                        }
+                                    >
+                                        <History
+                                            className="mr-1.5 h-3.5 w-3.5"
+                                            aria-hidden="true"
+                                        />
+                                        View history
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
+
+            <MonitorHistoryDialog
+                target={historyTarget}
+                open={historyTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setHistoryTarget(null);
+                }}
+            />
+            {profile.monitorManagement && (
+                <NativeMonitorDialog
+                    open={addCheckOpen}
+                    onOpenChange={setAddCheckOpen}
+                    management={profile.monitorManagement}
+                    monitor={null}
+                    onSaved={() => router.reload()}
+                />
+            )}
         </div>
     );
 }
@@ -2322,9 +2749,14 @@ function formatRate(value: number | null): string {
 
 export function DeviceInterfacesSensorsSection({
     profile,
+    deviceName,
 }: {
     profile: DeviceProfile;
+    deviceName?: string;
 }) {
+    const [historyTarget, setHistoryTarget] =
+        useState<MonitorHistoryTarget | null>(null);
+
     if (profile.interfacesSensors.length === 0) {
         return (
             <EmptyState
@@ -2336,82 +2768,180 @@ export function DeviceInterfacesSensorsSection({
         );
     }
 
+    const resolvedDeviceName = deviceName ?? profile.header.identity.name;
+
     return (
-        <div className="grid gap-3 xl:grid-cols-2">
-            {profile.interfacesSensors.map((sensor) => (
-                <Card key={sensor.monitorId}>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <CardTitle className="text-base">
-                                    {sensor.name}
-                                </CardTitle>
-                                <CardDescription>
-                                    {humanise(sensor.kind)}
-                                    {sensor.index !== null
-                                        ? ` · interface ${sensor.index}`
-                                        : ''}
-                                </CardDescription>
+        <>
+            <div className="grid gap-3 xl:grid-cols-2">
+                {profile.interfacesSensors.map((sensor) => (
+                    <Card key={sensor.monitorId}>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <CardTitle className="text-base">
+                                        {sensor.name}
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {humanise(sensor.kind)}
+                                        {sensor.index !== null
+                                            ? ` · interface ${sensor.index}`
+                                            : ''}
+                                    </CardDescription>
+                                </div>
+                                <StatusBadge
+                                    variant={stateStatusVariant(sensor.state)}
+                                >
+                                    {humanise(sensor.state)}
+                                </StatusBadge>
                             </div>
-                            <Badge variant={stateBadgeVariant(sensor.state)}>
-                                {humanise(sensor.state)}
-                            </Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        <Metric
-                            label="Reading"
-                            value={
-                                sensor.value === null
-                                    ? 'Not collected'
-                                    : `${sensor.value}${sensor.unit ?? ''}`
-                            }
-                        />
-                        <Metric
-                            label="In / out"
-                            value={`${formatRate(sensor.inBps)} / ${formatRate(sensor.outBps)}`}
-                        />
-                        <Metric
-                            label="Utilisation"
-                            value={`${sensor.inUtilisation ?? '—'}% / ${sensor.outUtilisation ?? '—'}%`}
-                        />
-                        <Metric
-                            label="Link state"
-                            value={
-                                sensor.operationalStatus ??
-                                sensor.adminStatus ??
-                                'Not collected'
-                            }
-                        />
-                        <Metric
-                            label="Errors / discards"
-                            value={`${sensor.errors ?? '—'} / ${sensor.discards ?? '—'}`}
-                        />
-                        <Metric
-                            label="Observed"
-                            value={formatRelative(
-                                sensor.observedAt,
-                                Date.now(),
-                                'Never',
-                            )}
-                        />
-                    </CardContent>
-                </Card>
-            ))}
-        </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                <Metric
+                                    label="Reading"
+                                    value={
+                                        sensor.value === null
+                                            ? 'Not collected'
+                                            : `${sensor.value}${sensor.unit ?? ''}`
+                                    }
+                                />
+                                <Metric
+                                    label="In / out"
+                                    value={`${formatRate(sensor.inBps)} / ${formatRate(sensor.outBps)}`}
+                                />
+                                <Metric
+                                    label="Utilisation"
+                                    value={`${sensor.inUtilisation ?? '—'}% / ${sensor.outUtilisation ?? '—'}%`}
+                                />
+                                <Metric
+                                    label="Link state"
+                                    value={
+                                        sensor.operationalStatus ??
+                                        sensor.adminStatus ??
+                                        'Not collected'
+                                    }
+                                />
+                                <Metric
+                                    label="Errors / discards"
+                                    value={`${sensor.errors ?? '—'} / ${sensor.discards ?? '—'}`}
+                                />
+                                <Metric
+                                    label="Observed"
+                                    value={formatRelative(
+                                        sensor.observedAt,
+                                        Date.now(),
+                                        'Never',
+                                    )}
+                                />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setHistoryTarget({
+                                            monitorId: sensor.monitorId,
+                                            monitorName: sensor.name,
+                                            deviceName: resolvedDeviceName,
+                                        })
+                                    }
+                                >
+                                    <History
+                                        className="mr-1.5 h-3.5 w-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    View history
+                                </Button>
+                                {sensor.portActions?.bounceHref ? (
+                                    <Button size="sm" variant="outline" asChild>
+                                        <Link
+                                            href={sensor.portActions.bounceHref}
+                                        >
+                                            <RotateCcw
+                                                className="mr-1.5 h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            Restart port
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                                {sensor.portActions?.enableHref ? (
+                                    <Button size="sm" variant="outline" asChild>
+                                        <Link
+                                            href={sensor.portActions.enableHref}
+                                        >
+                                            <Power
+                                                className="mr-1.5 h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            Enable port
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                                {sensor.portActions?.disableHref ? (
+                                    <Button size="sm" variant="outline" asChild>
+                                        <Link
+                                            href={
+                                                sensor.portActions.disableHref
+                                            }
+                                        >
+                                            <PowerOff
+                                                className="mr-1.5 h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            Disable port
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+            <MonitorHistoryDialog
+                target={historyTarget}
+                open={historyTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setHistoryTarget(null);
+                }}
+            />
+        </>
     );
 }
 
 export function DeviceConfigurationSection({
     profile,
+    deviceId,
+    deviceName,
     onEditRegistry,
     onEditServiceDue,
 }: {
     profile: DeviceProfile;
+    deviceId?: number;
+    deviceName?: string;
     onEditRegistry: () => void;
     onEditServiceDue?: () => void;
 }) {
-    const { registry, configuration, firmware } = profile.configuration;
+    const {
+        registry,
+        configuration,
+        firmware,
+        canViewSnapshots,
+        backupActionHref,
+        latestSnapshot,
+        snapshotHistory,
+        snapshotHistoryTruncated,
+    } = profile.configuration;
+    const [diffTarget, setDiffTarget] =
+        useState<ConfigurationDiffTarget | null>(null);
+    const resolvedDeviceId = deviceId ?? profile.header.identity.id;
+    const resolvedDeviceName = deviceName ?? profile.header.identity.name;
+    const previousSnapshots = (snapshotHistory ?? []).slice(1);
+    const showBackupsCard =
+        Boolean(backupActionHref) ||
+        Boolean(latestSnapshot) ||
+        (snapshotHistory?.length ?? 0) > 0;
 
     return (
         <div className="space-y-4">
@@ -2527,9 +3057,11 @@ export function DeviceConfigurationSection({
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <Badge variant={stateBadgeVariant(configuration.state)}>
+                        <StatusBadge
+                            variant={stateStatusVariant(configuration.state)}
+                        >
                             {humanise(configuration.state)}
-                        </Badge>
+                        </StatusBadge>
                         <Metric
                             label="Observed hash"
                             value={configuration.observedHash}
@@ -2551,9 +3083,11 @@ export function DeviceConfigurationSection({
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <Badge variant={stateBadgeVariant(firmware.state)}>
+                        <StatusBadge
+                            variant={stateStatusVariant(firmware.state)}
+                        >
                             {humanise(firmware.state)}
-                        </Badge>
+                        </StatusBadge>
                         <Metric
                             label="Current version"
                             value={firmware.currentVersion}
@@ -2569,6 +3103,243 @@ export function DeviceConfigurationSection({
                     </CardContent>
                 </Card>
             </div>
+
+            {showBackupsCard ? (
+                <Card>
+                    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <FileDiff className="h-4 w-4" /> Configuration
+                                backups
+                            </CardTitle>
+                            <CardDescription>
+                                Retained running and structured configuration
+                                snapshots with secrets redacted before storage.
+                            </CardDescription>
+                        </div>
+                        {backupActionHref ? (
+                            <Button size="sm" variant="outline" asChild>
+                                <Link href={backupActionHref}>
+                                    <Save
+                                        className="mr-1.5 h-3.5 w-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    Capture backup
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {canViewSnapshots === false ? (
+                            <p className="text-sm text-muted-foreground">
+                                Configuration snapshot downloads and version
+                                comparisons require IT, maintenance,
+                                integration, or reporting permissions at this
+                                Site.
+                            </p>
+                        ) : !latestSnapshot ? (
+                            <p className="text-sm text-muted-foreground">
+                                No configuration backups have been captured for
+                                this device yet.
+                            </p>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="space-y-3 rounded-lg border p-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <StatusBadge variant="success">
+                                                Latest backup
+                                            </StatusBadge>
+                                            <StatusBadge variant="info">
+                                                Secrets redacted
+                                            </StatusBadge>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {latestSnapshot.compareHref ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setDiffTarget({
+                                                            deviceId:
+                                                                resolvedDeviceId,
+                                                            deviceName:
+                                                                resolvedDeviceName,
+                                                            snapshotId:
+                                                                latestSnapshot.id,
+                                                            baselineSnapshotId:
+                                                                latestSnapshot.previousSnapshotId,
+                                                        })
+                                                    }
+                                                >
+                                                    <FileDiff
+                                                        className="mr-1.5 h-3.5 w-3.5"
+                                                        aria-hidden="true"
+                                                    />
+                                                    Compare versions
+                                                </Button>
+                                            ) : null}
+                                            {latestSnapshot.downloadHref ? (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    asChild
+                                                >
+                                                    <a
+                                                        href={
+                                                            latestSnapshot.downloadHref
+                                                        }
+                                                    >
+                                                        <Download
+                                                            className="mr-1.5 h-3.5 w-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Download snapshot
+                                                    </a>
+                                                </Button>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                        <Metric
+                                            label="Captured"
+                                            value={formatDateTime(
+                                                latestSnapshot.capturedAt,
+                                                'Not recorded',
+                                            )}
+                                            detail={humanise(
+                                                latestSnapshot.sourceKind,
+                                            )}
+                                        />
+                                        <Metric
+                                            label="Configuration hash"
+                                            value={shortHash(
+                                                latestSnapshot.configurationHash ??
+                                                    latestSnapshot.contentHash,
+                                            )}
+                                        />
+                                        <Metric
+                                            label="Firmware version"
+                                            value={
+                                                latestSnapshot.firmwareVersion
+                                            }
+                                        />
+                                        <Metric
+                                            label="Version comparison"
+                                            value={snapshotDiffLabel(
+                                                latestSnapshot,
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+
+                                {previousSnapshots.length > 0 ? (
+                                    <details className="rounded-lg border p-3">
+                                        <summary className="frontline-focus cursor-pointer text-sm font-medium">
+                                            Previous retained backups (
+                                            {previousSnapshots.length})
+                                        </summary>
+                                        <div className="mt-3 space-y-2">
+                                            {previousSnapshots.map(
+                                                (snapshot) => (
+                                                    <div
+                                                        key={snapshot.id}
+                                                        className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                                                    >
+                                                        <div className="min-w-0 space-y-0.5">
+                                                            <p className="text-sm font-medium">
+                                                                {formatDateTime(
+                                                                    snapshot.capturedAt,
+                                                                    `Snapshot #${snapshot.id}`,
+                                                                )}{' '}
+                                                                ·{' '}
+                                                                <span className="font-mono text-caption">
+                                                                    {shortHash(
+                                                                        snapshot.configurationHash ??
+                                                                            snapshot.contentHash,
+                                                                    )}
+                                                                </span>
+                                                            </p>
+                                                            <p className="text-caption">
+                                                                {snapshotDiffLabel(
+                                                                    snapshot,
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                                            {snapshot.compareHref ? (
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() =>
+                                                                        setDiffTarget(
+                                                                            {
+                                                                                deviceId:
+                                                                                    resolvedDeviceId,
+                                                                                deviceName:
+                                                                                    resolvedDeviceName,
+                                                                                snapshotId:
+                                                                                    snapshot.id,
+                                                                                baselineSnapshotId:
+                                                                                    snapshot.previousSnapshotId,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <FileDiff
+                                                                        className="mr-1.5 h-3.5 w-3.5"
+                                                                        aria-hidden="true"
+                                                                    />
+                                                                    Compare
+                                                                    versions
+                                                                </Button>
+                                                            ) : null}
+                                                            {snapshot.downloadHref ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    asChild
+                                                                >
+                                                                    <a
+                                                                        href={
+                                                                            snapshot.downloadHref
+                                                                        }
+                                                                    >
+                                                                        <Download
+                                                                            className="mr-1.5 h-3.5 w-3.5"
+                                                                            aria-hidden="true"
+                                                                        />
+                                                                        Download
+                                                                        snapshot
+                                                                    </a>
+                                                                </Button>
+                                                            ) : null}
+                                                        </div>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    </details>
+                                ) : null}
+
+                                {snapshotHistoryTruncated ? (
+                                    <p className="text-caption">
+                                        Showing the 11 most recent snapshots for
+                                        this device.
+                                    </p>
+                                ) : null}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : null}
+
+            <ConfigurationDiffDialog
+                target={diffTarget}
+                onClose={() => setDiffTarget(null)}
+            />
         </div>
     );
 }
@@ -2612,30 +3383,34 @@ export function DeviceTicketsSection({ profile }: { profile: DeviceProfile }) {
                                     {ticket.reference}
                                 </span>
                                 {ticket.status ? (
-                                    <Badge
-                                        variant={stateBadgeVariant(
+                                    <StatusBadge
+                                        variant={stateStatusVariant(
                                             ticket.status,
                                         )}
                                     >
                                         {humanise(ticket.status)}
-                                    </Badge>
+                                    </StatusBadge>
                                 ) : null}
                                 {ticket.priority ? (
-                                    <Badge variant="outline">
+                                    <StatusBadge
+                                        variant={stateStatusVariant(
+                                            ticket.priority,
+                                        )}
+                                    >
                                         {humanise(ticket.priority)}
-                                    </Badge>
+                                    </StatusBadge>
                                 ) : null}
                             </div>
                             <p className="mt-1 truncate text-sm font-semibold">
                                 {ticket.title}
                             </p>
                             {ticket.nextAction && (
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="mt-1 text-caption">
                                     Next: {ticket.nextAction}
                                 </p>
                             )}
                         </div>
-                        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex shrink-0 items-center gap-2 text-caption">
                             {ticket.workType ? humanise(ticket.workType) : null}
                             <ArrowRight className="h-4 w-4" />
                         </div>
@@ -2652,7 +3427,7 @@ export function DeviceAuditSection({ profile }: { profile: DeviceProfile }) {
             <EmptyState
                 icon={FileClock}
                 title="No audit entries"
-                description="Canonical device changes will appear here without exposing raw before-and-after payloads."
+                description="Device record changes will appear here without exposing raw before-and-after payloads."
                 variant="compact"
             />
         );
@@ -2665,8 +3440,8 @@ export function DeviceAuditSection({ profile }: { profile: DeviceProfile }) {
                     <ClipboardList className="h-4 w-4" /> Device audit
                 </CardTitle>
                 <CardDescription>
-                    Who changed the canonical device record and which fields
-                    were involved. Raw values remain protected.
+                    Who changed the device record and which fields were
+                    involved. Raw values remain protected.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -2679,7 +3454,7 @@ export function DeviceAuditSection({ profile }: { profile: DeviceProfile }) {
                             <p className="text-sm font-semibold">
                                 {humanise(entry.action)}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-caption">
                                 {entry.actor ?? 'System'}
                                 {entry.fields.length > 0
                                     ? ` · ${entry.fields.map(humanise).join(', ')}`
@@ -2687,13 +3462,127 @@ export function DeviceAuditSection({ profile }: { profile: DeviceProfile }) {
                             </p>
                         </div>
                         <span
-                            className="shrink-0 text-xs text-muted-foreground"
+                            className="shrink-0 text-caption"
                             title={formatDateTime(entry.createdAt)}
                         >
                             {formatRelative(entry.createdAt)}
                         </span>
                     </div>
                 ))}
+            </CardContent>
+        </Card>
+    );
+}
+
+const HISTORY_FILTERS: Array<{ key: string; label: string }> = [
+    { key: 'all', label: 'All' },
+    { key: 'event', label: 'Events' },
+    { key: 'command', label: 'Commands' },
+    { key: 'assignment', label: 'Assignments' },
+    { key: 'maintenance', label: 'Maintenance' },
+    { key: 'audit', label: 'Record changes' },
+];
+
+export function DeviceHistorySection({ profile }: { profile: DeviceProfile }) {
+    const [kindFilter, setKindFilter] = useState<string>('all');
+    const items = profile.historyTimeline ?? [];
+    const filtered =
+        kindFilter === 'all'
+            ? items
+            : items.filter((item) => item.kind === kindFilter);
+
+    return (
+        <Card data-testid="device-history-section">
+            <CardHeader className="space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <History className="h-4 w-4" /> Device history
+                        </CardTitle>
+                        <CardDescription>
+                            Chronological timeline of events, commands,
+                            assignments, maintenance, and record changes you are
+                            permitted to view.
+                        </CardDescription>
+                    </div>
+                    <StatusBadge variant="neutral">
+                        {filtered.length}{' '}
+                        {filtered.length === 1 ? 'entry' : 'entries'}
+                    </StatusBadge>
+                </div>
+                {items.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                        {HISTORY_FILTERS.map((filter) => (
+                            <Button
+                                key={filter.key}
+                                type="button"
+                                size="sm"
+                                variant={
+                                    kindFilter === filter.key
+                                        ? 'default'
+                                        : 'outline'
+                                }
+                                onClick={() => setKindFilter(filter.key)}
+                            >
+                                {filter.label}
+                            </Button>
+                        ))}
+                    </div>
+                )}
+            </CardHeader>
+            <CardContent>
+                {items.length === 0 ? (
+                    <EmptyState
+                        icon={History}
+                        title="No history recorded yet"
+                        description="Assignments, alerts, commands, maintenance, and record updates for this device will appear here automatically."
+                        variant="compact"
+                    />
+                ) : filtered.length === 0 ? (
+                    <EmptyState
+                        icon={History}
+                        title="No matching history entries"
+                        description="Choose another category filter above to see earlier activity."
+                        variant="compact"
+                    />
+                ) : (
+                    <div className="space-y-2">
+                        {filtered.map((item) => (
+                            <div
+                                key={item.id}
+                                className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-start sm:justify-between"
+                            >
+                                <div className="min-w-0 space-y-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <StatusBadge
+                                            variant={stateStatusVariant(
+                                                item.severity,
+                                            )}
+                                        >
+                                            {humanise(item.kind)}
+                                        </StatusBadge>
+                                        <span className="text-sm font-semibold">
+                                            {item.title}
+                                        </span>
+                                    </div>
+                                    {(item.detail || item.actor) && (
+                                        <p className="text-caption">
+                                            {[item.detail, item.actor]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        </p>
+                                    )}
+                                </div>
+                                <span
+                                    className="shrink-0 text-caption"
+                                    title={formatDateTime(item.occurredAt)}
+                                >
+                                    {formatRelative(item.occurredAt)}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

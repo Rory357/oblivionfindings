@@ -1,28 +1,34 @@
 import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
+import type { AlertActionKey } from '@/components/control-room/alert-record/alert-actions';
 import type { ControlRoomRowAction } from '@/components/control-room/control-room-row-actions';
 import {
     ArrowUpCircle,
+    ArrowUpRight,
+    Bell,
     BellOff,
     Check,
     Copy,
     ExternalLink,
     Eye,
-    MoveRight,
-    ShieldAlert,
+    FileWarning,
     UserPlus,
 } from 'lucide-react';
 
 type ActionDependencies = {
-    openWorkspace: (id: number) => void;
+    /** Show the alert in the preview beside the list. */
+    select: (id: number) => void;
+    /** Show the alert and open one of its action pop-ups. */
+    openAction: (id: number, action: AlertActionKey) => void;
     post: (href: string) => void;
     visit: (href: string) => void;
     copy: (value: string) => void;
 };
 
 /**
- * One permission-aware action model for every Control Room alert worklist.
- * Actions that require form input or lifecycle confirmation open the canonical
- * workspace instead of mutating the record directly.
+ * One permission-aware item list for every Control Room alert row — the same
+ * items on the kebab and on right-click. One-step, recorded actions (Claim,
+ * Acknowledge) run straight away; anything that needs words or a review
+ * opens its pop-up from the kit.
  */
 export function buildControlRoomAlertRowActions(
     row: AlertWorklistRow,
@@ -31,10 +37,16 @@ export function buildControlRoomAlertRowActions(
     const reference = row.reference_number ?? `Alert ${row.id}`;
     const actions: ControlRoomRowAction[] = [
         {
-            key: 'open',
-            label: row.next_action.label,
+            key: 'preview',
+            label: 'Show in preview',
             icon: Eye,
-            onSelect: () => dependencies.openWorkspace(row.id),
+            onSelect: () => dependencies.select(row.id),
+        },
+        {
+            key: 'open',
+            label: 'Open full record',
+            icon: ArrowUpRight,
+            onSelect: () => dependencies.visit(row.href),
         },
     ];
 
@@ -44,52 +56,49 @@ export function buildControlRoomAlertRowActions(
             label: 'Claim alert',
             icon: UserPlus,
             onSelect: () =>
-                dependencies.post(
-                    `/control-room/alerts/${row.id}/assign-to-me`,
-                ),
+                dependencies.post(`/control-room/alerts/${row.id}/assign-to-me`),
         });
     }
     if (row.actions.can_acknowledge) {
         actions.push({
             key: 'acknowledge',
-            label: 'Acknowledge alert',
+            label: 'Acknowledge',
             icon: Check,
             onSelect: () =>
                 dependencies.post(`/control-room/alerts/${row.id}/acknowledge`),
         });
     }
-    if (row.actions.can_move_queue) {
-        actions.push({
-            key: 'move',
-            label: 'Move queue in workspace',
-            icon: MoveRight,
-            onSelect: () => dependencies.openWorkspace(row.id),
-        });
-    }
     if (row.actions.can_escalate) {
         actions.push({
             key: 'escalate',
-            label: 'Escalate in workspace',
+            label: 'Escalate…',
             icon: ArrowUpCircle,
-            onSelect: () => dependencies.openWorkspace(row.id),
+            onSelect: () => dependencies.openAction(row.id, 'escalate'),
         });
     }
-    if (row.actions.can_snooze || row.actions.can_unsnooze) {
+    if (row.actions.can_snooze) {
         actions.push({
-            key: row.actions.can_unsnooze ? 'unsnooze' : 'snooze',
-            label: row.actions.can_unsnooze
-                ? 'Unsnooze in workspace'
-                : 'Snooze in workspace',
+            key: 'snooze',
+            label: 'Snooze…',
             icon: BellOff,
-            onSelect: () => dependencies.openWorkspace(row.id),
+            onSelect: () => dependencies.openAction(row.id, 'snooze'),
+        });
+    }
+    if (row.actions.can_unsnooze) {
+        actions.push({
+            key: 'unsnooze',
+            label: 'Bring back now',
+            icon: Bell,
+            onSelect: () =>
+                dependencies.post(`/control-room/alerts/${row.id}/unsnooze`),
         });
     }
     if (row.actions.can_create_incident) {
         actions.push({
             key: 'incident',
-            label: 'Create incident in workspace',
-            icon: ShieldAlert,
-            onSelect: () => dependencies.openWorkspace(row.id),
+            label: 'Report incident…',
+            icon: FileWarning,
+            onSelect: () => dependencies.openAction(row.id, 'report_incident'),
         });
     }
     if (row.actions.incident_href) {

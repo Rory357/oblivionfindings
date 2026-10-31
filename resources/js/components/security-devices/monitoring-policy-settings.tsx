@@ -47,8 +47,10 @@ import {
     Activity,
     Archive,
     ArrowUpRight,
+    BellRing,
     CalendarClock,
     ClipboardCheck,
+    Gauge,
     GitBranch,
     Layers,
     LayoutDashboard,
@@ -107,6 +109,9 @@ export type MonitoringProfilePolicy = PolicyBase & {
     recovery_confirmations: number;
     recovery_duration_seconds: number;
     stale_after_seconds: number;
+    threshold_direction?: 'above' | 'below';
+    warning_rising_threshold?: number | string | null;
+    warning_falling_threshold?: number | string | null;
     rising_threshold: number | string | null;
     falling_threshold: number | string | null;
     baseline_window_seconds: number;
@@ -114,6 +119,42 @@ export type MonitoringProfilePolicy = PolicyBase & {
     baseline_deviation_multiplier: number | string | null;
     retention_policy_id: number | null;
     used_by_count: number;
+};
+export type MonitoringThresholdPolicy = PolicyBase & {
+    name: string;
+    scope_kind: string;
+    scope_name: string;
+    site_id: number | null;
+    device_id: number | null;
+    monitor_id: number | null;
+    device_domain: string | null;
+    device_category: string | null;
+    monitor_kind: string | null;
+    metric_key: string;
+    threshold_direction: 'above' | 'below';
+    warning_rising_threshold: number | string | null;
+    warning_falling_threshold: number | string | null;
+    critical_rising_threshold: number | string | null;
+    critical_falling_threshold: number | string | null;
+};
+export type MonitoringAlertRoutePolicy = PolicyBase & {
+    name: string;
+    scope_kind: string;
+    scope_name: string;
+    site_id: number | null;
+    device_id: number | null;
+    monitor_id: number | null;
+    device_domain: string | null;
+    device_category: string | null;
+    monitor_kind: string | null;
+    warning_notify_in_app: boolean;
+    warning_notify_email: boolean;
+    warning_open_it_ticket: boolean;
+    critical_notify_in_app: boolean;
+    critical_notify_email: boolean;
+    critical_open_it_ticket: boolean;
+    critical_escalate_control_room: boolean;
+    recipient_role: string;
 };
 type CoveragePolicy = PolicyBase & {
     site_id: number | null;
@@ -180,25 +221,97 @@ export type MonitoringPolicyWorkspace = {
     catalogs: {
         domains: Array<Option & { categories: Option[] }>;
         capabilities: Array<Option & { monitor_kind: string }>;
+        monitor_kinds?: Option[];
+        metric_keys?: string[];
         data_classes: string[];
         privacy_classes: string[];
         timezones: string[];
     };
     profiles: MonitoringProfilePolicy[];
+    thresholds?: MonitoringThresholdPolicy[];
+    alert_routes?: MonitoringAlertRoutePolicy[];
     coverage: CoveragePolicy[];
     dependencies: DependencyPolicy[];
     maintenance: MaintenancePolicy[];
     retention: RetentionPolicy[];
 };
 
+type EffectivePolicyPreview = {
+    monitor: {
+        id: number;
+        name: string;
+        kind: string;
+        metric_key: string;
+    };
+    device: {
+        id: number;
+        name: string;
+        domain: string | null;
+        category: string | null;
+        site_id: number | null;
+    };
+    threshold: {
+        source_kind: string;
+        rule_id: number | null;
+        rule_name: string | null;
+        metric_key: string;
+        direction: 'above' | 'below';
+        warning_rising: number | null;
+        warning_falling: number | null;
+        critical_rising: number | null;
+        critical_falling: number | null;
+    };
+    alert_route: {
+        source_kind: string;
+        rule_id: number | null;
+        rule_name: string | null;
+        life_safety_floor: boolean;
+        recipient_role: string;
+        warning: {
+            notify_in_app: boolean;
+            notify_email: boolean;
+            open_it_ticket: boolean;
+        };
+        critical: {
+            notify_in_app: boolean;
+            notify_email: boolean;
+            open_it_ticket: boolean;
+            escalate_control_room: boolean;
+        };
+    };
+    maintenance: {
+        active_window: {
+            id: number;
+            name: string;
+            starts_at: string | null;
+            ends_at: string | null;
+            timezone: string;
+            life_safety_protected: boolean;
+        } | null;
+        upcoming_window: {
+            id: number;
+            name: string;
+            starts_at: string | null;
+            ends_at: string | null;
+            timezone: string;
+            life_safety_protected: boolean;
+        } | null;
+    };
+    recipient_count: number;
+};
+
 type Kind =
     | 'profiles'
+    | 'thresholds'
+    | 'alert_routes'
     | 'coverage'
     | 'dependencies'
     | 'maintenance'
     | 'retention';
 type PolicyRecord =
     | MonitoringProfilePolicy
+    | MonitoringThresholdPolicy
+    | MonitoringAlertRoutePolicy
     | CoveragePolicy
     | DependencyPolicy
     | MaintenancePolicy
@@ -213,6 +326,8 @@ type Preview = {
 
 const labels: Record<Kind, string> = {
     profiles: 'Profile',
+    thresholds: 'Threshold rule',
+    alert_routes: 'Alert route',
     coverage: 'Coverage expectation',
     dependencies: 'Dependency',
     maintenance: 'Maintenance window',
@@ -221,6 +336,8 @@ const labels: Record<Kind, string> = {
 
 const endpoints: Record<Kind, string> = {
     profiles: '/security-devices/settings/monitoring/profiles',
+    thresholds: '/security-devices/settings/monitoring/thresholds',
+    alert_routes: '/security-devices/settings/monitoring/alert-routes',
     coverage: '/security-devices/settings/monitoring/coverage',
     dependencies: '/security-devices/settings/monitoring/dependencies',
     maintenance: '/security-devices/settings/monitoring/maintenance',
@@ -504,6 +621,29 @@ function MonitoringPolicyEditor({
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [busy, setBusy] = useState(false);
+    const thresholds = workspace.thresholds ?? [];
+    const alertRoutes = workspace.alert_routes ?? [];
+    const metricKeys = workspace.catalogs.metric_keys ?? [
+        'value',
+        'latency_ms',
+        'in_utilization_pct',
+        'out_utilization_pct',
+        'errors',
+        'discards',
+    ];
+    const monitorKinds =
+        workspace.catalogs.monitor_kinds ??
+        workspace.catalogs.capabilities.map((cap) => ({
+            value: cap.monitor_kind,
+            label: cap.label,
+        }));
+    const [previewMonitorId, setPreviewMonitorId] = useState<string>(() =>
+        workspace.monitors[0] ? String(workspace.monitors[0].id) : '',
+    );
+    const [effectivePreview, setEffectivePreview] =
+        useState<EffectivePolicyPreview | null>(null);
+    const [previewBusy, setPreviewBusy] = useState(false);
+    const [previewError, setPreviewError] = useState('');
 
     const selectedDomain = workspace.catalogs.domains.find(
         (domain) => domain.value === form.device_domain,
@@ -550,9 +690,52 @@ function MonitoringPolicyEditor({
                 baseline_window_seconds: 3600,
                 baseline_minimum_samples: 10,
                 baseline_deviation_multiplier: '',
+                threshold_direction: 'above',
+                warning_rising_threshold: '',
+                warning_falling_threshold: '',
                 rising_threshold: '',
                 falling_threshold: '',
                 retention_policy_id: '',
+            };
+        if (kind === 'thresholds')
+            return {
+                name: '',
+                scope_kind: workspace.can_manage_application
+                    ? 'application'
+                    : 'site',
+                site_id: workspace.can_manage_application ? '' : siteId,
+                device_id: '',
+                monitor_id: '',
+                device_domain: 'it_infrastructure',
+                device_category: '',
+                monitor_kind: '',
+                metric_key: 'value',
+                threshold_direction: 'above',
+                warning_rising_threshold: '',
+                warning_falling_threshold: '',
+                critical_rising_threshold: '',
+                critical_falling_threshold: '',
+            };
+        if (kind === 'alert_routes')
+            return {
+                name: '',
+                scope_kind: workspace.can_manage_application
+                    ? 'application'
+                    : 'site',
+                site_id: workspace.can_manage_application ? '' : siteId,
+                device_id: '',
+                monitor_id: '',
+                device_domain: 'it_infrastructure',
+                device_category: '',
+                monitor_kind: '',
+                warning_notify_in_app: true,
+                warning_notify_email: false,
+                warning_open_it_ticket: false,
+                critical_notify_in_app: true,
+                critical_notify_email: true,
+                critical_open_it_ticket: true,
+                critical_escalate_control_room: false,
+                recipient_role: 'it_staff',
             };
         if (kind === 'coverage')
             return {
@@ -693,10 +876,18 @@ function MonitoringPolicyEditor({
         delete payload.upstream_monitor_name;
         delete payload.downstream_monitor_name;
         delete payload.source;
-        delete payload.monitor_kind;
+        if (kind === 'coverage') delete payload.monitor_kind;
         if (editor?.record) payload.version = editor.record.version;
         for (const key of Object.keys(payload)) {
             if (payload[key] === '') payload[key] = null;
+        }
+        if (kind === 'thresholds' || kind === 'alert_routes') {
+            const scope = form.scope_kind;
+            payload.site_id = scope === 'site' ? form.site_id || null : null;
+            payload.device_id =
+                scope === 'device' ? form.device_id || null : null;
+            payload.monitor_id =
+                scope === 'monitor' ? form.monitor_id || null : null;
         }
         if (kind === 'maintenance') {
             const mode = form.scope_mode;
@@ -1022,7 +1213,9 @@ function MonitoringPolicyEditor({
         try {
             const reactivating =
                 lifecycle.record.state === 'inactive' &&
-                (lifecycle.kind === 'coverage' ||
+                (lifecycle.kind === 'thresholds' ||
+                    lifecycle.kind === 'alert_routes' ||
+                    lifecycle.kind === 'coverage' ||
                     lifecycle.kind === 'retention');
             const verb = reactivating ? 'reactivate' : 'deactivate';
             await axios.post(
@@ -1099,10 +1292,14 @@ function MonitoringPolicyEditor({
                         'rationale',
                         'capability',
                         'site_name',
+                        'scope_name',
                         'device_name',
                         'monitor_name',
                         'device_domain',
                         'device_category',
+                        'monitor_kind',
+                        'metric_key',
+                        'recipient_role',
                         'data_class',
                         'privacy_class',
                     ].includes(key) && typeof value === 'string',
@@ -1111,9 +1308,213 @@ function MonitoringPolicyEditor({
             .join(' ')
             .toLowerCase()
             .includes(searchQuery.trim().toLowerCase());
+    async function loadEffectivePreview(monitorId: string) {
+        if (!monitorId || previewBusy) return;
+        setPreviewBusy(true);
+        setPreviewError('');
+        try {
+            const response = await axios.get<{
+                preview: EffectivePolicyPreview;
+            }>(
+                `/security-devices/settings/monitoring/effective-preview/${monitorId}`,
+            );
+            if (living.current) {
+                setEffectivePreview(response.data.preview);
+            }
+        } catch (error) {
+            if (living.current) {
+                setEffectivePreview(null);
+                setPreviewError(
+                    axios.isAxiosError(error)
+                        ? String(
+                              error.response?.data?.message ??
+                                  'The winning policy preview could not be loaded.',
+                          )
+                        : 'The winning policy preview could not be loaded.',
+                );
+            }
+        } finally {
+            if (living.current) setPreviewBusy(false);
+        }
+    }
+    function policyRecordsForKind(kind: Kind): PolicyRecord[] {
+        if (kind === 'thresholds') return thresholds;
+        if (kind === 'alert_routes') return alertRoutes;
+        return workspace[kind];
+    }
+    function winningRulePreview() {
+        if (workspace.monitors.length === 0) return null;
+        return (
+            <ReviewCard icon={Gauge} title="Winning policy preview">
+                <p className="text-sm text-muted-foreground">
+                    Inspect which threshold rule, alert route and maintenance
+                    window apply to a specific check using the monitor, device,
+                    Site and application precedence order.
+                </p>
+                <div className="mt-3 flex flex-wrap items-end gap-3">
+                    <div className="min-w-64 flex-1">
+                        <Field label="Monitor to inspect">
+                            <SelectField
+                                value={previewMonitorId}
+                                onChange={(value) => {
+                                    setPreviewMonitorId(value);
+                                    setEffectivePreview(null);
+                                    setPreviewError('');
+                                }}
+                            >
+                                {workspace.monitors.map((monitor) => (
+                                    <option key={monitor.id} value={monitor.id}>
+                                        {monitor.site_name} ·{' '}
+                                        {monitor.device_name} · {monitor.name}
+                                    </option>
+                                ))}
+                            </SelectField>
+                        </Field>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!previewMonitorId || previewBusy}
+                        onClick={() =>
+                            void loadEffectivePreview(previewMonitorId)
+                        }
+                    >
+                        {previewBusy
+                            ? 'Checking preview…'
+                            : 'Preview winning policy'}
+                    </Button>
+                </div>
+                {previewError ? (
+                    <p role="alert" className="mt-3 text-sm text-destructive">
+                        {previewError}
+                    </p>
+                ) : null}
+                {effectivePreview ? (
+                    <div className="mt-4 space-y-2 border-t border-border pt-3">
+                        <ReviewRow
+                            label="Winning threshold source"
+                            value={
+                                <span className="inline-flex flex-wrap items-center gap-2">
+                                    <StatusBadge variant="info">
+                                        {effectivePreview.threshold.source_kind.replaceAll(
+                                            '_',
+                                            ' ',
+                                        )}
+                                    </StatusBadge>
+                                    <span>
+                                        {effectivePreview.threshold.rule_name ??
+                                            'Built-in default'}
+                                    </span>
+                                </span>
+                            }
+                        />
+                        <ReviewRow
+                            label="Threshold levels"
+                            value={
+                                effectivePreview.threshold.warning_rising ===
+                                    null &&
+                                effectivePreview.threshold.critical_rising ===
+                                    null
+                                    ? 'Reported check state only'
+                                    : `${effectivePreview.threshold.direction === 'below' ? 'Below' : 'Above'} (${effectivePreview.threshold.metric_key.replaceAll('_', ' ')}) · warning ${effectivePreview.threshold.warning_rising ?? 'none'} (clear ${effectivePreview.threshold.warning_falling ?? 'same'}) · critical ${effectivePreview.threshold.critical_rising ?? 'none'} (clear ${effectivePreview.threshold.critical_falling ?? 'same'})`
+                            }
+                        />
+                        <ReviewRow
+                            label="Winning alert route"
+                            value={
+                                <span className="inline-flex flex-wrap items-center gap-2">
+                                    <StatusBadge
+                                        variant={
+                                            effectivePreview.alert_route
+                                                .life_safety_floor
+                                                ? 'critical'
+                                                : 'info'
+                                        }
+                                    >
+                                        {effectivePreview.alert_route.source_kind.replaceAll(
+                                            '_',
+                                            ' ',
+                                        )}
+                                    </StatusBadge>
+                                    <span>
+                                        {effectivePreview.alert_route
+                                            .rule_name ??
+                                            'Default operational routing'}
+                                    </span>
+                                </span>
+                            }
+                        />
+                        <ReviewRow
+                            label="Warning delivery"
+                            value={
+                                [
+                                    effectivePreview.alert_route.warning
+                                        .notify_in_app
+                                        ? 'In-app'
+                                        : null,
+                                    effectivePreview.alert_route.warning
+                                        .notify_email
+                                        ? 'Email'
+                                        : null,
+                                    effectivePreview.alert_route.warning
+                                        .open_it_ticket
+                                        ? 'IT incident ticket'
+                                        : null,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ') || 'Recorded on monitor only'
+                            }
+                        />
+                        <ReviewRow
+                            label="Critical delivery"
+                            value={
+                                [
+                                    effectivePreview.alert_route.critical
+                                        .notify_in_app
+                                        ? 'In-app'
+                                        : null,
+                                    effectivePreview.alert_route.critical
+                                        .notify_email
+                                        ? 'Email'
+                                        : null,
+                                    effectivePreview.alert_route.critical
+                                        .open_it_ticket
+                                        ? 'IT incident ticket'
+                                        : null,
+                                    effectivePreview.alert_route.critical
+                                        .escalate_control_room
+                                        ? 'Control Room escalation'
+                                        : null,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ') || 'Recorded on monitor only'
+                            }
+                        />
+                        <ReviewRow
+                            label="Permitted recipients"
+                            value={`${effectivePreview.recipient_count} ${effectivePreview.alert_route.recipient_role.replaceAll('_', ' ')} accounts`}
+                        />
+                        <ReviewRow
+                            label="Maintenance schedule"
+                            value={
+                                effectivePreview.maintenance.active_window
+                                    ? `Active now: ${effectivePreview.maintenance.active_window.name}`
+                                    : effectivePreview.maintenance
+                                            .upcoming_window
+                                      ? `Upcoming: ${effectivePreview.maintenance.upcoming_window.name}`
+                                      : 'No active or upcoming maintenance window'
+                            }
+                        />
+                    </div>
+                ) : null}
+            </ReviewCard>
+        );
+    }
     const policyTabs = [
         { key: 'overview', label: 'Overview', icon: LayoutDashboard },
         { key: 'profiles', label: 'Profiles', icon: Activity },
+        { key: 'thresholds', label: 'Thresholds', icon: Gauge },
+        { key: 'alert_routes', label: 'Alert routing', icon: BellRing },
         { key: 'coverage', label: 'Coverage', icon: Layers },
         { key: 'dependencies', label: 'Dependencies', icon: GitBranch },
         { key: 'maintenance', label: 'Maintenance', icon: CalendarClock },
@@ -1159,7 +1560,9 @@ function MonitoringPolicyEditor({
                                     <ReviewRow
                                         label="Saved rules"
                                         value={
-                                            workspace[tab.key as Kind].length
+                                            policyRecordsForKind(
+                                                tab.key as Kind,
+                                            ).length
                                         }
                                     />
                                     <Button
@@ -1175,9 +1578,11 @@ function MonitoringPolicyEditor({
                                 </ReviewCard>
                             ))}
                     </div>
+                    {winningRulePreview()}
                     <SettingsNotice role="note">
                         Each rule has its own review and save. Technical
-                        maintenance does not cancel a real safety response.
+                        maintenance and custom alert routing never mute or
+                        reroute life-safety, security or care alarms.
                     </SettingsNotice>
                 </section>
             ) : null}
@@ -1190,7 +1595,7 @@ function MonitoringPolicyEditor({
                         ' shown'
                     }
                     title="Profiles"
-                    action="New profile"
+                    action="Add profile"
                     enabled={canCreate('profiles')}
                     onAction={() => openEditor('profiles')}
                 />
@@ -1225,6 +1630,156 @@ function MonitoringPolicyEditor({
                 </EntityCardGrid>
             </PolicyPanel>
 
+            <PolicyPanel kind="thresholds" view={policyView} base={panelBase}>
+                <TabIntro
+                    caption={
+                        thresholds.filter(policyVisible).length +
+                        ' of ' +
+                        thresholds.length +
+                        ' shown'
+                    }
+                    title="Thresholds"
+                    action="Add threshold rule"
+                    enabled={canCreate('thresholds')}
+                    onAction={() => openEditor('thresholds')}
+                />
+                <p className="text-sm text-muted-foreground">
+                    Override warning and critical numeric thresholds with
+                    hysteresis recovery by monitor, device, Site or application
+                    scope. More specific scopes win over broader rules.
+                </p>
+                {winningRulePreview()}
+                <EntityCardGrid>
+                    {thresholds.filter(policyVisible).map((row) => (
+                        <RecordCard
+                            key={row.id}
+                            title={row.name}
+                            state={row.state}
+                            summary={
+                                <>
+                                    {row.scope_kind.replaceAll('_', ' ')} ·{' '}
+                                    {row.scope_name} ·{' '}
+                                    {row.metric_key.replaceAll('_', ' ')}
+                                    <br />
+                                    {row.threshold_direction === 'below'
+                                        ? 'Below'
+                                        : 'Above'}{' '}
+                                    · warning{' '}
+                                    {row.warning_rising_threshold ?? 'none'} ·
+                                    critical{' '}
+                                    {row.critical_rising_threshold ?? 'none'}
+                                </>
+                            }
+                            canManage={Boolean(row.can_manage)}
+                            onEdit={
+                                row.state === 'active'
+                                    ? () => openEditor('thresholds', row)
+                                    : undefined
+                            }
+                            onDeactivate={
+                                row.state === 'active' ||
+                                row.state === 'inactive'
+                                    ? () => openLifecycle('thresholds', row)
+                                    : undefined
+                            }
+                            lifecycleLabel={
+                                row.state === 'inactive'
+                                    ? 'Reactivate'
+                                    : 'Deactivate'
+                            }
+                        />
+                    ))}
+                </EntityCardGrid>
+            </PolicyPanel>
+
+            <PolicyPanel kind="alert_routes" view={policyView} base={panelBase}>
+                <TabIntro
+                    caption={
+                        alertRoutes.filter(policyVisible).length +
+                        ' of ' +
+                        alertRoutes.length +
+                        ' shown'
+                    }
+                    title="Alert routing"
+                    action="Add alert route"
+                    enabled={canCreate('alert_routes')}
+                    onAction={() => openEditor('alert_routes')}
+                />
+                <SettingsNotice role="note">
+                    Life-safety, security and healthcare alarms stay locked to
+                    Control Room and cannot be muted or rerouted here. Until a
+                    custom route matches, technical network checks notify IT in
+                    app on warnings and open an IT incident ticket with email
+                    and in-app notification on critical failures.
+                </SettingsNotice>
+                {winningRulePreview()}
+                <EntityCardGrid>
+                    {alertRoutes.filter(policyVisible).map((row) => (
+                        <RecordCard
+                            key={row.id}
+                            title={row.name}
+                            state={row.state}
+                            summary={
+                                <>
+                                    {row.scope_kind.replaceAll('_', ' ')} ·{' '}
+                                    {row.scope_name} ·{' '}
+                                    {row.recipient_role.replaceAll('_', ' ')}
+                                    <br />
+                                    Warning:{' '}
+                                    {[
+                                        row.warning_notify_in_app
+                                            ? 'in-app'
+                                            : null,
+                                        row.warning_notify_email
+                                            ? 'email'
+                                            : null,
+                                        row.warning_open_it_ticket
+                                            ? 'IT ticket'
+                                            : null,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(', ') || 'none'}{' '}
+                                    · Critical:{' '}
+                                    {[
+                                        row.critical_notify_in_app
+                                            ? 'in-app'
+                                            : null,
+                                        row.critical_notify_email
+                                            ? 'email'
+                                            : null,
+                                        row.critical_open_it_ticket
+                                            ? 'IT ticket'
+                                            : null,
+                                        row.critical_escalate_control_room
+                                            ? 'Control Room'
+                                            : null,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(', ') || 'none'}
+                                </>
+                            }
+                            canManage={Boolean(row.can_manage)}
+                            onEdit={
+                                row.state === 'active'
+                                    ? () => openEditor('alert_routes', row)
+                                    : undefined
+                            }
+                            onDeactivate={
+                                row.state === 'active' ||
+                                row.state === 'inactive'
+                                    ? () => openLifecycle('alert_routes', row)
+                                    : undefined
+                            }
+                            lifecycleLabel={
+                                row.state === 'inactive'
+                                    ? 'Reactivate'
+                                    : 'Deactivate'
+                            }
+                        />
+                    ))}
+                </EntityCardGrid>
+            </PolicyPanel>
+
             <PolicyPanel kind="coverage" view={policyView} base={panelBase}>
                 <TabIntro
                     caption={
@@ -1234,7 +1789,7 @@ function MonitoringPolicyEditor({
                         ' shown'
                     }
                     title="Coverage"
-                    action="New expectation"
+                    action="Add expectation"
                     enabled={canCreate('coverage')}
                     onAction={() => openEditor('coverage')}
                 />
@@ -1286,7 +1841,7 @@ function MonitoringPolicyEditor({
                         ' shown'
                     }
                     title="Dependencies"
-                    action="New manual dependency"
+                    action="Add manual dependency"
                     enabled={canCreate('dependencies')}
                     onAction={() => openEditor('dependencies')}
                 />
@@ -1396,7 +1951,7 @@ function MonitoringPolicyEditor({
                         ' shown'
                     }
                     title="Retention"
-                    action="New retention policy"
+                    action="Add retention policy"
                     enabled={canCreate('retention')}
                     onAction={() => openEditor('retention')}
                 />
@@ -1465,10 +2020,16 @@ function MonitoringPolicyEditor({
                 open={editor !== null && editor.kind !== 'maintenance'}
                 onOpenChange={(open) => !open && requestClose('editor')}
             >
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+                <DialogContent
+                    className="max-h-[90vh] overflow-y-auto"
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>
-                            {editor?.record ? 'Edit' : 'Create'}{' '}
+                            {editor?.record ? 'Edit' : 'Add'}{' '}
                             {editor
                                 ? labels[editor.kind].toLowerCase()
                                 : 'policy'}
@@ -1543,7 +2104,7 @@ function MonitoringPolicyEditor({
                                 : editor?.kind === 'retention' &&
                                     preview === null
                                   ? 'Preview impact'
-                                  : 'Save governed change'}
+                                  : 'Save policy change'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1555,7 +2116,7 @@ function MonitoringPolicyEditor({
                 title={
                     editor?.record
                         ? 'Edit maintenance window'
-                        : 'Create maintenance window'
+                        : 'Add maintenance window'
                 }
                 description="Review the approved scope and exact local clock times before saving."
                 railIcon={CalendarClock}
@@ -1729,7 +2290,12 @@ function MonitoringPolicyEditor({
                 open={lifecycle !== null}
                 onOpenChange={(open) => !open && requestClose('lifecycle')}
             >
-                <DialogContent>
+                <DialogContent
+                    style={{
+                        maxWidth: 'min(92vw, 480px)',
+                        width: 'min(92vw, 480px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>
                             {lifecycle?.kind === 'maintenance'
@@ -2011,6 +2577,50 @@ function MonitoringPolicyEditor({
                             }
                         />
                     </Field>
+                    <Field label="Threshold direction">
+                        <SelectField
+                            value={form.threshold_direction ?? 'above'}
+                            onChange={(value) =>
+                                update('threshold_direction', value)
+                            }
+                        >
+                            <option value="above">
+                                Above threshold triggers alert
+                            </option>
+                            <option value="below">
+                                Below threshold triggers alert
+                            </option>
+                        </SelectField>
+                        {errorFor('threshold_direction')}
+                    </Field>
+                    <Field label="Warning trigger threshold">
+                        <Input
+                            type="number"
+                            step="any"
+                            value={String(form.warning_rising_threshold ?? '')}
+                            onChange={(e) =>
+                                update(
+                                    'warning_rising_threshold',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        {errorFor('warning_rising_threshold')}
+                    </Field>
+                    <Field label="Warning clear threshold (hysteresis)">
+                        <Input
+                            type="number"
+                            step="any"
+                            value={String(form.warning_falling_threshold ?? '')}
+                            onChange={(e) =>
+                                update(
+                                    'warning_falling_threshold',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        {errorFor('warning_falling_threshold')}
+                    </Field>
                     <Field label="Rising threshold">
                         <Input
                             type="number"
@@ -2020,6 +2630,7 @@ function MonitoringPolicyEditor({
                                 update('rising_threshold', e.target.value)
                             }
                         />
+                        {errorFor('rising_threshold')}
                     </Field>
                     <Field label="Falling threshold">
                         <Input
@@ -2030,7 +2641,461 @@ function MonitoringPolicyEditor({
                                 update('falling_threshold', e.target.value)
                             }
                         />
+                        {errorFor('falling_threshold')}
                     </Field>
+                </div>
+            );
+        if (kind === 'thresholds')
+            return (
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Rule name">
+                        <Input
+                            value={String(form.name ?? '')}
+                            onChange={(e) => update('name', e.target.value)}
+                        />
+                        {errorFor('name')}
+                    </Field>
+                    <Field label="Scope">
+                        <SelectField
+                            value={form.scope_kind}
+                            onChange={(value) => update('scope_kind', value)}
+                        >
+                            <option
+                                value="application"
+                                disabled={!workspace.can_manage_application}
+                            >
+                                Application
+                            </option>
+                            <option value="site">Site</option>
+                            <option value="device">Device</option>
+                            <option value="monitor">Monitor</option>
+                        </SelectField>
+                        {errorFor('scope_kind')}
+                    </Field>
+                    {form.scope_kind === 'site' ? (
+                        <Field label="Site">
+                            <SelectField
+                                value={form.site_id}
+                                onChange={(value) => update('site_id', value)}
+                            >
+                                {workspace.sites.map((site) => (
+                                    <option key={site.id} value={site.id}>
+                                        {site.name}
+                                    </option>
+                                ))}
+                            </SelectField>
+                            {errorFor('site_id')}
+                        </Field>
+                    ) : null}
+                    {form.scope_kind === 'device' ? (
+                        <Field label="Device">
+                            <SelectField
+                                value={form.device_id}
+                                onChange={(value) => update('device_id', value)}
+                            >
+                                <option value="">Choose device</option>
+                                {workspace.devices.map((row) => (
+                                    <option key={row.id} value={row.id}>
+                                        {row.site_name} · {row.name}
+                                    </option>
+                                ))}
+                            </SelectField>
+                            {errorFor('device_id')}
+                        </Field>
+                    ) : null}
+                    {form.scope_kind === 'monitor' ? (
+                        <Field label="Monitor">
+                            <SelectField
+                                value={form.monitor_id}
+                                onChange={(value) =>
+                                    update('monitor_id', value)
+                                }
+                            >
+                                <option value="">Choose monitor</option>
+                                {workspace.monitors.map((row) => (
+                                    <option key={row.id} value={row.id}>
+                                        {row.site_name} · {row.device_name} ·{' '}
+                                        {row.name}
+                                    </option>
+                                ))}
+                            </SelectField>
+                            {errorFor('monitor_id')}
+                        </Field>
+                    ) : null}
+                    <Field label="Device domain filter">
+                        <SelectField
+                            value={form.device_domain}
+                            onChange={(value) => {
+                                update('device_domain', value);
+                                update('device_category', '');
+                            }}
+                        >
+                            <option value="">All domains</option>
+                            {workspace.catalogs.domains.map((row) => (
+                                <option key={row.value} value={row.value}>
+                                    {row.label}
+                                </option>
+                            ))}
+                        </SelectField>
+                    </Field>
+                    <Field label="Device category filter">
+                        <SelectField
+                            value={form.device_category}
+                            onChange={(value) =>
+                                update('device_category', value)
+                            }
+                        >
+                            <option value="">All categories</option>
+                            {selectedDomain?.categories.map((row) => (
+                                <option key={row.value} value={row.value}>
+                                    {row.label}
+                                </option>
+                            ))}
+                        </SelectField>
+                    </Field>
+                    <Field label="Check type filter">
+                        <SelectField
+                            value={form.monitor_kind}
+                            onChange={(value) => update('monitor_kind', value)}
+                        >
+                            <option value="">All check types</option>
+                            {monitorKinds.map((row) => (
+                                <option key={row.value} value={row.value}>
+                                    {row.label}
+                                </option>
+                            ))}
+                        </SelectField>
+                    </Field>
+                    <Field label="Observed metric">
+                        <SelectField
+                            value={form.metric_key}
+                            onChange={(value) => update('metric_key', value)}
+                        >
+                            {metricKeys.map((metric) => (
+                                <option key={metric} value={metric}>
+                                    {metric.replaceAll('_', ' ')}
+                                </option>
+                            ))}
+                        </SelectField>
+                        {errorFor('metric_key')}
+                    </Field>
+                    <Field label="Direction">
+                        <SelectField
+                            value={form.threshold_direction}
+                            onChange={(value) =>
+                                update('threshold_direction', value)
+                            }
+                        >
+                            <option value="above">
+                                Above threshold triggers alert
+                            </option>
+                            <option value="below">
+                                Below threshold triggers alert
+                            </option>
+                        </SelectField>
+                        {errorFor('threshold_direction')}
+                    </Field>
+                    <Field label="Warning trigger threshold">
+                        <Input
+                            type="number"
+                            step="any"
+                            value={String(form.warning_rising_threshold ?? '')}
+                            onChange={(e) =>
+                                update(
+                                    'warning_rising_threshold',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        {errorFor('warning_rising_threshold')}
+                    </Field>
+                    <Field label="Warning clear threshold (hysteresis)">
+                        <Input
+                            type="number"
+                            step="any"
+                            value={String(form.warning_falling_threshold ?? '')}
+                            onChange={(e) =>
+                                update(
+                                    'warning_falling_threshold',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        {errorFor('warning_falling_threshold')}
+                    </Field>
+                    <Field label="Critical trigger threshold">
+                        <Input
+                            type="number"
+                            step="any"
+                            value={String(form.critical_rising_threshold ?? '')}
+                            onChange={(e) =>
+                                update(
+                                    'critical_rising_threshold',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        {errorFor('critical_rising_threshold')}
+                    </Field>
+                    <Field label="Critical clear threshold (hysteresis)">
+                        <Input
+                            type="number"
+                            step="any"
+                            value={String(
+                                form.critical_falling_threshold ?? '',
+                            )}
+                            onChange={(e) =>
+                                update(
+                                    'critical_falling_threshold',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        {errorFor('critical_falling_threshold')}
+                    </Field>
+                </div>
+            );
+        if (kind === 'alert_routes')
+            return (
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                        <SettingsNotice role="note">
+                            Life-safety, security and healthcare checks stay
+                            locked to Control Room and cannot be muted or
+                            rerouted. Custom routes apply to technical network,
+                            facilities and tracking checks.
+                        </SettingsNotice>
+                    </div>
+                    <Field label="Route name">
+                        <Input
+                            value={String(form.name ?? '')}
+                            onChange={(e) => update('name', e.target.value)}
+                        />
+                        {errorFor('name')}
+                    </Field>
+                    <Field label="Scope">
+                        <SelectField
+                            value={form.scope_kind}
+                            onChange={(value) => update('scope_kind', value)}
+                        >
+                            <option
+                                value="application"
+                                disabled={!workspace.can_manage_application}
+                            >
+                                Application
+                            </option>
+                            <option value="site">Site</option>
+                            <option value="device">Device</option>
+                            <option value="monitor">Monitor</option>
+                        </SelectField>
+                        {errorFor('scope_kind')}
+                    </Field>
+                    {form.scope_kind === 'site' ? (
+                        <Field label="Site">
+                            <SelectField
+                                value={form.site_id}
+                                onChange={(value) => update('site_id', value)}
+                            >
+                                {workspace.sites.map((site) => (
+                                    <option key={site.id} value={site.id}>
+                                        {site.name}
+                                    </option>
+                                ))}
+                            </SelectField>
+                            {errorFor('site_id')}
+                        </Field>
+                    ) : null}
+                    {form.scope_kind === 'device' ? (
+                        <Field label="Device">
+                            <SelectField
+                                value={form.device_id}
+                                onChange={(value) => update('device_id', value)}
+                            >
+                                <option value="">Choose device</option>
+                                {workspace.devices.map((row) => (
+                                    <option key={row.id} value={row.id}>
+                                        {row.site_name} · {row.name}
+                                    </option>
+                                ))}
+                            </SelectField>
+                            {errorFor('device_id')}
+                        </Field>
+                    ) : null}
+                    {form.scope_kind === 'monitor' ? (
+                        <Field label="Monitor">
+                            <SelectField
+                                value={form.monitor_id}
+                                onChange={(value) =>
+                                    update('monitor_id', value)
+                                }
+                            >
+                                <option value="">Choose monitor</option>
+                                {workspace.monitors.map((row) => (
+                                    <option key={row.id} value={row.id}>
+                                        {row.site_name} · {row.device_name} ·{' '}
+                                        {row.name}
+                                    </option>
+                                ))}
+                            </SelectField>
+                            {errorFor('monitor_id')}
+                        </Field>
+                    ) : null}
+                    <Field label="Device domain filter">
+                        <SelectField
+                            value={form.device_domain}
+                            onChange={(value) => {
+                                update('device_domain', value);
+                                update('device_category', '');
+                            }}
+                        >
+                            <option value="">
+                                All non-life-safety domains
+                            </option>
+                            {workspace.catalogs.domains
+                                .filter(
+                                    (row) =>
+                                        row.value !== 'security' &&
+                                        row.value !== 'iot_healthcare',
+                                )
+                                .map((row) => (
+                                    <option key={row.value} value={row.value}>
+                                        {row.label}
+                                    </option>
+                                ))}
+                        </SelectField>
+                        {errorFor('device_domain')}
+                    </Field>
+                    <Field label="Device category filter">
+                        <SelectField
+                            value={form.device_category}
+                            onChange={(value) =>
+                                update('device_category', value)
+                            }
+                        >
+                            <option value="">All categories</option>
+                            {selectedDomain?.categories.map((row) => (
+                                <option key={row.value} value={row.value}>
+                                    {row.label}
+                                </option>
+                            ))}
+                        </SelectField>
+                    </Field>
+                    <Field label="Check type filter">
+                        <SelectField
+                            value={form.monitor_kind}
+                            onChange={(value) => update('monitor_kind', value)}
+                        >
+                            <option value="">All check types</option>
+                            {monitorKinds.map((row) => (
+                                <option key={row.value} value={row.value}>
+                                    {row.label}
+                                </option>
+                            ))}
+                        </SelectField>
+                    </Field>
+                    <Field label="Recipient group">
+                        <SelectField
+                            value={form.recipient_role}
+                            onChange={(value) =>
+                                update('recipient_role', value)
+                            }
+                        >
+                            <option value="it_staff">
+                                IT staff for the Site
+                            </option>
+                            <option value="monitoring_managers">
+                                Monitoring managers for the Site
+                            </option>
+                            <option value="site_managers">
+                                Site managers and IT staff
+                            </option>
+                        </SelectField>
+                        {errorFor('recipient_role')}
+                    </Field>
+                    <div className="space-y-1 sm:col-span-2">
+                        <p className="text-sm font-medium text-foreground">
+                            Warning state (degraded)
+                        </p>
+                        {[
+                            [
+                                'warning_notify_in_app',
+                                'Notify recipients in app on warnings',
+                            ],
+                            [
+                                'warning_notify_email',
+                                'Send email notification on warnings',
+                            ],
+                            [
+                                'warning_open_it_ticket',
+                                'Open or update an IT incident ticket on warnings',
+                            ],
+                        ].map(([fieldKey, label]) => (
+                            <div
+                                key={fieldKey}
+                                className="flex items-center justify-between gap-4 border-b border-border py-2.5"
+                            >
+                                <Label htmlFor={`${panelBase}-${fieldKey}`}>
+                                    {label}
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-caption">
+                                        {form[fieldKey] ? 'On' : 'Off'}
+                                    </span>
+                                    <Switch
+                                        id={`${panelBase}-${fieldKey}`}
+                                        checked={Boolean(form[fieldKey])}
+                                        onCheckedChange={(value) =>
+                                            update(fieldKey, value)
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                        <p className="text-sm font-medium text-foreground">
+                            Critical state (failed)
+                        </p>
+                        {[
+                            [
+                                'critical_notify_in_app',
+                                'Notify recipients in app on critical failures',
+                            ],
+                            [
+                                'critical_notify_email',
+                                'Send email notification on critical failures',
+                            ],
+                            [
+                                'critical_open_it_ticket',
+                                'Open or update an IT incident ticket on critical failures',
+                            ],
+                            [
+                                'critical_escalate_control_room',
+                                'Escalate critical failures to Control Room',
+                            ],
+                        ].map(([fieldKey, label]) => (
+                            <div
+                                key={fieldKey}
+                                className="flex items-center justify-between gap-4 border-b border-border py-2.5"
+                            >
+                                <Label htmlFor={`${panelBase}-${fieldKey}`}>
+                                    {label}
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-caption">
+                                        {form[fieldKey] ? 'On' : 'Off'}
+                                    </span>
+                                    <Switch
+                                        id={`${panelBase}-${fieldKey}`}
+                                        checked={Boolean(form[fieldKey])}
+                                        onCheckedChange={(value) =>
+                                            update(fieldKey, value)
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             );
         if (kind === 'coverage')

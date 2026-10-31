@@ -1,15 +1,18 @@
+import { phoneUrl } from '@/components/public-provider';
+import { NoteLine, PageIntro } from '@/components/public-site/primitives';
+import { siteLinks, usePublicSite } from '@/components/public-site/site';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
-import { Field } from '@/components/wizard/primitives';
+import { Label } from '@/components/ui/label';
 import { useSettingsLeaveConfirmation } from '@/hooks/use-settings-leave-confirmation';
-import MarketingLayout from '@/layouts/marketing-layout';
+import PublicSiteLayout from '@/layouts/marketing-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head } from '@inertiajs/react';
 import axios from 'axios';
-import { CheckCircle2, FileUp, LockKeyhole } from 'lucide-react';
+import { FileUp, LockKeyhole, Phone, ShieldCheck } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 type RequestDetails = {
@@ -22,6 +25,7 @@ type RequestDetails = {
 };
 
 export default function ReferralDocumentPage({ token }: { token: string }) {
+    const { provider } = usePublicSite();
     const [passcode, setPasscode] = useState('');
     const [details, setDetails] = useState<RequestDetails | null>(null);
     const [file, setFile] = useState<File | null>(null);
@@ -38,6 +42,7 @@ export default function ReferralDocumentPage({ token }: { token: string }) {
         undefined,
         busy,
     );
+    const phone = provider.phone?.trim();
 
     async function submit() {
         if (pending.current) return;
@@ -116,169 +121,252 @@ export default function ReferralDocumentPage({ token }: { token: string }) {
     }
 
     const received = details?.state === 'received';
+    const choose = (next: File | null) => {
+        setFile(next);
+        setConfirmed(false);
+        setError('');
+    };
+
     return (
-        <MarketingLayout title="Share a requested document">
+        <PublicSiteLayout
+            title="Secure upload"
+            current="upload"
+            intro={
+                <PageIntro
+                    eyebrow="Secure upload"
+                    title="Share a requested document"
+                    lede={
+                        details
+                            ? `Your intake coordinator asked for this document. This link expires on ${formatDateTimeLong(details.expires_at)}.`
+                            : 'Your intake coordinator asked for a document. Enter the code they sent you separately to open the request. You don’t need an account.'
+                    }
+                />
+            }
+        >
             {leave.confirmation}
             <Head>
                 <meta name="robots" content="noindex,nofollow" />
                 <meta name="referrer" content="no-referrer" />
             </Head>
-            <div className="mx-auto max-w-2xl space-y-5">
-                <Card>
-                    <CardHeader className="space-y-3">
-                        {received ? (
-                            <CheckCircle2
-                                className="size-6 text-status-success"
-                                aria-hidden
-                            />
-                        ) : details ? (
-                            <FileUp
-                                className="size-6 text-primary"
-                                aria-hidden
-                            />
-                        ) : (
-                            <LockKeyhole
-                                className="size-6 text-primary"
-                                aria-hidden
-                            />
-                        )}
-                        <h1
+            <div className="journey-site-container grid items-start gap-6 py-12 lg:grid-cols-[1.5fr_1fr]">
+                <section
+                    aria-labelledby="upload-heading"
+                    className="space-y-6 rounded-3xl border border-border bg-card p-6 md:p-8"
+                >
+                    <div className="space-y-1.5">
+                        <p className="journey-site-kicker">
+                            {received
+                                ? 'Received'
+                                : details
+                                  ? 'Requested by our intake team'
+                                  : 'Your request'}
+                        </p>
+                        <h2
+                            id="upload-heading"
                             ref={heading}
                             tabIndex={-1}
-                            className="text-page-title"
+                            className="text-section-title focus-visible:outline-none"
                         >
                             {received
                                 ? 'Document received'
                                 : details
                                   ? 'Share your document'
                                   : 'Open your document request'}
-                        </h1>
-                        <p className="text-subtle">
-                            {received
-                                ? 'The team will check the file and review the information. This receipt does not confirm funding, eligibility or the start of support.'
-                                : details
-                                  ? 'Send only the document requested below. You can contact the team if you need help or another way to provide it.'
-                                  : 'Enter the code the team gave you separately. You do not need an account.'}
-                        </p>
-                    </CardHeader>
-                    <CardContent className="space-y-5">
-                        {error && (
-                            <Alert variant="warning">
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
-                        )}
-                        {received ? (
-                            <div className="space-y-4">
-                                <p className="text-subtle">
-                                    Receipt:{' '}
-                                    <span className="font-medium break-all text-foreground">
-                                        {details.reference}
-                                    </span>
-                                </p>
-                                <p className="text-subtle">
-                                    Received{' '}
-                                    {formatDateTimeLong(details.received_at!)}
-                                </p>
-                                <Button asChild className="frontline-tap">
-                                    <a href="/">Return to the website</a>
-                                </Button>
-                            </div>
-                        ) : (
-                            <form
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    void submit();
-                                }}
-                                className="space-y-5"
-                                aria-busy={busy}
+                        </h2>
+                    </div>
+                    {error && (
+                        <Alert variant="warning">
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                    )}
+                    {received ? (
+                        <div className="space-y-5">
+                            <div
+                                role="status"
+                                className="flex items-center gap-4 rounded-2xl bg-muted p-5"
                             >
-                                {details ? (
-                                    <>
-                                        <div className="space-y-2 rounded-lg border bg-muted/30 p-4">
-                                            <h2 className="text-section-title break-words">
-                                                {details.title}
-                                            </h2>
-                                            <p className="text-subtle break-words whitespace-pre-wrap">
-                                                {details.instructions}
-                                            </p>
-                                            <p className="text-caption text-muted-foreground">
-                                                Link expires{' '}
-                                                {formatDateTimeLong(
-                                                    details.expires_at,
-                                                )}
-                                            </p>
-                                        </div>
-                                        <Field
-                                            label="Choose a document"
-                                            hint="One PDF, JPEG or PNG, up to 10 MB. Check that every page is readable."
-                                        >
-                                            <Input
-                                                className="min-h-[44px] w-full min-w-0"
-                                                type="file"
-                                                accept=".pdf,.jpg,.jpeg,.png"
-                                                disabled={busy}
-                                                onChange={(event) => {
-                                                    setFile(
-                                                        event.target
-                                                            .files?.[0] ?? null,
-                                                    );
-                                                    setConfirmed(false);
-                                                    setError('');
-                                                }}
-                                            />
-                                        </Field>
-                                        {file && (
-                                            <p className="text-subtle break-all">
-                                                {file.name} ·{' '}
-                                                {(file.size / 1024).toFixed(0)}{' '}
-                                                KB
-                                            </p>
+                                {/* Signature: success is the brand ring closing, not a green tick. */}
+                                <span
+                                    className="journey-site-ring-done"
+                                    aria-hidden
+                                />
+                                <span>
+                                    <span className="block font-semibold">
+                                        Received — thank you
+                                    </span>
+                                    <span className="block text-sm text-muted-foreground">
+                                        We check every file for viruses before
+                                        your coordinator opens it. This receipt
+                                        does not confirm funding, eligibility or
+                                        the start of support.
+                                    </span>
+                                </span>
+                            </div>
+                            <dl className="grid gap-1 text-sm">
+                                <div className="flex flex-wrap gap-x-2">
+                                    <dt className="text-muted-foreground">
+                                        Receipt
+                                    </dt>
+                                    <dd className="font-medium break-all">
+                                        {details.reference}
+                                    </dd>
+                                </div>
+                                <div className="flex flex-wrap gap-x-2">
+                                    <dt className="text-muted-foreground">
+                                        Received
+                                    </dt>
+                                    <dd>
+                                        {formatDateTimeLong(
+                                            details.received_at!,
                                         )}
-                                        <label className="flex min-h-[44px] items-start gap-3">
-                                            <Checkbox
-                                                className="frontline-hit mt-1"
-                                                checked={confirmed}
-                                                disabled={busy}
-                                                onCheckedChange={(value) =>
-                                                    setConfirmed(value === true)
-                                                }
+                                    </dd>
+                                </div>
+                            </dl>
+                            <Button asChild className="frontline-tap">
+                                <a href={siteLinks.home}>
+                                    Return to the website
+                                </a>
+                            </Button>
+                        </div>
+                    ) : (
+                        <form
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                void submit();
+                            }}
+                            className="space-y-6"
+                            aria-busy={busy}
+                        >
+                            {details ? (
+                                <>
+                                    <div className="space-y-2 rounded-2xl bg-muted p-5">
+                                        <h3 className="font-semibold break-words">
+                                            {details.title}
+                                        </h3>
+                                        <p className="text-sm break-words whitespace-pre-wrap text-muted-foreground">
+                                            {details.instructions}
+                                        </p>
+                                        <p className="text-caption text-muted-foreground">
+                                            Link expires{' '}
+                                            {formatDateTimeLong(
+                                                details.expires_at,
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label id="upload-document-label">
+                                            Choose a document
+                                        </Label>
+                                        <p
+                                            id="upload-document-hint"
+                                            className="text-caption text-muted-foreground"
+                                        >
+                                            One PDF, JPEG or PNG, up to 10 MB.
+                                            Check that every page is readable.
+                                        </p>
+                                        {file && (
+                                            <StagedFileCard
+                                                file={file}
+                                                onRemove={() => choose(null)}
                                             />
-                                            <span className="text-subtle">
-                                                I have checked this file and
-                                                want to share it with the team
-                                                for this request.
-                                            </span>
-                                        </label>
-                                    </>
-                                ) : (
-                                    <Field
-                                        label="10-digit code"
-                                        hint="If you do not have a code, contact the team using the details you already know."
-                                    >
-                                        <Input
-                                            className="min-h-[44px]"
-                                            inputMode="numeric"
-                                            autoComplete="one-time-code"
-                                            type="password"
-                                            value={passcode}
-                                            maxLength={10}
+                                        )}
+                                        <FileDropzone
+                                            aria-labelledby="upload-document-label"
+                                            aria-describedby="upload-document-hint"
+                                            onFiles={(list) =>
+                                                choose(list[0] ?? null)
+                                            }
+                                            multiple={false}
                                             disabled={busy}
-                                            onChange={(event) =>
-                                                setPasscode(
-                                                    event.target.value.replace(
-                                                        /\D/g,
-                                                        '',
-                                                    ),
-                                                )
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            title={
+                                                file
+                                                    ? 'Choose a different file'
+                                                    : 'Drag your document here, or browse'
+                                            }
+                                            hint="PDF, JPG or PNG · up to 10 MB"
+                                        />
+                                    </div>
+                                    <label className="flex items-start gap-3 rounded-2xl bg-muted p-4">
+                                        <Checkbox
+                                            className="frontline-hit mt-0.5"
+                                            checked={confirmed}
+                                            disabled={busy}
+                                            onCheckedChange={(value) =>
+                                                setConfirmed(value === true)
                                             }
                                         />
-                                    </Field>
-                                )}
+                                        <span className="text-sm">
+                                            I have checked this file and want to
+                                            share it with the team for this
+                                            request.
+                                        </span>
+                                    </label>
+                                </>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="upload-code">
+                                        10-digit code
+                                    </Label>
+                                    <Input
+                                        id="upload-code"
+                                        className="frontline-tap max-w-xs"
+                                        inputMode="numeric"
+                                        autoComplete="one-time-code"
+                                        type="password"
+                                        value={passcode}
+                                        maxLength={10}
+                                        disabled={busy}
+                                        aria-describedby="upload-code-hint"
+                                        onChange={(event) =>
+                                            setPasscode(
+                                                event.target.value.replace(
+                                                    /\D/g,
+                                                    '',
+                                                ),
+                                            )
+                                        }
+                                    />
+                                    <p
+                                        id="upload-code-hint"
+                                        className="text-caption text-muted-foreground"
+                                    >
+                                        Your coordinator sent the code
+                                        separately from this link, so only you
+                                        can use it.
+                                    </p>
+                                </div>
+                            )}
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+                                <p
+                                    className="text-sm text-muted-foreground"
+                                    role={busy ? 'status' : undefined}
+                                >
+                                    {busy
+                                        ? 'Please keep this page open while we confirm the result.'
+                                        : !details
+                                          ? 'Enter your 10-digit code to open the request.'
+                                          : !file
+                                            ? 'Choose a file to send.'
+                                            : 'Ready to send.'}
+                                </p>
                                 <Button
                                     type="submit"
-                                    className="frontline-tap w-full sm:w-auto"
+                                    size="lg"
+                                    className="frontline-tap"
                                     disabled={busy}
                                 >
+                                    {details ? (
+                                        <FileUp
+                                            className="size-4"
+                                            aria-hidden
+                                        />
+                                    ) : (
+                                        <LockKeyhole
+                                            className="size-4"
+                                            aria-hidden
+                                        />
+                                    )}
                                     {busy
                                         ? details
                                             ? 'Sending document…'
@@ -287,17 +375,38 @@ export default function ReferralDocumentPage({ token }: { token: string }) {
                                           ? 'Send document'
                                           : 'Open request'}
                                 </Button>
-                                {busy && (
-                                    <p role="status" className="text-subtle">
-                                        Please keep this page open while we
-                                        confirm the result.
-                                    </p>
-                                )}
-                            </form>
+                            </div>
+                        </form>
+                    )}
+                </section>
+                <aside className="space-y-3 rounded-3xl border border-border bg-card p-6">
+                    <NoteLine icon={ShieldCheck}>
+                        Files are checked for viruses and stored privately. Only
+                        the staff working on your referral can open them.
+                    </NoteLine>
+                    <NoteLine icon={LockKeyhole}>
+                        This link only accepts the document that was requested,
+                        and stops working when it expires.
+                    </NoteLine>
+                    <NoteLine icon={Phone}>
+                        Didn’t expect this request?{' '}
+                        {phone ? (
+                            <>
+                                Call us on{' '}
+                                <a
+                                    href={phoneUrl(phone)}
+                                    className="font-semibold text-primary hover:underline"
+                                >
+                                    {phone}
+                                </a>{' '}
+                                before uploading anything.
+                            </>
+                        ) : (
+                            'Contact us before uploading anything.'
                         )}
-                    </CardContent>
-                </Card>
+                    </NoteLine>
+                </aside>
             </div>
-        </MarketingLayout>
+        </PublicSiteLayout>
     );
 }

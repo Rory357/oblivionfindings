@@ -6,8 +6,13 @@ use App\Models\Client;
 use App\Models\HsEvent;
 use App\Models\HsRiskAssessment;
 use App\Models\Site;
+use App\Services\HealthSafety\HsEventAccessService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\HsRiskAssessmentService;
+use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Services\UserSiteAccessService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Validation for creating a risk assessment (also the base for Edit + Supersede).
@@ -21,15 +26,15 @@ class StoreHsRiskAssessmentRequest extends FormRequest
         // Permission remains route-gated. Route-model actions additionally deny
         // direct objects outside the viewer's canonical Site scope before validation.
         $assessment = $this->route('assessment');
-        if (! $assessment instanceof HsRiskAssessment) {
-            return true;
-        }
-
-        return app(UserSiteAccessService::class)->applyHsRiskAssessmentScope(
-            HsRiskAssessment::query(),
-            $this->user(),
-            ['healthSafety.viewAllSites'],
-        )->whereKey($assessment->getKey())->exists();
+        if ($assessment === null) { return true; }
+        $id = $assessment instanceof HsRiskAssessment ? $assessment->getKey() : $assessment;
+        if ((! is_string($id) && ! is_int($id)) || ! preg_match('/^[1-9][0-9]*$/D', (string) $id) || filter_var($id, FILTER_VALIDATE_INT) === false) { return false; }
+        return HealthSafetyReadContext::within($this->user(), RiskAssessmentPresenter::readPermissions(), fn ($context) => $context->consumeSourceViewer(RiskAssessmentPresenter::readPermissions(), function ($current) use ($id, $context): bool {
+            if (! $current->canDo('hazards.manage')) { return false; }
+            $query = RiskAssessmentPresenter::applySiteScopeInContext(HsRiskAssessment::query()->whereKey((int) $id), $current, $context);
+            $query->whereExists(app(HsRiskAssessmentService::class)->authorityQueryInContext($current, $context, ['hazards.manage'])->selectRaw('1')->toBase());
+            return app(HsEventAccessService::class)->applyFirstAidRiskSourceScope($query, $current, $context)->exists();
+        }));
     }
 
     public function rules(): array
@@ -47,25 +52,26 @@ class StoreHsRiskAssessmentRequest extends FormRequest
             'existing_controls' => ['nullable', 'string', 'max:5000'],
             'additional_controls' => ['nullable', 'string', 'max:5000'],
 
-            'residual_likelihood' => ['nullable', 'integer', 'between:1,5'],
-            'residual_consequence' => ['nullable', 'integer', 'between:1,5'],
+            'residual_likelihood' => ['nullable', 'required_with:residual_consequence', 'integer', 'between:1,5'],
+            'residual_consequence' => ['nullable', 'required_with:residual_likelihood', 'integer', 'between:1,5'],
             'risk_acceptable' => ['nullable', 'boolean'],
 
             'review_frequency_days' => ['nullable', 'integer', 'in:30,90,180,365'],
-            'review_due_at' => ['nullable', 'date'],
+            'review_due_at' => ['nullable', 'date_format:Y-m-d'],
         ];
     }
 
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
+            HealthSafetyReadContext::within($this->user(), RiskAssessmentPresenter::readPermissions(), fn ($context) => $context->consumeSourceViewer(RiskAssessmentPresenter::readPermissions(), function ($current, $reads) use ($validator, $context): void {
             $type = $this->input('attach_type');
             $id = $this->input('attach_id');
             $siteAccess = app(UserSiteAccessService::class);
-            $siteIds = $siteAccess->accessibleSiteIds($this->user(), ['healthSafety.viewAllSites']);
+            $siteIds = $siteAccess->accessibleSiteIds($current, ['healthSafety.viewAllSites'], $reads);
 
             if ($type === 'standalone') {
-                if (! $siteAccess->canBypass($this->user(), ['healthSafety.viewAllSites'])) {
+                if (! $siteAccess->canBypass($current, ['healthSafety.viewAllSites'])) {
                     $validator->errors()->add('attach_type', 'Application-wide assessments require application-wide H&S access.');
                 }
 
@@ -79,17 +85,14 @@ class StoreHsRiskAssessmentRequest extends FormRequest
             $exists = match ($type) {
                 'site' => Site::query()->whereIn('id', $siteIds)->whereKey($id)->exists(),
                 'client' => Client::query()->whereIn('site_id', $siteIds)->whereKey($id)->exists(),
-                'event' => $siteAccess->applyHsEventScope(
-                    HsEvent::query(),
-                    $this->user(),
-                    ['healthSafety.viewAllSites'],
-                )->whereKey($id)->exists(),
+                'event' => app(HsEventAccessService::class)->applyFirstAidSourceScope($siteAccess->applyHsEventScope(HsEvent::query(), $current, ['healthSafety.viewAllSites'])->whereNotNull('site_id')->whereKey($id), $current, $context)->exists(),
                 default => false,
             };
 
             if (! $exists) {
                 $validator->errors()->add('attach_id', 'The selected '.$type.' is unavailable for your Site access.');
             }
+            }));
         });
     }
 

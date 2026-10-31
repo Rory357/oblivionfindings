@@ -69,6 +69,11 @@ class AttendanceService
     /**
      * @throws \LogicException
      */
+    public function clockInRecorded(User $user, array $data = []): HrAttendanceSession
+    {
+        return $this->clockIn($user, [...$data, '_recorded_clock' => true]);
+    }
+
     public function clockIn(User $user, array $data = []): HrAttendanceSession
     {
         $clockInAt = isset($data['clock_in_at']) ? Carbon::parse($data['clock_in_at']) : now();
@@ -127,6 +132,11 @@ class AttendanceService
                 null,
             );
 
+            if (($data['_recorded_clock'] ?? false)
+                && HrTimeEntry::query()->where('user_id', $lockedUser->id)->active()->lockForUpdate()->exists()) {
+                throw new \LogicException('You are already clocked in.');
+            }
+
             $openSession = HrAttendanceSession::query()
                 ->where('user_id', $lockedUser->id)
                 ->open()
@@ -137,7 +147,7 @@ class AttendanceService
                 throw new \LogicException('You are already clocked in. Please clock out before starting another session.');
             }
 
-            $session = HrAttendanceSession::create([
+            $session = new HrAttendanceSession([
                 'user_id' => $lockedUser->id,
                 'shift_id' => $lockedShift?->id,
                 'site_id' => $siteId,
@@ -149,6 +159,12 @@ class AttendanceService
                 'meta' => $data['meta'] ?? null,
                 'created_by' => $data['created_by'] ?? $lockedUser->id,
             ]);
+            $expectedClock = $this->clockRecordedValues($session, ['user_id', 'shift_id', 'site_id', 'clock_in_at', 'status']);
+            if ($session->save() !== true || ! $session->exists || ! $session->getKey()) {
+                throw new \LogicException('The attendance clock-in could not be saved.');
+            }
+            $expectedClock = ['id' => (int) $session->id, ...$expectedClock,
+                'clock_out_at' => null, 'break_started_at' => null, 'break_minutes' => 0, 'break_count' => 0];
             $session->setRelation('shift', $lockedShift);
 
             if ($lockedShift && in_array($lockedShift->status, ['draft', 'scheduled'], true)) {
@@ -161,17 +177,100 @@ class AttendanceService
             }
 
             $this->timeEntries->lockPayrollRunsForSession($session);
-            $this->timeEntries->project($session, $lockedUser, [
+            $entry = $this->timeEntries->project($session, $lockedUser, [
                 ...$data,
                 'locked_timesheet' => $lockedTimesheet,
                 'payroll_boundary_locked' => true,
                 'link_timesheet' => true,
             ]);
 
-            return $session->fresh(['shift.client', 'timesheet']);
+            $fresh = $session->fresh(['shift.client', 'timesheet']);
+            return ($data['_recorded_clock'] ?? false)
+                ? $this->recordedClockCommand($fresh, $entry, $expectedClock, 'clock_in')
+                : $fresh;
         });
 
-        return $session->fresh(['shift.client', 'timesheet']);
+        return ($data['_recorded_clock'] ?? false)
+            ? $session : $session->fresh(['shift.client', 'timesheet']);
+    }
+
+    /** Verify and retain the acted rows before this clock transaction commits. */
+    private function recordedClockCommand(HrAttendanceSession $session, HrTimeEntry $entry, array $expected, string $action, ?int $expectedTimesheetBreakMinutes = null): HrAttendanceSession
+    {
+        $raw = DB::table($session->getTable())->where('id', $expected['id'])->lockForUpdate()->first(array_keys($expected));
+        if (! $raw || $this->clockRecordedValues($session, array_keys($expected)) !== $expected
+            || $this->clockRecordedValues($raw, array_keys($expected)) !== $expected) {
+            throw new \LogicException('The recorded attendance clock evidence is inconsistent.');
+        }
+        $entryFields = ['id', 'user_id', 'attendance_session_id', 'shift_id', 'site_id', 'clock_in', 'clock_out', 'break_minutes', 'total_hours', 'status'];
+        $entryRaw = DB::table($entry->getTable())->where('id', $entry->id)->lockForUpdate()->first($entryFields);
+        if (! $entryRaw || (int) $entry->id < 1
+            || $this->clockRecordedValues($entry, $entryFields) !== $this->clockRecordedValues($entryRaw, $entryFields)
+            || (int) $entry->attendance_session_id !== (int) $session->id
+            || (int) $entry->user_id !== (int) $session->user_id
+            || $entry->shift_id !== $session->shift_id || $entry->site_id !== $session->site_id
+            || $entry->fromDateTime($entry->clock_in) !== $session->fromDateTime($session->clock_in_at)
+            || $entry->fromDateTime($entry->clock_out) !== $session->fromDateTime($session->clock_out_at)
+            || (int) $entry->break_minutes !== (int) $session->break_minutes
+            || ($action === 'clock_out' && abs((float) $entry->total_hours - $session->worked_hours) > 0.001)) {
+            throw new \LogicException('The recorded attendance time entry is inconsistent.');
+        }
+        if ($action === 'clock_out' && ($session->handoverOutcome() === null
+            || HrAttendanceBreakEvent::query()->where('session_id', $session->id)->whereNull('ended_at')->exists())) {
+            throw new \LogicException('The active attendance break could not be closed.');
+        }
+        $synced = $session->timesheetSyncOutcome()->wasSynced();
+        $timesheet = $synced && $session->relationLoaded('timesheet') ? $session->getRelation('timesheet') : null;
+        if ($synced) {
+            $fields = ['id', 'user_id', 'attendance_session_id', 'starts_at', 'ends_at', 'break_minutes', 'status'];
+            $stored = $timesheet ? DB::table($timesheet->getTable())->where('id', $timesheet->id)->lockForUpdate()->first($fields) : null;
+            if (! $stored || (int) $timesheet->id < 1
+                || $this->clockRecordedValues($timesheet, $fields) !== $this->clockRecordedValues($stored, $fields)
+                || (int) $timesheet->attendance_session_id !== (int) $session->id
+                || (int) $timesheet->user_id !== (int) $session->user_id
+                || $timesheet->fromDateTime($timesheet->starts_at) !== $session->fromDateTime($session->clock_in_at)
+                || $timesheet->fromDateTime($timesheet->ends_at) !== $session->fromDateTime($session->clock_out_at)
+                || (int) $timesheet->break_minutes !== ($expectedTimesheetBreakMinutes ?? (int) $session->break_minutes)) {
+                throw new \LogicException('The recorded attendance timesheet is inconsistent.');
+            }
+        }
+
+        $session->setRelation('attendanceClockRecordedAuthority', [
+            'id' => (int) $session->id, 'user_id' => (int) $session->user_id,
+            'shift_id' => $session->shift_id, 'site_id' => $session->site_id,
+        ]);
+        return $session->setRelation('attendanceClockRecordedResult', [
+            'action' => $action, 'session_id' => (int) $session->id,
+            'shift_id' => $session->shift_id === null ? null : (int) $session->shift_id,
+            'session_status' => $session->status,
+            'clock_in_at' => $session->clock_in_at->toIso8601String(),
+            'clock_out_at' => $session->clock_out_at?->toIso8601String(),
+            'break_minutes' => (int) $session->break_minutes,
+            'worked_hours' => $session->clock_out_at ? $session->worked_hours : null,
+            'timesheet_sync_outcome' => $session->timesheetSyncOutcome()->value,
+            'timesheet_id' => $synced ? (int) $timesheet->id : null,
+            'timesheet_status' => $synced ? $timesheet->status : null,
+            'handover_outcome' => $session->handoverOutcome()?->value,
+        ]);
+    }
+
+    private function clockRecordedValues(object $row, array $fields): array
+    {
+        $values = [];
+        foreach ($fields as $field) {
+            $value = $row instanceof \Illuminate\Database\Eloquent\Model ? $row->getAttribute($field) : ($row->{$field} ?? null);
+            if ($value instanceof \DateTimeInterface) {
+                $value = $row->fromDateTime($value);
+            }
+            if ($value !== null && ($field === 'id' || str_ends_with($field, '_id') || in_array($field, ['break_minutes', 'break_count'], true))) {
+                $value = (int) $value;
+            }
+            if ($value !== null && $field === 'total_hours') {
+                $value = number_format((float) $value, 2, '.', '');
+            }
+            $values[$field] = $value;
+        }
+        return $values;
     }
 
     /**
@@ -250,6 +349,12 @@ class AttendanceService
     /**
      * @throws \LogicException
      */
+    public function clockOutRecorded(User $user, HrAttendanceSession $session, ?int $expectedShiftId, array $data = []): HrAttendanceSession
+    {
+        return $this->clockOut($user, $session, [...$data,
+            '_recorded_clock' => true, '_expected_shift_id' => $expectedShiftId]);
+    }
+
     public function clockOut(User $user, ?HrAttendanceSession $session = null, array $data = []): HrAttendanceSession
     {
         $session = $session ?: HrAttendanceSession::query()
@@ -297,6 +402,9 @@ class AttendanceService
             abort_unless((int) $session->user_id === (int) $lockedUser->id, 404);
 
             $siteId = $this->assertSelfAttendanceSessionScope($session, $lockedUser);
+            if (($data['_recorded_clock'] ?? false) && $session->shift_id !== $data['_expected_shift_id']) {
+                abort(409, 'The selected attendance Shift has changed.');
+            }
 
             if ($session->status !== 'open' || $session->clock_out_at) {
                 throw new \LogicException('This attendance session has already been closed.');
@@ -346,6 +454,10 @@ class AttendanceService
                 'break_started_at' => null,
                 'status' => 'closed',
             ]);
+            $expectedClock = $this->clockRecordedValues($session, [
+                'id', 'user_id', 'shift_id', 'site_id', 'clock_in_at', 'clock_out_at',
+                'status', 'break_started_at', 'break_minutes', 'break_count',
+            ]);
             $this->assertValidProjectionInterval($session);
             $this->timeEntries->lockPayrollRunsForSession($session);
             $lockedTimesheet = $this->lockAttendanceTimesheet($session);
@@ -384,7 +496,7 @@ class AttendanceService
                 throw new \LogicException('An override reason is required to end a shift with outstanding checklist items.');
             }
 
-            $session->update([
+            if ($session->update([
                 'site_id' => $session->site_id ?: $siteId,
                 'clock_out_at' => $clockOutAt,
                 'break_minutes' => $breakMinutes,
@@ -392,7 +504,9 @@ class AttendanceService
                 'status' => 'closed',
                 'notes' => $data['notes'] ?? $session->notes,
                 'closed_by' => $lockedUser->id,
-            ]);
+            ]) !== true) {
+                throw new \LogicException('The attendance clock-out could not be saved.');
+            }
 
             $this->closeOpenBreakEvent($session, $clockOutAt, $openBreakStartedAt);
 
@@ -410,6 +524,7 @@ class AttendanceService
                 );
             }
 
+            $expectedTimesheetBreakMinutes = max((int) ($lockedTimesheet?->getRawOriginal('break_minutes') ?? 0), (int) $expectedClock['break_minutes']);
             $timesheetSyncOutcome = $this->syncAttendanceTimesheet(
                 $session,
                 $lockedUser->id,
@@ -417,7 +532,7 @@ class AttendanceService
                 $lockedTimesheet,
             );
 
-            $this->timeEntries->project($session, $lockedUser, [
+            $entry = $this->timeEntries->project($session, $lockedUser, [
                 ...$data,
                 'locked_timesheet' => $lockedTimesheet,
                 'payroll_boundary_locked' => true,
@@ -445,9 +560,12 @@ class AttendanceService
                 ]);
             }
 
-            return ($session->fresh(['shift.client', 'timesheet']) ?? $session)
+            $fresh = ($session->fresh(['shift.client', 'timesheet']) ?? $session)
                 ->markTimesheetSyncOutcome($timesheetSyncOutcome)
                 ->markHandoverOutcome($handoverOutcome);
+            return ($data['_recorded_clock'] ?? false)
+                ? $this->recordedClockCommand($fresh, $entry, $expectedClock, 'clock_out', $expectedTimesheetBreakMinutes)
+                : $fresh;
         });
 
         // Safety overlay: end any lone-worker monitoring tied to this shift now
@@ -1605,14 +1723,14 @@ class AttendanceService
     }
 
     /**
-     * @throws \LogicException
+     * @throws ValidationException
      */
     public function startBreak(User $user, ?HrAttendanceSession $session = null, array $data = []): HrAttendanceSession
     {
         $startedAt = isset($data['started_at']) ? Carbon::parse($data['started_at']) : now();
         $sessionId = $session?->id;
 
-        return DB::transaction(function () use ($sessionId, $user, $startedAt) {
+        return $this->breakTransaction(function () use ($sessionId, $user, $startedAt) {
             $this->timeEntries->lockApplicationPayrollMutex();
             [$session, $lockedUser] = $this->lockOpenSessionForUser(
                 $user,
@@ -1629,30 +1747,50 @@ class AttendanceService
                 throw new \LogicException('A break is already in progress.');
             }
 
-            $session->update([
-                'break_started_at' => $startedAt,
-                'break_count' => ((int) $session->break_count) + 1,
+            $expectedSession = $this->breakCommandValues($session, [
+                'id', 'user_id', 'shift_id', 'site_id', 'status', 'clock_in_at', 'clock_out_at',
+                'break_started_at', 'break_count', 'break_minutes',
             ]);
+            $expectedSession['break_started_at'] = $session->fromDateTime($startedAt);
+            $expectedSession['break_count'] = ((int) $session->break_count) + 1;
+            if ($session->update([
+                'break_started_at' => $startedAt,
+                'break_count' => $expectedSession['break_count'],
+            ]) !== true) {
+                throw new \LogicException('The attendance break could not be saved.');
+            }
 
-            HrAttendanceBreakEvent::query()->create([
-                'session_id' => $session->id,
+            $event = new HrAttendanceBreakEvent([
+                'session_id' => $expectedSession['id'],
                 'started_at' => $startedAt,
+                'ended_at' => null,
+                'minutes' => 0,
                 'created_by' => $lockedUser->id,
             ]);
+            if ($event->save() !== true || ! $event->exists || ! $event->getKey()) {
+                throw new \LogicException('The attendance break could not be saved.');
+            }
 
-            return $session->fresh(['shift.client', 'timesheet', 'breakEvents']);
+            return $this->recordedBreakCommand($session, $expectedSession, [
+                'id' => (int) $event->id,
+                'session_id' => $expectedSession['id'],
+                'started_at' => $session->fromDateTime($startedAt),
+                'ended_at' => null,
+                'minutes' => 0,
+                'created_by' => (int) $lockedUser->id,
+            ]);
         });
     }
 
     /**
-     * @throws \LogicException
+     * @throws ValidationException
      */
     public function endBreak(User $user, ?HrAttendanceSession $session = null, array $data = []): HrAttendanceSession
     {
         $endedAt = isset($data['ended_at']) ? Carbon::parse($data['ended_at']) : now();
         $sessionId = $session?->id;
 
-        return DB::transaction(function () use ($sessionId, $user, $endedAt) {
+        return $this->breakTransaction(function () use ($sessionId, $user, $endedAt) {
             $this->timeEntries->lockApplicationPayrollMutex();
             [$session, $lockedUser] = $this->lockOpenSessionForUser(
                 $user,
@@ -1672,22 +1810,113 @@ class AttendanceService
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
-            if ($events->count() !== 1) {
+            if ($events->count() !== 1
+                || ! $events->first()->started_at
+                || $session->fromDateTime($events->first()->started_at) !== $session->fromDateTime($session->break_started_at)) {
                 throw new \LogicException('The active attendance break evidence is missing or conflicting.');
             }
             $minutes = max(0, (int) $session->break_started_at->diffInMinutes($endedAt));
-            $events->first()->update([
-                'ended_at' => $endedAt,
-                'minutes' => $minutes,
+            $event = $events->first();
+            $expectedEvent = $this->breakCommandValues($event, [
+                'id', 'session_id', 'started_at', 'ended_at', 'minutes', 'created_by',
             ]);
-
-            $session->update([
-                'break_started_at' => null,
-                'break_minutes' => ((int) $session->break_minutes) + $minutes,
+            $expectedEvent['ended_at'] = $event->fromDateTime($endedAt);
+            $expectedEvent['minutes'] = $minutes;
+            $expectedSession = $this->breakCommandValues($session, [
+                'id', 'user_id', 'shift_id', 'site_id', 'status', 'clock_in_at', 'clock_out_at',
+                'break_started_at', 'break_count', 'break_minutes',
             ]);
+            $expectedSession['break_started_at'] = null;
+            $expectedSession['break_minutes'] = ((int) $session->break_minutes) + $minutes;
+            if ($event->update(['ended_at' => $endedAt, 'minutes' => $minutes]) !== true
+                || $session->update([
+                    'break_started_at' => null,
+                    'break_minutes' => $expectedSession['break_minutes'],
+                ]) !== true) {
+                throw new \LogicException('The attendance break could not be saved.');
+            }
 
-            return $session->fresh(['shift.client', 'timesheet', 'breakEvents']);
+            return $this->recordedBreakCommand($session, $expectedSession, $expectedEvent);
         });
+    }
+
+    /** Only the same exception rethrown after rollback is a retryable rejection. */
+    private function breakTransaction(callable $command): HrAttendanceSession
+    {
+        $innerFailure = null;
+        try {
+            return DB::transaction(function () use ($command, &$innerFailure) {
+                try {
+                    return $command();
+                } catch (\Throwable $exception) {
+                    $innerFailure = $exception;
+                    throw $exception;
+                }
+            });
+        } catch (\Throwable $exception) {
+            if ($exception === $innerFailure && $exception instanceof \LogicException) {
+                throw ValidationException::withMessages(['break' => $exception->getMessage()]);
+            }
+            if ($exception !== $innerFailure
+                && ($exception instanceof \LogicException || $exception instanceof ValidationException)) {
+                // A commit callback may throw after the break is durable. Do
+                // not let framework validation handling describe it as rejected.
+                throw new \RuntimeException('The break result could not be confirmed.', 0, $exception);
+            }
+            throw $exception;
+        }
+    }
+
+    /** Validate the acted rows before the existing transaction may commit. */
+    private function recordedBreakCommand(HrAttendanceSession $session, array $expectedSession, array $expectedEvent): HrAttendanceSession
+    {
+        if ($expectedSession['status'] !== 'open' || $expectedSession['clock_out_at'] !== null
+            || $expectedSession['break_count'] < 0 || $expectedSession['break_minutes'] < 0 || $expectedEvent['minutes'] < 0
+            || ($expectedEvent['ended_at'] === null && $expectedSession['break_count'] < 1)) {
+            throw new \LogicException('The attendance break could not be saved.');
+        }
+        $fresh = $session->fresh(['shift.client', 'timesheet', 'breakEvents']);
+        $acted = $fresh?->breakEvents->where('id', $expectedEvent['id']);
+        if (! $fresh || $acted?->count() !== 1) {
+            throw new \LogicException('The attendance break could not be saved.');
+        }
+        foreach ([[$fresh, $expectedSession], [$acted->first(), $expectedEvent]] as [$row, $expected]) {
+            $stored = DB::table($row->getTable())->where('id', $expected['id'])->lockForUpdate()->first(array_keys($expected));
+            if (! $stored
+                || $this->breakCommandValues($row, array_keys($expected)) !== $expected
+                || $this->breakCommandValues($stored, array_keys($expected)) !== $expected) {
+                throw new \LogicException('The attendance break could not be saved.');
+            }
+        }
+        $openIds = HrAttendanceBreakEvent::query()->where('session_id', $expectedSession['id'])
+            ->whereNull('ended_at')->orderBy('id')->lockForUpdate()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if ($openIds !== ($expectedEvent['ended_at'] === null ? [$expectedEvent['id']] : [])) {
+            throw new \LogicException('The active attendance break evidence is missing or conflicting.');
+        }
+
+        // Transient writer evidence only. Default controller callers ignore it.
+        return $fresh->setRelation('attendanceBreakCommandEvent', $acted->first());
+    }
+
+    /** Compare installed casts and SQL datetime precision for these two break rows. */
+    private function breakCommandValues(object $row, array $fields): array
+    {
+        $values = [];
+        foreach ($fields as $field) {
+            $value = $row instanceof HrAttendanceSession || $row instanceof HrAttendanceBreakEvent
+                ? $row->getAttribute($field) : ($row->{$field} ?? null);
+            if ($value instanceof \DateTimeInterface) {
+                $value = $row->fromDateTime($value);
+            }
+            if ($value !== null && in_array($field, [
+                'id', 'user_id', 'shift_id', 'site_id', 'break_count', 'break_minutes', 'session_id', 'minutes', 'created_by',
+            ], true) && is_numeric($value)) {
+                $value = (int) $value;
+            }
+            $values[$field] = $value;
+        }
+
+        return $values;
     }
 
     /** @return array{0: HrAttendanceSession, 1: User} */
@@ -1780,12 +2009,29 @@ class AttendanceService
             throw new \LogicException('The active attendance break evidence is missing or conflicting.');
         }
 
-        $events->first()?->update([
+        $eventStartedAt = $events->first()?->started_at;
+        if ($events->isNotEmpty() && (
+            ! ($eventStartedAt instanceof \DateTimeInterface)
+            || $startedAt === null
+            || $session->fromDateTime($eventStartedAt) !== $session->fromDateTime($startedAt)
+        )) {
+            throw new \LogicException('The active attendance break evidence is missing or conflicting.');
+        }
+        if ($events->isNotEmpty() && (
+            $clockOutAt->lessThan($startedAt)
+            || $clockOutAt->lessThan($eventStartedAt)
+        )) {
+            throw new \LogicException('Clock-out time cannot be before the active break starts.');
+        }
+
+        if ($events->isNotEmpty() && $events->first()->update([
             'ended_at' => $clockOutAt,
             'minutes' => $startedAt
                 ? max(0, (int) $startedAt->diffInMinutes($clockOutAt))
                 : null,
-        ]);
+        ]) !== true) {
+            throw new \LogicException('The active attendance break could not be closed.');
+        }
     }
 
     /**

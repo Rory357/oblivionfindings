@@ -2,9 +2,19 @@
 
 namespace App\Domain\SecurityDevices\Endpoints\Services;
 
+use App\Models\Integration\IntegrationProviderConnection;
+use App\Services\Integration\IntegrationSecretManager;
+use App\Services\Integration\IntegrationSecretMaterialService;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
+/**
+ * Read-only Microsoft Graph Intune managed-device client.
+ *
+ * Official Microsoft documentation:
+ * - https://learn.microsoft.com/en-us/graph/api/intune-devices-manageddevice-list?view=graph-rest-1.0
+ * - https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow
+ */
 final class IntuneReadClient
 {
     private const HOST = 'https://graph.microsoft.com/v1.0/deviceManagement/managedDevices';
@@ -13,10 +23,84 @@ final class IntuneReadClient
 
     private const UUID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
+    public function __construct(
+        private readonly ?IntegrationSecretMaterialService $secrets = null,
+    ) {}
+
+    public function isConfigured(): bool
+    {
+        $connection = $this->connectedIntegrationConnection();
+        if ($connection !== null) {
+            $config = is_array($connection->config) ? $connection->config : [];
+            $directory = trim((string) ($config['directory_id'] ?? ''));
+            $client = trim((string) ($config['client_id'] ?? ''));
+
+            if (preg_match(self::UUID, $directory) === 1 && preg_match(self::UUID, $client) === 1) {
+                return true;
+            }
+        }
+
+        if (! config('endpoint_management.intune.enabled', false)) {
+            return false;
+        }
+
+        $directory = (string) config('endpoint_management.intune.directory_id');
+        $client = (string) config('endpoint_management.intune.client_id');
+        $secret = (string) config('endpoint_management.intune.client_secret');
+
+        return preg_match(self::UUID, $directory) === 1
+            && preg_match(self::UUID, $client) === 1
+            && $secret !== '';
+    }
+
+    public function testConnection(IntegrationProviderConnection $connection): bool
+    {
+        try {
+            $token = $this->tokenForConnection($connection);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        try {
+            $response = Http::withToken($token)
+                ->acceptJson()
+                ->connectTimeout(10)
+                ->timeout(20)
+                ->withoutRedirecting()
+                ->get(self::HOST.'?$select=id&$top=1');
+
+            if (! $response->successful() || strlen($response->body()) > 1_000_000) {
+                return false;
+            }
+
+            $body = $response->json();
+
+            return is_array($body) && isset($body['value']) && is_array($body['value']);
+        } catch (\Throwable) {
+            return false;
+        } finally {
+            try {
+                sodium_memzero($token);
+            } catch (\Throwable) {
+            }
+        }
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function devicesForConnection(IntegrationProviderConnection $connection): array
+    {
+        return $this->fetchDevicesWithToken($this->tokenForConnection($connection));
+    }
+
     /** @return list<array<string, mixed>> */
     public function devices(): array
     {
-        $token = $this->token();
+        return $this->fetchDevicesWithToken($this->token());
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function fetchDevicesWithToken(#[\SensitiveParameter] string $token): array
+    {
         $url = self::HOST.'?$select='.self::FIELDS.'&$top=100';
         $visited = [];
         $devices = [];
@@ -57,18 +141,57 @@ final class IntuneReadClient
 
             return array_values($devices);
         } finally {
-            sodium_memzero($token);
+            try {
+                sodium_memzero($token);
+            } catch (\Throwable) {
+            }
         }
     }
 
     private function token(): string
     {
+        $connection = $this->connectedIntegrationConnection();
+        if ($connection !== null) {
+            return $this->tokenForConnection($connection);
+        }
+
         if (! config('endpoint_management.intune.enabled')) {
             throw new RuntimeException('Intune visibility is not configured.');
         }
         $directory = (string) config('endpoint_management.intune.directory_id');
         $client = (string) config('endpoint_management.intune.client_id');
         $secret = (string) config('endpoint_management.intune.client_secret');
+
+        return $this->requestAccessToken($directory, $client, $secret);
+    }
+
+    private function tokenForConnection(IntegrationProviderConnection $connection): string
+    {
+        $config = is_array($connection->config) ? $connection->config : [];
+        $directory = strtolower(trim((string) ($config['directory_id'] ?? '')));
+        $client = strtolower(trim((string) ($config['client_id'] ?? '')));
+        $secrets = $this->secrets ?? app(IntegrationSecretMaterialService::class);
+        $secret = (string) ($secrets->application(
+            $connection,
+            IntegrationSecretManager::PURPOSE_PRIMARY,
+            'client_secret',
+        ) ?? '');
+
+        try {
+            return $this->requestAccessToken($directory, $client, $secret);
+        } finally {
+            try {
+                sodium_memzero($secret);
+            } catch (\Throwable) {
+            }
+        }
+    }
+
+    private function requestAccessToken(
+        string $directory,
+        string $client,
+        #[\SensitiveParameter] string $secret,
+    ): string {
         if (! preg_match(self::UUID, $directory) || ! preg_match(self::UUID, $client) || $secret === '') {
             throw new RuntimeException('Intune read-only connection details are incomplete.');
         }
@@ -83,6 +206,22 @@ final class IntuneReadClient
         }
 
         return $token;
+    }
+
+    private function connectedIntegrationConnection(): ?IntegrationProviderConnection
+    {
+        try {
+            if (IntegrationProviderConnection::getConnectionResolver() === null) {
+                return null;
+            }
+
+            return IntegrationProviderConnection::query()
+                ->forProvider('intune')
+                ->connected()
+                ->first();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function assertPageUrl(string $url): void

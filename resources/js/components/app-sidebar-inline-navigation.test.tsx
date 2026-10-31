@@ -71,7 +71,7 @@ describe('inline application navigation', () => {
     it.each([
         [
             '/operations/workforce-settings?tab=safety',
-            'Workforce settings',
+            'Settings',
             { rostering: { viewAny: true } },
         ],
         [
@@ -81,13 +81,18 @@ describe('inline application navigation', () => {
         ],
         [
             '/operations/qualifications?site_id=3',
-            'Qualifications',
+            'Rostering',
             { rostering: { viewAny: true } },
         ],
         [
             '/operations/qualifications/check/17',
-            'Qualifications',
+            'Rostering',
             { rostering: { viewAny: true } },
+        ],
+        [
+            '/operations/shift-notes?site_id=3',
+            'Handovers',
+            { shifts: { viewAny: true }, rostering: { viewAny: true } },
         ],
     ])(
         'opens only Workforce automatically on %s',
@@ -122,8 +127,14 @@ describe('inline application navigation', () => {
                     ).toHaveAttribute('aria-expanded', 'true'),
                 );
                 expect(operations).toHaveAttribute('aria-expanded', 'false');
+                const workforce = () =>
+                    within(
+                        screen.getByRole('group', {
+                            name: 'Workforce navigation',
+                        }),
+                    );
                 expect(
-                    screen.getByRole('link', { name: label }),
+                    workforce().getByRole('link', { name: label }),
                 ).toHaveAttribute('aria-current', 'page');
                 fireEvent.click(operations);
                 const group = within(
@@ -135,7 +146,7 @@ describe('inline application navigation', () => {
                     group.getByRole('link', { name: 'Dashboard' }),
                 ).not.toHaveAttribute('aria-current');
                 expect(
-                    screen.getByRole('link', { name: label }),
+                    workforce().getByRole('link', { name: label }),
                 ).toHaveAttribute('aria-current', 'page');
             } finally {
                 vi.mocked(usePage).mockReturnValue(original);
@@ -239,11 +250,11 @@ describe('inline application navigation', () => {
             name: 'Security & Devices navigation',
         });
         expect(
-            within(navigation).getByRole('link', { name: 'All devices' }),
+            within(navigation).getByRole('link', { name: 'Devices' }),
         ).toHaveAttribute('aria-current', 'page');
         expect(
-            within(navigation).getByRole('link', { name: 'Network & IT' }),
-        ).toHaveAttribute('href', '/security-devices/network-it');
+            within(navigation).getByRole('link', { name: 'Alerts & upkeep' }),
+        ).toHaveAttribute('href', '/security-devices/monitoring');
         expect(
             screen.queryByRole('button', { name: 'Close menu' }),
         ).not.toBeInTheDocument();

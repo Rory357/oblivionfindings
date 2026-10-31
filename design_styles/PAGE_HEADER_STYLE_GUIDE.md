@@ -148,10 +148,13 @@ Identity, left (13px gap to the mark, 3px stack gap):
      (brand .35). Same family as the loader ring
      (LOADER_STYLE_GUIDE.md).
    - Profile: the record's avatar/initials inside the same ring.
-   - Profile only: a 32px glass **back chip** (radius 10, white/8 fill,
-     white/20 border, chevron-left) sits before the mark.
-2. **Title row**: 22px/700 white title + one `<StatusBadge>`-language
-   chip (e.g. "13 active", "Active") using the status token pair.
+   - Records, pages that belong to one record, documents and full-page
+     forms only: a 32px glass **back chip** (radius 10, white/8 fill,
+     white/20 border, chevron-left) sits before the mark (§11, H3).
+2. **Title row**: 22px/700 white title. Records add one
+   `<StatusBadge>`-language chip with the record's state ("Active") using
+   the status token pair; other pages put a count in the subline or a
+   meter, not a chip (§11, H4).
 3. **Fact subline**: 13px muted (`rgba(255,255,255,.65)`):
    - **Index pages — ONE line**: the page description and/or key facts
      joined with middle dots — e.g. "Occupancy, leads and safety ·
@@ -169,11 +172,13 @@ they are clickable.
 
 Actions, right (36px controls, radius 10):
 
-- **Scoped search field** — ALWAYS inside the header, scoped to the
-  section: "Search sites, regions, leads…" on an index, "Search this
-  site…" on a profile. Glass (white/9 fill, white/18 border), leading
-  search icon, trailing `/` kbd hint. The global ⌘K command search
-  stays in the top bar — the two never merge.
+- **Scoped search field** — inside the header on hubs, lists and
+  workspaces, scoped to the section: "Search sites, regions, leads…".
+  Every other page (records, dashboards, calendars, settings) searches
+  through the rail's Find chip instead (§7, §11 H5). Glass (white/9
+  fill, white/18 border), leading search icon, trailing `/` kbd hint.
+  The global ⌘K command search stays in the top bar — the two never
+  merge.
 - Glass secondary buttons (white/10 fill, white/20 border) — e.g.
   "Select", icon-only chat/edit/overflow chips on profiles.
 - Exactly **one white primary button** (white fill, brand-dark text):
@@ -430,7 +435,29 @@ No full-capsule (`999px`) pills anywhere in the header or sub nav.
    reduced-motion, density.
 
 
-### Frontline phone summary (eMAR audit, 2026-10-04)
+## 11. One header per template (approved by Stephan 2026-10-21 / 22)
+
+The header belongs to the page's template (`PAGE_KIT_STYLE_GUIDE.md` §1), not to the
+page, so pages of the same kind look the same in every module.
+
+| | Rule | What it means |
+|---|---|---|
+| H1 | **Size by template** | Full (title row, up to 6 meters, rail) on hubs, lists and records. Compact (title row and rail, no meters) on every other page; a compact page's numbers lead the body as one tally. |
+| H2 | **One mark** | An initials avatar only when the page is about one person: a person's record and their own "my" pages. Every other page shows its module icon. |
+| H3 | **Back chip** | Only on a record, a page that belongs to one record (its child pages), a document and a full-page form. Never on hubs, lists, dashboards, calendars or settings; their breadcrumbs lead back. |
+| H4 | **Status chip** | Only on records: the record's state after its name. On other pages the words join the subline. |
+| H5 | **Search** | The scoped search field only on hubs, lists and workspaces. Elsewhere the rail's Find chip. |
+| H6 | **Buttons** | One white primary named for what it does, up to two glass buttons, the rest under More. |
+| H7 | **Filters** | At most four filter chips in the filter row (the first is the active scope); the rest fold into one "More filters" chip. |
+| H8 | **A number appears once** | A meter whose count a rail tab already shows is dropped; the tab keeps it. |
+| H9 | **One subline on index pages** | The line under the title stays on one line (about 110 characters); the rest opens the first body block. Records keep their two lines. Privacy, safety and legal wording stays even if it wraps. |
+| H10 | **Six meters at most** | Any more lead the body as one tally, so no number is lost. |
+| H11 | **Nine tabs at most** | Eight tabs and a "More" tab holding the rest; the open tab always stays visible. |
+
+What still varies between pages is real content: whether a page has tabs, filters or
+numbers at all.
+
+## 12. Frontline phone summary
 
 The shared header may receive an explicit `mobileSummary` for a task page on
 phones. The short, truthful count stays visible with a 44 px Details & filters

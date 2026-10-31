@@ -21,6 +21,16 @@ class HrApplication extends Model
         return HrApplicationFactory::new();
     }
 
+    /**
+     * Work-readiness answers from the public apply wizard (all optional).
+     * Labels live in resources/js/lib/job-posting-constants.ts.
+     */
+    public const YEARS_OF_EXPERIENCE = ['none', 'under_1', '1_to_3', '3_plus'];
+
+    public const RIGHT_TO_WORK_STATUSES = ['citizen_or_resident', 'work_visa', 'not_yet'];
+
+    public const DRIVER_LICENCE_CLASSES = ['full', 'restricted', 'none'];
+
     protected $fillable = [
         'tenant_id',
         'candidate_id',
@@ -32,6 +42,10 @@ class HrApplication extends Model
         'cv_storage_path',
         'cv_original_name',
         'cover_letter',
+        'experience_summary',
+        'years_of_experience',
+        'right_to_work_status',
+        'driver_licence_class',
         'screening_answers',
         'candidate_tracking_token',
         'status',
@@ -40,6 +54,10 @@ class HrApplication extends Model
 
     protected $casts = [
         'screening_answers' => 'array',
+        'experience_summary' => 'string',
+        'years_of_experience' => 'string',
+        'right_to_work_status' => 'string',
+        'driver_licence_class' => 'string',
     ];
 
     /* ------------------------------------------------------------------ */

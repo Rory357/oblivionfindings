@@ -15,6 +15,15 @@ class WorkCapacityAssessment extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'source_schema_version',
+        'source_revision',
+        'worker_id',
+        'assessor_user_id',
+        'recorded_by',
+        'attribution_state',
+        'worker_snapshot',
+        'assessor_snapshot',
+        'recorder_snapshot',
         'workplace_injury_id',
         'user_id',
         'assessment_date',
@@ -31,6 +40,11 @@ class WorkCapacityAssessment extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
+        'worker_snapshot' => 'array',
+        'assessor_snapshot' => 'array',
+        'recorder_snapshot' => 'array',
         'assessment_date' => 'date',
         'next_assessment_date' => 'date',
     ];
@@ -65,7 +79,9 @@ class WorkCapacityAssessment extends Model
 
     public function scopeForWorker($query, int $userId)
     {
-        return $query->where('user_id', $userId);
+        return $query->whereHas('workplaceInjury', fn ($injury) => $injury->where('user_id', $userId))->where(function ($tuple) use ($userId): void {
+            $tuple->where('source_schema_version', 0)->orWhere('worker_id', $userId);
+        });
     }
 
     public function scopeFitForFullDuties($query)
@@ -82,5 +98,25 @@ class WorkCapacityAssessment extends Model
     {
         return $query->whereNotNull('next_assessment_date')
             ->where('next_assessment_date', '<=', now());
+    }
+
+    /** Immutable source history; no authority is inherited from this relation. */
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(WorkplaceInjurySourceVersion::class, 'source_id')->where('source_type', 'capacity_assessment');
+    }
+    public function worker(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'worker_id');
+    }
+
+    public function assessor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assessor_user_id');
+    }
+
+    public function recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
     }
 }

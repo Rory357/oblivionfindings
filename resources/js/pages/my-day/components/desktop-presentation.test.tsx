@@ -10,6 +10,7 @@ import { RecordCareActions } from './record-care-actions';
 import { ShiftSummary } from './shift-summary';
 
 vi.mock('@inertiajs/react', () => ({
+    usePage: () => ({ props: { auth: { can: {} } } }),
     Link: ({
         href,
         children,
@@ -75,6 +76,24 @@ function Header({ hasShift = true }: { hasShift?: boolean }) {
 }
 
 describe('My Day desktop presentation', () => {
+    it('holds both clock actions while a break is saving, without blocking timesheet review', () => {
+        const pause = vi.fn();
+        const finish = vi.fn();
+        const review = vi.fn();
+        render(
+            <ShiftSummary
+                clockedIn onBreak={false} hasShift elapsed="1h"
+                canClock canReviewTime breakPending clockActionsBlocked
+                onClock={finish} onToggleBreak={pause} onReviewTime={review}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Saving break…' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Finish shift' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Review my timesheet' }));
+        expect(pause).not.toHaveBeenCalled();
+        expect(finish).not.toHaveBeenCalled();
+        expect(review).toHaveBeenCalledOnce();
+    });
     it('lets a worker choose a named person and work type directly, with the selection visible', () => {
         render(<Header />);
         const forPeople = within(

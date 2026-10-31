@@ -5,6 +5,7 @@ use App\Models\AppSetting;
 use App\Models\OpsConversation;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Chat\ChatInvitations;
 use App\Services\Chat\ChatSettings;
 use App\Services\Operations\OpsMessageVisibilityService;
 use App\Support\SecurityPolicy;
@@ -29,8 +30,8 @@ function chatChannelStaff(Site $site): User
 function chatChannelWith(array $people, array $attributes): OpsConversation
 {
     $conversation = OpsConversation::create(['conversation_type' => 'group', 'title' => 'Kōwhai House'] + $attributes);
-    foreach ($people as $person) {
-        $conversation->participants()->create(['user_id' => $person->id, 'role' => 'member']);
+    foreach ($people as $index => $person) {
+        $conversation->participants()->create(['user_id' => $person->id, 'role' => $index === 0 ? 'admin' : 'member']);
     }
 
     return $conversation;
@@ -52,14 +53,31 @@ it('keeps a Site channel open to its Site when one member now works at another S
         ->getJson(route('chat.messages', $channel))->assertForbidden();
 });
 
-it('still hides a private group whose members the viewer cannot all see', function () {
+it('keeps a private group, and the moved member\'s name, for everyone in it', function () {
     [$kowhai, $rata] = [Site::factory()->create(), Site::factory()->create()];
     [$viewer, $colleague] = [chatChannelStaff($kowhai), chatChannelStaff($kowhai)];
-    $elsewhere = chatChannelStaff($rata);
-    $group = chatChannelWith([$viewer, $colleague, $elsewhere], ['is_managed_channel' => false]);
-    $group->messages()->create(['sender_id' => $colleague->id, 'sender_type' => 'user', 'content' => 'Private plan']);
+    $moved = chatChannelStaff($rata);
+    $group = chatChannelWith([$viewer, $colleague, $moved], ['is_managed_channel' => false]);
+    $group->messages()->create(['sender_id' => $moved->id, 'sender_type' => 'user', 'content' => 'I start at Rātā on Monday']);
 
     test()->actingAs($viewer)->withHeader('X-Chat-Actor', (string) $viewer->id)
-        ->getJson(route('chat.messages', $group))->assertForbidden();
-    expect(app(OpsMessageVisibilityService::class)->unreadCount($viewer))->toBe(0);
+        ->getJson(route('chat.messages', $group))->assertOk()
+        ->assertJsonPath('messages.0.sender_name', $moved->name)
+        ->assertJsonFragment(['id' => $moved->id, 'name' => $moved->name]);
+    expect(app(OpsMessageVisibilityService::class)->unreadCount($viewer))->toBe(1);
+
+    // The person who moved keeps the group too.
+    test()->actingAs($moved)->withHeader('X-Chat-Actor', (string) $moved->id)
+        ->getJson(route('chat.messages', $group))->assertOk();
+});
+
+it('lets members add only people they can see, even when a member has moved Site', function () {
+    [$kowhai, $rata] = [Site::factory()->create(), Site::factory()->create()];
+    [$owner, $colleague, $newcomer] = [chatChannelStaff($kowhai), chatChannelStaff($kowhai), chatChannelStaff($kowhai)];
+    [$moved, $stranger] = [chatChannelStaff($rata), chatChannelStaff($rata)];
+    $group = chatChannelWith([$owner, $colleague, $moved], ['is_managed_channel' => false]);
+    $invitations = app(ChatInvitations::class);
+
+    expect($invitations->eligible($owner, $newcomer, $group))->toBeTrue()
+        ->and($invitations->eligible($owner, $stranger, $group))->toBeFalse();
 });

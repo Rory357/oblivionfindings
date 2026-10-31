@@ -26,7 +26,7 @@ final class EndpointRemoteSessions
 
     private function enabled(): void
     {
-        abort_unless(config('endpoint_management.enabled') && config('endpoint_management.remote_support.enabled'), 404);
+        abort_unless(app(EndpointRemoteSupportSettings::class)->sessionBrokerEnabled(), 404);
     }
 
     /** Read-only connection choices for a scoped technician; policy editing is a separate grant. */
@@ -434,7 +434,7 @@ final class EndpointRemoteSessions
             return false;
         }
         try {
-            abort_unless(config('endpoint_management.enabled') && config('endpoint_management.remote_support.enabled'), 403);
+            abort_unless(app(EndpointRemoteSupportSettings::class)->sessionBrokerEnabled(), 403);
             $this->readyAgent($agent);
             abort_unless((string) $session->agent_uuid === (string) $agent->uuid, 403);
             $policy = $this->policies->current($agent->device);

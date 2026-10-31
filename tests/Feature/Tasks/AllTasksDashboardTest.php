@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Jobs\DispatchIncidentOwnerDelivery;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientIncident;
@@ -10,11 +11,14 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Incidents\IncidentOwnershipService;
 use App\Services\Tasks\TaskAggregator;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -261,14 +265,58 @@ it('gates every provider on the module permission', function () {
 });
 
 it('filters to unassigned items', function () {
-    $user = makeTasksUser(['incidents.viewAny']);
-    $unassigned = makeTasksIncident($user, ['status' => 'submitted', 'investigation_assigned_to' => null]);
-    makeTasksIncident($user, ['status' => 'submitted', 'investigation_assigned_to' => $user->id]);
+    $user = makeTasksUser(['incidents.viewAny', 'incidents.owner.hold']);
+    $unassigned = makeTasksIncident($user, ['status' => 'submitted', 'incident_owner_user_id' => null, 'investigation_assigned_to' => $user->id]);
+    $owned = makeTasksIncident($user, ['status' => 'submitted', 'investigation_assigned_to' => null]);
+    // A raw owner pointer is replacement work, not ownership: assign through the governed owner command.
+    $manager = makeTasksUser(['incidents.viewAny', 'incidents.owner.assign']);
+    scopeAllTasksUserToSite($manager, $owned->site);
+    Bus::fake([DispatchIncidentOwnerDelivery::class]);
+    app(IncidentOwnershipService::class)->assign($manager, $owned, $user->id, 0, (string) Str::uuid(), null);
+    expect((int) $owned->fresh()->incident_owner_user_id)->toBe((int) $user->id);
 
     $this->actingAs($user)
         ->get('/tasks?assigned=unassigned')
         ->assertInertia(fn ($page) => $page
             ->where('items', fn ($items) => collect($items)->pluck('id')->all() === ['incident-'.$unassigned->id]));
+});
+
+it('lists only the viewer\'s own incidents on the My Day "My tasks" card', function () {
+    $user = makeTasksUser(['incidents.viewAny', 'incidents.owner.hold']);
+    $mine = makeTasksIncident($user, ['status' => 'submitted', 'investigation_assigned_to' => null]);
+    $theirs = makeTasksIncident($user, ['status' => 'submitted', 'investigation_assigned_to' => null]);
+    $unowned = makeTasksIncident($user, ['status' => 'submitted', 'incident_owner_user_id' => null, 'investigation_assigned_to' => null]);
+    $colleague = makeTasksUser(['incidents.viewAny', 'incidents.owner.hold']);
+    scopeAllTasksUserToSite($colleague, $mine->site);
+    $manager = makeTasksUser(['incidents.viewAny', 'incidents.owner.assign']);
+    scopeAllTasksUserToSite($manager, $mine->site);
+    Bus::fake([DispatchIncidentOwnerDelivery::class]);
+    app(IncidentOwnershipService::class)->assign($manager, $mine, $user->id, 0, (string) Str::uuid(), null);
+    app(IncidentOwnershipService::class)->assign($manager, $theirs, $colleague->id, 0, (string) Str::uuid(), null);
+    expect((int) $mine->fresh()->incident_owner_user_id)->toBe((int) $user->id)
+        ->and((int) $theirs->fresh()->incident_owner_user_id)->toBe((int) $colleague->id);
+
+    // The viewer can see all three; the card leaves two out only because they are not the viewer's.
+    $allIds = collect([$mine, $theirs, $unowned])->map(fn (ClientIncident $incident) => 'incident-'.$incident->id)->sort()->values()->all();
+    $this->actingAs($user)
+        ->get('/tasks')
+        ->assertInertia(fn ($page) => $page
+            ->where('items', fn ($items) => collect($items)->pluck('id')->sort()->values()->all() === $allIds));
+
+    $this->actingAs($user)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('myTasks.total', 1)
+            ->where('myTasks.items', fn ($items) => collect($items)->pluck('id')->all() === ['incident-'.$mine->id]));
+
+    // The colleague's card shows only theirs.
+    $this->actingAs($colleague)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('myTasks.total', 1)
+            ->where('myTasks.items', fn ($items) => collect($items)->pluck('id')->all() === ['incident-'.$theirs->id]));
 });
 
 it('filters to items due within the week', function () {

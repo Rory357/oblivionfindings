@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { TrainingHero } from '@/components/hr/training-hero';
 import {
     TrainingWizardDialog,
@@ -77,6 +78,8 @@ interface Course {
     cost: number | null;
     is_mandatory: boolean;
     is_active: boolean;
+    /** Its certificates prove first-aid cover, so archiving it needs a warning. */
+    counts_for_first_aid: boolean;
     requires_renewal: boolean;
     validity_period_months: number | null;
     cpd_points: number | null;
@@ -246,6 +249,10 @@ type SheetSession = SheetData['sessions'][number];
 /** TrainingController::cancelSession — reason nullable, max 500. */
 const SESSION_CANCEL_REASON_MAX = 500;
 
+/** NzsAssuranceResolver only counts certificates from active first-aid courses. */
+const FIRST_AID_ARCHIVE_WARNING =
+    "Certificates from this course stop counting towards first-aid cover, so Sites will show first-aid cover as needing action until it's active again.";
+
 export default function TrainingHub({
     summary,
     dashboard,
@@ -284,6 +291,10 @@ export default function TrainingHub({
     const [cancellingSession, setCancellingSession] = useState(false);
     const [assignmentToWaive, setAssignmentToWaive] =
         useState<Assignment | null>(null);
+    const [courseToArchive, setCourseToArchive] = useState<Course | null>(null);
+    // The selection is captured when the bulk confirmation opens.
+    const [bulkArchiveIds, setBulkArchiveIds] = useState<number[] | null>(null);
+    const [archivingCourses, setArchivingCourses] = useState(false);
     const searchRef = useRef<HTMLInputElement>(null);
 
     /* localStorage tab prefs + deep-link */
@@ -322,8 +333,14 @@ export default function TrainingHub({
         const onKey = (e: KeyboardEvent) => {
             const t = (document.activeElement?.tagName ?? '') as string;
             if (e.key === 'Escape') {
-                // The cancel-session and waive dialogs handle their own Escape.
-                if (sessionToCancel || assignmentToWaive) return;
+                // The confirmation and reason dialogs handle their own Escape.
+                if (
+                    sessionToCancel ||
+                    assignmentToWaive ||
+                    courseToArchive ||
+                    bulkArchiveIds
+                )
+                    return;
                 if (wizard) setWizard(null);
                 else if (ctx) setCtx(null);
                 else if (sheetId) setSheetId(null);
@@ -412,11 +429,33 @@ export default function TrainingHub({
     };
 
     /* mutations */
+    // Archive only opens a confirmation (the request is sent from its confirm
+    // button); Activate is sent straight away.
     const toggleArchive = (c: Course) => {
+        if (c.is_active) {
+            setCourseToArchive(c);
+            return;
+        }
         router.patch(
             `/hr/training/courses/${c.id}/toggle`,
             {},
             { preserveScroll: true, onSuccess: () => router.reload() },
+        );
+    };
+    const confirmArchiveCourse = () => {
+        if (courseToArchive === null) return;
+        router.patch(
+            `/hr/training/courses/${courseToArchive.id}/toggle`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setArchivingCourses(true),
+                onSuccess: () => router.reload(),
+                onFinish: () => {
+                    setArchivingCourses(false);
+                    setCourseToArchive(null);
+                },
+            },
         );
     };
     // "Cancel session" opens a dialog with an optional reason; the session is
@@ -493,15 +532,31 @@ export default function TrainingHub({
     const doExport = (type: string) => {
         window.location.href = `/hr/training/export?type=${type}`;
     };
-    const bulkArchive = () => {
+    const bulkArchive = () => setBulkArchiveIds(selected);
+    // Active first-aid courses in the selection; archiving them drops cover.
+    const bulkFirstAidTitles = courses
+        .filter(
+            (c) =>
+                bulkArchiveIds?.includes(c.id) &&
+                c.is_active &&
+                c.counts_for_first_aid,
+        )
+        .map((c) => c.title);
+    const confirmBulkArchive = () => {
+        if (bulkArchiveIds === null) return;
         router.post(
             '/hr/training/courses/bulk-archive',
-            { course_ids: selected, active: false },
+            { course_ids: bulkArchiveIds, active: false },
             {
                 preserveScroll: true,
+                onStart: () => setArchivingCourses(true),
                 onSuccess: () => {
                     setSelected([]);
                     router.reload();
+                },
+                onFinish: () => {
+                    setArchivingCourses(false);
+                    setBulkArchiveIds(null);
                 },
             },
         );
@@ -1076,6 +1131,10 @@ export default function TrainingHub({
                                                 <GuardrailButton
                                                     unstyled
                                                     type="button"
+                                                    aria-label={`Select ${c.title}`}
+                                                    aria-pressed={selected.includes(
+                                                        c.id,
+                                                    )}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setSelected((s) =>
@@ -1116,6 +1175,7 @@ export default function TrainingHub({
                                                 <GuardrailButton
                                                     unstyled
                                                     type="button"
+                                                    aria-label={`Actions for ${c.title}`}
                                                     onClick={(e) =>
                                                         courseCtx(c, e)
                                                     }
@@ -1944,6 +2004,91 @@ export default function TrainingHub({
                 confirmLabel="Waive training"
                 destructive
                 onConfirm={submitWaive}
+            />
+
+            {/* ───────── ARCHIVE COURSES ───────── */}
+            <ConfirmDialog
+                open={courseToArchive !== null}
+                onClose={() => {
+                    if (!archivingCourses) setCourseToArchive(null);
+                }}
+                onConfirm={confirmArchiveCourse}
+                title="Archive this course?"
+                description={
+                    <div className="space-y-2">
+                        <p>
+                            <span className="font-medium text-foreground">
+                                {courseToArchive?.title}
+                            </span>{' '}
+                            is marked inactive. It stays in the catalogue, and
+                            its sessions, assignments and training records are
+                            kept. New starters are no longer enrolled in it
+                            during induction.
+                        </p>
+                        {courseToArchive?.counts_for_first_aid ? (
+                            <p>{FIRST_AID_ARCHIVE_WARNING}</p>
+                        ) : null}
+                        <p>You can activate it again from its menu.</p>
+                    </div>
+                }
+                confirmText="Archive course"
+                variant="destructive"
+                processing={archivingCourses}
+            />
+            <ConfirmDialog
+                open={bulkArchiveIds !== null}
+                onClose={() => {
+                    if (!archivingCourses) setBulkArchiveIds(null);
+                }}
+                onConfirm={confirmBulkArchive}
+                title={
+                    bulkArchiveIds?.length === 1
+                        ? 'Archive 1 course?'
+                        : `Archive ${bulkArchiveIds?.length ?? 0} courses?`
+                }
+                description={
+                    bulkArchiveIds?.length === 1 ? (
+                        <div className="space-y-2">
+                            <p>
+                                The selected course is marked inactive. It stays
+                                in the catalogue, and its sessions, assignments
+                                and training records are kept. New starters are
+                                no longer enrolled in it during induction.
+                            </p>
+                            {bulkFirstAidTitles.length > 0 ? (
+                                <p>{FIRST_AID_ARCHIVE_WARNING}</p>
+                            ) : null}
+                            <p>You can activate it again from its menu.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <p>
+                                The {bulkArchiveIds?.length ?? 0} selected
+                                courses are marked inactive. They stay in the
+                                catalogue, and their sessions, assignments and
+                                training records are kept. New starters are no
+                                longer enrolled in them during induction.
+                            </p>
+                            {bulkFirstAidTitles.length > 0 ? (
+                                <p>
+                                    {bulkFirstAidTitles.length === 1
+                                        ? `${bulkFirstAidTitles[0]} counts towards first-aid cover. Its certificates stop counting, so Sites will show first-aid cover as needing action until it's active again.`
+                                        : `${bulkFirstAidTitles.join(', ')} count towards first-aid cover. Their certificates stop counting, so Sites will show first-aid cover as needing action until they're active again.`}
+                                </p>
+                            ) : null}
+                            <p>
+                                You can activate each one again from its menu.
+                            </p>
+                        </div>
+                    )
+                }
+                confirmText={
+                    bulkArchiveIds?.length === 1
+                        ? 'Archive course'
+                        : 'Archive courses'
+                }
+                variant="destructive"
+                processing={archivingCourses}
             />
         </AppLayout>
     );

@@ -305,7 +305,7 @@ describe('FacilitiesWorkspacePanels', () => {
 
         expect(
             screen.getByRole('heading', {
-                name: 'Canonical facility history',
+                name: 'Facility history',
             }),
         ).toBeInTheDocument();
         expect(
@@ -318,6 +318,31 @@ describe('FacilitiesWorkspacePanels', () => {
             'href',
             '/security-devices/reports/events.csv?domain=facilities',
         );
+    });
+
+    it('renders active attention filter banner and matching devices on overview', () => {
+        render(
+            <FacilitiesWorkspacePanels
+                data={withTab('overview', {
+                    attentionFilter: {
+                        key: 'device-attention',
+                        label: 'Facility devices requiring attention',
+                    },
+                    devices: [device],
+                })}
+            />,
+        );
+
+        expect(screen.getByText(/Filtered to:/)).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: 'Clear attention filter' }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/facilities-iot?tab=overview',
+        );
+        expect(
+            screen.getByRole('link', { name: 'Kauri cool room sensor' }),
+        ).toBeInTheDocument();
     });
 });
 

@@ -78,7 +78,7 @@ export function SignalRail({
                     <h3 className="text-sm font-bold tracking-tight">
                         Needs you
                     </h3>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
                         {signals.length}
                     </span>
                 </header>
@@ -109,10 +109,10 @@ export function SignalRail({
                                         <span className="block text-xs leading-tight font-semibold text-foreground">
                                             {s.title}
                                         </span>
-                                        <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                                        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                                             {s.body}
                                         </span>
-                                        <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
+                                        <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary">
                                             {s.cta}
                                             <span aria-hidden="true">→</span>
                                         </span>
@@ -162,7 +162,7 @@ export function SignalRail({
                                     className="flex items-center gap-2.5"
                                 >
                                     <span
-                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold uppercase"
+                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
                                         style={avatarHueStyle(row.hue)}
                                     >
                                         {row.initials}
@@ -184,7 +184,7 @@ export function SignalRail({
                                             }}
                                         />
                                     </span>
-                                    <span className="w-8 text-right text-[11px] font-semibold text-muted-foreground tabular-nums">
+                                    <span className="w-8 text-right text-xs font-semibold text-muted-foreground tabular-nums">
                                         {row.hours}h
                                     </span>
                                 </li>

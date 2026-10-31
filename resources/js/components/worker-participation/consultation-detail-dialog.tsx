@@ -53,6 +53,7 @@ import {
     type FormEvent,
     type ReactNode,
 } from 'react';
+import { ParticipationOwnershipNotice } from './ownership-notice';
 
 /* ------------------------------------------------------------------ */
 /*  Local tokens (dialog uses shared CONSULT_STATUS + a tiny dot map)   */
@@ -105,7 +106,10 @@ export function ConsultationDetailDialog({
     const [action, setAction] = useState<WpDetailAction | null>(initialAction);
     const d = detail;
 
-    const st = CONSULT_STATUS[d.status] ?? CONSULT_STATUS.open;
+    const st = CONSULT_STATUS[d.status] ?? {
+        tone: 'neutral' as const,
+        label: d.status || 'Status not recorded',
+    };
     const closed = d.status === 'closed';
     const docs = (d.document_path ? 1 : 0) + (d.outcome_document_path ? 1 : 0);
 
@@ -189,7 +193,7 @@ export function ConsultationDetailDialog({
             description={`${consultationTypeLabel(d.consultation_type)} · ${st.label}`}
             railIcon={MessageSquare}
             railTitle={d.title}
-            railSub={`${consultationTypeLabel(d.consultation_type)} · ${d.site?.name ?? 'All sites'}`}
+            railSub={`${consultationTypeLabel(d.consultation_type)} · ${d.site?.name ?? 'Site not recorded'}`}
             steps={SECTIONS}
             stepIndex={stepIndex}
             onStepClick={(i) => {
@@ -199,6 +203,7 @@ export function ConsultationDetailDialog({
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
+            <ParticipationOwnershipNotice state={d.site_ownership} />
             {action === 'edit' ? (
                 <EditPane d={d} onDone={() => setAction(null)} />
             ) : action === 'feedback' ? (
@@ -312,7 +317,29 @@ function OverviewSection({
 
 function LifecycleSection({ d }: { d: ConsultationDetail }) {
     const currentIdx = CONSULT_STAGES.findIndex((s) => s.key === d.status);
-    const idx = d.stage_index ?? (currentIdx >= 0 ? currentIdx : 0);
+    if (currentIdx < 0) {
+        return (
+            <div className="flex flex-col gap-3">
+                <p className="text-subtle">Lifecycle stage not confirmed</p>
+                <DetailNote
+                    icon={MessageSquare}
+                    title="Worker feedback"
+                    body={d.worker_feedback_summary}
+                />
+                <DetailNote
+                    icon={FileCheck2}
+                    title="Outcome"
+                    body={d.outcome}
+                />
+                <DetailNote
+                    icon={ListChecks}
+                    title="Changes made"
+                    body={d.changes_made}
+                />
+            </div>
+        );
+    }
+    const idx = d.stage_index ?? currentIdx;
 
     return (
         <div className="flex flex-col gap-5">
@@ -953,7 +980,7 @@ function ClosePane({
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                         {consultationTypeLabel(d.consultation_type)} ·{' '}
-                        {d.site?.name ?? 'All sites'} ·{' '}
+                        {d.site?.name ?? 'Site ownership not confirmed'} ·{' '}
                         {fmtDate(d.consultation_date)}
                     </p>
                 </div>

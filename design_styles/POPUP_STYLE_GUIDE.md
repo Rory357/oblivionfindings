@@ -4,22 +4,104 @@ Every modal popup in Oblivion Findings — create dialogs, edit dialogs, confirm
 dialogs, detail viewers — follows the same look-and-feel so users can recognise
 them instantly. There are **two tiers** of dialog, and every popup is one of them:
 
-1. **Simple dialog** — one screen of fields, or a confirmation/detail viewer.
-   Reference implementations:
-   [`resources/js/pages/sites/contacts/_dialogs.tsx`](../resources/js/pages/sites/contacts/_dialogs.tsx)
-   (Site Contact dialogs) and
-   [`resources/js/pages/Governance/Resolutions/_dialogs.tsx`](../resources/js/pages/Governance/Resolutions/_dialogs.tsx)
-   (New Resolution dialog).
+1. **Simple dialog** — one screen of fields, or a confirmation/detail viewer,
+   built on the shared `Dialog` primitives and `ConfirmDialog`.
 2. **Entity wizard dialog** — the `WizardShell` multi-step modal (stepper rail,
    step header, progress strip, completeness meter, success pane). **This is the
    default for adding and editing entity records** — sites, clients, staff,
    assets, incidents, risk assessments, and anything else with more than one
-   section of fields. Reference implementations:
-   [`resources/js/components/clients/add-client-dialog.tsx`](../resources/js/components/clients/add-client-dialog.tsx)
-   (the original contract) and
-   [`resources/js/components/sites/add-site-dialog.tsx`](../resources/js/components/sites/add-site-dialog.tsx).
+   section of fields. Built on `WizardShell`
+   (`components/wizard/shell.tsx`).
 
 When you build a new popup, follow this guide.
+
+**Slate look (approved by Stephan 2026-10-20).** Every pop-up uses the
+Slate palette in DESIGN.md: white surface (dark `#1E293B`) with a
+`#E2E8F0` border and a soft shadow, a `#F1F5F9` footer band and nested
+sections (dark `#273449`), muted text `#475569`, brand tint `#F3EEFF` for
+selected tiles and the active wizard step, and the flatter Slate buttons.
+Widths stay 480 / 720 / 900 / 1100 (wizards 1100) — never others. Every
+template is drawn in light and dark on the "Oblivion colours & look"
+canvas (claude.ai/artifact/CPsdrsDkwjpYwscYf8jHbY), page 3:
+- wizard: step, review with Edit links, step with an error, success,
+  "Discard this draft?", the narrow-screen strip;
+- form at each width, with an error and while saving;
+- confirm, delete confirm and confirm with a reason;
+- file preview and its states, read-only detail, settings pop-up and
+  edit side panel;
+- pickers, menus, Ctrl K, notifications and the user menu.
+
+Page 4 is the date and time pickers, and pages 8–9 show all 1,539
+pop-ups in the app on these templates.
+
+## The pop-up kit — 8 types, 21 blocks, 4 widths (approved by Stephan 2026-10-20)
+
+Every overlay in the app is one of eight types, built from the same blocks, at one
+of four widths. A new module brings its own words and fields, never a new frame,
+width or button order. The two tiers below are the kit's two most common types:
+the simple dialog is the **Form**, and `WizardShell` is the **Wizard**. Drawn in
+light and dark in the design viewer (The pop-up kit:
+claude.ai/artifact/S2FWVebvqtxrVL5LHahzHy).
+
+| Type | Use for | Width (fixed) |
+|---|---|---|
+| **Wizard** | A main record with 3 or more sections, or more than about 12 fields | 1100 only |
+| **Form** | Every other add, edit, record or send | 480 (up to 3 fields) · 720 (up to about 10) · 900 (sections inside) |
+| **Confirm** | Yes / no: plain, destructive, with a reason, or a one-button notice | 480 |
+| **Viewer** | A read-only record, event or file | 480 · 720 · 900 |
+| **Side panel** | Look at or manage a record beside the list you keep working in | 480 · 640, from the right |
+| **Settings** | Switch rows and config cards (the Fleet settings pattern) | 720 (900 for who-gets-what tables) |
+| **Picker & menu** | Search pickers; one item list shared by the ⋮ menu and right-click | Popover |
+| **Toast & selection bar** | "It worked", with Undo; act on ticked rows | — |
+
+**Which type: ask in this order.**
+1. Yes / no → Confirm.
+2. Read-only → Viewer.
+3. Beside a list you keep working in → Side panel.
+4. A setting → Settings.
+5. A main record with 3+ sections or 12+ fields → Wizard.
+6. Anything else → Form, sized by field count.
+
+A one-step wizard is a Form. A wizard rail used as tabs is a Side panel. No other
+width exists: never 440, 560, 600, 640 (except the side panel), 760, `max-w-*` or
+`92vw` variants.
+
+**The 21 blocks.** Every pop-up is assembled only from these:
+- header (icon in its lens, title, one line, ✕) · context row (a locked parent, read-only) · callout · section;
+- text field · choose & numbers · date & time (the approved pickers only) · choice tiles · segmented choice · chips · switch & tick · people;
+- upload (always the shared drop zone) · repeating rows · step rail · review card · success;
+- footers (form, wizard, destructive, viewer) · "Discard this draft?";
+- states (loading, couldn't load, no access, nothing yet) · saving.
+
+**Words.**
+- Sentence case.
+- The title is verb + thing ("Add risk"). Use "Add …" for a new record; the verb rules are in `WRITING_STYLE_GUIDE.md`.
+- The one line under the title says what will happen.
+- A confirm asks a question that names the thing ("Delete document?").
+- The main button names the action ("Save risk"), never "Submit" or "OK".
+- Cancel comes first and the main button last, on the right.
+- "Delete" means gone for good. "Remove" means it stays in history.
+- One wording for the discard guard everywhere: "Discard this draft?".
+
+**Colour.** Red (destructive) only when data is destroyed or a safety check is
+loosened (pausing an alert, marking a check "not required"). Resolving,
+recording, approving and agreeing stay plain. So do actions that keep the record
+in history: cancel, reverse, archive and close.
+
+**Behaviour every pop-up keeps.**
+- Closing with unsaved typing asks "Discard this draft?".
+- Every upload is the shared drop zone.
+- Dates and times only through the approved pickers.
+- A required reason is required in the confirm itself.
+- When the server enforces separation of duties (approver ≠ creator), the confirm says so.
+- Pop-ups used to record on shift (doses, checks, handovers, incidents) use the frontline size: 44 px targets.
+- Safety, privacy, consent and legal wording is kept word for word; the kit changes the frame, never that text.
+- No browser `alert()`, `confirm()` or `prompt()`.
+- No button for a feature that isn't built.
+
+**Tokens only.** Pop-ups read design tokens (`--card`, `--border`, `--primary`,
+the status pairs). Change a token or a block once and every pop-up follows. Never
+put a hex value or a raw palette class in a pop-up.
 
 ## When to use which
 
@@ -32,9 +114,8 @@ When you build a new popup, follow this guide.
 
 Do **not** send a long or multi-step form to a full page any more — that was
 the old rule from before `WizardShell` existed. New create/edit flows for
-entity records are wizard dialogs opened from the index page. (The remaining
-full-page wizards — e.g. `pages/sites/create.tsx` / `edit.tsx` on the legacy
-`wizard-stepper` — are migration targets, not precedents.)
+entity records are wizard dialogs opened from the index page. Remaining
+full-page wizards are migration targets, not precedents.
 
 ## Entity wizard dialogs (WizardShell)
 
@@ -267,6 +348,60 @@ Picker rules:
 - Active state uses **primary** ring + tint, never status colours (a "selected"
   tile is not warning/critical).
 - `aria-pressed` on every tile.
+
+## Dropdowns — modern, and searchable when the list is long (Stephan 2026-10-26)
+
+Applies to every dropdown in the app: pop-ups, page filters, settings and forms.
+
+**Pick the control by the number of choices.**
+
+| Choices | Control |
+|---|---|
+| 2–4 fixed choices | Segmented choice, or choice tiles when each needs a line of explanation |
+| 5–7 fixed choices | A dropdown (no search needed) |
+| 8 or more, or a list that can grow | **A searchable dropdown** |
+| Several at once | The multi-select combobox (chips in the field, searchable list) |
+| Existing records (people, clients, Sites, vehicles, assets, accounts, suppliers) | A searchable record selector — the rules in the next section |
+
+A list "can grow" when it comes from data or settings, not from code: categories,
+codes, templates, accounts, teams, roles, countries. Those are always
+searchable, even if they are short today.
+
+**The modern look (every dropdown, searchable or not).**
+- The trigger is the same height, radius, border and focus ring as a text field.
+  It shows the chosen option, or a muted placeholder such as "Choose a category", with a chevron on the right.
+- The open list is a popover on `--popover`, with the hairline border and soft shadow, at least the trigger's width (min 240 px).
+  It is at most about 320 px tall and scrolls inside.
+- Options are comfortable rows (32–36 px):
+  - a leading icon, colour dot or avatar only when it helps tell options apart;
+  - a muted second line for extra detail;
+  - a tick on the selected option.
+- Long lists can be grouped under small muted headings. Put a short "Recent" or "Suggested" group first when it helps.
+- Disabled options say why, in their second line.
+
+**Searchable dropdowns also have:**
+- A search box at the top of the open list, focused as it opens ("Search categories…").
+- Matching on the option's name and any useful code. Results narrow as you type.
+- A quiet "No matches" line, with "Clear search" if useful. Never an empty white box.
+- Keyboard support: type to search, arrows to move, Enter to choose. Escape closes the list only; it never closes the pop-up or discards the form.
+- No custom value unless the field allows one. Then "Add “…”" is the last row, and it never auto-selects the first match.
+
+**Lists people can add to** (configurable catalogues such as types, purposes,
+categories and presets):
+- Search the existing values first, then offer a clearly labelled "Add “…”".
+- A new value is trimmed and given tidy spacing, a duplicate in different case is refused, and length is limited. Errors say why.
+- The new value is selectable straight away and in every future use of the list.
+- Adding to the list is its own action, separate from saving the form. If the new value survives cancelling the form, say so.
+- A field that must point to a real record (a person, client, Site, vehicle or provider) never accepts free text. Creating such a record belongs to its own workflow.
+- Small fixed lists (status, yes / no, answer type) never gain new values.
+- Review steps show readable names, never bare IDs.
+
+**Build it once.** Build on the shared `Popover` + `Command` primitives
+(`components/ui/popover.tsx`, `components/ui/command.tsx`), with the same look as
+`MultiSelectCombobox`.
+- One shared single-select searchable dropdown lives in `components/ui/`. A module never builds its own.
+- New work does not use a native `<select>`.
+- The Radix `Select` stays only for the short fixed lists in the table above.
 
 ## Searchable record selectors
 
@@ -712,23 +847,3 @@ final check.
 - [ ] `preserveScroll` and `preserveState` set on the Inertia request.
 - [ ] Trigger button gated by permission.
 - [ ] Accessible (`DialogTitle`, `DialogDescription`, `aria-label`, `aria-pressed`).
-
-# User-authorized catalog and interval amendment · 22 September 2026
-
-Apply this alongside the searchable record-selector contract below. Use shared Popover + Command controls for growing configurable catalogs such as service types, checklist purposes and interval presets. Search existing values before offering a clearly labelled **Add custom: [value]** action; preserve the selected value, trim/normalize input, reject duplicates and invalid numeric values, and support keyboard selection. Creation must be explicit and permission-aware, with a returned catalog identity and audit trail in the implemented application. A prototype may demonstrate local creation if it clearly states that scope.
-
-This is not a blanket free-text substitute for existing-record relationships. Staff, clients, vehicles, sites and providers must resolve to permitted canonical records. Creating such a record requires its owning workflow and appropriate permission. Small fixed enums (status, yes/no, answer type) remain concise selects or choices; do not add arbitrary custom approval states.
-
-Service recurrence uses **calendar months**, not a fixed conversion to days. Offer searchable month presets and positive whole-number custom months; clamp month-end recurrence to the target month's last valid date. Offer distance presets plus a positive custom kilometre interval. Either trigger may apply; show both and say which is first due. Recalculate suggested next triggers from actual completion date/odometer and require review. Reminder lead times may still use days because they represent offsets rather than service recurrence.
-
-Every structured form must show meaningful initial choices, concise guidance, optional/required state, validation and a useful review. Preserve selected custom values through step changes and retry. Do not leave large blank free-text fields where users should choose a known catalog option. Keep the shared wizard rail/header/footer contract and avoid nested scrolling in the page body.
-
-## User-requested catalogue and document follow-up · PKG-02B v7
-
-An explicit Add new action must return a selectable value and make it available in future uses of the same catalogue. Normalize whitespace, reject case-insensitive duplicates, bound name length, and surface creation/storage errors. Preserve optional-field identity: changing a label to include “optional” must not create a separate catalogue. Do not save arbitrary search text automatically. A local mockup may use browser persistence when it states that scope; the application uses canonical IDs, central persistence, creation history and catalogue-management permission.
-
-Catalogue creation and form save are separate actions. If creating a catalogue entry survives cancelling the parent form, make that behavior clear. Report-only users choose existing options and can explain an unlisted concern in notes; controlled approval/lifecycle enums do not gain arbitrary new states. Person/provider/Finance relationships use the owning record workflow.
-
-Vehicle document forms must support the actual files, classification, reference, optional expiry, version replacement and a visible source owner. Offer a renewal reminder where useful. Preserve original files and require an archive reason. Flag conflicts between a document expiry and profile metadata rather than silently replacing one with the other. Reuse existing evidence by reference where possible.
-
-Review steps show readable record names, not only opaque IDs. Finance handoffs show the source, evidence, receiving owner and pending status; editing a vehicle or completing work does not approve or post Finance transactions.

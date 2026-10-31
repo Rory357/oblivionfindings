@@ -14,7 +14,7 @@ import Maintenance, {
 } from './maintenance';
 const mocks = vi.hoisted(() => ({
     actor: 7,
-    can: {} as Record<string, boolean>,
+    can: {} as Record<string, Record<string, boolean>>,
     get: vi.fn(),
     post: vi.fn(),
     reload: vi.fn(),
@@ -190,9 +190,11 @@ const ownerPage = () => ({
 beforeEach(() => {
     mocks.actor = 7;
     mocks.can = {
-        'securityDevices.maintenance.view': true,
-        'securityDevices.maintenance.manage': true,
-        'securityDevices.devices.view': true,
+        securityDevices: {
+            maintenanceView: true,
+            maintenanceManage: true,
+            devicesView: true,
+        },
     };
     for (const name of ['get', 'post', 'reload', 'visit'] as const)
         mocks[name].mockReset();
@@ -202,6 +204,95 @@ afterEach(() => {
     vi.useRealTimers();
 });
 describe('Maintenance shared work records and completion review', () => {
+    it('withholds retained work after current nested maintenance-view authority is withdrawn', () => {
+        const workspace = maintenanceFixture();
+        const ui = render(<Maintenance workspace={workspace} />);
+        expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
+        mocks.can.securityDevices.maintenanceView = false;
+        ui.rerender(<Maintenance workspace={workspace} />);
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Calibrate synthetic pump'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('does not rebind retained private work when auth and response actor metadata change together', async () => {
+        const workspace = maintenanceFixture();
+        workspace.filters.search = 'WO-42';
+        const ui = render(<Maintenance workspace={workspace} />);
+        await openReview();
+        checked();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Record completion' }),
+        );
+        const cancel = vi.fn();
+        callbacks().onCancelToken({ cancel });
+        mocks.actor = 8;
+        ui.rerender(<Maintenance workspace={{ ...workspace, actor_id: 8 }} />);
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryAllByRole('article')).toHaveLength(0);
+        expect(
+            screen.queryByText('Calibrate synthetic pump'),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText('Clinical Site')).not.toBeInTheDocument();
+        expect(screen.getByRole('searchbox')).toHaveValue('');
+        act(() => callbacks().onSuccess(ownerPage()));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.getAllByText('Restricted').length).toBeGreaterThan(0);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.get).toHaveBeenCalledWith(
+            '/security-devices/maintenance',
+            {},
+            { preserveState: false, preserveScroll: true },
+        );
+        expect(mocks.reload).not.toHaveBeenCalled();
+        expect(mocks.post).toHaveBeenCalledTimes(1);
+        ui.unmount();
+        const current = maintenanceFixture();
+        current.actor_id = 8;
+        current.records = [
+            {
+                ...current.records[0],
+                description: 'Current actor permitted work',
+            },
+        ];
+        render(<Maintenance workspace={current} />);
+        expect(
+            screen.getByText('Current actor permitted work'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('Calibrate synthetic pump'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('uses a complete read after current maintenance-view authority is withdrawn', () => {
+        const workspace = maintenanceFixture();
+        workspace.filters.search = 'WO-42';
+        const ui = render(<Maintenance workspace={workspace} />);
+        mocks.can.securityDevices.maintenanceView = false;
+        ui.rerender(<Maintenance workspace={workspace} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.get).toHaveBeenCalledWith(
+            '/security-devices/maintenance',
+            {},
+            { preserveState: false, preserveScroll: true },
+        );
+        expect(mocks.reload).not.toHaveBeenCalled();
+        expect(mocks.post).not.toHaveBeenCalled();
+    });
+
+    it('keeps an ordinary same-actor header refresh as a partial read', () => {
+        render(<Maintenance workspace={maintenanceFixture()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(mocks.reload).toHaveBeenCalledWith({
+            only: ['workspace', 'auth'],
+            onSuccess: expect.any(Function),
+        });
+        expect(mocks.get).not.toHaveBeenCalled();
+        expect(mocks.post).not.toHaveBeenCalled();
+    });
+
     it('retains exact identifiers, all original safe fields and NZ calendar/completion dates in full details', async () => {
         render(<Maintenance workspace={maintenanceFixture()} />);
         expect(screen.getByText('Work reference WO-42')).toBeInTheDocument();
@@ -487,8 +578,8 @@ describe('Maintenance shared work records and completion review', () => {
         const workspace = maintenanceFixture();
         const view = render(<Maintenance workspace={workspace} />);
         await openReview();
-        mocks.can['securityDevices.maintenance.manage'] = false;
-        mocks.can['securityDevices.devices.view'] = false;
+        mocks.can.securityDevices.maintenanceManage = false;
+        mocks.can.securityDevices.devicesView = false;
         view.rerender(<Maintenance workspace={workspace} />);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(
@@ -547,6 +638,14 @@ describe('Maintenance shared work records and completion review', () => {
                     'Completion is no longer permitted in this scope. Refresh Maintenance for current access.',
                 ),
             ).toBeInTheDocument();
+            expect(mocks.post).toHaveBeenCalledTimes(1);
+            fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+            expect(mocks.get).toHaveBeenCalledWith(
+                '/security-devices/maintenance',
+                {},
+                { preserveState: false, preserveScroll: true },
+            );
+            expect(mocks.reload).not.toHaveBeenCalled();
             expect(mocks.post).toHaveBeenCalledTimes(1);
         },
     );
