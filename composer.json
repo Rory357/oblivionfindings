@@ -83,7 +83,17 @@
             "@php artisan test"
         ],
         "test:prepare": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv DB_DATABASE=oblivion_findings_codex_test_snapshot",
             "@php artisan testing:prepare-schema --env=testing"
+        ],
+        "test:fast": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php scripts/test/fast.php"
+        ],
+        "test:changed": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php scripts/test/changed.php"
         ],
         "test:unit": [
             "@php artisan test --testsuite=Unit"

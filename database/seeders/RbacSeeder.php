@@ -710,9 +710,12 @@ class RbacSeeder extends Seeder
             // Own-site operations dashboard; OperationsPermissionsSeeder creates the key
             // and grants it on a fresh install, this keeps it on a reseed (20 Oct 2026).
             'operations.dashboard.view',
-            // Read the H&S Overview and Safety reviews for their own Sites (Stephan, 30 Oct, option A). Reading only;
-            // Site scope still applies. Grant migration: 2026_10_30_120000_grant_provider_manager_hazards_view.
+            // Read the H&S Overview and Safety reviews for their own Sites (Stephan, 30 Oct, option A). Site scope still
+            // applies. Grant migration: 2026_10_30_120000_grant_provider_manager_hazards_view.
             'hazards.view',
+            // Take on and act on H&S items at their own Sites, H&S items only, no restraint access (Stephan, Q4, 31 Oct).
+            // Grant migration: 2026_10_31_220000_grant_provider_manager_hazards_manage. No restraint keys (see below).
+            'hazards.manage',
             'fleet.viewAny', 'fleet.manage', 'fleet.driverSessions.manage', 'fleet.signals.view', 'fleet.trips.manage',
             'fleet.fuel.manage', 'fleet.reports.view', 'fleet.bookings.approve', 'fleet.incidents.manage',
             'fleet.maintenance.manage', 'fleet.medication.manage', 'fleet.mileage.approve', 'fleet.outings.manage',
@@ -1111,13 +1114,16 @@ class RbacSeeder extends Seeder
             'hazards.create' => ['restraints.view', 'restraints.create'],
             'hazards.manage' => ['restraints.view', 'restraints.create', 'restraints.manage', 'restraints.review'],
         ];
+        // Provider managers act on H&S items at their sites with no restraint access (Stephan, Q4, 31 Oct 2026), so
+        // their hazards keys never copy restraint keys. This matches live, where they hold none.
+        $noRestraintCopy = Role::whereIn('name', ['provider_manager'])->pluck('id')->all();
         foreach ($restraintGrantMap as $hazardKey => $grantKeys) {
             $hazard = Permission::where('key', $hazardKey)->first();
             if (! $hazard) {
                 continue;
             }
             $grantIds = Permission::whereIn('key', $grantKeys)->pluck('id')->all();
-            foreach ($hazard->roles()->pluck('roles.id')->all() as $roleId) {
+            foreach (array_diff($hazard->roles()->pluck('roles.id')->all(), $noRestraintCopy) as $roleId) {
                 Role::find($roleId)?->permissions()->syncWithoutDetaching($grantIds);
             }
         }

@@ -326,21 +326,21 @@ export default function HsEventsIndex({
         },
         {
             id: 'investigating',
-            label: 'Investigating',
+            label: hsLabel('review_status', 'investigating'),
             icon: Search,
             tone: 'primary',
             badge: tabCounts.investigating || undefined,
         },
         {
             id: 'corrective_actions',
-            label: 'Corrective actions',
+            label: hsLabel('review_status', 'corrective_action'),
             icon: ListChecks,
             tone: 'warning',
             badge: tabCounts.corrective_actions || undefined,
         },
         {
             id: 'handover',
-            label: 'Awaiting handover',
+            label: 'Waiting to be taken on',
             icon: ShieldCheck,
             tone: 'warning',
             badge: tabCounts.handover || undefined,
@@ -354,7 +354,7 @@ export default function HsEventsIndex({
         },
         {
             id: 'monitoring',
-            label: 'Monitoring',
+            label: hsLabel('review_status', 'monitoring'),
             icon: Activity,
             tone: 'success',
             badge: tabCounts.monitoring || undefined,
@@ -539,21 +539,21 @@ export default function HsEventsIndex({
             key: 'handover',
             label: 'Handover to accept',
             value: at.handover_due,
-            caption: 'Waiting for Health & safety',
+            caption: hsLabel('handover_status', 'awaiting_acceptance'),
         },
     ];
     const tableTitle =
         {
             all: 'All safety reviews',
             open: 'Open safety reviews',
-            investigating: 'Under investigation',
-            corrective_actions: 'In corrective action',
-            handover: 'Awaiting H&S acceptance',
+            investigating: hsLabel('review_status', 'investigating'),
+            corrective_actions: hsLabel('review_status', 'corrective_action'),
+            handover: hsLabel('handover_status', 'awaiting_acceptance'),
             worksafe: 'WorkSafe-notifiable',
-            monitoring: 'Monitoring',
+            monitoring: hsLabel('review_status', 'monitoring'),
             closed: 'Closed safety reviews',
             investigation_due: 'Investigation needed',
-            awaiting_verification: 'Actions awaiting verification',
+            awaiting_verification: 'Actions waiting to be checked',
             worksafe_pending: 'WorkSafe pending',
         }[tab] ?? 'Safety reviews';
     const showOrphanNote =
@@ -564,7 +564,7 @@ export default function HsEventsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Health and safety', href: '/health-safety' },
                 { title: 'Safety reviews', href: '/health-safety/events' },
             ]}
         >
@@ -1002,7 +1002,7 @@ function reviewWhere(ev: EventRow): {
     const worksafe = worksafeState(ev);
     const waits: string[] = [];
     if (ev.handover.status === 'awaiting_acceptance')
-        waits.push('Waiting for Health & safety');
+        waits.push(hsLabel('handover_status', 'awaiting_acceptance'));
     if (ev.status !== 'closed')
         waits.push(`WorkSafe: ${worksafeLabel(worksafe)}`);
     if (ev.flags.investigation_overdue) waits.push('Investigation overdue');
@@ -1211,10 +1211,10 @@ export function EventTable({
                                 <FlagBadge
                                     icon={ShieldCheck}
                                     tone="warning"
-                                    title="Actions awaiting verification"
+                                    title="Actions waiting to be checked"
                                 >
-                                    {ev.flags.awaiting_verification} awaiting
-                                    verification
+                                    {ev.flags.awaiting_verification} waiting to
+                                    be checked
                                 </FlagBadge>
                             )}
                             {ev.has_open_actions && (

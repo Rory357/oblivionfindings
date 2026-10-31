@@ -7,6 +7,7 @@
  * command forms and their guards are unchanged; they open in the main column.
  */
 import { InjuryCommandForm } from '@/components/health-safety/injury-command-form';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { injuryCommandAllowed, INJURY_COMMAND_LABELS } from '@/components/health-safety/injury-command-state';
 import { SEVERITY_TONE, severityLabel, STATUS_ORDER, statusLabel } from '@/components/health-safety/injury-constants';
 import { InjuryRecordPanel, InjuryRecordSide } from '@/components/health-safety/injury-record-panels';
@@ -54,6 +55,7 @@ function stageDates(d: InjuryRecord): Record<string, string> {
 
 function InjuryWorkspace({ detail: d, return_to }: Props) {
     const { url, props: shared } = usePage<SharedData>();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const location = injuryLocation(url); const { section, command } = location;
     const returnTo = injuryReturn(return_to ?? location.returnTo);
     const drafts = useSafetyWorkspaceDrafts(); const panel = useRef<HTMLDivElement>(null); const interacted = useRef(false);
@@ -104,7 +106,7 @@ function InjuryWorkspace({ detail: d, return_to }: Props) {
         ? { label: 'Next step', text: 'Choose who coordinates this injury', tone: 'critical', meta: 'Recovery, the on-the-day response and the safety review each have their own owner' }
         : NEXT_STEP[d.status] ? { label: 'Next step', text: `${owner} ${NEXT_STEP[d.status]}`, meta: `Recovery coordinator${d.coordination.next_review_date ? ` · next review ${dateWithYear(d.coordination.next_review_date)}` : ''}` } : null;
 
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' }, { title: 'Workplace injuries', href: INJURY_REGISTER }, { title: `${d.injury_type_label} · ${d.reference}`, href: injuryHref(d.id) }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('care', safetyCan), { title: 'Workplace injuries', href: INJURY_REGISTER }, { title: `${d.injury_type_label} · ${d.reference}`, href: injuryHref(d.id) }]}>
         <Head title={`Workplace injury · ${d.reference}`} />
         <SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" wrapTitle backHref={returnTo} title={`${d.injury_type_label} — ${d.worker?.name ?? 'Name hidden'}`} icon={HeartPulse}

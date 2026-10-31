@@ -5,6 +5,8 @@
  * next follow-up on top. The command forms open in the main column as before;
  * Edit still opens the treatment wizard.
  */
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     FIRST_AID_COMMAND_LABELS,
     FIRST_AID_COMMAND_SECTIONS,
@@ -108,6 +110,7 @@ export default function FirstAidShow(props: Props) {
 }
 function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const { section, command, followup, attachment } = firstAidLocation(url);
     const returnTo = firstAidReturn(return_to);
     const drafts = useSafetyWorkspaceDrafts();
@@ -336,8 +339,7 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
+                ...safetyHubCrumbs('care', safetyCan),
                 { title: 'First aid', href: FIRST_AID_REGISTER },
                 { title: `First aid — ${d.treated_person_name}`, href: firstAidHref(d.id) },
             ]}

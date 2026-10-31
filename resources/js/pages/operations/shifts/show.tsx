@@ -2835,7 +2835,7 @@ export default function ShiftShow({
                                         {handover.map((h) => (
                                             <div
                                                 key={h.id}
-                                                className="rounded-lg border border-l-[3px] border-border border-l-status-info bg-muted/40 p-3"
+                                                className="rounded-lg border border-border bg-muted/40 p-3"
                                             >
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="text-sm font-semibold text-foreground">
@@ -3192,7 +3192,7 @@ export default function ShiftShow({
                                     {(incidents || []).map((i: any) => (
                                         <div
                                             key={i.id}
-                                            className="rounded-lg border border-l-[3px] border-border border-l-status-warning p-3"
+                                            className="rounded-lg border border-border p-3"
                                         >
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div className="text-sm font-semibold text-foreground capitalize">

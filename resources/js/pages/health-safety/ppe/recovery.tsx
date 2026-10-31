@@ -7,6 +7,8 @@
  * Each queue fetch and retry re-enters current source access; an empty page is never a purge certificate.
  */
 import { PageHeader, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageLayout } from '@/components/page';
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import type { MenuItem } from '@/components/lists/entity-menu';
 import { EntityContextMenu, useEntityContextMenu } from '@/components/lists/entity-menu';
 import { Log, Note, QuietLine, type LogItem, type SgTone } from '@/components/signature/blocks';
@@ -14,7 +16,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatTime, toDateInput } from '@/lib/datetime';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { HardHat, History, Info, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -119,9 +121,10 @@ export function PpeRecoveryQueue({ kind, checkSignal = 0 }: { kind: RecoveryKind
 }
 const VIEWS: { key: RecoveryKind; label: string }[] = [{ key: 'uploads', label: 'Unfinished uploads' }, { key: 'removals', label: 'Removed evidence' }, { key: 'relocations', label: 'Old public copies' }];
 export default function PpeRecovery() {
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const [section, setSection] = useState<RecoveryKind>('uploads');
     const [checks, setChecks] = useState<Record<RecoveryKind, number>>({ uploads: 0, removals: 0, relocations: 0 });
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('prevention', safetyCan),
         { title: 'PPE & equipment', href: '/health-safety/ppe' }, { title: 'File recovery', href: '/health-safety/ppe/recovery' }]}>
         <Head title="Equipment file recovery" />
         <PageLayout hero={<PageHeader title="Equipment file recovery" icon={History} subline="Files that didn’t finish uploading, and older evidence to move"

@@ -7,6 +7,7 @@
  * line and the source-repair note keep the code's wording; identifiable exposures are never counted here.
  */
 import { CHEMICAL_EXPOSURES } from '@/lib/health-safety/chemical-exposure-navigation';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
 import { RecordIdentity, RecordTable, type RecordTableColumn } from '@/components/incidents/record-table';
 import type { MenuItem } from '@/components/lists';
@@ -40,6 +41,7 @@ const SAFE_USE = 'Recorded checks help people work safely; they don’t prove a 
 
 export default function ChemicalRegister(props: ChemicalIndexProps) {
     const { filters, rows, hero, sites, can, tabCounts } = props; const { props: shared } = usePage<SharedData>();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const exposures = props.exposure_summary;
     const [search, setSearch] = useState(filters.q);
     useEffect(() => setSearch(filters.q), [filters.q]);
@@ -75,7 +77,7 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
         <p className="text-subtle">Showing {rows.data.length} of {rows.total}</p>
         {rows.last_page > 1 ? <LaravelPagination links={links} lastPage={rows.last_page} /> : null}
     </>;
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' }, { title: 'Chemical register', href: CHEMICAL_REGISTER }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('prevention', safetyCan), { title: 'Chemical register', href: CHEMICAL_REGISTER }]}>
         <Head title="Chemical register" /><PageLayout hero={<PageHeader title="Chemical register" icon={FlaskConical} subline="Chemicals, their safety data sheets and where each is stored"
             actions={<><PageHeaderSearch value={search} onChange={setSearch} ariaLabel="Search chemical references" placeholder="Search references…" onKeyDown={(event) => { if (event.key === 'Enter') go({ q: search, page: 1 }); }} />
                 {shared.auth.can?.governance?.view && <DropdownMenu><DropdownMenuTrigger asChild><PageHeaderGlassButton icon={FileText}>{BOARD_REPORTS_LABEL}</PageHeaderGlassButton></DropdownMenuTrigger>

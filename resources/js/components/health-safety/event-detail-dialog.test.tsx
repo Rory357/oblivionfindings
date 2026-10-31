@@ -697,7 +697,7 @@ describe('Permanent safety review workspace', () => {
     it('tells a read-only viewer the next step without offering decisions', () => {
         render(
             <EventRecordWorkspace
-                detail={eventDetail({
+                detail={withoutNextAction(eventDetail({
                     can: {
                         manage: false,
                         close: false,
@@ -707,6 +707,12 @@ describe('Permanent safety review workspace', () => {
                         verify_corrective_actions: false,
                     },
                     worksafe: { can_decide: false },
+                    next_step: {
+                        key: 'worksafe_decision',
+                        label: 'Record the WorkSafe decision',
+                        can: false,
+                        who: 'Moana Rangi, the owner, or anyone who manages health and safety at Kauri House records it.',
+                    },
                     handover: {
                         status: 'accepted',
                         owner: { id: 8, name: 'Moana Rangi' },
@@ -715,17 +721,16 @@ describe('Permanent safety review workspace', () => {
                         notes: null,
                         can_accept: false,
                     },
-                } as EventDetailOverrides)}
+                } as EventDetailOverrides))}
             />,
         );
         expect(
             screen.getByRole('heading', { name: 'Next step' }),
         ).toBeInTheDocument();
+        // B1.4: the step and who does it, said once; no read-only fallback text.
         expect(
-            screen.getByText(
-                'You can read this review. Specialist decisions show here if you’re allowed to make them.',
-            ),
-        ).toBeInTheDocument();
+            screen.getAllByText(/Moana Rangi, the owner, or anyone who manages health and safety at Kauri House records it./),
+        ).toHaveLength(1);
         expect(
             screen.queryByRole('button', { name: 'Accept handover' }),
         ).not.toBeInTheDocument();
@@ -1131,7 +1136,7 @@ describe('EventDetailDialog control-room handover', () => {
     it('shows awaiting ownership and all three lifecycle states in the overview', () => {
         renderDialog();
 
-        expect(screen.getByText('Awaiting H&S acceptance')).toBeInTheDocument();
+        expect(screen.getByText('Waiting for Health and safety to take it on')).toBeInTheDocument();
         expect(screen.getByText('No H&S owner assigned')).toBeInTheDocument();
         expect(screen.getAllByText('Control Room')).not.toHaveLength(0);
         expect(screen.getByText('Resolved')).toBeInTheDocument();
@@ -1216,7 +1221,7 @@ describe('EventDetailDialog control-room handover', () => {
             } as EventDetailOverrides),
         );
 
-        expect(screen.getByText('Accepted into H&S')).toBeInTheDocument();
+        expect(screen.getByText('Taken on by Health and safety')).toBeInTheDocument();
         expect(screen.getByText('Moana Rangi')).toBeInTheDocument();
         expect(screen.getByText('Tama Lewis')).toBeInTheDocument();
         expect(
@@ -1411,6 +1416,72 @@ describe('EventDetailDialog WorkSafe governance', () => {
         notes: null,
         can_accept: false,
     };
+
+    it('K1a: an approver who asked for it sees why someone else decides, and no Approve', () => {
+        const blocker = {
+            key: 'hs_investigation',
+            complete: false,
+            label: 'Complete the required investigation before closing this event.',
+            href: '/health-safety/events/17?action=investigation',
+            classification: 'exceptional' as const,
+        };
+        renderDialog(
+            eventDetail({
+                close_gate: { allowed: false, requirements: [blocker] },
+                close_readiness: {
+                    ordinary_allowed: false,
+                    requirements: [blocker],
+                    hard_blockers: [],
+                    exceptional_blockers: [blocker],
+                },
+                closure_exceptions: [
+                    {
+                        id: 44,
+                        status: 'pending',
+                        category: 'investigation_record',
+                        reason: 'The external evidence has a documented delivery delay.',
+                        evidence_reference: 'BOARD-2026-44',
+                        scope: ['hs_investigation'],
+                        requester: { id: 8, name: 'Moana Rangi' },
+                        approver: null,
+                        decision_reason: null,
+                        created_at: '2026-08-14T01:00:00Z',
+                        requested_at: '2026-08-14T01:00:00Z',
+                        decided_at: null,
+                        review_at: '2099-08-18T02:00:00Z',
+                        expires_at: '2099-08-21T02:00:00Z',
+                        provenance_hash: 'b'.repeat(64),
+                        can_decide: false,
+                        decide_blocked_reason: 'You asked for this, so someone else decides it.',
+                    },
+                ],
+                can: {
+                    manage: false,
+                    close: false,
+                    request_closure_exception: false,
+                    approve_closure_exception: true,
+                    manage_corrective_action_lifecycle: false,
+                    verify_corrective_actions: false,
+                },
+            }),
+        );
+
+        expect(
+            screen.queryByRole('button', { name: 'Close event' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Review closure exception' }),
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Review closure exception' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/You asked for this, so someone else decides it./),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Approve exception' }),
+        ).not.toBeInTheDocument();
+    });
 
     it('shows an undecided state and records an explicit reasoned choice', () => {
         renderDialog(
@@ -2551,3 +2622,38 @@ describe('Safety review originating incident return', () => {
         expect(inertia.post).not.toHaveBeenCalled();
     });
 });
+describe('K1a: who can close (B1.5)', () => {
+    it('tells a viewer who cannot close who can, once', () => {
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                close_authority: {
+                    who: 'owner_or_close_any',
+                    text: 'Only Jordan Peri, the owner, or someone who can close any safety review can close this.',
+                },
+                can: {
+                    manage: true,
+                    close: false,
+                    request_closure_exception: false,
+                    approve_closure_exception: false,
+                    manage_corrective_action_lifecycle: false,
+                    verify_corrective_actions: false,
+                },
+            })}
+                returnHref="/health-safety/events"
+            />,
+        );
+        expect(
+            screen.getAllByText(/Only Jordan Peri, the owner/),
+        ).toHaveLength(1);
+        expect(
+            screen.queryByRole('button', { name: 'Close event' }),
+        ).not.toBeInTheDocument();
+    });
+});
+
+/** The server sends no manager next_action to a viewer who can't act (B1.4 uses next_step instead). */
+function withoutNextAction(detail: EventDetail): EventDetail {
+    detail.handover_summary = { ...detail.handover_summary, next_action: null };
+    return detail;
+}

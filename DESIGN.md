@@ -60,6 +60,19 @@ lucide-react icons, Recharts.
    - every word follows `design_styles/WRITING_STYLE_GUIDE.md`;
    - before shipping, run the page kit's checklist (§12) and compare the new
      pages with an existing module's pages of the same template.
+8. **No coloured edge lines on boxes — hard rule** (Stephan, 31 Oct 2026:
+   "never look like this it is obvious a AI thing"). Cards, surfaces,
+   panels, strips, list blocks, pop-ups and toasts never carry a coloured
+   line, bar or gradient on any edge: no brand or status-tinted top border
+   (`border-t-2/3/4` + a colour, a `::before`/`::after` bar, an "accent" or
+   "horizon" line), and no coloured side or bottom border either. A box is a
+   plain card: the neutral 1px `--border`, the soft shadow, white on the page
+   ground. What a box means is said by its title, a `<StatusBadge>`, a ring
+   or an icon, never by a coloured edge. Neutral dividers *inside* a box
+   (row rules, the dashed list rule) and table total rules are fine.
+   Enforced: ESLint `design/no-edge-accent-line` (coloured `border-t-*`,
+   `border-l-*`, `border-r-*`, `border-b-*` widths with a colour class on the
+   same element). See the named anti-pattern "Coloured edge lines".
 
 ---
 
@@ -294,8 +307,9 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
   draft?" · Keep editing · Discard draft) that Esc, ✕ and Cancel all ask
   when typing would be lost. Wizards stay on `WizardShell` (1100). Every
   pop-up has the same top: a round icon **lens** (`.popup-lens`, never a
-  rounded square), the title, one line, ✕; a 2px **horizon** line on its top
-  edge (`.popup-horizon`); the record it came from as a plain context line;
+  rounded square), the title, one line, ✕; no coloured line on its top edge
+  (the `.popup-horizon` line was removed 31 Oct 2026, non-negotiable 8); the
+  record it came from as a plain context line;
   a grey footer band with Cancel first and the main button last, named for
   what it does. Red only when data is destroyed or a safety check is
   loosened. Consequential actions keep a review step (Control Room: resolve,
@@ -489,7 +503,8 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
   lives in the header, never in a second band under it; a fifth number goes
   in the page body (a `Tally`), never a fifth box. Page bodies use the
   signature blocks (`components/signature/blocks.tsx`,
-  `resources/css/signature-blocks.css`): the surface with its horizon line,
+  `resources/css/signature-blocks.css`): the plain surface (no coloured edge
+  line, non-negotiable 8),
   rings read as state (`Ring`, `RingCard`, `Checks`), the Journey line,
   `Story`, `Log` (time first), `PeopleCards`/`PlaceCards`, `Tally` (zeros
   fold into one sentence), `Flow`, `RiskMap` (the H&S bands), `DutyClock`
@@ -568,6 +583,15 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
 
 These are recurring mistakes. Recognise and avoid them; each has burned us
 before.
+
+- **Coloured edge lines** (corrected 2026-10-31, Stephan on the H&S Overview:
+  "remove these lines everywhere … never look like this it is obvious a AI
+  thing") — a thin brand or status-coloured line on the top edge of a card,
+  surface, strip, panel or pop-up (the old `.sg-surface` "horizon line", the
+  `.popup-horizon` gradient, `border-t-4 border-t-primary-fill`,
+  `border-t-[3px] border-t-primary`), or the same trick on a side or bottom
+  edge. All removed 31 Oct 2026; never add one back, in any colour, on any
+  box. Non-negotiable 8; ESLint `design/no-edge-accent-line`.
 
 - **Generic sign-in screens** (corrected 2026-10-13: "this does not look
   unique to us") — sign-in or account pages built from stock auth layouts, a
