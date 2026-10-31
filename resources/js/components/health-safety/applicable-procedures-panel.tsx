@@ -1,36 +1,36 @@
-/* Reusable read-only "Safe Work Procedures" panel — surfaces the controlled
- * procedures applicable to a person's role(s) or a site, on host pages (HR self-
- * service /hr/my, Site profile, HR staff profile, client risk tab). Each row deep-
- * links to the procedures register with the detail modal open (?procedure=) so the
- * one ProcedureDetailDialog is reused rather than duplicated. Semantic tokens only. */
 import {
-    categoryMeta,
-    reviewFlag,
-    statusMeta,
-} from '@/components/health-safety/procedure-detail-dialog';
-import { formatDateLong } from '@/lib/datetime';
+    ProcedureReviewDate,
+    ProcedureStatus,
+    procedureCategory,
+} from '@/components/health-safety/procedures/procedure-kit';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
-    FlagBadge,
-    TONE_BG,
-} from '@/pages/health-safety/components/register-row-kit';
-import { Link, router } from '@inertiajs/react';
-import { CalendarCheck, Check, ChevronRight, FileText } from 'lucide-react';
+    PROCEDURE_REGISTER,
+    procedureHref,
+    procedureReturn,
+} from '@/lib/health-safety/procedure-navigation';
+import { Link, usePage } from '@inertiajs/react';
+import { Check, ChevronRight, FileText } from 'lucide-react';
 
 export type ApplicableProcedure = {
     id: number;
-    reference_number: string;
+    reference_number: string | null;
     title: string;
     category: string;
     status: string;
     review_date: string | null;
+    version?: number;
+    href?: string;
     acknowledged?: boolean;
+    provenance?: string;
 };
 
+/** The list opens the authorized published version. Only its page records acknowledgement. */
 export function ApplicableProceduresPanel({
     procedures,
-    title = 'Safe Work Procedures',
+    title = 'Safe work procedures',
     subtitle,
-    emptyLabel = 'No safe work procedures apply here yet.',
+    emptyLabel = 'No safe work procedures are available here for your current access.',
     showAcknowledge = false,
     ackReadonly = false,
 }: {
@@ -38,139 +38,90 @@ export function ApplicableProceduresPanel({
     title?: string;
     subtitle?: string;
     emptyLabel?: string;
-    /** Show a per-row acknowledge button (self-service surfaces like /hr/my). */
     showAcknowledge?: boolean;
-    /** Show the subject's acknowledgement status read-only (manager views, no button). */
     ackReadonly?: boolean;
 }) {
+    const returnTo = procedureReturn(usePage().url);
     return (
-        <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:px-5">
-                <div className="flex items-center gap-2.5">
-                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
-                        <FileText className="h-4 w-4" />
-                    </span>
-                    <div className="flex flex-col">
-                        <h2 className="text-sm font-bold text-foreground">
-                            {title}
-                        </h2>
-                        {subtitle ? (
-                            <span className="text-xs text-muted-foreground">
-                                {subtitle}
-                            </span>
-                        ) : null}
-                    </div>
+        <section className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+                <div className="min-w-0">
+                    <h2 className="text-section-title flex items-center gap-2">
+                        <FileText className="size-4 shrink-0" />
+                        {title}
+                    </h2>
+                    {subtitle && <p className="text-subtle mt-1">{subtitle}</p>}
                 </div>
                 <Link
-                    href="/health-safety/procedures"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    href={PROCEDURE_REGISTER}
+                    className="frontline-tap frontline-focus inline-flex shrink-0 items-center gap-1 text-sm text-primary underline"
                 >
-                    Library <ChevronRight className="h-3 w-3" />
+                    Library
+                    <ChevronRight className="size-4" />
                 </Link>
             </div>
-
             {procedures.length ? (
                 <ul className="divide-y divide-border">
-                    {procedures.map((p) => {
-                        const cat = categoryMeta(p.category);
-                        const st = statusMeta(p.status);
-                        const StatusIcon = st.icon;
-                        const flag = reviewFlag(p.review_date);
-                        return (
-                            <li
-                                key={p.id}
-                                className="flex items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/45 md:px-5"
+                    {procedures.map((p) => (
+                        <li key={p.id} className="space-y-2 px-4 py-3">
+                            <Link
+                                href={
+                                    p.href ?? procedureHref(p.id, { returnTo })
+                                }
+                                className="frontline-tap frontline-focus flex items-center justify-between gap-3 rounded-sm text-primary"
                             >
-                                <Link
-                                    href={`/health-safety/procedures?procedure=${p.id}`}
-                                    className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-none"
-                                >
-                                    <span
-                                        className={`h-2 w-2 shrink-0 rounded-full ${cat.dot}`}
-                                    />
-                                    <span className="min-w-0 flex-1">
-                                        <span className="flex items-center gap-2">
-                                            <span className="truncate text-sm font-semibold text-foreground">
-                                                {p.title}
-                                            </span>
-                                            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                                                {p.reference_number}
-                                            </span>
-                                        </span>
-                                        <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                                            <span
-                                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-medium ${cat.chip}`}
-                                            >
-                                                {cat.label}
-                                            </span>
-                                            <span
-                                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ${TONE_BG[st.tone]}`}
-                                            >
-                                                <StatusIcon className="h-2.5 w-2.5" />
-                                                {st.label}
-                                            </span>
-                                            {flag ? (
-                                                <FlagBadge
-                                                    icon={CalendarCheck}
-                                                    tone={flag.tone}
-                                                    title="Review window"
-                                                >
-                                                    {flag.label}
-                                                </FlagBadge>
-                                            ) : p.review_date ? (
-                                                <span className="text-[10.5px] text-muted-foreground">
-                                                    Review{' '}
-                                                    {formatDateLong(
-                                                        p.review_date,
-                                                    )}
-                                                </span>
-                                            ) : null}
-                                        </span>
+                                <span className="min-w-0">
+                                    <span className="block font-semibold break-words underline">
+                                        {p.title}
                                     </span>
-                                </Link>
+                                    <span className="text-caption block text-muted-foreground">
+                                        {p.reference_number}
+                                        {p.version
+                                            ? ` · Version ${p.version}`
+                                            : ''}
+                                    </span>
+                                </span>
+                                <ChevronRight className="size-4 shrink-0" />
+                            </Link>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <ProcedureStatus
+                                    status={p.status}
+                                    legacy={
+                                        p.provenance ===
+                                        'legacy_current_capture'
+                                    }
+                                />
+                                <span className="text-caption">
+                                    {procedureCategory(p.category)}
+                                </span>
+                                <ProcedureReviewDate date={p.review_date} />
                                 {(showAcknowledge || ackReadonly) &&
-                                p.acknowledged ? (
-                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-status-success-bg px-2.5 py-1 text-[11px] font-semibold text-status-success">
-                                        <Check className="h-3 w-3" />{' '}
-                                        Acknowledged
-                                    </span>
-                                ) : ackReadonly && p.status === 'approved' ? (
-                                    <span className="inline-flex shrink-0 items-center rounded-full bg-status-warning-bg px-2.5 py-1 text-[11px] font-semibold text-status-warning">
-                                        Pending
-                                    </span>
-                                ) : showAcknowledge &&
-                                  p.status === 'approved' ? (
-                                    // eslint-disable-next-line no-restricted-syntax -- inline ack affordance on a list row, not a form control
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            router.post(
-                                                `/health-safety/procedures/${p.id}/acknowledge`,
-                                                {},
-                                                {
-                                                    preserveScroll: true,
-                                                    preserveState: true,
-                                                },
-                                            )
-                                        }
-                                        className="shrink-0 rounded-lg border border-primary/40 px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/10"
-                                    >
-                                        Acknowledge
-                                    </button>
-                                ) : (
-                                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                )}
-                            </li>
-                        );
-                    })}
+                                    (p.acknowledged ? (
+                                        <StatusBadge variant="success">
+                                            <Check className="size-3" />
+                                            Acknowledged this version
+                                        </StatusBadge>
+                                    ) : (
+                                        <StatusBadge variant="warning">
+                                            Acknowledgement pending
+                                        </StatusBadge>
+                                    ))}
+                            </div>
+                            {showAcknowledge && !p.acknowledged && (
+                                <p className="text-subtle">
+                                    Open the procedure to read and acknowledge
+                                    {p.provenance === 'legacy_current_capture'
+                                        ? ' the captured instructions.'
+                                        : ' the published version.'}
+                                </p>
+                            )}
+                        </li>
+                    ))}
                 </ul>
             ) : (
-                <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-                    <FileText className="h-8 w-8 text-muted-foreground/40" />
-                    <p className="text-sm text-muted-foreground">
-                        {emptyLabel}
-                    </p>
-                </div>
+                <p className="text-subtle px-4 py-8 text-center">
+                    {emptyLabel}
+                </p>
             )}
         </section>
     );

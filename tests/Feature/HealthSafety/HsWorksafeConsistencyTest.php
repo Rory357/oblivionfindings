@@ -23,6 +23,8 @@ use Tests\TestCase;
 
 class HsWorksafeConsistencyTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -46,6 +48,11 @@ class HsWorksafeConsistencyTest extends TestCase
         ]));
         $viewer = $this->admin();
 
+        $this->actingAs($viewer)->get('/incidents?tab=worksafe_pending')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('hero.attention.worksafe.value', 1)
+                ->where('tabCounts.worksafe_pending', 1)->has('rows.data', 1)
+                ->where('rows.data.0.worksafe_notification_status', HsEvent::WORKSAFE_PENDING));
+
         $this->actingAs($viewer)
             ->get('/incidents?tab=worksafe')
             ->assertOk()
@@ -64,7 +71,7 @@ class HsWorksafeConsistencyTest extends TestCase
             );
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('backbone.events.worksafe_pending', 1)
@@ -200,7 +207,9 @@ class HsWorksafeConsistencyTest extends TestCase
                 ->where('detail.control_room_alert', null)
                 ->where('detail.close_gate.allowed', false)
                 ->where('detail.close_gate.requirements.0.key', 'journey_integrity')
-                ->where('detail.is_notifiable', false)
+                // A broken canonical link makes the detail decision unknown;
+                // it must not claim a negative decision from another incident.
+                ->where('detail.is_notifiable', null)
                 ->where('detail.worksafe_notification_status', null)
                 ->where('detail.worksafe_reference', null)
                 ->where('detail.worksafe_notified_at', null)
@@ -265,7 +274,7 @@ class HsWorksafeConsistencyTest extends TestCase
         $viewer = $this->siteBoundUser($siteA, ['hazards.view']);
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('backbone.events.worksafe_pending', 1)
@@ -276,7 +285,7 @@ class HsWorksafeConsistencyTest extends TestCase
             );
 
         $this->actingAs($viewer)
-            ->get("/health-safety?site={$siteB->id}")
+            ->getOverview("/health-safety?site={$siteB->id}")
             ->assertForbidden();
 
         $this->assertNotSame($eventA->reference_number, $eventB->reference_number);
@@ -336,7 +345,7 @@ class HsWorksafeConsistencyTest extends TestCase
             );
 
         $this->actingAs($viewer)
-            ->get("/health-safety?site={$incidentSite->id}")
+            ->getOverview("/health-safety?site={$incidentSite->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('backbone.events.worksafe_pending', 1)
@@ -352,7 +361,7 @@ class HsWorksafeConsistencyTest extends TestCase
             );
 
         $this->actingAs($viewer)
-            ->get("/health-safety?site={$currentClientSite->id}")
+            ->getOverview("/health-safety?site={$currentClientSite->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('backbone.events.worksafe_pending', 0)
@@ -446,7 +455,7 @@ class HsWorksafeConsistencyTest extends TestCase
             );
 
         $this->actingAs($viewer)
-            ->get("/health-safety?site={$incidentSite->id}")
+            ->getOverview("/health-safety?site={$incidentSite->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('backbone.events.worksafe_pending', 1)
@@ -466,7 +475,7 @@ class HsWorksafeConsistencyTest extends TestCase
             );
 
         $this->actingAs($viewer)
-            ->get("/health-safety?site={$newClientSite->id}")
+            ->getOverview("/health-safety?site={$newClientSite->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('backbone.events.worksafe_pending', 0)

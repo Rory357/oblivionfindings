@@ -4,6 +4,7 @@ import {
     type OfferRole,
     type OfferSite,
 } from '@/components/hr';
+import InputError from '@/components/input-error';
 import {
     PageHero,
     type PageHeroBadge,
@@ -49,6 +50,12 @@ import {
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import {
+    driverLicenceOptions,
+    optionLabel,
+    rightToWorkOptions,
+    yearsOfExperienceOptions,
+} from '@/lib/job-posting-constants';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
@@ -67,6 +74,7 @@ import {
     FileText,
     FolderOpen,
     Gift,
+    Loader2,
     Mail,
     MessageSquare,
     Phone,
@@ -169,8 +177,28 @@ interface Application {
     offer: Offer | null;
     job_posting: JobPosting | null;
     cover_letter: string | null;
-    screening_answers: Record<string, string> | null;
+    /** Work readiness from the public apply wizard (all optional). */
+    experience_summary: string | null;
+    years_of_experience: string | null;
+    right_to_work_status: string | null;
+    driver_licence_class: string | null;
+    /** Careers stores `{question, answer}` rows; older rows may be a map. */
+    screening_answers:
+        | Array<{ question: string; answer: string | null }>
+        | Record<string, string>
+        | null;
     cv_original_name: string | null;
+}
+
+/** Screening answers as question/answer pairs, whichever shape was stored. */
+function screeningPairs(
+    answers: Application['screening_answers'],
+): Array<[string, string]> {
+    if (!answers) return [];
+    if (Array.isArray(answers)) {
+        return answers.map((row) => [row.question, row.answer ?? '']);
+    }
+    return Object.entries(answers);
 }
 
 interface ActivityEntry {
@@ -257,6 +285,9 @@ function formatNZDateTime(dateStr: string): string {
         minute: '2-digit',
     });
 }
+
+/** CandidateController::declineOfferApproval — reason nullable, max 2000. */
+const DECLINE_REASON_MAX = 2000;
 
 function isExpired(dateStr: string | null): boolean {
     if (!dateStr) return false;
@@ -375,6 +406,10 @@ export default function CandidateShow({
         destructive?: boolean;
         action: () => void;
     } | null>(null);
+    const [offerToDecline, setOfferToDecline] = useState<number | null>(null);
+    const [declineReason, setDeclineReason] = useState('');
+    const [declineError, setDeclineError] = useState<string | undefined>();
+    const [decliningOffer, setDecliningOffer] = useState(false);
 
     function rejectApplication(applicationId: number) {
         setConfirmState({
@@ -439,15 +474,38 @@ export default function CandidateShow({
             { preserveScroll: true },
         );
     }
+    // "Decline" opens a dialog with an optional reason; the request is sent
+    // only from its submit button.
     function declineOfferApproval(offerId: number) {
-        const reason = window.prompt(
-            'Decline this offer for changes. Reason (optional):',
-        );
-        if (reason === null) return; // cancelled — don't decline
+        setDeclineReason('');
+        setDeclineError(undefined);
+        setOfferToDecline(offerId);
+    }
+    function submitDeclineOffer(e: React.FormEvent) {
+        e.preventDefault();
+        if (offerToDecline === null) return;
+        const reason = declineReason.trim();
+        // Server rule: reason nullable|string|max:2000.
+        if (reason.length > DECLINE_REASON_MAX) {
+            setDeclineError(
+                `Keep the reason to ${DECLINE_REASON_MAX.toLocaleString('en-NZ')} characters or fewer.`,
+            );
+            return;
+        }
         router.post(
-            `/hr/recruitment/offers/${offerId}/decline-approval`,
+            `/hr/recruitment/offers/${offerToDecline}/decline-approval`,
             { reason },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onStart: () => setDecliningOffer(true),
+                onSuccess: () => setOfferToDecline(null),
+                onError: (errors) =>
+                    setDeclineError(
+                        errors.reason ??
+                            'Could not decline the offer. Try again.',
+                    ),
+                onFinish: () => setDecliningOffer(false),
+            },
         );
     }
 
@@ -1420,6 +1478,62 @@ export default function CandidateShow({
                                             <div>{renderNextSteps(app)}</div>
                                         </div>
 
+                                        {/* Work readiness (public apply wizard answers, read-only) */}
+                                        {(app.years_of_experience ||
+                                            app.right_to_work_status ||
+                                            app.driver_licence_class ||
+                                            app.experience_summary) && (
+                                            <div className="rounded-lg border p-4">
+                                                <h4 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+                                                    <Briefcase className="h-4 w-4" />
+                                                    Experience and right to work
+                                                </h4>
+                                                <div className="grid gap-3 text-sm sm:grid-cols-3">
+                                                    <div>
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            Support work
+                                                            experience
+                                                        </span>
+                                                        {optionLabel(
+                                                            yearsOfExperienceOptions,
+                                                            app.years_of_experience,
+                                                        ) ?? 'Not given'}
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            Right to work in NZ
+                                                        </span>
+                                                        {optionLabel(
+                                                            rightToWorkOptions,
+                                                            app.right_to_work_status,
+                                                        ) ?? 'Not given'}
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            Driver licence
+                                                        </span>
+                                                        {optionLabel(
+                                                            driverLicenceOptions,
+                                                            app.driver_licence_class,
+                                                        ) ?? 'Not given'}
+                                                    </div>
+                                                </div>
+                                                {app.experience_summary && (
+                                                    <div className="mt-3 text-sm">
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            About their
+                                                            experience
+                                                        </span>
+                                                        <p className="whitespace-pre-wrap">
+                                                            {
+                                                                app.experience_summary
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {/* Cover Letter (collapsible) */}
                                         {app.cover_letter && (
                                             <div className="rounded-lg border">
@@ -1456,71 +1570,64 @@ export default function CandidateShow({
                                         )}
 
                                         {/* Screening Answers (collapsible) */}
-                                        {app.screening_answers &&
-                                            Object.keys(app.screening_answers)
-                                                .length > 0 && (
-                                                <div className="rounded-lg border">
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        onClick={() =>
-                                                            toggleScreening(
-                                                                app.id,
-                                                            )
+                                        {screeningPairs(app.screening_answers)
+                                            .length > 0 && (
+                                            <div className="rounded-lg border">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    onClick={() =>
+                                                        toggleScreening(app.id)
+                                                    }
+                                                    className="h-auto w-full justify-between rounded-none px-4 py-2.5 text-sm font-medium"
+                                                >
+                                                    <span className="flex items-center gap-1.5">
+                                                        <MessageSquare className="h-3.5 w-3.5" />
+                                                        Screening Answers (
+                                                        {
+                                                            screeningPairs(
+                                                                app.screening_answers,
+                                                            ).length
                                                         }
-                                                        className="h-auto w-full justify-between rounded-none px-4 py-2.5 text-sm font-medium"
-                                                    >
-                                                        <span className="flex items-center gap-1.5">
-                                                            <MessageSquare className="h-3.5 w-3.5" />
-                                                            Screening Answers (
-                                                            {
-                                                                Object.keys(
-                                                                    app.screening_answers,
-                                                                ).length
-                                                            }
-                                                            )
-                                                        </span>
-                                                        {expandedScreening[
-                                                            app.id
-                                                        ] ? (
-                                                            <ChevronUp className="h-4 w-4" />
-                                                        ) : (
-                                                            <ChevronDown className="h-4 w-4" />
-                                                        )}
-                                                    </Button>
+                                                        )
+                                                    </span>
                                                     {expandedScreening[
                                                         app.id
-                                                    ] && (
-                                                        <div className="space-y-3 border-t px-4 py-3">
-                                                            {Object.entries(
-                                                                app.screening_answers,
-                                                            ).map(
-                                                                ([
-                                                                    question,
-                                                                    answer,
-                                                                ]) => (
-                                                                    <div
-                                                                        key={
+                                                    ] ? (
+                                                        <ChevronUp className="h-4 w-4" />
+                                                    ) : (
+                                                        <ChevronDown className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                                {expandedScreening[app.id] && (
+                                                    <div className="space-y-3 border-t px-4 py-3">
+                                                        {screeningPairs(
+                                                            app.screening_answers,
+                                                        ).map(
+                                                            ([
+                                                                question,
+                                                                answer,
+                                                            ]) => (
+                                                                <div
+                                                                    key={
+                                                                        question
+                                                                    }
+                                                                >
+                                                                    <p className="text-xs font-medium text-muted-foreground">
+                                                                        {
                                                                             question
                                                                         }
-                                                                    >
-                                                                        <p className="text-xs font-medium text-muted-foreground">
-                                                                            {
-                                                                                question
-                                                                            }
-                                                                        </p>
-                                                                        <p className="mt-0.5 text-sm">
-                                                                            {
-                                                                                answer
-                                                                            }
-                                                                        </p>
-                                                                    </div>
-                                                                ),
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
+                                                                    </p>
+                                                                    <p className="mt-0.5 text-sm">
+                                                                        {answer}
+                                                                    </p>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
 
                                         {/* Interviews */}
                                         {app.interviews.length > 0 && (
@@ -2510,6 +2617,69 @@ export default function CandidateShow({
                     offerId={respondOffer.offerId}
                 />
             )}
+
+            <Dialog
+                open={offerToDecline !== null}
+                onOpenChange={(o) => {
+                    if (!o && !decliningOffer) setOfferToDecline(null);
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <form onSubmit={submitDeclineOffer} className="grid gap-4">
+                        <DialogHeader>
+                            <DialogTitle>
+                                Decline this offer for changes?
+                            </DialogTitle>
+                            <DialogDescription>
+                                The offer isn&apos;t approved. It goes back to
+                                the person who drafted it so they can change it
+                                and ask for approval again. They&apos;re told,
+                                along with your reason if you give one. The
+                                candidate isn&apos;t told.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="decline-offer-reason">
+                                Reason (optional)
+                            </Label>
+                            <Textarea
+                                id="decline-offer-reason"
+                                value={declineReason}
+                                onChange={(e) => {
+                                    setDeclineReason(e.target.value);
+                                    if (declineError)
+                                        setDeclineError(undefined);
+                                }}
+                                maxLength={DECLINE_REASON_MAX}
+                                rows={3}
+                                placeholder="e.g. Start date needs to move to March"
+                                aria-invalid={Boolean(declineError)}
+                            />
+                            <InputError message={declineError} />
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOfferToDecline(null)}
+                                disabled={decliningOffer}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="destructive"
+                                disabled={decliningOffer}
+                            >
+                                {decliningOffer ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : null}
+                                Decline offer
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             <AlertDialog
                 open={confirmState !== null}

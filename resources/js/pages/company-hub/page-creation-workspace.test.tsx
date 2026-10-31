@@ -7,6 +7,7 @@ function Workspace() {
     return (
         <>
             <section hidden={!!creation}>
+                {/* eslint-disable-next-line no-restricted-syntax -- test harness control, not shipped UI */}
                 <button onClick={() => open()}>Write a story</button>
             </section>
             {creation && (
@@ -14,7 +15,9 @@ function Workspace() {
                     <h1 data-hub-page-creation-heading tabIndex={-1}>
                         Start with a purpose
                     </h1>
+                    {/* eslint-disable-next-line no-restricted-syntax -- test harness control, not shipped UI */}
                     <button onClick={() => close()}>Cancel</button>
+                    {/* eslint-disable-next-line no-restricted-syntax -- test harness control, not shipped UI */}
                     <button onClick={() => close(false)}>
                         Open created draft
                     </button>

@@ -5,10 +5,19 @@ namespace App\Services\Tasks;
 use App\Exceptions\TaskProviderNavigationException;
 use App\Models\TaskWatcher;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomGovernanceReadService;
+use App\Services\HealthSafety\EmergencyDrillAccessService;
+use App\Services\HealthSafety\FirstAidAccessService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\InjuryAccessService;
+use App\Services\HealthSafety\RestraintAccessService;
+use App\Services\HealthSafety\SafeWorkProcedureAccessService;
+use App\Services\Tasks\Contracts\ContextualHealthSafetyTaskProvider;
 use App\Services\Tasks\Contracts\ProvidesTaskSourceAliases;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
 use Illuminate\Support\Carbon;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Throwable;
 
 /**
@@ -21,6 +30,12 @@ use Throwable;
  */
 class TaskAggregator
 {
+    public const NAVIGATION_REQUEST_ATTRIBUTE = 'healthSafety.task_navigation';
+
+    public const NAVIGATION_USER_ATTRIBUTE = 'healthSafety.task_navigation_user_id';
+
+    public const NAVIGATION_EVENT_ATTRIBUTE = 'healthSafety.task_navigation_event_id';
+
     private const SEVERITY_RANK = ['critical' => 0, 'high' => 1, 'medium' => 2, 'low' => 3, 'info' => 4];
 
     /** @var TaskProvider[] */
@@ -71,6 +86,9 @@ class TaskAggregator
             new Providers\HsInvestigationProvider,
             new Providers\HsCorrectiveActionProvider,
             new Providers\SiteHazardProvider,
+            new Providers\ProcedureReviewRequestProvider,
+            new Providers\EmergencyDrillProvider,
+            new Providers\EmergencyDrillFindingProvider,
             new Providers\WorkplaceInjuryProvider,
             new Providers\SafeguardingConcernProvider,
             new Providers\SafeguardingActionPlanProvider,
@@ -104,8 +122,15 @@ class TaskAggregator
             new Providers\SiteChecklistRunProvider,
             new Providers\ShiftTaskProvider,
             new Providers\RespiteTaskProvider,
+            new Providers\ReferralTaskProvider,
             new Providers\FirstAidFollowupProvider,
             new Providers\RestraintReviewProvider,
+            // Private follow-ups remain source-owned; generic Tasks cannot mutate them.
+            new Providers\ChemicalExposureFollowupProvider,
+            // Exposures that haven't reached the H&S register, for exposure managers (job 3).
+            new Providers\ChemicalExposureDeliveryProvider,
+            // H&S events whose source changed after a signed WorkSafe decision or after close (job 3).
+            new Providers\HsEventReviewFlagProvider,
         ];
     }
 
@@ -160,8 +185,51 @@ class TaskAggregator
         string $source,
         int $id,
         array $filters = [],
+        ?HealthSafetyReadContext $providedContext = null,
     ): ?TaskItem {
         $provider = $this->providerFor($source);
+        if ($provider instanceof ContextualHealthSafetyTaskProvider) {
+            $permissions = array_values(array_unique([
+                ...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS,
+                ...InjuryAccessService::PERMISSIONS, ...SafeWorkProcedureAccessService::PERMISSIONS,
+                ...EmergencyDrillAccessService::PERMISSIONS, ...($provider instanceof Providers\ControlRoomAlertProvider ? ControlRoomGovernanceReadService::PERMISSIONS : []),
+            ]));
+            $consume = fn (HealthSafetyReadContext $context): ?TaskItem => $context->consumeSourceViewer($permissions,
+                function (User $current) use ($provider, $user, $source, $id, $filters, $context): ?TaskItem {
+                    if (! $provider->canView($current)) {
+                        return null;
+                    }
+                    $itemIds = ["{$source}-{$id}"];
+                    if ($provider->sourceKey() === $source && $provider instanceof ProvidesTaskSourceAliases) {
+                        $alias = $this->legacySourceAliasFor($provider, $current, $id);
+                        $itemIds = $alias ? ["{$alias}-{$id}"] : $itemIds;
+                    }
+                    $exactFilters = [...$filters, 'id' => $id];
+                    foreach ([false, true] as $includeDone) {
+                        $lookup = $includeDone ? [...$exactFilters, 'include_done' => true] : $exactFilters;
+                        foreach ($provider->authorizedTasksInContext($user, $lookup, $context) as $item) {
+                            if (in_array($item->id, $itemIds, true)) {
+                                return $item;
+                            }
+                        }
+                    }
+                    return null;
+                });
+            try {
+                if ($providedContext !== null) {
+                    $providedContext->assertViewer($user);
+
+                    return $consume($providedContext);
+                }
+
+                return HealthSafetyReadContext::within($user, $permissions, $consume);
+            } catch (HttpException $denial) {
+                if (! in_array($denial->getStatusCode(), [403, 404], true)) {
+                    throw $denial;
+                }
+                return null;
+            }
+        }
         if (! $provider || ! $provider->canView($user)) {
             return null;
         }
@@ -399,14 +467,40 @@ class TaskAggregator
      */
     public function sourcesFor(User $user): array
     {
+        $currentVisibility = [];
+        $contextual = array_filter($this->providers, fn ($provider): bool => $provider instanceof ContextualHealthSafetyTaskProvider);
+        if ($contextual !== []) {
+            $permissions = array_values(array_unique([
+                ...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS,
+                ...InjuryAccessService::PERMISSIONS, ...SafeWorkProcedureAccessService::PERMISSIONS,
+                ...EmergencyDrillAccessService::PERMISSIONS, ...(array_filter($contextual, fn ($provider) => $provider instanceof Providers\ControlRoomAlertProvider) !== [] ? ControlRoomGovernanceReadService::PERMISSIONS : []),
+            ]));
+            try {
+                $currentVisibility = HealthSafetyReadContext::within($user, $permissions,
+                    fn (HealthSafetyReadContext $context): array => $context->consumeSourceViewer($permissions,
+                        function (User $current) use ($contextual): array {
+                            $visibility = [];
+                            foreach ($contextual as $provider) {
+                                // Chooser authority only: never hydrate tasks or source children here.
+                                $visibility[spl_object_id($provider)] = $provider->canView($current);
+                            }
+                            return $visibility;
+                        }));
+            } catch (HttpException $denial) {
+                if (! in_array($denial->getStatusCode(), [403, 404], true)) {
+                    throw $denial;
+                }
+            }
+        }
         $sources = [];
-
         foreach ($this->providers as $provider) {
-            if ($provider->canView($user)) {
+            $visible = $provider instanceof ContextualHealthSafetyTaskProvider
+                ? ($currentVisibility[spl_object_id($provider)] ?? false)
+                : $provider->canView($user);
+            if ($visible) {
                 $sources[] = ['key' => $provider->sourceKey(), 'label' => $provider->label()];
             }
         }
-
         return $sources;
     }
 
@@ -420,21 +514,81 @@ class TaskAggregator
      */
     public function navigationBadgeFor(User $user): array
     {
+        return $this->navigationBadge($user);
+    }
+
+    /**
+     * Whether the person reads at least one task module (the /tasks link shows),
+     * without building the badge. Plain modules answer from their read checks in
+     * a few milliseconds; the H&S modules' read checks run only when none of them
+     * is readable, and never load any H&S work.
+     * Same answer as navigationBadgeFor()['view'].
+     */
+    public function navigationVisibleFor(User $user): bool
+    {
+        foreach ($this->providers as $provider) {
+            if ($provider instanceof ContextualHealthSafetyTaskProvider) {
+                continue;
+            }
+            try {
+                if ($provider->canView($user)) {
+                    return true;
+                }
+            } catch (Throwable) {
+                // Not readable here; the badge pass reports the fault.
+            }
+        }
+
+        // No plain module: ask the H&S modules the same read check the badge pass
+        // makes, without loading any of their work (the badge loads it later).
+        foreach ($this->healthSafetyProviderPasses($user, [], true, null, viewOnly: true) as $pass) {
+            if ($pass['view']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Computes scalar navigation inside the caller's active read callback. */
+    public function navigationBadgeInContext(User $viewer, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+
+        return $this->navigationBadge($viewer, $context);
+    }
+
+    /** @return array{view: bool, badge: int, degraded: bool} */
+    private function navigationBadge(User $user, ?HealthSafetyReadContext $context = null): array
+    {
         $view = false;
         $degraded = false;
         $items = [];
+        $healthSafety = $this->healthSafetyProviderPasses($user, [], true, $context);
 
         foreach ($this->providers as $provider) {
             $sourceKey = $provider::class;
 
             try {
                 $sourceKey = $provider->sourceKey();
-                if (! $provider->canView($user)) {
-                    continue;
+                if ($provider instanceof ContextualHealthSafetyTaskProvider) {
+                    $pass = $healthSafety[spl_object_id($provider)] ?? ['view' => false, 'items' => [], 'failed' => false];
+                    $degraded = $degraded || $pass['failed'];
+                    if (! $pass['view']) {
+                        continue;
+                    }
+                    $providerItems = $pass['items'];
+                } else {
+                    if (! $provider->canView($user)) {
+                        continue;
+                    }
+                    // A readable module still owns a destination when its task read fails.
+                    $view = true;
+                    $providerItems = $this->authorizedTasksMemo($provider, $user);
                 }
 
                 $view = true;
-                foreach ($this->authorizedTasksMemo($provider, $user) as $item) {
+                foreach ($providerItems as $item) {
                     // Match itemsFor(): retries or legacy aliases cannot
                     // inflate the shared count for one canonical record.
                     $items[$item->id] ??= $item;
@@ -475,17 +629,27 @@ class TaskAggregator
     {
         $sources = $filters['sources'] ?? null;
         $items = [];
+        $healthSafety = $this->healthSafetyProviderPasses($user, $filters);
 
         foreach ($this->providers as $provider) {
             if ($sources !== null && $sources !== [] && ! in_array($provider->sourceKey(), $sources, true)) {
                 continue;
             }
 
-            if (! $provider->canView($user)) {
-                continue;
+            if ($provider instanceof ContextualHealthSafetyTaskProvider) {
+                $pass = $healthSafety[spl_object_id($provider)] ?? ['view' => false, 'items' => []];
+                if (! $pass['view']) {
+                    continue;
+                }
+                $providerItems = $pass['items'];
+            } else {
+                if (! $provider->canView($user)) {
+                    continue;
+                }
+                $providerItems = $this->authorizedTasksMemo($provider, $user, $filters);
             }
 
-            foreach ($this->authorizedTasksMemo($provider, $user, $filters) as $item) {
+            foreach ($providerItems as $item) {
                 // A provider retry or legacy duplicate must not create two
                 // tickets for the same canonical source record.
                 $items[$item->id] ??= $item;
@@ -498,6 +662,104 @@ class TaskAggregator
     }
 
     /**
+     * These source projections share one fresh local read; only DTOs leave it.
+     * Unrelated providers retain the original viewer and their existing boundary.
+     *
+     * @return array<int, array{view: bool, items: TaskItem[], failed: bool}>
+     */
+    private function healthSafetyProviderPasses(User $viewer, array $filters, bool $navigation = false, ?HealthSafetyReadContext $providedContext = null, bool $viewOnly = false): array
+    {
+        $sources = $filters['sources'] ?? null;
+        $providers = array_values(array_filter($this->providers,
+            fn (TaskProvider $provider): bool => $provider instanceof ContextualHealthSafetyTaskProvider
+                && ($sources === null || $sources === [] || in_array($provider->sourceKey(), $sources, true))));
+        if ($providers === []) {
+            return [];
+        }
+        $permissions = array_values(array_unique([
+            ...FirstAidAccessService::PERMISSIONS,
+            ...RestraintAccessService::PERMISSIONS,
+            ...InjuryAccessService::PERMISSIONS,
+            ...SafeWorkProcedureAccessService::PERMISSIONS,
+            ...EmergencyDrillAccessService::PERMISSIONS, ...(array_filter($providers, fn ($provider) => $provider instanceof Providers\ControlRoomAlertProvider) !== [] ? ControlRoomGovernanceReadService::PERMISSIONS : []),
+        ]));
+
+        try {
+            $consume = fn (HealthSafetyReadContext $context): array => $context->consumeSourceViewer($permissions,
+                function (User $current) use ($context, $viewer, $filters, $providers, $navigation, $viewOnly): array {
+                    // Listing every H&S provider is a page-wide read (speed option B); a lookup by id stays bounded.
+                    if (! isset($filters['id'])) { $context->provePageWide(); }
+                    $passes = [];
+                    foreach ($providers as $provider) {
+                        $pass = ['view' => false, 'items' => [], 'failed' => false];
+                        try {
+                            $pass['view'] = $provider->canView($current);
+                            if ($pass['view'] && ! $viewOnly) {
+                                $pass['items'] = $navigation
+                                    ? $provider->authorizedNavigationTasksInContext($viewer, $context)
+                                    : $provider->authorizedTasksInContext($viewer, $filters, $context);
+                            }
+                        } catch (HttpException $exception) {
+                            if (! in_array($exception->getStatusCode(), [403, 404], true)) {
+                                if (! $navigation) {
+                                    throw $exception;
+                                }
+                                $this->reportNavigationFailure($provider, $viewer, $exception);
+                                $pass['failed'] = true;
+                            }
+                            $pass['items'] = [];
+                        } catch (Throwable $exception) {
+                            if (! $navigation) {
+                                throw $exception;
+                            }
+                            $this->reportNavigationFailure($provider, $viewer, $exception);
+                            $pass['failed'] = true;
+                        }
+                        $passes[spl_object_id($provider)] = $pass;
+                    }
+
+                    return $passes;
+                });
+            if ($providedContext !== null) {
+                $providedContext->assertViewer($viewer);
+
+                return $consume($providedContext);
+            }
+
+            return HealthSafetyReadContext::within($viewer, $permissions, $consume);
+        } catch (HttpException $exception) {
+            if (in_array($exception->getStatusCode(), [403, 404], true)) {
+                return [];
+            }
+            if (! $navigation) {
+                throw $exception;
+            }
+        } catch (Throwable $exception) {
+            if (! $navigation) {
+                throw $exception;
+            }
+        }
+
+        $passes = [];
+        foreach ($providers as $provider) {
+            $this->reportNavigationFailure($provider, $viewer, $exception);
+            $passes[spl_object_id($provider)] = ['view' => false, 'items' => [], 'failed' => true];
+        }
+
+        return $passes;
+    }
+
+    private function reportNavigationFailure(TaskProvider $provider, User $viewer, Throwable $exception): void
+    {
+        report(new TaskProviderNavigationException(
+            providerClass: $provider::class,
+            sourceKey: $provider->sourceKey(),
+            userId: (int) $viewer->id,
+            previous: $exception,
+        ));
+    }
+
+    /**
      * One provider pass per (provider, user, filters) per request. TaskItem
      * DTOs are read-only downstream, so sharing the arrays between the badge
      * and feed passes is safe.
@@ -506,6 +768,16 @@ class TaskAggregator
      */
     private function authorizedTasksMemo(TaskProvider $provider, User $user, array $filters = []): array
     {
+        if ($provider instanceof ContextualHealthSafetyTaskProvider) {
+            return $provider->authorizedTasks($user, $filters);
+        }
+
+        // "Assigned to me" is applied to every module's rows afterwards (filterItems()), and no plain module reads
+        // it, so it is left out here: My Day's card and the sidebar count then share one read per module in a
+        // request instead of two (31 Oct 2026; the medication modules ran twice on /my-day since c59d5ca28).
+        // If a plain module ever narrows by assignee itself, stop removing it here.
+        unset($filters['assigned']);
+
         // Keyed by instance (not class): registries and tests may hold
         // several providers of one class. Instances live in $this->providers
         // for the aggregator's lifetime, so the object id cannot be reused.

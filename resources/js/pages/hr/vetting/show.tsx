@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,8 @@ import {
 import { FormEvent, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
+
+type VettingAction = 'clear' | 'renew' | 'delete';
 
 type StaffBackgroundCheck = {
     id: number;
@@ -127,6 +130,68 @@ export default function VettingShow({ check, can }: Props) {
     const [consentGiven, setConsentGiven] = useState(false);
     const [consentNotes, setConsentNotes] = useState('');
 
+    // Mark cleared, Request renewal and Delete record only open a
+    // confirmation; the request is sent from its confirm button.
+    const [pendingAction, setPendingAction] = useState<VettingAction | null>(
+        null,
+    );
+    const [actionBusy, setActionBusy] = useState(false);
+    const checkLabel = check.check_type.replace(/_/g, ' ');
+    const actionCopy: Record<
+        VettingAction,
+        {
+            title: string;
+            description: string;
+            confirmText: string;
+            variant: 'default' | 'destructive';
+        }
+    > = {
+        clear: {
+            title: 'Mark this check as cleared?',
+            description: `The ${checkLabel} for ${check.user.name} is recorded as clear, with you as the person who verified it today. Their compliance is updated to match.`,
+            confirmText: 'Mark cleared',
+            variant: 'default',
+        },
+        renew: {
+            title: 'Request a renewal for this check?',
+            description: `The ${checkLabel} for ${check.user.name} is marked as due for renewal and their compliance is updated to match. No request is sent to anyone, so arrange the new check yourself.`,
+            confirmText: 'Request renewal',
+            variant: 'default',
+        },
+        delete: {
+            title: 'Delete this vetting record?',
+            description: `The ${checkLabel} for ${check.user.name} is removed from vetting and their compliance is updated to match. This can't be undone.`,
+            confirmText: 'Delete record',
+            variant: 'destructive',
+        },
+    };
+    const runPendingAction = () => {
+        if (pendingAction === null) return;
+        const options = {
+            onStart: () => setActionBusy(true),
+            onFinish: () => {
+                setActionBusy(false);
+                setPendingAction(null);
+            },
+        };
+        if (pendingAction === 'delete') {
+            router.delete(`/hr/compliance/vetting/${check.id}`, options);
+            return;
+        }
+        router.post(
+            `/hr/compliance/vetting/${check.id}/${pendingAction}`,
+            {},
+            options,
+        );
+    };
+    // Keep the last action's copy while the dialog animates closed.
+    const [shownAction, setShownAction] = useState<VettingAction>('clear');
+    const askFor = (action: VettingAction) => {
+        setShownAction(action);
+        setPendingAction(action);
+    };
+    const pendingCopy = actionCopy[pendingAction ?? shownAction];
+
     const submitConsent = (e: FormEvent) => {
         e.preventDefault();
         if (!consentGiven) return;
@@ -210,17 +275,7 @@ export default function VettingShow({ check, can }: Props) {
                                         check.status === 'requested') && (
                                         <Button
                                             size="sm"
-                                            onClick={() => {
-                                                if (
-                                                    confirm(
-                                                        'Mark this check as cleared?',
-                                                    )
-                                                ) {
-                                                    router.post(
-                                                        `/hr/compliance/vetting/${check.id}/clear`,
-                                                    );
-                                                }
-                                            }}
+                                            onClick={() => askFor('clear')}
                                         >
                                             <CheckCircle className="mr-1.5 h-4 w-4" />
                                             Mark Cleared
@@ -486,17 +541,7 @@ export default function VettingShow({ check, can }: Props) {
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => {
-                                        if (
-                                            confirm(
-                                                'Request a renewal for this check?',
-                                            )
-                                        ) {
-                                            router.post(
-                                                `/hr/compliance/vetting/${check.id}/renew`,
-                                            );
-                                        }
-                                    }}
+                                    onClick={() => askFor('renew')}
                                 >
                                     Request Renewal
                                 </Button>
@@ -505,17 +550,7 @@ export default function VettingShow({ check, can }: Props) {
                                 size="sm"
                                 variant="outline"
                                 className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                onClick={() => {
-                                    if (
-                                        confirm(
-                                            'Are you sure you want to delete this vetting record?',
-                                        )
-                                    ) {
-                                        router.delete(
-                                            `/hr/compliance/vetting/${check.id}`,
-                                        );
-                                    }
-                                }}
+                                onClick={() => askFor('delete')}
                             >
                                 Delete Record
                             </Button>
@@ -577,6 +612,19 @@ export default function VettingShow({ check, can }: Props) {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                open={pendingAction !== null}
+                onClose={() => {
+                    if (!actionBusy) setPendingAction(null);
+                }}
+                onConfirm={runPendingAction}
+                title={pendingCopy.title}
+                description={pendingCopy.description}
+                confirmText={pendingCopy.confirmText}
+                variant={pendingCopy.variant}
+                processing={actionBusy}
+            />
         </AppLayout>
     );
 }

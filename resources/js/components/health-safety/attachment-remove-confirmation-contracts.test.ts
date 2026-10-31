@@ -5,15 +5,13 @@ import { describe, expect, it } from 'vitest';
 
 // GOOD-CATCHES §3 row 35: these detail viewers used to delete an attachment
 // the moment the trash button was clicked. Each now asks first through the
-// shared ConfirmDialog and only deletes from the confirmed handler.
+// shared ConfirmDialog and only deletes from the confirmed handler. The injury, first aid, drill, restraint and
+// risk assessment viewers were removed with the unreachable screens (b3090e6bc); their record pages remove a file
+// through their own "Remove evidence" pop-up, which asks for a reason first.
 const VIEWERS = [
-    'resources/js/components/health-safety/injury-detail-dialog.tsx',
-    'resources/js/components/health-safety/first-aid-detail-dialog.tsx',
-    'resources/js/components/health-safety/drill-detail-dialog.tsx',
-    'resources/js/components/health-safety/restraint-event-detail-dialog.tsx',
     'resources/js/components/health-safety/procedure-detail-dialog.tsx',
-    'resources/js/components/health-safety/risk-assessments/ra-detail-dialog.tsx',
     'resources/js/components/safeguarding/concern-dialog.tsx',
+    'resources/js/components/safeguarding/concern-record.tsx',
     'resources/js/components/privacy/privacy-attachments-pane.tsx',
 ];
 
@@ -32,9 +30,9 @@ describe('attachment removal asks first', () => {
         expect(source).toContain('variant="destructive"');
         expect(source).toContain('processing={removingFile}');
 
-        // The trash button only picks the file; it never deletes directly.
-        expect(source).not.toMatch(/onClick=\{\(\) =>\s*router\.delete\(/);
-        expect(source).toMatch(/onClick=\{\(\) =>\s*setFileToRemove\(/);
+        // The trash button (or row-menu item) only picks the file; it never deletes directly.
+        expect(source).not.toMatch(/onClick(?:=\{|:\s*)\(\) =>\s*router\.delete\(/);
+        expect(source).toMatch(/onClick(?:=\{|:\s*)\(\) =>\s*setFileToRemove\(/);
 
         // The delete request is sent only from the confirmed handler.
         expect(source).toMatch(

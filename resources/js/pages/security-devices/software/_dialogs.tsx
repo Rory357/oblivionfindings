@@ -113,7 +113,7 @@ const actionText: Record<
     review: {
         title: 'Review software release',
         verb: 'Approve for use',
-        next: 'This exact installer becomes available for governed installation requests. Computer permissions and consent still apply.',
+        next: 'This exact installer becomes available for approved installation requests. Computer permissions and consent still apply.',
         status: 'published',
     },
     withdraw: {

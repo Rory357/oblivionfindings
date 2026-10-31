@@ -78,8 +78,10 @@ import {
 import { useEffect, useState, type ReactNode } from 'react';
 import {
     DeviceCard,
+    deviceCategoryLabel,
     deviceMonitoringVariant,
     formatTimeSince,
+    sentenceCaseLabel,
     type DeviceListItem,
     type FilterOption,
     type Paginated,
@@ -137,11 +139,6 @@ const iconMap: Record<string, LucideIcon> = {
     'it-infrastructure': Server,
     facilities: Building2,
 };
-function singularizeTitle(title: string) {
-    if (title.endsWith('ies')) return `${title.slice(0, -3)}y`;
-    return title.endsWith('s') ? title.slice(0, -1) : title;
-}
-
 export function CategorySearchInput({
     title,
     value,
@@ -262,7 +259,7 @@ export function CategoryWorkspaceHero({
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Need attention"
+                        label="Needs attention"
                         tone={
                             workspace.summary.attention > 0
                                 ? 'warning'
@@ -402,11 +399,7 @@ function CategoryWorkspace(props: CategoryPageProps) {
     useEffect(() => setSearch(filters.search ?? ''), [filters.search]);
     const addDeviceDialog = useAddDeviceDialogState();
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
-    const registerLabel =
-        pageConfig.slug.includes('-') ||
-        ['security', 'healthcare', 'tracking'].includes(pageConfig.slug)
-            ? 'Register device'
-            : `Register ${singularizeTitle(pageConfig.title)}`;
+    const registerLabel = 'Register device';
     const showInventory =
         workspace.activeTabState === 'available' && !bulkManagement;
     const applyFilters = (changes: Record<string, string>) =>
@@ -479,7 +472,14 @@ function CategoryWorkspace(props: CategoryPageProps) {
                                     ? filter(
                                           'category',
                                           'Categories',
-                                          filterOptions.categories,
+                                          filterOptions.categories.map(
+                                              (option) => ({
+                                                  ...option,
+                                                  label: deviceCategoryLabel(
+                                                      option.value,
+                                                  ),
+                                              }),
+                                          ),
                                       )
                                     : null}
                                 {filterOptions.subcategories.length > 0
@@ -489,7 +489,7 @@ function CategoryWorkspace(props: CategoryPageProps) {
                                           filterOptions.subcategories.map(
                                               (option) => ({
                                                   ...option,
-                                                  label: `${option.label} (${stats.bySubcategory[option.value] ?? 0})`,
+                                                  label: `${sentenceCaseLabel(option.label)} (${stats.bySubcategory[option.value] ?? 0})`,
                                               }),
                                           ),
                                       )
@@ -669,7 +669,7 @@ function CategoryInventory({
             label: 'Equipment',
             width: '1fr',
             cell: (device) => (
-                <EntityChip>{device.category.replaceAll('_', ' ')}</EntityChip>
+                <EntityChip>{deviceCategoryLabel(device.category)}</EntityChip>
             ),
         },
         {

@@ -3,7 +3,10 @@
 namespace App\Domain\SecurityDevices\Credentials\Services;
 
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
+use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerSecretStore;
 use App\Domain\SecurityDevices\Credentials\Data\SecretLeaseRequest;
+use App\Domain\SecurityDevices\Credentials\Data\SecretReferenceRequest;
+use App\Domain\SecurityDevices\Credentials\Data\SecretWriteRequest;
 use App\Domain\SecurityDevices\Credentials\Enums\CredentialReferenceStatus;
 use App\Domain\SecurityDevices\Credentials\Enums\CredentialRotationStatus;
 use App\Domain\SecurityDevices\Credentials\Enums\CredentialTestStatus;
@@ -13,6 +16,7 @@ use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -23,6 +27,7 @@ final class CredentialReferenceManager
         private readonly CredentialReferenceRules $rules,
         private readonly SecretManagerLeaseIssuer $issuer,
         private readonly CredentialLeaseLifecycleService $leases,
+        private readonly ?SecretManagerSecretStore $store = null,
     ) {}
 
     /** @param array<string, mixed> $attributes */
@@ -34,7 +39,16 @@ final class CredentialReferenceManager
         $provider = $this->rules->provider((string) ($attributes['provider'] ?? ''));
         $purpose = $this->rules->purpose((string) ($attributes['purpose'] ?? ''));
         $capabilities = $this->rules->capabilities((array) ($attributes['capabilities'] ?? []));
-        $externalReference = $this->rules->externalReference((string) ($attributes['secret_manager_reference'] ?? ''));
+        $material = is_array($attributes['credential_material'] ?? null) ? $attributes['credential_material'] : null;
+        $rawExternalReference = trim((string) ($attributes['secret_manager_reference'] ?? ''));
+        if ($rawExternalReference === '' && $material !== null && $material !== []) {
+            $rawExternalReference = sprintf('oblivion/sites/%d/%s/%s/%s', $siteId, $provider, $purpose, Str::uuid());
+        }
+        $externalReference = $this->rules->externalReference($rawExternalReference);
+
+        if ($material !== null && $material !== []) {
+            $this->writeMaterial($externalReference, $material);
+        }
 
         return DB::transaction(function () use ($actor, $siteId, $referenceKey, $provider, $purpose, $capabilities, $externalReference): CredentialReference {
             $reference = CredentialReference::query()->create([
@@ -62,13 +76,23 @@ final class CredentialReferenceManager
         });
     }
 
+    /** @param array<string, scalar|null>|null $material */
     public function rotate(
         User $actor,
         CredentialReference $reference,
         #[\SensitiveParameter] string $externalReference,
+        #[\SensitiveParameter] ?array $material = null,
     ): CredentialReference {
         $this->authoriseReference($actor, $reference);
-        $externalReference = $this->rules->externalReference($externalReference);
+        $rawExternalReference = trim($externalReference);
+        if ($rawExternalReference === '' && $material !== null && $material !== []) {
+            $rawExternalReference = (string) $reference->secret_manager_reference;
+        }
+        $externalReference = $this->rules->externalReference($rawExternalReference);
+
+        if ($material !== null && $material !== []) {
+            $this->writeMaterial($externalReference, $material);
+        }
 
         $updated = DB::transaction(function () use ($actor, $reference, $externalReference): CredentialReference {
             $locked = CredentialReference::query()->lockForUpdate()->findOrFail($reference->id);
@@ -204,5 +228,23 @@ final class CredentialReferenceManager
             'safe_context' => $safeContext,
             'occurred_at' => CarbonImmutable::now('UTC'),
         ]);
+    }
+
+    /** @param array<string, scalar|null> $material */
+    private function writeMaterial(
+        #[\SensitiveParameter] string $externalReference,
+        #[\SensitiveParameter] array $material,
+    ): void {
+        $store = $this->store ?? app(SecretManagerSecretStore::class);
+        $expectedVersion = 0;
+
+        try {
+            $existing = $store->metadata(new SecretReferenceRequest($externalReference));
+            $expectedVersion = $existing->version;
+        } catch (Throwable) {
+            $expectedVersion = 0;
+        }
+
+        $store->put(new SecretWriteRequest($externalReference, $material, $expectedVersion));
     }
 }

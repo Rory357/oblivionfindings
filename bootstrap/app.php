@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\It\Services\ItTicketRequestTrace;
+use App\Domain\Referrals\Http\ProtectDocumentRequestResponses;
 use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Http\Middleware\AddContentSecurityPolicy;
 use App\Http\Middleware\AuthenticateItServiceIdentity;
@@ -69,6 +70,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/endpoints/agent/remote/*/media/offer', 'it/remote-support/sessions/*/media/answer',
         )]);
         $middleware->prepend(TraceItTicketCreation::class);
+        $middleware->prepend(\App\Http\Middleware\ProtectIncidentRecordingCommands::class);
         $middleware->prepend(ProtectItDraftResponses::class);
         $middleware->prepend(ProtectVendorVaultResponses::class);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
@@ -103,10 +105,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(fn (Throwable $exception, Request $request) => ProtectDocumentRequestResponses::render($exception, $request));
+        $exceptions->report(fn (Throwable $exception) => ProtectDocumentRequestResponses::report($exception));
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectRemoteSupportResponses::render($exception, $request));
         $exceptions->report(fn (Throwable $exception) => ProtectRemoteSupportResponses::report($exception));
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectObliResponses::render($exception, $request));
         $exceptions->report(fn (Throwable $exception) => ProtectObliResponses::report($exception));
+        $exceptions->render(fn (Throwable $exception, Request $request) => \App\Http\Middleware\ProtectIncidentRecordingCommands::render($exception, $request));
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectItDraftResponses::render($exception, $request));
         $exceptions->report(fn (Throwable $exception) => ProtectItDraftResponses::report($exception));
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectVendorVaultResponses::render($exception, $request));

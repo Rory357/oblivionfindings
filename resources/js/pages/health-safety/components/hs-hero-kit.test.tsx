@@ -46,9 +46,14 @@ describe('HeroComplianceBadges — canonical NZ labels', () => {
         ).toBeInTheDocument();
         // Lower-case "substances".
         expect(
-            screen.getByText('Hazardous substances · SDS current'),
+            screen.getByText('Hazardous substances · No SDS expiry alerts'),
         ).toBeInTheDocument();
-        expect(screen.getByText('Fire · Drills current')).toBeInTheDocument();
+        expect(
+            screen.getByText('Fire · No drill due alerts'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(/SDS current|Drills current/),
+        ).not.toBeInTheDocument();
         expect(
             screen.getByText('First aid · Cover unknown'),
         ).toBeInTheDocument();

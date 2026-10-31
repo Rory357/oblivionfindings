@@ -4,15 +4,30 @@ namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Enums\MonitorKind;
+use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
+use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\Monitoring\Services\ConfigurationSnapshotService;
+use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
+use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
+use App\Domain\SecurityDevices\Cctv\Models\CctvSource;
 use App\Domain\SecurityDevices\Cctv\Services\CctvNavigation;
+use App\Domain\SecurityDevices\Cctv\Services\OnvifCameraProfileClient;
+use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
+use App\Domain\SecurityDevices\Endpoints\Presenters\EndpointDevicePosturePresenter;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommands;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCommands;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommands;
+use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
+use App\Domain\SecurityDevices\Management\Enums\CommandConfirmationMode;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Enums\ManagementLevel;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
@@ -26,9 +41,13 @@ use App\Domain\SecurityDevices\Management\Services\DeclaredDeviceCommandCapabili
 use App\Domain\SecurityDevices\Management\Services\DeviceCommandBreakGlassService;
 use App\Domain\SecurityDevices\Management\Services\DeviceCommandParameterPolicyService;
 use App\Domain\SecurityDevices\Management\Services\DeviceManagementAuthorizationService;
+use App\Domain\SecurityDevices\Management\Services\NetworkDeviceCommandPolicyService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Domain\SecurityDevices\Services\QueclinkUnitConsoleService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\Client;
@@ -67,6 +86,8 @@ class DeviceProfilePresenter
         private readonly QueclinkConfigurationProfileService $configurationProfiles,
         private readonly UserSiteAccessService $siteAccess,
         private readonly ControlRoomAlertAccessService $controlRoomAccess,
+        private readonly ?ConfigurationSnapshotService $snapshots = null,
+        private readonly ?NetworkDeviceCommandPolicyService $networkCommandPolicy = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -83,14 +104,61 @@ class DeviceProfilePresenter
         $observations = $canViewMonitoring
             ? $this->latestObservations($monitors->pluck('id'))
             : collect();
+        try {
+            $canonicalSiteId = $this->siteResolver->resolve((int) $device->id);
+        } catch (UnexpectedValueException) {
+            $canonicalSiteId = null;
+        }
+        $maintenanceWindows = $canViewMonitoring && $canonicalSiteId !== null
+            ? $this->maintenanceWindows($canonicalSiteId)
+            : collect();
         $tickets = $canViewIt
             ? $this->tickets($viewer, $device)
             : $this->restrictedTickets($device);
         $audit = $canViewAudit ? $this->audit($device) : collect();
         $controlRoomAlerts = $this->controlRoomAlerts($viewer, $device, $canViewControlRoom);
         $management = $this->management($viewer, $device);
+        $endpointPosture = app(EndpointDevicePosturePresenter::class)->present($viewer, $device, $canonicalSiteId);
+        $consoleService = app(QueclinkUnitConsoleService::class);
+        $queclinkConsole = $consoleService->canViewConsole($viewer) && $consoleService->supportsDevice($device)
+            ? $consoleService->present($viewer, $device)
+            : null;
+        $interfacesSensors = $canViewMonitoring
+            ? $this->interfacesAndSensors($monitors, $observations, $viewer, $device, $canonicalSiteId)
+            : [];
+        $configuration = $this->configuration($device, $viewer, $canonicalSiteId);
+        $cctv = app(CctvNavigation::class)->forDevice($viewer, $device);
+        $profileLayout = $this->resolveProfileLayout($device, $endpointPosture);
+        $typeProfile = $this->buildTypeProfile(
+            $profileLayout,
+            $viewer,
+            $device,
+            $canonicalSiteId,
+            $canViewMonitoring,
+            $monitors,
+            $observations,
+            $interfacesSensors,
+            $configuration,
+            $management,
+            $endpointPosture,
+            $queclinkConsole,
+            $consoleService,
+            $cctv,
+        );
+        $historyTimeline = $this->buildHistoryTimeline(
+            $viewer,
+            $device,
+            $canViewMonitoring,
+            $canViewMaintenance,
+            $canViewAudit,
+            $audit,
+            $management['history'],
+        );
 
         return [
+            'profileLayout' => $profileLayout,
+            'typeProfile' => $typeProfile,
+            'historyTimeline' => $historyTimeline,
             'header' => $this->header(
                 $viewer,
                 $device,
@@ -112,21 +180,27 @@ class DeviceProfilePresenter
                 $controlRoomAlerts,
                 (bool) $management['visible'],
                 count($management['history']),
+                count($historyTimeline),
+                $endpointPosture !== null,
+                $queclinkConsole !== null,
             ),
-            'health' => $this->health($device, $monitors, $canViewMonitoring),
+            'health' => $this->health($device, $monitors, $canViewMonitoring, $maintenanceWindows, $canonicalSiteId),
+            'ping' => $this->pingPayload($viewer, $device),
+            'offlineAlert' => $this->offlineAlertPayload($viewer, $device, $monitors, $canonicalSiteId),
+            'monitorManagement' => $this->monitorManagementPayload($viewer, $device, $canonicalSiteId),
             'monitors' => $canViewMonitoring
-                ? $monitors->map(fn (Monitor $monitor): array => $this->monitor($monitor))->values()
+                ? $monitors->map(fn (Monitor $monitor): array => $this->monitor($monitor, $maintenanceWindows, $canonicalSiteId, (int) $device->id))->values()
                 : [],
-            'interfacesSensors' => $canViewMonitoring
-                ? $this->interfacesAndSensors($monitors, $observations)
-                : [],
-            'configuration' => $this->configuration($device),
+            'interfacesSensors' => $interfacesSensors,
+            'configuration' => $configuration,
             'tickets' => $tickets->values(),
             'controlRoomAlerts' => $controlRoomAlerts->values(),
             'audit' => $audit->values(),
             'management' => $management,
+            'endpointPosture' => $endpointPosture,
+            'queclinkConsole' => $queclinkConsole,
             'capabilities' => $this->capabilities($viewer, $device, $management),
-            'cctv' => app(CctvNavigation::class)->forDevice($viewer, $device),
+            'cctv' => $cctv,
         ];
     }
 
@@ -167,7 +241,9 @@ class DeviceProfilePresenter
                 'id' => $device->id,
                 'name' => $device->name,
                 'uid' => $device->device_uid,
-                'type' => collect([$device->category, $device->subcategory])->filter()->join(' / '),
+                'type' => $this->deviceTypeLabel($device),
+                // Stored key, used only to choose the header icon.
+                'category' => $device->category,
                 'manufacturer' => $device->manufacturer,
                 'model' => $device->model,
             ],
@@ -179,8 +255,8 @@ class DeviceProfilePresenter
                 'expectedReturnAt' => $assignment->expected_return_at?->toISOString(),
             ] : null,
             'health' => [
-                'state' => $device->health_status?->value ?? HealthStatus::Unknown->value,
-                'label' => $device->health_status?->label() ?? HealthStatus::Unknown->label(),
+                'state' => $device->effectiveHealthState(),
+                'label' => $device->effectiveHealthLabel(),
                 'deviceState' => $device->status?->value,
                 'deviceStateLabel' => $device->status?->label(),
             ],
@@ -462,13 +538,18 @@ class DeviceProfilePresenter
         Collection $controlRoomAlerts,
         bool $canViewManagement,
         int $commandCount,
+        int $historyCount = 0,
+        bool $canViewEndpointPosture = false,
+        bool $canViewQueclinkConsole = false,
     ): array {
         return collect([
             ['key' => 'health', 'label' => 'Health', 'group' => 'status'],
-            $canViewMonitoring ? ['key' => 'monitors', 'label' => 'Monitors', 'group' => 'status', 'count' => $monitors->count()] : null,
+            $canViewMonitoring ? ['key' => 'monitors', 'label' => 'Checks', 'group' => 'status', 'count' => $monitors->count()] : null,
             ['key' => 'topology', 'label' => 'Topology', 'group' => 'technical'],
             $canViewMonitoring ? ['key' => 'interfaces-sensors', 'label' => 'Interfaces & sensors', 'group' => 'technical'] : null,
             ['key' => 'configuration', 'label' => 'Configuration', 'group' => 'technical'],
+            $canViewQueclinkConsole ? ['key' => 'console', 'label' => 'Unit console', 'group' => 'technical'] : null,
+            $canViewEndpointPosture ? ['key' => 'endpoint', 'label' => 'Endpoint', 'group' => 'technical'] : null,
             $canViewManagement ? ['key' => 'management', 'label' => 'Management', 'group' => 'technical', 'count' => $commandCount] : null,
             ['key' => 'assignments', 'label' => 'Assignments', 'group' => 'operations', 'count' => $device->assignments->count()],
             $canViewIt || $tickets->isNotEmpty() ? ['key' => 'tickets', 'label' => 'Tickets', 'group' => 'operations', 'count' => $tickets->count()] : null,
@@ -479,23 +560,32 @@ class DeviceProfilePresenter
                 'count' => ($canViewMonitoring ? $device->events->count() : 0) + $controlRoomAlerts->count(),
             ] : null,
             $canViewMaintenance ? ['key' => 'maintenance', 'label' => 'Maintenance', 'group' => 'operations', 'count' => $device->maintenanceRecords->count()] : null,
+            ['key' => 'history', 'label' => 'History', 'group' => 'records', 'count' => $historyCount],
             ['key' => 'documents', 'label' => 'Documents', 'group' => 'records', 'count' => $device->documents->count()],
             $canViewAudit ? ['key' => 'audit', 'label' => 'Audit', 'group' => 'records', 'count' => $audit->count()] : null,
         ])->filter()->values()->all();
     }
 
     /** @return array<string, mixed> */
-    private function health(Device $device, Collection $monitors, bool $canViewMonitoring): array
-    {
+    private function health(
+        Device $device,
+        Collection $monitors,
+        bool $canViewMonitoring,
+        Collection $maintenanceWindows,
+        ?int $canonicalSiteId,
+    ): array {
         $enabled = $monitors->where('is_enabled', true);
 
         return [
-            'state' => $device->health_status?->value ?? 'unknown',
+            'state' => $device->effectiveHealthState(),
             'deviceState' => $device->status?->value,
             'lastSeenAt' => $device->last_seen_at?->toISOString(),
             'lastSignalAt' => $device->last_signal_at?->toISOString(),
             'batteryLevel' => $device->battery_level,
             'batteryUpdatedAt' => $device->battery_updated_at?->toISOString(),
+            'maintenance' => $canViewMonitoring
+                ? $this->maintenanceFor($maintenanceWindows, $canonicalSiteId, (int) $device->id, null)
+                : null,
             'monitoring' => $canViewMonitoring ? [
                 'enabled' => $enabled->count(),
                 'healthy' => $enabled->filter(fn (Monitor $monitor): bool => $monitor->current_state?->value === 'healthy')->count(),
@@ -506,8 +596,12 @@ class DeviceProfilePresenter
     }
 
     /** @return array<string, mixed> */
-    private function monitor(Monitor $monitor): array
-    {
+    private function monitor(
+        Monitor $monitor,
+        Collection $maintenanceWindows,
+        ?int $canonicalSiteId,
+        int $deviceId,
+    ): array {
         return [
             'id' => $monitor->id,
             'name' => $monitor->name,
@@ -519,17 +613,67 @@ class DeviceProfilePresenter
             'lastObservationAt' => $monitor->last_observation_at?->toISOString(),
             'lastStateChangedAt' => $monitor->last_state_changed_at?->toISOString(),
             'suppressedUntil' => $monitor->suppressed_until?->toISOString(),
+            'maintenance' => $this->maintenanceFor($maintenanceWindows, $canonicalSiteId, $deviceId, (int) $monitor->id),
             'profile' => $monitor->profile ? [
                 'name' => $monitor->profile->name,
                 'intervalSeconds' => $monitor->profile->interval_seconds,
                 'staleAfterSeconds' => $monitor->profile->stale_after_seconds,
             ] : null,
+            'collectorId' => $monitor->collector_id === null ? null : (int) $monitor->collector_id,
+            'collectorName' => $monitor->collector?->name,
+            'runsFrom' => $monitor->collector_id === null
+                ? 'Runs from: server'
+                : 'Runs from: hub '.($monitor->collector?->name ?? '#'.$monitor->collector_id),
             'collector' => $monitor->collector ? [
                 'name' => $monitor->collector->name,
                 'status' => $monitor->collector->status,
                 'lastSeenAt' => $monitor->collector->last_seen_at?->toISOString(),
             ] : null,
         ];
+    }
+
+    /**
+     * The header's type line in words: the taxonomy subtype ("Card reader")
+     * when one is recorded, otherwise the category ("Access control").
+     */
+    private function deviceTypeLabel(Device $device): string
+    {
+        $category = (string) $device->category;
+        $subcategory = (string) $device->subcategory;
+
+        if ($subcategory !== '') {
+            $known = DeviceTaxonomy::subcategoriesFor((string) $device->domain, $category)[$subcategory] ?? null;
+
+            return is_string($known) ? $this->sentenceCase($known) : $this->taxonomyWords($subcategory);
+        }
+
+        return $category !== '' ? $this->taxonomyWords($category) : '';
+    }
+
+    /** "PIR Motion Sensor" → "PIR motion sensor"; words like NVR and LoRa keep their capitals. */
+    private function sentenceCase(string $label): string
+    {
+        return collect(explode(' ', $label))
+            ->map(fn (string $word, int $index): string => $index === 0 || preg_match('/[A-Z]/', mb_substr($word, 1)) === 1
+                ? $word
+                : mb_strtolower($word))
+            ->join(' ');
+    }
+
+    /** A stored key in words: "access_control" → "Access control", "cctv" → "CCTV". */
+    private function taxonomyWords(string $value): string
+    {
+        $acronyms = [
+            '5g' => '5G', 'can' => 'CAN', 'cctv' => 'CCTV', 'co' => 'CO', 'dvr' => 'DVR', 'gps' => 'GPS',
+            'hvac' => 'HVAC', 'it' => 'IT', 'iot' => 'IoT', 'lora' => 'LoRa', 'lpg' => 'LPG', 'lte' => 'LTE',
+            'mfp' => 'MFP', 'nas' => 'NAS', 'nvr' => 'NVR', 'obd' => 'OBD', 'pbx' => 'PBX', 'pdu' => 'PDU',
+            'pir' => 'PIR', 'ptz' => 'PTZ', 'san' => 'SAN', 'sip' => 'SIP', 'sos' => 'SOS', 'ups' => 'UPS',
+        ];
+        $words = preg_split('/[_\s-]+/', mb_strtolower($value), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return collect($words)
+            ->map(fn (string $word, int $index): string => $acronyms[$word] ?? ($index === 0 ? Str::ucfirst($word) : $word))
+            ->join(' ');
     }
 
     private function monitorKindLabel(?MonitorKind $kind): string
@@ -542,6 +686,8 @@ class DeviceProfilePresenter
             MonitorKind::Tls => 'TLS',
             MonitorKind::Snmp => 'SNMP',
             MonitorKind::SnmpInterface => 'SNMP interface',
+            MonitorKind::SshInventory => 'Read-only SSH inventory',
+            MonitorKind::WinRmInventory => 'Read-only WinRM inventory',
             MonitorKind::Provider => 'Provider check',
             MonitorKind::Collector => 'Collector health',
             default => 'Monitor',
@@ -567,8 +713,28 @@ class DeviceProfilePresenter
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function interfacesAndSensors(Collection $monitors, Collection $observations): array
-    {
+    private function interfacesAndSensors(
+        Collection $monitors,
+        Collection $observations,
+        User $viewer,
+        Device $device,
+        ?int $canonicalSiteId,
+    ): array {
+        $canManageCommands = $viewer->canDo('securityDevices.commands.manage');
+        $canControlCommands = $viewer->canDo('securityDevices.commands.control');
+        $supportsBounce = $canManageCommands
+            && $canonicalSiteId !== null
+            && $this->declaredCommandCapabilities->supports($device, 'network.port.bounce')
+            && $this->commandExecutionRoutes->resolve($device, $canonicalSiteId, 'network.port.bounce')->available;
+        $supportsEnable = $canManageCommands
+            && $canonicalSiteId !== null
+            && $this->declaredCommandCapabilities->supports($device, 'network.port.enable')
+            && $this->commandExecutionRoutes->resolve($device, $canonicalSiteId, 'network.port.enable')->available;
+        $supportsDisable = $canControlCommands
+            && $canonicalSiteId !== null
+            && $this->declaredCommandCapabilities->supports($device, 'network.port.disable')
+            && $this->commandExecutionRoutes->resolve($device, $canonicalSiteId, 'network.port.disable')->available;
+
         return $monitors->filter(function (Monitor $monitor) use ($observations): bool {
             if ($monitor->kind === MonitorKind::SnmpInterface) {
                 return true;
@@ -580,13 +746,24 @@ class DeviceProfilePresenter
                 && is_array($metrics)
                 && collect(['interface_name', 'if_name', 'sensor_name', 'sensor_type'])
                     ->contains(fn (string $key): bool => data_get($metrics, $key) !== null);
-        })->map(function (Monitor $monitor) use ($observations): array {
+        })->map(function (Monitor $monitor) use (
+            $observations,
+            $device,
+            $supportsBounce,
+            $supportsEnable,
+            $supportsDisable,
+        ): array {
             $observation = $observations->get($monitor->id);
             $metrics = is_array($observation?->metrics) ? $observation->metrics : [];
+            $interfaceName = $this->identifierMetric($metrics, ['interface_name', 'if_name']);
+            $displayName = $interfaceName ?: ($this->identifierMetric($metrics, ['sensor_name']) ?: $monitor->name);
+            $isInterface = $monitor->kind === MonitorKind::SnmpInterface || $interfaceName !== null;
+            $portIdentifier = $interfaceName ?: $monitor->name;
+            $encodedInterface = rawurlencode($portIdentifier);
 
             return [
                 'monitorId' => $monitor->id,
-                'name' => $this->identifierMetric($metrics, ['interface_name', 'if_name', 'sensor_name']) ?: $monitor->name,
+                'name' => $displayName,
                 'kind' => $monitor->kind?->value,
                 'state' => $monitor->current_state?->value,
                 'value' => $this->numeric($observation?->value),
@@ -602,12 +779,23 @@ class DeviceProfilePresenter
                 'errors' => $this->boundedIntegerMetric($metrics, ['errors', 'error_count']),
                 'discards' => $this->boundedIntegerMetric($metrics, ['discards', 'discard_count']),
                 'observedAt' => $observation?->observed_at?->toISOString(),
+                'portActions' => $isInterface && ($supportsBounce || $supportsEnable || $supportsDisable) ? [
+                    'bounceHref' => $supportsBounce
+                        ? "/security-devices/devices/{$device->id}?section=management&action=network.port.bounce&command_interface={$encodedInterface}"
+                        : null,
+                    'enableHref' => $supportsEnable
+                        ? "/security-devices/devices/{$device->id}?section=management&action=network.port.enable&command_interface={$encodedInterface}"
+                        : null,
+                    'disableHref' => $supportsDisable
+                        ? "/security-devices/devices/{$device->id}?section=management&action=network.port.disable&command_interface={$encodedInterface}"
+                        : null,
+                ] : null,
             ];
         })->values()->all();
     }
 
     /** @return array<string, mixed> */
-    private function configuration(Device $device): array
+    private function configuration(Device $device, User $viewer, ?int $canonicalSiteId): array
     {
         $observedHash = $this->scalarEvidence($device, [
             'observed.configuration_hash',
@@ -624,8 +812,27 @@ class DeviceProfilePresenter
             'monitoring.firmware.desired_version',
             'firmware.desired_version',
         ]);
+        $snapshotService = $this->snapshots ?? app(ConfigurationSnapshotService::class);
+        $canViewSnapshots = $snapshotService->canViewSnapshots($viewer);
+        $loadedSnapshots = $device->relationLoaded('configurationSnapshots')
+            ? $device->configurationSnapshots
+            : $device->configurationSnapshots()->latest('captured_at')->latest('id')->limit(12)->get();
+        $snapshotCandidates = $canonicalSiteId === null
+            ? collect()
+            : $loadedSnapshots
+                ->where('site_id', $canonicalSiteId)
+                ->values();
+        $snapshotHistory = $snapshotCandidates
+            ->take(11)
+            ->map(fn (ConfigurationSnapshot $snapshot): array => $this->configurationSnapshot($device, $snapshot, $canViewSnapshots))
+            ->values();
 
         return [
+            'canViewSnapshots' => $canViewSnapshots,
+            'backupActionHref' => null,
+            'latestSnapshot' => $snapshotHistory->first(),
+            'snapshotHistory' => $snapshotHistory->all(),
+            'snapshotHistoryTruncated' => $snapshotCandidates->count() > $snapshotHistory->count(),
             'registry' => [
                 'manufacturer' => $device->manufacturer,
                 'model' => $device->model,
@@ -683,6 +890,99 @@ class DeviceProfilePresenter
                     'monitoring.firmware.observed_at',
                 ]),
             ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function configurationSnapshot(Device $device, ConfigurationSnapshot $snapshot, bool $canViewSnapshots): array
+    {
+        $diff = is_array($snapshot->diff_summary) ? $snapshot->diff_summary : [];
+        $added = collect($diff['added'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
+        $removed = collect($diff['removed'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
+        $changed = collect($diff['changed'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
+        $canAccessPayload = $snapshot->storage_state === 'available' && $canViewSnapshots;
+
+        return [
+            'id' => $snapshot->id,
+            'sourceKind' => $snapshot->source_kind,
+            'source' => $snapshot->source,
+            'capturedAt' => $snapshot->captured_at?->toISOString(),
+            'contentHash' => $snapshot->content_hash,
+            'configurationHash' => $snapshot->configuration_hash,
+            'contentSize' => $snapshot->content_size,
+            'mimeType' => $snapshot->mime_type,
+            'firmwareVersion' => $snapshot->firmware_version,
+            'storageState' => $snapshot->storage_state,
+            'previousSnapshotId' => $snapshot->previous_snapshot_id,
+            'diff' => [
+                'added' => $added->all(),
+                'removed' => $removed->all(),
+                'changed' => $changed->all(),
+                'count' => $added->count() + $removed->count() + $changed->count(),
+                'truncated' => (bool) ($diff['truncated'] ?? false),
+            ],
+            'downloadHref' => $canAccessPayload
+                ? "/security-devices/devices/{$device->id}/configuration-snapshots/{$snapshot->id}"
+                : null,
+            'compareHref' => $canAccessPayload
+                ? "/security-devices/devices/{$device->id}/configuration-snapshots/{$snapshot->id}/compare"
+                : null,
+        ];
+    }
+
+    /** @return Collection<int, MonitoringMaintenanceWindow> */
+    private function maintenanceWindows(int $siteId): Collection
+    {
+        return MonitoringMaintenanceWindow::query()
+            ->where('status', 'active')
+            ->where('site_id', $siteId)
+            ->where('ends_at', '>', now())
+            ->where('starts_at', '<=', now()->addDays(7))
+            ->orderBy('starts_at')
+            ->limit(100)
+            ->get();
+    }
+
+    /** @return array{activeWindow: array<string, mixed>|null, upcomingWindow: array<string, mixed>|null} */
+    private function maintenanceFor(
+        Collection $windows,
+        ?int $siteId,
+        int $deviceId,
+        ?int $monitorId,
+    ): array {
+        if ($siteId === null || $windows->isEmpty()) {
+            return ['activeWindow' => null, 'upcomingWindow' => null];
+        }
+
+        $now = now();
+        $matching = $windows->filter(function (MonitoringMaintenanceWindow $window) use ($siteId, $deviceId, $monitorId): bool {
+            if ((int) $window->site_id !== $siteId) {
+                return false;
+            }
+            if ($window->monitor_id !== null) {
+                return $monitorId !== null && (int) $window->monitor_id === $monitorId;
+            }
+            if ($window->device_id !== null) {
+                return (int) $window->device_id === $deviceId;
+            }
+
+            return true;
+        });
+
+        $active = $matching->first(fn (MonitoringMaintenanceWindow $w): bool => $w->starts_at !== null && $w->starts_at->lte($now));
+        $upcoming = $matching->first(fn (MonitoringMaintenanceWindow $w): bool => $w->starts_at !== null && $w->starts_at->gt($now));
+
+        $format = static fn (?MonitoringMaintenanceWindow $w): ?array => $w === null ? null : [
+            'id' => $w->id,
+            'name' => $w->name,
+            'scopeType' => $w->monitor_id !== null ? 'monitor' : ($w->device_id !== null ? 'device' : 'site'),
+            'startsAt' => $w->starts_at?->toISOString(),
+            'endsAt' => $w->ends_at?->toISOString(),
+        ];
+
+        return [
+            'activeWindow' => $format($active),
+            'upcomingWindow' => $format($upcoming),
         ];
     }
 
@@ -970,6 +1270,8 @@ class DeviceProfilePresenter
         $canObserve = $this->managementAuthorization->allowsLevel($viewer, ManagementLevel::Observe);
         $freshness = $this->commandFreshness->inspect($device);
         $compatibleConfigurationProfiles = $this->configurationProfiles->compatibleProfiles($device);
+        $networkPolicy = $this->networkCommandPolicy ?? app(NetworkDeviceCommandPolicyService::class);
+        $knownInterfaces = $networkPolicy->knownInterfaces($device);
         try {
             $siteId = $this->siteResolver->resolve((int) $device->id);
             $assignmentFingerprint = $this->commandAssignments->forDevice($device);
@@ -980,7 +1282,7 @@ class DeviceProfilePresenter
             $eligibleChanges = collect();
         }
         $actions = $this->declaredCommandCapabilities->forDevice($device)
-            ->map(function (string $key) use ($viewer, $device, $eligibleChanges, $freshness, $siteId, $compatibleConfigurationProfiles): ?array {
+            ->map(function (string $key) use ($viewer, $device, $eligibleChanges, $freshness, $siteId, $compatibleConfigurationProfiles, $networkPolicy, $knownInterfaces): ?array {
                 try {
                     $definition = $this->commandCapabilities->definition($key);
                 } catch (\DomainException) {
@@ -1077,24 +1379,41 @@ class DeviceProfilePresenter
                     'requiresChange' => $definition->requiresChange,
                     'allowsBreakGlass' => $definition->allowsBreakGlass,
                     'expiresAfterSeconds' => $definition->expiresAfterSeconds,
+                    'protectedInterfaces' => $key === 'network.port.bounce'
+                        ? collect($knownInterfaces)
+                            ->where('protected', true)
+                            ->mapWithKeys(fn (array $row): array => [$row['name'] => $row['protectionReason']])
+                            ->all()
+                        : [],
                     'parameters' => collect($definition->parameters)
-                        ->map(function (array $schema, string $name) use ($compatibleConfigurationProfiles): array {
+                        ->map(function (array $schema, string $name) use ($key, $compatibleConfigurationProfiles, $networkPolicy, $knownInterfaces): array {
                             $profileSource = ($schema['source'] ?? null) === 'compatible_configuration_profiles';
+                            $interfaceSource = $name === 'interface' && $networkPolicy->isPortCapability($key) && $knownInterfaces !== [];
 
                             return [
                                 'name' => $name,
-                                'label' => $profileSource ? 'Approved configuration profile' : ($name === 'package_uuid' ? 'Approved software' : Str::headline($name)),
+                                'label' => $profileSource
+                                    ? 'Approved configuration profile'
+                                    : ($name === 'package_uuid'
+                                        ? 'Approved software'
+                                        : ($interfaceSource ? 'Network port' : Str::headline($name))),
                                 'type' => $schema['type'],
                                 'min' => $schema['min'] ?? null,
                                 'max' => $schema['max'] ?? $schema['max_length'] ?? null,
                                 'options' => $profileSource
                                     ? $compatibleConfigurationProfiles->pluck('id')->map(fn (int $id): string => (string) $id)->all()
-                                    : ($schema['enum'] ?? []),
+                                    : ($interfaceSource ? array_keys($knownInterfaces) : ($schema['enum'] ?? [])),
                                 'optionLabels' => $profileSource
                                     ? $compatibleConfigurationProfiles->mapWithKeys(fn ($profile): array => [
                                         (string) $profile->id => $profile->name.' · v'.$profile->version,
                                     ])->all()
-                                    : ($schema['option_labels'] ?? []),
+                                    : ($interfaceSource
+                                        ? collect($knownInterfaces)->mapWithKeys(fn (array $row): array => [
+                                            $row['name'] => $key === 'network.port.bounce'
+                                                ? $row['label']
+                                                : str_replace(' — Independent approval required', '', $row['label']),
+                                        ])->all()
+                                        : ($schema['option_labels'] ?? [])),
                             ];
                         })->values()->all(),
                 ];
@@ -1228,7 +1547,7 @@ class DeviceProfilePresenter
                         && $command->risk === $definition->risk
                         && $command->management_level === $definition->level
                         && $command->confirmation_mode === $definition->confirmationMode
-                        && (! $definition->isHighRisk() || $command->impact_acknowledged_at !== null)
+                        && ((! $definition->isHighRisk() && $definition->confirmationMode === CommandConfirmationMode::None) || $command->impact_acknowledged_at !== null)
                         && $siteId !== null
                         && (int) $command->site_id === $siteId
                         && is_string($assignmentFingerprint)
@@ -1258,6 +1577,7 @@ class DeviceProfilePresenter
                         'confirmationMode' => $command->confirmation_mode?->value,
                         'impactAcknowledgedAt' => $command->impact_acknowledged_at?->toISOString(),
                         'reason' => $command->reason,
+                        'service' => app(EndpointServiceCommands::class)->projection($command, $latestAttempt),
                         'restart' => app(EndpointRestartCommands::class)->projection($command, $viewer, $latestAttempt),
                         'software' => app(EndpointSoftwareCommands::class)->projection($command, $viewer, $latestAttempt),
                         'safeParameters' => $command->safe_parameter_summary ?? [],
@@ -1547,5 +1867,842 @@ class DeviceProfilePresenter
         $number = (float) $value;
 
         return is_finite($number) && abs($number) <= 1_000_000_000_000 ? $number : null;
+    }
+
+    /** @return array<string, mixed> */
+    private function pingPayload(User $viewer, Device $device): array
+    {
+        $target = trim((string) ($device->ip_address ?? ''));
+        $canView = $viewer->canDo('securityDevices.devices.view');
+        $canPing = $canView && $target !== '';
+        $missingReason = null;
+
+        if (! $canView) {
+            $missingReason = 'Device view permission is required.';
+        } elseif ($target === '') {
+            $missingReason = 'Add an IP address or hostname to this device first.';
+        }
+
+        return [
+            'url' => "/security-devices/devices/{$device->id}/ping",
+            'target' => $target !== '' ? $target : null,
+            'canPing' => $canPing,
+            'missingReason' => $missingReason,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function offlineAlertPayload(
+        User $viewer,
+        Device $device,
+        Collection $monitors,
+        ?int $canonicalSiteId,
+    ): array {
+        $canManage = $viewer->canDo('securityDevices.monitoring.manage');
+        $activeMonitor = $device->relationLoaded('monitors')
+            ? $monitors->first(fn (Monitor $monitor): bool => $monitor->collector_id === null
+                && ($monitor->kind?->value ?? (string) $monitor->kind) === MonitorKind::Icmp->value
+                && (bool) $monitor->affects_availability
+                && (bool) $monitor->is_enabled)
+            : ($canManage
+                ? Monitor::query()
+                    ->where('device_id', $device->id)
+                    ->whereNull('collector_id')
+                    ->where('kind', MonitorKind::Icmp->value)
+                    ->where('affects_availability', true)
+                    ->where('is_enabled', true)
+                    ->first()
+                : null);
+
+        $enabled = $activeMonitor !== null;
+        $target = trim((string) ($device->ip_address ?? ''));
+        $missingReason = null;
+
+        if (! $canManage) {
+            $missingReason = 'Monitoring management permission is required to change offline alerts.';
+        } elseif (! $enabled && $canonicalSiteId === null) {
+            $missingReason = 'Assign this device to a Site first so offline alerts know where it lives.';
+        } elseif (! $enabled && $target === '') {
+            $missingReason = 'Add an IP address or hostname to this device first.';
+        }
+
+        $canToggle = $canManage && ($enabled || ($canonicalSiteId !== null && $target !== ''));
+
+        return [
+            'url' => "/security-devices/devices/{$device->id}/offline-alert",
+            'enabled' => $enabled,
+            'canToggle' => $canToggle,
+            'monitorId' => $activeMonitor ? (int) $activeMonitor->id : null,
+            'state' => $activeMonitor?->current_state?->value,
+            'target' => $target !== '' ? $target : null,
+            'missingReason' => $missingReason,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function monitorManagementPayload(
+        User $viewer,
+        Device $device,
+        ?int $canonicalSiteId,
+    ): array {
+        $canManage = $viewer->canDo('securityDevices.monitoring.manage');
+        $site = $canonicalSiteId !== null
+            ? Site::query()
+                ->whereKey($canonicalSiteId)
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at')
+                ->first(['id', 'name'])
+            : null;
+
+        $profiles = $canManage
+            ? MonitoringProfile::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (MonitoringProfile $profile): array => [
+                    'id' => (int) $profile->id,
+                    'name' => $profile->name,
+                ])
+                ->values()
+                ->all()
+            : [];
+
+        $collectors = [];
+        if ($canManage && $site !== null) {
+            $accessibleSiteIds = $this->deviceAccess->accessibleSiteIds($viewer);
+            $canViewAllSites = $this->deviceAccess->canViewAllSites($viewer);
+            $availability = app(MonitoringCollectorAvailabilityService::class);
+            $collectors = ($canViewAllSites || $accessibleSiteIds !== [])
+                ? MonitoringCollector::query()
+                    ->with('site:id,name')
+                    ->whereNull('revoked_at')
+                    ->when(! $canViewAllSites, fn ($query) => $query->whereIn('site_id', $accessibleSiteIds))
+                    ->orderBy('name')
+                    ->get()
+                    ->filter(fn (MonitoringCollector $collector): bool => in_array((int) $site->id, $collector->authorisedSiteIds(), true))
+                    ->map(fn (MonitoringCollector $collector): array => [
+                        'id' => (int) $collector->id,
+                        'name' => $collector->name,
+                        'home_site_id' => (int) $collector->site_id,
+                        'home_site_name' => $collector->site?->name,
+                        'authorised_site_ids' => array_values(array_filter(
+                            $collector->authorisedSiteIds(),
+                            fn (int $id): bool => $canViewAllSites || in_array($id, $accessibleSiteIds, true),
+                        )),
+                        'state' => $availability->state($collector),
+                    ])
+                    ->values()
+                    ->all()
+                : [];
+        }
+
+        $hasActiveScope = false;
+        if ($canManage && $site !== null) {
+            $hasActiveScope = DiscoveryScope::query()
+                ->where('site_id', $site->id)
+                ->where('status', 'active')
+                ->get(['collector_id', 'cidrs', 'protocols', 'exclusions', 'port_bounds'])
+                ->contains(function (DiscoveryScope $scope) use ($collectors): bool {
+                    if (($scope->exclusions ?? []) !== [] || empty($scope->cidrs)) {
+                        return false;
+                    }
+                    $protocols = array_map('strtolower', array_filter($scope->protocols ?? [], 'is_string'));
+                    if ($scope->collector_id !== null) {
+                        return $collectors !== [] && $protocols !== [];
+                    }
+                    if (in_array('icmp', $protocols, true) || $collectors !== []) {
+                        return true;
+                    }
+
+                    return collect($scope->port_bounds ?? [])->contains(
+                        fn (mixed $ports, mixed $protocol): bool => is_string($protocol)
+                            && in_array(strtolower($protocol), $protocols, true)
+                            && is_array($ports)
+                            && $ports !== [],
+                    );
+                });
+        }
+
+        $missingReason = null;
+        $fixHref = null;
+        $fixLabel = null;
+
+        if (! $canManage) {
+            $missingReason = 'You need monitoring management permission to add checks.';
+        } elseif ($site === null) {
+            $missingReason = 'Assign this device to a Site first so checks know where it lives.';
+            $fixLabel = 'Edit device';
+        } elseif ($profiles === []) {
+            $missingReason = 'Create an active check schedule on Setup first.';
+            $fixHref = '/security-devices/settings';
+            $fixLabel = 'Open Setup';
+        } elseif (! $hasActiveScope) {
+            $missingReason = 'Add an approved Site subnet on Setup first (or switch on "Alert me if this goes offline" to cover this device\'s IP automatically).';
+            $fixHref = '/security-devices/discovery?tab=scopes';
+            $fixLabel = 'Add Site subnet';
+        }
+
+        $canAddCheck = $canManage && $site !== null && $profiles !== [] && $hasActiveScope;
+
+        return [
+            'actor_id' => (int) $viewer->id,
+            'can_manage' => $canManage,
+            'can_add_check' => $canAddCheck,
+            'create_url' => $canManage ? '/security-devices/monitoring/native-monitors' : null,
+            'default_target' => $device->ip_address,
+            'kinds' => $canManage ? NativeMonitoringDefinitionService::directKindOptions() : [],
+            'profiles' => $profiles,
+            'devices' => $site ? [[
+                'id' => (int) $device->id,
+                'name' => $device->name,
+                'site' => [
+                    'id' => (int) $site->id,
+                    'name' => $site->name,
+                ],
+            ]] : [],
+            'collectors' => $collectors,
+            'missing_reason' => $missingReason,
+            'fix_href' => $fixHref,
+            'fix_label' => $fixLabel,
+        ];
+    }
+
+    /**
+     * Classify a Device into one of the 8 Phase 4.1 primary profile layouts.
+     *
+     * @param  array<string, mixed>|null  $endpointPosture
+     */
+    private function resolveProfileLayout(Device $device, ?array $endpointPosture): string
+    {
+        $domain = strtolower(trim((string) $device->domain));
+        $category = strtolower(trim((string) $device->category));
+        $subcategory = strtolower(trim((string) $device->subcategory));
+
+        if ($domain === DeviceDomain::ItInfrastructure->value && in_array($category, ['network', 'networking'], true)) {
+            return 'network';
+        }
+
+        if (
+            ($domain === DeviceDomain::Security->value && $category === 'cctv')
+            || ($domain === DeviceDomain::ItInfrastructure->value && $category === 'recording')
+        ) {
+            return 'camera';
+        }
+
+        if (
+            ($domain === DeviceDomain::Security->value && in_array($category, ['alarm', 'perimeter'], true))
+            || ($domain === DeviceDomain::Facilities->value && $category === 'building_safety' && $subcategory === 'fire_panel')
+        ) {
+            return 'alarm_panel';
+        }
+
+        if (
+            ($domain === DeviceDomain::Security->value && $category === 'access_control')
+            || ($domain === DeviceDomain::Facilities->value && $category === 'facility_access')
+        ) {
+            return 'door';
+        }
+
+        if (
+            $domain === DeviceDomain::IotHealthcare->value
+            || ($domain === DeviceDomain::Facilities->value && in_array($category, ['leak_detection', 'gas_detection', 'cold_chain', 'mechanical', 'building_safety'], true))
+            || ($domain === DeviceDomain::ItInfrastructure->value && $category === 'it_environmental')
+        ) {
+            return 'sensor';
+        }
+
+        if ($domain === DeviceDomain::Tracking->value) {
+            return 'tracker';
+        }
+
+        if ($domain === DeviceDomain::ItInfrastructure->value && (
+            in_array($category, ['server', 'workstation', 'computer'], true)
+            || ($category === 'endpoint' && in_array($subcategory, ['', 'workstation', 'laptop', 'kiosk', 'thin_client', 'shared_device'], true))
+            || $endpointPosture !== null
+        )) {
+            return 'computer';
+        }
+
+        return 'other';
+    }
+
+    /**
+     * Build the type-specific overview payload for the resolved layout.
+     *
+     * @param  Collection<int, Monitor>  $monitors
+     * @param  Collection<int, MonitorObservation>  $observations
+     * @param  array<int, array<string, mixed>>  $interfacesSensors
+     * @param  array<string, mixed>  $configuration
+     * @param  array<string, mixed>  $management
+     * @param  array<string, mixed>|null  $endpointPosture
+     * @param  array<string, mixed>|null  $queclinkConsole
+     * @param  array<string, mixed>  $cctv
+     * @return array<string, mixed>
+     */
+    private function buildTypeProfile(
+        string $layout,
+        User $viewer,
+        Device $device,
+        ?int $canonicalSiteId,
+        bool $canViewMonitoring,
+        Collection $monitors,
+        Collection $observations,
+        array $interfacesSensors,
+        array $configuration,
+        array $management,
+        ?array $endpointPosture,
+        ?array $queclinkConsole,
+        QueclinkUnitConsoleService $consoleService,
+        array $cctv,
+    ): array {
+        return match ($layout) {
+            'network' => $this->networkTypeProfile($viewer, $device, $canonicalSiteId, $interfacesSensors, $configuration),
+            'camera' => $this->cameraTypeProfile($viewer, $device, $cctv),
+            'alarm_panel' => $this->alarmPanelTypeProfile($device, $canViewMonitoring, $management),
+            'door' => $this->doorTypeProfile($device, $canViewMonitoring, $management),
+            'sensor' => $this->sensorTypeProfile($device, $canViewMonitoring, $monitors, $observations, $interfacesSensors),
+            'tracker' => [
+                'kind' => 'tracker',
+                'position' => $consoleService->presentTrackerPosition($viewer, $device),
+                'hasConsole' => $queclinkConsole !== null,
+                'imeiMasked' => $this->maskImeiValue($device->imei),
+            ],
+            'computer' => [
+                'kind' => 'computer',
+                'agentEnrolled' => $endpointPosture !== null
+                    && ! in_array($endpointPosture['agent']['state'] ?? 'not_enrolled', ['not_enrolled'], true),
+                'agentState' => $endpointPosture['agent']['state'] ?? 'not_enrolled',
+                'hostname' => $endpointPosture['inventory']['hostname']
+                    ?? $endpointPosture['intune']['snapshot']['deviceName']
+                    ?? null,
+                'osVersion' => $endpointPosture['inventory']['osVersion']
+                    ?? $endpointPosture['intune']['snapshot']['operatingSystem']
+                    ?? null,
+                'scriptExecutionAvailable' => false,
+            ],
+            default => [
+                'kind' => 'other',
+                'domainLabel' => $this->taxonomyWords((string) $device->domain),
+                'categoryLabel' => $this->deviceTypeLabel($device),
+                'ipAddress' => $device->ip_address,
+                'macAddress' => $device->mac_address,
+                'serialNumber' => $device->serial_number,
+                'firmwareVersion' => $device->firmware_version,
+                'notes' => $device->notes,
+            ],
+        };
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $interfacesSensors
+     * @param  array<string, mixed>  $configuration
+     * @return array<string, mixed>
+     */
+    private function networkTypeProfile(
+        User $viewer,
+        Device $device,
+        ?int $canonicalSiteId,
+        array $interfacesSensors,
+        array $configuration,
+    ): array {
+        $visibleDeviceIds = $canonicalSiteId !== null
+            ? $this->deviceAccess->visibleDevicesForSite($viewer, $canonicalSiteId)->pluck('devices.id')->map(fn ($id): int => (int) $id)->values()
+            : $this->deviceAccess->visibleDevices($viewer)->limit(500)->pluck('devices.id')->map(fn ($id): int => (int) $id)->values();
+
+        if (! $device->relationLoaded('parentRelationships')) {
+            $device->load(['parentRelationships.parent:id,name,category,subcategory,ip_address,status']);
+        }
+        if (! $device->relationLoaded('childRelationships')) {
+            $device->load(['childRelationships.child:id,name,category,subcategory,ip_address,status']);
+        }
+
+        $neighbours = app(SiteTopologyMapService::class)->neighboursForDevice(
+            $device,
+            $visibleDeviceIds,
+            $canonicalSiteId,
+        );
+
+        return [
+            'kind' => 'network',
+            'neighbours' => $neighbours,
+            'interfaceCount' => count($interfacesSensors),
+            'configState' => $configuration['configuration']['state'] ?? 'not_observed',
+            'latestSnapshotAt' => $configuration['latestSnapshot']['capturedAt'] ?? null,
+            'firmwareVersion' => $device->firmware_version,
+            'ipAddress' => $device->ip_address,
+            'macAddress' => $device->mac_address,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $cctv
+     * @return array<string, mixed>
+     */
+    private function cameraTypeProfile(User $viewer, Device $device, array $cctv): array
+    {
+        $subcategory = strtolower(trim((string) $device->subcategory));
+        $isRecorder = in_array($subcategory, ['nvr', 'dvr', 'nvr_infrastructure', 'dvr_infrastructure', 'video_server'], true)
+            || strtolower(trim((string) $device->category)) === 'recording';
+        $canViewMedia = $viewer->canDo('securityDevices.cctv.media.view')
+            && $device->status !== DeviceStatus::Decommissioned;
+        $canOperatePtz = $canViewMedia && (
+            $viewer->canDo('securityDevices.commands.operate')
+            || $viewer->canDo('securityDevices.commands.manage')
+            || $viewer->canDo('securityDevices.commands.control')
+            || $viewer->canDo('securityDevices.commands.admin')
+        );
+
+        $source = CctvSource::query()
+            ->where('camera_id', $device->id)
+            ->where('enabled', true)
+            ->orderByDesc('revision')
+            ->first(['id', 'provider', 'stream_state', 'verified_at', 'stream_verified_at']);
+
+        $ptzSupported = ! $isRecorder && OnvifCameraProfileClient::supportsPtz($device);
+
+        return [
+            'kind' => 'camera',
+            'isRecorder' => $isRecorder,
+            'streamState' => $source
+                ? ($source->stream_state === 'verified' ? 'verified' : 'configured_unverified')
+                : 'not_configured',
+            'sourceProvider' => $source?->provider,
+            'streamVerifiedAt' => $source?->stream_verified_at?->toISOString(),
+            'liveHref' => $cctv['live_href'] ?? null,
+            'setupHref' => $cctv['setup_href'] ?? null,
+            'recordingReferencesHref' => $cctv['reference_href'] ?? null,
+            'canViewMedia' => $canViewMedia,
+            'hasIpAddress' => trim((string) ($device->ip_address ?? '')) !== '',
+            'snapshotUrl' => $canViewMedia && ! $isRecorder && $device->domain === 'security' && $device->category === 'cctv'
+                ? "/security-devices/devices/{$device->id}/camera/snapshot"
+                : null,
+            'ptzSupported' => $ptzSupported,
+            'canOperatePtz' => $canOperatePtz,
+            'ptzUrl' => $canOperatePtz && $ptzSupported && $device->domain === 'security' && $device->category === 'cctv'
+                ? "/security-devices/devices/{$device->id}/camera/ptz"
+                : null,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $management
+     * @return array<string, mixed>
+     */
+    private function alarmPanelTypeProfile(Device $device, bool $canViewMonitoring, array $management): array
+    {
+        $events = $canViewMonitoring && $device->relationLoaded('events')
+            ? $device->events
+            : collect();
+
+        $panelState = 'not_reported';
+        $panelStateAt = null;
+        $zones = [];
+
+        foreach ($events as $event) {
+            if (! $event instanceof DeviceEvent) {
+                continue;
+            }
+            $type = strtolower(trim((string) $event->event_type));
+            if ($panelState === 'not_reported') {
+                if (in_array($type, ['alarm_trigger', 'alarm_triggered', 'alarm.triggered', 'fire_alarm', 'medical_alarm', 'intrusion', 'panic', 'duress'], true)) {
+                    $panelState = 'triggered';
+                    $panelStateAt = $event->occurred_at?->toISOString();
+                } elseif (in_array($type, ['tamper', 'alarm_fault', 'alarm.fault', 'fault'], true)) {
+                    $panelState = 'fault';
+                    $panelStateAt = $event->occurred_at?->toISOString();
+                } elseif (in_array($type, ['alarm_armed', 'alarm.armed', 'armed', 'armed_away', 'armed_stay'], true)) {
+                    $panelState = 'armed';
+                    $panelStateAt = $event->occurred_at?->toISOString();
+                } elseif (in_array($type, ['alarm_disarmed', 'alarm.disarmed', 'disarmed'], true)) {
+                    $panelState = 'disarmed';
+                    $panelStateAt = $event->occurred_at?->toISOString();
+                }
+            }
+
+            $payload = is_array($event->payload) ? $event->payload : [];
+            $zoneKey = $this->safeZoneIdentifier($payload['zone'] ?? $payload['zone_id'] ?? null);
+            if ($zoneKey !== null && ! isset($zones[$zoneKey]) && count($zones) < 32) {
+                $zoneLabel = $this->safeZoneLabel($payload['zone_name'] ?? null) ?? "Zone {$zoneKey}";
+                $rawState = strtolower(trim((string) ($payload['zone_state'] ?? '')));
+                $zoneState = in_array($rawState, ['normal', 'open', 'triggered', 'bypassed', 'tamper', 'fault'], true)
+                    ? $rawState
+                    : (str_contains($type, 'bypass') ? 'bypassed' : (str_contains($type, 'trigger') ? 'triggered' : 'observed'));
+
+                $zones[$zoneKey] = [
+                    'zone' => $zoneKey,
+                    'label' => $zoneLabel,
+                    'state' => $zoneState,
+                    'observedAt' => $event->occurred_at?->toISOString(),
+                ];
+            }
+        }
+
+        $actions = collect($management['actions'] ?? [])->keyBy('key');
+
+        return [
+            'kind' => 'alarm_panel',
+            'panelState' => $panelState,
+            'panelStateAt' => $panelStateAt,
+            'zones' => array_values($zones),
+            'commandStoreUrl' => "/security-devices/devices/{$device->id}/commands",
+            'armAction' => $this->summariseGovernedAction($actions->get('alarm.arm')),
+            'disarmAction' => $this->summariseGovernedAction($actions->get('alarm.disarm')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $management
+     * @return array<string, mixed>
+     */
+    private function doorTypeProfile(Device $device, bool $canViewMonitoring, array $management): array
+    {
+        $events = $canViewMonitoring && $device->relationLoaded('events')
+            ? $device->events
+            : collect();
+
+        $doorState = 'not_reported';
+        $doorStateAt = null;
+        $recentDoorEvents = [];
+
+        foreach ($events as $event) {
+            if (! $event instanceof DeviceEvent) {
+                continue;
+            }
+            $type = strtolower(trim((string) $event->event_type));
+            if ($doorState === 'not_reported') {
+                if (in_array($type, ['door_forced', 'door.forced', 'forced_open'], true)) {
+                    $doorState = 'forced';
+                    $doorStateAt = $event->occurred_at?->toISOString();
+                } elseif (in_array($type, ['door_unlocked', 'door.unlocked', 'unlocked'], true)) {
+                    $doorState = 'unlocked';
+                    $doorStateAt = $event->occurred_at?->toISOString();
+                } elseif (in_array($type, ['door_locked', 'door.locked', 'locked'], true)) {
+                    $doorState = 'locked';
+                    $doorStateAt = $event->occurred_at?->toISOString();
+                } elseif (in_array($type, ['door_opened', 'door.opened'], true)) {
+                    $doorState = 'open';
+                    $doorStateAt = $event->occurred_at?->toISOString();
+                } elseif (in_array($type, ['door_closed', 'door.closed'], true)) {
+                    $doorState = 'closed';
+                    $doorStateAt = $event->occurred_at?->toISOString();
+                }
+            }
+
+            if (count($recentDoorEvents) < 10) {
+                $recentDoorEvents[] = [
+                    'id' => (int) $event->id,
+                    'eventType' => (string) $event->event_type,
+                    'severity' => (string) $event->severity,
+                    'source' => $event->source,
+                    'occurredAt' => $event->occurred_at?->toISOString(),
+                ];
+            }
+        }
+
+        $actions = collect($management['actions'] ?? [])->keyBy('key');
+
+        return [
+            'kind' => 'door',
+            'doorState' => $doorState,
+            'doorStateAt' => $doorStateAt,
+            'recentEvents' => $recentDoorEvents,
+            'commandStoreUrl' => "/security-devices/devices/{$device->id}/commands",
+            'unlockAction' => $this->summariseGovernedAction($actions->get('access.door.unlock_timed')),
+            'lockAction' => $this->summariseGovernedAction($actions->get('access.door.lock')),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Monitor>  $monitors
+     * @param  Collection<int, MonitorObservation>  $observations
+     * @param  array<int, array<string, mixed>>  $interfacesSensors
+     * @return array<string, mixed>
+     */
+    private function sensorTypeProfile(
+        Device $device,
+        bool $canViewMonitoring,
+        Collection $monitors,
+        Collection $observations,
+        array $interfacesSensors,
+    ): array {
+        $battery = $device->battery_level;
+        $batteryState = $battery === null
+            ? 'not_reported'
+            : ($battery <= 15 ? 'critical' : ($battery <= 30 ? 'low' : 'good'));
+
+        $readings = collect($interfacesSensors)
+            ->filter(fn (array $row): bool => ($row['kind'] ?? null) !== MonitorKind::SnmpInterface->value)
+            ->map(fn (array $row): array => [
+                'id' => 'sensor-'.$row['monitorId'],
+                'label' => $row['name'],
+                'value' => $row['value'],
+                'unit' => $row['unit'],
+                'state' => $row['state'],
+                'observedAt' => $row['observedAt'],
+            ])
+            ->values();
+
+        if ($canViewMonitoring) {
+            $seenIds = $readings->pluck('id')->flip();
+            foreach ($monitors as $monitor) {
+                $key = 'sensor-'.$monitor->id;
+                if ($seenIds->has($key) || $monitor->kind === MonitorKind::SnmpInterface) {
+                    continue;
+                }
+                $obs = $observations->get($monitor->id);
+                $numValue = $this->numeric($obs?->value);
+                if ($numValue === null) {
+                    continue;
+                }
+                $readings->push([
+                    'id' => $key,
+                    'label' => $monitor->name,
+                    'value' => $numValue,
+                    'unit' => $this->safeUnit($obs?->unit),
+                    'state' => $monitor->current_state?->value,
+                    'observedAt' => $obs?->observed_at?->toISOString(),
+                ]);
+            }
+
+            $observedReadings = data_get($device->meta, 'observed.sensor_readings');
+            if (is_array($observedReadings)) {
+                foreach ($observedReadings as $metricKey => $entry) {
+                    if (! is_string($metricKey) || ! is_array($entry)) {
+                        continue;
+                    }
+                    $numValue = $this->numeric($entry['value'] ?? null);
+                    if ($numValue === null) {
+                        continue;
+                    }
+                    $readings->push([
+                        'id' => 'observed-'.$metricKey,
+                        'label' => is_string($entry['label'] ?? null) && $entry['label'] !== ''
+                            ? $entry['label']
+                            : ucfirst(str_replace('_', ' ', $metricKey)),
+                        'value' => $numValue,
+                        'unit' => $this->safeUnit(is_string($entry['unit'] ?? null) ? $entry['unit'] : null),
+                        'state' => is_string($entry['state'] ?? null) ? $entry['state'] : 'healthy',
+                        'observedAt' => is_string($entry['observed_at'] ?? null) ? $entry['observed_at'] : null,
+                    ]);
+                }
+            }
+        }
+
+        $recentTriggers = $canViewMonitoring && $device->relationLoaded('events')
+            ? $device->events
+                ->take(8)
+                ->map(fn (DeviceEvent $event): array => [
+                    'id' => (int) $event->id,
+                    'eventType' => (string) $event->event_type,
+                    'severity' => (string) $event->severity,
+                    'occurredAt' => $event->occurred_at?->toISOString(),
+                ])
+                ->values()
+                ->all()
+            : [];
+
+        return [
+            'kind' => 'sensor',
+            'batteryLevel' => $battery,
+            'batteryUpdatedAt' => $device->battery_updated_at?->toISOString(),
+            'batteryState' => $batteryState,
+            'readings' => $readings->take(16)->values()->all(),
+            'recentTriggers' => $recentTriggers,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $action
+     * @return array<string, mixed>|null
+     */
+    private function summariseGovernedAction(?array $action): ?array
+    {
+        if ($action === null) {
+            return null;
+        }
+
+        return [
+            'key' => $action['key'],
+            'label' => $action['label'],
+            'risk' => $action['risk'],
+            'available' => (bool) $action['available'],
+            'allowed' => (bool) $action['allowed'],
+            'adapterAvailable' => (bool) $action['adapterAvailable'],
+            'state' => $action['state'],
+            'reason' => $action['reason'],
+            'confirmationMode' => $action['confirmationMode'],
+            'requiresStepUp' => (bool) $action['requiresStepUp'],
+            'requiresMfa' => (bool) $action['requiresMfa'],
+            'requiresApproval' => (bool) $action['requiresApproval'],
+            'impact' => $action['impact'],
+            'expectedResult' => $action['expectedResult'],
+        ];
+    }
+
+    private function safeZoneIdentifier(mixed $value): ?string
+    {
+        if (is_int($value) && $value >= 1 && $value <= 512) {
+            return (string) $value;
+        }
+        if (! is_string($value)) {
+            return null;
+        }
+        $trimmed = trim($value);
+
+        return preg_match('/^[A-Za-z0-9_-]{1,24}$/', $trimmed) === 1 ? $trimmed : null;
+    }
+
+    private function safeZoneLabel(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+        $trimmed = trim($value);
+
+        return preg_match('/^[A-Za-z0-9 _\-\/]{1,48}$/', $trimmed) === 1 ? $trimmed : null;
+    }
+
+    private function maskImeiValue(?string $imei): ?string
+    {
+        $trimmed = trim((string) ($imei ?? ''));
+        if ($trimmed === '') {
+            return null;
+        }
+
+        return strlen($trimmed) <= 8
+            ? $trimmed
+            : substr($trimmed, 0, 4).'•••••••'.substr($trimmed, -4);
+    }
+
+    /**
+     * Build a viewer-authorised, secret-redacted chronological history timeline.
+     *
+     * @param  Collection<int, array<string, mixed>>  $audit
+     * @param  array<int, array<string, mixed>>  $commandHistory
+     * @return list<array{id: string, kind: string, title: string, detail: string|null, severity: string, actor: string|null, occurredAt: string}>
+     */
+    private function buildHistoryTimeline(
+        User $viewer,
+        Device $device,
+        bool $canViewMonitoring,
+        bool $canViewMaintenance,
+        bool $canViewAudit,
+        Collection $audit,
+        array $commandHistory,
+    ): array {
+        $items = collect();
+
+        if ($device->relationLoaded('assignments')) {
+            foreach ($device->assignments->take(20) as $assignment) {
+                $targetType = (string) $assignment->assignable_type === 'site'
+                    ? 'Site'
+                    : strtolower(str_replace('_', ' ', (string) $assignment->assignable_type));
+                if ($assignment->assigned_at !== null) {
+                    $assignmentTypeValue = $assignment->assignment_type instanceof \BackedEnum
+                        ? (string) $assignment->assignment_type->value
+                        : (string) ($assignment->assignment_type ?? '');
+                    $items->push([
+                        'id' => 'assign-'.$assignment->id,
+                        'kind' => 'assignment',
+                        'title' => "Assigned to {$targetType}",
+                        'detail' => $assignmentTypeValue !== '' ? ucfirst(strtolower(str_replace('_', ' ', $assignmentTypeValue))) : null,
+                        'severity' => 'info',
+                        'actor' => null,
+                        'occurredAt' => $assignment->assigned_at->toISOString(),
+                    ]);
+                }
+                if ($assignment->released_at !== null) {
+                    $items->push([
+                        'id' => 'release-'.$assignment->id,
+                        'kind' => 'assignment',
+                        'title' => "Released from {$targetType}",
+                        'detail' => null,
+                        'severity' => 'neutral',
+                        'actor' => null,
+                        'occurredAt' => $assignment->released_at->toISOString(),
+                    ]);
+                }
+            }
+        }
+
+        if ($canViewMonitoring && $device->relationLoaded('events')) {
+            foreach ($device->events->take(25) as $event) {
+                if ($event->occurred_at === null) {
+                    continue;
+                }
+                $items->push([
+                    'id' => 'event-'.$event->id,
+                    'kind' => 'event',
+                    'title' => ucfirst(strtolower(trim((string) preg_replace('/[._-]+/', ' ', (string) $event->event_type)))),
+                    'detail' => $event->source ? ucfirst(strtolower(trim((string) preg_replace('/[._-]+/', ' ', (string) $event->source)))) : null,
+                    'severity' => in_array($event->severity, ['critical', 'high', 'error'], true)
+                        ? 'critical'
+                        : (in_array($event->severity, ['warning', 'medium'], true) ? 'warning' : 'info'),
+                    'actor' => null,
+                    'occurredAt' => $event->occurred_at->toISOString(),
+                ]);
+            }
+        }
+
+        foreach (array_slice($commandHistory, 0, 20) as $cmd) {
+            if (empty($cmd['requestedAt'])) {
+                continue;
+            }
+            $status = (string) ($cmd['status'] ?? 'requested');
+            $items->push([
+                'id' => 'command-'.$cmd['id'],
+                'kind' => 'command',
+                'title' => (string) ($cmd['label'] ?? 'Device command'),
+                'detail' => 'Status: '.str_replace('_', ' ', $status),
+                'severity' => in_array($status, ['failed', 'blocked', 'mismatch'], true)
+                    ? 'critical'
+                    : (in_array($status, ['awaiting_approval', 'awaiting_step_up', 'uncertain'], true) ? 'warning' : 'info'),
+                'actor' => $cmd['requestedBy'] ?? null,
+                'occurredAt' => (string) $cmd['requestedAt'],
+            ]);
+        }
+
+        if ($canViewMaintenance && $device->relationLoaded('maintenanceRecords')) {
+            foreach ($device->maintenanceRecords->take(15) as $record) {
+                $timestamp = $record->completed_at ?? $record->scheduled_for ?? $record->created_at;
+                if ($timestamp === null) {
+                    continue;
+                }
+                $items->push([
+                    'id' => 'maint-'.$record->id,
+                    'kind' => 'maintenance',
+                    'title' => 'Maintenance: '.strtolower(str_replace('_', ' ', (string) $record->type)),
+                    'detail' => $record->description,
+                    'severity' => $record->status === 'completed' ? 'success' : 'info',
+                    'actor' => null,
+                    'occurredAt' => $timestamp->toISOString(),
+                ]);
+            }
+        }
+
+        if ($canViewAudit) {
+            foreach ($audit->take(25) as $entry) {
+                if (empty($entry['createdAt'])) {
+                    continue;
+                }
+                $fields = ! empty($entry['fields']) ? 'Changed: '.implode(', ', $entry['fields']) : null;
+                $items->push([
+                    'id' => 'audit-'.$entry['id'],
+                    'kind' => 'audit',
+                    'title' => ucfirst(strtolower(trim((string) preg_replace('/[._-]+/', ' ', (string) $entry['action'])))),
+                    'detail' => $fields,
+                    'severity' => 'neutral',
+                    'actor' => $entry['actor'] ?? null,
+                    'occurredAt' => (string) $entry['createdAt'],
+                ]);
+            }
+        }
+
+        return $items
+            ->sortByDesc(fn (array $row): string => $row['occurredAt'])
+            ->take(60)
+            ->values()
+            ->all();
     }
 }

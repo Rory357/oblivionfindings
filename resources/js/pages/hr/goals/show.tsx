@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- The detail header, weighted ring, sub-tab
  * strip and KR rows mirror the Goals & OKR design prototype and use styled native
  * controls. Every colour is a semantic design token. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CheckinWizard } from '@/components/hr/goals/checkin-wizard';
 import { ObjectiveWizard } from '@/components/hr/goals/objective-wizard';
 import {
@@ -161,21 +162,38 @@ export default function GoalShow({
         key_results: goal.key_results,
     } as unknown as Objective;
 
-    const markStatus = (status: string) =>
+    const markStatus = (
+        status: string,
+        options: { onStart?: () => void; onFinish?: () => void } = {},
+    ) =>
         router.put(
             `/hr/goals/${goal.id}`,
             { status },
-            { preserveScroll: true },
+            { preserveScroll: true, ...options },
         );
-    const deleteKr = (id: number) => {
-        if (confirm('Delete this key result?'))
-            router.delete(`/hr/goals/key-results/${id}`, {
-                preserveScroll: true,
-            });
+    // Delete and Archive only open a confirmation; the request is sent from it.
+    const [krToDelete, setKrToDelete] = useState<DetailKr | null>(null);
+    const [archiveOpen, setArchiveOpen] = useState(false);
+    const [confirmBusy, setConfirmBusy] = useState(false);
+    const deleteKr = () => {
+        if (krToDelete === null) return;
+        router.delete(`/hr/goals/key-results/${krToDelete.id}`, {
+            preserveScroll: true,
+            onStart: () => setConfirmBusy(true),
+            onFinish: () => {
+                setConfirmBusy(false);
+                setKrToDelete(null);
+            },
+        });
     };
-    const archive = () => {
-        if (confirm(`Archive “${goal.title}”?`)) markStatus('cancelled');
-    };
+    const archive = () =>
+        markStatus('cancelled', {
+            onStart: () => setConfirmBusy(true),
+            onFinish: () => {
+                setConfirmBusy(false);
+                setArchiveOpen(false);
+            },
+        });
     const exportCsv = () => {
         window.location.href = goal.cycle_id
             ? `/hr/goals/export?cycle=${goal.cycle_id}`
@@ -368,7 +386,7 @@ export default function GoalShow({
                         {can.manage && (
                             <button
                                 type="button"
-                                onClick={archive}
+                                onClick={() => setArchiveOpen(true)}
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-status-critical/30 bg-card px-3 py-2 text-[12.5px] font-semibold text-status-critical hover:bg-status-critical-bg"
                             >
                                 <Trash2 className="h-3.5 w-3.5" /> Archive
@@ -471,8 +489,8 @@ export default function GoalShow({
                                     {can.manage && (
                                         <button
                                             type="button"
-                                            onClick={() => deleteKr(k.id)}
-                                            aria-label="Delete key result"
+                                            onClick={() => setKrToDelete(k)}
+                                            aria-label={`Delete key result ${k.title}`}
                                             className="grid h-7 w-7 place-items-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted"
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
@@ -671,6 +689,48 @@ export default function GoalShow({
                     onClose={() => setKrDialog(false)}
                 />
             )}
+            <ConfirmDialog
+                open={krToDelete !== null}
+                onClose={() => {
+                    if (!confirmBusy) setKrToDelete(null);
+                }}
+                onConfirm={deleteKr}
+                title="Delete this key result?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            “{krToDelete?.title}”
+                        </span>{' '}
+                        and its check-in history are deleted, and the
+                        objective&apos;s progress is worked out again from the
+                        key results that are left. This can&apos;t be undone.
+                    </>
+                }
+                confirmText="Delete key result"
+                variant="destructive"
+                processing={confirmBusy}
+            />
+            <ConfirmDialog
+                open={archiveOpen}
+                onClose={() => {
+                    if (!confirmBusy) setArchiveOpen(false);
+                }}
+                onConfirm={archive}
+                title="Archive this objective?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            “{goal.title}”
+                        </span>{' '}
+                        is marked cancelled. Its key results and check-in
+                        history are kept. To make it active again, edit the
+                        objective and save it.
+                    </>
+                }
+                confirmText="Archive objective"
+                variant="destructive"
+                processing={confirmBusy}
+            />
         </AppLayout>
     );
 }

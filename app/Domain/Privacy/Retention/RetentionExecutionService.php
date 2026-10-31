@@ -2,6 +2,10 @@
 
 namespace App\Domain\Privacy\Retention;
 
+use App\Domain\Referrals\Models\CareReferral;
+use App\Domain\Referrals\Models\ReferralEvidence;
+use App\Domain\Referrals\Models\ReferralOutbox;
+use App\Domain\Referrals\Models\ReferralServiceAgreement;
 use App\Models\AnonymizationLog;
 use App\Models\Client;
 use App\Models\DataRetentionExecution;
@@ -133,6 +137,8 @@ final class RetentionExecutionService
             'data-retention-v1',
             $policy->getKey(),
             $fingerprint,
+            // A blocked attempt under an older approval must not suppress a newly approved run.
+            $policy->approved_fingerprint ?? '',
             now('UTC')->toDateString(),
         ]));
 
@@ -332,18 +338,24 @@ final class RetentionExecutionService
                 default => 'archived',
             };
 
+            $cascade = [];
             if ($action === 'anonymize') {
                 $updates = [];
                 foreach ($owner->anonymizationFields as $field => $strategy) {
-                    if ($record->getAttribute($field) === null) {
+                    $current = $record->getAttribute($field);
+                    if ($current === null) {
                         continue;
                     }
-                    $updates[$field] = $strategy === 'redact' ? '[REDACTED]' : null;
+                    $updates[$field] = $owner->anonymizedValue($field, $current, $record);
                     $fields[] = $field;
-                    $methods[$field] = $strategy === 'redact' ? 'redacted' : 'cleared';
+                    $methods[$field] = $strategy === 'clear' ? 'cleared' : 'redacted';
                 }
                 if ($updates !== []) {
                     $record->forceFill($updates)->saveQuietly();
+                }
+                // Related narratives, files and indexes follow the record in the same transaction.
+                if ($owner->afterAnonymize) {
+                    $cascade = ($owner->afterAnonymize)($record);
                 }
             } else {
                 $record->delete();
@@ -375,7 +387,8 @@ final class RetentionExecutionService
                     'fields' => $fields,
                     'legal_hold_checked' => true,
                     'active_case_checked' => (bool) $policy->active_case_exemption,
-                ]),
+                ], $owner->protections === [] ? [] : ['protections_checked' => array_keys($owner->protections)],
+                    $cascade === [] ? [] : ['related' => $cascade]),
             ]);
 
             AuditLogger::logOrFail('data_retention.'.$resultKey, $record, [
@@ -410,6 +423,16 @@ final class RetentionExecutionService
                 'exempt_count' => max(0, $beforeExemptions - $eligible),
                 'cutoff' => now()->subYears($years)->toDateString(),
             ];
+            if ($owner->protections !== []) {
+                // Why records past the period are kept, one count per protection (a record can meet several).
+                $cutoff = now()->subYears($years);
+                $actions[$action]['protected'] = array_values(array_map(function (string $key) use ($owner, $policy, $action, $years, $beforeExemptions, $cutoff): array {
+                    $kept = $this->baseQuery($policy, $owner, $action, $years);
+                    ($owner->protections[$key]['scope'])($kept, $cutoff);
+
+                    return ['key' => $key, 'label' => $owner->protections[$key]['label'], 'count' => max(0, $beforeExemptions - $kept->count())];
+                }, array_keys($owner->protections)));
+            }
             $eligibleCount += $eligible;
             $exemptCount += $actions[$action]['exempt_count'];
         }
@@ -425,6 +448,8 @@ final class RetentionExecutionService
             'block_reason' => $blocked ? 'A global legal hold is active.' : null,
             'actions' => $actions,
             'previewed_at' => now()->toIso8601String(),
+            'anonymization_fields' => isset($actions['anonymize']) ? array_keys($owner->anonymizationFields) : [],
+            ...($owner->guidance === [] ? [] : ['guidance' => $owner->guidance]),
         ];
     }
 
@@ -454,6 +479,9 @@ final class RetentionExecutionService
             }
         }
 
+        // Owner protections (open work, linked people, holds on a parent record) are mandatory too.
+        $owner->applyProtections($query, now()->subYears($years));
+
         return $query;
     }
 
@@ -473,7 +501,7 @@ final class RetentionExecutionService
         }
 
         $query->where(
-            $model->getTable().'.'.$model->getCreatedAtColumn(),
+            $model->getTable().'.'.$owner->cutoffColumn(),
             '<',
             now()->subYears($years),
         );
@@ -513,10 +541,43 @@ final class RetentionExecutionService
         ], fn (?int $value): bool => $value !== null);
     }
 
+    /**
+     * Owners whose native contract (fields, operators, exemptions) changed after settings-only
+     * approvals were recorded. Their approvals bind the full owner contract, so an approval made
+     * before the change must be previewed and approved again. Every other owner keeps the
+     * settings-only fingerprint, so its existing approvals and scheduled retention keep running.
+     * Add an owner here when its registered contract changes.
+     */
+    private const CONTRACT_BOUND_OWNERS = [
+        // Saved contact preferences became a cleared anonymisation field; since 21 Oct 2026 the
+        // person's referrals are anonymised with them (bound through the owner's contract version).
+        Client::class,
+        // Referral owners were registered with their contract bound from the start (21 Oct 2026):
+        // no settings-only approval ever existed for them, so binding breaks nothing, and any later
+        // change to their fields, protections, cutoff date or related clean-up needs a new approval.
+        CareReferral::class,
+        ReferralEvidence::class,
+        ReferralOutbox::class,
+        ReferralServiceAgreement::class,
+    ];
+
     public function fingerprint(DataRetentionPolicy $policy): string
     {
+        // Unknown owners still reach the normal auditable execution failure path.
+        $bindOwnerContract = in_array($policy->model_type, self::CONTRACT_BOUND_OWNERS, true);
+        $owner = $bindOwnerContract && in_array($policy->model_type, $this->registry->identifiers(), true)
+            ? $this->registry->resolve($policy->model_type) : null;
         $contract = [
             'owner_key' => $policy->model_type,
+            ...($bindOwnerContract ? ['owner_contract' => $owner ? [
+                'model' => $owner->modelClass,
+                'condition_operators' => $owner->conditionOperators,
+                'anonymization_fields' => $owner->anonymizationFields,
+                'active_case_relation' => $owner->activeCaseRelation,
+                'soft_deletes' => $owner->usesSoftDeletes(),
+                // Empty for owners without these options, so the Client contract is unchanged.
+                ...$owner->extendedContract(),
+            ] : null] : []),
             'retention_period_years' => $policy->retention_period_years,
             'archive_after_years' => $policy->archive_after_years,
             'hard_delete_after_years' => $policy->hard_delete_after_years,

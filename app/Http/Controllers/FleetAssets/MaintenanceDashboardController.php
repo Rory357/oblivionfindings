@@ -6,7 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetTrip;
-use App\Models\FleetWorkOrder;
+use App\Services\Fleet\MaintenanceAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -48,37 +49,46 @@ class MaintenanceDashboardController extends Controller
         $period = (int) $request->input('period', 90);
         $since = now()->subDays($period);
 
+        // Only vehicles at the viewer's Sites, the same rule as the work-order
+        // list (MaintenanceAccessService); this dashboard read every Site.
+        $user = $request->user() ?? abort(403);
+        $access = app(MaintenanceAccessService::class);
+        $sites = $access->approvedSiteIds($user);
+        $workOrders = fn () => $access->scopedWorkOrders($user);
+        $schedules = fn () => FleetServiceSchedule::query()->whereHas('asset', fn (Builder $asset) => $asset
+            ->whereNotNull('site_id')->whereIn('site_id', $sites));
+
         // Summary stats
-        $totalWorkOrders = FleetWorkOrder::where('created_at', '>=', $since)->count();
-        $openWorkOrders = FleetWorkOrder::whereIn('status', ['open', 'in_progress', 'on_hold'])->count();
-        $totalSpend = FleetWorkOrder::where('created_at', '>=', $since)->sum('actual_cost') ?? 0;
+        $totalWorkOrders = $workOrders()->where('created_at', '>=', $since)->count();
+        $openWorkOrders = $workOrders()->whereIn('status', ['open', 'in_progress', 'on_hold'])->count();
+        $totalSpend = $workOrders()->where('created_at', '>=', $since)->sum('actual_cost') ?? 0;
         $avgCost = $totalWorkOrders > 0 ? round((float) $totalSpend / $totalWorkOrders, 2) : 0;
-        $overdueSchedules = FleetServiceSchedule::where('is_active', true)
+        $overdueSchedules = $schedules()->where('is_active', true)
             ->whereNotNull('next_due_at')
             ->where('next_due_at', '<', now())
             ->count();
 
         // Command-centre hero counts (state-of-the-world, not period-scoped)
-        $woOpen = FleetWorkOrder::where('status', 'open')->count();
-        $woInProgress = FleetWorkOrder::where('status', 'in_progress')->count();
-        $woOverdue = FleetWorkOrder::whereNotIn('status', ['completed', 'cancelled'])
+        $woOpen = $workOrders()->where('status', 'open')->count();
+        $woInProgress = $workOrders()->where('status', 'in_progress')->count();
+        $woOverdue = $workOrders()->whereNotIn('status', ['completed', 'cancelled'])
             ->whereNotNull('due_at')
             ->where('due_at', '<', now())
             ->count();
-        $serviceDue7d = FleetServiceSchedule::where('is_active', true)
+        $serviceDue7d = $schedules()->where('is_active', true)
             ->whereNotNull('next_due_at')
             ->whereBetween('next_due_at', [now(), now()->addDays(7)])
             ->count();
-        $serviceDue30d = FleetServiceSchedule::where('is_active', true)
+        $serviceDue30d = $schedules()->where('is_active', true)
             ->whereNotNull('next_due_at')
             ->whereBetween('next_due_at', [now(), now()->addDays(30)])
             ->count();
-        $monthCost = (float) FleetWorkOrder::where('created_at', '>=', now()->startOfMonth())
+        $monthCost = (float) $workOrders()->where('created_at', '>=', now()->startOfMonth())
             ->whereNotNull('actual_cost')
             ->sum('actual_cost');
 
         // Cost by vehicle (top 10)
-        $costByVehicle = FleetWorkOrder::query()
+        $costByVehicle = $workOrders()
             ->select('asset_id', DB::raw('SUM(actual_cost) as total_cost'))
             ->where('created_at', '>=', $since)
             ->whereNotNull('actual_cost')
@@ -97,7 +107,7 @@ class MaintenanceDashboardController extends Controller
 
         // Cost by month (last 6 months always)
         $monthsSince = now()->subMonths(6)->startOfMonth();
-        $costByMonth = FleetWorkOrder::query()
+        $costByMonth = $workOrders()
             ->select(
                 DB::raw("DATE_FORMAT(created_at, '%Y-%m') as month"),
                 DB::raw('SUM(actual_cost) as total_cost'),
@@ -116,7 +126,7 @@ class MaintenanceDashboardController extends Controller
             ->values();
 
         // Cost by priority
-        $costByPriority = FleetWorkOrder::query()
+        $costByPriority = $workOrders()
             ->select('priority', DB::raw('SUM(actual_cost) as total_cost'), DB::raw('COUNT(*) as count'))
             ->where('created_at', '>=', $since)
             ->whereNotNull('actual_cost')
@@ -130,7 +140,7 @@ class MaintenanceDashboardController extends Controller
             ->values();
 
         // Recent work orders (last 10)
-        $recentWorkOrders = FleetWorkOrder::query()
+        $recentWorkOrders = $workOrders()
             ->with(['asset:id,name,asset_tag'])
             ->latest()
             ->limit(10)
@@ -148,7 +158,7 @@ class MaintenanceDashboardController extends Controller
             ->values();
 
         // Overdue service schedules
-        $overdueServices = FleetServiceSchedule::query()
+        $overdueServices = $schedules()
             ->where('is_active', true)
             ->whereNotNull('next_due_at')
             ->where('next_due_at', '<', now())
@@ -162,7 +172,8 @@ class MaintenanceDashboardController extends Controller
                 'asset_name' => $s->asset?->name ?? 'Unknown',
                 'asset_tag' => $s->asset?->asset_tag,
                 'next_due_at' => optional($s->next_due_at)->toISOString(),
-                'days_overdue' => $s->next_due_at ? (int) now()->diffInDays($s->next_due_at) : 0,
+                // Due date → now; Carbon 3 signs diffInDays(), so the reverse was negative.
+                'days_overdue' => $s->next_due_at ? (int) $s->next_due_at->diffInDays(now()) : 0,
             ])
             ->values();
 
@@ -170,14 +181,14 @@ class MaintenanceDashboardController extends Controller
         $predictions = collect();
         $hasTripsTable = Schema::hasTable('fleet_trips');
         if ($hasTripsTable) {
-            $schedules = FleetServiceSchedule::where('is_active', true)
+            $kmSchedules = $schedules()->where('is_active', true)
                 ->whereNotNull('next_due_km')
                 ->with('asset:id,name,asset_tag,odometer_km')
                 ->get();
 
             $thirtyDaysAgo = now()->subDays(30);
 
-            foreach ($schedules as $schedule) {
+            foreach ($kmSchedules as $schedule) {
                 $asset = $schedule->asset;
                 if (!$asset) continue;
 
@@ -209,7 +220,7 @@ class MaintenanceDashboardController extends Controller
         }
 
         // Fleet health: % of vehicles not overdue
-        $totalScheduled = FleetServiceSchedule::where('is_active', true)->count();
+        $totalScheduled = $schedules()->where('is_active', true)->count();
         $fleetHealthPct = $totalScheduled > 0
             ? round((($totalScheduled - $overdueSchedules) / $totalScheduled) * 100)
             : 100;

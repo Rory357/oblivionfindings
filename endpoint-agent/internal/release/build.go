@@ -153,7 +153,7 @@ func buildWindows(ctx context.Context, source, output string, spec BuildSpec, si
 			}
 			executableHandles = append(executableHandles, handle)
 			if err = verify(filepath.Join(snapshot, filepath.FromSlash(record.Path)), spec.Architecture); err != nil {
-				return result, errors.New("a staged Windows executable failed architecture or Authenticode verification")
+				return result, errors.New("a staged Windows executable failed executable or architecture verification")
 			}
 		}
 	}

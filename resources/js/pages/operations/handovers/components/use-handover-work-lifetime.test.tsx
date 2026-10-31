@@ -35,7 +35,10 @@ describe('committed operations handover owner', () => {
         }
         function Owner({ actorId }: { actorId: number }) {
             const owner = useHandoverWorkLifetime({ ...context, actorId });
-            work = owner.work;
+            // Hand the owner to the test once the render commits, not during it.
+            useLayoutEffect(() => {
+                work = owner.work;
+            });
             return <Child actorId={actorId} owner={owner.work} />;
         }
         const page = render(<Owner actorId={4} />);

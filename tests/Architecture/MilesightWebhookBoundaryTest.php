@@ -111,12 +111,11 @@ it('keeps Milesight webhook configuration governed secret-safe and operator visi
             'Real-time monitoring webhook',
             'Signature verification enabled',
             'Webhook secret ending in',
-            'Last verified event:',
-            'Stored encrypted and never displayed again.',
-            'This is separate from the OAuth client',
-            'secret above.',
-            'providerConnection?.webhook_url',
-            'providerConnection.last_webhook_received_at',
+            'label="Last verified event"',
+            'It is separate from the OAuth client secret, stored encrypted and never displayed again.',
+            'webhook verification secret are',
+            'connection?.webhook_url ??',
+            'connection?.last_webhook_received_at,',
         )
         ->and($runbook)->toContain(
             'HTTP 200',

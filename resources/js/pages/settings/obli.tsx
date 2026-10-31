@@ -33,6 +33,11 @@ import { Head, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Bot, Check, CircleDollarSign, KeyRound, Shield } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import {
+    defaultRemoteSupport,
+    ObliRemoteSupportCard,
+    type RemoteSupportConfiguration,
+} from './obli-remote-support-card';
 
 type Configuration = {
     version: number;
@@ -51,7 +56,11 @@ type Configuration = {
     technician_enabled: boolean;
     diagnostic_categories: ('system' | 'software' | 'services')[];
 };
-type Props = { actor_id: number; configuration: Configuration };
+type Props = {
+    actor_id: number;
+    configuration: Configuration;
+    remote_support?: RemoteSupportConfiguration;
+};
 const diagnosticGroups = [
     [
         'system',
@@ -107,7 +116,11 @@ export default function ObliSettings() {
         />
     );
 }
-function ObliSettingsEditor({ actor_id, configuration }: Props) {
+function ObliSettingsEditor({
+    actor_id,
+    configuration,
+    remote_support,
+}: Props) {
     const [saved, setSaved] = useState(configuration);
     const [draft, setDraft] = useState(configuration);
     const [apiKey, setApiKey] = useState('');
@@ -376,6 +389,24 @@ function ObliSettingsEditor({ actor_id, configuration }: Props) {
                             Reload saved settings
                         </Button>
                     )}
+                    <ObliRemoteSupportCard
+                        key={actor_id + ':' + (remote_support?.version ?? 0)}
+                        actorId={actor_id}
+                        initial={
+                            remote_support ??
+                            defaultRemoteSupport(saved.helper_access_enabled)
+                        }
+                        onHelperAccessChange={(enabled) => {
+                            setSaved((current) => ({
+                                ...current,
+                                helper_access_enabled: enabled,
+                            }));
+                            setDraft((current) => ({
+                                ...current,
+                                helper_access_enabled: enabled,
+                            }));
+                        }}
+                    />
                     <Card>
                         <CardHeader>
                             <CardTitle>Who can use Obli</CardTitle>
@@ -420,9 +451,9 @@ function ObliSettingsEditor({ actor_id, configuration }: Props) {
                                 Replies and selected technician checks are
                                 encrypted for recovery. Questions are not stored
                                 separately by this chat gateway. Provider
-                                retention is governed separately by your
-                                provider account and agreement. Changing
-                                retention applies to new replies.
+                                retention is managed separately by your provider
+                                account and agreement. Changing retention
+                                applies to new replies.
                             </p>
                         </CardContent>
                     </Card>

@@ -15,6 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { toDatetimeLocal } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -27,10 +28,9 @@ import {
 import { useEffect, useState } from 'react';
 import type { RespiteStayRow } from '../types';
 
+/** Now as NZ wall-clock; the server reads datetime-local values in NZ time. */
 function nowInput() {
-    const date = new Date();
-    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-    return date.toISOString().slice(0, 16);
+    return toDatetimeLocal(new Date());
 }
 
 export function CheckInModal({

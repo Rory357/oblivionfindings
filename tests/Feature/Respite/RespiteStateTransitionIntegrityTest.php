@@ -30,6 +30,8 @@ use Symfony\Component\Process\Process;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
+require_once __DIR__.'/../../Support/RespiteCommencementFixtures.php';
+
 class RespiteStateTransitionIntegrityTest extends TestCase
 {
     use RefreshDatabase;
@@ -310,6 +312,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
     public function test_stay_lifecycle_is_atomic_and_discharge_is_terminal_until_a_new_episode(): void
     {
         $booking = $this->booking('confirmed');
+        prepareRespiteCommencement($booking);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -352,9 +355,11 @@ class RespiteStateTransitionIntegrityTest extends TestCase
             ->assertSessionHasErrors('status');
 
         $extendedEnd = $booking->end_at->copy()->addDay();
+        // The extend dialog posts NZ wall-clock; storage is UTC.
+        $extendedEndNz = $extendedEnd->copy()->setTimezone('Pacific/Auckland')->format('Y-m-d H:i:s');
         $this->actingAs($this->admin)
             ->post(route('respite.stays.extend', $stay), [
-                'new_end' => $extendedEnd->format('Y-m-d H:i:s'),
+                'new_end' => $extendedEndNz,
             ])
             ->assertRedirect()
             ->assertSessionHasNoErrors();
@@ -363,7 +368,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post(route('respite.stays.extend', $stay), [
-                'new_end' => $extendedEnd->format('Y-m-d H:i:s'),
+                'new_end' => $extendedEndNz,
             ])
             ->assertRedirect()
             ->assertSessionHasErrors('new_end');
@@ -424,6 +429,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
     {
         Event::fake([RespiteEvent::class]);
         $booking = $this->booking('confirmed');
+        prepareRespiteCommencement($booking);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -502,6 +508,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
         $this->assertSame('pending', $conflictingSourceBooking->refresh()->status);
 
         $booking = $this->booking('confirmed');
+        prepareRespiteCommencement($booking);
         $stay = RespiteStay::query()->create([
             'booking_id' => $booking->id,
             'client_id' => $this->client->id,

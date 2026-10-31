@@ -37,6 +37,10 @@ import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
+import {
+    incidentRegisterReturn,
+    incidentWorkspaceHref,
+} from '@/lib/incidents/navigation';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -161,14 +165,33 @@ export default function ClientIncidents({
     templates,
     can,
 }: Props) {
-    const { labels } = usePage().props as any;
+    const page = usePage();
+    const { labels } = page.props as any;
+    const source = new URL(
+        incidentRegisterReturn(page.url),
+        'https://incident-return.invalid',
+    );
+    const initial = source.searchParams;
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [showNew, setShowNew] = useState(false);
 
-    const [view, setView] = useState<ViewKey>('all');
-    const [search, setSearch] = useState('');
-    const [typeFilter, setTypeFilter] = useState('all');
-    const [severityFilter, setSeverityFilter] = useState('all');
+    const [view, setView] = useState<ViewKey>(
+        () => (initial.get('view') as ViewKey) || 'all',
+    );
+    const [search, setSearch] = useState(() => initial.get('q') ?? '');
+    const [typeFilter, setTypeFilter] = useState(
+        () => initial.get('type') ?? 'all',
+    );
+    const [severityFilter, setSeverityFilter] = useState(
+        () => initial.get('severity') ?? 'all',
+    );
+    const returnQuery = new URLSearchParams();
+    if (view !== 'all') returnQuery.set('view', view);
+    if (search) returnQuery.set('q', search);
+    if (typeFilter !== 'all') returnQuery.set('type', typeFilter);
+    if (severityFilter !== 'all') returnQuery.set('severity', severityFilter);
+    const incidentReturnTo =
+        source.pathname + (returnQuery.size ? `?${returnQuery}` : '');
 
     const form = useForm({
         template_id: '',
@@ -704,7 +727,12 @@ export default function ClientIncidents({
                                 key={i.id}
                                 className={`group relative cursor-pointer rounded-lg border border-l-4 bg-card transition-all hover:shadow-md ${sev.border}`}
                                 onClick={() =>
-                                    router.visit(`/incidents/${i.id}`)
+                                    router.visit(
+                                        incidentWorkspaceHref(
+                                            i.id,
+                                            incidentReturnTo,
+                                        ),
+                                    )
                                 }
                             >
                                 <div className="block px-4 py-3 pr-12">
@@ -795,7 +823,10 @@ export default function ClientIncidents({
                                             <DropdownMenuItem
                                                 onClick={() =>
                                                     router.visit(
-                                                        `/incidents/${i.id}`,
+                                                        incidentWorkspaceHref(
+                                                            i.id,
+                                                            incidentReturnTo,
+                                                        ),
                                                     )
                                                 }
                                             >

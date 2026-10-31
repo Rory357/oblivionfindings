@@ -119,7 +119,11 @@ export function ShiftDetailDialog({
     return (
         <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
             <DialogContent
-                className="max-h-[90vh] !w-full !max-w-[min(94vw,820px)] overflow-hidden !rounded-2xl !p-0 [&>button:last-child]:hidden"
+                className="max-h-[90vh] overflow-hidden !rounded-2xl !p-0 [&>button:last-child]:hidden"
+                style={{
+                    maxWidth: 'min(92vw, 900px)',
+                    width: 'min(92vw, 900px)',
+                }}
                 onInteractOutside={(e) => e.preventDefault()}
             >
                 <VisuallyHidden.Root>
@@ -140,10 +144,10 @@ export function ShiftDetailDialog({
                                 <CalendarClock className="h-5 w-5 text-primary" />
                             </span>
                             <div className="min-w-0 flex-1">
-                                <div className="text-[10.5px] font-semibold tracking-wider text-primary uppercase">
+                                <div className="text-xs font-semibold tracking-wider text-primary uppercase">
                                     Shift · #{shift.id}
                                 </div>
-                                <h2 className="mt-0.5 text-xl font-bold tracking-tight text-foreground">
+                                <h2 className="text-section-title mt-0.5 tracking-tight">
                                     {clientFullName(shift.client)}
                                 </h2>
                                 <p className="mt-0.5 text-sm text-muted-foreground">
@@ -210,7 +214,7 @@ export function ShiftDetailDialog({
                                 )}
                             </SDRow>
                             <SDRow label="Type" icon={Briefcase}>
-                                <span className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                <span className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                                     <TypeIcon className="h-3 w-3" />
                                     {type.label}
                                 </span>

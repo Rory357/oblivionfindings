@@ -58,13 +58,13 @@ async function acknowledgeAlert(workspace: Locator) {
 
 async function startTriage(workspace: Locator) {
     await workspace
-        .getByRole('button', { name: 'Start triage', exact: true })
+        .getByRole('button', { name: 'Start response', exact: true })
         .click();
     await expect(
-        workspace.getByText('Start triage', { exact: true }).first(),
+        workspace.getByText('Start response', { exact: true }).first(),
     ).toBeVisible();
     await workspace
-        .getByRole('button', { name: 'Start triage', exact: true })
+        .getByRole('button', { name: 'Start response', exact: true })
         .click();
     await expectWorkspaceStatus(workspace, 'Triaging');
 }

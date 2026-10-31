@@ -47,6 +47,7 @@ export function MaintenanceHealthWorkRecords({
     canManage,
     onComplete,
     filtered,
+    financeNote,
 }: {
     rows: MaintenanceRecord[];
     total: number;
@@ -55,6 +56,8 @@ export function MaintenanceHealthWorkRecords({
     canManage: boolean;
     onComplete: (row: MaintenanceRecord) => void;
     filtered: boolean;
+    /** Server boundary note, shown word for word wherever a cost appears. */
+    financeNote?: string;
 }) {
     const state = (row: MaintenanceRecord) =>
         row.is_overdue ? 'overdue' : row.status;
@@ -197,6 +200,11 @@ export function MaintenanceHealthWorkRecords({
                                         : `$${row.cost}`
                                 }
                             />
+                            {financeNote ? (
+                                <p role="note" className="text-caption">
+                                    {financeNote}
+                                </p>
+                            ) : null}
                             <ReviewRow label="Notes" value={text(row.notes)} />
                         </>
                     ),

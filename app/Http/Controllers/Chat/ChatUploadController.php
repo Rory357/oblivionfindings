@@ -7,13 +7,14 @@ use App\Models\ChatUpload;
 use App\Models\OpsConversation;
 use App\Services\Chat\ChatAccess;
 use App\Services\Chat\ChatFileScan;
+use App\Services\Chat\ChatSettings;
 use App\Services\Chat\ChatUploads;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 final class ChatUploadController extends Controller
 {
-    public function __construct(private ChatAccess $access, private ChatUploads $uploads) {}
+    public function __construct(private ChatAccess $access, private ChatUploads $uploads, private ChatSettings $settings) {}
 
     public function index(Request $request, OpsConversation $conversation)
     {
@@ -40,7 +41,9 @@ final class ChatUploadController extends Controller
         $formats = $kind === 'voice_note'
             ? 'mimetypes:audio/webm,video/webm,audio/ogg,application/ogg,audio/mp4,video/mp4,audio/x-m4a'
             : 'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,csv,txt,rtf';
-        $request->validate(['file' => ['required', 'file', 'max:20480', $formats]]);
+        // The Site's own limit applies here too, not only when the message is sent (20 MB is the ceiling).
+        $maxKilobytes = min(20, (int) $this->settings->forConversation($conversation)['max_file_mb']) * 1024;
+        $request->validate(['file' => ['required', 'file', 'max:'.$maxKilobytes, $formats]]);
 
         return $this->response($this->uploads->store($conversation, $request->user(), $upload, $request->file('file'), $kind));
     }

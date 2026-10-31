@@ -31,6 +31,12 @@ class SubstanceStorageLocation extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
+        'hazardous_substance_id' => 'integer',
+        'site_id' => 'integer',
+        'created_by' => 'integer',
+        'updated_by' => 'integer',
         'current_quantity' => 'decimal:2',
         'maximum_quantity' => 'decimal:2',
         'properly_labelled' => 'boolean',
@@ -73,7 +79,12 @@ class SubstanceStorageLocation extends Model
 
     public function scopeNonCompliant($query)
     {
-        return $query->where('properly_labelled', false)
-            ->orWhere('segregation_compliant', false);
+        return $query->where(fn ($unsafe) => $unsafe->where('properly_labelled', false)
+            ->orWhere('segregation_compliant', false));
+    }
+
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ChemicalSourceVersion::class, 'root_id')->where('root_type', 'storage');
     }
 }

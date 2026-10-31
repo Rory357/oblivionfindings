@@ -199,12 +199,17 @@ export function InfoCard({
 /* ------------------------------------------------------------------ */
 
 export function SelectInput({
+    id,
     value,
     onChange,
     placeholder,
     options,
     ariaLabel,
+    frontline = false,
+    disabled = false,
+    className,
 }: {
+    id?: string;
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
@@ -213,14 +218,19 @@ export function SelectInput({
     /** Accessible name for the trigger; falls back to the placeholder so a
      *  placeholder-only (unselected) trigger is never a nameless button (axe button-name). */
     ariaLabel?: string;
+    /** Expand this control's own target on frontline forms. */
+    frontline?: boolean;
+    disabled?: boolean;
+    className?: string;
 }) {
     return (
         // Keep the empty string as a real controlled value. Converting it to
         // undefined makes Radix switch ownership mid-session and can commit a
         // highlighted option instead of the option the worker clicked.
-        <Select value={value} onValueChange={onChange}>
+        <Select value={value} onValueChange={onChange} disabled={disabled}>
             <SelectTrigger
-                className="w-full"
+                id={id}
+                className={cn('w-full', frontline && 'frontline-tap', className)}
                 aria-label={ariaLabel ?? placeholder}
             >
                 <SelectValue placeholder={placeholder} />
@@ -231,6 +241,7 @@ export function SelectInput({
                         key={o.value}
                         value={o.value}
                         disabled={o.disabled}
+                        className={frontline ? 'frontline-tap' : undefined}
                     >
                         {o.label}
                     </SelectItem>

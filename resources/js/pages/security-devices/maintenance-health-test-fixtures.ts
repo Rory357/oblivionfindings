@@ -2,6 +2,8 @@ import type { MaintenanceHealthProps } from './maintenance-health';
 export function healthFixture(): MaintenanceHealthProps {
     return {
         actor_id: 7,
+        financeNote:
+            'Costs shown in legacy maintenance history are informational. Finance remains the authoritative financial record.',
         stats: {
             overdue: 1,
             upcoming: 2,

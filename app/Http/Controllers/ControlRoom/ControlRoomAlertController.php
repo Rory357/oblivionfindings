@@ -126,6 +126,8 @@ class ControlRoomAlertController extends Controller
         $viewContext = $worklists->viewContextFor($user);
 
         return Inertia::render('control-room/alerts/index', [
+            // Live counts on the Live response tabs (same rules as each tab).
+            'tabCounts' => fn () => app(\App\Services\ControlRoom\LiveResponseTabCounts::class)->for($user),
             'alerts' => $alerts,
             'filters' => array_merge(
                 $request->only(['status', 'severity', 'source', 'queue_id', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir', 'snoozed']),

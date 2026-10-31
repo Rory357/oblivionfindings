@@ -1,0 +1,21 @@
+[Unit]
+Description=Oblivion Findings Site Monitoring Hub
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/oblivion-collector
+ExecStart=/opt/oblivion-collector/oblivion-site-collector --identity=/etc/oblivion-collector/collector.identity.json
+Restart=always
+RestartSec=10
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

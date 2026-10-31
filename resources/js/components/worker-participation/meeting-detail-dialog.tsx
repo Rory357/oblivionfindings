@@ -6,9 +6,15 @@
  * and every mutation redirect()->back()s so Inertia re-renders `detail` in place
  * — on success we just setAction(null) to return to the section view. NZ English;
  * semantic design tokens only; en-NZ dates via shared fmtDate/fmtDateTime. */
+import {
+    ActualEventTimeField,
+    actualEventInstant,
+} from '@/components/clinical/actual-event-time-field';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Field, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
 import {
@@ -21,6 +27,13 @@ import {
     type WpCan,
     type WpDetailAction,
 } from '@/components/worker-participation/shared';
+import {
+    WORKER_TIMEZONE,
+    formatDateLong,
+    toDatetimeLocal,
+    workerTimeOffset,
+    workerTimeOffsets,
+} from '@/lib/datetime';
 import type { Tone } from '@/pages/health-safety/components/register-row-kit';
 import { router, useForm } from '@inertiajs/react';
 import {
@@ -48,41 +61,34 @@ import {
     type FormEvent,
     type ReactNode,
 } from 'react';
+import { ParticipationOwnershipNotice } from './ownership-notice';
 
 /* ------------------------------------------------------------------ */
-/*  Tokens (local dot helper; tone maps come from shared)              */
+/*  Meeting presentation; tone maps come from shared                  */
 /* ------------------------------------------------------------------ */
-
-const DOT: Record<Tone, string> = {
-    neutral: 'bg-muted-foreground',
-    success: 'bg-status-success',
-    warning: 'bg-status-warning',
-    critical: 'bg-status-critical',
-};
 
 type Staff = { id: number; name: string };
 type SectionKey = 'overview' | 'attendees' | 'agenda' | 'minutes';
 
-function titleCase(s: string | null | undefined): string {
-    return (s ?? '')
-        .replace(/[_-]/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+function meetingStatusLabel(status: string): string {
+    switch (status) {
+        case 'scheduled':
+            return 'Scheduled';
+        case 'in_progress':
+            return 'In progress';
+        case 'completed':
+            return 'Completed';
+        case 'cancelled':
+            return 'Cancelled';
+        default:
+            return 'Status not confirmed';
+    }
 }
 
 const ACTION_STATUS: Record<string, { tone: Tone; label: string }> = {
     open: { tone: 'warning', label: 'Open' },
     in_progress: { tone: 'neutral', label: 'In progress' },
     done: { tone: 'success', label: 'Done' },
-};
-
-/** ISO string → value the <input type="datetime-local"> expects. */
-const toLocalInput = (iso: string | null | undefined): string => {
-    if (!iso) return '';
-    const dt = new Date(iso);
-    if (Number.isNaN(dt.getTime())) return '';
-    return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
 };
 
 /* ------------------------------------------------------------------ */
@@ -130,7 +136,9 @@ export function MeetingDetailDialog({
     const attendees = d.attendee_users ?? [];
     const agenda = d.agenda_items ?? [];
     const actions = d.action_items ?? [];
-    const tone = MEETING_STATUS[d.status] ?? 'neutral';
+    const tone = Object.hasOwn(MEETING_STATUS, d.status)
+        ? MEETING_STATUS[d.status]
+        : 'neutral';
     const scheduled = d.status === 'scheduled';
     const cancelled = d.status === 'cancelled';
     const completed = d.status === 'completed';
@@ -177,10 +185,9 @@ export function MeetingDetailDialog({
 
     const footerStart = (
         <div className="flex items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 font-medium">
-                <span className={`h-1.5 w-1.5 rounded-full ${DOT[tone]}`} />
-                {titleCase(d.status)}
-            </span>
+            <StatusBadge variant={tone}>
+                {meetingStatusLabel(d.status)}
+            </StatusBadge>
             <span className="inline-flex items-center gap-1 text-muted-foreground">
                 <Users className="h-3 w-3" /> {attendees.length}{' '}
                 {attendees.length === 1 ? 'attendee' : 'attendees'}
@@ -188,12 +195,17 @@ export function MeetingDetailDialog({
         </div>
     );
 
-    const cancelMeeting = () =>
-        router.put(
-            `${WP_BASE}/meetings/${d.id}/cancel`,
-            {},
-            { preserveScroll: true },
-        );
+    // Cancelling asks first: a cancelled meeting stays on the record and can't be held or edited.
+    const [confirmCancel, setConfirmCancel] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+    const cancelMeeting = () => setConfirmCancel(true);
+    const runCancel = () => {
+        setCancelling(true);
+        router.put(`${WP_BASE}/meetings/${d.id}/cancel`, {}, {
+            preserveScroll: true,
+            onFinish: () => { setCancelling(false); setConfirmCancel(false); },
+        });
+    };
 
     // Gated Options bar — only when the viewer can manage and the meeting isn't
     // cancelled. Suppressed while an action pane owns the body (it renders its own row).
@@ -245,8 +257,19 @@ export function MeetingDetailDialog({
             description={`${d.committee?.name ?? 'Committee meeting'} — ${fmtDateTime(d.scheduled_at)}`}
             railIcon={Users}
             railTitle={d.committee?.name ?? 'Committee meeting'}
-            railSub={`${titleCase(d.status)} · ${fmtDate(d.scheduled_at)}`}
+            railSub={`${meetingStatusLabel(d.status)} · ${formatDateLong(d.scheduled_at)}`}
+            headerLabel={
+                action
+                    ? {
+                          edit: 'Edit meeting',
+                          attendees: 'Add attendees',
+                          complete: 'Complete meeting',
+                          minutes: 'Upload minutes',
+                      }[action]
+                    : SECTIONS[stepIndex].label
+            }
             steps={SECTIONS}
+            sequential={false}
             stepIndex={stepIndex}
             onStepClick={(i) => {
                 setAction(null); // leaving an open action pane back to its section
@@ -255,6 +278,7 @@ export function MeetingDetailDialog({
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
+            <ParticipationOwnershipNotice state={d.site_ownership} />
             {action === 'edit' ? (
                 <EditPane d={d} onDone={() => setAction(null)} />
             ) : action === 'attendees' ? (
@@ -299,6 +323,17 @@ export function MeetingDetailDialog({
                     ) : null}
                 </>
             )}
+            <ConfirmDialog
+                open={confirmCancel}
+                onClose={() => { if (!cancelling) setConfirmCancel(false); }}
+                onConfirm={runCancel}
+                processing={cancelling}
+                variant="destructive"
+                title="Cancel this meeting?"
+                description={`The ${d.committee?.name ?? 'committee'} meeting on ${fmtDateTime(d.scheduled_at)} stays on the record as cancelled and can’t be held or edited. This can’t be undone.`}
+                confirmText="Cancel meeting"
+                cancelText="Keep meeting"
+            />
         </WizardShell>
     );
 }
@@ -576,25 +611,69 @@ function StaffMultiSelect({
 function EditPane({ d, onDone }: { d: MeetingDetail; onDone: () => void }) {
     const form = useForm<{
         scheduled_at: string;
+        scheduled_offset: string;
         location: string;
         agenda_items: string[];
     }>({
-        scheduled_at: toLocalInput(d.scheduled_at),
+        scheduled_at: toDatetimeLocal(d.scheduled_at),
+        scheduled_offset: d.scheduled_at
+            ? workerTimeOffset(d.scheduled_at)
+            : '',
         location: d.location ?? '',
         agenda_items: d.agenda_items ?? [],
     });
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        if (!form.data.scheduled_at) {
+        const scheduleChanged =
+            form.data.scheduled_at !== toDatetimeLocal(d.scheduled_at) ||
+            form.data.scheduled_offset !==
+                (d.scheduled_at ? workerTimeOffset(d.scheduled_at) : '');
+        if (scheduleChanged && !form.data.scheduled_at) {
             form.setError('scheduled_at', 'Set the meeting date and time.');
             return;
         }
-        form.transform((data) => ({
-            ...data,
-            agenda_items: data.agenda_items
-                .map((a) => a.trim())
-                .filter(Boolean),
-        }));
+        if (
+            scheduleChanged &&
+            !actualEventInstant(
+                form.data.scheduled_at,
+                form.data.scheduled_offset,
+            )
+        ) {
+            const field =
+                workerTimeOffsets(form.data.scheduled_at).length > 1
+                    ? 'scheduled_offset'
+                    : 'scheduled_at';
+            form.setError(
+                field,
+                field === 'scheduled_offset'
+                    ? 'Choose which occurrence of this repeated time to use.'
+                    : 'Choose a valid New Zealand date and time.',
+            );
+            return;
+        }
+        form.transform((data) => {
+            const { scheduled_at, scheduled_offset, ...other } = data;
+            const payload = {
+                ...other,
+                agenda_items: data.agenda_items
+                    .map((a) => a.trim())
+                    .filter(Boolean),
+            };
+            // An unrelated edit preserves the exact recorded instant, including
+            // seconds and the selected occurrence of a repeated clock reading.
+            if (
+                scheduled_at === toDatetimeLocal(d.scheduled_at) &&
+                scheduled_offset ===
+                    (d.scheduled_at ? workerTimeOffset(d.scheduled_at) : '')
+            )
+                return payload;
+            return {
+                ...payload,
+                scheduled_at,
+                scheduled_timezone: WORKER_TIMEZONE,
+                scheduled_offset: scheduled_offset || null,
+            };
+        });
         form.put(`${WP_BASE}/meetings/${d.id}`, {
             preserveScroll: true,
             onSuccess: (page) => {
@@ -619,19 +698,23 @@ function EditPane({ d, onDone }: { d: MeetingDetail; onDone: () => void }) {
                 processing={form.processing}
             >
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <Field
-                        label="Date & time"
-                        required
-                        error={form.errors.scheduled_at}
-                    >
-                        <Input
-                            type="datetime-local"
-                            value={form.data.scheduled_at}
-                            onChange={(e) =>
-                                form.setData('scheduled_at', e.target.value)
-                            }
-                        />
-                    </Field>
+                    <ActualEventTimeField
+                        id="meeting-edit-schedule"
+                        label="Meeting date & time"
+                        value={form.data.scheduled_at}
+                        offset={form.data.scheduled_offset}
+                        error={
+                            form.errors.scheduled_at ||
+                            form.errors.scheduled_offset
+                        }
+                        onChange={(value, offset) =>
+                            form.setData((previous) => ({
+                                ...previous,
+                                scheduled_at: value,
+                                scheduled_offset: offset,
+                            }))
+                        }
+                    />
                     <Field
                         label="Location"
                         hint="Optional"
@@ -893,12 +976,9 @@ function OverviewSection({
                 <ReviewRow
                     label="Status"
                     value={
-                        <span className="inline-flex items-center gap-1.5">
-                            <span
-                                className={`h-1.5 w-1.5 rounded-full ${DOT[tone]}`}
-                            />
-                            {titleCase(d.status)}
-                        </span>
+                        <StatusBadge variant={tone}>
+                            {meetingStatusLabel(d.status)}
+                        </StatusBadge>
                     }
                 />
             </ReviewCard>

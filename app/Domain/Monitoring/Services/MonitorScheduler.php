@@ -92,7 +92,7 @@ final class MonitorScheduler
                 ->where('interval_seconds', '>', 0))
             ->with([
                 'profile:id,interval_seconds,is_active',
-                'collector:id,collector_uuid,site_id,status',
+                'collector:id,collector_uuid,site_id,status,config,revoked_at',
             ])
             ->orderBy('id')
             ->chunkById(self::CHUNK_SIZE, function (Collection $monitors) use (
@@ -184,7 +184,8 @@ final class MonitorScheduler
     ): bool {
         $collector = $monitor->collector;
         if (! $collector instanceof MonitoringCollector
-            || (int) $collector->site_id !== $siteId
+            || $collector->revoked_at !== null
+            || ! in_array($siteId, $collector->authorisedSiteIds(), true)
             || ! in_array(strtolower(trim((string) $collector->status)), self::ENROLLED_COLLECTOR_STATES, true)
             || ! Str::isUuid((string) $collector->collector_uuid)) {
             return false;

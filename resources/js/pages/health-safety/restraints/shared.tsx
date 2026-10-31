@@ -1,6 +1,18 @@
-/* Shared types, token maps and en-NZ formatters for the Restraints & Behaviour
- * Support register, detail modals and workflow wizards. Mirrors the
+/* Shared types, token maps and en-NZ formatters for the restraints and behaviour
+ * support plan list, detail pages and workflow wizards. Mirrors the
  * RestraintController payloads. Semantic tokens only (no raw oklch/hex). NZ-only. */
+import {
+    formatDate,
+    formatDateLong,
+    formatDurationMinutes,
+    formatTime,
+    toDateInput,
+} from '@/lib/datetime';
+import {
+    hsLabel,
+    hsVariant,
+    humaniseHsValue,
+} from '@/lib/health-safety/hs-labels';
 import {
     Archive,
     CheckCircle2,
@@ -292,7 +304,7 @@ export function typeMeta(type: string | null | undefined): TypeMeta {
         return { label: '—', icon: ShieldAlert, tone: 'neutral', blurb: '' };
     return (
         RESTRAINT_TYPE_META[type] ?? {
-            label: titleCase(type),
+            label: hsLabel('restraint_type', type),
             icon: ShieldAlert,
             tone: 'neutral',
             blurb: '',
@@ -310,11 +322,12 @@ export const RESTRAINT_TYPE_OPTIONS = [
 
 /* ---- severity ---- */
 
+/** One severity scale everywhere (vocabulary.md): Low neutral · Medium warning · High and Critical critical. */
 export const SEVERITY_TONE: Record<string, ChipTone> = {
-    low: 'neutral',
-    medium: 'info',
-    high: 'warning',
-    critical: 'critical',
+    low: hsVariant('severity', 'low'),
+    medium: hsVariant('severity', 'medium'),
+    high: hsVariant('severity', 'high'),
+    critical: hsVariant('severity', 'critical'),
 };
 
 export function severityMeta(s: string | null | undefined): {
@@ -322,7 +335,7 @@ export function severityMeta(s: string | null | undefined): {
     tone: ChipTone;
 } {
     if (!s) return { label: '—', tone: 'neutral' };
-    return { label: titleCase(s), tone: SEVERITY_TONE[s] ?? 'neutral' };
+    return { label: hsLabel('severity', s), tone: hsVariant('severity', s) };
 }
 
 export const SEVERITY_OPTIONS = [
@@ -337,17 +350,33 @@ export const SEVERITY_OPTIONS = [
 export type StatusMeta = { label: string; icon: LucideIcon; tone: ChipTone };
 
 export const PLAN_STATUS_META: Record<string, StatusMeta> = {
-    draft: { label: 'Draft', icon: FileEdit, tone: 'neutral' },
-    active: { label: 'Active', icon: CheckCircle2, tone: 'success' },
-    under_review: { label: 'Under review', icon: Eye, tone: 'warning' },
-    archived: { label: 'Archived', icon: Archive, tone: 'neutral' },
+    draft: {
+        label: hsLabel('plan_status', 'draft'),
+        icon: FileEdit,
+        tone: 'neutral',
+    },
+    active: {
+        label: hsLabel('plan_status', 'active'),
+        icon: CheckCircle2,
+        tone: 'success',
+    },
+    under_review: {
+        label: hsLabel('plan_status', 'under_review'),
+        icon: Eye,
+        tone: 'warning',
+    },
+    archived: {
+        label: hsLabel('plan_status', 'archived'),
+        icon: Archive,
+        tone: 'neutral',
+    },
 };
 
 export function planStatusMeta(status: string | null | undefined): StatusMeta {
     if (!status) return PLAN_STATUS_META.draft;
     return (
         PLAN_STATUS_META[status] ?? {
-            label: titleCase(status),
+            label: hsLabel('plan_status', status),
             icon: FileEdit,
             tone: 'neutral',
         }
@@ -358,7 +387,7 @@ export const REVIEW_STATE_META: Record<
     string,
     { label: string; tone: ChipTone }
 > = {
-    ok: { label: 'On track', tone: 'success' },
+    ok: { label: 'Review not due yet', tone: 'neutral' },
     due: { label: 'Review due', tone: 'warning' },
     overdue: { label: 'Review overdue', tone: 'critical' },
 };
@@ -366,12 +395,21 @@ export const REVIEW_STATE_META: Record<
 /* ---- plan review outcome ---- */
 
 export const PLAN_REVIEW_OUTCOME_OPTIONS = [
-    { value: 'continued', label: 'Continue unchanged' },
-    { value: 'modified', label: 'Modify plan' },
-    { value: 'reduced', label: 'Reduce restrictive practice' },
-    { value: 'discontinued', label: 'Discontinue plan' },
-    { value: 'escalated', label: 'Escalate for specialist review' },
+    { value: 'continued', label: 'Keep the plan as it is' },
+    { value: 'modified', label: 'Change the plan' },
+    { value: 'reduced', label: 'Reduce the restraint used' },
+    { value: 'discontinued', label: 'Stop using the plan' },
+    { value: 'escalated', label: 'Ask a specialist to review' },
 ];
+
+/** Past-tense wording for a review that has already happened (the options above are choices). */
+export const PLAN_REVIEW_OUTCOME_RESULT: Record<string, string> = {
+    continued: 'Plan kept as it is',
+    modified: 'Plan changed',
+    reduced: 'Restraint reduced',
+    discontinued: 'Plan stopped',
+    escalated: 'Sent to a specialist to review',
+};
 
 export const PLAN_REVIEW_OUTCOME_LABEL: Record<string, string> =
     Object.fromEntries(
@@ -395,71 +433,58 @@ export const ATTACHMENT_CATEGORY_LABEL: Record<string, string> =
 
 export const PERIOD_ITEMS = [
     { key: 'week', label: 'This week' },
-    { key: '30d', label: '30 days' },
-    { key: 'quarter', label: 'Quarter' },
-    { key: 'all', label: 'All' },
+    { key: '30d', label: 'Last 30 days' },
+    { key: 'quarter', label: 'Last 3 months' },
+    { key: 'all', label: 'All time' },
 ];
 
 /* ------------------------------------------------------------------ */
 /*  Formatters (en-NZ)                                                 */
 /* ------------------------------------------------------------------ */
 
+/** Readable words for a stored value ("under_review" → "Under review"): sentence case, never snake_case. */
 export function titleCase(s: string): string {
-    return s.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return humaniseHsValue(s);
 }
 
 export function fmtDate(iso: string | null | undefined): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        day: '2-digit',
-        month: 'short',
-    });
+    return formatDate(iso);
 }
 
 export function fmtDateFull(iso: string | null | undefined): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
+    return formatDateLong(iso);
 }
 
 export function fmtTime(iso: string | null | undefined): string {
-    if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return formatTime(iso, '');
 }
 
 export function fmtDateTime(iso: string | null | undefined): string {
     if (!iso) return '—';
-    return `${fmtDate(iso)} · ${fmtTime(iso)}`;
+    return `${fmtDate(iso)}, ${fmtTime(iso)}`;
 }
 
-/** Relative "when" phrasing for the events table — "Yesterday 14:20", "2d ago 09:05". */
+/**
+ * Relative "when" phrasing for the events table — "Yesterday, 2:20 pm",
+ * "2 days ago, 9:05 am". Days are NZ calendar days, whatever the browser's
+ * timezone.
+ */
 export function whenLabel(iso: string | null | undefined): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    const now = new Date();
-    const sameDay = d.toDateString() === now.toDateString();
-    const yest = new Date(now);
-    yest.setDate(now.getDate() - 1);
-    const isYest = d.toDateString() === yest.toDateString();
-    const days = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-    if (sameDay) return `Today ${fmtTime(iso)}`;
-    if (isYest) return `Yesterday ${fmtTime(iso)}`;
-    if (days >= 0 && days <= 6) return `${days}d ago ${fmtTime(iso)}`;
-    return `${fmtDate(iso)} ${fmtTime(iso)}`;
+    const day = iso ? toDateInput(iso) : '';
+    if (!day) return '—';
+    const days = Math.round(
+        (Date.parse(toDateInput(new Date())) - Date.parse(day)) / 86_400_000,
+    );
+    const time = fmtTime(iso);
+    if (days === 0) return `Today, ${time}`;
+    if (days === 1) return `Yesterday, ${time}`;
+    if (days >= 2 && days <= 6) return `${days} days ago, ${time}`;
+    return `${fmtDate(iso)}, ${time}`;
 }
 
 export function durationLabel(minutes: number | null | undefined): string {
     if (minutes == null) return '—';
-    if (minutes < 60) return `${minutes} min`;
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    return formatDurationMinutes(minutes);
 }
 
 export function formatFileSize(bytes: number | null | undefined): string {

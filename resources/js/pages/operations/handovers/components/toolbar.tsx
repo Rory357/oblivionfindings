@@ -109,7 +109,7 @@ export function Toolbar({
                         Clear filters
                     </GuardrailButton>
                 ) : null}
-                <span className="text-[12.5px] text-muted-foreground tabular-nums">
+                <span className="text-sm text-muted-foreground tabular-nums">
                     {shown} of {total} shown
                 </span>
                 <GuardrailCard
@@ -129,7 +129,7 @@ export function Toolbar({
                                 aria-selected={view === v.id}
                                 onClick={() => onView(v.id)}
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors',
+                                    'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors',
                                     view === v.id
                                         ? 'bg-primary-fill text-primary-fill-foreground'
                                         : 'text-muted-foreground hover:bg-accent hover:text-foreground',

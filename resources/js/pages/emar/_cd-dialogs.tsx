@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 /* eslint-disable no-restricted-syntax -- summary/balance panes are custom-layout
    bordered surfaces inside the wizard, not Card components; all colours are tokens. */
@@ -2029,7 +2030,8 @@ export function RecordDestructionDialog({
 /**
  * Void a destruction record. The register is immutable (MoD Regs 1977) — a record
  * is never deleted; voiding supersedes it (kept visible, struck through, with the
- * reason) and removes it from live counts.
+ * reason). Stock and register balances are not changed (EmarController::
+ * voidDestruction); a correction goes through witnessed reconciliation.
  */
 export function VoidDestructionDialog({
     destruction,
@@ -2044,6 +2046,9 @@ export function VoidDestructionDialog({
     onClose: () => void;
 }) {
     const form = useForm({ void_reason: '' });
+    // Voiding can't be undone, so "Void record" asks first; the request is
+    // sent only from the ConfirmDialog (GOOD-CATCHES §3, eMAR row 100).
+    const [confirming, setConfirming] = useState(false);
     const submit = () => {
         form.post(`/emar/destructions/${destruction.id}/void`, {
             preserveScroll: true,
@@ -2052,79 +2057,110 @@ export function VoidDestructionDialog({
                 onClose();
             },
             onError: () => toast.error('A reason is required to void a record'),
+            onFinish: () => setConfirming(false),
         });
     };
+    const quantity = [destruction.quantity, destruction.unit]
+        .filter((part) => part !== null && part !== '')
+        .join(' ');
     return (
-        <MedsWizardDialog
-            formState={form}
-            open
-            onClose={onClose}
-            title="Void destruction record"
-            description="Correct an erroneous entry. The record is retained and shown as voided — it is never deleted."
-            railIcon={Ban}
-            railTitle="Void record"
-            railSubtitle="Immutable register"
-            steps={[
-                {
-                    key: 'reason',
-                    label: 'Reason',
-                    blurb: 'Why void',
-                    icon: Ban,
-                },
-            ]}
-            stepIndex={0}
-            onStepClick={() => {}}
-            footer={
-                <>
-                    <Button
-                        variant="ghost"
-                        onClick={onClose}
-                        disabled={form.processing}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        onClick={submit}
-                        disabled={
-                            form.processing || !form.data.void_reason.trim()
-                        }
-                    >
-                        Void record
-                    </Button>
-                </>
-            }
-        >
-            <StepHead
-                icon={Ban}
-                title="Void this record"
-                blurb="Voiding keeps the original entry in the register, struck through, with this reason attached."
+        <>
+            <ConfirmDialog
+                frontline
+                open={confirming}
+                onClose={() => {
+                    if (!form.processing) setConfirming(false);
+                }}
+                onConfirm={submit}
+                processing={form.processing}
+                title="Void this destruction record?"
+                description={
+                    <>
+                        The record of{' '}
+                        <span className="font-medium text-foreground">
+                            {destruction.medication_name ?? 'this medicine'}
+                            {quantity ? ` (${quantity})` : ''}
+                        </span>{' '}
+                        stays in the register, struck through, with your reason.
+                        A void can&rsquo;t be undone. Stock and register
+                        balances don&rsquo;t change: correct any stock
+                        difference with a witnessed count.
+                    </>
+                }
+                confirmText="Void record"
+                variant="destructive"
             />
-            <div className="mb-4 rounded-lg border px-4">
-                <SummaryRow
-                    label="Medication"
-                    value={destruction.medication_name ?? '—'}
-                />
-                <SummaryRow
-                    label="Quantity"
-                    value={`${destruction.quantity ?? '—'} ${destruction.unit ?? ''}`}
-                />
-            </div>
-            <Field
-                label="Reason for voiding"
-                required
-                error={form.errors.void_reason}
-                span
+            <MedsWizardDialog
+                formState={form}
+                open
+                onClose={onClose}
+                title="Void destruction record"
+                description="Correct an erroneous entry. The record is retained and shown as voided — it is never deleted."
+                railIcon={Ban}
+                railTitle="Void record"
+                railSubtitle="Immutable register"
+                steps={[
+                    {
+                        key: 'reason',
+                        label: 'Reason',
+                        blurb: 'Why void',
+                        icon: Ban,
+                    },
+                ]}
+                stepIndex={0}
+                onStepClick={() => {}}
+                footer={
+                    <>
+                        <Button
+                            variant="ghost"
+                            onClick={onClose}
+                            disabled={form.processing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => setConfirming(true)}
+                            disabled={
+                                form.processing || !form.data.void_reason.trim()
+                            }
+                        >
+                            Void record
+                        </Button>
+                    </>
+                }
             >
-                <Input
-                    value={form.data.void_reason}
-                    onChange={(e) =>
-                        form.setData('void_reason', e.target.value)
-                    }
-                    placeholder="e.g. Duplicate entry / wrong quantity recorded"
+                <StepHead
+                    icon={Ban}
+                    title="Void this record"
+                    blurb="Voiding keeps the original entry in the register, struck through, with this reason attached."
                 />
-            </Field>
-        </MedsWizardDialog>
+                <div className="mb-4 rounded-lg border px-4">
+                    <SummaryRow
+                        label="Medication"
+                        value={destruction.medication_name ?? '—'}
+                    />
+                    <SummaryRow
+                        label="Quantity"
+                        value={`${destruction.quantity ?? '—'} ${destruction.unit ?? ''}`}
+                    />
+                </div>
+                <Field
+                    label="Reason for voiding"
+                    required
+                    error={form.errors.void_reason}
+                    span
+                >
+                    <Input
+                        value={form.data.void_reason}
+                        onChange={(e) =>
+                            form.setData('void_reason', e.target.value)
+                        }
+                        placeholder="e.g. Duplicate entry / wrong quantity recorded"
+                    />
+                </Field>
+            </MedsWizardDialog>
+        </>
     );
 }
 

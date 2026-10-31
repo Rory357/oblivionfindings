@@ -1,13 +1,17 @@
-/* H&S Event — thin deep-link / share shell. The register opens the governance
- * modal over the list; this page renders the *same* HsEventDialog on its own so
- * a shared `/health-safety/events/{id}` URL works. Closing returns to the register. */
+/* Permanent safety review workspace over the canonical event and its workflows. */
 import {
-    EventDetailDialog,
+    EventRecordWorkspace,
+    safetyReviewTitle,
     type EventActionKey,
     type EventDetail,
     type EventSectionKey,
 } from '@/components/health-safety/event-detail-dialog';
 import AppLayout from '@/layouts/app-layout';
+import {
+    safetyReviewHref,
+    safetyReviewPaneFromUrl,
+    safetyReviewReturn,
+} from '@/lib/health-safety/navigation';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 
@@ -25,8 +29,10 @@ export function actionFromUrl(url: string): EventActionKey | null {
                 'worksafe-site-preservation': 'worksafe_site_preservation',
                 'worksafe-site-release': 'worksafe_site_release',
                 investigation: 'investigation',
+                close: 'close',
+                'add-action': 'add_action',
             } as const
-        )[action ?? ''] ?? null
+        )[action?.replaceAll('_', '-') ?? ''] ?? null
     );
 }
 
@@ -51,25 +57,55 @@ export function sectionFromUrl(url: string): EventSectionKey | null {
 export default function HsEventShow({ detail }: { detail: EventDetail }) {
     const pageUrl = usePage().url;
     const initialAction = actionFromUrl(pageUrl);
-    const initialSection = sectionFromUrl(pageUrl) ?? 'overview';
+    const initialPane = safetyReviewPaneFromUrl(pageUrl);
+    const initialSection =
+        sectionFromUrl(pageUrl) ??
+        (initialPane?.kind.startsWith('inv_')
+            ? 'investigation'
+            : initialPane?.kind.startsWith('ca_')
+              ? 'actions'
+              : 'overview');
+    const params = new URLSearchParams(
+        pageUrl.split('?')[1]?.split('#')[0] ?? '',
+    );
+    const returnTo = safetyReviewReturn(params.get('return_to'));
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Health & Safety', href: '/health-safety' },
-        { title: 'Events', href: '/health-safety/events' },
+        { title: 'Home', href: '/dashboard' },
+        { title: 'Health & safety', href: '/health-safety' },
+        { title: 'Safety reviews', href: '/health-safety/events' },
         {
-            title: detail.reference_number,
+            title: safetyReviewTitle(detail),
             href: `/health-safety/events/${detail.id}`,
         },
     ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`${detail.reference_number} · H&S Event`} />
-            <EventDetailDialog
+            <Head title={`${safetyReviewTitle(detail)} · ${detail.reference_number}`} />
+            <EventRecordWorkspace
+                key={detail.id}
                 detail={detail}
-                open
                 initialSection={initialSection}
                 initialAction={initialAction}
-                onClose={() => router.visit('/health-safety/events')}
+                initialPane={initialPane}
+                returnHref={returnTo}
+                onPaneChange={(pane, section) =>
+                    router.replace({
+                        url: safetyReviewHref(detail.id, {
+                            pane,
+                            section,
+                            returnTo,
+                        }),
+                        preserveState: true,
+                        preserveScroll: true,
+                    })
+                }
+                onSectionChange={(section) =>
+                    router.visit(
+                        safetyReviewHref(detail.id, { section, returnTo }),
+                        { preserveState: true, preserveScroll: true },
+                    )
+                }
             />
         </AppLayout>
     );

@@ -67,6 +67,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.retention.create');
         Route::post('/privacy/retention', [DataRetentionPolicyController::class, 'store'])
             ->name('privacy.retention.store');
+        Route::post('/privacy/retention/referral-periods', [DataRetentionPolicyController::class, 'referralPeriods'])
+            ->name('privacy.retention.referral-periods');
         Route::get('/privacy/retention/{policy}/edit', [DataRetentionPolicyController::class, 'edit'])
             ->name('privacy.retention.edit');
         Route::put('/privacy/retention/{policy}', [DataRetentionPolicyController::class, 'update'])

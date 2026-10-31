@@ -162,6 +162,7 @@ class StaffBackgroundCheck extends Model
     {
         return $this->expires_at
             && $this->expires_at->isFuture()
-            && $this->expires_at->diffInDays(now()) <= $days;
+            // lte() rather than diffInDays(now()) <= $days, which Carbon 3 signs.
+            && $this->expires_at->lte(now()->addDays($days));
     }
 }

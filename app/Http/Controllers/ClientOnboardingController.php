@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientOnboardingOverride;
 use App\Services\AuditLogger;
 use App\Services\Clients\ClientOnboardingAccess;
+use App\Services\Clients\ClientProfileChecklist;
 use Illuminate\Http\Request;
 
 class ClientOnboardingController extends Controller
@@ -26,15 +27,7 @@ class ClientOnboardingController extends Controller
             403,
         );
 
-        $allowed = [
-            'profile',
-            'next_of_kin',
-            'medications',
-            'conditions',
-            'emergency_contacts',
-            'history',
-            'documents',
-        ];
+        $allowed = array_keys(ClientProfileChecklist::LABELS);
 
         abort_unless(in_array($key, $allowed, true), 404);
 

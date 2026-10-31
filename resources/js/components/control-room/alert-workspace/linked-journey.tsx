@@ -87,11 +87,12 @@ export function LinkedJourney({
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="text-xs font-semibold tracking-wide text-primary uppercase">
-                        Linked safety journey
+                        Incident report
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        One operational alert, one official incident, then
-                        governed H&S ownership.
+                        {incident
+                            ? 'Reported. Health & Safety takes over the follow-up.'
+                            : 'If someone was hurt or put at risk, report it.'}
                     </p>
                 </div>
                 {actionControl}
@@ -100,28 +101,28 @@ export function LinkedJourney({
             <div className="mt-4 grid grid-cols-3 gap-2">
                 <JourneyStage
                     icon={RadioTower}
-                    label="Control Room"
+                    label="This alert"
                     reference={alertReference}
-                    state="In progress"
+                    state={['resolved', 'closed', 'dismissed'].includes(alertStatus) ? 'Finished' : 'Being handled'}
                     complete={Boolean(incident)}
                 />
                 <JourneyStage
                     icon={FileWarning}
-                    label="Incident"
+                    label="Incident report"
                     reference={incident?.referenceNumber ?? null}
-                    state={incident ? 'Official record created' : 'Not created'}
+                    state={incident ? 'Reported' : 'Not reported yet'}
                     complete={Boolean(incident)}
                 />
                 <JourneyStage
                     icon={HeartPulse}
-                    label="Health & Safety"
+                    label="H&S follow-up"
                     reference={healthSafety?.referenceNumber ?? null}
                     state={
                         healthSafety
                             ? healthSafety.handoverStatus === 'accepted'
-                                ? 'Handover accepted'
-                                : 'Waiting for acceptance'
-                            : 'Not started'
+                                ? 'H&S has taken it on'
+                                : 'Waiting for H&S to take it'
+                            : 'Starts once reported'
                     }
                     complete={healthSafety?.handoverStatus === 'accepted'}
                 />
@@ -171,10 +172,10 @@ function JourneyStage({
                     />
                 )}
             </div>
-            <p className="mt-2 font-mono text-xs font-semibold text-foreground">
-                {reference ?? 'Not yet assigned'}
-            </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">{state}</p>
+            <p className="mt-2 text-sm font-semibold text-foreground">{state}</p>
+            {reference ? (
+                <p className="text-caption mt-0.5 tabular-nums">{reference}</p>
+            ) : null}
         </Card>
     );
 }

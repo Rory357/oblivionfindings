@@ -38,7 +38,10 @@ func (s *buildSigner) Sign(_ io.Reader, message []byte, options crypto.SignerOpt
 
 func buildFixture(t *testing.T) (string, string, BuildSpec, ed25519.PrivateKey, map[string][]byte) {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	source := filepath.Join(root, "stage")
 	if err := os.Mkdir(source, 0700); err != nil {
 		t.Fatal(err)

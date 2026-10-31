@@ -24,7 +24,8 @@ beforeEach(function () {
     $this->publisher = app(HubPublishing::class);
     $this->page = $this->publisher->create($this->writer, 'news', 'A draft for review');
     $draft = $this->page->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'A complete story for the publication and review workflow.';
+    // The story template also starts an image and a second text block; keep one complete text block.
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'A complete story for the publication and review workflow.']];
     $this->page->update(['draft' => $draft]);
     $this->base = '/company-hub/manage/'.$this->page->id;
 });
@@ -49,7 +50,7 @@ test('history filters the original snapshot audience and conceals direct foreign
     $this->postJson($this->base.'/revisions/'.$secret->id.'/review', ['action' => 'request_changes', 'version' => 1, 'note' => 'Feedback'])->assertNotFound();
     $other = $this->publisher->create($this->editor, 'news', 'Another page');
     $draft = $other->draft;
-    $draft['sections'][0]['blocks'][0]['body'] = 'The other page has complete authored content.';
+    $draft['sections'][0]['blocks'] = [[...$draft['sections'][0]['blocks'][0], 'body' => 'The other page has complete authored content.']];
     $other->update(['draft' => $draft]);
     $visible = $this->publisher->submit($this->editor, $other, 1);
     $this->getJson($this->base.'/revisions/'.$visible->id)->assertNotFound();

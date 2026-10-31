@@ -44,7 +44,7 @@ class ActionsAggregator
                 $client,
                 (bool) ($access['notes'] ?? false) && (bool) $user?->canDo('progress_notes.review'),
             ))
-            ->merge($this->expiringDocuments($client, (bool) ($access['documents'] ?? false)))
+            ->merge($this->expiringDocuments($client, (bool) ($access['documents'] ?? false), $user))
             ->merge($this->riskReviews($client, (bool) ($access['risks'] ?? false)))
             ->merge($this->carePlanReviews($client, (bool) ($access['care_plans'] ?? false)))
             ->merge($this->assessmentReviews($client, (bool) ($access['assessments'] ?? false)))
@@ -118,13 +118,14 @@ class ActionsAggregator
             ));
     }
 
-    private function expiringDocuments(Client $client, bool $canView): Collection
+    private function expiringDocuments(Client $client, bool $canView, ?User $user): Collection
     {
-        if (! $canView) {
+        if (! $canView || ! $user) {
             return collect();
         }
 
         return ClientDocument::query()
+            ->visibleReferralReleases($user)
             ->where('client_id', $client->id)
             ->whereNotNull('expiry_date')
             ->whereDate('expiry_date', '<=', now()->addDays(30))

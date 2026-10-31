@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Cctv\Models\CctvSource;
 use App\Domain\SecurityDevices\Cctv\Services\CctvNavigation;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
@@ -43,7 +44,7 @@ class SecurityWorkspacePresenter
         private readonly ControlRoomAlertAccessService $controlRoomAccess,
     ) {}
 
-    public function present(User $viewer, Builder $securityScope, array $activeTab): array
+    public function present(User $viewer, Builder $securityScope, array $activeTab, array $filters = []): array
     {
         $canViewEvents = $viewer->canDo('securityDevices.events.view');
         $canViewMaintenance = $viewer->canDo('securityDevices.maintenance.view');
@@ -52,9 +53,22 @@ class SecurityWorkspacePresenter
         $canOpenControlRoomQueue = $viewer->canDo('controlRoom.viewAny');
         $canViewMedia = $viewer->canDo('securityDevices.cctv.media.view');
 
+        $statusEnum = isset($filters['status']) && is_string($filters['status'])
+            ? DeviceStatus::tryFrom($filters['status'])
+            : null;
+        $statusFilter = $statusEnum !== null ? [
+            'key' => $statusEnum->value,
+            'label' => $statusEnum === DeviceStatus::Offline
+                ? 'Offline security devices'
+                : "{$statusEnum->label()} security devices",
+        ] : null;
+
         $activeScope = clone $securityScope;
         if (isset($activeTab['categories'])) {
             $activeScope->whereIn('category', $activeTab['categories']);
+        }
+        if ($statusEnum !== null) {
+            $activeScope->where('status', $statusEnum->value);
         }
 
         $activeDevices = (clone $activeScope)
@@ -72,6 +86,7 @@ class SecurityWorkspacePresenter
             ->limit(self::DEVICE_LIMIT)
             ->get();
         $assignmentContext = $this->assignmentContext($viewer, $activeDevices);
+        $cctvSources = $this->cctvSources($activeDevices);
 
         $events = $canViewEvents
             ? DeviceEvent::query()
@@ -117,6 +132,7 @@ class SecurityWorkspacePresenter
                 'label' => $activeTab['label'],
                 'description' => $activeTab['description'],
                 'restricted' => $restricted,
+                'statusFilter' => $statusFilter,
                 'inventoryTotal' => (clone $activeScope)->count(),
                 'inventoryShown' => $activeDevices->count(),
                 'inventoryTruncated' => (clone $activeScope)->count() > self::DEVICE_LIMIT,
@@ -126,6 +142,7 @@ class SecurityWorkspacePresenter
                         $viewer,
                         $device,
                         $assignmentContext,
+                        $cctvSources,
                         $canViewMaintenance,
                         $canViewMedia,
                     ))->values(),
@@ -436,10 +453,58 @@ class SecurityWorkspacePresenter
         ];
     }
 
+    /**
+     * @param  Collection<int, Device>  $devices
+     * @return Collection<int, CctvSource>
+     */
+    private function cctvSources(Collection $devices): Collection
+    {
+        $cameraIds = $devices
+            ->filter(fn (Device $device): bool => $device->category === 'cctv' && $device->subcategory !== 'nvr')
+            ->pluck('id')
+            ->values();
+
+        if ($cameraIds->isEmpty()) {
+            return collect();
+        }
+
+        return CctvSource::query()
+            ->whereIn('camera_id', $cameraIds)
+            ->select(['id', 'camera_id', 'provider', 'revision', 'enabled', 'stream_state', 'verified_at', 'stream_verified_at'])
+            ->orderByDesc('revision')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('camera_id')
+            ->keyBy('camera_id');
+    }
+
+    /** @return array{state: string, label: string} */
+    private function cctvSourceSummary(?CctvSource $source): array
+    {
+        if ($source === null) {
+            return ['state' => 'not_configured', 'label' => 'Source not configured'];
+        }
+
+        if (! $source->enabled) {
+            return ['state' => 'disabled', 'label' => 'Source disabled'];
+        }
+
+        if ($source->stream_state === 'verified' && $source->stream_verified_at !== null) {
+            return ['state' => 'verified', 'label' => 'Live source verified'];
+        }
+
+        if ($source->stream_state === 'failed') {
+            return ['state' => 'failed', 'label' => 'Live check failed'];
+        }
+
+        return ['state' => 'configured', 'label' => 'Source configured (not verified)'];
+    }
+
     private function mapDevice(
         User $viewer,
         Device $device,
         array $siteContext,
+        Collection $cctvSources,
         bool $canViewMaintenance,
         bool $canViewMedia,
     ): array {
@@ -455,7 +520,7 @@ class SecurityWorkspacePresenter
             'subcategory' => $device->subcategory,
             'provider' => $device->provider,
             'status' => $device->status?->value,
-            'health' => $device->health_status?->value,
+            'health' => $device->effectiveHealthState(),
             'lastSeenAt' => $device->last_seen_at?->toISOString(),
             'deviceHref' => "/security-devices/devices/{$device->id}",
             'site' => $site,
@@ -487,6 +552,9 @@ class SecurityWorkspacePresenter
             $navigation = app(CctvNavigation::class)->forDevice($viewer, $device);
             $mapped += $navigation;
             $mapped['media'] = $this->mediaAccess($device, $canViewMedia && $navigation['live_href'] !== null);
+            $mapped['cctvSource'] = $device->subcategory === 'nvr'
+                ? null
+                : $this->cctvSourceSummary($cctvSources->get($device->id));
         }
 
         return $mapped;

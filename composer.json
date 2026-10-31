@@ -1,15 +1,15 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/react-starter-kit",
+    "name": "oblivion/care",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Oblivion Care: the supported-living care platform.",
     "keywords": [
-        "laravel",
-        "framework"
+        "oblivion",
+        "care"
     ],
-    "license": "MIT",
+    "license": "proprietary",
     "require": {
-        "php": "^8.4",
+        "php": "^8.4.27",
         "ext-sodium": "*",
         "barryvdh/laravel-dompdf": "^3.1",
         "endroid/qr-code": "^6.0",

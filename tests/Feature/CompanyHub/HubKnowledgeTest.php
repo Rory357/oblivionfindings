@@ -25,7 +25,8 @@ beforeEach(function () {
     $this->reader->roles()->attach(Role::where('name', 'support_worker')->sole());
     ensureCanonicalHrStaffProfile($this->reader, $this->site, ['department_id' => $this->team->id]);
     $this->publisher = app(HubPublishing::class);
-    $this->page = $this->publisher->create($this->editor, 'knowledge', 'Your first week', 'guide');
+    // Starter templates begin with unfinished blocks that cannot publish; these checklist tests need no authored blocks.
+    $this->page = $this->publisher->create($this->editor, 'knowledge', 'Your first week', 'blank');
     $this->steps = [['id' => 'welcome', 'title' => 'Meet your orientation buddy'], ['id' => 'tools', 'title' => 'Check your essential tools']];
     $this->page = $this->publisher->save($this->editor, $this->page, [...$this->page->draft, 'resource_type' => 'Checklist', 'checklist' => $this->steps, 'team_ids' => [$this->team->id], 'review_on' => '2027-01-12'], 1);
     $this->revision = $this->publisher->publish($this->editor, $this->page, 2, null, null);
@@ -75,7 +76,7 @@ test('knowledge reader projects only visible current work contacts and published
     ensureCanonicalHrStaffProfile($this->editor, $this->site, ['department_id' => $this->team->id, 'secondary_site_ids' => [$otherSite->id], 'work_email' => 'team@company.test', 'bio' => 'Private HR note']);
     $this->editor = $this->editor->fresh();
     foreach (['visible', 'private', 'draft', 'expired'] as $status) {
-        $related = $this->publisher->create($this->editor, 'knowledge', $status.' guide');
+        $related = $this->publisher->create($this->editor, 'knowledge', $status.' guide', 'blank');
         $related = $this->publisher->save($this->editor, $related, [...$related->draft, 'team_ids' => [$this->team->id], 'audience' => $status === 'private' ? ['type' => 'sites', 'ids' => [$otherSite->id]] : ['type' => 'all', 'ids' => []]], 1);
         if ($status !== 'draft') {
             $this->publisher->publish($this->editor, $related, 2, null, $status === 'expired' ? now()->addHour()->toIso8601String() : null);

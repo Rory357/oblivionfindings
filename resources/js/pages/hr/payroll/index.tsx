@@ -34,6 +34,11 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    NetPayEvidenceDialog,
+    type NetPayAction,
+    type NetPayRun,
+} from './_dialogs';
 
 interface PayrollRun {
     id: number;
@@ -156,6 +161,10 @@ export default function PayrollIndex({
     const [selectedProfileByRun, setSelectedProfileByRun] = useState<
         Record<number, string>
     >({});
+    const [netPayDialog, setNetPayDialog] = useState<{
+        action: NetPayAction;
+        run: NetPayRun;
+    } | null>(null);
     const page = usePage<{ errors?: Record<string, string | string[]> }>();
     const { open: openRunContext, element: runContextElement } =
         useRowContextMenu();
@@ -184,79 +193,32 @@ export default function PayrollIndex({
         );
     }
 
-    function handleSettleNetPay(run: PayrollRun) {
-        const existingReference = run.net_settlement?.acceptance_reference;
-        const reference =
-            existingReference || window.prompt('Bank acceptance reference');
-        if (!reference) return;
-        const confirmationDigest = existingReference
-            ? null
-            : window.prompt(
-                  'Bank confirmation digest or immutable evidence reference',
-              );
-        if (!existingReference && !confirmationDigest) return;
-
-        router.post(
-            `/hr/payroll/runs/${run.id}/pay`,
-            {
-                idempotency_key: `payroll-net:${run.id}:${reference}`,
-                acceptance_reference: reference,
-                acceptance_evidence: confirmationDigest
-                    ? { confirmation_digest: confirmationDigest }
-                    : undefined,
+    // Bank evidence is collected in one dialog with labelled fields, never a
+    // chain of window.prompt() boxes (DESIGN.md anti-pattern).
+    function openNetPayDialog(action: NetPayAction, run: PayrollRun) {
+        setNetPayDialog({
+            action,
+            run: {
+                id: run.id,
+                periodLabel: `${formatDate(run.period_start)} – ${formatDate(run.period_end)}`,
+                acceptanceReference:
+                    run.net_settlement?.status === 'accepted'
+                        ? (run.net_settlement.acceptance_reference ?? null)
+                        : null,
             },
-            { preserveScroll: true },
-        );
+        });
+    }
+
+    function handleSettleNetPay(run: PayrollRun) {
+        openNetPayDialog('settle', run);
     }
 
     function handleRejectNetPay(run: PayrollRun) {
-        const reference = window.prompt('Bank rejection reference');
-        const reason = window.prompt('Bank rejection reason');
-        const evidenceReference = window.prompt(
-            'Bank rejection digest or immutable evidence reference',
-        );
-        if (!reference || !reason || !evidenceReference) return;
-
-        router.post(
-            `/hr/payroll/runs/${run.id}/reject-net-pay`,
-            {
-                idempotency_key:
-                    `payroll-reject:${run.id}:${reference}:${evidenceReference}`.slice(
-                        0,
-                        128,
-                    ),
-                reference,
-                reason,
-                evidence: { rejection_digest: evidenceReference },
-            },
-            { preserveScroll: true },
-        );
+        openNetPayDialog('reject', run);
     }
 
     function handleReconcileNetPay(run: PayrollRun) {
-        const bankTransactionInput = window.prompt(
-            'Cleared bank transaction ID',
-        );
-        const reference = window.prompt('Bank reconciliation reference');
-        const evidenceReference = window.prompt(
-            'Bank reconciliation digest or immutable evidence reference',
-        );
-        if (!bankTransactionInput || !reference || !evidenceReference) return;
-
-        const bankTransactionId = Number(bankTransactionInput);
-        if (!Number.isSafeInteger(bankTransactionId) || bankTransactionId < 1)
-            return;
-
-        router.post(
-            `/hr/payroll/runs/${run.id}/reconcile-net-pay`,
-            {
-                idempotency_key: `payroll-reconcile:${run.id}:${bankTransactionId}`,
-                bank_transaction_id: bankTransactionId,
-                reference,
-                evidence: { reconciliation_digest: evidenceReference },
-            },
-            { preserveScroll: true },
-        );
+        openNetPayDialog('reconcile', run);
     }
 
     function handleSetDefaultProfile(profileId: number) {
@@ -1075,6 +1037,11 @@ export default function PayrollIndex({
                 )}
             </PageLayout>
             {runContextElement}
+            <NetPayEvidenceDialog
+                action={netPayDialog?.action ?? null}
+                run={netPayDialog?.run ?? null}
+                onClose={() => setNetPayDialog(null)}
+            />
         </AppLayout>
     );
 }

@@ -72,7 +72,7 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
 
     Route::get('/clients/{client}/medications/{medication}/prn-history', [MedicationsApiController::class, 'getPrnHistory'])
         ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
-        ->name('api.medications.prn.history');
+        ->name('api.medications.prnHistory');
 
     // Alerts
     Route::get('/alerts', [MedicationsApiController::class, 'getDashboardAlerts'])

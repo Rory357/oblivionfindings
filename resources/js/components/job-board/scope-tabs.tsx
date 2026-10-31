@@ -79,7 +79,7 @@ export function ScopeTabs({
             }))}
             value={scope}
             onSelect={onScopeChange}
-            ariaLabel="Job board view"
+            ariaLabel="Available shifts view"
         />
     );
 }

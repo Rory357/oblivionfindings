@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Respite;
 
 use App\Domain\Governance\Models\NotifiableIncident;
+use App\Domain\Referrals\Services\ReferralActivationGuard;
+use App\Domain\Referrals\Services\ReferralRespiteReview;
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -15,12 +17,16 @@ use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
 use App\Models\ServiceAgreement;
+use App\Services\HealthSafety\RestraintCommandValues;
+use App\Services\HealthSafety\RestraintService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\References\ReferenceNumberGenerator;
 use App\Services\Respite\RespiteMedicalDisclosure;
+use App\Services\Respite\RespiteRestraintReadService;
 use App\Services\Respite\RespiteShiftSync;
 use App\Services\Respite\RespiteStateTransitionService;
 use App\Services\Respite\RespiteStayScope;
+use App\Support\Respite\RespiteWallClock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -79,7 +85,8 @@ class RespiteStayController extends Controller
                     ...$validated,
                     'status' => 'admitted',
                     'created_by' => auth()->id(),
-                    'actual_start' => now(),
+                    // Governed (referral-originated) stays record actual start only at reviewed check-in.
+                    'actual_start' => $booking->client && app(ReferralActivationGuard::class)->governsRespite($booking->client, $booking) ? null : now(),
                 ]);
             },
         );
@@ -115,6 +122,9 @@ class RespiteStayController extends Controller
 
         return Inertia::render('respite/stays/show', [
             'stay' => $stay,
+            'serviceStartReviewUrl' => app(ReferralRespiteReview::class)->url(request()->user(), $stay->client, $stay->booking),
+            'supportPreparation' => app(ReferralRespiteReview::class)->preparation(request()->user(), $stay->client, $stay->booking),
+            'restraints' => app(RespiteRestraintReadService::class)->forStay(request()->user(), $stay),
         ]);
     }
 
@@ -136,12 +146,16 @@ class RespiteStayController extends Controller
                 $booking = $stay->booking;
                 $this->states->assertStayCheckIn($stay->status, $booking->status);
 
+                $governed = app(ReferralActivationGuard::class)->governsRespite($stay->client, $booking);
+                app(ReferralActivationGuard::class)->assertRespitePermitted($stay->client, $booking);
+
                 $this->guardAnaphylaxisAcknowledgement($stay, $validated);
                 $this->guardAdmissionMedicationReconciliation($stay, $validated['med_rec_override_reason'] ?? null);
 
                 $stay->update([
                     'status' => 'active',
-                    'actual_start' => $stay->actual_start ?? now(),
+                    // A governed stay's actual start is the reviewed check-in, never an admission timestamp.
+                    'actual_start' => $governed ? now() : ($stay->actual_start ?? now()),
                     'updated_by' => auth()->id(),
                 ]);
                 $booking->update([
@@ -178,7 +192,7 @@ class RespiteStayController extends Controller
                 $booking = $stay->booking;
                 $this->states->assertStayExtension($stay->status, $booking->status);
 
-                $newEnd = Carbon::parse($validated['new_end']);
+                $newEnd = RespiteWallClock::toUtc($validated['new_end']);
                 $currentEnd = collect([$stay->actual_end, $booking->end_at])
                     ->filter()
                     ->map(fn ($end) => Carbon::parse($end))
@@ -190,6 +204,10 @@ class RespiteStayController extends Controller
                         'new_end' => 'The new end must be after the current respite stay end.',
                     ]);
                 }
+
+                $extendedBooking = clone $booking;
+                $extendedBooking->end_at = $newEnd;
+                app(ReferralActivationGuard::class)->assertRespitePermitted($stay->client, $extendedBooking);
 
                 $stay->update([
                     'status' => 'extended',
@@ -252,7 +270,7 @@ class RespiteStayController extends Controller
                 $stay->update([
                     'bed_hold_status' => $validated['bed_hold_status'],
                     'bed_hold_reason' => $validated['bed_hold_reason'] ?? null,
-                    'bed_hold_until' => $validated['bed_hold_until'] ?? null,
+                    'bed_hold_until' => RespiteWallClock::toUtc($validated['bed_hold_until'] ?? null),
                     'absence_records' => $absenceRecords,
                     'updated_by' => auth()->id(),
                 ]);
@@ -348,7 +366,7 @@ class RespiteStayController extends Controller
                 'source' => $validated['source'] ?? null,
                 'count_received' => $validated['count_received'] ?? null,
                 'discrepancies' => $validated['discrepancies'] ?? null,
-                'first_dose_due_at' => $validated['first_dose_due_at'] ?? null,
+                'first_dose_due_at' => RespiteWallClock::toUtc($validated['first_dose_due_at'] ?? null),
                 'override_reason' => $validated['override_reason'] ?? null,
                 'reconciled_by_user_id' => auth()->id(),
                 'reconciled_at' => in_array($validated['status'], ['completed', 'overridden'], true) ? now() : null,
@@ -399,10 +417,15 @@ class RespiteStayController extends Controller
             'related_incident_id' => 'nullable|integer',
         ]);
 
+        // Actual times, like the H&S restraint command: the form sends NZ
+        // wall-clock with its explicit offset, stored as UTC.
+        $validated['started_at'] = RestraintCommandValues::instant($validated['started_at'], 'started_at');
+        $validated['ended_at'] = RestraintCommandValues::instant($validated['ended_at'] ?? null, 'ended_at');
+
         $event = DB::transaction(function () use ($request, $stay, $validated): RestraintEvent {
             $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true);
-            $started = Carbon::parse($validated['started_at']);
-            $ended = isset($validated['ended_at']) ? Carbon::parse($validated['ended_at']) : null;
+            $started = Carbon::parse($validated['started_at'], 'UTC');
+            $ended = $validated['ended_at'] !== null ? Carbon::parse($validated['ended_at'], 'UTC') : null;
             $withinSupportPlan = (bool) ($validated['within_support_plan'] ?? true);
             $behaviourSupportPlanId = isset($validated['behaviour_support_plan_id'])
                 ? (int) $validated['behaviour_support_plan_id']
@@ -442,6 +465,39 @@ class RespiteStayController extends Controller
         return back()->with('success', 'Restraint event recorded.');
     }
 
+    /**
+     * The save behind the stay's own "record a restraint" page (the shared restraint form). It goes through the shared
+     * restraint command with a command key: the stay's own person, Site and stay, one receipt and one Respite event, so
+     * a lost response is recovered from its receipt instead of being sent twice. The Respite workspace's quick form
+     * keeps the direct save above.
+     */
+    public function recordRestraintFromPage(Request $request, RespiteStay $stay, RestraintService $commands): RedirectResponse
+    {
+        $accepted = DB::transaction(function () use ($request, $stay, $commands): array {
+            $currentStay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true);
+            $input = $request->except('_token', '_method', 'return_to', 'section', 'action');
+            if (! array_key_exists('client_id', $input)) {
+                $input['client_id'] = (int) $currentStay->client_id;
+            }
+            $result = $commands->createForStay($request->user(), $currentStay, $input);
+            $proof = $commands->confirmationForViewer($request->user(), $result);
+            abort_unless($proof && $proof['event_id'] === $result['event_id'] && $proof['idempotency_key'] === $result['idempotency_key']
+                && $proof['version'] === $result['version'] && $proof['command'] === 'create', 403);
+            $proof['replayed'] = $result['replayed'];
+
+            return ['confirmation' => $proof, 'stay_id' => (int) $currentStay->id, 'client_id' => (int) $currentStay->client_id];
+        });
+        if (! $accepted['confirmation']['replayed']) {
+            event(new RespiteEvent('respite.stay.restraint_recorded', [
+                'id' => $accepted['confirmation']['event_id'],
+                'stay_id' => $accepted['stay_id'],
+                'client_id' => $accepted['client_id'],
+            ]));
+        }
+
+        return back()->with('success', 'Restraint event recorded.')->with('restraint_confirmation', $accepted['confirmation']);
+    }
+
     public function recordIncident(Request $request, RespiteStay $stay): RedirectResponse
     {
         $validated = $request->validate([
@@ -475,7 +531,7 @@ class RespiteStayController extends Controller
                 'severity' => $validated['severity'],
                 'status' => 'submitted',
                 'submitted_at' => now(),
-                'occurred_at' => $validated['occurred_at'] ?? now(),
+                'occurred_at' => RespiteWallClock::toUtc($validated['occurred_at'] ?? null) ?? now(),
                 'title' => $validated['title'],
                 'description' => $validated['description'],
                 'requires_followup' => in_array($validated['severity'], ['high', 'critical'], true),
@@ -557,6 +613,7 @@ class RespiteStayController extends Controller
             'escalated_to_hdc' => 'nullable|in:no,offered,requested,submitted',
             'status' => 'nullable|in:open,acknowledged,resolved,escalated',
         ]);
+        $validated = RespiteWallClock::inputsToUtc($validated, ['received_at', 'acknowledged_at']);
 
         $complaint = RespiteComplaint::create([
             ...$validated,
@@ -597,7 +654,7 @@ class RespiteStayController extends Controller
             return;
         }
 
-        $nights = max(1, Carbon::parse($start)->startOfDay()->diffInDays(Carbon::parse($end)->startOfDay()));
+        $nights = max(1, RespiteWallClock::nights(Carbon::parse($start), Carbon::parse($end)));
         $hours = $nights * 24;
         $budget = 0.0;
 

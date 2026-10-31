@@ -29,6 +29,7 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { cn } from '@/lib/utils';
 
 import type { MyHrCalendarEvent, MyHrCalendarFeed } from './my-hr-types';
@@ -166,6 +167,9 @@ export function MyHrCalendar({
 
     const [menu, setMenu] = useState<MenuState>(null);
     const [hover, setHover] = useState<HoverState>(null);
+    const [leaveToCancel, setLeaveToCancel] =
+        useState<MyHrCalendarEvent | null>(null);
+    const [cancellingLeave, setCancellingLeave] = useState(false);
 
     // Re-seed if the shell feed changes (e.g. after an Inertia visit).
     useEffect(() => {
@@ -209,13 +213,15 @@ export function MyHrCalendar({
         }
         const onKey = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;
+            // The cancel-leave confirmation handles its own Escape.
+            if (leaveToCancel) return;
             if (menu) setMenu(null);
             else if (pickerOpen) setPickerOpen(false);
             else onClose();
         };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
-    }, [open, menu, pickerOpen, onClose]);
+    }, [open, menu, pickerOpen, onClose, leaveToCancel]);
 
     const closeMenu = useCallback(() => setMenu(null), []);
     const openMenuAt = useCallback(
@@ -277,13 +283,23 @@ export function MyHrCalendar({
         toast.success('Downloading calendar invite');
     };
     const viewLeave = () => router.visit('/hr/my/leave');
-    const cancelLeave = (refId?: number | null) => {
+    // The menu item only opens the confirmation; the request is sent from it.
+    const cancelLeave = (ev: MyHrCalendarEvent) => {
+        if (!ev.ref_id) return;
+        setLeaveToCancel(ev);
+    };
+    const confirmCancelLeave = () => {
+        const refId = leaveToCancel?.ref_id;
         if (!refId) return;
-        if (!window.confirm('Cancel this approved leave request?')) return;
         router.delete(`/hr/my/leave/${refId}`, {
             preserveScroll: true,
+            onStart: () => setCancellingLeave(true),
             onSuccess: () => toast.success('Leave request cancelled'),
             onError: () => toast.error('Could not cancel leave'),
+            onFinish: () => {
+                setCancellingLeave(false);
+                setLeaveToCancel(null);
+            },
         });
     };
 
@@ -338,7 +354,7 @@ export function MyHrCalendar({
                 {
                     label: 'Cancel leave',
                     icon: Trash2,
-                    onClick: () => cancelLeave(ev.ref_id),
+                    onClick: () => cancelLeave(ev),
                     danger: true,
                 },
             ];
@@ -773,6 +789,30 @@ export function MyHrCalendar({
                     </div>
                 </>
             ) : null}
+
+            <ConfirmDialog
+                open={leaveToCancel !== null}
+                onClose={() => {
+                    if (!cancellingLeave) setLeaveToCancel(null);
+                }}
+                onConfirm={confirmCancelLeave}
+                title="Cancel this leave?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {leaveToCancel?.title ?? 'This leave'}
+                        </span>{' '}
+                        is cancelled in full, including any other days it
+                        covers. It comes off the roster, the hours go back into
+                        your leave balance and your approver is told. To take
+                        the time off later, send a new request.
+                    </>
+                }
+                confirmText="Cancel leave"
+                cancelText="Keep leave"
+                variant="destructive"
+                processing={cancellingLeave}
+            />
         </div>
     );
 }

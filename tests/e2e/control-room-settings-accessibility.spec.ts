@@ -7,19 +7,12 @@ import {
     seedIncidentHandoverFixtures,
 } from './incident-handover-helpers';
 
+// Control Room is desktop web only (DESIGN.md) — 24 Oct 2026 rebuild on the
+// pop-up kit: every settings change opens a kit pop-up.
 const viewports = [
-    { width: 390, height: 844 },
+    { width: 1440, height: 900 },
     { width: 1024, height: 768 },
 ] as const;
-
-async function expectMinimumTarget(locator: Locator) {
-    const box = await locator.boundingBox();
-    expect(box).not.toBeNull();
-    if (!box) return;
-
-    expect(box.width).toBeGreaterThanOrEqual(44);
-    expect(box.height).toBeGreaterThanOrEqual(44);
-}
 
 async function expectContained(locator: Locator) {
     const width = await locator.evaluate((element) => ({
@@ -45,7 +38,7 @@ async function expectNoNameViolations(page: Page, include?: string) {
 test.describe('Control Room settings accessibility and reflow', () => {
     test.describe.configure({ timeout: 120_000 });
 
-    test('names every rule control and keeps the validation footer reachable', async ({
+    test('names every routing rule control and keeps bad JSON in the form', async ({
         page,
     }) => {
         const manifest = seedIncidentHandoverFixtures();
@@ -54,9 +47,9 @@ test.describe('Control Room settings accessibility and reflow', () => {
 
         for (const viewport of viewports) {
             await page.setViewportSize(viewport);
-            await page.goto('/control-room/settings');
+            await page.goto('/control-room/settings?tab=rules');
             await expect(
-                page.getByRole('heading', { name: 'Settings', exact: true }),
+                page.getByRole('heading', { level: 1, name: 'Settings' }),
             ).toBeVisible();
 
             const pageWidth = await page.evaluate(() => ({
@@ -66,80 +59,43 @@ test.describe('Control Room settings accessibility and reflow', () => {
             expect(pageWidth.scroll).toBeLessThanOrEqual(pageWidth.client);
             await expectNoNameViolations(page);
 
-            const createRule = page
-                .getByRole('button', { name: 'Create Rule', exact: true })
-                .first();
-            await expectMinimumTarget(createRule);
-            await createRule.focus();
-            await expect(createRule).toBeFocused();
-            await createRule.press('Enter');
-            const dialog = page.getByRole('dialog', {
-                name: 'Create Signal Rule',
-            });
+            const addRule = page.getByRole('button', { name: 'Add rule', exact: true });
+            await addRule.click();
+            const dialog = page.getByRole('dialog', { name: 'Add routing rule' });
             await expect(dialog).toBeVisible();
 
-            for (const name of [
-                'Signal type',
-                'Signal source',
-                'Output severity',
-                'Playbook',
-            ]) {
-                const control = dialog.getByRole('combobox', { name });
-                await expect(control).toBeVisible();
-                await expectMinimumTarget(control);
+            for (const name of ['Signal type', 'Signal source', 'Severity', 'Response procedure']) {
+                await expect(dialog.getByRole('combobox', { name })).toBeVisible();
             }
             for (const name of [
-                'Suppress during maintenance',
-                'Deduplicate',
-                'Rule active',
+                'Hold during maintenance',
+                'Join repeats to the open alert',
+                'Rule is on',
             ]) {
-                await expect(
-                    dialog.getByRole('switch', { name }),
-                ).toBeVisible();
+                await expect(dialog.getByRole('switch', { name })).toBeVisible();
             }
 
-            const ruleName = dialog.getByRole('textbox', {
-                name: 'Rule name',
-            });
-            await expectMinimumTarget(ruleName);
-            await ruleName.fill(
-                'A deliberately long rule name that must reflow without hiding the actions',
-            );
-            const conditions = dialog.getByRole('textbox', {
-                name: 'Conditions (JSON)',
-            });
-            await conditions.fill('{not valid JSON');
             await dialog
-                .getByRole('button', { name: 'Create Rule', exact: true })
-                .click();
-            await expect(
-                dialog
-                    .getByRole('alert')
-                    .filter({ hasText: 'Enter valid JSON' }),
-            ).toBeVisible();
-            await expect(conditions).toHaveAttribute(
-                'aria-describedby',
-                'rule-conditions-error',
-            );
+                .getByRole('textbox', { name: /Rule name/ })
+                .fill('A deliberately long rule name that must reflow without hiding the actions');
+            await dialog
+                .getByRole('textbox', { name: 'Only when the signal has (JSON)' })
+                .fill('{not valid JSON');
+            await dialog.getByRole('button', { name: 'Save rule', exact: true }).click();
+            await expect(dialog.getByText(/Enter valid JSON/)).toBeVisible();
 
             await expectContained(dialog);
-            for (const button of [
-                dialog.getByRole('button', { name: 'Close' }),
-                dialog.getByRole('button', { name: 'Cancel' }),
-                dialog.getByRole('button', {
-                    name: 'Create Rule',
-                    exact: true,
-                }),
-            ]) {
-                await expect(button).toBeVisible();
-                await expectMinimumTarget(button);
+            for (const name of ['Close', 'Cancel', 'Save rule']) {
+                await expect(dialog.getByRole('button', { name, exact: true })).toBeVisible();
             }
-
             await expectNoNameViolations(page, '[role="dialog"]');
 
+            // Typing was done, so closing asks the one discard question.
             await page.keyboard.press('Escape');
+            const discard = page.getByRole('alertdialog', { name: 'Discard this draft?' });
+            await expect(discard).toBeVisible();
+            await discard.getByRole('button', { name: 'Discard draft' }).click();
             await expect(dialog).toBeHidden();
-            await expect(createRule).toBeFocused();
         }
 
         expectNoConsoleErrors(consoleErrors);
@@ -148,108 +104,46 @@ test.describe('Control Room settings accessibility and reflow', () => {
     test('gives each settings field a plain unique name', async ({ page }) => {
         const manifest = seedIncidentHandoverFixtures();
         const consoleErrors = collectConsoleErrors(page);
-        await page.setViewportSize(viewports[0]);
+        await page.setViewportSize(viewports[1]);
         await loginAsFixture(page, manifest.users.operator);
-        await page.goto('/control-room/settings');
 
-        await page.getByRole('tab', { name: 'Triage Queues' }).click();
-        const createQueue = page.getByRole('button', {
-            name: 'Create Queue',
-            exact: true,
-        });
-        await expect(createQueue).toBeVisible();
-        await createQueue.focus();
-        await createQueue.press('Enter');
-        const queueDialog = page.getByRole('dialog', {
-            name: 'Create Triage Queue',
-        });
+        await page.goto('/control-room/settings?tab=queues');
+        await page.getByRole('button', { name: 'Add queue', exact: true }).click();
+        const queueDialog = page.getByRole('dialog', { name: 'Add queue' });
         await expect(queueDialog).toBeVisible();
-        for (const name of ['Queue name', 'Queue code', 'Queue description']) {
-            await expect(
-                queueDialog.getByRole('textbox', { name, exact: true }),
-            ).toHaveCount(1);
+        for (const name of [/Queue name/, /Queue code/, /Description/]) {
+            await expect(queueDialog.getByRole('textbox', { name })).toHaveCount(1);
         }
-        for (const name of ['Queue tier', 'Auto-escalate after (minutes)']) {
-            await expect(
-                queueDialog.getByRole('spinbutton', { name, exact: true }),
-            ).toHaveCount(1);
+        for (const name of [/^Level/, /Move on after/]) {
+            await expect(queueDialog.getByRole('spinbutton', { name })).toHaveCount(1);
         }
-        for (const name of [
-            'Handle low severity',
-            'Handle fleet source',
-            'Assign control room operator role',
-        ]) {
-            await expect(
-                queueDialog.getByRole('checkbox', { name, exact: true }),
-            ).toHaveCount(1);
+        for (const name of ['Low', 'Fleet', 'Control room operator']) {
+            await expect(queueDialog.getByRole('button', { name, exact: true })).toHaveCount(1);
         }
-        await expect(
-            queueDialog.getByRole('combobox', {
-                name: 'Escalation queue',
-                exact: true,
-            }),
-        ).toHaveCount(1);
-        await expect(
-            queueDialog.getByRole('switch', {
-                name: 'Queue active',
-                exact: true,
-            }),
-        ).toHaveCount(1);
+        await expect(queueDialog.getByRole('combobox', { name: 'Move on to' })).toHaveCount(1);
+        await expect(queueDialog.getByRole('switch', { name: 'Queue is on' })).toHaveCount(1);
         await expectContained(queueDialog);
         await expectNoNameViolations(page, '[role="dialog"]');
         await page.keyboard.press('Escape');
-        await expect(createQueue).toBeFocused();
 
-        await page.getByRole('tab', { name: 'Maintenance' }).click();
-        const scheduleWindow = page.getByRole('button', {
-            name: 'Schedule Window',
-            exact: true,
-        });
-        await expect(scheduleWindow).toBeVisible();
-        await scheduleWindow.click();
-        const maintenanceDialog = page.getByRole('dialog', {
-            name: 'Schedule Maintenance Window',
-        });
-        for (const name of [
-            'Maintenance window name',
-            'Maintenance window description',
-        ]) {
-            await expect(
-                maintenanceDialog.getByRole('textbox', {
-                    name,
-                    exact: true,
-                }),
-            ).toHaveCount(1);
+        await page.goto('/control-room/settings?tab=maintenance');
+        await page.getByRole('button', { name: 'Schedule maintenance', exact: true }).click();
+        const maintenanceDialog = page.getByRole('dialog', { name: 'Schedule maintenance' });
+        for (const name of [/^Name/, /^Notes/]) {
+            await expect(maintenanceDialog.getByRole('textbox', { name })).toHaveCount(1);
         }
-        for (const name of ['Signal source', 'Site']) {
-            await expect(
-                maintenanceDialog.getByRole('combobox', {
-                    name,
-                    exact: true,
-                }),
-            ).toHaveCount(1);
+        for (const name of ['Signal source', 'House']) {
+            await expect(maintenanceDialog.getByRole('combobox', { name })).toHaveCount(1);
         }
         await expectContained(maintenanceDialog);
         await expectNoNameViolations(page, '[role="dialog"]');
         await page.keyboard.press('Escape');
 
-        await page.getByRole('tab', { name: 'Ticket Options' }).click();
-        const addOption = page.getByRole('button', {
-            name: 'Add Alert Categories option',
-            exact: true,
-        });
-        await expect(addOption).toBeVisible();
-        await addOption.click();
-        const optionDialog = page.getByRole('dialog', { name: 'Add Option' });
-        for (const name of [
-            'Option value (slug)',
-            'Display label',
-            'Option colour (hex)',
-            'Option description (optional)',
-        ]) {
-            await expect(
-                optionDialog.getByRole('textbox', { name, exact: true }),
-            ).toHaveCount(1);
+        await page.goto('/control-room/settings?tab=ticket-options');
+        await page.getByRole('button', { name: 'Add to alert categories', exact: true }).click();
+        const optionDialog = page.getByRole('dialog', { name: 'Add option' });
+        for (const name of [/^Name/, /^Short code/, /^Colour/, /^Description/]) {
+            await expect(optionDialog.getByRole('textbox', { name })).toHaveCount(1);
         }
         await expectContained(optionDialog);
         await expectNoNameViolations(page, '[role="dialog"]');

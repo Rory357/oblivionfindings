@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\RespiteReferral;
 use App\Models\ServiceContext;
 use App\Support\Respite\RespiteFundingSource;
+use App\Support\Respite\RespiteWallClock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -121,7 +122,8 @@ class RespiteReferralController extends Controller
                     'service_context_id' => ServiceContext::defaultId(),
                     'funding_type' => RespiteFundingSource::label($fundingSource),
                     'funding_notes' => $fundingReference,
-                    'status' => 'active',
+                    // Established intake behaviour, unless the organisation requires a commencement review for everyone.
+                    'status' => \App\Domain\Referrals\Services\ReferralActivationGuard::requiredForEveryone() ? 'onboarding' : 'active',
                 ]);
             }
         }
@@ -142,7 +144,7 @@ class RespiteReferralController extends Controller
             'urgency' => $validated['urgency'],
             'funding_source' => $fundingSource,
             'funding_reference' => $fundingReference,
-            'received_at' => $validated['received_at'] ?? now(),
+            'received_at' => RespiteWallClock::toUtc($validated['received_at'] ?? null) ?? now(),
             'triage_notes' => $validated['triage_notes'] ?? null,
             'risk_level' => $validated['risk_level'] ?? null,
             'is_maori' => (bool) ($validated['is_maori'] ?? false),

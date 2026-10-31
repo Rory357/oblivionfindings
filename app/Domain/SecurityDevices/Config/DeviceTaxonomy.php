@@ -42,6 +42,7 @@ class DeviceTaxonomy
                     'zone_partition' => 'Zone / Partition Module',
                 ],
                 'cctv' => [
+                    'ip_camera' => 'IP Camera',
                     'dome_camera' => 'Dome Camera',
                     'bullet_camera' => 'Bullet Camera',
                     'ptz_camera' => 'PTZ Camera',
@@ -178,7 +179,11 @@ class DeviceTaxonomy
                     'generator_monitor' => 'Generator Monitor',
                 ],
                 'endpoint' => [
+                    'workstation' => 'Workstation / PC',
+                    'laptop' => 'Laptop',
                     'tablet' => 'Tablet',
+                    'mobile_device' => 'Phone / Mobile Device',
+                    'media_display' => 'Smart TV / Media Display',
                     'shared_device' => 'Shared Device',
                     'kiosk' => 'Kiosk',
                     'thin_client' => 'Thin Client',
@@ -247,14 +252,14 @@ class DeviceTaxonomy
     /**
      * Get all valid categories for a domain.
      *
-     * @return array<string, string>  slug => label
+     * @return array<string, string> slug => label
      */
     public static function categoriesFor(string $domain): array
     {
         $tree = self::all()[$domain] ?? [];
 
         return array_map(
-            fn(string $slug) => str_replace('_', ' ', ucfirst($slug)),
+            fn (string $slug) => str_replace('_', ' ', ucfirst($slug)),
             array_combine(array_keys($tree), array_keys($tree))
         );
     }
@@ -262,7 +267,7 @@ class DeviceTaxonomy
     /**
      * Get all valid subcategories for a domain + category.
      *
-     * @return array<string, string>  slug => label
+     * @return array<string, string> slug => label
      */
     public static function subcategoriesFor(string $domain, string $category): array
     {
@@ -277,7 +282,7 @@ class DeviceTaxonomy
     {
         $tree = self::all();
 
-        if (!isset($tree[$domain][$category])) {
+        if (! isset($tree[$domain][$category])) {
             return false;
         }
 

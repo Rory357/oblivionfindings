@@ -437,7 +437,7 @@ export function StatusPill({
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
                 STATUS_PILL[status] ?? 'bg-muted text-muted-foreground',
                 className,
             )}
@@ -464,11 +464,11 @@ export function MoodChip({
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-foreground',
+                'inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-foreground',
                 className,
             )}
         >
-            <span className="text-[13px] leading-none">{moodEmoji(mood)}</span>
+            <span className="text-sm leading-none">{moodEmoji(mood)}</span>
             {mood}
         </span>
     );

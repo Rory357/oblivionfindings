@@ -25,6 +25,7 @@ import {
     Paintbrush,
     Palette,
     Plug,
+    Server,
     Shield,
     ShieldCheck,
     User,
@@ -56,6 +57,17 @@ interface NavSection {
 }
 
 const navSections: NavSection[] = [
+    {
+        label: 'Referrals',
+        permission: 'referrals.settings.view',
+        items: [
+            {
+                icon: Inbox,
+                title: 'Referral settings',
+                href: '/settings/referrals',
+            },
+        ],
+    },
     {
         label: 'Chat',
         permission: 'settings.manageAccess',
@@ -174,7 +186,12 @@ const navSections: NavSection[] = [
     {
         label: 'Integrations',
         items: [
-            { icon: KeyRound, title: 'Obli', href: '/settings/obli', permission: 'integrations.manageObli' },
+            {
+                icon: KeyRound,
+                title: 'Obli',
+                href: '/settings/obli',
+                permission: 'integrations.manageObli',
+            },
             {
                 icon: CalendarSync,
                 title: 'Calendar Sync',
@@ -226,6 +243,11 @@ const navSections: NavSection[] = [
                 icon: Boxes,
                 title: 'Modules & Features',
                 href: '/settings/modules',
+            },
+            {
+                icon: Server,
+                title: 'Server readiness',
+                href: '/settings/server-readiness',
             },
         ],
     },

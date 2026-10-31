@@ -8,6 +8,7 @@ use App\Http\Requests\HealthSafety\UploadHsCorrectiveActionEvidenceRequest;
 use App\Models\HsAttachment;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Services\HealthSafety\HsEventAccessService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,6 @@ class HsCorrectiveActionEvidenceController extends Controller
         HsEvent $event,
         HsCorrectiveAction $action,
     ): RedirectResponse {
-        $event = $this->resolveEvent($request, $event);
         $path = null;
 
         try {
@@ -41,6 +41,7 @@ class HsCorrectiveActionEvidenceController extends Controller
                 $action,
                 &$path,
             ): void {
+                $event = $this->resolveEvent($request, $event);
                 $action = $this->lockAction($event, $action);
                 $this->authorizeParticipant($request, $action);
                 $this->assertEvidenceMutable($action);
@@ -89,6 +90,15 @@ class HsCorrectiveActionEvidenceController extends Controller
         HsCorrectiveAction $action,
         HsAttachment $attachment,
     ): StreamedResponse {
+        return DB::transaction(fn () => $this->downloadWithinSourceAuthority($request, $event, $action, $attachment));
+    }
+
+    private function downloadWithinSourceAuthority(
+        Request $request,
+        HsEvent $event,
+        HsCorrectiveAction $action,
+        HsAttachment $attachment,
+    ): StreamedResponse {
         $event = $this->resolveEvent($request, $event);
         abort_unless((int) $action->hs_event_id === (int) $event->id, 404);
         $this->authorizeParticipant($request, $action);
@@ -111,7 +121,6 @@ class HsCorrectiveActionEvidenceController extends Controller
         HsCorrectiveAction $action,
         HsAttachment $attachment,
     ): RedirectResponse {
-        $event = $this->resolveEvent($request, $event);
         $deletedFile = null;
 
         try {
@@ -122,6 +131,7 @@ class HsCorrectiveActionEvidenceController extends Controller
                 $attachment,
                 &$deletedFile,
             ): void {
+                $event = $this->resolveEvent($request, $event);
                 $action = $this->lockAction($event, $action);
                 $this->authorizeParticipant($request, $action);
                 $this->assertEvidenceMutable($action);
@@ -173,14 +183,9 @@ class HsCorrectiveActionEvidenceController extends Controller
         Request $request,
         HsEvent $event,
     ): HsEvent {
-        $query = HsEvent::query();
-        $this->siteAccess->applyHsEventScope(
-            $query,
-            $request->user(),
-            [],
-        );
-
-        return $query->findOrFail($event->id);
+        // The event page's H&S source read (incident-linked events need incident read); it stays locked until commit.
+        // Evidence changes the action, not the event, so the event isn't held for update.
+        return app(HsEventAccessService::class)->readableEventForCommand($request->user(), (int) $event->id, [], false);
     }
 
     private function lockAction(

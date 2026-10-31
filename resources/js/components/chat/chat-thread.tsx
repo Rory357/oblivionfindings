@@ -2026,6 +2026,13 @@ function ChatThreadContent({
                                                 type="button"
                                                 key={reaction.emoji}
                                                 aria-pressed={reaction.mine}
+                                                title={
+                                                    reaction.people?.length
+                                                        ? reaction.people.join(
+                                                              ', ',
+                                                          )
+                                                        : undefined
+                                                }
                                                 className={cn(
                                                     'min-h-[44px] min-w-[44px] rounded-full px-2 text-xs',
                                                     reaction.mine &&

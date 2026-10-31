@@ -19,6 +19,8 @@ interface Props {
     canReviewTime: boolean;
     onClock: () => void;
     onToggleBreak: () => void;
+    breakPending?: boolean;
+    clockActionsBlocked?: boolean;
     onReviewTime: () => void;
 }
 
@@ -68,9 +70,10 @@ export function ShiftSummary(p: Props) {
                             className="frontline-tap"
                             variant="outline"
                             onClick={p.onToggleBreak}
+                            disabled={p.clockActionsBlocked}
                         >
                             <Coffee className="size-4" />
-                            {p.onBreak ? 'End break' : 'Take a break'}
+                            {p.breakPending ? 'Saving break…' : p.onBreak ? 'End break' : 'Take a break'}
                         </Button>
                     )}
                     {p.canClock && (
@@ -78,6 +81,7 @@ export function ShiftSummary(p: Props) {
                             className="frontline-tap"
                             variant={p.clockedIn ? 'outline' : 'default'}
                             onClick={p.onClock}
+                            disabled={p.clockActionsBlocked}
                         >
                             {p.clockedIn ? (
                                 <LogOut className="size-4" />

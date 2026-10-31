@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Operations;
 
+use App\Domain\Referrals\Services\ReferralActivationGuard;
+use App\Domain\Referrals\Services\ReferralCareHandovers;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientOnboardingStep;
@@ -30,6 +32,7 @@ class ClientOnboardingWorkflowController extends Controller
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'in:in_progress,completed,cancelled'],
+            'overdue' => ['nullable', 'boolean'],
         ]);
         $search = trim((string) ($filters['q'] ?? ''));
 
@@ -39,9 +42,13 @@ class ClientOnboardingWorkflowController extends Controller
         );
 
         $workflows = $scopedWorkflows()
-            ->with(['client:id,first_name,last_name'])
-            ->withCount(['steps', 'steps as completed_steps_count' => fn ($q) => $q->where('status', 'completed')])
+            ->with(['client:id,first_name,last_name', 'site:id,name', 'serviceContext:id,name', 'assignee:id,name'])
+            ->withCount(['steps', 'steps as completed_steps_count' => fn ($q) => $q->where('status', 'completed'),
+                'steps as overdue_steps' => fn ($q) => $q->where('status', 'pending')->where('due_date', '<', now('Pacific/Auckland')->toDateString()),
+            ])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['overdue'] ?? false, fn ($q) => $q->where('status', 'in_progress')->whereHas('steps', fn ($steps) => $steps
+                ->where('status', 'pending')->where('due_date', '<', now('Pacific/Auckland')->toDateString())))
             ->when($search !== '', function ($query) use ($search) {
                 $query->whereHas('client', function ($clientQuery) use ($search) {
                     $clientQuery->where(fn ($nameQuery) => $nameQuery
@@ -57,15 +64,9 @@ class ClientOnboardingWorkflowController extends Controller
             'active' => $scopedWorkflows()->where('status', 'in_progress')->count(),
             'completed_this_month' => $scopedWorkflows()->where('status', 'completed')->where('completed_at', '>=', now()->startOfMonth())->count(),
             'overdue_steps' => ClientOnboardingStep::query()
-                ->whereHas('workflow', fn ($workflowQuery) => $workflowQuery
-                    ->where('status', 'in_progress')
-                    ->whereHas('client', fn ($clientQuery) => $this->siteAccess->applyClientScope(
-                        $clientQuery,
-                        $auth,
-                        ['onboarding.viewAny'],
-                    )))
+                ->whereIn('workflow_id', $scopedWorkflows()->where('status', 'in_progress')->select('client_onboarding_workflows.id'))
                 ->where('status', 'pending')
-                ->where('due_date', '<', now())
+                ->where('due_date', '<', now('Pacific/Auckland')->toDateString())
                 ->count(),
             'avg_days' => (int) ($scopedWorkflows()
                 ->where('status', 'completed')
@@ -88,6 +89,7 @@ class ClientOnboardingWorkflowController extends Controller
             'filters' => [
                 'q' => $filters['q'] ?? null,
                 'status' => $filters['status'] ?? null,
+                'overdue' => (bool) ($filters['overdue'] ?? false),
             ],
         ]);
     }
@@ -98,12 +100,18 @@ class ClientOnboardingWorkflowController extends Controller
         abort_unless($auth && $this->access->canViewWorkflows($auth), 403);
 
         $workflow = $this->workflowQueryFor($auth, ['onboarding.viewAny'])
-            ->with(['client:id,first_name,last_name', 'steps' => fn ($q) => $q->orderBy('step_order')])
+            ->with(['client:id,first_name,last_name,site_id', 'site:id,name', 'serviceContext:id,name', 'steps' => fn ($q) => $q->orderBy('step_order')])
             ->findOrFail($workflow);
 
         return inertia('operations/onboarding/Show', [
             'workflow' => $workflow,
-        ]);
+            'capabilities' => [
+                'complete' => $this->access->canManageWorkflows($auth),
+                'open_person' => $workflow->client && $auth->can('view', $workflow->client),
+            ],
+            'requires_separate_service_start' => $workflow->source_referral_id !== null || ($workflow->client && app(ReferralActivationGuard::class)->governsActivation($workflow->client)),
+            'care_handovers' => app(ReferralCareHandovers::class)->forWorkflow($auth, $workflow),
+        ])->toResponse($request)->header('Cache-Control', 'no-store, private');
     }
 
     public function create(Request $request)
@@ -253,10 +261,13 @@ class ClientOnboardingWorkflowController extends Controller
         abort_unless($auth && $this->access->canManageWorkflows($auth), 403);
 
         $completed = DB::transaction(function () use ($auth, $workflow): bool {
+            $candidate = $this->workflowQueryFor($auth, ['clients.update'])->findOrFail($workflow);
+            // Match the conversion lock order: person, then onboarding workflow.
+            $client = Client::query()->lockForUpdate()->findOrFail($candidate->client_id);
             $workflowModel = $this->workflowQueryFor($auth, ['clients.update'])
-                ->with('client')
                 ->lockForUpdate()
                 ->findOrFail($workflow);
+            $workflowModel->setRelation('client', $client);
 
             if ($workflowModel->steps()->where('is_required', true)->where('status', 'pending')->exists()) {
                 return false;
@@ -267,7 +278,11 @@ class ClientOnboardingWorkflowController extends Controller
                 'completed_at' => now(),
                 'completed_by' => $auth->id,
             ]);
-            $workflowModel->client->update(['status' => 'active']);
+            // Referral-originated people (or everyone, when the organisation requires it) start
+            // support only through the separate commencement review; others keep the established flow.
+            if (! $workflowModel->source_referral_id && ! app(ReferralActivationGuard::class)->governsActivation($client)) {
+                $client->update(['status' => 'active']);
+            }
 
             return true;
         });
@@ -288,6 +303,9 @@ class ClientOnboardingWorkflowController extends Controller
     private function workflowQueryFor(User $user, array $bypassPermissions = []): Builder
     {
         return ClientOnboardingWorkflow::query()
+            ->where(function (Builder $scope) use ($user): void {
+                $scope->whereNull('site_id')->orWhereIn('site_id', $this->siteAccess->accessibleSiteIds($user, ['clinical.accessAllSites', 'sites.viewAll']));
+            })
             ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
                 $clientQuery,
                 $user,
@@ -302,7 +320,7 @@ class ClientOnboardingWorkflowController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($client->getKey());
 
-            if ($lockedClient->onboardingWorkflows()->where('status', 'in_progress')->exists()) {
+            if ($lockedClient->onboardingWorkflows()->where('scope', 'person')->where('status', 'in_progress')->exists()) {
                 return null;
             }
 

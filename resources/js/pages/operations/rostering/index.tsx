@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     PageHeaderFilterButton,
     PageHeaderGlassButton,
@@ -12,6 +13,7 @@ import {
     PageLayout,
 } from '@/components/page';
 import {
+    addDaysWP,
     AnalyticsPane,
     type AnalyticsTrendPoint,
     type AvailabilityLeaveRequest,
@@ -27,6 +29,7 @@ import {
     EntityFilter,
     type EntityFilterOption,
     type FillBySite,
+    formatWeekRange,
     type GridConflictPeer,
     type GridShift,
     type GridShiftStatus,
@@ -54,28 +57,26 @@ import {
     type Signal,
     SignalRail,
     SiteFilter,
+    startOfWeek,
     TimeOffPane,
     type TimeOffRequest,
     UnassignMakeOpenDialog,
     type UnassignMakeOpenShift,
     WeekGridPane,
-    WeekPicker,
-    addDaysWP,
-    formatWeekRange,
-    startOfWeek,
     weekLabel,
+    WeekPicker,
 } from '@/components/rostering';
 import {
     type EligibilityObservation,
     EligibilityRefreshPanel,
 } from '@/components/rostering/eligibility-refresh-panel';
-import { TemplateLibrary } from '@/components/rostering/template-library';
 import { rosterShiftListUrl } from '@/components/rostering/roster-shift-list-url';
 import {
+    type RosterView,
     RosterWorkspaceRail,
     RosterWorkspaceViewSelect,
-    type RosterView,
 } from '@/components/rostering/roster-workspace-navigation';
+import { TemplateLibrary } from '@/components/rostering/template-library';
 import { TEMPLATE_READ_KEYS } from '@/components/rostering/use-template-command';
 import ViewTimesheetDialog, {
     type ViewTimesheetRow,
@@ -85,7 +86,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
-import { WORKER_TIMEZONE } from '@/lib/datetime';
+import { formatDateTime, formatTime, WORKER_TIMEZONE } from '@/lib/datetime';
 import { index as rosteringIndex } from '@/routes/operations/rostering';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -107,7 +108,7 @@ import {
     Wand2,
 } from 'lucide-react';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
     CreateShiftDialog,
     type EditableShift,
@@ -463,14 +464,15 @@ function initialRosterTab(
     return isRosterTab(requested) ? requested : defaultTab;
 }
 
+// Shift types are categories, not severities: use the chart palette, never
+// the status (safety) colours or fixed hex values.
 const SHIFT_TYPE_COLORS = [
-    'var(--primary)',
-    'var(--status-info)',
-    'var(--status-success)',
-    'var(--status-warning)',
-    'var(--status-critical)',
-    '#06b6d4',
-    '#94a3b8',
+    'var(--chart-1)',
+    'var(--chart-2)',
+    'var(--chart-3)',
+    'var(--chart-4)',
+    'var(--chart-5)',
+    'var(--muted-foreground)',
 ];
 
 function ymd(d: Date) {
@@ -551,6 +553,98 @@ function rangesOverlap(aS: string, aE: string, bS: string, bE: string) {
     return new Date(aS) < new Date(bE) && new Date(bS) < new Date(aE);
 }
 
+// Grid/calendar shift actions that ask first. Each kind has its own copy,
+// checked against ShiftController (cancelOccurrence → ShiftCancellationService,
+// duplicate, autoFill, publishShift, reopenOccurrence → ShiftLifecycleService).
+type PendingShiftAction = {
+    kind: 'cancel' | 'duplicate' | 'autoFill' | 'publish' | 'reopen';
+    shift: GridShift;
+};
+
+function shiftConfirmCopy({ kind, shift }: PendingShiftAction): {
+    title: string;
+    description: ReactNode;
+    confirmText: string;
+    cancelText?: string;
+    variant: 'destructive' | 'default';
+} {
+    const staff = shift.staff?.trim() || null;
+    const summary = [
+        `${formatDateTime(shift.starts_at)} – ${formatTime(shift.ends_at)}`,
+        shift.client,
+        staff,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    const body = (...lines: string[]) => (
+        <div className="space-y-2">
+            <p className="font-medium text-foreground">{summary}</p>
+            {lines.map((line) => (
+                <p key={line}>{line}</p>
+            ))}
+        </div>
+    );
+
+    switch (kind) {
+        case 'cancel':
+            return {
+                title: 'Cancel this shift?',
+                description: body(
+                    'The shift comes off the roster. Any cover request for it is closed, a timesheet that isn’t approved yet is sent back, and linked medication and transport records are flagged for review.',
+                    `${staff ? `${staff} isn’t sent a notification, so let them know. ` : ''}Anyone due to take a handover from this shift is told. You can reopen the shift later.`,
+                ),
+                confirmText: 'Cancel shift',
+                cancelText: 'Keep shift',
+                variant: 'destructive',
+            };
+        case 'duplicate':
+            return {
+                title: 'Duplicate this shift?',
+                description: body(
+                    'A copy is added at the same time as an unassigned draft, with the same tasks. Nobody is notified.',
+                ),
+                confirmText: 'Duplicate shift',
+                variant: 'default',
+            };
+        case 'autoFill':
+            return {
+                title: 'Auto-fill this open shift?',
+                description: body(
+                    'The first staff member, in name order, who can work this shift with no eligibility warnings is assigned to it. They aren’t sent a notification.',
+                    'If only staff with warnings are available, nobody is assigned and you can choose someone yourself.',
+                ),
+                confirmText: 'Auto-fill shift',
+                variant: 'default',
+            };
+        case 'publish':
+            return {
+                title: 'Publish this shift?',
+                description: staff
+                    ? body(
+                          `${staff} will see it in their roster. Nobody is sent a notification.`,
+                          'If they have eligibility warnings for this shift, publishing records that you accepted those warnings.',
+                      )
+                    : body(
+                          'It’s published as an open shift, ready for someone to be assigned. Nobody is sent a notification.',
+                      ),
+                confirmText: 'Publish shift',
+                variant: 'default',
+            };
+        case 'reopen':
+            return {
+                title: 'Reopen this shift?',
+                description: body(
+                    staff
+                        ? `It goes back on the roster with ${staff} still assigned, so check they can still work it. Nobody is notified.`
+                        : 'It goes back on the roster as an unassigned draft. Nobody is notified.',
+                    'Anything changed when it was cancelled, such as a returned timesheet or a closed cover request, stays as it is.',
+                ),
+                confirmText: 'Reopen shift',
+                variant: 'default',
+            };
+    }
+}
+
 export default function RosteringIndex(props: Props) {
     const conflictQueueHref = `/operations/rostering/conflicts?week=${encodeURIComponent(props.weekStart)}`;
     const rosterPage = usePage();
@@ -617,6 +711,12 @@ export default function RosteringIndex(props: Props) {
     const [reassignShift, setReassignShift] = useState<ReassignShift | null>(
         null,
     );
+    // The action stays set after the dialog closes so its copy doesn't blank
+    // out while the dialog fades away; `shiftConfirmOpen` drives visibility.
+    const [pendingShiftAction, setPendingShiftAction] =
+        useState<PendingShiftAction | null>(null);
+    const [shiftConfirmOpen, setShiftConfirmOpen] = useState(false);
+    const [shiftActionBusy, setShiftActionBusy] = useState(false);
     const [requestReplacementShift, setRequestReplacementShift] =
         useState<RequestReplacementShift | null>(null);
     const [unassignMakeOpenShift, setUnassignMakeOpenShift] =
@@ -1841,25 +1941,76 @@ export default function RosteringIndex(props: Props) {
         );
     };
 
-    const cancelShift = (shiftId: number) => {
-        if (!window.confirm('Cancel this shift?')) return;
-        // Route is PATCH /operations/shifts/{shift}/cancel — operations.shifts.cancel.
-        router.patch(
-            `/operations/shifts/${shiftId}/cancel`,
-            { return_to: '/operations/rostering' },
-            { preserveScroll: true },
-        );
+    // Cancel, duplicate, auto-fill, publish and reopen each only open the
+    // shared confirmation below; the request is sent from its confirm button.
+    const askShiftAction = (
+        kind: PendingShiftAction['kind'],
+        shift: GridShift,
+    ) => {
+        setPendingShiftAction({ kind, shift });
+        setShiftConfirmOpen(true);
     };
+    const cancelShift = (shift: GridShift) => askShiftAction('cancel', shift);
+    const duplicateShift = (shift: GridShift) =>
+        askShiftAction('duplicate', shift);
+    const autoFillShift = (shift: GridShift) =>
+        askShiftAction('autoFill', shift);
+    const publishShift = (shift: GridShift) => askShiftAction('publish', shift);
+    const reopenShift = (shift: GridShift) => askShiftAction('reopen', shift);
 
-    const duplicateShift = (shiftId: number) => {
-        if (!window.confirm('Duplicate this shift as an unassigned draft?'))
-            return;
-        router.post(
-            `/operations/shifts/${shiftId}/duplicate`,
-            { return_to: '/operations/rostering' },
-            { preserveScroll: true },
-        );
+    const runPendingShiftAction = () => {
+        if (pendingShiftAction === null) return;
+        const { kind, shift } = pendingShiftAction;
+        const options = {
+            preserveScroll: true,
+            onStart: () => setShiftActionBusy(true),
+            onFinish: () => {
+                setShiftActionBusy(false);
+                setShiftConfirmOpen(false);
+            },
+        };
+        switch (kind) {
+            case 'cancel':
+                // Route is PATCH /operations/shifts/{shift}/cancel — operations.shifts.cancel.
+                router.patch(
+                    `/operations/shifts/${shift.id}/cancel`,
+                    { return_to: '/operations/rostering' },
+                    options,
+                );
+                return;
+            case 'duplicate':
+                router.post(
+                    `/operations/shifts/${shift.id}/duplicate`,
+                    { return_to: '/operations/rostering' },
+                    options,
+                );
+                return;
+            case 'autoFill':
+                router.post(
+                    `/operations/shifts/${shift.id}/auto-fill`,
+                    { return_to: '/operations/rostering' },
+                    options,
+                );
+                return;
+            case 'publish':
+                router.patch(
+                    `/operations/shifts/${shift.id}/publish`,
+                    {},
+                    options,
+                );
+                return;
+            case 'reopen':
+                router.patch(
+                    `/operations/shifts/${shift.id}/reopen`,
+                    {},
+                    options,
+                );
+                return;
+        }
     };
+    const shiftConfirm = pendingShiftAction
+        ? shiftConfirmCopy(pendingShiftAction)
+        : null;
 
     const openEditShift = async (shift: GridShift) => {
         setEditShiftError(null);
@@ -1960,33 +2111,10 @@ export default function RosteringIndex(props: Props) {
         );
     };
 
-    const autoFillShift = (shiftId: number) => {
-        if (
-            !window.confirm(
-                'Auto-fill this open shift with the best-match eligible staff?',
-            )
-        )
-            return;
-        router.post(
-            `/operations/shifts/${shiftId}/auto-fill`,
-            { return_to: '/operations/rostering' },
-            { preserveScroll: true },
-        );
-    };
-
     const reopenCompletedShift = (shiftId: number, reason: string) => {
         router.patch(
             `/operations/shifts/${shiftId}/reopen`,
             { reason },
-            { preserveScroll: true },
-        );
-    };
-
-    const publishShift = (shiftId: number) => {
-        if (!window.confirm('Publish this draft shift?')) return;
-        router.patch(
-            `/operations/shifts/${shiftId}/publish`,
-            {},
             { preserveScroll: true },
         );
     };
@@ -2026,20 +2154,6 @@ export default function RosteringIndex(props: Props) {
                 preserveScroll: true,
                 onSuccess: () => setRequestReplacementShift(null),
             },
-        );
-    };
-
-    const reopenShift = (shiftId: number) => {
-        if (
-            !window.confirm(
-                'Reopen this cancelled shift and restore it to planning?',
-            )
-        )
-            return;
-        router.patch(
-            `/operations/shifts/${shiftId}/reopen`,
-            {},
-            { preserveScroll: true },
         );
     };
 
@@ -2157,11 +2271,12 @@ export default function RosteringIndex(props: Props) {
 
     const railItems: PageHeaderRailItem<RosterTab>[] = tabItems.map((item) => ({
         key: item.id as RosterTab,
-        label: item.id === 'coverage'
-            ? activeShiftCount > 0
-                ? `${item.label} · ${coverageRate}% of shifts assigned`
-                : `${item.label} · No active shifts`
-            : item.label,
+        label:
+            item.id === 'coverage'
+                ? activeShiftCount > 0
+                    ? `${item.label} · ${coverageRate}% of shifts assigned`
+                    : `${item.label} · No active shifts`
+                : item.label,
         icon: item.icon,
         count:
             typeof (item as { badge?: unknown }).badge === 'number'
@@ -2362,22 +2477,33 @@ export default function RosteringIndex(props: Props) {
                         onOpenConflicts={() => router.visit(conflictQueueHref)}
                         onOpenShiftList={
                             auth?.can?.shifts?.viewAny === true
-                                ? () => router.visit(rosterShiftListUrl({
-                                    from: ymd(weekStartDate),
-                                    to: ymd(addDaysWP(weekStartDate, 6)),
-                                    siteIds: props.filters.site_ids?.length
-                                        ? props.filters.site_ids
-                                        : props.filters.site_id
-                                          ? [props.filters.site_id]
-                                          : [],
-                                    staffId: props.filters.staff_id ?? null,
-                                    clientId: props.filters.client_id ?? null,
-                                }))
+                                ? () =>
+                                      router.visit(
+                                          rosterShiftListUrl({
+                                              from: ymd(weekStartDate),
+                                              to: ymd(
+                                                  addDaysWP(weekStartDate, 6),
+                                              ),
+                                              siteIds: props.filters.site_ids
+                                                  ?.length
+                                                  ? props.filters.site_ids
+                                                  : props.filters.site_id
+                                                    ? [props.filters.site_id]
+                                                    : [],
+                                              staffId:
+                                                  props.filters.staff_id ??
+                                                  null,
+                                              clientId:
+                                                  props.filters.client_id ??
+                                                  null,
+                                          }),
+                                      )
                                 : undefined
                         }
                         onOpenQualifications={
                             auth?.can?.rostering?.viewAny === true
-                                ? () => router.visit('/operations/qualifications')
+                                ? () =>
+                                      router.visit('/operations/qualifications')
                                 : undefined
                         }
                     />
@@ -2410,7 +2536,7 @@ export default function RosteringIndex(props: Props) {
                         items={staffFilterItems}
                         value={props.filters.staff_id}
                         onChange={(next) => updateFilter({ staff_id: next })}
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <EntityFilter
                         compact
@@ -2420,14 +2546,14 @@ export default function RosteringIndex(props: Props) {
                         items={clientFilterItems}
                         value={props.filters.client_id}
                         onChange={(next) => updateFilter({ client_id: next })}
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <SiteFilter
                         onDark
                         sites={props.sites ?? []}
                         value={props.filters.site_ids ?? []}
                         onChange={(next) => updateFilter({ site_ids: next })}
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                 </>
             }
@@ -2467,7 +2593,7 @@ export default function RosteringIndex(props: Props) {
                             />
                         </div>
                     )}
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="min-w-0">
                         {tab === 'shifts' ? (
                             <WeekGridPane
@@ -2483,7 +2609,7 @@ export default function RosteringIndex(props: Props) {
                                 todayKey={todayKey}
                                 canManage={props.canManageAny}
                                 onUnassign={openUnassignMakeOpenDialog}
-                                onCancelShift={(s) => cancelShift(s.id)}
+                                onCancelShift={(s) => cancelShift(s)}
                                 onCreateShift={openCreateShift}
                                 onAssignOpen={(s) =>
                                     setReassignShift({
@@ -2510,7 +2636,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onDuplicateShift={
                                     props.canManageAny
-                                        ? (s) => duplicateShift(s.id)
+                                        ? (s) => duplicateShift(s)
                                         : undefined
                                 }
                                 onEditShift={
@@ -2541,7 +2667,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onAutoFillShift={
                                     props.canManageAny
-                                        ? (s) => autoFillShift(s.id)
+                                        ? (s) => autoFillShift(s)
                                         : undefined
                                 }
                                 onReopenCompletedForCorrection={
@@ -2557,7 +2683,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onPublishShift={
                                     props.canManageAny
-                                        ? (s) => publishShift(s.id)
+                                        ? (s) => publishShift(s)
                                         : undefined
                                 }
                                 onMakeRecurring={
@@ -2594,7 +2720,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onReopenShift={
                                     props.canManageAny
-                                        ? (s) => reopenShift(s.id)
+                                        ? (s) => reopenShift(s)
                                         : undefined
                                 }
                                 onReportIncident={(s) =>
@@ -2610,7 +2736,7 @@ export default function RosteringIndex(props: Props) {
                                 canManageAny={props.canManageAny}
                                 filters={props.filters}
                                 onUnassign={openUnassignMakeOpenDialog}
-                                onCancelShift={(s) => cancelShift(s.id)}
+                                onCancelShift={(s) => cancelShift(s)}
                                 onCreateShift={openCreateShift}
                                 onAssignOpen={(s) =>
                                     setReassignShift({
@@ -2637,7 +2763,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onDuplicateShift={
                                     props.canManageAny
-                                        ? (s) => duplicateShift(s.id)
+                                        ? (s) => duplicateShift(s)
                                         : undefined
                                 }
                                 onEditShift={
@@ -2668,7 +2794,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onAutoFillShift={
                                     props.canManageAny
-                                        ? (s) => autoFillShift(s.id)
+                                        ? (s) => autoFillShift(s)
                                         : undefined
                                 }
                                 onReopenCompletedForCorrection={
@@ -2684,7 +2810,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onPublishShift={
                                     props.canManageAny
-                                        ? (s) => publishShift(s.id)
+                                        ? (s) => publishShift(s)
                                         : undefined
                                 }
                                 onMakeRecurring={
@@ -2721,7 +2847,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onReopenShift={
                                     props.canManageAny
-                                        ? (s) => reopenShift(s.id)
+                                        ? (s) => reopenShift(s)
                                         : undefined
                                 }
                                 onReportIncident={(s) =>
@@ -2977,7 +3103,9 @@ export default function RosteringIndex(props: Props) {
                 <ReassignDialog
                     open={Boolean(reassignShift)}
                     shift={reassignShift}
-                    canOverride={auth?.can?.shifts?.overrideEligibility === true}
+                    canOverride={
+                        auth?.can?.shifts?.overrideEligibility === true
+                    }
                     onOpenChange={(open) => {
                         if (!open) setReassignShift(null);
                     }}
@@ -3004,6 +3132,20 @@ export default function RosteringIndex(props: Props) {
                     onConfirm={(shift, reason) =>
                         unassignShift(shift.id, reason)
                     }
+                />
+
+                <ConfirmDialog
+                    open={shiftConfirmOpen && shiftConfirm !== null}
+                    onClose={() => {
+                        if (!shiftActionBusy) setShiftConfirmOpen(false);
+                    }}
+                    onConfirm={runPendingShiftAction}
+                    title={shiftConfirm?.title ?? ''}
+                    description={shiftConfirm?.description ?? null}
+                    confirmText={shiftConfirm?.confirmText}
+                    cancelText={shiftConfirm?.cancelText}
+                    variant={shiftConfirm?.variant ?? 'default'}
+                    processing={shiftActionBusy}
                 />
 
                 <ViewTimesheetDialog

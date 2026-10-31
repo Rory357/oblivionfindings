@@ -1,10 +1,4 @@
-import {
-    EntityCard,
-    EntityChip,
-    EntityContextMenu,
-    useEntityContextMenu,
-    type MenuItem,
-} from '@/components/lists';
+import { EntityChip } from '@/components/lists';
 import {
     EvidenceRecords,
     type EvidenceRecordsView,
@@ -95,56 +89,6 @@ function cardProps(row: MaintenanceRow, profiles: boolean) {
             secondary: siteLink(row, profiles),
         },
     };
-}
-export function MaintenanceCard({
-    row,
-    canManage,
-    profiles = true,
-    onComplete,
-    actions,
-}: {
-    row: MaintenanceRow;
-    canManage: boolean;
-    profiles?: boolean;
-    onComplete?: () => void;
-    actions?: MenuItem[];
-}) {
-    const context = useEntityContextMenu<MaintenanceRow>();
-    const menu =
-        actions ??
-        (canManage && !['completed', 'cancelled'].includes(row.status)
-            ? [
-                  {
-                      label: 'Mark complete',
-                      icon: CheckCircle2,
-                      disabled: onComplete
-                          ? undefined
-                          : 'Open Maintenance to review this record.',
-                      onClick: onComplete,
-                  },
-              ]
-            : []);
-    return (
-        <>
-            <EntityCard
-                {...cardProps(row, profiles)}
-                actions={menu}
-                onOpen={() =>
-                    menu.find((a) => a.label === 'View evidence')?.onClick?.()
-                }
-                onContextMenu={(event) => context.open(event, row)}
-            />
-            {context.ctx ? (
-                <EntityContextMenu
-                    x={context.ctx.x}
-                    y={context.ctx.y}
-                    title={row.description}
-                    items={menu}
-                    onClose={context.close}
-                />
-            ) : null}
-        </>
-    );
 }
 export function MaintenanceRecords({
     rows,

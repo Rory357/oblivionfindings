@@ -82,7 +82,7 @@ test('editorial month combines canonical visible event occurrences pages plans a
     $this->actingAs($this->editor);
     $this->postJson('/company-hub/editor/plans', [...$this->planData, 'target_date' => now()->toDateString()])->assertOk();
     $publisher = app(HubPublishing::class);
-    $page = $publisher->create($this->editor, 'news', 'Scheduled story');
+    $page = $publisher->create($this->editor, 'news', 'Scheduled story', 'blank');
     $publisher->publish($this->editor, $page, 1, now()->addDay()->toIso8601String(), null);
     HrCalendarEvent::create(['title' => 'Visible learning session', 'event_type' => 'company', 'starts_at' => now()->addDay(), 'ends_at' => now()->addDay()->addHour(), 'rrule' => 'FREQ=WEEKLY;COUNT=2', 'created_by' => $this->editor->id]);
     HrCalendarEvent::create(['title' => 'Other site event', 'event_type' => 'company', 'site_id' => Site::factory()->create(['is_active' => true])->id, 'starts_at' => now()->addDay(), 'ends_at' => now()->addDay()->addHour(), 'created_by' => $this->editor->id]);

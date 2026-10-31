@@ -2,10 +2,13 @@
  * dialog posting to the bulk-email endpoint, with reusable saved templates.
  * Native inputs; semantic tokens. */
 import { router, useForm } from '@inertiajs/react';
-import { Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Loader2, Trash2 } from 'lucide-react';
+import { useId, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -14,7 +17,15 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+
+/** Server rules for a saved template (CandidateController::storeEmailTemplate). */
+const TEMPLATE_NAME_MAX = 255;
+const TEMPLATE_SUBJECT_MAX = 255;
+const TEMPLATE_BODY_MAX = 10000;
+
+type TemplateErrors = { name?: string; message?: string };
 
 export type EmailTemplate = {
     id: number;
@@ -54,35 +65,106 @@ export function BulkEmailDialog({
         }
     };
 
-    const saveTemplate = () => {
-        const name = window.prompt(
-            'Save this message as a template. Template name:',
-        );
-        if (!name || name.trim() === '') return;
+    // "Save as template" opens a small dialog for the name; the request is
+    // sent only from that dialog's submit button.
+    const nameFieldId = useId();
+    const [templateOpen, setTemplateOpen] = useState(false);
+    const [templateName, setTemplateName] = useState('');
+    const [templateErrors, setTemplateErrors] = useState<TemplateErrors>({});
+    const [savingTemplate, setSavingTemplate] = useState(false);
+
+    const openTemplateDialog = () => {
+        setTemplateName('');
+        setTemplateErrors({});
+        setTemplateOpen(true);
+    };
+
+    const validateTemplate = (name: string): TemplateErrors => {
+        if (name === '') return { name: 'Enter a name for the template.' };
+        if (name.length > TEMPLATE_NAME_MAX)
+            return {
+                name: `Keep the name to ${TEMPLATE_NAME_MAX} characters or fewer.`,
+            };
+        if (
+            templates.some(
+                (t) => t.name.trim().toLowerCase() === name.toLowerCase(),
+            )
+        )
+            return {
+                name: 'A template with this name already exists. Choose another name.',
+            };
+        if (subject.trim().length > TEMPLATE_SUBJECT_MAX)
+            return {
+                message: `The subject is too long to save. Keep it to ${TEMPLATE_SUBJECT_MAX} characters or fewer.`,
+            };
+        if (body.trim().length > TEMPLATE_BODY_MAX)
+            return {
+                message: `The message is too long to save. Keep it to ${TEMPLATE_BODY_MAX.toLocaleString('en-NZ')} characters or fewer.`,
+            };
+        return {};
+    };
+
+    const saveTemplate = (e: FormEvent) => {
+        e.preventDefault();
+        const name = templateName.trim();
+        const errors = validateTemplate(name);
+        setTemplateErrors(errors);
+        if (errors.name || errors.message) return;
         router.post(
             '/hr/recruitment/email-templates',
-            { name: name.trim(), subject: subject.trim(), body: body.trim() },
+            { name, subject: subject.trim(), body: body.trim() },
             {
                 preserveScroll: true,
+                onStart: () => setSavingTemplate(true),
                 onSuccess: (page) => {
                     const f = (page.props as { flash?: { error?: string } })
                         .flash;
-                    if (f?.error)
+                    if (f?.error) {
                         toast.error('Could not save template', {
                             description: f.error,
                         });
-                    else toast.success('Template saved');
+                        return;
+                    }
+                    toast.success('Template saved');
+                    setTemplateOpen(false);
                 },
+                onError: (errors) =>
+                    setTemplateErrors({
+                        name: errors.name,
+                        message:
+                            errors.subject ??
+                            errors.body ??
+                            (errors.name
+                                ? undefined
+                                : 'Could not save the template. Try again.'),
+                    }),
+                onFinish: () => setSavingTemplate(false),
             },
         );
     };
 
-    const deleteTemplate = (id: string) => {
+    // "Delete template" only opens a confirmation; the request is sent from
+    // its confirm button.
+    const [templateToDelete, setTemplateToDelete] =
+        useState<EmailTemplate | null>(null);
+    const [deletingTemplate, setDeletingTemplate] = useState(false);
+
+    const askDeleteTemplate = (id: string) =>
+        setTemplateToDelete(templates.find((t) => String(t.id) === id) ?? null);
+
+    const deleteTemplate = () => {
+        if (templateToDelete === null) return;
+        const id = String(templateToDelete.id);
         router.delete(`/hr/recruitment/email-templates/${id}`, {
             preserveScroll: true,
+            onStart: () => setDeletingTemplate(true),
             onSuccess: () => {
                 if (templateId === id) setTemplateId('');
                 toast.success('Template removed');
+            },
+            onFinish: () => {
+                setDeletingTemplate(false);
+                setTemplateToDelete(null);
             },
         });
     };
@@ -158,7 +240,7 @@ export function BulkEmailDialog({
                                     <button
                                         type="button"
                                         onClick={() =>
-                                            deleteTemplate(templateId)
+                                            askDeleteTemplate(templateId)
                                         }
                                         aria-label="Delete template"
                                         className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-border text-muted-foreground hover:bg-muted"
@@ -199,7 +281,7 @@ export function BulkEmailDialog({
                     {canManage ? (
                         <button
                             type="button"
-                            onClick={saveTemplate}
+                            onClick={openTemplateDialog}
                             disabled={!canSaveTemplate}
                             className="h-9 rounded-md border border-border bg-card px-3 text-[13px] font-semibold hover:bg-muted disabled:opacity-50"
                         >
@@ -226,6 +308,85 @@ export function BulkEmailDialog({
                         </button>
                     </div>
                 </DialogFooter>
+
+                <Dialog
+                    open={templateOpen}
+                    onOpenChange={(o) => {
+                        if (!o && !savingTemplate) setTemplateOpen(false);
+                    }}
+                >
+                    <DialogContent className="max-w-md">
+                        <form onSubmit={saveTemplate} className="grid gap-4">
+                            <DialogHeader>
+                                <DialogTitle>Save as a template</DialogTitle>
+                                <DialogDescription>
+                                    Saves this subject and message so anyone who
+                                    emails candidates can start from it next
+                                    time.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor={nameFieldId}>
+                                    Template name
+                                </Label>
+                                <Input
+                                    id={nameFieldId}
+                                    value={templateName}
+                                    onChange={(e) => {
+                                        setTemplateName(e.target.value);
+                                        if (templateErrors.name)
+                                            setTemplateErrors({});
+                                    }}
+                                    maxLength={TEMPLATE_NAME_MAX}
+                                    placeholder="e.g. Interview invitation"
+                                    aria-invalid={Boolean(templateErrors.name)}
+                                    autoFocus
+                                />
+                                <InputError message={templateErrors.name} />
+                                <InputError message={templateErrors.message} />
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setTemplateOpen(false)}
+                                    disabled={savingTemplate}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={savingTemplate}>
+                                    {savingTemplate ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : null}
+                                    Save template
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+
+                <ConfirmDialog
+                    open={templateToDelete !== null}
+                    onClose={() => {
+                        if (!deletingTemplate) setTemplateToDelete(null);
+                    }}
+                    onConfirm={deleteTemplate}
+                    title="Delete this template?"
+                    description={
+                        <>
+                            <span className="font-medium text-foreground">
+                                “{templateToDelete?.name}”
+                            </span>{' '}
+                            is deleted for everyone who emails candidates.
+                            Emails already sent aren&apos;t affected, and the
+                            subject and message in this form stay as they are.
+                            This can&apos;t be undone.
+                        </>
+                    }
+                    confirmText="Delete template"
+                    variant="destructive"
+                    processing={deletingTemplate}
+                />
             </DialogContent>
         </Dialog>
     );

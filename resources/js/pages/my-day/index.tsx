@@ -1,4 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { AttendanceBreakFeedback } from '@/components/attendance-break-feedback';
+import { useAttendanceBreak } from '@/hooks/use-attendance-break';
 import {
     AlertTriangle,
     Calendar,
@@ -18,6 +20,7 @@ import { toast } from 'sonner';
 import { ChecklistConfigProvider } from '@/components/checklists/context';
 import { CategoryIcon, StatusBadge } from '@/components/checklists/primitives';
 import { RunModal } from '@/components/checklists/run-modal';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import EndOfShiftChecklist, {
     type EndOfShiftBlocker,
 } from '@/components/end-of-shift-checklist';
@@ -36,7 +39,7 @@ import {
 
 import { BeforeYouFinish } from './components/before-you-finish';
 import { DayWorkList } from './components/day-work-list';
-import { DigestPanel } from './components/digest-panel';
+import { DigestPanel, TeamUpdates } from './components/digest-panel';
 import { MedicinesCard } from './components/medicines-card';
 import {
     MyDayHeader,
@@ -50,6 +53,8 @@ import { ShiftSummary } from './components/shift-summary';
 import { TaskDetailDialog } from './components/task-detail-dialog';
 import { TaskHelpInbox } from './components/task-help-inbox';
 import { TomorrowPanel } from './components/tomorrow-panel';
+import { myDayIncidentHref } from './lib/incident-navigation';
+import { useBroadcastUpdates } from './lib/use-broadcast-updates';
 import { residentHue, residentInitials } from './lib/resident-hue';
 import { buildStream } from './lib/stream-grouping';
 import type {
@@ -117,6 +122,12 @@ export default function MyDay() {
         can_record_clinical?: boolean;
     };
     const auth = props.auth;
+    const broadcastUpdates = useBroadcastUpdates({
+        viewerId: auth?.user?.id ?? null,
+        notifications: props.notifications,
+        reader: props.broadcast_updates_reader,
+        url: page.url,
+    });
 
     const availabilityHref =
         auth?.user?.id && auth?.can?.staff?.availabilityUpdateSelf
@@ -318,6 +329,30 @@ export default function MyDay() {
     const openSession = props.clock?.open_session ?? null;
     const clockedIn = !!openSession;
     const isOnBreak = !!openSession?.is_on_break;
+    const breakCommand = useAttendanceBreak(
+        {
+            actorId: auth?.user?.id ?? null,
+            sessionId: openSession?.id ?? null,
+            shiftId: openSession?.shift_id ?? null,
+            canAct: props.clock?.can_clock === true,
+            onBreak: isOnBreak,
+        },
+        (raw) => {
+            if (!raw || typeof raw !== 'object') return null;
+            const fresh = raw as SharedProps;
+            if (typeof fresh.clock?.open_session?.is_on_break !== 'boolean') return null;
+            if (!(fresh.clock.open_session.shift_id === null ||
+                (Number.isSafeInteger(fresh.clock.open_session.shift_id) && fresh.clock.open_session.shift_id > 0)))
+                return null;
+            return {
+                actorId: fresh.auth?.user?.id ?? null,
+                sessionId: fresh.clock?.open_session?.id ?? null,
+                shiftId: fresh.clock?.open_session?.shift_id ?? null,
+                canAct: fresh.clock?.can_clock === true,
+                onBreak: fresh.clock?.open_session?.is_on_break === true,
+            };
+        },
+    );
 
     // CLOCKED headline ticks up from the session's clock-in time. The backend
     // doesn't report elapsed minutes, so derive it from clock_in_at against the
@@ -384,6 +419,7 @@ export default function MyDay() {
     // surface the legacy clock-in/active-shift cards use, so the back-end can
     // trust the payload it receives.
     const handleClockToggle = () => {
+        if (breakCommand.isBlocked()) return;
         if (clockedIn) {
             setEndShiftOpen(true);
             return;
@@ -400,15 +436,6 @@ export default function MyDay() {
         if (!openSession?.shift_id) return;
         setHandoverWriteOpen(true);
     }, [openSession?.shift_id]);
-
-    const handleBreakToggle = useCallback(() => {
-        if (!openSession?.id) return;
-        router.post(
-            isOnBreak ? '/attendance/break/end' : '/attendance/break/start',
-            { session_id: openSession.id },
-            { preserveScroll: true },
-        );
-    }, [isOnBreak, openSession?.id]);
 
     // The "Today's timesheet" hero button is the worker's one-click entry
     // into the per-client allocation popup for today's shift. If a draft /
@@ -503,19 +530,27 @@ export default function MyDay() {
         );
     }, [loneWorkerSessionId]);
 
+    // "I need help" only opens the confirmation; the emergency check-in is
+    // sent from its confirm button.
+    const [confirmEmergency, setConfirmEmergency] = useState(false);
+    const [sendingEmergency, setSendingEmergency] = useState(false);
     const handleLoneWorkerEmergency = useCallback(() => {
         if (!loneWorkerSessionId) return;
-        if (
-            !confirm(
-                'Send an emergency alert? Your coordinator and the Control Room will be notified immediately that you need help.',
-            )
-        ) {
-            return;
-        }
+        setConfirmEmergency(true);
+    }, [loneWorkerSessionId]);
+    const sendLoneWorkerEmergency = useCallback(() => {
+        if (!loneWorkerSessionId) return;
         router.post(
             `/health-safety/lone-workers/sessions/${loneWorkerSessionId}/check-in`,
             { status: 'emergency' },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onStart: () => setSendingEmergency(true),
+                onFinish: () => {
+                    setSendingEmergency(false);
+                    setConfirmEmergency(false);
+                },
+            },
         );
     }, [loneWorkerSessionId]);
 
@@ -622,6 +657,7 @@ export default function MyDay() {
             alertTasks={openItemTasks}
             incidents={props.incidents ?? []}
             notifications={props.notifications ?? []}
+            broadcastUpdates={broadcastUpdates}
             onAckAlert={handleAckAlert}
             onSnoozeAlert={handleSnoozeAlert}
             onConfirmHandoverRead={handleConfirmHandoverRead}
@@ -802,6 +838,9 @@ export default function MyDay() {
                                 props.medications_hidden_controlled_overdue ?? 0
                             }
                         />
+                    )}
+                    {view === 'today' && (
+                        <TeamUpdates notifications={props.notifications ?? []} broadcastUpdates={broadcastUpdates} />
                     )}
                     {view === 'handover' && (
                         <>
@@ -984,6 +1023,7 @@ export default function MyDay() {
                             )}
                         />
                     )}
+                    <AttendanceBreakFeedback command={breakCommand} checkHref="/my-day" />
                     <ShiftSummary
                         location={
                             site?.name ??
@@ -1008,7 +1048,9 @@ export default function MyDay() {
                             (!!auth?.can?.timesheets?.create && !!activeShift)
                         }
                         onClock={handleClockToggle}
-                        onToggleBreak={handleBreakToggle}
+                        onToggleBreak={breakCommand.submit}
+                        breakPending={breakCommand.pending}
+                        clockActionsBlocked={breakCommand.blocked}
                         onReviewTime={handleOpenTimesheets}
                     />
                     {view === 'today' && (
@@ -1057,13 +1099,37 @@ export default function MyDay() {
                         onObservation={() => setVitalsOpen(true)}
                         onIncident={() =>
                             router.visit(
-                                activeShift
-                                    ? '/incidents/create?shift_id=' +
-                                          activeShift.id
-                                    : '/incidents/create',
+                                myDayIncidentHref({ shiftId: activeShift?.id }),
                             )
                         }
                     />
+
+                    {(props.own_open_injuries ?? 0) > 0 ? (
+                        <Card>
+                            <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <HeartPulse
+                                        className="mt-0.5 size-5 shrink-0 text-status-warning"
+                                        aria-hidden="true"
+                                    />
+                                    <div>
+                                        <h2 className="text-section-title">
+                                            Your workplace injury
+                                        </h2>
+                                        <p className="text-subtle">
+                                            See your care and return-to-work
+                                            plan.
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button variant="outline" asChild>
+                                    <Link href="/hr/my/injuries">
+                                        Open my injury
+                                    </Link>
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ) : null}
 
                     {props.first_aid_followups?.length ? (
                         <FirstAidFollowupsCard
@@ -1263,6 +1329,20 @@ export default function MyDay() {
                     />
                 </ChecklistConfigProvider>
             ) : null}
+
+            <ConfirmDialog
+                frontline
+                open={confirmEmergency}
+                onClose={() => {
+                    if (!sendingEmergency) setConfirmEmergency(false);
+                }}
+                onConfirm={sendLoneWorkerEmergency}
+                title="Send an emergency alert?"
+                description="The Control Room gets an urgent alert, and coordinators and managers are told straight away that you need help."
+                confirmText="Send emergency alert"
+                variant="destructive"
+                processing={sendingEmergency}
+            />
         </AppLayout>
     );
 }

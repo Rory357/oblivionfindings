@@ -29,6 +29,10 @@ export default [
             'react/prop-types': 'off',
             'react/no-unescaped-entities': 'off',
 
+            // Pop-up kit (design_styles/POPUP_STYLE_GUIDE.md): no browser
+            // alert() / confirm() / prompt() — use the kit's Confirm or a Form.
+            'no-alert': 'error',
+
             // Pragmatic baseline for large mixed-quality pages while module work continues.
             '@typescript-eslint/no-explicit-any': 'off',
             '@typescript-eslint/no-unused-vars': 'off',
@@ -158,6 +162,13 @@ export default [
                     'no-accent-active-state': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-blanket-descendant-size': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
+                    'no-emoji-icon': builtinRules.get('no-restricted-syntax'),
+                    'no-oblivion-fallback': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
@@ -184,6 +195,43 @@ export default [
                         "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/])",
                     message:
                         'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white / bg-primary-foreground, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. On a hero, use PageHeaderPrimaryButton (white primary) or PageHeaderGlassButton (glass secondary). See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "Chat — the Chat v3 boards" and its anti-patterns (corrected
+        // 2026-10-22). Chat is rebuilt to the approved boards; these guard the
+        // rebuild. The ignored files predate the rule and are rebuilt in stage 4.
+        files: [
+            'resources/js/components/chat/**/*.{ts,tsx}',
+            'resources/js/pages/chat/**/*.{ts,tsx}',
+        ],
+        ignores: [
+            '**/*.test.tsx',
+            '**/*.test.ts',
+            'resources/js/components/chat/chat-attachment-publication.tsx',
+            'resources/js/components/chat/chat-attachment-queue.tsx',
+            'resources/js/components/chat/chat-voice-recorder.tsx',
+            'resources/js/components/chat/chat-thread.tsx',
+        ],
+        rules: {
+            'design/no-blanket-descendant-size': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/\\[&_[^\\]]+\\]:min-[hw]-/], TemplateElement[value.raw=/\\[&_[^\\]]+\\]:min-[hw]-/])',
+                    message:
+                        'Blanket descendant min-height/min-width rules also catch switches and compact controls. Give a control that needs a larger target .frontline-hit. See DESIGN.md non-negotiable 5 and "Chat — the Chat v3 boards".',
+                },
+            ],
+            'design/no-emoji-icon': [
+                'error',
+                {
+                    selector:
+                        'JSXText[value=/[\\uD83C-\\uD83E][\\uDC00-\\uDFFF]|[\\u2600-\\u27BF]/]',
+                    message:
+                        'Emoji are message content (messages, reactions, the emoji picker, stickers), never icons or labels in chat chrome. Use a lucide icon. See DESIGN.md "Icons" and "Chat — the Chat v3 boards".',
                 },
             ],
         },
@@ -274,6 +322,38 @@ export default [
         },
     },
     {
+        // DESIGN.md "Oblivion identity on a client's site" (client demo
+        // website, 23 Oct 2026): the public website and the sign-in layout
+        // speak as the client. The provider's name comes from Settings ›
+        // Branding or Settings › Referrals and reads neutrally when unset —
+        // never an "Oblivion Care" string fallback or @oblivioncare
+        // placeholder. JSX text (the Powered by line's screen-reader text)
+        // isn't a Literal, so it stays allowed.
+        files: [
+            'resources/js/components/Header.tsx',
+            'resources/js/components/Footer.tsx',
+            'resources/js/components/public-site/**/*.{ts,tsx}',
+            'resources/js/layouts/marketing-layout.tsx',
+            'resources/js/layouts/auth/auth-journey-layout.tsx',
+            'resources/js/pages/public-provider/**/*.{ts,tsx}',
+            'resources/js/pages/public-referrals/**/*.{ts,tsx}',
+            'resources/js/pages/auth/login.tsx',
+            'resources/js/pages/portal/login.tsx',
+        ],
+        ignores: ['**/*.test.tsx', '**/*.test.ts'],
+        rules: {
+            'design/no-oblivion-fallback': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/oblivion ?care/i], TemplateElement[value.raw=/oblivion ?care/i])',
+                    message:
+                        'The public website and sign-in pages are the client’s: take the provider name from usePublicSite() / useCustomBrandName() and read neutrally when it is null, never "Oblivion Care". See DESIGN.md "Oblivion identity on a client’s site".',
+                },
+            ],
+        },
+    },
+    {
         // DESIGN.md "Band text": the floored dark bands (the .eh-header sky
         // and the PageHero band) carry --band-foreground, which is always
         // white. --primary-foreground follows the brand and turns ink for a
@@ -317,6 +397,15 @@ export default [
             'no-restricted-imports': [
                 'error',
                 {
+                    paths: [
+                        {
+                            // DESIGN.md "Skeleton vs loader" + anti-pattern "Bare <Deferred>".
+                            name: '@inertiajs/react',
+                            importNames: ['Deferred'],
+                            message:
+                                'Background-loaded panels use <DeferredPanel> (@/components/deferred-panel): it adds the error state with Try again and keeps data through a refresh. See DESIGN.md "Skeleton vs loader".',
+                        },
+                    ],
                     patterns: [
                         {
                             group: ['@fullcalendar/*'],
@@ -359,6 +448,13 @@ export default [
                             message:
                                 'FinanceHero is deleted. Use <PageHeader> from @/components/page. See DESIGN.md "Page headers".',
                         },
+                        {
+                            // Repeated from the calendar block (this block replaces it for finance).
+                            name: '@inertiajs/react',
+                            importNames: ['Deferred'],
+                            message:
+                                'Background-loaded panels use <DeferredPanel> (@/components/deferred-panel): it adds the error state with Try again and keeps data through a refresh. See DESIGN.md "Skeleton vs loader".',
+                        },
                     ],
                     patterns: [
                         {
@@ -373,6 +469,52 @@ export default [
                                 'Calendars reuse pages/sites/calendar (SiteCalendar + _parts) with a data adapter, not a new FullCalendar skin. See DESIGN.md "Calendars".',
                         },
                     ],
+                },
+            ],
+        },
+    },
+    {
+        // Security & Devices plain-language rule: keep system-design jargon out
+        // of user-facing copy while leaving backend payload keys and TypeScript
+        // identifiers untouched.
+        files: [
+            'resources/js/pages/security-devices/**/*.{ts,tsx}',
+            'resources/js/components/security-devices/**/*.{ts,tsx}',
+        ],
+        ignores: ['**/*.test.ts', '**/*.test.tsx', '**/*fixtures*.ts'],
+        plugins: {
+            'security-devices-copy': {
+                rules: {
+                    'no-jargon': builtinRules.get('no-restricted-syntax'),
+                },
+            },
+        },
+        rules: {
+            'security-devices-copy/no-jargon': [
+                'error',
+                {
+                    selector:
+                        'JSXText[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i]',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+                {
+                    selector:
+                        'JSXAttribute[name.name=/^(?:label|title|description|subline|caption|placeholder|aria-label|ariaLabel|empty|note|railTitle|railSub|blurb|text|confirmText)$/] :matches(Literal[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i], TemplateElement[value.raw=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i])',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+                {
+                    selector:
+                        'Property[key.name=/^(?:label|title|description|subline|caption|placeholder|empty|note|blurb|next|confirmText)$/] > :matches(Literal[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i], TemplateElement[value.raw=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i])',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+                {
+                    selector:
+                        'ArrayExpression > Literal:first-child[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i]',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
                 },
             ],
         },
@@ -417,6 +559,7 @@ export default [
             // with several active worktrees. CI never has these.
             '.claude/worktrees/**',
             '.claude/**',
+            '.endpoint-tools/**',
         ],
     },
     prettier, // Turn off all rules that might conflict with Prettier

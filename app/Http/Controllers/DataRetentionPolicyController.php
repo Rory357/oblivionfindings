@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Privacy\Retention\RetentionContractException;
 use App\Domain\Privacy\Retention\RetentionExecutionService;
 use App\Domain\Privacy\Retention\RetentionOwnerRegistry;
+use App\Domain\Referrals\Services\ReferralRetention;
 use App\Models\DataRetentionPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ class DataRetentionPolicyController extends Controller
     /**
      * Display a listing of retention policies.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, RetentionExecutionService $service): Response
     {
         $this->authorizePermission($request);
 
@@ -47,7 +48,23 @@ class DataRetentionPolicyController extends Controller
                 'total' => DataRetentionPolicy::count(),
                 'active' => DataRetentionPolicy::where('active', true)->count(),
             ],
+            // Referral retention periods as settings rows, each backed by one governed policy.
+            'referralRetention' => app(ReferralRetention::class)->periodRows($service),
         ]);
+    }
+
+    /**
+     * Save the referral retention periods. Each new or changed period becomes a draft policy that
+     * needs a fresh preview and a different person's approval on Review data before it runs.
+     */
+    public function referralPeriods(Request $request, RetentionExecutionService $service): RedirectResponse
+    {
+        $this->authorizePermission($request);
+        $changed = app(ReferralRetention::class)->savePeriods($request->user(), $request->all(), $service);
+
+        return back()->with('success', $changed === []
+            ? 'No retention periods changed.'
+            : 'Retention periods saved. Each changed period needs a fresh preview and a second person’s approval on Review data before it runs.');
     }
 
     /**
@@ -156,7 +173,7 @@ class DataRetentionPolicyController extends Controller
     /**
      * Review data for retention.
      */
-    public function review(Request $request): Response
+    public function review(Request $request, RetentionExecutionService $service, RetentionOwnerRegistry $registry): Response
     {
         $this->authorizePermission($request);
 
@@ -167,7 +184,18 @@ class DataRetentionPolicyController extends Controller
             ->get();
 
         return Inertia::render('privacy/retention/review', [
-            'policies' => $policies,
+            'policies' => $policies->map(function (DataRetentionPolicy $policy) use ($service, $registry): array {
+                $fingerprint = $service->fingerprint($policy);
+
+                return array_merge($policy->toArray(), [
+                    'preview_current' => is_string($policy->preview_fingerprint)
+                        && hash_equals($fingerprint, $policy->preview_fingerprint),
+                    'approval_current' => is_string($policy->approved_fingerprint)
+                        && hash_equals($fingerprint, $policy->approved_fingerprint),
+                    // The record type in plain words, and what its policy does, before anyone previews it.
+                    'owner' => $registry->describe((string) $policy->model_type),
+                ]);
+            }),
         ]);
     }
 

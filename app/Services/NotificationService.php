@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\AppEventNotification;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -44,6 +45,11 @@ class NotificationService
 
     public const AUDITOR_ROLES = [
         'auditor',
+    ];
+
+    // The finance team (role group "finance"), e.g. drafts made from referrals that need review.
+    public const FINANCE_ROLES = [
+        'finance',
     ];
 
     /**
@@ -87,6 +93,8 @@ class NotificationService
             ], true) ? 'client_medical' : null),
             'entity' => $entityLabel,
             'client_id' => $client?->id ?? ($entity?->client_id ?? null),
+            'task_source' => $extra['data']['task_source'] ?? null,
+            'task_id' => $extra['data']['task_id'] ?? null,
         ];
         $recipients = $this->filterRecipientScope(
             $this->resolveRecipients($actor, $entity, $client, $extra),
@@ -130,10 +138,77 @@ class NotificationService
 
         $notification = new AppEventNotification($payload);
 
+        // A repeating reminder (an hourly or daily check about the same item)
+        // keeps ONE unread copy per person: while their copy is unread, each
+        // run refreshes it (newest text, back to the top) instead of adding
+        // another. Once they have read it, the next run sends a new one.
+        if (($extra['refresh_unread_copy'] ?? false) === true && $entity !== null) {
+            $recipients = $this->refreshUnreadCopies(
+                $recipients,
+                $notification,
+                $eventKey,
+                $entityLabel,
+                $entity,
+                // A reminder an escalation rule watches keeps its original
+                // time, so the rule's clock is never restarted.
+                keepTime: (bool) ($rule?->enabled),
+            );
+        }
+
         $recipients->each(fn(User $u) => $u->notify($notification));
     }
 
-    /** Medical facts require the same current reads as the Medical section. */
+    /**
+     * Refresh each recipient's newest unread copy of this event about this
+     * item, and return the recipients who had none (they get a new one).
+     *
+     * @param  Collection<int, User>  $recipients
+     * @return Collection<int, User>
+     */
+    protected function refreshUnreadCopies(
+        Collection $recipients,
+        AppEventNotification $notification,
+        string $eventKey,
+        string $entityLabel,
+        Model $entity,
+        bool $keepTime,
+    ): Collection {
+        if ($recipients->isEmpty()) {
+            return $recipients;
+        }
+
+        $copies = DatabaseNotification::query()
+            ->where('notifiable_type', $recipients->first()->getMorphClass())
+            ->whereIn('notifiable_id', $recipients->map(fn (User $user) => (int) $user->getKey())->all())
+            ->whereNull('read_at')
+            ->where('type', AppEventNotification::class)
+            ->where('data->event_key', $eventKey)
+            ->where('data->entity', $entityLabel)
+            ->where('data->entity_id', $entity->getKey())
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get()
+            ->unique(fn (DatabaseNotification $copy) => (int) $copy->notifiable_id)
+            ->keyBy(fn (DatabaseNotification $copy) => (int) $copy->notifiable_id);
+
+        return $recipients
+            ->reject(function (User $user) use ($copies, $notification, $keepTime): bool {
+                $copy = $copies->get((int) $user->getKey());
+                if ($copy === null) {
+                    return false;
+                }
+
+                $copy->forceFill(array_filter([
+                    'data' => $notification->toArray($user),
+                    'created_at' => $keepTime ? null : now(),
+                ], fn ($value) => $value !== null))->save();
+
+                return true;
+            })
+            ->values();
+    }
+
+    /** Sensitive notifications retain their owning module's current read boundary. */
     public function filterRecipientScope(Collection $recipients, array $payload): Collection
     {
         $scope = $payload['recipient_scope'] ?? null;
@@ -144,7 +219,15 @@ class NotificationService
             $scope = 'client_medical';
         }
         if ($scope === null) {
+            // Old task notices lack a stable item identity for reauthorization.
+            // Do not replay their private titles through delayed escalation.
+            if (($payload['entity'] ?? null) === 'task' && ($payload['context']['Module'] ?? null) === 'Referrals') {
+                return collect();
+            }
             return $recipients;
+        }
+        if ($scope === 'referral_task') {
+            return app(\App\Domain\Referrals\Services\ReferralTaskNotifications::class)->recipients($recipients, $payload);
         }
         if ($scope !== 'client_medical' || ! is_numeric($payload['client_id'] ?? null)) {
             return collect();
@@ -369,6 +452,9 @@ class NotificationService
                 ->pluck('id'),
             'auditors' => User::query()
                 ->whereHas('roles', fn($q) => $q->whereIn('name', self::AUDITOR_ROLES))
+                ->pluck('id'),
+            'finance' => User::query()
+                ->whereHas('roles', fn($q) => $q->whereIn('name', self::FINANCE_ROLES))
                 ->pluck('id'),
             'approvers' => User::query()
                 ->where(function ($q) {

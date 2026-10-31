@@ -78,6 +78,8 @@ export type ProcedureActionKey =
 
 export type ProcedureFormData = {
     id?: number;
+    expected_version?: number;
+    expected_lock_version?: number;
     title: string;
     reference_number: string;
     category: string;
@@ -87,9 +89,9 @@ export type ProcedureFormData = {
     ppe_required: string[];
     hazards_addressed: string[];
     emergency_procedures: string;
-    applicable_roles: string[];
-    applicable_sites: number[];
-    related_training: number[];
+    applicable_roles: string[] | null;
+    applicable_sites: number[] | null;
+    related_training: number[] | null;
     review_date: string | null;
     review_frequency_months: number | null;
     owner_id: number | null;

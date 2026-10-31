@@ -25,11 +25,19 @@ class FirstAidFollowup extends Model
         'completed_at',
         'notes',
         'created_by',
+        'assignment_revision',
+        'completed_by_user_id',
+        'completion_notes',
+        'completion_outcome',
+        'completion_evidence_ids',
     ];
 
     protected $casts = [
         'due_at' => 'datetime',
         'completed_at' => 'datetime',
+        'assignment_revision' => 'integer',
+        'completion_outcome' => 'array',
+        'completion_evidence_ids' => 'array',
     ];
 
     public function record(): BelongsTo
@@ -45,6 +53,11 @@ class FirstAidFollowup extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function completedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completed_by_user_id');
     }
 
     public function isCompleted(): bool

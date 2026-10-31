@@ -65,12 +65,12 @@ export function CoveragePane({
                             <h3 className="text-sm font-bold tracking-tight">
                                 Coverage windows needing review
                             </h3>
-                            <div className="text-[11px] text-muted-foreground">
+                            <div className="text-xs text-muted-foreground">
                                 Returned alerts for the selected week. Site
                                 totals below cover every assessed window.
                             </div>
                         </div>
-                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
                             {visibleAlerts.length}
                         </span>
                     </div>
@@ -207,7 +207,7 @@ function CoverageAlertRow({ alert }: { alert: CoverageAlertSummary }) {
                     {missing > 0 ? `${missing} short` : 'Review required'}
                 </StatusBadge>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="rounded bg-muted px-1.5 py-0.5">
                     {alert.window_label}
                 </span>

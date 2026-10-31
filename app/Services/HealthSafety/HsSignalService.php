@@ -70,22 +70,35 @@ class HsSignalService
         string $priority,
         ?int $siteId = null,
         array $extraContext = [],
+        ?int $daysSinceCompleted = null,
     ): void {
-        // High-priority overdue actions escalate faster
+        // High-priority overdue actions escalate faster. Severity always counts from the due date, also while the
+        // done work waits for verification, so nothing becomes less urgent by being marked completed.
         $severity = match (true) {
             $priority === 'critical' => AlertSeverity::HIGH,
             $daysOverdue >= 7 => AlertSeverity::HIGH,
             default => AlertSeverity::MEDIUM,
         };
 
+        // Marked completed but not yet verified: say what is actually waiting (MASTER/Stephan, 30 Oct). Same alert
+        // type and key, so the open alert carries the new title on the next check.
+        $title = $daysSinceCompleted === null
+            ? "Corrective action overdue: {$referenceNumber} ({$daysOverdue} days, {$priority} priority)"
+            : "Waiting for verification: {$referenceNumber} (completed ".match ($daysSinceCompleted) {
+                0 => 'today',
+                1 => '1 day ago',
+                default => "{$daysSinceCompleted} days ago",
+            }.", {$priority} priority)";
+
         $this->emit(
             self::TYPE_CORRECTIVE_ACTION_OVERDUE,
-            "Corrective action overdue: {$referenceNumber} ({$daysOverdue} days, {$priority} priority)",
+            $title,
             $severity,
             array_merge([
                 'hs_corrective_action_id' => $actionId,
                 'reference_number' => $referenceNumber,
                 'days_overdue' => $daysOverdue,
+                'days_since_completed' => $daysSinceCompleted,
                 'priority' => $priority,
                 'site_id' => $siteId,
             ], $extraContext),
@@ -186,6 +199,8 @@ class HsSignalService
                 'description' => $message,
                 'source_module' => 'health_safety',
                 'signal_type' => $signalType,
+                // One open alert per item: the next check refreshes it (see SignalProcessingService::openConditionAlert).
+                SignalProcessingService::CONDITION_KEY => $entityKey === null ? null : SignalProcessingService::conditionKey($signalType, 'entity', $entityKey),
             ], $context),
         ];
 

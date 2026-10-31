@@ -31,7 +31,7 @@ test.describe('Security & Devices specialist workspace shell', () => {
         });
         await expect(securityTabs).toBeVisible();
         await securityTabs
-            .getByRole('link', { name: 'Access Control', exact: true })
+            .getByRole('link', { name: 'Access control', exact: true })
             .click();
 
         await expect(page).toHaveURL(/tab=access-control/);
@@ -39,7 +39,7 @@ test.describe('Security & Devices specialist workspace shell', () => {
         await expect(page).toHaveURL(/status=offline/);
         await expect(
             securityTabs.getByRole('link', {
-                name: 'Access Control',
+                name: 'Access control',
                 exact: true,
             }),
         ).toHaveAttribute('aria-current', 'page');

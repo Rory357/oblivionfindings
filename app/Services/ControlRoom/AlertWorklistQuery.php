@@ -20,6 +20,7 @@ final class AlertWorklistQuery
         private readonly UserSiteAccessService $siteAccess,
         private readonly AlertPriorityService $priority,
         private readonly ControlRoomAlertAccessService $alertAccess,
+        private readonly RestraintHsReferenceVisibility $restraintReferences,
     ) {}
 
     /** @param array<string, mixed> $filters */
@@ -41,7 +42,7 @@ final class AlertWorklistQuery
                 'playbookRun:id,playbook_id,status,current_step,completed_steps,total_steps',
                 'playbookRun.playbook:id,name,code',
                 'clientIncident:id,reference_number,control_room_alert_id,hs_event_id,status,severity,site_id',
-                'hsEvent:id,reference_number,control_room_alert_id,handover_status,owner_user_id,status,severity,worksafe_notifiable,worksafe_status',
+                'hsEvent:id,reference_number,control_room_alert_id,handover_status,owner_user_id,status,severity,worksafe_notifiable,worksafe_status,source_type',
             ]);
 
         $this->applyLens($query, (string) ($filters['lens'] ?? 'active'), $user);
@@ -68,14 +69,15 @@ final class AlertWorklistQuery
             ->when(filled($filters['escalation_level'] ?? null), fn (Builder $q) => $q->where('control_room_alerts.escalation_level', '>=', (int) $filters['escalation_level']))
             ->when(filled($filters['date_from'] ?? null), fn (Builder $q) => $q->whereDate('control_room_alerts.triggered_at', '>=', $filters['date_from']))
             ->when(filled($filters['date_to'] ?? null), fn (Builder $q) => $q->whereDate('control_room_alerts.triggered_at', '<=', $filters['date_to']))
-            ->when(filled($filters['q'] ?? null), function (Builder $q) use ($filters): void {
+            ->when(filled($filters['q'] ?? null), function (Builder $q) use ($filters, $user): void {
                 $term = '%'.trim((string) $filters['q']).'%';
-                $q->where(function (Builder $search) use ($term): void {
+                $q->where(function (Builder $search) use ($term, $user): void {
                     $search->where('control_room_alerts.reference_number', 'like', $term)
                         ->orWhere('control_room_alerts.alert_type', 'like', $term)
                         ->orWhere('control_room_alerts.notes', 'like', $term)
                         ->orWhereHas('clientIncident', fn (Builder $incident) => $incident->where('reference_number', 'like', $term))
-                        ->orWhereHas('hsEvent', fn (Builder $event) => $event->where('reference_number', 'like', $term));
+                        // A restraint's H&S reference finds its alert only for readers of that restraint.
+                        ->orWhereHas('hsEvent', fn (Builder $event) => $this->restraintReferences->constrainReferenceSearch($event, $user, $term));
                 });
             });
 

@@ -21,18 +21,23 @@ test('privacy request show supports identity verification and completion through
         $browser->loginAs($user)
             ->visit("/privacy/requests/{$request->id}")
             ->waitForText($request->reference_number, 10)
-            ->script(<<<'JS'
-                window.__codexPromptValues = [
-                    'Passport verification',
-                    'Completed during browser QA coverage.',
-                ];
-
-                window.prompt = () => window.__codexPromptValues.shift() ?? '';
-            JS);
-
-        $browser->press('Verify Identity')
+            ->press('Verify Identity')
+            ->waitFor('[role="dialog"]', 10)
+            ->within('[role="dialog"]', function (Browser $dialog) {
+                $dialog->assertSee("Verify QA Requester's identity?")
+                    ->type('verification_method', 'Passport verification')
+                    ->press('Verify identity');
+            })
+            ->waitUntilMissing('[role="dialog"]', 10)
             ->waitForText('Identity Verified', 10)
             ->press('Mark Complete')
+            ->waitFor('[role="dialog"]', 10)
+            ->within('[role="dialog"]', function (Browser $dialog) {
+                $dialog->assertSee('Mark this request as complete?')
+                    ->type('completion_notes', 'Completed during browser QA coverage.')
+                    ->press('Mark complete');
+            })
+            ->waitUntilMissing('[role="dialog"]', 10)
             ->waitForText('completed', 10)
             ->waitForText('Completed during browser QA coverage.', 10);
     });
@@ -40,6 +45,7 @@ test('privacy request show supports identity verification and completion through
     $request->refresh();
 
     expect($request->identity_verified)->toBe('verified');
+    expect($request->verification_method)->toBe('Passport verification');
     expect($request->status)->toBe('completed');
     expect($request->completion_notes)->toBe('Completed during browser QA coverage.');
 });

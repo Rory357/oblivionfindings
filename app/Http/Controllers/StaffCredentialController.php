@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\LimitsStaffRecordsToViewerSites;
 use App\Models\StaffCredential;
 use App\Services\NotificationService;
 use App\Models\User;
@@ -9,6 +10,8 @@ use Illuminate\Http\Request;
 
 class StaffCredentialController extends Controller
 {
+    use LimitsStaffRecordsToViewerSites;
+
     protected function canManage(Request $request, User $user): bool
     {
         $auth = $request->user();
@@ -34,6 +37,7 @@ class StaffCredentialController extends Controller
         if ($auth->id !== $user->id) {
             abort_unless($auth->canDo('staff.credentials.viewAny') || $auth->canDo('staff.viewAny'), 403);
         }
+        $this->abortUnlessStaffInViewerSites($auth, $user);
 
         $creds = StaffCredential::query()
             ->where('user_id', $user->id)
@@ -51,6 +55,7 @@ class StaffCredentialController extends Controller
     public function store(Request $request, User $user)
     {
         abort_unless($this->canManage($request, $user), 403);
+        $this->abortUnlessStaffInViewerSites($request->user(), $user);
 
         $data = $request->validate([
             'type' => ['required', 'string', 'max:255'],
@@ -75,6 +80,7 @@ class StaffCredentialController extends Controller
     public function update(Request $request, User $user, StaffCredential $credential)
     {
         abort_unless($this->canManage($request, $user), 403);
+        $this->abortUnlessStaffInViewerSites($request->user(), $user);
         abort_unless($credential->user_id === $user->id, 404);
 
         $data = $request->validate([
@@ -100,6 +106,7 @@ class StaffCredentialController extends Controller
     public function destroy(Request $request, User $user, StaffCredential $credential)
     {
         abort_unless($this->canManage($request, $user), 403);
+        $this->abortUnlessStaffInViewerSites($request->user(), $user);
         abort_unless($credential->user_id === $user->id, 404);
 
         $credential->delete();

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Privacy\Retention;
 
+use App\Domain\Referrals\Services\ReferralRetention;
 use App\Models\Client;
 use App\Models\ClientNote;
 use App\Models\RespiteBooking;
@@ -11,6 +12,7 @@ use App\Models\RespiteEvidencePack;
 use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteReferral;
 use App\Models\RespiteStay;
+use Illuminate\Database\Eloquent\Model;
 
 final class RetentionOwnerRegistry
 {
@@ -72,6 +74,7 @@ final class RetentionOwnerRegistry
                     'preferred_name' => 'clear',
                     'email' => 'clear',
                     'phone' => 'clear',
+                    'contact_preferences' => 'clear',
                     'nhi_number' => 'clear',
                     'nhi_hash' => 'clear',
                     'date_of_birth' => 'clear',
@@ -86,6 +89,27 @@ final class RetentionOwnerRegistry
                     'strengths_abilities' => 'clear',
                 ],
                 '@self',
+                // Anonymising a person also anonymises the referrals that led to their support
+                // (Stephan, 21 Oct 2026), so nothing identifying is left behind in Referrals.
+                afterAnonymize: fn (Model $client): array => app(ReferralRetention::class)->anonymiseForPerson($client),
+                guidance: [
+                    'summary' => 'Supported people’s profiles. Anonymising a person also anonymises the referrals that led to their support.',
+                    'removes' => [
+                        'Name, date of birth, NHI, contact details, address, photo and life story',
+                        'In their referrals: names, contact details, intake answers, notes, uploaded files and the name search entries',
+                    ],
+                    'keeps' => [
+                        'The profile’s status, site, service and dates',
+                        'In their referrals: the handover, support start and service agreement facts and funding outcomes, without names or notes',
+                    ],
+                    'blocked_by' => [
+                        'A legal hold on the person, or an active person when the active-person exemption is on',
+                        'A legal hold on one of their referrals keeps that referral as it is',
+                    ],
+                    'period' => 'Uses the periods set on this policy.',
+                ],
+                // Bound into Client approvals: they must cover the referral clean-up too.
+                contractVersion: 'client-with-referrals-2026-10-21',
             ),
             ClientNote::class => new RetentionOwnerAdapter(
                 ClientNote::class,
@@ -262,6 +286,21 @@ final class RetentionOwnerRegistry
                 ['source' => 'clear', 'discrepancies' => 'clear', 'override_reason' => 'clear'],
                 'stay.client',
             ),
+            // Closed referrals, their documents and message copies: anonymised, never deleted.
+            ...collect(app(ReferralRetention::class)->owners())
+                ->mapWithKeys(fn (RetentionOwnerAdapter $owner): array => [$owner->key => $owner])->all(),
         ];
+    }
+
+    /**
+     * Plain-language explanation of an owner's choices for the people who preview and approve it.
+     *
+     * @return array{label: string, guidance: array<string, mixed>}|null
+     */
+    public function describe(string $identifier): ?array
+    {
+        $owner = $this->owners()[$identifier] ?? null;
+
+        return $owner ? ['label' => $owner->label, 'guidance' => $owner->guidance] : null;
     }
 }

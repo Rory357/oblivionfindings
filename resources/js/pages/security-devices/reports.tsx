@@ -23,6 +23,13 @@ import {
 import { Head, router, usePage } from '@inertiajs/react';
 import { BarChart3, Download, LayoutGrid, List, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+
+type CurrentPermissions = {
+    securityDevices?: {
+        reportsView?: boolean;
+    };
+};
+
 export type ReportsProps = {
     actor_id: number;
     as_of: string;
@@ -34,13 +41,17 @@ const validCount = (value: number) =>
     Number.isSafeInteger(value) && value >= 0 ? value : null;
 export default function SecurityDevicesReports(props: ReportsProps) {
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+        auth?: { user?: { id: number } | null; can?: CurrentPermissions };
     }>().props;
+    // Metadata-only partial changes cannot transfer ownership of retained DTOs.
+    // A complete read with a fresh page mount establishes the next source actor.
+    const [sourceActor] = useState(props.actor_id);
     const [view, setView] = useState<'cards' | 'table'>('cards');
     const visible = Boolean(
         auth?.user?.id &&
         props.actor_id === auth.user.id &&
-        auth.can?.['securityDevices.reports.view'] === true,
+        props.actor_id === sourceActor &&
+        auth.can?.securityDevices?.reportsView === true,
     );
     return (
         <ReportsBody
@@ -120,6 +131,17 @@ function ReportsBody({
         if (refreshing.current) return;
         refreshing.current = true;
         setNotice('');
+        if (!visible) {
+            router.visit('/security-devices/reports', {
+                method: 'get',
+                preserveState: false,
+                preserveScroll: true,
+                onFinish: () => {
+                    if (live.current) refreshing.current = false;
+                },
+            });
+            return;
+        }
         router.reload({
             only: ['stats', 'windowDays', 'actor_id', 'as_of', 'auth'],
             onSuccess: (page) => {
@@ -128,14 +150,14 @@ function ReportsBody({
                     actor_id?: number;
                     auth?: {
                         user?: { id?: number };
-                        can?: Record<string, unknown>;
+                        can?: CurrentPermissions;
                     };
                 };
                 if (
                     page.component === 'security-devices/reports' &&
                     props.actor_id === actor &&
                     props.auth?.user?.id === actor &&
-                    props.auth.can?.['securityDevices.reports.view'] === true
+                    props.auth.can?.securityDevices?.reportsView === true
                 )
                     setDenied(false);
                 else {
@@ -214,7 +236,7 @@ function ReportsBody({
                 <PageHeader
                     icon={BarChart3}
                     title="Reports"
-                    subline="Download permitted device, event and maintenance records as CSV files."
+                    subline="Download permitted device, event and maintenance records as CSV files"
                     mobileSummary={
                         visible
                             ? '3 report types · counts at the last refresh'

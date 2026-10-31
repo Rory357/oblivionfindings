@@ -6,7 +6,8 @@ import {
     type HazardRegisterData,
 } from '@/components/health-safety/hazard-register';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
+import type { SharedData } from '@/types';
+import { Head, usePage } from '@inertiajs/react';
 
 type Props = HazardRegisterData & {
     site: { id: number; name: string; type: string; suburb?: string | null };
@@ -18,16 +19,23 @@ export default function SiteHazardsIndex({
     recommendedHazards: _recommendedHazards,
     ...data
 }: Props) {
+    const canReadSite = !!usePage<SharedData>().props.auth.can?.sites?.viewAny;
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Sites', href: '/sites' },
-                { title: site.name, href: `/sites/${site.id}` },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Hazards', href: '/compliance/hazards' },
+                {
+                    title: site.name,
+                    href: canReadSite
+                        ? `/sites/${site.id}`
+                        : `/sites/${site.id}/hazards`,
+                },
                 { title: 'Hazards', href: `/sites/${site.id}/hazards` },
             ]}
         >
             <Head title={`${site.name} — Hazards`} />
-            <div className="flex flex-col p-6">
+            <div className="flex min-w-0 flex-col gap-5">
                 <HazardRegister
                     baseUrl={`/sites/${site.id}/hazards`}
                     scopedSite={site}

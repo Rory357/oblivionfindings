@@ -29,6 +29,8 @@ final class CommandExpectedStateResolver
             'camera.evidence.export' => ['governed_export_ready' => true, 'case_reference' => $parameters['case_reference'] ?? null],
             'network.port.enable' => ['admin_state' => 'enabled', 'interface' => $parameters['interface'] ?? null],
             'network.port.disable' => ['admin_state' => 'disabled', 'interface' => $parameters['interface'] ?? null],
+            'network.port.bounce' => ['admin_state' => 'enabled', 'bounced' => true, 'interface' => $parameters['interface'] ?? null],
+            'network.config.backup' => ['snapshot_available' => true],
             'network.firewall_policy.apply' => ['policy_reference' => $parameters['policy_reference'] ?? null],
             'configuration.apply' => $this->configurationProfileState($parameters),
             'firmware.update' => ['firmware_version' => $parameters['target_version'] ?? null],

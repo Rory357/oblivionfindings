@@ -224,6 +224,7 @@ class AttendanceController extends Controller
             : collect();
 
         return Inertia::render('attendance/index', [
+            'handoverCommandProtocol' => \App\Services\Operations\OperationsHandoverReadiness::available() ? 1 : null,
             'sessions' => $sessions,
             'sessionPagination' => [
                 'current_page' => $sessionPage->currentPage(), 'last_page' => $sessionPage->lastPage(),
@@ -592,15 +593,36 @@ class AttendanceController extends Controller
             $request->input('session_id'),
         );
 
-        $data = $request->validate([
-            'session_id' => ['nullable', 'integer', 'min:1'],
-        ]);
+        try {
+            $data = $request->validate([
+                'session_id' => [$this->wantsBreakResult($request) ? 'required' : 'nullable', 'integer', 'min:1'],
+            ]);
+        } catch (ValidationException $exception) {
+            if ($this->wantsBreakResult($request)) {
+                return $this->breakJson(['code' => 'break_rejected', 'message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
+            }
+            throw $exception;
+        }
         $data['session_id'] = $session?->id;
 
+        $receiptCanCommit = $this->isOutsideTransaction();
         try {
-            $this->attendanceService->startBreak($auth, $session, $data);
-        } catch (\LogicException $exception) {
-            return redirect()->back()->withErrors(['break' => $exception->getMessage()]);
+            $changed = $this->attendanceService->startBreak($auth, $session, $data);
+        } catch (ValidationException $exception) {
+            if ($this->wantsBreakResult($request)) {
+                return $this->breakJson(['code' => 'break_rejected', 'message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
+            }
+            throw $exception;
+        } catch (Throwable $exception) {
+            if ($this->wantsBreakResult($request)
+                && ! $exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                return $this->unconfirmedBreakResult();
+            }
+            throw $exception;
+        }
+
+        if ($this->wantsBreakResult($request)) {
+            return $this->breakResult($auth, $changed, 'start_break', $receiptCanCommit);
         }
 
         return redirect()->back()->with('success', 'Break started.');
@@ -616,18 +638,126 @@ class AttendanceController extends Controller
             $request->input('session_id'),
         );
 
-        $data = $request->validate([
-            'session_id' => ['nullable', 'integer', 'min:1'],
-        ]);
+        try {
+            $data = $request->validate([
+                'session_id' => [$this->wantsBreakResult($request) ? 'required' : 'nullable', 'integer', 'min:1'],
+            ]);
+        } catch (ValidationException $exception) {
+            if ($this->wantsBreakResult($request)) {
+                return $this->breakJson(['code' => 'break_rejected', 'message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
+            }
+            throw $exception;
+        }
         $data['session_id'] = $session?->id;
 
+        $receiptCanCommit = $this->isOutsideTransaction();
         try {
-            $this->attendanceService->endBreak($auth, $session, $data);
-        } catch (\LogicException $exception) {
-            return redirect()->back()->withErrors(['break' => $exception->getMessage()]);
+            $changed = $this->attendanceService->endBreak($auth, $session, $data);
+        } catch (ValidationException $exception) {
+            if ($this->wantsBreakResult($request)) {
+                return $this->breakJson(['code' => 'break_rejected', 'message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
+            }
+            throw $exception;
+        } catch (Throwable $exception) {
+            if ($this->wantsBreakResult($request)
+                && ! $exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                return $this->unconfirmedBreakResult();
+            }
+            throw $exception;
+        }
+
+        if ($this->wantsBreakResult($request)) {
+            return $this->breakResult($auth, $changed, 'end_break', $receiptCanCommit);
         }
 
         return redirect()->back()->with('success', 'Break ended.');
+    }
+
+    private function wantsBreakResult(Request $request): bool
+    {
+        return ! $request->headers->has('X-Inertia')
+            && strtolower($request->getAcceptableContentTypes()[0] ?? '') === 'application/json';
+    }
+
+    private function breakResult(User $actor, HrAttendanceSession $recorded, string $action, bool $receiptCanCommit): \Illuminate\Http\JsonResponse
+    {
+        if (! $receiptCanCommit || ! $this->isOutsideTransaction()) {
+            return $this->unconfirmedBreakResult();
+        }
+
+        // Recheck current read authority, but never replace the writer's frame
+        // with a later session or a guessed/latest break event.
+        $reader = User::query()->staff()->whereNotNull('approved_at')->findOrFail($actor->id);
+        abort_unless($this->canClock($reader), 403);
+        $current = $this->attendanceService->resolveSelfAttendanceSession($reader, (int) $recorded->id);
+        abort_unless($current
+            && (int) $current->id === (int) $recorded->id
+            && (int) $current->user_id === (int) $reader->id
+            && (int) $recorded->user_id === (int) $reader->id
+            && $current->shift_id === $recorded->shift_id
+            && $current->site_id === $recorded->site_id, 404);
+
+        try {
+            $event = $recorded->relationLoaded('attendanceBreakCommandEvent')
+                ? $recorded->getRelation('attendanceBreakCommandEvent') : null;
+            if (! in_array($action, ['start_break', 'end_break'], true)
+                || ! $event instanceof \App\Domain\Hr\Models\HrAttendanceBreakEvent
+                || ! $event->exists || (int) $event->id < 1
+                || (int) $event->session_id !== (int) $recorded->id
+                || (int) $recorded->id < 1 || $recorded->status !== 'open' || $recorded->clock_out_at
+                || ($recorded->shift_id !== null && (int) $recorded->shift_id < 1)
+                || (int) $recorded->break_count < 0 || (int) $recorded->break_minutes < 0
+                || (int) $event->minutes < 0 || ! $event->started_at
+                || ($action === 'start_break' && ((int) $recorded->break_count < 1 || ! $recorded->break_started_at || $event->ended_at
+                    || (int) $event->minutes !== 0
+                    || $recorded->fromDateTime($recorded->break_started_at) !== $event->fromDateTime($event->started_at)))
+                || ($action === 'end_break' && ($recorded->break_started_at || ! $event->ended_at
+                    || $event->ended_at->lt($event->started_at)
+                    || (int) $recorded->break_minutes < (int) $event->minutes))) {
+                return $this->unconfirmedBreakResult();
+            }
+
+            return $this->breakJson([
+                'schema_version' => 1,
+                'scope' => 'attendance_break_recorded_result',
+                'action' => $action,
+                'actor_id' => (int) $reader->id,
+                'session' => [
+                    'id' => (int) $recorded->id,
+                    'shift_id' => $recorded->shift_id === null ? null : (int) $recorded->shift_id,
+                    'status' => 'open',
+                    'break_started_at' => $recorded->break_started_at?->toIso8601String(),
+                    'break_minutes' => (int) $recorded->break_minutes,
+                    'break_count' => (int) $recorded->break_count,
+                ],
+                'break_event' => [
+                    'id' => (int) $event->id,
+                    'session_id' => (int) $event->session_id,
+                    'started_at' => $event->started_at->toIso8601String(),
+                    'ended_at' => $event->ended_at?->toIso8601String(),
+                    'minutes' => (int) $event->minutes,
+                ],
+            ]);
+        } catch (Throwable) {
+            return $this->unconfirmedBreakResult();
+        }
+    }
+
+    private function unconfirmedBreakResult(): \Illuminate\Http\JsonResponse
+    {
+        return $this->breakJson([
+            'code' => 'break_result_unconfirmed',
+            'message' => 'The break result could not be confirmed. Check attendance before trying again.',
+        ], 409);
+    }
+
+    private function breakJson(array $data, int $status = 200): \Illuminate\Http\JsonResponse
+    {
+        return response()->json($data, $status)->withHeaders([
+            'Cache-Control' => 'private, no-store',
+            'Pragma' => 'no-cache',
+            'Referrer-Policy' => 'no-referrer',
+        ]);
     }
 
     protected function canClock(?User $auth): bool

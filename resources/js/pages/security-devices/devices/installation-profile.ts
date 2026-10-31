@@ -139,6 +139,23 @@ export function installationProfile(
     return r as Profile;
 }
 
+export type InstallationProfileFile = Profile;
+
+export function encodeComputerSetupCode(profile: Profile): string {
+    const bytes = new TextEncoder().encode(JSON.stringify(profile));
+    let binary = '';
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+    }
+    return (
+        'ofc1_' +
+        btoa(binary)
+            .replace(/\+/gu, '-')
+            .replace(/\//gu, '_')
+            .replace(/=+$/u, '')
+    );
+}
+
 export async function installationJSON(
     deviceId: number,
     action: 'bootstrap-options' | 'bootstrap' | 'revoke',

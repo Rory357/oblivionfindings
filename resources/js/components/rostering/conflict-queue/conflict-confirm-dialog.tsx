@@ -65,7 +65,12 @@ export function ConflictConfirmDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={changeOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent
+                    style={{
+                        maxWidth: 'min(92vw, 480px)',
+                        width: 'min(92vw, 480px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>{labels[kind]}</DialogTitle>
                         <DialogDescription>

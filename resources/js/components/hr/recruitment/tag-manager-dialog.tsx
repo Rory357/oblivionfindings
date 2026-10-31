@@ -5,6 +5,7 @@ import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     Dialog,
     DialogContent,
@@ -27,6 +28,10 @@ export function TagManagerDialog({
     const [editing, setEditing] = useState<string | null>(null);
     const [draft, setDraft] = useState('');
     const [busy, setBusy] = useState(false);
+    const [tagToRemove, setTagToRemove] = useState<{
+        tag: string;
+        count: number;
+    } | null>(null);
 
     const onSuccess = (pg: { props: object }) => {
         const f = (pg.props as { flash?: { error?: string; success?: string } })
@@ -56,18 +61,21 @@ export function TagManagerDialog({
         );
     };
 
-    const remove = (tag: string) => {
-        if (
-            !window.confirm(
-                `Remove the tag “${tag}” from every candidate that carries it?`,
-            )
-        )
-            return;
-        setBusy(true);
+    // The trash button only opens the confirmation; the request is sent from it.
+    const remove = () => {
+        if (tagToRemove === null) return;
         router.post(
             '/hr/recruitment/tags/delete',
-            { tag },
-            { preserveScroll: true, onSuccess, onFinish: () => setBusy(false) },
+            { tag: tagToRemove.tag },
+            {
+                preserveScroll: true,
+                onSuccess,
+                onStart: () => setBusy(true),
+                onFinish: () => {
+                    setBusy(false);
+                    setTagToRemove(null);
+                },
+            },
         );
     };
 
@@ -152,9 +160,10 @@ export function TagManagerDialog({
                                                     type="button"
                                                     disabled={busy}
                                                     onClick={() =>
-                                                        remove(t.tag)
+                                                        setTagToRemove(t)
                                                     }
                                                     title="Delete tag"
+                                                    aria-label={`Delete tag ${t.tag}`}
                                                     className="grid h-8 w-8 place-items-center rounded-md border border-status-critical/30 text-status-critical hover:bg-status-critical-bg disabled:opacity-50"
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" />
@@ -167,6 +176,32 @@ export function TagManagerDialog({
                         ))}
                     </div>
                 )}
+
+                <ConfirmDialog
+                    open={tagToRemove !== null}
+                    onClose={() => {
+                        if (!busy) setTagToRemove(null);
+                    }}
+                    onConfirm={remove}
+                    title="Remove this tag?"
+                    description={
+                        <>
+                            <span className="font-medium text-foreground">
+                                “{tagToRemove?.tag}”
+                            </span>{' '}
+                            comes off the {tagToRemove?.count ?? 0}{' '}
+                            {tagToRemove?.count === 1
+                                ? 'candidate that carries'
+                                : 'candidates that carry'}{' '}
+                            it, however it&apos;s capitalised. Nothing else on
+                            their profiles changes. To use the tag again, add it
+                            back to each candidate.
+                        </>
+                    }
+                    confirmText="Remove tag"
+                    variant="destructive"
+                    processing={busy}
+                />
             </DialogContent>
         </Dialog>
     );

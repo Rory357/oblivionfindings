@@ -3,18 +3,24 @@
 namespace App\Services\Sites\Profile;
 
 use App\Models\EmergencyDrill;
-use App\Models\FirstAidRecord;
 use App\Models\HsRiskAssessment;
-use App\Models\PpeInventory;
-use App\Models\SafeWorkProcedure;
 use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
 use App\Models\User;
+use App\Services\HealthSafety\EmergencyDrillAccessService;
+use App\Services\HealthSafety\FirstAidSourceProjectionService;
+use App\Services\HealthSafety\HsEventAccessService;
+use App\Services\HealthSafety\PpeSiteReadService;
 use App\Services\Sites\SiteEmergencyPlanService;
 use App\Services\Sites\SiteTypePlanService;
+use App\Support\HealthSafety\EmergencyDrillPresenter;
+use App\Support\HealthSafety\EmergencyDrillReturn;
 use App\Support\HealthSafety\RiskAssessmentPresenter;
+use App\Support\HealthSafety\SafeWorkProcedurePresenter;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class SiteProfileSafetyPresenter
 {
@@ -47,20 +53,9 @@ class SiteProfileSafetyPresenter
                 'href' => route('sites.hazards.show', $hazard),
             ])->values();
 
-        $procedures = $user->canDo('procedures.view')
-            ? SafeWorkProcedure::query()
-                ->applicableToSite($site->id)
-                ->orderBy('title')
-                ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
-                ->map(fn (SafeWorkProcedure $procedure) => [
-                    'id' => $procedure->id,
-                    'reference_number' => $procedure->reference_number,
-                    'title' => $procedure->title,
-                    'category' => $procedure->category,
-                    'status' => $procedure->status,
-                    'review_date' => $procedure->review_date?->toDateString(),
-                ])->values()
-            : collect();
+        $procedures = SafeWorkProcedurePresenter::applicableRows(
+            $user, '/sites/'.$site->id.'?tab=hazards', (int) $site->id,
+        );
 
         return [
             'locked' => false,
@@ -75,28 +70,31 @@ class SiteProfileSafetyPresenter
     /** @return array<string, mixed> */
     public function riskAssessments(User $user, Site $site): array
     {
-        if (! $this->canView($user)) {
-            return $this->locked();
-        }
+        return RiskAssessmentPresenter::materialise($user, null, function ($current, $reads, $context) use ($site) {
+            if (! $this->canView($current)) {
+                return $this->locked();
+            }
 
-        $items = HsRiskAssessment::query()
-            ->forAssessable(Site::class, $site->id)
-            ->with(['assessable', 'hsEvent', 'assessedBy'])
-            ->withCount('attachments')
-            ->orderByDesc('created_at')
-            ->limit(100)
-            ->get()
-            ->map(fn (HsRiskAssessment $assessment) => RiskAssessmentPresenter::row($assessment))
-            ->values();
+            $query = HsRiskAssessment::forAssessable(Site::class, $site->id)
+                ->with(['assessable', 'hsEvent', 'assessedBy'])->withCount('attachments');
+            $original = RiskAssessmentPresenter::guardEagerQuery($query, $current, $context);
+            $items = (clone $original)
+                ->orderByDesc('created_at')
+                ->limit(100)
+                ->get()
+                ->map(fn (HsRiskAssessment $assessment) => RiskAssessmentPresenter::row($assessment, $current, $context, $original))
+                ->values()->all();
 
-        return [
-            'locked' => false,
-            'assessments' => $items,
-            'pickers' => RiskAssessmentPresenter::pickers(),
-            'can_manage' => $this->canManage($user, $site),
-            'site' => ['id' => $site->id, 'name' => $site->name],
-            'href' => route('health-safety.risk-assessments.index', ['site_id' => $site->id]),
-        ];
+            return [
+                'locked' => false,
+                'assessments' => $items,
+                'pickers' => RiskAssessmentPresenter::pickerRowsInContext($current, [(int) $site->id], $context),
+                'can_manage' => $this->canManage($current, $site),
+                'site' => ['id' => $site->id, 'name' => $site->name],
+                'href' => route('health-safety.risk-assessments.index', ['site_id' => $site->id]),
+            ];
+
+        });
     }
 
     /** @return array<string, mixed> */
@@ -153,36 +151,37 @@ class SiteProfileSafetyPresenter
     /** @return array<string, mixed> */
     public function drills(User $user, Site $site): array
     {
-        if (! $this->canView($user)) {
+        $access = app(EmergencyDrillAccessService::class);
+        try {
+            return $access->withCurrentViewer($user, function ($current, $reads, $sites) use ($access, $site) {
+                abort_unless($current->canDo('hazards.view'), 403);
+                abort_unless(in_array((int) $site->id, $sites, true), 404);
+                $records = $reads->query($access->scopeForSites(EmergencyDrill::query(), $sites))->where('site_id', $site->id)->orderByDesc('scheduled_at')->get();
+                $presenter = app(EmergencyDrillPresenter::class);
+                $origin = '/sites/'.$site->id.'?tab=drills';
+                $items = $records->map(function (EmergencyDrill $drill) use ($presenter, $current, $origin) {
+                    $row = $presenter->row($drill, $current, $origin);
+
+                    return ['id' => $row['id'], 'title' => $row['title'], 'type' => $row['drill_type'],
+                        'scheduled_at' => $row['scheduled_at'], 'completed_at' => $row['completed_at'],
+                        'drill_status' => $row['raw_status'], 'outcome' => $row['outcome'],
+                        'participants' => $row['total_participants'], 'assigned_count' => $row['participants_count'], 'attended_count' => $row['attended_count'],
+                        'evacuation_time_seconds' => $drill->evacuation_time_seconds, 'open_findings' => $row['findings_open'],
+                        'href' => $row['href'], 'can' => $row['can']];
+                })->values();
+
+                return ['locked' => false, 'items' => $items,
+                    'can_manage' => $current->canDo('hazards.manage'),
+                    'can_schedule' => $access->canCreate($current),
+                    'href' => EmergencyDrillReturn::fromRegister(['site_id' => $site->id])];
+            });
+        } catch (HttpException $error) {
+            if (! in_array($error->getStatusCode(), [403, 404], true)) {
+                throw $error;
+            }
+
             return $this->locked();
         }
-
-        $items = EmergencyDrill::query()
-            ->where('site_id', $site->id)
-            ->withCount(['findings as open_findings' => fn ($query) => $query->whereNotIn('status', ['resolved', 'accepted'])])
-            ->orderByDesc('scheduled_at')
-            ->limit(100)
-            ->get(['id', 'title', 'drill_type', 'scheduled_at', 'completed_at', 'status', 'outcome', 'total_participants', 'evacuation_time_seconds'])
-            ->map(fn (EmergencyDrill $drill) => [
-                'id' => $drill->id,
-                'title' => $drill->title,
-                'type' => $drill->drill_type,
-                'scheduled_at' => $drill->scheduled_at?->toISOString(),
-                'completed_at' => $drill->completed_at?->toISOString(),
-                'drill_status' => $drill->status,
-                'outcome' => $drill->outcome,
-                'participants' => (int) $drill->total_participants,
-                'evacuation_time_seconds' => $drill->evacuation_time_seconds,
-                'open_findings' => (int) $drill->open_findings,
-                'href' => route('health-safety.drills.show', $drill),
-            ])->values();
-
-        return [
-            'locked' => false,
-            'items' => $items,
-            'can_manage' => $this->canManage($user, $site),
-            'href' => route('health-safety.drills.index', ['site_id' => $site->id]),
-        ];
     }
 
     /** @return array<string, mixed> */
@@ -192,27 +191,7 @@ class SiteProfileSafetyPresenter
             return $this->locked();
         }
 
-        $items = FirstAidRecord::query()
-            ->where('site_id', $site->id)
-            ->with(['firstAider:id,name'])
-            ->withCount(['followups as open_followups_count' => fn ($query) => $query->whereNull('completed_at')])
-            ->orderByDesc('treatment_date')
-            ->limit(100)
-            ->get(['id', 'reference_number', 'treatment_date', 'treated_person_name', 'injury_illness_type', 'treatment_outcome', 'ambulance_called'])
-            ->map(fn (FirstAidRecord $record) => [
-                'id' => $record->id,
-                'reference' => $record->reference_number,
-                'treatment_date' => $record->treatment_date?->toISOString(),
-                'person' => $record->treated_person_name,
-                'injury' => $record->injury_illness_type,
-                'outcome' => $record->treatment_outcome,
-                'ambulance_called' => (bool) $record->ambulance_called,
-                'first_aider' => $record->firstAider?->name,
-                'incident_reported' => (bool) $record->incident_reported,
-                'related_incident_id' => $record->related_incident_id,
-                'open_followups_count' => (int) $record->open_followups_count,
-                'href' => route('health-safety.first-aid.show', $record),
-            ])->values();
+        $items = app(FirstAidSourceProjectionService::class)->forSite($user, $site);
 
         return [
             'locked' => false,
@@ -225,36 +204,15 @@ class SiteProfileSafetyPresenter
     /** @return array<string, mixed> */
     public function ppe(User $user, Site $site): array
     {
-        if (! $this->canView($user)) {
+        try {
+            return app(PpeSiteReadService::class)->profileForSite($user, (int) $site->id);
+        } catch (HttpException $denial) {
+            if (! in_array($denial->getStatusCode(), [403, 404], true)) {
+                throw $denial;
+            }
+
             return $this->locked();
         }
-
-        $items = PpeInventory::query()
-            ->where('site_id', $site->id)
-            ->whereNotIn('status', ['disposed', 'lost'])
-            ->with('ppeType:id,name')
-            ->orderBy('expiry_date')
-            ->limit(100)
-            ->get(['id', 'ppe_type_id', 'brand', 'model', 'condition', 'quantity', 'status', 'location', 'expiry_date', 'next_inspection_due'])
-            ->map(fn (PpeInventory $item) => [
-                'id' => $item->id,
-                'name' => $item->ppeType?->name ?? trim((string) $item->brand.' '.(string) $item->model),
-                'condition' => $item->condition,
-                'quantity' => (int) $item->quantity,
-                'status' => $item->status,
-                'location' => $item->location,
-                'expiry_date' => $item->expiry_date?->toDateString(),
-                'next_inspection_due' => $item->next_inspection_due?->toDateString(),
-                'expired' => $item->isExpired(),
-                'inspection_due' => $item->isInspectionDue(),
-            ])->values();
-
-        return [
-            'locked' => false,
-            'items' => $items,
-            'can_manage' => $this->canManage($user, $site),
-            'href' => route('health-safety.ppe.index', ['site_id' => $site->id]),
-        ];
     }
 
     /** @return array<string, mixed> */
