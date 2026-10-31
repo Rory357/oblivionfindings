@@ -187,6 +187,10 @@ final class IncidentJourneyReconciler
         $event->forceFill([
             'source_type' => ClientIncident::class,
             'source_id' => $incident->id,
+            // K8: a review re-pointed at an incident goes through the incident handover, never "not required".
+            'handover_status' => $event->status === HsEvent::STATUS_CLOSED
+                ? $event->handover_status
+                : \App\Services\HealthSafety\HsEventService::initialHandoverStatus($incident, $event->handover_status),
             'idempotency_key' => HsEvent::buildIdempotencyKey(
                 ClientIncident::class,
                 $incident->id,
@@ -301,6 +305,18 @@ final class IncidentJourneyReconciler
         IncidentJourneyReconciliationResult $result,
         bool $apply,
     ): void {
+        // K8: an open review of this incident left on "not required" can never close (the close check asks for an
+        // acceptance). Put it back to awaiting acceptance; nobody is recorded as having accepted it.
+        if ($event !== null && $event->handover_status === HsEvent::HANDOVER_NOT_REQUIRED && $event->status !== HsEvent::STATUS_CLOSED) {
+            $result->issue($incident->id, 'handover_not_required', 'Open H&S review of an incident is marked "handover not required".');
+            if ($apply) {
+                $event->forceFill(['handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE])->saveQuietly();
+                $result->repaired('handover_not_required');
+            }
+
+            return;
+        }
+
         if ($event === null
             || $event->handover_status === HsEvent::HANDOVER_ACCEPTED
             || $event->handover_status === HsEvent::HANDOVER_NOT_REQUIRED

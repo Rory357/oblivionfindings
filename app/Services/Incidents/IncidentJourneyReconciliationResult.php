@@ -13,6 +13,7 @@ final class IncidentJourneyReconciliationResult
         'missing_site',
         'dismissed_active',
         'acceptance_backfill',
+        'handover_not_required',
         'ambiguous',
     ];
 
