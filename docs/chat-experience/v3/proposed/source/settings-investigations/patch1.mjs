@@ -1,0 +1,30 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+let s = readFileSync('b-settings.mjs', 'utf8');
+const rep = (a, b) => { if (!s.includes(a)) throw new Error('missing: ' + a.slice(0, 80)); s = s.split(a).join(b); };
+rep("        chip: 'Organisation',\n", '');
+rep("Email for mentions, urgent messages and family work.'", "Email for mentions, urgent messages and family work and replies.'");
+// section subtitles, shorter
+rep("'Full page at 1440 · Settings › Chat opens on one review card per area, each with its way in · Service health sits on the overview (C1.11)'", "'Full page at 1440 · opens on one review card per area, each with its way in · Service health on the overview (C1.11)'");
+rep("'Full page · “Chat” shows the real state (on at 1 of 2 Sites), Sites switch on one at a time, server-side parts can’t be switched on yet and say why · one unsaved change'", "'Full page · “Chat” shows its real state · Sites switch on one at a time · server parts say why they can’t go on yet'");
+rep("sec('Messages and files · a Site’s own settings', 'Full page with the header scope set to Kōwhai House · inherited rows say “Follows the organisation”, own settings say “Kōwhai House only” with a way back, the unsaved change is marked · file sharing can’t be switched on yet',", "sec('A Site’s own settings', 'Full page, scope set to Kōwhai House · inherited vs “Kōwhai House only” · no virus scanner, so files can’t go on yet',");
+rep("'Staff calls drawn at the page column’s real width (924 px) · a call relay that isn’t set up can’t be switched on · family video is off per Site (D5)'", "'Staff calls at the page column’s width (924 px) · family video off per Site (D5)'");
+rep("'Full page · real time and date pickers for service hours and closed dates · urgent help number · switching off the privacy check is marked “Loosens a safety check” before review'", "'Full page · real time and date pickers · urgent help · switching off the privacy check is marked before review'");
+rep("'Full page · every Chat notice has In-app, Email and Push switch columns showing On/Off · push isn’t set up, so its column is off with the reason · one changed choice'", "'Full page · In-app, Email and Push switch columns · push isn’t set up yet, and says why'");
+rep("'The separate delivery tab, with real controls (never badge-only cards) · drawn at the page column’s width'", "'The separate delivery tab, with real controls'");
+rep("'Retention can’t be switched on until a period is approved · second-person approval for investigators is a setting that starts off (D11)'", "'Nothing deletes itself · second-person approval for investigators starts off (D11)'");
+rep("sec('Saving · review, loosening, failure, someone else first', 'Every save goes through Review changes (720) showing before → after and who it affects · a change that loosens a safety check is flagged and saved with the destructive button · nothing is lost when a save fails or clashes',", "sec('Saving', 'Review changes (720): before → after and who it affects · loosening a safety check saves in red · nothing is lost',");
+rep("'Full page · a personal page in Settings › General with breadcrumbs · reading, alerts and calls only: light and dark mode stay in Appearance (C7.8) · quiet hours on a schedule · microphone check lives here (D13)'", "'Full page · a personal page in Settings › General · no theme switch: that stays in Appearance (C7.8)'");
+rep("sec('Messages · reactions and links', 'The other Messages sub-tab at the page column’s width · the quick six reactions (C3.6), Oblivion and organisation stickers (D6), outside link previews on by default (D7)',", "sec('Messages · reactions and links', 'The other Messages sub-tab · quick six (C3.6), stickers (D6), link previews on (D7)',");
+// family video rows
+rep("row({ label: 'Kōwhai House', hint: follows('Off'), ctrl: sw(false) }),", "row({ label: 'Video at Kōwhai House', hint: follows('Off'), ctrl: sw(false) }),");
+rep("row({ label: 'Tōtara service', hint: follows('Off'), ctrl: sw(false) }),", "row({ label: 'Video at Tōtara service', hint: follows('Off'), ctrl: sw(false) }),");
+// crops: auto height
+for (const h of ['{ h: 470 }', '{ h: 610 }', '{ h: 820 }', '{ h: 520 }']) rep(h, '{}');
+// side notes for crops
+const aside = (items) => `\`<div class="ch-col">\${cap('What to check')}<ul class="oc-sig-list">${items.map((t) => `<li>${t}</li>`).join('')}</ul></div>\``;
+rep("`<div class=\"st-cols\" style=\"grid-template-columns: 924px 1fr\">${reactCrop}<div></div></div>`", "`<div class=\"st-cols\" style=\"grid-template-columns: 924px 1fr\">${reactCrop}${" + aside(['The quick six are emoji in the content font, never icons.', 'Organisation stickers and GIFs come from a library you upload; there is no outside GIF service (D6).', 'Link previews are on by default (D7); the hint says the server fetches them, not the reader’s browser.']) + "}</div>`");
+rep("`<div class=\"st-cols\" style=\"grid-template-columns: 924px 1fr\">${deliveryCrop}<div></div></div>`", "`<div class=\"st-cols\" style=\"grid-template-columns: 924px 1fr\">${deliveryCrop}${" + aside(['Every channel has real switches; status words sit in the group caption.', 'Push can’t be switched on until the server has the push sender (C2.3).', 'Urgent messages ignore off-shift holding and are always on.', '“Check saved choices” is Fleet’s dry run: nothing is sent.']) + "}</div>`");
+rep("`<div class=\"st-cols\" style=\"grid-template-columns: 924px 1fr\">${privacyCrop}<div></div></div>`", "`<div class=\"st-cols\" style=\"grid-template-columns: 924px 1fr\">${privacyCrop}${" + aside(['Automatic deletion stays off until a retention period is approved; nothing invents one.', 'Who can investigate is given in Roles, never here. This page only links there.', 'Turning second-person approval off again would loosen a safety check and save in red.', 'Managing settings never opens anyone’s conversations.']) + "}</div>`");
+s = s.replace("import {\n    svg,", "import {\n    cap, svg,");
+writeFileSync('b-settings.mjs', s);
+console.log('ok');
