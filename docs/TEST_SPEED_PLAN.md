@@ -78,9 +78,10 @@ its database ~21 times.
   `composer test:prepare` would have wiped the developer's own database.
 - `tests/Unit/Database/SchemaSnapshotFreshnessTest.php` fails once the dump
   falls more than 50 migrations behind.
-- `Tests\TestCase` finds the `mysql` client on PATH (Linux CI used to fall back
-  to the PHP loader), and the PHP loader now handles `DELIMITER` blocks, so
-  triggers load either way. Both loaders produce identical databases.
+- `Tests\TestCase` finds the `mysql` client on PATH: Linux CI used to fall back
+  to the PHP loader, which by design (`PortableSchemaTriggerSafetyTest`) cannot
+  load the triggers the dump now holds. Without the client, the slot is built
+  by migrating from scratch instead.
 
 ### 2. Permission seeders replayed (`tests/Support/SeedReplay.php`)
 
@@ -121,27 +122,31 @@ keeps them in one process (more than 15 files run in parallel).
 
 ## Results
 
-Measured on Rory's machine, MySQL at its default settings:
+Measured on Rory's machine:
 
 | | Before | After |
 |---|---|---|
 | One small file | 348s | **5s** (67s the first time, building the slot) |
 | A seeding test | 1.35s | 0.45s |
 | `tests/Feature/Finance` (98 files), one process | 320s, 179 of 473 failing | 330s, 473 of 473 passing |
-| `tests/Feature/Finance`, `composer test:fast` (3 workers) | — | 199s, 473 passing |
+| `tests/Feature/Finance`, `composer test:fast` (3 workers, default MySQL) | — | 199s, 473 passing |
+| **Whole suite**, `composer test:fast` (8 workers, MySQL settings below) | could not finish in one process (out of memory after ~2,000 tests) | **76 min**: 25,032 passed, 107 failed, 218 skipped |
 
-The whole suite has not been timed end to end yet. With 3 workers (all that
-MySQL's default table cache allows), 8,590 tests ran in about 100 minutes
-before the run was stopped; each of their 38 failures fails the same way with
-both changes switched off (`TEST_DB_KEEP=false TEST_SEED_REPLAY=false`):
-`ChatBrowserPushTransportTest` (OpenSSL key creation on Windows),
-`DismissedAlertScopeTest`, `DocumentRequestResponsesTest`, the governance
-meeting calendar tests, `ShiftReportingServiceTest` and
-`ShiftStaffEligibilityServiceTest`. What remains slow is the tests themselves:
-the HealthSafety chemical-exposure tests take 30–150s each with or without
-these changes, and the committing integrity tests checksum every table through
-`CommittedFixtureCleanup`. Raising MySQL's table cache (below) should let 8
-workers run.
+Every one of the 107 failures was run again with both changes switched off
+(`TEST_DB_KEEP=false TEST_SEED_REPLAY=false`, today's behaviour). Seventeen
+came from these changes, all from tests that recognised only a
+`<base>_<pid>` database name or read the PDO loader's source, and are fixed.
+The rest fail the same way without them, for example
+`ChatBrowserPushTransportTest` (OpenSSL key creation on Windows), the
+governance meeting calendar, `RestrictedIndependentAuthoritySeedingTest`
+(the demo admin holds `referrals.settings.governance`) and the restraint
+alert-bridge concurrency tests (lock waits). Without these changes the same 52
+files fail 290 tests in a parallel run, against 101 with them, because leaked
+rows are no longer inherited.
+
+What remains slow is the tests themselves: the HealthSafety chemical-exposure
+tests take 30–150s each with or without these changes, and the committing
+integrity tests checksum every table through `CommittedFixtureCleanup`.
 
 ## MySQL settings for parallel runs
 

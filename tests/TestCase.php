@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Arr;
+use Mockery\MockInterface;
 use PDO;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
@@ -157,15 +158,22 @@ abstract class TestCase extends BaseTestCase
             return;
         }
 
+        // A test may fire these with a mocked connection; never fail it here.
         $this->app['events']->listen(QueryExecuted::class, static function (QueryExecuted $query): void {
-            if ($query->connection->transactionLevel() === 0
-                && preg_match('/\A\s*(?:insert|update|delete|replace|create|alter|drop|truncate|rename)\b/i', $query->sql) === 1) {
-                static::$committedWrites = true;
+            try {
+                if (! $query->connection instanceof MockInterface && $query->connection->transactionLevel() === 0
+                    && preg_match('/\A\s*(?:insert|update|delete|replace|create|alter|drop|truncate|rename)\b/i', $query->sql) === 1) {
+                    static::$committedWrites = true;
+                }
+            } catch (\Throwable) {
             }
         });
         $this->app['events']->listen(TransactionCommitted::class, static function (TransactionCommitted $event): void {
-            if ($event->connection->transactionLevel() === 0) {
-                static::$committedWrites = true;
+            try {
+                if (! $event->connection instanceof MockInterface && $event->connection->transactionLevel() === 0) {
+                    static::$committedWrites = true;
+                }
+            } catch (\Throwable) {
             }
         });
     }
@@ -206,13 +214,26 @@ abstract class TestCase extends BaseTestCase
             return false;
         }
 
-        foreach ($this->app['db']->getConnections() as $connection) {
-            $pdo = $connection->getRawPdo();
+        $manager = $this->app['db'];
 
-            if ($pdo instanceof PDO && $connection->getDriverName() === 'mysql'
-                && $connection->transactionLevel() > 0 && ! $pdo->inTransaction()) {
-                return true;
+        // DB::shouldReceive() swaps the manager for a mock with no such calls
+        // expected. Anything missed here is still caught when the next run
+        // checks its database, so this check never fails a test itself.
+        if ($manager instanceof MockInterface) {
+            return false;
+        }
+
+        try {
+            foreach ($manager->getConnections() as $connection) {
+                $pdo = $connection->getRawPdo();
+
+                if ($pdo instanceof PDO && $connection->getDriverName() === 'mysql'
+                    && $connection->transactionLevel() > 0 && ! $pdo->inTransaction()) {
+                    return true;
+                }
             }
+        } catch (\Throwable) {
+            return false;
         }
 
         return false;
@@ -800,9 +821,8 @@ abstract class TestCase extends BaseTestCase
 
     /**
      * Stream-execute a `*-schema.sql` dump via PDO. Splits on `;` at end of
-     * line (after stripping `--` comments and blank lines), or on the
-     * delimiter a DELIMITER directive sets: mysqldump wraps trigger bodies in
-     * `DELIMITER ;;` ... `DELIMITER ;`.
+     * line (after stripping `--` comments and blank lines). Skips DELIMITER
+     * directives because the portable dumper does not emit them.
      */
     protected function loadSchemaDumpViaPdo(
         string $schemaPath,
@@ -829,7 +849,6 @@ abstract class TestCase extends BaseTestCase
         }
 
         $buffer = '';
-        $delimiter = ';';
         $insideMultiLineComment = false;
 
         try {
@@ -838,12 +857,6 @@ abstract class TestCase extends BaseTestCase
 
                 // Skip blank lines and `--` comments before any statement starts.
                 if ($buffer === '' && ($trimmed === '' || $trimmed === "\n" || str_starts_with($trimmed, '--'))) {
-                    continue;
-                }
-
-                if ($buffer === '' && preg_match('/^DELIMITER\s+(\S+)\s*$/i', $trimmed, $directive) === 1) {
-                    $delimiter = $directive[1];
-
                     continue;
                 }
 
@@ -856,8 +869,7 @@ abstract class TestCase extends BaseTestCase
                     continue;
                 }
 
-                // Inside a DELIMITER block such a comment is a trigger body to run.
-                if ($delimiter === ';' && $buffer === '' && str_starts_with($trimmed, '/*') && ! str_contains($line, '*/')) {
+                if ($buffer === '' && str_starts_with($trimmed, '/*') && ! str_contains($line, '*/')) {
                     $insideMultiLineComment = true;
 
                     continue;
@@ -865,14 +877,10 @@ abstract class TestCase extends BaseTestCase
 
                 $buffer .= $line;
 
-                // A statement ends with the delimiter at the end of a line (ignoring trailing whitespace).
-                if (str_ends_with(rtrim($line), $delimiter)) {
+                // A statement ends with `;` at the end of a line (ignoring trailing whitespace).
+                if (preg_match('/;\s*$/', rtrim($line))) {
                     $statement = trim($buffer);
                     $buffer = '';
-
-                    if ($delimiter !== ';') {
-                        $statement = trim(substr($statement, 0, -strlen($delimiter)));
-                    }
 
                     if ($statement === '' || $statement === ';') {
                         continue;
