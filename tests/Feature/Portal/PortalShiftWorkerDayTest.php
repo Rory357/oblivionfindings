@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Client;
+use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\RespiteBooking;
 use App\Models\Role;
@@ -198,6 +199,34 @@ it('places a family visit at its NZ wall-clock time on the portal calendar', fun
     expect($event)->not->toBeNull()
         ->and(Carbon::parse($event['start'])->utc()->toIso8601String())->toBe('2026-10-07T21:00:00+00:00')
         ->and(Carbon::parse($event['end'])->utc()->toIso8601String())->toBe('2026-10-07T22:30:00+00:00');
+});
+
+it('reads upcoming visits and overdue family notes on the NZ date', function () {
+    $fixture = portalWorkerDayFixture();
+    $clientId = $fixture['client']->id;
+
+    // 7:30 am NZ on 6 Oct: the UTC date is still 5 Oct.
+    foreach (['2026-10-05', '2026-10-06'] as $date) {
+        FamilyVisitRequest::query()->create([
+            'user_id' => $fixture['user']->id,
+            'client_id' => $clientId,
+            'requested_date' => $date,
+            'visit_type' => 'in_person',
+            'status' => 'approved',
+        ]);
+        FamilyNote::query()->create([
+            'client_id' => $clientId,
+            'created_by' => $fixture['user']->id,
+            'title' => 'Note due '.$date,
+            'status' => 'open',
+            'due_date' => $date,
+        ]);
+    }
+
+    expect(FamilyVisitRequest::query()->where('client_id', $clientId)->upcoming()
+        ->pluck('requested_date')->map->toDateString()->all())->toBe(['2026-10-06'])
+        ->and(FamilyNote::query()->where('client_id', $clientId)->overdue()
+            ->pluck('due_date')->map->toDateString()->all())->toBe(['2026-10-05']);
 });
 
 it('refuses a visit request for a date that has already passed in NZ', function () {
