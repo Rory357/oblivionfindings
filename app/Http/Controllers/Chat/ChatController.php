@@ -14,6 +14,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Chat\ChatAccess;
 use App\Services\Chat\ChatAudience;
+use App\Services\Chat\ChatDocument;
 use App\Services\Chat\ChatFamilyContacts;
 use App\Services\Chat\ChatFamilyResponse;
 use App\Services\Chat\ChatFileSafety;
@@ -289,14 +290,16 @@ final class ChatController extends Controller
         }
         $settings = $this->settings->forConversation($conversation);
         abort_unless($settings['enabled'] && ($conversation->conversation_type !== 'family' || $settings['family_enabled']), 403);
+        // A formatted message is the source of its text: content and mentions are written from it.
+        $document = app(ChatDocument::class)->requested($request);
         $data = $request->validate([
             'audience_token' => ['nullable', 'string', 'size:64'],
             'recoverable_send' => ['sometimes', 'boolean'],
             'draft_version' => ['nullable', 'required_with:draft_boundary', 'integer', 'min:0', 'max:9007199254740000'],
             'draft_boundary' => ['nullable', 'required_with:draft_version', 'string', 'regex:/^[a-f0-9]{64}$/D'],
-            'mutation_id' => ['required', 'uuid'], 'content' => ['nullable', 'string', 'max:10000'],
+            'mutation_id' => ['required', 'uuid'], 'content' => [Rule::excludeIf($document !== null), 'nullable', 'string', 'max:10000'],
             'reply_to_id' => ['nullable', 'integer'],
-            'mentions' => ['sometimes', 'array', 'max:30'],
+            'mentions' => [Rule::excludeIf($document !== null), 'sometimes', 'array', 'max:30'],
             'mentions.*' => ['array:user_id,start,length'],
             'mentions.*.user_id' => ['required', 'integer', 'min:1'],
             'mentions.*.start' => ['required', 'integer', 'between:0,10000'],
@@ -308,6 +311,10 @@ final class ChatController extends Controller
             'captions' => ['sometimes', 'array', 'max:'.$settings['max_files']],
             'captions.*' => ['nullable', 'string', 'max:1000'],
         ]);
+        if ($document !== null) {
+            $data['content'] = app(ChatDocument::class)->plainText($document);
+            $data['mentions'] = app(ChatDocument::class)->mentions($document);
+        }
         $files = $request->file('files', []);
         if (isset($data['draft_version'])) {
             abort_unless($request->header('X-Chat-Actor') === (string) $request->user()->id, 403);
@@ -337,7 +344,7 @@ final class ChatController extends Controller
         }
         $paths = [];
         try {
-            $message = DB::transaction(function () use ($request, $conversation, $data, $files, $scans, $uploadIds, $attachmentCount, &$paths) {
+            $message = DB::transaction(function () use ($request, $conversation, $data, $document, $files, $scans, $uploadIds, $attachmentCount, &$paths) {
                 $locked = OpsConversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
                 $this->access->authorize($request->user(), $locked, true);
                 $existing = OpsMessage::withTrashed()->where('sender_id', $request->user()->id)->where('mutation_id', $data['mutation_id'])->first();
@@ -360,6 +367,7 @@ final class ChatController extends Controller
                     'content' => trim($data['content'] ?? ''), 'message_type' => $attachmentCount ? 'attachment' : 'text',
                     'client_id' => $locked->conversation_type === 'family' ? $locked->client_id : null,
                     'mutation_id' => $data['mutation_id'], 'reply_to_id' => $data['reply_to_id'] ?? null,
+                    'body_document' => $document,
                 ]);
                 foreach ($mentions as $mention) {
                     DB::table('chat_message_mentions')->insert($mention + ['message_id' => $message->id, 'created_at' => now()]);
@@ -489,10 +497,10 @@ final class ChatController extends Controller
     public function action(Request $request, OpsMessage $message)
     {
         $data = $request->validate(['action' => ['required', Rule::in(['pin', 'delete', 'react', 'save'])], 'active' => ['required_unless:action,delete', 'boolean'], 'emoji' => ['required_if:action,react', 'nullable', function (string $attribute, mixed $value, \Closure $fail): void {
-                if ($value !== null && ! ChatReactionEmoji::valid($value)) {
-                    $fail('Choose one emoji to react with.');
-                }
-            }],
+            if ($value !== null && ! ChatReactionEmoji::valid($value)) {
+                $fail('Choose one emoji to react with.');
+            }
+        }],
             'mutation_id' => ['required_if:action,delete', 'uuid'], 'version' => ['required_if:action,delete', 'integer', 'min:0']]);
 
         if ($data['action'] === 'delete') {

@@ -55,7 +55,14 @@ final class ChatMessageEditing
             $message->setRelation('conversation', $conversation);
             $this->access->message($actor, $message, true);
             abort_unless((int) $message->sender_id === (int) $actor->id, 403);
-            $hash = hash('sha256', json_encode([$message->id, (int) $data['version'], $data['content'] ?? '', $data['mentions'] ?? []], JSON_THROW_ON_ERROR));
+            // A formatted edit writes its plain text and mentions from the document. A plain edit
+            // has no document, so it clears the earlier one rather than leave it out of step.
+            $document = isset($data['document']) ? app(ChatDocument::class)->normalise($data['document']) : null;
+            if ($document !== null) {
+                $data['content'] = app(ChatDocument::class)->plainText($document);
+                $data['mentions'] = app(ChatDocument::class)->mentions($document);
+            }
+            $hash = hash('sha256', json_encode([$message->id, (int) $data['version'], $data['content'] ?? '', $data['mentions'] ?? [], ...($document !== null ? [$document] : [])], JSON_THROW_ON_ERROR));
             $receipt = DB::table('chat_message_revisions')->where('actor_id', $actor->id)->where('mutation_id', $data['mutation_id'])->first();
             if ($receipt) {
                 abort_unless((int) $receipt->message_id === (int) $message->id && hash_equals($receipt->request_hash, $hash), 409, 'This edit reference was already used for different content.');
@@ -73,14 +80,14 @@ final class ChatMessageEditing
             DB::table('chat_message_revisions')->insert([
                 'message_id' => $message->id, 'actor_id' => $actor->id, 'mutation_id' => $data['mutation_id'],
                 'request_hash' => $hash, 'version' => (int) $message->chat_edit_version + 1,
-                'previous_state' => Crypt::encryptString(json_encode(['content' => $message->content, 'mentions' => $previousMentions], JSON_THROW_ON_ERROR)),
+                'previous_state' => Crypt::encryptString(json_encode(['content' => $message->content, 'mentions' => $previousMentions, 'document' => $message->body_document], JSON_THROW_ON_ERROR)),
                 'created_at' => now(),
             ]);
             DB::table('chat_message_mentions')->where('message_id', $message->id)->delete();
             foreach ($mentions as $mention) {
                 DB::table('chat_message_mentions')->insert($mention + ['message_id' => $message->id, 'created_at' => now()]);
             }
-            $message->forceFill(['content' => $content, 'edited_at' => now(), 'chat_edit_version' => (int) $message->chat_edit_version + 1])->save();
+            $message->forceFill(['content' => $content, 'body_document' => $document, 'edited_at' => now(), 'chat_edit_version' => (int) $message->chat_edit_version + 1])->save();
             app(ChatMessageChanges::class)->record($message);
             AuditLog::create(['user_id' => $actor->id, 'client_id' => $conversation->client_id, 'action' => 'chat.message.edited',
                 'meta' => ['conversation_id' => $conversation->id, 'message_id' => $message->id, 'version' => $message->chat_edit_version]]);
@@ -114,7 +121,7 @@ final class ChatMessageEditing
             DB::table('chat_message_revisions')->insert([
                 'message_id' => $message->id, 'actor_id' => $actor->id, 'mutation_id' => $data['mutation_id'],
                 'request_hash' => $hash, 'version' => (int) $message->chat_edit_version + 1,
-                'previous_state' => Crypt::encryptString(json_encode(['content' => $message->content, 'mentions' => $mentions], JSON_THROW_ON_ERROR)),
+                'previous_state' => Crypt::encryptString(json_encode(['content' => $message->content, 'mentions' => $mentions, 'document' => $message->body_document], JSON_THROW_ON_ERROR)),
                 'created_at' => now(),
             ]);
             $message->forceFill(['chat_edit_version' => (int) $message->chat_edit_version + 1])->save();

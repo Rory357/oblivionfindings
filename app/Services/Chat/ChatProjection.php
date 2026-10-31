@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\DB;
 
 final class ChatProjection
 {
+    /** Message kinds (C2.6). */
+    public const KINDS = ['text', 'card', 'poll', 'sticker', 'call', 'system'];
+
     public function __construct(private readonly ChatAccess $access, private readonly ClientFamilyCommunicationAccess $family) {}
 
     /**
@@ -125,6 +128,9 @@ final class ChatProjection
             'sender_name' => $message->sender?->name ?? 'Former participant',
             'mine' => (int) $message->sender_id === (int) $viewer->id,
             'content' => $deleted ? '' : $message->content,
+            'kind' => $this->kind($message),
+            // The formatted text, rendered by the browser as elements and never as HTML; null for plain text.
+            'document' => $deleted ? null : $message->body_document,
             'deleted' => $deleted,
             'pinned' => ! $deleted && $message->is_pinned,
             'pinned_by_name' => ! $deleted && $message->is_pinned && $message->pinned_by ? ($message->pinned_by === $viewer->id ? 'You' : ($message->pinnedBy?->name ?? 'Former participant')) : null,
@@ -151,6 +157,12 @@ final class ChatProjection
                 'people' => $rows->map(fn ($row) => $row->user_id === $viewer->id ? 'You' : ($row->user?->name ?? 'Former participant'))->take(20)->values(),
             ])->values(),
         ];
+    }
+
+    /** Files belong to a text message, so the old 'attachment' type (and any older one) reads as 'text'. */
+    private function kind(OpsMessage $message): string
+    {
+        return in_array($message->message_type, self::KINDS, true) ? $message->message_type : 'text';
     }
 
     private function legacyAttachment(OpsMessage $message, array $file, User $viewer): array
