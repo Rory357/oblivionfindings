@@ -107,6 +107,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:incidents.portal.manage')
         ->name('incidents.attachments.update');
 
+    // Answer 20 (G3): a dated note beside a submitted report's words (never an edit).
+    Route::post('/incidents/{incident}/notes', [\App\Http\Controllers\IncidentNoteController::class, 'store'])
+        ->whereNumber('incident')
+        ->middleware('permission:incidents.approve')
+        ->name('incidents.notes.store');
+
     // Workflow actions
     Route::post('/incidents/{incident}/submit', [IncidentController::class, 'submit'])
         ->whereNumber('incident')
