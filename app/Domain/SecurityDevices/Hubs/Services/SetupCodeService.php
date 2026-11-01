@@ -125,6 +125,11 @@ final readonly class SetupCodeService
         if (! in_array($mode, ['staff', 'full'], true)) {
             throw new DomainException('Choose who the install is for.');
         }
+        if ($mode === 'staff') {
+            // The installer can put Obli in place without admin rights, but the agent and the tray
+            // don't run per person yet, so Obli would have no computer support. Not offered until they do.
+            throw new DomainException('Installs for staff without admin rights aren’t ready yet: Obli wouldn’t be able to reach IT. Use IT’s full install for now.');
+        }
         HubInstallationSettings::assertLabel($site->name);
         $expiresAt = CarbonImmutable::now('UTC')->addHours(self::LIFETIME_HOURS)->subSecond();
         $plain = $this->newCode();

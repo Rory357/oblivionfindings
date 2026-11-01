@@ -239,3 +239,15 @@ it('serves the Pi one-liner for a Linux hub code, and a plain refusal for anythi
     // A Linux code has no Windows download link.
     $this->get("/h/{$code}")->assertNotFound();
 });
+
+it('makes IT’s full computer install but not a staff install that Obli couldn’t support yet', function () {
+    $this->actingAs($this->admin)->postJson(route('security-devices.computers.setup-codes.issue'), [
+        'site_id' => $this->site->id,
+        'install_mode' => 'staff',
+    ])->assertUnprocessable()->assertJsonValidationErrors(['site_id']);
+
+    $this->actingAs($this->admin)->postJson(route('security-devices.computers.setup-codes.issue'), [
+        'site_id' => $this->site->id,
+        'install_mode' => 'full',
+    ])->assertCreated()->assertJsonPath('install_mode', 'full');
+});
