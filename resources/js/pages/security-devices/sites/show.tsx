@@ -140,7 +140,7 @@ export default function SiteShow(props: SitePageProps) {
     );
 
     let body: ReactNode = null;
-    if (tab === 'overview' && props.overview) body = <OverviewTab overview={props.overview} siteName={site.name} now={now} onDevices={() => go('devices')} />;
+    if (tab === 'overview' && props.overview) body = <OverviewTab overview={props.overview} siteName={site.name} now={now} onDevices={() => router.visit(`/security-devices/devices?site=${site.id}`)} />;
     if (tab === 'network' && props.network) body = <NetworkTab tree={props.network.tree as SiteTopologyTree | undefined} siteName={site.name} />;
     if (tab === 'internet' && props.internet) body = <InternetTab internet={props.internet} now={now} />;
 
@@ -207,7 +207,7 @@ function OverviewTab({ overview, siteName, now, onDevices }: { overview: NonNull
             ) : null}
             <SideBySide cols="minmax(0, 1fr) 360px">
                 <div className="flex flex-col gap-5">
-                    <Surface title={`Devices at ${siteName}`} sub={total === 0 ? undefined : 'Open one from the Devices tab'} action={total === 0 ? null : { label: 'All devices', onClick: onDevices }}>
+                    <Surface title={`Devices at ${siteName}`} sub={total === 0 ? undefined : "Open one from the Devices list"} action={total === 0 ? null : { label: 'All devices', onClick: onDevices }}>
                         {total === 0 ? (
                             <p className="text-subtle">No devices here yet.</p>
                         ) : (
