@@ -24,7 +24,9 @@ return new class extends Migration
             $table->timestamp('last_synced_at')->nullable();
             $table->timestamp('events_until')->nullable();
             $table->timestamp('exit_buttons_confirmed_at')->nullable();
-            $table->foreignId('exit_buttons_confirmed_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            // Named: the automatic name is over MySQL's 64-character limit.
+            $table->foreignId('exit_buttons_confirmed_by_user_id')->nullable();
+            $table->foreign('exit_buttons_confirmed_by_user_id', 'sd_access_consoles_exit_by_fk')->references('id')->on('users')->nullOnDelete();
             $table->foreignId('connected_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });

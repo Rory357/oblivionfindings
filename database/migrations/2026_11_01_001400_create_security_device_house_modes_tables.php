@@ -60,7 +60,9 @@ return new class extends Migration
             $table->foreignId('device_id')->constrained('devices')->cascadeOnDelete();
             $table->timestamp('until');
             $table->string('source', 24)->default('house_mode');
-            $table->foreignId('house_mode_event_id')->nullable()->constrained('security_device_house_mode_events')->nullOnDelete();
+            // Named: the automatic name (…_house_mode_event_id_foreign) is over MySQL's 64-character limit.
+            $table->foreignId('house_mode_event_id')->nullable();
+            $table->foreign('house_mode_event_id', 'sd_camera_privacy_mode_event_fk')->references('id')->on('security_device_house_mode_events')->nullOnDelete();
             $table->timestamps();
 
             $table->index(['device_id', 'until'], 'sd_camera_privacy_overrides_device_idx');

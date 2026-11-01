@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use Tests\Feature\SecurityDevices\Concerns\ReadsRetiredWorkspaceProps;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryCandidate;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryRun;
