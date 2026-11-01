@@ -112,6 +112,7 @@ export type ActionRow = {
     is_overdue: boolean;
     completed_at: string | null;
     verified_at: string | null;
+    effectiveness_confirmed?: boolean | null;
     /** Separation-of-duties: who completed it, and may the current viewer verify it. */
     completed_by_user_id: number | null;
     completed_by_name: string | null;
@@ -180,8 +181,22 @@ type Props = {
             critical_open: number;
             unassigned: number;
             monitoring_events: number;
+            /** G3 board M7. */
+            failed?: number;
+            due_soon?: number;
+            closed_month?: number;
         };
     };
+    /** G3 board M7: checks that said an action didn't work, with no revised action yet. */
+    failedChecks?: Array<{
+        id: number;
+        title: string;
+        reference_number: string;
+        priority: string;
+        owner: string | null;
+        review: { id: number; reference_number: string; label: string } | null;
+        revise_href: string | null;
+    }>;
     filters: Filters;
     sites: Array<{ id: number; name: string }>;
     detail: EventDetail | null;
@@ -297,6 +312,7 @@ export default function CorrectiveActionsIndex({
     detail,
     can,
     monitoringReviewUrl,
+    failedChecks = [],
 }: Props) {
     const pageUrl = usePage().url;
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
@@ -475,6 +491,18 @@ export default function CorrectiveActionsIndex({
         },
     ];
 
+    /* ---- the one button on a board card (G3 board M7): its next step, from the same lifecycle the menu offers ---- */
+    const primaryFor = (action: ActionRow): { label: string; run: () => void } | null => {
+        if (!action.event || !can.manage) return null;
+        if (needsOwner(action)) return { label: 'Choose a new owner', run: () => openActionPane(action, 'owner') };
+        const base = `/health-safety/events/${action.event.id}/corrective-actions/${action.id}`;
+        if (action.status === 'open') return { label: 'Start', run: () => router.post(`${base}/start`, {}, { preserveScroll: true }) };
+        if (action.status === 'in_progress') return { label: 'Mark done', run: () => openActionPane(action, 'complete') };
+        if (action.status === 'completed' && action.can_verify) return { label: 'Check it worked', run: () => openActionPane(action, 'verify') };
+        if (action.status === 'verified') return { label: 'Close action', run: () => setClosing({ href: `${base}/close`, title: action.title }) };
+        return null;
+    };
+
     /* ---- status-aware lifecycle menu (right-click + kebab share one payload) ---- */
     const menuItems = (action: ActionRow): ShiftCtxItem[] => {
         if (!action.event) return [];
@@ -643,31 +671,36 @@ export default function CorrectiveActionsIndex({
                     }
                     strip={
                         <PageHeaderNumbers>
+                            {/* G3 board M7: four numbers the columns don't already show. */}
                             <PageHeaderNumber
                                 value={attention.overdue}
-                                label="Overdue"
-                                caption="Past the due date"
+                                label="Overdue actions"
+                                caption="Need attention now"
                                 tone={attention.overdue ? 'critical' : undefined}
                                 pressed={tab === 'overdue'}
-                                onClick={() => setTab('overdue')}
+                                onClick={() => setTab('overdue', 'list')}
                             />
                             <PageHeaderNumber
-                                value={attention.critical_open}
-                                label="High or critical"
-                                caption="Not yet checked or closed"
-                                tone={
-                                    attention.critical_open
-                                        ? 'critical'
-                                        : undefined
-                                }
-                                pressed={tab === 'critical_open'}
-                                onClick={() => setTab('critical_open')}
+                                value={attention.failed ?? 0}
+                                label="Checked — it didn’t work"
+                                caption="Its safety review can’t close yet"
+                                tone={attention.failed ? 'warning' : undefined}
+                                pressed={tab === 'failed'}
+                                onClick={() => setTab('failed', 'list')}
                             />
                             <PageHeaderNumber
-                                value={attention.monitoring_events}
-                                label="Reviews in monitoring"
-                                caption="With matching actions"
-                                href={monitoringReviewUrl}
+                                value={attention.due_soon ?? 0}
+                                label="Due in the next 7 days"
+                                caption="Not done yet"
+                                pressed={tab === 'due_soon'}
+                                onClick={() => setTab('due_soon', 'list')}
+                            />
+                            <PageHeaderNumber
+                                value={attention.closed_month ?? 0}
+                                label="Closed this month"
+                                caption="Checked and closed"
+                                pressed={tab === 'closed_month'}
+                                onClick={() => setTab('closed_month', 'list')}
                             />
                         </PageHeaderNumbers>
                     }
@@ -795,9 +828,14 @@ export default function CorrectiveActionsIndex({
                     renderLink={() => null}
                 />
 
+                {view === 'board' && failedChecks.length ? (
+                    <FailedChecksPanel items={failedChecks} total={attention.failed ?? failedChecks.length} />
+                ) : null}
+
                 {view === 'board' ? (
                     actions.data.length ? (
                         <ActionBoard
+                            primary={primaryFor}
                             rows={actions.data}
                             tab={tab}
                             tabCounts={tabCounts}
@@ -909,6 +947,7 @@ function needsOwner(action: ActionRow): boolean {
  * (same filters); the cards are the ones on this page of the register, and "N more" opens the List on that lens.
  */
 export function ActionBoard({
+    primary,
     rows,
     tab,
     tabCounts,
@@ -928,6 +967,8 @@ export function ActionBoard({
     onOpen: (id: number) => void;
     onMenu: (action: ActionRow, x: number, y: number) => void;
     onColumn: (tab: string) => void;
+    /** The card's one button (G3 board M7). */
+    primary?: (action: ActionRow) => { label: string; run: () => void } | null;
 }) {
     const today = toDateInput(new Date());
     // Real totals only on the unfiltered lens; a lens (Overdue, a stage …) counts what it shows.
@@ -935,9 +976,10 @@ export function ActionBoard({
     const columns: BoardColumn[] = [
         {
             key: 'unassigned',
-            title: 'Needs an owner',
+            title: 'Need a new owner',
             tab: 'unassigned',
             tone: 'warning',
+            sub: 'The owner left, so it can’t move until someone new is chosen.',
             count: tabCounts.unassigned ?? unassigned,
             match: needsOwner,
         },
@@ -945,6 +987,7 @@ export function ActionBoard({
             key: 'open',
             title: 'To do',
             tab: 'open',
+            sub: 'Ready to start.',
             count: tabCounts.open ?? 0,
             match: (action) => action.status === 'open' && !needsOwner(action),
         },
@@ -952,32 +995,29 @@ export function ActionBoard({
             key: 'in_progress',
             title: 'In progress',
             tab: 'in_progress',
+            sub: 'Work is under way.',
             count: tabCounts.in_progress ?? 0,
             match: (action) =>
                 action.status === 'in_progress' && !needsOwner(action),
         },
         {
             key: 'completed',
-            title: HS_LABELS.action_status.completed,
+            title: 'Done — waiting for check',
             tab: 'awaiting_verification',
             tone: 'info',
-            sub: 'Someone other than the owner checks it',
+            sub: 'The work is done; someone else checks it worked.',
             count: tabCounts.awaiting_verification ?? 0,
             match: (action) =>
                 action.status === 'completed' && !needsOwner(action),
         },
         {
             key: 'checked',
-            title: 'Checked and closed',
-            tab:
-                (tabCounts.verified ?? 0) >
-                rows.filter((action) => action.status === 'verified').length
-                    ? 'verified'
-                    : 'closed',
+            title: 'Checked — it worked',
+            tab: 'verified',
             tone: 'success',
-            count: (tabCounts.verified ?? 0) + (tabCounts.closed ?? 0),
-            match: (action) =>
-                action.status === 'verified' || action.status === 'closed',
+            sub: 'Checked and working; ready to close.',
+            count: tabCounts.verified ?? 0,
+            match: (action) => action.status === 'verified' && action.effectiveness_confirmed !== false,
         },
     ];
     const placed = new Set<number>();
@@ -1034,6 +1074,7 @@ export function ActionBoard({
                                             today={today}
                                             onOpen={onOpen}
                                             onMenu={onMenu}
+                                            primary={primary?.(action) ?? null}
                                         />
                                     ))}
                                 </ul>
@@ -1049,7 +1090,7 @@ export function ActionBoard({
                                     className="h-auto justify-start px-0"
                                     onClick={() => onColumn(column.tab)}
                                 >
-                                    {more} more
+                                    + {more} more · Show all
                                 </Button>
                             ) : null}
                         </section>
@@ -1060,14 +1101,58 @@ export function ActionBoard({
     );
 }
 
+/**
+ * "Failed check — needs a revised action" (G3 board M7): above the board, a plain card (grey border, tinted head —
+ * never a red outline, non-negotiable 8) listing checks that said an action didn't work, each with "Add revised action"
+ * opening its safety review on that step.
+ */
+function FailedChecksPanel({ items, total }: { items: NonNullable<Props['failedChecks']>; total: number }) {
+    return (
+        <section aria-label="Failed check — needs a revised action" className="sg-surface">
+            <div className="bg-status-warning-bg px-[18px] py-3">
+                <h3 className="font-semibold text-foreground">Failed check — needs a revised action</h3>
+                <p className="text-sm text-muted-foreground">
+                    {total === 1 ? '1 action didn’t work and is stopping a safety review from closing.' : `${total} actions didn’t work and are stopping safety reviews from closing.`}{' '}
+                    Add a revised action to fix it, then check that one too.
+                </p>
+            </div>
+            <ul className="grid">
+                {items.map((item) => (
+                    <li key={item.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-[18px] py-3 first:border-t-0">
+                        <div className="min-w-0 flex-1">
+                            <p className="font-semibold">{item.title}</p>
+                            <p className="text-caption">
+                                {item.reference_number}
+                                {item.review ? ` · ${item.review.label}` : ''}
+                                {item.owner ? ` · ${item.owner}` : ''}
+                            </p>
+                        </div>
+                        <StatusBadge variant="critical" size="sm">
+                            Checked — it didn’t work
+                        </StatusBadge>
+                        <span className="text-caption">Its safety review can’t close until a revised action is added.</span>
+                        {item.revise_href ? (
+                            <Button type="button" size="sm" variant="outline" onClick={() => router.visit(item.revise_href!)}>
+                                Add revised action
+                            </Button>
+                        ) : null}
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
 function BoardCard({
     action,
     today,
     onOpen,
     onMenu,
+    primary = null,
 }: {
     action: ActionRow;
     today: string;
+    primary?: { label: string; run: () => void } | null;
     onOpen: (id: number) => void;
     onMenu: (action: ActionRow, x: number, y: number) => void;
 }) {
@@ -1147,6 +1232,13 @@ function BoardCard({
                     ) : null}
                 </span>
             </button>
+            {primary ? (
+                <div className="px-3 pb-3">
+                    <Button type="button" size="sm" variant="outline" className="w-full" onClick={primary.run}>
+                        {primary.label}
+                    </Button>
+                </div>
+            ) : null}
             {action.event ? (
                 <Button
                     type="button"

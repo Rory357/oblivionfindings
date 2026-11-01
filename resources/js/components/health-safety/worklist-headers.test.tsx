@@ -219,15 +219,14 @@ it('retains all action refinements for attention meters and the distinct parent-
     const props = actionProps();
     render(<Actions {...props} />);
     expect(document.querySelectorAll('header.eh-header')).toHaveLength(1);
-    expect(
-        screen.getByRole('link', { name: 'View reviews in monitoring' }),
-    ).toHaveAttribute('href', props.monitoringReviewUrl);
+    // G3 board M7: four numbers the columns don't already show; each opens its list.
+    expect(screen.getAllByRole('button', { name: /^View / })).toHaveLength(4);
     fireEvent.click(
-        screen.getByRole('button', { name: 'View high or critical' }),
+        screen.getByRole('button', { name: 'View checked — it didn’t work' }),
     );
     expect(state.get).toHaveBeenCalledWith(
         '/health-safety/corrective-actions',
-        { ...props.filters, tab: 'critical_open' },
+        { ...props.filters, tab: 'failed', view: 'list' },
         { preserveScroll: true },
     );
     fireEvent.click(
@@ -443,7 +442,7 @@ it('shows actions on a board by stage with real column totals and opens the list
             name: 'Lifecycle actions for CA-BOARD',
         }),
     ).toBeInTheDocument();
-    fireEvent.click(progress.getByRole('button', { name: '2 more' }));
+    fireEvent.click(progress.getByRole('button', { name: '+ 2 more · Show all' }));
     expect(state.get).toHaveBeenCalledWith(
         '/health-safety/corrective-actions',
         { ...props.filters, tab: 'in_progress', view: 'list' },

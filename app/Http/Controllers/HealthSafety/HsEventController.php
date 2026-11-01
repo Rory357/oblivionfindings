@@ -1806,7 +1806,7 @@ class HsEventController extends Controller
             'verified' => $verifiedCount,
             'closed' => $closedCount,
         ];
-        foreach (['critical_open', 'unassigned'] as $attentionTab) {
+        foreach (['critical_open', 'unassigned', 'failed', 'due_soon', 'closed_month'] as $attentionTab) {
             $attentionQuery = clone $base;
             $this->applyActionTab($attentionQuery, $attentionTab);
             $tabCounts[$attentionTab] = $attentionQuery->count();
@@ -1823,6 +1823,9 @@ class HsEventController extends Controller
                 'overdue' => $tabCounts['overdue'],
                 'critical_open' => $tabCounts['critical_open'],
                 'unassigned' => $tabCounts['unassigned'],
+                'failed' => $tabCounts['failed'],
+                'due_soon' => $tabCounts['due_soon'],
+                'closed_month' => $tabCounts['closed_month'],
                 'monitoring_events' => (int) (clone $base)
                     ->whereHas('hsEvent', fn (Builder $q) => $q->where('status', HsEvent::STATUS_MONITORING))
                     ->distinct('hs_event_id')
@@ -1845,8 +1848,32 @@ class HsEventController extends Controller
             ->unique()
             ->values();
 
+        // G3 board M7: the "Failed check — needs a revised action" panel above the board.
+        $failedQuery = clone $base;
+        $this->applyActionTab($failedQuery, 'failed');
+        $canRevise = $request->user()->canDo('hazards.manage');
+        $failedChecks = $failedQuery->with(['hsEvent:id,reference_number,event_category,site_id', 'hsEvent.site:id,name', 'assignedTo:id,name'])
+            ->orderBy('verified_at')->limit(5)
+            ->get(['id', 'hs_event_id', 'title', 'reference_number', 'priority', 'assigned_to_user_id', 'verified_at'])
+            ->map(fn (HsCorrectiveAction $action): array => [
+                'id' => (int) $action->id,
+                'title' => $action->title,
+                'reference_number' => $action->reference_number,
+                'priority' => $action->priority,
+                'owner' => $action->assignedTo?->name,
+                'review' => $action->hsEvent ? [
+                    'id' => (int) $action->hsEvent->id,
+                    'reference_number' => $action->hsEvent->reference_number,
+                    'label' => \App\Support\HealthSafety\HsLabels::label('review_category', $action->hsEvent->event_category)
+                        .($action->hsEvent->site ? ' — '.$action->hsEvent->site->name : ''),
+                ] : null,
+                'revise_href' => $canRevise && $action->hsEvent
+                    ? "/health-safety/events/{$action->hsEvent->id}?action=ca-add&replaces={$action->id}" : null,
+            ])->values()->all();
+
         return [
             'actions' => $actions->toArray(),
+            'failedChecks' => $failedChecks,
             'tab' => $tab,
             'tabCounts' => $tabCounts,
             'hero' => $hero,
@@ -1964,6 +1991,14 @@ class HsEventController extends Controller
                 ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
             'unassigned' => $query->whereNull('assigned_to_user_id')
                 ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
+            // G3 board M7: the header boxes the columns don't already show.
+            'failed' => $query->whereIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                ->where('effectiveness_confirmed', false)->whereDoesntHave('revisions'),
+            'due_soon' => $query->whereNotIn('status', [HsCorrectiveAction::STATUS_COMPLETED, HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                ->whereNotNull('due_date')
+                ->whereBetween('due_date', [now((string) (config('app.worker_timezone', 'Pacific/Auckland') ?: 'Pacific/Auckland'))->toDateString(), now((string) (config('app.worker_timezone', 'Pacific/Auckland') ?: 'Pacific/Auckland'))->addDays(7)->toDateString()]),
+            'closed_month' => $query->where('status', HsCorrectiveAction::STATUS_CLOSED)
+                ->where('closed_at', '>=', now((string) (config('app.worker_timezone', 'Pacific/Auckland') ?: 'Pacific/Auckland'))->startOfMonth()->utc()),
             default => $query,
         };
     }
