@@ -8,8 +8,10 @@ return [
     'notifications' => [
         // Keep off until device binding and browser acceptance are verified. No native push here.
         'browser_push_enabled' => env('CHAT_BROWSER_PUSH_ENABLED', false),
-        // Exact trusted browser push hosts only. Never accept these from a subscription request.
-        'push_hosts' => array_values(array_filter(array_map('trim', explode(',', (string) env('CHAT_BROWSER_PUSH_HOSTS', 'fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com'))))),
+        // Trusted browser push hosts (Chat and every PushChannel notice). Never accept these from a subscription request.
+        // Exact hosts, or a leading dot for any host below a domain: Edge's push hosts vary under notify.windows.com
+        // (Stephan approved 23 Oct 2026). Servers that set CHAT_BROWSER_PUSH_HOSTS must add it themselves.
+        'push_hosts' => array_values(array_filter(array_map('trim', explode(',', (string) env('CHAT_BROWSER_PUSH_HOSTS', 'fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com,.notify.windows.com'))))),
     ],
     // Operational contact labels only; never credentials or client information.
     'health' => ['owners' => [
