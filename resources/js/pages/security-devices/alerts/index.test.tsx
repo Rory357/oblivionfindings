@@ -366,7 +366,7 @@ describe('Alerts', () => {
         expect(screen.getAllByText('On')).toHaveLength(2);
         expect(screen.getByText('Alerts per week')).toBeInTheDocument();
         expect(screen.getByText(/, down from 5\./)).toBeInTheDocument();
-        // Automations come with Phase F: no button for them.
+        // Without automations.manage there's no Add automation button.
         expect(
             screen.queryByRole('button', { name: /automation/i }),
         ).not.toBeInTheDocument();
@@ -379,6 +379,129 @@ describe('Alerts', () => {
             await screen.findByRole('alertdialog', {
                 name: 'Turn off this rule?',
             }),
+        ).toBeInTheDocument();
+    });
+
+    it('lists the house automations beside the rules, with Edit, Test it, Turn off and Remove (S&D Phase F)', async () => {
+        const post = vi.spyOn(axios, 'post').mockResolvedValue({
+            data: {
+                run: {
+                    id: 40,
+                    test: true,
+                    at: ago(0),
+                    summary: 'Front door opened at 10:21 pm',
+                    outcome: 'ok',
+                    lines: [
+                        {
+                            tone: 'success',
+                            text: 'You got “TEST · Front door at night” in the app',
+                            at: ago(0),
+                        },
+                    ],
+                    result: 'The action worked',
+                },
+            },
+        });
+        const base = fixture();
+        const props = fixture({
+            tab: 'rules',
+            queue: [],
+            selected: null,
+            counts: { ...base.counts, rules: 1 },
+            rules: { rows: [] },
+            automations: [
+                {
+                    id: 5,
+                    version: 2,
+                    name: 'Front door at night',
+                    when: 'Front door opens between 10:00 pm and 6:00 am',
+                    sub: 'Automation · door',
+                    icon: 'door-open',
+                    where: 'Synthetic House',
+                    then: 'Tell the staff on shift (app) · check the alarm is armed',
+                    last_run: { at: ago(60 * 30), test: true, outcome: 'ok' },
+                    on: true,
+                    can_change: true,
+                    definition: null,
+                },
+            ],
+            can: { ...base.can, add_automation: true },
+        });
+        render(<AlertsIndex {...props} />);
+
+        expect(
+            screen.getByText('Front door opens between 10:00 pm and 6:00 am'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Automation · door · Front door at night'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Tell the staff on shift (app) · check the alarm is armed',
+            ),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/\(test\)$/)).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'When something happens, who is told and what Oblivion does',
+            ),
+        ).toBeInTheDocument();
+
+        fireEvent.contextMenu(
+            screen.getByText('Front door opens between 10:00 pm and 6:00 am'),
+        );
+        expect(
+            await screen.findByRole('menuitem', { name: /Edit/ }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('menuitem', { name: /Turn off/ }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('menuitem', { name: /Remove/ }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('menuitem', { name: /Test it/ }));
+
+        const viewer = await screen.findByRole('dialog', {
+            name: 'Test: Front door at night',
+        });
+        expect(
+            await within(viewer).findByText(
+                'You got “TEST · Front door at night” in the app',
+            ),
+        ).toBeInTheDocument();
+        expect(post).toHaveBeenCalledWith(
+            '/security-devices/automations/5/test',
+            {},
+            expect.anything(),
+        );
+    });
+
+    it('opens Add automation and loads its choices only then', async () => {
+        const base = fixture();
+        render(
+            <AlertsIndex
+                {...fixture({
+                    tab: 'rules',
+                    queue: [],
+                    selected: null,
+                    rules: { rows: [] },
+                    automations: [],
+                    can: { ...base.can, add_automation: true },
+                })}
+            />,
+        );
+
+        expect(
+            screen.getByText(
+                'No rules or automations yet, so the standard routing tells IT for each Site.',
+            ),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Add automation' }));
+        expect(inertia.reload).toHaveBeenCalledWith(
+            expect.objectContaining({ only: ['automationForm'] }),
+        );
+        expect(
+            await screen.findByText('Loading your Sites and devices…'),
         ).toBeInTheDocument();
     });
 

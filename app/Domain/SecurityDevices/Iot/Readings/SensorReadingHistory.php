@@ -45,6 +45,7 @@ final class SensorReadingHistory
      */
     private function afterRecorded(int $deviceId, array $values, CarbonImmutable $at): void
     {
+        app(\App\Domain\SecurityDevices\Automations\AutomationEngine::class)->onReading($deviceId, $values, $at); // S&D Phase F: house automations (never throws)
         $temperature = $values['temperature'] ?? null;
         $occupancy = $values['occupancy'] ?? null;
         if (! is_numeric($temperature) && ! is_numeric($occupancy)) {

@@ -24,6 +24,7 @@ final class SafetyEventObserver
             $at = $event->occurred_at !== null ? CarbonImmutable::parse($event->occurred_at)->setTimezone('UTC') : CarbonImmutable::now('UTC');
             if ($door instanceof Device && $at->gte(CarbonImmutable::now('UTC')->subMinutes(30))) {
                 app(\App\Domain\SecurityDevices\Care\CareRules::class)->onDoorOpened($door, $at);
+                app(\App\Domain\SecurityDevices\Automations\AutomationEngine::class)->onDoorOpened($door, $at); // S&D Phase F: house automations
             }
 
             return;

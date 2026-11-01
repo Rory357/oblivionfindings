@@ -1,8 +1,9 @@
 /**
  * Alerts (S&D rebuild drawing pg-sdr-13, Workspace template, split layout): a work queue of what needs
  * someone, with the chosen alert's next step, story and timeline beside it. Done is a table, and
- * Rules & automations (13b) lists who is told when a check fails. Automations arrive with Phase F;
- * the Quiet times tab (13c) waits for its drawing's approval.
+ * Rules & automations (13b) lists who is told when a check fails and (S&D Phase F) the house
+ * automations, with Add automation (pop-up 40) and Test it (41). The Quiet times tab (13c) waits for
+ * its drawing's approval.
  */
 import {
     EntityContextMenu,
@@ -31,18 +32,35 @@ import {
     alertLine,
 } from '@/components/security-devices/alert-popups';
 import {
+    AddAutomation,
+    AutomationOnOff,
+    AutomationTest,
+    RemoveAutomation,
+    type AutomationTarget,
+} from '@/components/security-devices/automation-popups';
+import {
     Queue,
     QuietLine,
     SideBySide,
     Tally,
     type TallyItem,
 } from '@/components/signature/blocks';
+import { Button } from '@/components/ui/button';
 import { SkeletonCard } from '@/components/ui/skeleton-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { durationWords, timedText } from '@/lib/security-devices/device-time';
 import { Head, router, usePage } from '@inertiajs/react';
-import { BellRing, Eye, Plus, Power, PowerOff } from 'lucide-react';
+import {
+    BellRing,
+    Eye,
+    FlaskConical,
+    Pencil,
+    Plus,
+    Power,
+    PowerOff,
+    Trash2,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BlockHead, ListPager } from '../devices/_parts';
 import {
@@ -52,11 +70,13 @@ import {
     BlockFailed,
     DoneTable,
     RulesTable,
+    type RulesListRow,
 } from './_parts';
 import type {
     AlertRuleRow,
     AlertsProps,
     AlertsTab,
+    AutomationRow,
     DoneRow,
     TimedLine,
 } from './_types';
@@ -111,6 +131,11 @@ type Popup =
     | { kind: 'rule' }
     | { kind: 'rule-on-off'; rule: AlertRuleRow }
     | { kind: 'viewer'; id: number }
+    // S&D Phase F: house automations.
+    | { kind: 'automation'; editing: AutomationRow | null }
+    | { kind: 'automation-test'; target: AutomationTarget }
+    | { kind: 'automation-on-off'; row: AutomationRow }
+    | { kind: 'automation-remove'; row: AutomationRow }
     | null;
 
 const lineText = (line: string | TimedLine, now: Date) =>
@@ -138,8 +163,8 @@ export default function AlertsIndex(props: AlertsProps) {
     const [choosing, setChoosing] = useState<number | null>(null);
     const [chooseFailed, setChooseFailed] = useState<number | null>(null);
     const doneMenu = useEntityContextMenu<DoneRow>();
-    const ruleMenu = useEntityContextMenu<AlertRuleRow>();
-    const lazy = useLazyProps(['alertDevices', 'ruleForm']);
+    const ruleMenu = useEntityContextMenu<RulesListRow>();
+    const lazy = useLazyProps(['alertDevices', 'ruleForm', 'automationForm']);
 
     const params = (changes: Record<string, string | number | undefined>) => {
         const next: Record<string, string | number | undefined> = {
@@ -221,6 +246,14 @@ export default function AlertsIndex(props: AlertsProps) {
             ...(props.ruleForm === undefined ? ['ruleForm'] : []),
             ...(props.alertDevices === undefined ? ['alertDevices'] : []),
         ]);
+    // S&D Phase F: Add automation (40) loads its choices when it opens; Edit is the same wizard.
+    const openAutomation = (editing: AutomationRow | null) => {
+        if (props.automationForm === undefined) lazy.load(['automationForm']);
+        ruleMenu.close();
+        setPopup({ kind: 'automation', editing });
+    };
+    const reloadAutomations = () =>
+        router.reload({ only: ['automations', 'counts'] });
 
     const openHref = `${BASE}${site !== 'all' ? `?site=${site}` : ''}`;
     const zeros = [meters.needs_now.count === 0, meters.waiting.count === 0];
@@ -275,6 +308,55 @@ export default function AlertsIndex(props: AlertsProps) {
         setPopup({ kind: 'viewer', id });
         if (selected?.id !== id) choose(id);
     };
+    const automationActions = (row: AutomationRow): MenuItem[] => {
+        const blocked = row.can_change
+            ? undefined
+            : 'Only people who manage automations can change them';
+        return [
+            {
+                label: 'Edit',
+                icon: Pencil,
+                disabled: blocked,
+                onClick: () => openAutomation(row),
+            },
+            {
+                label: 'Test it',
+                icon: FlaskConical,
+                disabled: blocked,
+                onClick: () =>
+                    setPopup({
+                        kind: 'automation-test',
+                        target: { id: row.id, name: row.name },
+                    }),
+            },
+            row.on
+                ? {
+                      label: 'Turn off',
+                      icon: PowerOff,
+                      danger: true,
+                      disabled: blocked,
+                      onClick: () =>
+                          setPopup({ kind: 'automation-on-off', row }),
+                  }
+                : {
+                      label: 'Turn on',
+                      icon: Power,
+                      disabled: blocked,
+                      onClick: () =>
+                          setPopup({ kind: 'automation-on-off', row }),
+                  },
+            { separator: true },
+            {
+                label: 'Remove',
+                icon: Trash2,
+                danger: true,
+                disabled: blocked,
+                onClick: () => setPopup({ kind: 'automation-remove', row }),
+            },
+        ];
+    };
+    const listActions = (row: RulesListRow): MenuItem[] =>
+        row.type === 'automation' ? automationActions(row) : ruleActions(row);
     const ruleActions = (row: AlertRuleRow): MenuItem[] =>
         row.can_change
             ? [
@@ -302,8 +384,18 @@ export default function AlertsIndex(props: AlertsProps) {
                   },
               ];
 
-    const ruleRows = useMemo(() => {
-        const rows = rules?.rows ?? [];
+    const ruleRows = useMemo((): RulesListRow[] => {
+        // S&D Phase F: the house automations first, then the alert rules, in one list (13b).
+        const rows: RulesListRow[] = [
+            ...(props.automations ?? []).map((row) => ({
+                ...row,
+                type: 'automation' as const,
+            })),
+            ...(rules?.rows ?? []).map((row) => ({
+                ...row,
+                type: 'rule' as const,
+            })),
+        ];
         const words = (props.q ?? '').trim().toLowerCase();
         return words === ''
             ? rows
@@ -312,7 +404,7 @@ export default function AlertsIndex(props: AlertsProps) {
                       .toLowerCase()
                       .includes(words),
               );
-    }, [rules, props.q]);
+    }, [rules, props.automations, props.q]);
 
     const header = (
         <PageHeader
@@ -550,19 +642,39 @@ export default function AlertsIndex(props: AlertsProps) {
                         <div className="border-b border-border px-4 py-3.5">
                             <BlockHead
                                 title="Rules & automations"
-                                sub="When a check fails on network gear or a computer, who is told and how"
+                                sub="When something happens, who is told and what Oblivion does"
+                                right={
+                                    can.add_automation ? (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => openAutomation(null)}
+                                        >
+                                            Add automation
+                                        </Button>
+                                    ) : null
+                                }
                             />
                         </div>
                         {ruleRows.length === 0 ? (
                             <p className="text-subtle px-4 py-6">
                                 {searching
-                                    ? 'No rules match. Try another search.'
-                                    : 'No rules yet, so the standard routing tells IT for each Site.'}
+                                    ? 'No rules or automations match. Try another search.'
+                                    : 'No rules or automations yet, so the standard routing tells IT for each Site.'}
                             </p>
                         ) : (
                             <RulesTable
                                 rows={ruleRows}
-                                actionsFor={ruleActions}
+                                now={now}
+                                actionsFor={listActions}
+                                onOpen={(row) => {
+                                    if (
+                                        row.type === 'automation' &&
+                                        row.can_change
+                                    )
+                                        openAutomation(row);
+                                }}
                                 onContextMenu={(event, row) =>
                                     ruleMenu.open(event, row)
                                 }
@@ -576,7 +688,7 @@ export default function AlertsIndex(props: AlertsProps) {
                                 from: ruleRows.length === 0 ? 0 : 1,
                                 to: ruleRows.length,
                             }}
-                            noun="rules"
+                            noun="rules and automations"
                             onPage={() => undefined}
                         />
                     </section>
@@ -621,7 +733,7 @@ export default function AlertsIndex(props: AlertsProps) {
                     y={ruleMenu.ctx.y}
                     icon={BellRing}
                     title={ruleMenu.ctx.record.when}
-                    items={ruleActions(ruleMenu.ctx.record)}
+                    items={listActions(ruleMenu.ctx.record)}
                     onClose={ruleMenu.close}
                 />
             ) : null}
@@ -672,6 +784,34 @@ export default function AlertsIndex(props: AlertsProps) {
             <RuleOnOff
                 rule={popup?.kind === 'rule-on-off' ? popup.rule : null}
                 onClose={() => setPopup(null)}
+            />
+            <AddAutomation
+                open={popup?.kind === 'automation'}
+                form={props.automationForm}
+                formFailed={lazy.failed}
+                load={() => lazy.load(['automationForm'])}
+                editing={popup?.kind === 'automation' ? popup.editing : null}
+                siteId={site === 'all' ? null : site}
+                onClose={() => setPopup(null)}
+                onSaved={reloadAutomations}
+                onTest={(target) =>
+                    setPopup({ kind: 'automation-test', target })
+                }
+            />
+            <AutomationTest
+                target={popup?.kind === 'automation-test' ? popup.target : null}
+                onClose={() => setPopup(null)}
+                onRan={reloadAutomations}
+            />
+            <AutomationOnOff
+                row={popup?.kind === 'automation-on-off' ? popup.row : null}
+                onClose={() => setPopup(null)}
+                onChanged={reloadAutomations}
+            />
+            <RemoveAutomation
+                row={popup?.kind === 'automation-remove' ? popup.row : null}
+                onClose={() => setPopup(null)}
+                onRemoved={reloadAutomations}
             />
             <AlertViewer
                 open={popup?.kind === 'viewer'}

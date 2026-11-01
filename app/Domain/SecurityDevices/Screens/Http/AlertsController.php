@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Screens\Alerts\AlertRulesPresenter;
 use App\Domain\SecurityDevices\Screens\Alerts\AlertsPresenter;
+use App\Domain\SecurityDevices\Screens\Alerts\AutomationsPresenter;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceFormOptions;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
@@ -40,6 +41,8 @@ final class AlertsController extends Controller
             'alertDevices' => Inertia::optional(fn (): array => $manages ? $this->alerts->pickableDevices($user) : []),
             // Add alert rule (21): who can be told, and whether a rule can cover every Site.
             'ruleForm' => Inertia::optional(fn (): ?array => $manages ? $rules->formOptions($user) : null),
+            // S&D Phase F: Add automation (40): Sites, their devices, roles and the safe actions, loaded when it opens.
+            'automationForm' => Inertia::optional(fn (): ?array => AutomationsPresenter::canManage($user) ? app(AutomationsPresenter::class)->formOptions($user) : null),
         ]);
     }
 

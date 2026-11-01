@@ -602,6 +602,17 @@ Route::middleware([
         Route::post('/hazard', [AlertsController::class, 'raiseHazard'])->name('security-devices.alerts.hazard');
     });
 
+    // S&D Phase F: house automations (pg-sdr-13b, pop-ups 40 and 41). The controller checks automations.manage.
+    Route::post('/automations', [\App\Domain\SecurityDevices\Screens\Http\AutomationsController::class, 'store'])
+        ->middleware('throttle:20,1')->name('security-devices.automations.store');
+    Route::prefix('/automations/{automation}')->whereNumber('automation')->middleware('throttle:20,1')->group(function (): void {
+        Route::put('/', [\App\Domain\SecurityDevices\Screens\Http\AutomationsController::class, 'update'])->name('security-devices.automations.update');
+        Route::post('/off', [\App\Domain\SecurityDevices\Screens\Http\AutomationsController::class, 'turnOff'])->name('security-devices.automations.off');
+        Route::post('/on', [\App\Domain\SecurityDevices\Screens\Http\AutomationsController::class, 'turnOn'])->name('security-devices.automations.on');
+        Route::delete('/', [\App\Domain\SecurityDevices\Screens\Http\AutomationsController::class, 'destroy'])->name('security-devices.automations.destroy');
+        Route::post('/test', [\App\Domain\SecurityDevices\Screens\Http\AutomationsController::class, 'test'])->middleware('throttle:6,1')->name('security-devices.automations.test');
+    });
+
     // S&D Phase G (pop-up 61): open a device's web page through the hub (webPage.open).
     Route::post('/devices/{device}/web', [\App\Domain\SecurityDevices\WebPages\Http\WebPageController::class, 'open'])
         ->whereNumber('device')

@@ -233,6 +233,19 @@ final class DeviceAlertEngine
         }
     }
 
+    /** S&D Phase F: an automation's "Open an alert", on the device that started it. */
+    public const array AUTOMATION_KINDS = ['automation'];
+
+    /**
+     * S&D Phase F: open (or refresh) an automation's alert for the staff on shift at the house (in
+     * the app). A person marks it done. Returns the new alert, or null when one was already open;
+     * a failure is thrown so the automation's run log can say it didn't work.
+     */
+    public function openAutomation(Device $device, string $title, CarbonImmutable $at, string $what, ?string $detail): ?DeviceAlert
+    {
+        return $this->openForHouse($device, 'automation', 'warning', $title, $at, $what, $detail);
+    }
+
     /** @param  callable(DeviceAlert): string  $words */
     public function closeCare(Device $device, string $kind, CarbonImmutable $at, callable $words): void
     {
@@ -316,6 +329,8 @@ final class DeviceAlertEngine
                 $to === MonitorState::Healthy && $from !== MonitorState::Healthy => $this->maybeRecovered($device, $at),
                 default => null,
             };
+            // S&D Phase F: automations that start when a device goes offline or comes back (never throws).
+            app(\App\Domain\SecurityDevices\Automations\AutomationEngine::class)->onCheck($device, $monitor, $from, $to, $at);
         } catch (Throwable $exception) {
             // An alert must never stop a check result from being stored.
             Log::error('Device alert could not be updated', ['monitor_id' => $monitor->id, 'error' => $exception->getMessage()]);
@@ -635,7 +650,8 @@ final class DeviceAlertEngine
         // Wrong sensor logins are an event too: someone says when they've looked into it. So are the
         // Phase F care and scald alerts: a person says they've checked.
         // A house mode's check finding too: a person locks or arms by hand, then says so.
-        return array_values(array_unique([...array_column(self::SAFETY_EVENTS, 0), 'mqtt_logins', ...self::CARE_KINDS, ...self::MODE_CHECK_KINDS]));
+        // S&D Phase F: an automation's alert too (AUTOMATION_KINDS): a person says it's dealt with.
+        return array_values(array_unique([...array_column(self::SAFETY_EVENTS, 0), 'mqtt_logins', ...self::CARE_KINDS, ...self::MODE_CHECK_KINDS, ...self::AUTOMATION_KINDS]));
     }
 
     /** @return list<string> the kinds that share one open alert per device */

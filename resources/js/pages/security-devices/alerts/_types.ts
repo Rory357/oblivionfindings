@@ -96,6 +96,126 @@ export type RuleForm = {
     can_all_sites: boolean;
 };
 
+/* S&D Phase F: house automations (pg-sdr-13b, pop-ups 40 and 41), from AutomationsPresenter. */
+
+/** The only actions an automation may take (SafeActions::ACTIONS, D12). There is no disarm or unlock. */
+export type SafeActionKey =
+    | 'notify'
+    | 'open_alert'
+    | 'camera_privacy_on'
+    | 'door_locked_check'
+    | 'alarm_armed_check';
+
+export type AutomationTriggerKind =
+    | 'door_opened'
+    | 'reading'
+    | 'device_offline'
+    | 'device_back'
+    | 'time';
+
+/** What starts it. `device_id` null is "any at the Site"; times are NZ wall clock ("21:00"). */
+export type AutomationTrigger = {
+    kind: AutomationTriggerKind;
+    device_id?: number | null;
+    metric?: string;
+    direction?: 'above' | 'below';
+    value?: number;
+    at?: string;
+    /** 1–7, Monday first. */
+    days?: number[];
+};
+
+export type AutomationAction = {
+    action: SafeActionKey;
+    who?: 'on_shift' | 'role';
+    role?: string | null;
+    email?: boolean;
+    push?: boolean;
+    message?: string | null;
+    cameras?: number[];
+    until?: string;
+    doors?: number[];
+    panels?: number[];
+};
+
+export type AutomationDefinition = {
+    site_id: number;
+    name: string;
+    is_on: boolean;
+    trigger: AutomationTrigger;
+    conditions: {
+        between: { from: string; to: string } | null;
+        /** The Site's house modes it runs in; empty runs in any mode. */
+        modes?: number[];
+    };
+    actions: AutomationAction[];
+};
+
+export type AutomationRow = {
+    id: number;
+    version: number;
+    name: string;
+    /** "Front door opens between 10:00 pm and 6:00 am": the only-if folds into the when. */
+    when: string;
+    sub: string;
+    icon: string;
+    where: string;
+    then: string;
+    last_run: {
+        at: string;
+        test: boolean;
+        outcome: 'ok' | 'partial' | 'failed';
+    } | null;
+    on: boolean;
+    can_change: boolean;
+    /** For Edit (the same wizard, prefilled); null without automations.manage. */
+    definition: AutomationDefinition | null;
+};
+
+export type AutomationDeviceGroup =
+    | 'doors'
+    | 'sensors'
+    | 'cameras'
+    | 'panels'
+    | 'any';
+
+/** What Add automation chooses from (an optional prop, loaded when it opens). */
+export type AutomationForm = {
+    sites: { value: string; label: string }[];
+    /** By Site id, then group: only devices the person can see there. */
+    devices: Record<
+        string,
+        Partial<Record<AutomationDeviceGroup, { id: number; name: string }[]>>
+    >;
+    roles: { value: string; label: string }[];
+    actions: { key: SafeActionKey; label: string; description: string }[];
+    /** By Site id: its house modes, for "House mode is". A Site with none shows no choice. */
+    modes?: Record<string, { id: number; name: string }[]>;
+    metrics: {
+        value: string;
+        label: string;
+        unit: string;
+        min: number;
+        max: number;
+    }[];
+    max_actions: number;
+};
+
+/** One run's lines (pop-up 41). */
+export type AutomationRunResult = {
+    id: number;
+    test: boolean;
+    at: string;
+    summary: string;
+    outcome: 'ok' | 'partial' | 'failed';
+    lines: {
+        tone: 'success' | 'warning' | 'critical' | 'info';
+        text: string;
+        at: string;
+    }[];
+    result: string;
+};
+
 /** A device Quiet time can pause or a rule can name: network gear, computers and building systems. */
 export type PickableDevice = {
     id: number;
@@ -126,15 +246,21 @@ export type AlertsProps = {
     } | null;
     selected: SelectedAlert | null;
     rules: AlertsRules | null;
+    /** S&D Phase F: the house automations, in the same list as the rules (Rules & automations tab). */
+    automations?: AutomationRow[] | null;
     per_week?: { labels: string[]; values: number[] } | null;
     can: {
         acknowledge: boolean;
         quiet_time: boolean;
         add_rule: boolean;
         report_incident: boolean;
+        /** securityDevices.automations.manage: add, change, test, turn off and remove automations. */
+        add_automation?: boolean;
     };
     /** Optional, loaded when Quiet time or Add alert rule opens. */
     alertDevices?: PickableDevice[];
     /** Optional, loaded when Add alert rule opens. */
     ruleForm?: RuleForm | null;
+    /** Optional, loaded when Add automation opens; null without automations.manage. */
+    automationForm?: AutomationForm | null;
 };

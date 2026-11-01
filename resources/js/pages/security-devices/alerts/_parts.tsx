@@ -21,16 +21,26 @@ import {
     BellRing,
     CircleCheck,
     Clock,
+    DoorOpen,
     Flag,
     MapPin,
     Network,
+    Thermometer,
+    Wifi,
     WifiOff,
+    Workflow,
     type LucideIcon,
 } from 'lucide-react';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
 import { Fragment, useState, type MouseEvent, type ReactNode } from 'react';
-import type { AlertRuleRow, AlertTone, DoneRow, SelectedAlert } from './_types';
+import type {
+    AlertRuleRow,
+    AlertTone,
+    AutomationRow,
+    DoneRow,
+    SelectedAlert,
+} from './_types';
 
 /** "**bold**" in a server line becomes the figure. */
 export function Bolded({ text }: { text: string }): ReactNode {
@@ -360,23 +370,64 @@ export function DoneTable({
 const RULE_ICON: Record<string, LucideIcon> = {
     'wifi-off': WifiOff,
     bell: Bell,
+    // S&D Phase F: automations.
+    'door-open': DoorOpen,
+    thermometer: Thermometer,
+    wifi: Wifi,
+    clock: Clock,
+    workflow: Workflow,
 };
+
+/** One row of Rules & automations: an alert rule, or (S&D Phase F) a house automation. */
+export type RulesListRow =
+    | ({ type: 'rule' } & AlertRuleRow)
+    | ({ type: 'automation' } & AutomationRow);
+
+/** An automation's last run: "7:45 am", "Fri 23 Oct, 9:00 pm (test)", or "Not yet". */
+function LastRan({ row, now }: { row: RulesListRow; now: Date }) {
+    if (row.type === 'rule') {
+        return <span className="text-muted-foreground">Not available</span>;
+    }
+    if (!row.last_run) {
+        return <span className="text-muted-foreground">Not yet</span>;
+    }
+    return (
+        <span className="grid">
+            <span>
+                {seenTime(row.last_run.at, now)}
+                {row.last_run.test ? ' (test)' : ''}
+            </span>
+            {row.last_run.outcome !== 'ok' ? (
+                <span className="text-caption">
+                    {row.last_run.outcome === 'failed'
+                        ? 'Didn’t work'
+                        : 'Some actions didn’t work'}
+                </span>
+            ) : null}
+        </span>
+    );
+}
 
 /** The Rules & automations table (13b): when, where, then, last ran, on. */
 export function RulesTable({
     rows,
     actionsFor,
     onContextMenu,
+    onOpen,
+    now = new Date(),
 }: {
-    rows: AlertRuleRow[];
-    actionsFor: (row: AlertRuleRow) => MenuItem[];
-    onContextMenu: (event: MouseEvent, row: AlertRuleRow) => void;
+    rows: RulesListRow[];
+    actionsFor: (row: RulesListRow) => MenuItem[];
+    onContextMenu: (event: MouseEvent, row: RulesListRow) => void;
+    /** A click on an automation's row opens it (Edit); rules have no record to open. */
+    onOpen?: (row: RulesListRow) => void;
+    now?: Date;
 }) {
     return (
-        <EntityTable<AlertRuleRow>
+        <EntityTable<RulesListRow>
             className="rounded-none border-0 shadow-none"
             rows={rows}
-            rowKey={(row) => row.id}
+            rowKey={(row) => `${row.type}-${row.id}`}
             identityLabel="When"
             identity={(row) => ({
                 icon: RULE_ICON[row.icon] ?? Bell,
@@ -401,12 +452,8 @@ export function RulesTable({
                 {
                     key: 'ran',
                     label: 'Last ran',
-                    width: '110px',
-                    cell: () => (
-                        <span className="text-muted-foreground">
-                            Not available
-                        </span>
-                    ),
+                    width: '140px',
+                    cell: (row) => <LastRan row={row} now={now} />,
                 },
                 {
                     key: 'on',
@@ -423,6 +470,7 @@ export function RulesTable({
                 },
             ]}
             actionsFor={actionsFor}
+            onOpen={onOpen}
             onRowContextMenu={onContextMenu}
             mutedFor={(row) => !row.on}
             rowHeight="content"

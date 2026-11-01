@@ -44,6 +44,7 @@ final class AlertsPresenter
         private readonly DeviceDirectory $directory,
         private readonly CoveringHubResolver $hubs,
         private readonly AlertRulesPresenter $rules,
+        private readonly AutomationsPresenter $automations,
     ) {}
 
     public static function canOpen(User $viewer): bool
@@ -77,7 +78,8 @@ final class AlertsPresenter
         $snoozed = (clone $base)->with(['device:id,name', 'site:id,name', 'acknowledgedBy:id,name', 'assignedTo:id,name'])
             ->where('state', DeviceAlert::STATE_SNOOZED)->orderBy('snoozed_until')->get();
         $doneCount = (clone $base)->where('state', DeviceAlert::STATE_DONE)->where('closed_at', '>=', $now->subDays(30))->count();
-        $rules = $this->rules->count($viewer, $siteFilter);
+        // S&D Phase F: the tab counts the house automations beside the alert rules.
+        $rules = $this->rules->count($viewer, $siteFilter) + $this->automations->count($viewer, $siteFilter);
 
         $queue = match ($tab) {
             'open' => [...$open->filter($matches)->map(fn (DeviceAlert $alert): array => $this->row($alert))->values()->all(), ...$resolved->filter($matches)->map(fn (DeviceAlert $alert): array => $this->row($alert))->values()->all()],
@@ -115,6 +117,8 @@ final class AlertsPresenter
             'done' => $done,
             'selected' => $selected,
             'rules' => $tab === 'rules' ? $this->rules->present($viewer, $siteFilter) : null,
+            // S&D Phase F: the house automations (when, only if, then), in the same list as the rules.
+            'automations' => $tab === 'rules' ? $this->automations->rows($viewer, $siteFilter) : null,
             // Alerts per week (13b), counted from the alerts themselves. Who was told isn't kept per
             // person or role (the timeline joins the names), so that chart isn't drawn.
             'per_week' => $tab === 'rules' ? $this->perWeek($base, $now) : null,
@@ -123,6 +127,7 @@ final class AlertsPresenter
                 'quiet_time' => $viewer->canDo('securityDevices.monitoring.manage'),
                 'add_rule' => $viewer->canDo('securityDevices.monitoring.manage'),
                 'report_incident' => $viewer->canDo('incidents.create'),
+                'add_automation' => AutomationsPresenter::canManage($viewer),
             ],
         ];
     }
@@ -164,6 +169,7 @@ final class AlertsPresenter
                 $alert->kind === 'battery' => 'Battery',
                 str_starts_with($alert->kind, 'reading_') => 'Reading',
                 in_array($alert->kind, ['mqtt_logins', 'mqtt_exposed'], true) => 'Sensor broker',
+                $alert->kind === 'automation' => 'Automation',
                 default => $alert->severity === 'critical' ? 'Failing' : 'Warning',
             }],
         ];
@@ -271,6 +277,7 @@ final class AlertsPresenter
             'tamper' => "{$name} reported being tampered with at {time}.",
             'battery' => "{$name}’s battery dropped below ".DeviceAlertEngine::BATTERY_LOW."% at {time}. It closes by itself once a new battery reports.",
             'mqtt_logins' => "The sensor relay on {$name} refused a run of wrong logins at {time}.",
+            'automation' => 'An automation opened this at {time}. Check, then mark it done.',
             'mqtt_exposed' => "At {time} Oblivion’s public address answered on an MQTT port. Sensor readings must never be reachable from the internet.",
             default => $alert->severity === 'critical' ? "A check on {$name} started failing at {time}." : "A check on {$name} started needing attention at {time}.",
         };
