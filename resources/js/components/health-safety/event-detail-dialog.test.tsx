@@ -1240,7 +1240,7 @@ describe('EventDetailDialog closure governance', () => {
     it('lists every blocker in plain language and does not offer an unauthorised override', () => {
         renderDialog();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
 
         expect(
             screen.getByRole('link', {
@@ -1259,7 +1259,7 @@ describe('EventDetailDialog closure governance', () => {
             screen.queryByRole('textbox', { name: /Override reason/ }),
         ).not.toBeInTheDocument();
         expect(
-            screen.getByRole('button', { name: 'Close event' }),
+            screen.getByRole('button', { name: 'Close safety review' }),
         ).toBeDisabled();
     });
 
@@ -1314,12 +1314,12 @@ describe('EventDetailDialog closure governance', () => {
             } as EventDetailOverrides),
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
         fireEvent.change(
             screen.getByRole('textbox', { name: /Closure summary/ }),
             { target: { value: 'Closed under the formal exception process.' } },
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
 
         expect(inertia.post).toHaveBeenCalledWith(
             '/health-safety/events/17/close',
@@ -1378,13 +1378,13 @@ describe('EventDetailDialog closure governance', () => {
         );
 
         expect(
-            screen.queryByRole('button', { name: 'Close event' }),
+            screen.queryByRole('button', { name: 'Close safety review' }),
         ).not.toBeInTheDocument();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Review closure exception' }),
+            screen.getByRole('button', { name: 'Review a close-anyway request' }),
         );
         expect(
-            screen.getByRole('heading', { name: 'Review closure exception' }),
+            screen.getByRole('heading', { name: 'Review a close-anyway request' }),
         ).toBeInTheDocument();
         fireEvent.change(
             screen.getByRole('textbox', {
@@ -1470,13 +1470,13 @@ describe('EventDetailDialog WorkSafe governance', () => {
         );
 
         expect(
-            screen.queryByRole('button', { name: 'Close event' }),
+            screen.queryByRole('button', { name: 'Close safety review' }),
         ).not.toBeInTheDocument();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Review closure exception' }),
+            screen.getByRole('button', { name: 'Review a close-anyway request' }),
         );
         expect(
-            screen.getByRole('heading', { name: 'Review closure exception' }),
+            screen.getByRole('heading', { name: 'Review a close-anyway request' }),
         ).toBeInTheDocument();
         expect(
             screen.getByText(/You asked for this, so someone else decides it./),
@@ -1773,7 +1773,7 @@ describe('EventDetailDialog WorkSafe governance', () => {
             }),
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
 
         expect(
             screen.getByRole('link', {
@@ -1808,7 +1808,7 @@ describe('EventDetailDialog WorkSafe governance', () => {
         });
         const { unmount } = renderDialog(pending);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
         expect(
             screen.getByRole('link', {
                 name: 'Record the WorkSafe notification before closing this event.',
@@ -2650,7 +2650,7 @@ describe('K1a: who can close (B1.5)', () => {
             screen.getAllByText(/Only Jordan Peri, the owner/),
         ).toHaveLength(1);
         expect(
-            screen.queryByRole('button', { name: 'Close event' }),
+            screen.queryByRole('button', { name: 'Close safety review' }),
         ).not.toBeInTheDocument();
     });
 });

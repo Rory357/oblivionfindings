@@ -148,6 +148,7 @@ import {
 import { correctiveActionHref } from '@/lib/health-safety/navigation';
 import { incidentWorkspaceHref } from '@/lib/incidents/navigation';
 import { cn } from '@/lib/utils';
+import { PopupCallout } from '@/components/popup';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -1248,7 +1249,7 @@ function EventWorkspace({
                             : ''
                     }
                 >
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Close event
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Close safety review
                 </Button>
             ) : null}
             {!canClose && canReviewClosureExceptions ? (
@@ -1257,8 +1258,7 @@ function EventWorkspace({
                     variant="outline"
                     onClick={() => setPane({ kind: 'close' })}
                 >
-                    <ShieldCheck className="mr-1.5 h-4 w-4" /> Review closure
-                    exception
+                    <ShieldCheck className="mr-1.5 h-4 w-4" /> Review a close-anyway request
                 </Button>
             ) : null}
         </div>
@@ -1605,7 +1605,7 @@ function reviewHeaderActions(
     else if (canReviewClosureExceptions)
         items.push({
             key: 'exception',
-            label: 'Review closure exception',
+            label: 'Review a close-anyway request',
             icon: ShieldCheck,
             pane: { kind: 'close' },
         });
@@ -3856,11 +3856,11 @@ function CloseEventPane({
         <div className="flex flex-col gap-4">
             <StepHead
                 icon={CheckCircle2}
-                title={d.can.close ? 'Close event' : 'Review closure exception'}
+                title={d.can.close ? 'Close safety review' : 'Review a close-anyway request'}
                 blurb={
                     d.can.close
-                        ? 'The statutory and protective checks are hard gates. An independently approved, current exception can cover only the named internal-governance blocker.'
-                        : 'Review the request, evidence, scope and time limit independently. This authority does not grant ordinary closure permission.'
+                        ? 'Everything below must be done first. WorkSafe and safety checks can never be skipped; an approved exception can only cover an internal record that can’t be finished in time.'
+                        : 'Check the request, its evidence and its time limit. Approving it does not let you close the review yourself.'
                 }
             />
 
@@ -3876,27 +3876,36 @@ function CloseEventPane({
             <JourneyGateList gate={d.close_gate} />
 
             {hardBlockers.length > 0 ? (
-                <InfoCard icon={AlertTriangle} tone="crit">
-                    <p className="font-semibold">Hard safety blockers</p>
-                    <p className="mt-2">
-                        These WorkSafe, Site-preservation, Site-scope,
-                        active-alert or protective-work checks cannot be
-                        bypassed by an exception.
+                <PopupCallout tone="critical">
+                    <p className="font-semibold">
+                        {hardBlockers.length === 1
+                            ? 'This must be done before the review can close'
+                            : `These ${hardBlockers.length} things must be done before the review can close`}
                     </p>
-                </InfoCard>
+                    <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+                        {hardBlockers.map((blocker) => (
+                            <li key={blocker.key}>{blocker.label}</li>
+                        ))}
+                    </ul>
+                    <p className="mt-1.5">
+                        An exception can’t cover these, even an approved one.
+                    </p>
+                </PopupCallout>
             ) : null}
 
             {exceptionalBlockers.length > 0 ? (
-                <InfoCard icon={ShieldCheck} tone="warn">
+                <PopupCallout tone={authorisingException ? 'success' : 'warning'}>
                     <p className="font-semibold">
-                        Exceptional internal blocker
-                    </p>
-                    <p className="mt-2">
                         {authorisingException
-                            ? `Approved exception #${authorisingException.id} covers the current blocker until ${authorisingException.expires_at ? formatDateTime(authorisingException.expires_at) : 'its recorded expiry'}. It will be rechecked when you close.`
-                            : 'A separate requester and approver must record a current, evidence-backed exception for the exact blocker. Free text cannot authorise closure.'}
+                            ? `Covered by approved exception #${authorisingException.id}`
+                            : 'An internal record isn’t finished'}
                     </p>
-                </InfoCard>
+                    <p className="mt-1">
+                        {authorisingException
+                            ? `It covers ${exceptionalBlockers.map((blocker) => blocker.label).join('; ')} until ${authorisingException.expires_at ? formatDateTime(authorisingException.expires_at) : 'its expiry'}. It is checked again when you close.${hardBlockers.length > 0 ? ' The items above still need doing first.' : ''}`
+                            : 'If it truly can’t be finished in time, someone can ask to close anyway below, and a different person must approve it with evidence.'}
+                    </p>
+                </PopupCallout>
             ) : null}
 
             {d.can.close ? (
@@ -3915,6 +3924,17 @@ function CloseEventPane({
                             placeholder="How was this event resolved? What did the investigation and corrective actions conclude?"
                         />
                     </Field>
+                    {!canSubmit && !form.processing ? (
+                        <p className="text-caption text-right">
+                            {hardBlockers.length > 0
+                                ? 'You can close once the items above are done.'
+                                : exceptionalBlockers.length > 0 && !authorisingException
+                                  ? 'You can close once the internal record is finished or an exception is approved.'
+                                  : form.data.closure_summary.trim() === ''
+                                    ? 'Add a closure summary to close.'
+                                    : null}
+                        </p>
+                    ) : null}
                     <div className="flex justify-end gap-2">
                         <Button
                             type="button"
@@ -3927,7 +3947,7 @@ function CloseEventPane({
                             type="submit"
                             disabled={form.processing || !canSubmit}
                         >
-                            Close event
+                            Close safety review
                         </Button>
                     </div>
                 </form>
@@ -3976,6 +3996,12 @@ function ClosureExceptionPanel({
         e.preventDefault();
         request.post(`/health-safety/events/${d.id}/closure-exceptions`, {
             preserveScroll: true,
+            // A sent request shows in the record above; clear the form so it isn't sent twice by accident.
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) {
+                    request.reset('reason', 'evidence_reference');
+                }
+            },
         });
     };
 
@@ -4137,9 +4163,6 @@ function ClosureExceptionRecord({
                     Decision: {exception.decision_reason}
                 </p>
             ) : null}
-            <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                Provenance {exception.provenance_hash.slice(0, 16)}
-            </p>
 
             {exception.status === 'pending' &&
             exception.can_decide === false &&
