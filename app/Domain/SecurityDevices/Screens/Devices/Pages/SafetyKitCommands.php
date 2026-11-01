@@ -33,9 +33,13 @@ final class SafetyKitCommands
         'alarm.arm' => 'securityDevices.alarms.arm',
         'alarm.disarm' => 'securityDevices.alarms.disarm',
         'access.door.unlock_timed' => 'securityDevices.doors.unlock',
-        // Not a capability yet: no governed path keeps a door unlocked for hours (UniFi Access lock
-        // rules have no command, adapter or hub job). Until one exists the action is never offered.
+        // S&D Phase H: a UniFi Access lock rule through the Site's hub (pop-up 70), and ending it early.
         'access.door.keep_unlocked' => 'securityDevices.doors.unlock',
+        'access.door.keep_unlocked_end' => 'securityDevices.doors.unlock',
+        // S&D Phase H (pop-up 86): UniFi Access's Site-wide emergency modes, on the console's device.
+        'access.site.lockdown' => 'securityDevices.access.lockdown',
+        'access.site.evacuate' => 'securityDevices.access.lockdown',
+        'access.site.emergency_end' => 'securityDevices.access.lockdown',
     ];
 
     private const array CHECKING = ['queued', 'dispatching', 'accepted', 'running', 'succeeded', 'reconciling'];
@@ -175,6 +179,11 @@ final class SafetyKitCommands
         $done = match ($capability) {
             'alarm.arm' => 'Armed · the panel confirmed it',
             'alarm.disarm' => 'Disarmed · the panel confirmed it',
+            'access.door.keep_unlocked' => 'Kept unlocked · UniFi Access confirmed it',
+            'access.door.keep_unlocked_end' => 'Locked again · UniFi Access confirmed it',
+            'access.site.lockdown' => 'Locked down · UniFi Access confirmed it',
+            'access.site.evacuate' => 'Evacuating · UniFi Access confirmed it',
+            'access.site.emergency_end' => 'Back to normal · UniFi Access confirmed it',
             default => 'Unlocked, then locked again · the door confirmed it',
         };
 
@@ -186,9 +195,12 @@ final class SafetyKitCommands
             CommandStatus::Queued, CommandStatus::Dispatching, CommandStatus::Accepted, CommandStatus::Running,
             CommandStatus::Succeeded, CommandStatus::Reconciling => 'Checking…',
             CommandStatus::Reconciled => $done,
-            CommandStatus::Mismatch => str_starts_with($capability, 'alarm.')
-                ? 'The panel didn’t change · it still reports its old state'
-                : 'The door didn’t lock again · check it now',
+            CommandStatus::Mismatch => match (true) {
+                str_starts_with($capability, 'alarm.') => 'The panel didn’t change · it still reports its old state',
+                str_starts_with($capability, 'access.site.') || $capability === 'access.door.keep_unlocked' || $capability === 'access.door.keep_unlocked_end'
+                    => 'UniFi Access doesn’t show the change · check it now',
+                default => 'The door didn’t lock again · check it now',
+            },
             CommandStatus::Uncertain => 'Result not confirmed',
             CommandStatus::Failed => 'Didn’t work',
             CommandStatus::Rejected => 'Turned down',

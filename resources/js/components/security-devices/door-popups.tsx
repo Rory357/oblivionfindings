@@ -5,8 +5,9 @@
  *
  * "Unlock for N seconds" is today's governed timed unlock: the seconds are the door's own approved
  * setting and it locks again by itself. When the framework wants the person to confirm it's them, or
- * a second person's approval, the pop-up says so. "Keep unlocked" is drawn here, but no governed
- * command can keep a door unlocked for hours yet, so the door page never opens it until one exists.
+ * a second person's approval, the pop-up says so. "Keep unlocked" (S&D Phase H) is the governed
+ * access.door.keep_unlocked through the Site's hub, for a door UniFi Access knows; "Lock again now"
+ * ends it early.
  */
 import { DateTimeField, validLocalDateTime } from '@/components/fleet-assets/maintenance/date-time-field';
 import { PopupCallout, PopupConfirm, PopupField, PopupForm } from '@/components/popup';
@@ -140,19 +141,26 @@ function untilProblem(value: string, now: Date): string | null {
 export function KeepDoorUnlocked({
     open,
     door,
-    onSubmit,
-    processing = false,
-    error,
+    action,
+    confirmUrl,
     onClose,
 }: {
     open: boolean;
     door: DoorPopupDoor;
-    /** Sends the request; the door page passes it only once a governed command exists for it. */
-    onSubmit: (until: string, reason: string) => void;
-    processing?: boolean;
-    error?: string;
+    /** The governed keep-unlocked action (S&D Phase H): step-up, approval and the hub route come from it. */
+    action: GovernedAction;
+    confirmUrl: string;
     onClose: () => void;
 }) {
+    const { state, send, check } = useSafetyRequest(open, 'keep-unlocked');
+    const stepUp = action.step_up;
+    const processing = state.processing;
+    const error = state.unconfirmed ? undefined : (state.error ?? (!action.available ? (action.reason ?? undefined) : undefined));
+    const onSubmit = (value: string, why: string) => {
+        if (state.unconfirmed) return check(RELOAD, onClose);
+        if (stepUp) return confirmIdentity(confirmUrl);
+        send(`/security-devices/devices/${door.id}/safety/keep-unlocked`, { until: value, reason: why }, onClose);
+    };
     const [until, setUntil] = useState('');
     const [reason, setReason] = useState('');
     const [touched, setTouched] = useState(false);
@@ -191,16 +199,20 @@ export function KeepDoorUnlocked({
             error={error}
             dirty={reason.trim() !== ''}
             draftName={`Keep ${door.name} unlocked`}
-            submitLabel="Keep unlocked"
+            submitLabel={state.unconfirmed ? 'Check result' : stepUp ? 'Confirm it’s you' : 'Keep unlocked'}
             processing={processing}
-            processingLabel="Asking…"
-            submitDisabled={problem !== null || reason.trim().length < 10}
+            processingLabel={state.unconfirmed ? 'Checking…' : 'Asking…'}
+            submitDisabled={!action.available || (!stepUp && !state.unconfirmed && (problem !== null || reason.trim().length < 10))}
             onSubmit={() => {
                 setTouched(true);
-                if (problem === null && reason.trim().length >= 10) onSubmit(until, reason.trim());
+                if (state.unconfirmed || stepUp || (problem === null && reason.trim().length >= 10)) onSubmit(until, reason.trim());
             }}
             testId="sd-keep-unlocked"
         >
+            {state.unconfirmed ? <PopupCallout tone="warning">{UNCONFIRMED_WORDS}</PopupCallout> : null}
+            {stepUp ? (
+                <PopupCallout tone="info">For your safety, confirm it’s you (your password) before you keep a door unlocked. You’ll come straight back here.</PopupCallout>
+            ) : null}
             <DateTimeField
                 id="sd-keep-unlocked-until"
                 label="Until"
@@ -228,7 +240,58 @@ export function KeepDoorUnlocked({
             </PopupField>
             <PopupCallout tone="info">
                 Locks again by itself{time ? ` at ${time}` : ''}. Only a person can do this; automations never unlock.
+                {action.approval ? ' A second person who approves device commands says yes first; you’ll see it waiting on this page.' : ''}
             </PopupCallout>
         </PopupForm>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Lock it again now (ends a keep unlocked early)                     */
+/* ------------------------------------------------------------------ */
+
+export function LockDoorAgain({
+    open,
+    door,
+    action,
+    confirmUrl,
+    onClose,
+}: {
+    open: boolean;
+    door: DoorPopupDoor;
+    action: GovernedAction;
+    confirmUrl: string;
+    onClose: () => void;
+}) {
+    const { state, send, check } = useSafetyRequest(open, 'lock-again');
+    const stepUp = action.step_up;
+    const submit = () => {
+        if (state.unconfirmed) return check(RELOAD, onClose);
+        if (stepUp) return confirmIdentity(confirmUrl);
+        send(`/security-devices/devices/${door.id}/safety/keep-unlocked/end`, {}, onClose);
+    };
+
+    return (
+        <PopupConfirm
+            open={open}
+            onClose={onClose}
+            onConfirm={submit}
+            icon={DoorClosed}
+            title={`Lock ${doorWords(door.name)} again now?`}
+            description={
+                <>
+                    Ends the keep unlocked early. <b className="font-semibold text-foreground">{door.name}</b>
+                    {door.site ? ` at ${door.site}` : ''} goes back to locking by itself.
+                </>
+            }
+            error={state.unconfirmed ? undefined : (state.error ?? (!action.available ? (action.reason ?? undefined) : undefined))}
+            confirmLabel={state.unconfirmed ? 'Check result' : stepUp ? 'Confirm it’s you' : 'Lock again'}
+            processing={state.processing}
+            processingLabel={state.unconfirmed ? 'Checking…' : 'Locking…'}
+            confirmDisabled={!action.available}
+            testId="sd-lock-again"
+        >
+            {state.unconfirmed ? <PopupCallout tone="warning">{UNCONFIRMED_WORDS}</PopupCallout> : null}
+        </PopupConfirm>
     );
 }

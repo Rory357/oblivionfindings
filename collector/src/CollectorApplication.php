@@ -32,6 +32,7 @@ use Oblivion\Collector\Runtime\SshConfigBackupRunner;
 use Oblivion\Collector\Runtime\AlarmAreaCommandRunner;
 use Oblivion\Collector\Runtime\OnvifSnapshotRunner;
 use Oblivion\Collector\Runtime\UnifiAccessCommandRunner;
+use Oblivion\Collector\Runtime\UnifiAccessControlRunner;
 use Oblivion\Collector\Security\CredentialLeaseDecryptor;
 use Oblivion\Collector\Security\EnvelopeVerifier;
 use Oblivion\Collector\Security\HubVault;
@@ -422,6 +423,8 @@ final class CollectorApplication
                 new AlarmAreaCommandRunner($scope, $credentialDecryptor),
                 // S&D Phase E (R5): pictures from standard ONVIF cameras.
                 new OnvifSnapshotRunner($scope, $credentialDecryptor),
+                // S&D Phase H: keep a door unlocked, and the Site emergency modes, in UniFi Access.
+                new UnifiAccessControlRunner($scope, $credentialDecryptor),
             );
             foreach ($config->commands as $command) {
                 if ($spool->status()['state'] === 'buffer_full') {

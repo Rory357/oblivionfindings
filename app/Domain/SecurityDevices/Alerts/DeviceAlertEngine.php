@@ -247,6 +247,41 @@ final class DeviceAlertEngine
     }
 
     /** @param  callable(DeviceAlert): string  $words */
+    /** S&D Phase H: a Site in lockdown or evacuating (UniFi Access), on the console's device. */
+    public const array EMERGENCY_KINDS = ['access_lockdown', 'access_evacuation'];
+
+    /**
+     * S&D Phase H: open the Site's lockdown or evacuation alert for the staff on shift (in the app
+     * and by push). It closes by itself when the emergency ends.
+     */
+    public function openEmergency(Device $console, string $mode, CarbonImmutable $at, string $what, ?string $detail): ?DeviceAlert
+    {
+        $kind = 'access_'.$mode;
+        if (! in_array($kind, self::EMERGENCY_KINDS, true)) {
+            throw new \InvalidArgumentException('Not an emergency kind.');
+        }
+        try {
+            // One emergency at a time: the other kind closes first.
+            foreach (array_diff(self::EMERGENCY_KINDS, [$kind]) as $other) {
+                $this->closeKind($console, $other, $at, fn (): string => 'Changed to '.($mode === 'evacuation' ? 'evacuation' : 'lockdown').'.');
+            }
+
+            return $this->openForHouse($console, $kind, 'critical', $mode === 'evacuation' ? 'Evacuating' : 'Lockdown', $at, $what, $detail, ['database', 'push']);
+        } catch (Throwable $exception) {
+            Log::error('Emergency alert could not be opened', ['device_id' => $console->id, 'mode' => $mode, 'error' => $exception->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /** S&D Phase H: the emergency ended; its alert closes. */
+    public function closeEmergency(Device $console, CarbonImmutable $at): void
+    {
+        foreach (self::EMERGENCY_KINDS as $kind) {
+            $this->closeKind($console, $kind, $at, fn (): string => 'Ended: the doors are back to their usual schedules.');
+        }
+    }
+
     public function closeCare(Device $device, string $kind, CarbonImmutable $at, callable $words): void
     {
         if (in_array($kind, self::CARE_KINDS, true)) {

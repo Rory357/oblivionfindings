@@ -13,6 +13,12 @@ final class CommandExpectedStateResolver
             'access.door.unlock_timed' => ['locked' => true],
             'access.door.lock' => ['locked' => true],
             'access.door.lockdown' => ['locked' => true, 'lockdown' => true],
+            // S&D Phase H: read back from UniFi Access by the hub.
+            'access.door.keep_unlocked' => ['keep_unlocked' => true],
+            'access.door.keep_unlocked_end' => ['keep_unlocked' => false],
+            'access.site.lockdown' => ['emergency' => 'lockdown'],
+            'access.site.evacuate' => ['emergency' => 'evacuation'],
+            'access.site.emergency_end' => ['emergency' => 'normal'],
             'access.schedule.update' => ['schedule_reference' => $parameters['schedule_reference'] ?? null],
             'access.credential.revoke' => ['credential_revoked' => true, 'credential_reference' => $parameters['credential_reference'] ?? null],
             'access.credential.grant' => ['credential_granted' => true, 'credential_reference' => $parameters['credential_reference'] ?? null, 'expires_at' => $parameters['expires_at'] ?? null],

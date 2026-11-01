@@ -2,6 +2,9 @@
 
 namespace App\Domain\SecurityDevices\Management\Services;
 
+use App\Domain\SecurityDevices\Access\AccessConsoles;
+use App\Domain\SecurityDevices\Access\Models\AccessConsole;
+use App\Domain\SecurityDevices\Access\Models\AccessDoor;
 use App\Domain\SecurityDevices\Drivers\Contracts\AlarmPanelDriver;
 use App\Domain\SecurityDevices\Drivers\Contracts\NetworkConfigBackupDriver;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
@@ -21,6 +24,12 @@ final class DeclaredDeviceCommandCapabilities
         'network.port.disable',
         'network.port.bounce',
     ];
+
+    /** S&D Phase H: door actions a UniFi Access door takes through the Site's hub. */
+    public const array UNIFI_ACCESS_DOOR_ACTIONS = ['access.door.keep_unlocked', 'access.door.keep_unlocked_end'];
+
+    /** S&D Phase H: UniFi Access's Site-wide emergency modes, on the console's device. */
+    public const array UNIFI_ACCESS_SITE_ACTIONS = ['access.site.lockdown', 'access.site.evacuate', 'access.site.emergency_end'];
 
     /** @return Collection<int, string> */
     public function forDevice(Device $device): Collection
@@ -70,6 +79,9 @@ final class DeclaredDeviceCommandCapabilities
             // no switch or controller has, so it is never offered until a real driver is built and
             // walked (Phase G).
             ...self::UNBUILT_PORT_ACTIONS,
+            // S&D Phase H: only from a real UniFi Access link (added back below).
+            ...self::UNIFI_ACCESS_DOOR_ACTIONS,
+            ...self::UNIFI_ACCESS_SITE_ACTIONS,
         ], true));
 
         $driverRegistry = app(DeviceDriverRegistry::class);
@@ -80,6 +92,14 @@ final class DeclaredDeviceCommandCapabilities
         if ($this->hasDirectAlarmApiTarget($device)
             && $driverRegistry->resolveAlarmDriver($device) instanceof AlarmPanelDriver) {
             $declared->push('alarm.arm', 'alarm.disarm');
+        }
+        // S&D Phase H: keep unlocked on a door UniFi Access knows; lockdown and evacuation on the
+        // Site's UniFi Access console. Both run only through the Site's hub.
+        if (AccessConsoles::doorFor($device) instanceof AccessDoor) {
+            $declared->push(...self::UNIFI_ACCESS_DOOR_ACTIONS);
+        }
+        if (AccessConsoles::consoleFor($device) instanceof AccessConsole) {
+            $declared->push(...self::UNIFI_ACCESS_SITE_ACTIONS);
         }
         if (app(EndpointScriptAuthority::class)->supports($device)) {
             $declared->push('endpoint.script.run');

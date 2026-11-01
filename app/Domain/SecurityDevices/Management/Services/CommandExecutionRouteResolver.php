@@ -141,6 +141,11 @@ final class CommandExecutionRouteResolver
                 "{$label} needs its software update before it can arm or disarm the alarm. Oblivion doesn’t reach into the house directly.",
             );
         }
+        if ($descriptor instanceof UnifiAccessControlCollectorDescriptor && ! UnifiAccessControlCollectorDescriptor::hubRunsIt($hub)) {
+            return CommandExecutionRoute::unavailable(
+                "{$label} needs its software update before it can change doors in UniFi Access. Oblivion doesn’t reach into the house directly.",
+            );
+        }
         if (! $descriptor->supports($device, $hub, $siteId)) {
             return CommandExecutionRoute::unavailable(
                 "{$label} can’t run this for the device yet: it needs an approved address, a saved login and a supported device type.",

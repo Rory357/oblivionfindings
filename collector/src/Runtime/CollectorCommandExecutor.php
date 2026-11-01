@@ -15,6 +15,7 @@ final readonly class CollectorCommandExecutor
         private ?CameraSnapshotRunner $cameraSnapshots = null,
         private ?AlarmAreaCommandRunner $alarmAreas = null,
         private ?OnvifSnapshotRunner $onvifSnapshots = null,
+        private ?UnifiAccessControlRunner $accessControl = null,
     ) {}
 
     /** @param array<string, mixed> $command */
@@ -49,7 +50,7 @@ final readonly class CollectorCommandExecutor
     }
 
     /** @param array<string, mixed> $command */
-    private function runnerFor(array $command): UnifiAccessCommandRunner|SshConfigBackupRunner|CameraSnapshotRunner|AlarmAreaCommandRunner|OnvifSnapshotRunner
+    private function runnerFor(array $command): UnifiAccessCommandRunner|SshConfigBackupRunner|CameraSnapshotRunner|AlarmAreaCommandRunner|OnvifSnapshotRunner|UnifiAccessControlRunner
     {
         return match ($command['adapter'] ?? null) {
             'unifi_access_timed_unlock_v1' => $this->runner,
@@ -57,6 +58,7 @@ final readonly class CollectorCommandExecutor
             'camera_snapshot_v1' => $this->cameraSnapshots ?? throw new ScopeViolation('This hub build cannot take camera pictures.'),
             'camera_snapshot_onvif_v1' => $this->onvifSnapshots ?? throw new ScopeViolation('This hub build cannot take ONVIF camera pictures.'),
             'alarm_area_control_v1' => $this->alarmAreas ?? throw new ScopeViolation('This hub build cannot arm or disarm alarms.'),
+            'unifi_access_control_v1' => $this->accessControl ?? throw new ScopeViolation('This hub build cannot change doors in UniFi Access.'),
             default => throw new ScopeViolation('Command adapter is not supported by this hub.'),
         };
     }

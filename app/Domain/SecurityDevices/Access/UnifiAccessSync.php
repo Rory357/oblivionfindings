@@ -119,6 +119,13 @@ final class UnifiAccessSync
 
         try {
             $this->store($console, $payload, $syncedAt);
+            // Door devices linked by UniFi door id; the console and its doors count as just seen.
+            app(AccessConsoles::class)->touch($console->fresh(), $syncedAt);
+            // Lockdown or evacuation set (or ended) in UniFi Access itself: told like one from Oblivion.
+            // An older console that doesn't say keeps what was known.
+            if (in_array($payload['emergency'] ?? null, AccessEmergency::MODES, true)) {
+                app(AccessEmergency::class)->changed($console->fresh(), $payload['emergency'], 'unifi', $syncedAt);
+            }
         } catch (Throwable $exception) {
             // A snapshot that can't be stored never blocks the hub's other uploads; the next one tries again.
             report($exception);
@@ -151,8 +158,6 @@ final class UnifiAccessSync
             $console->forceFill([
                 'state' => 'ok', 'last_error' => null, 'last_synced_at' => $syncedAt,
                 'events_until' => $until !== null && ($console->events_until === null || $until->gt($console->events_until)) ? $until : $console->events_until,
-                // As UniFi last said; an older console that doesn't say keeps what was known.
-                'emergency_mode' => in_array($payload['emergency'] ?? null, ['normal', 'lockdown', 'evacuation'], true) ? $payload['emergency'] : $console->emergency_mode,
             ])->save();
         });
     }

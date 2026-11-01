@@ -34,6 +34,11 @@ final readonly class ScopeGuard
         'alarm_area_control_v1' => [
             'capability' => ['alarm.arm', 'alarm.disarm'], 'provider' => ['inception', 'gallagher'], 'protocol' => 'command.alarm_rest',
         ],
+        // S&D Phase H: keep a UniFi Access door unlocked (or lock it again), and the Site's emergency modes.
+        'unifi_access_control_v1' => [
+            'capability' => ['access.door.keep_unlocked', 'access.door.keep_unlocked_end', 'access.site.lockdown', 'access.site.evacuate', 'access.site.emergency_end'],
+            'provider' => 'unifi_access', 'protocol' => 'command.unifi_access_control',
+        ],
     ];
 
     /** @return list<string> the job types this hub runs (reported in its heartbeat) */
@@ -135,6 +140,7 @@ final readonly class ScopeGuard
             'camera_snapshot_v1' => $this->assertCameraSnapshotCommand($command),
             'camera_snapshot_onvif_v1' => $this->assertOnvifSnapshotCommand($command),
             'alarm_area_control_v1' => $this->assertAlarmAreaCommand($command),
+            'unifi_access_control_v1' => $this->assertUnifiAccessControlCommand($command),
             default => $this->assertUnifiAccessCommand($command),
         };
 
@@ -266,6 +272,46 @@ final readonly class ScopeGuard
             || ! is_int($endpoint['connect_timeout_seconds']) || $endpoint['connect_timeout_seconds'] < 1 || $endpoint['connect_timeout_seconds'] > 10
             || ! is_int($endpoint['response_timeout_seconds']) || $endpoint['response_timeout_seconds'] < 1 || $endpoint['response_timeout_seconds'] > 30
             || ! is_int($endpoint['max_response_bytes']) || $endpoint['max_response_bytes'] < 1024 || $endpoint['max_response_bytes'] > 262_144) {
+            throw new ScopeViolation('Command endpoint is invalid or unbounded.');
+        }
+    }
+
+    /**
+     * S&D Phase H: one door's keep-unlocked (5 to 240 minutes) or its end, or the Site's emergency
+     * mode, to the UniFi Access console at its scoped private address with its trusted key only.
+     *
+     * @param  array<string, mixed>  $command
+     */
+    private function assertUnifiAccessControlCommand(array $command): void
+    {
+        $operations = [
+            'access.door.keep_unlocked' => ['keep_unlocked', ['keep_unlocked' => true], true],
+            'access.door.keep_unlocked_end' => ['keep_unlocked_end', ['keep_unlocked' => false], true],
+            'access.site.lockdown' => ['lockdown', ['emergency' => 'lockdown'], false],
+            'access.site.evacuate' => ['evacuate', ['emergency' => 'evacuation'], false],
+            'access.site.emergency_end' => ['emergency_end', ['emergency' => 'normal'], false],
+        ];
+        [$operation, $expected, $onDoor] = $operations[$command['capability']];
+        $parameters = $command['parameters'];
+        $wanted = $operation === 'keep_unlocked' ? ['operation', 'minutes'] : ['operation'];
+        if (! is_array($parameters) || array_keys($parameters) !== $wanted || $parameters['operation'] !== $operation
+            || ($operation === 'keep_unlocked' && (! is_int($parameters['minutes']) || $parameters['minutes'] < 5 || $parameters['minutes'] > 240))
+            || $command['expected_state'] !== $expected) {
+            throw new ScopeViolation('Command parameters or expected state are invalid.');
+        }
+        $endpoint = $command['endpoint'];
+        $keys = ['address', 'port', 'trusted_pin', 'door_id', 'connect_timeout_seconds', 'response_timeout_seconds', 'max_response_bytes'];
+        if (! is_array($endpoint) || array_keys($endpoint) !== $keys
+            || $endpoint['address'] !== $command['target']
+            || ! is_string($endpoint['address']) || filter_var($endpoint['address'], FILTER_VALIDATE_IP) === false
+            || filter_var($endpoint['address'], FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false
+            || ! in_array($endpoint['port'], [443, 12445], true)
+            || ! is_string($endpoint['trusted_pin']) || preg_match('/\Asha256\/\/[A-Za-z0-9+\/]{43}=\z/', $endpoint['trusted_pin']) !== 1
+            || ($onDoor && (! is_string($endpoint['door_id']) || preg_match('/\A[A-Za-z0-9._:-]{1,64}\z/', $endpoint['door_id']) !== 1))
+            || (! $onDoor && $endpoint['door_id'] !== null)
+            || ! is_int($endpoint['connect_timeout_seconds']) || $endpoint['connect_timeout_seconds'] < 1 || $endpoint['connect_timeout_seconds'] > 10
+            || ! is_int($endpoint['response_timeout_seconds']) || $endpoint['response_timeout_seconds'] < 1 || $endpoint['response_timeout_seconds'] > 30
+            || ! is_int($endpoint['max_response_bytes']) || $endpoint['max_response_bytes'] < 1024 || $endpoint['max_response_bytes'] > 65_536) {
             throw new ScopeViolation('Command endpoint is invalid or unbounded.');
         }
     }

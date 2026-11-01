@@ -85,12 +85,71 @@ final class SafetyKitCommandController extends Controller
         return $this->sendOne($request, $user, $device, 'access.door.unlock_timed', ['duration_seconds' => $seconds], trim($data['reason']), null, $data['idempotency_key']);
     }
 
+    /**
+     * S&D Phase H (pop-up 70): keep a UniFi Access door unlocked until a time at most 4 hours ahead
+     * (NZ time), through the Site's hub. The minutes are worked out here, never taken from the browser.
+     */
+    public function keepUnlocked(Request $request, Device $device): RedirectResponse
+    {
+        $user = $this->guard($request, $device, DoorPagePresenter::serves($device), 'access.door.keep_unlocked');
+        $data = $request->validate([
+            'until' => ['required', 'date_format:Y-m-d\TH:i'],
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+            'idempotency_key' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9:_-]+$/'],
+        ], [
+            'reason.min' => 'Say a little more about why, so the next person understands (at least 10 characters).',
+            'until.date_format' => 'Choose a date and a time.',
+        ]);
+        $until = CarbonImmutable::createFromFormat('Y-m-d\TH:i', $data['until'], 'Pacific/Auckland')->utc();
+        $minutes = (int) ceil(CarbonImmutable::now('UTC')->diffInSeconds($until, false) / 60);
+        if ($minutes < 5) {
+            throw ValidationException::withMessages(['until' => 'Choose a time at least 5 minutes from now.']);
+        }
+        if ($minutes > 240) {
+            throw ValidationException::withMessages(['until' => 'Choose a time at most 4 hours ahead.']);
+        }
+
+        return $this->sendOne($request, $user, $device, 'access.door.keep_unlocked', ['minutes' => $minutes], trim($data['reason']), null, $data['idempotency_key']);
+    }
+
+    /** S&D Phase H: end a keep unlocked early. Only locks the door again. */
+    public function keepUnlockedEnd(Request $request, Device $device): RedirectResponse
+    {
+        $user = $this->guard($request, $device, DoorPagePresenter::serves($device), 'access.door.keep_unlocked_end');
+        $data = $request->validate([
+            'idempotency_key' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9:_-]+$/'],
+        ]);
+
+        return $this->sendOne($request, $user, $device, 'access.door.keep_unlocked_end', [], 'Locked again early from the door page in Oblivion', null, $data['idempotency_key']);
+    }
+
+    /**
+     * S&D Phase H (pop-up 86): lock down, evacuate, or end either at a Site, on its UniFi Access
+     * console's device. Every governed step stays: reason, the typed name, two-step sign-in, and a
+     * second person's approval (or IT's break-glass). Exit buttons and handles always open the doors.
+     */
+    public function siteEmergency(Request $request, Device $device, string $mode): RedirectResponse
+    {
+        $capability = ['lockdown' => 'access.site.lockdown', 'evacuate' => 'access.site.evacuate', 'end' => 'access.site.emergency_end'][$mode] ?? null;
+        abort_unless($capability !== null, 404);
+        $user = $this->guard($request, $device, \App\Domain\SecurityDevices\Access\AccessConsoles::consoleFor($device) !== null, $capability);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+            'confirmation_text' => ['nullable', 'string', 'max:255'],
+            'idempotency_key' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9:_-]+$/'],
+        ], [
+            'reason.min' => 'Say a little more about why, so the next person understands (at least 10 characters).',
+        ]);
+
+        return $this->sendOne($request, $user, $device, $capability, [], trim($data['reason']), $data['confirmation_text'] ?? null, $data['idempotency_key']);
+    }
+
     /** Send a request a second person has approved; only its requester (or an IT admin) may. */
     public function run(Request $request, Device $device, DeviceCommandRequest $command): RedirectResponse
     {
         abort_unless((int) $command->device_id === (int) $device->id, 404);
         $user = $this->guard($request, $device, true, $command->capability);
-        abort_unless(in_array($command->capability, ['alarm.arm', 'alarm.disarm', 'access.door.unlock_timed'], true), 404);
+        abort_unless(in_array($command->capability, ['alarm.arm', 'alarm.disarm', 'access.door.unlock_timed', 'access.door.keep_unlocked', 'access.door.keep_unlocked_end', 'access.site.lockdown', 'access.site.evacuate', 'access.site.emergency_end'], true), 404);
         abort_unless((int) $command->requested_by_user_id === (int) $user->id || $user->canDo('securityDevices.commands.admin'), 403);
         $this->queue->queue($command, $user);
 
@@ -103,7 +162,10 @@ final class SafetyKitCommandController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User && $user->canDo('securityDevices.devices.view'), 403);
         $this->access->assertCanViewDevice($user, $device);
-        $request->session()->put('url.intended', route('security-devices.devices.show', $device, false));
+        // A Site's UniFi Access console comes back to the Access page (pop-up 86), anything else to its own page.
+        $request->session()->put('url.intended', \App\Domain\SecurityDevices\Access\AccessConsoles::consoleFor($device) !== null
+            ? '/security-devices/access'
+            : route('security-devices.devices.show', $device, false));
 
         return redirect()->route('password.confirm');
     }

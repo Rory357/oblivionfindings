@@ -18,8 +18,14 @@ final class CollectorCommandDescriptorRegistry
         CameraSnapshotCollectorDescriptor $cameraSnapshot,
         AlarmArmCollectorDescriptor $alarmArm,
         AlarmDisarmCollectorDescriptor $alarmDisarm,
+        // S&D Phase H: keep a door unlocked, and the Site emergency modes, in UniFi Access.
+        UnifiAccessKeepUnlockedCollectorDescriptor $keepUnlocked,
+        UnifiAccessKeepUnlockedEndCollectorDescriptor $keepUnlockedEnd,
+        UnifiAccessLockdownCollectorDescriptor $lockdown,
+        UnifiAccessEvacuateCollectorDescriptor $evacuate,
+        UnifiAccessEmergencyEndCollectorDescriptor $emergencyEnd,
     ) {
-        foreach ([$unifiAccess, $sshConfigBackup, $cameraSnapshot, $alarmArm, $alarmDisarm] as $descriptor) {
+        foreach ([$unifiAccess, $sshConfigBackup, $cameraSnapshot, $alarmArm, $alarmDisarm, $keepUnlocked, $keepUnlockedEnd, $lockdown, $evacuate, $emergencyEnd] as $descriptor) {
             $this->byCapability[$descriptor->capability()] = $descriptor;
         }
     }

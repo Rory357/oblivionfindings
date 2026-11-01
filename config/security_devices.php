@@ -157,6 +157,20 @@ $capabilities = [
         'duration_seconds' => ['type' => 'integer', 'min' => 5, 'max' => 60],
     ], ['duration_seconds'], true),
     'access.door.lock' => $high('Lock door', 'security', 'door_lock_state', [], [], true),
+    // S&D Phase H (pop-up 70): keep a UniFi Access door unlocked for up to 4 hours, through the Site's hub.
+    // A person only; automations never unlock (SafeActions). Ending it early only locks the door again.
+    'access.door.keep_unlocked' => $high('Keep door unlocked', 'security', 'door_keep_unlocked_state', [
+        'minutes' => ['type' => 'integer', 'min' => 5, 'max' => 240],
+    ], ['minutes'], true),
+    'access.door.keep_unlocked_end' => array_replace(
+        $definition('Lock door again now', 'security', 'control', 'medium', true, false, false, false, 300, 'door_keep_unlocked_state'),
+        ['confirmation_mode' => 'acknowledge_impact'],
+    ),
+    // S&D Phase H (pop-up 86): UniFi Access's own Site-wide emergency modes, through the Site's hub.
+    // Every door has an exit button and a handle (Stephan, 30 Oct), so lockdown never shuts anyone in.
+    'access.site.lockdown' => $critical('Lock down the Site', 'security', 'site_emergency_state'),
+    'access.site.evacuate' => $critical('Evacuate the Site', 'security', 'site_emergency_state'),
+    'access.site.emergency_end' => $high('End lockdown or evacuation', 'security', 'site_emergency_state', [], [], true),
     'access.door.lockdown' => $critical('Lock down door', 'security', 'door_lockdown_state'),
     'access.schedule.update' => array_replace($high('Update access schedule', 'security', 'access_schedule_hash_matches', [
         'schedule_reference' => ['type' => 'string', 'max_length' => 120],
@@ -305,6 +319,9 @@ $authorise(
     ['access_control'],
     sensitivity: 'security_control',
 );
+// S&D Phase H: keep a door unlocked (the door's device), and the Site emergency modes (the console's device).
+$authorise(['access.door.keep_unlocked', 'access.door.keep_unlocked_end'], ['security'], ['access_control'], ['securityDevices.doors.unlock'], 'security_control');
+$authorise(['access.site.lockdown', 'access.site.evacuate', 'access.site.emergency_end'], ['security'], ['access_control'], ['securityDevices.access.lockdown'], 'security_control');
 $authorise(
     ['alarm.arm', 'alarm.disarm', 'alarm.bypass', 'alarm.reset', 'alarm.emergency_mode.set'],
     ['security'],
@@ -380,6 +397,11 @@ $guidance = [
     'network.firewall_policy.apply' => ['Changes network security policy and may affect Site connectivity.', 'A fresh configuration hash matches the approved firewall policy.'],
     'access.door.unlock_timed' => ['Temporarily unlocks this exact door for the approved attendance window.', 'The provider confirms the door returns to locked after the bounded window.'],
     'access.door.lock' => ['Locks this exact door and may prevent physical entry or exit.', 'A fresh provider observation confirms the door is locked.'],
+    'access.door.keep_unlocked' => ['Leaves this door unlocked until the time chosen: anyone can walk in until then. It locks again by itself.', 'The hub reads the door back and UniFi Access shows it kept unlocked.'],
+    'access.door.keep_unlocked_end' => ['Locks this door again now, ending a keep unlocked early.', 'The hub reads the door back and UniFi Access no longer shows it kept unlocked.'],
+    'access.site.lockdown' => ['Stops every card, PIN and phone opening the doors at this Site from outside. People inside can always leave by the exit button and handle.', 'The hub reads UniFi Access back and it shows the Site in lockdown.'],
+    'access.site.evacuate' => ['Unlocks every door at this Site so everyone can get out, until someone ends it.', 'The hub reads UniFi Access back and it shows the Site evacuating.'],
+    'access.site.emergency_end' => ['Ends lockdown or evacuation: the doors go back to their usual schedules and lock.', 'The hub reads UniFi Access back and it shows no emergency at the Site.'],
     'access.door.lockdown' => ['Places this exact door into lockdown and may materially affect life safety and access.', 'A fresh provider observation confirms locked and lockdown state.'],
     'access.schedule.update' => ['Changes when approved credentials may use this access point.', 'A fresh access-schedule hash matches the approved schedule.'],
     'access.credential.revoke' => ['Immediately removes the referenced credential access.', 'The provider freshly confirms the credential is revoked.'],

@@ -46,12 +46,16 @@ export function DoorOverview({
     now,
     onTab,
     onUnlock,
+    onKeepUnlocked,
+    onLockAgain,
     onCheck,
 }: {
     props: DoorPageProps;
     now: Date;
     onTab: (tab: DoorPageProps['tab']) => void;
     onUnlock: () => void;
+    onKeepUnlocked?: () => void;
+    onLockAgain?: () => void;
     onCheck: () => void;
 }) {
     const overview = props.overview;
@@ -71,11 +75,27 @@ export function DoorOverview({
     }
     lines.push(...commandLineItems({ commands: control.commands, now, deviceId: props.device.id, onCheck }));
 
+    const keep = can.keep_unlocked && onKeepUnlocked;
+    const again = can.lock_again && onLockAgain && lock.title.startsWith('Unlocked');
     const actions =
-        can.unlock && seconds ? (
-            <Button type="button" size="sm" onClick={onUnlock}>
-                Unlock for {seconds} seconds
-            </Button>
+        (can.unlock && seconds) || keep || again ? (
+            <>
+                {can.unlock && seconds ? (
+                    <Button type="button" size="sm" onClick={onUnlock}>
+                        Unlock for {seconds} seconds
+                    </Button>
+                ) : null}
+                {keep ? (
+                    <Button type="button" size="sm" variant="outline" onClick={onKeepUnlocked}>
+                        Keep unlocked
+                    </Button>
+                ) : null}
+                {again ? (
+                    <Button type="button" size="sm" variant="outline" onClick={onLockAgain}>
+                        Lock again now
+                    </Button>
+                ) : null}
+            </>
         ) : undefined;
 
     return (

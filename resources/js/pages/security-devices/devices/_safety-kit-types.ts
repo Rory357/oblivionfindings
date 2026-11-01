@@ -178,9 +178,12 @@ export type DoorPageProps = {
         relocks: boolean;
     };
     meters: SafetyKitMeter[];
-    can: BaseCan & { unlock: boolean };
+    can: BaseCan & { unlock: boolean; keep_unlocked?: boolean; lock_again?: boolean };
     control: {
         unlock: GovernedAction | null;
+        /** S&D Phase H (pop-up 70): keep unlocked and lock again, for a door UniFi Access knows. */
+        keep_unlocked?: GovernedAction | null;
+        lock_again?: GovernedAction | null;
         seconds: number | null;
         commands: SafetyCommand[];
         confirm_identity_url: string;

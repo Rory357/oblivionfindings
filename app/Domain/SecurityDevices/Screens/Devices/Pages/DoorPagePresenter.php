@@ -32,8 +32,8 @@ use Illuminate\Support\Str;
  *
  * "Unlock for N seconds" is today's governed access.door.unlock_timed (step-up, approval, hub-first,
  * read-back that it locked again); the seconds are the door's own approved setting. "Keep unlocked"
- * has no governed command yet, so it is never offered here. The door never unlocks by schedule or
- * automation (D12). The Settings tab has no approved drawing yet, so it isn't built.
+ * (S&D Phase H) is governed access.door.keep_unlocked, offered only for a door UniFi Access knows,
+ * through the Site's hub. The door never unlocks by schedule or automation (D12). The Settings tab has no approved drawing yet, so it isn't built.
  */
 final class DoorPagePresenter
 {
@@ -83,6 +83,9 @@ final class DoorPagePresenter
         $events = $canSeeEvents ? $this->events($viewer, $device, $now->subDays(self::NAME_DAYS), $people, $now) : collect();
         $stepUpAt = $input['step_up_at'] ?? null;
         $unlock = $this->commands->action($viewer, $device, $siteId, 'access.door.unlock_timed', $stepUpAt);
+        // S&D Phase H (pop-up 70): keep unlocked, only for a door UniFi Access knows, through the hub.
+        $keep = $this->commands->action($viewer, $device, $siteId, 'access.door.keep_unlocked', $stepUpAt);
+        $keepEnd = $this->commands->action($viewer, $device, $siteId, 'access.door.keep_unlocked_end', $stepUpAt);
         $seconds = data_get($device->config ?? [], 'management.unifi_access.unlock_duration_seconds');
         $seconds = is_int($seconds) && $seconds >= 5 && $seconds <= 60 ? $seconds : null;
         $credentials = $siteId !== null ? $this->credentials($device, $siteId) : collect();
@@ -116,6 +119,8 @@ final class DoorPagePresenter
                 'assign' => $viewer->canDo('securityDevices.devices.assign'),
                 'see_events' => $canSeeEvents,
                 'unlock' => $unlock !== null && $unlock['available'] && $seconds !== null,
+                'keep_unlocked' => $keep !== null && $keep['available'],
+                'lock_again' => $keepEnd !== null && $keepEnd['available'],
             ],
             'control' => [
                 'unlock' => $unlock === null ? null : [
@@ -124,7 +129,9 @@ final class DoorPagePresenter
                     'reason' => $unlock['reason'] ?? ($seconds === null ? 'The door’s unlock time isn’t set up safely yet, so Oblivion won’t unlock it.' : null),
                 ],
                 'seconds' => $seconds,
-                'commands' => $this->commands->recent($viewer, $device, ['access.door.unlock_timed'], $now),
+                'keep_unlocked' => $keep,
+                'lock_again' => $keepEnd,
+                'commands' => $this->commands->recent($viewer, $device, ['access.door.unlock_timed', 'access.door.keep_unlocked', 'access.door.keep_unlocked_end'], $now),
                 'confirm_identity_url' => route('security-devices.devices.safety.confirm-identity', ['device' => $device->id], false),
             ],
             'overview' => $tab === 'overview' ? [

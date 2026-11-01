@@ -6,13 +6,15 @@
  * after it is sent this page shows "Checking…" until the door confirms it locked again. The door never
  * unlocks by schedule or automation (D12).
  *
- * Not built here, on purpose: "Keep unlocked" (sdr-70 is drawn in door-popups.tsx, but no governed
- * command can keep a door unlocked yet, so it is never offered), "Keep locked", "Give someone access"
- * (Phase H), "Export", camera clips, and the Settings tab (no approved drawing yet).
+ * "Keep unlocked" (sdr-70) and "Lock again now" are governed too (S&D Phase H), for a door UniFi
+ * Access knows, through the Site's hub.
+ *
+ * Not built here, on purpose: "Keep locked", "Give someone access" (on the Access page), "Export",
+ * camera clips, and the Settings tab (no approved drawing yet).
  */
 import { PageLayout } from '@/components/page';
 import { DeviceFormPopup, useDeviceFormOptions, WatchDevice, type PopupDevice } from '@/components/security-devices/device-popups';
-import { UnlockDoor, type DoorPopupDoor } from '@/components/security-devices/door-popups';
+import { KeepDoorUnlocked, LockDoorAgain, UnlockDoor, type DoorPopupDoor } from '@/components/security-devices/door-popups';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { Lock } from 'lucide-react';
@@ -23,7 +25,7 @@ import type { DoorPageProps, DoorTab } from './_safety-kit-types';
 
 export type { DoorPageProps } from './_safety-kit-types';
 
-type Popup = 'edit' | 'watch' | 'unlock' | null;
+type Popup = 'edit' | 'watch' | 'unlock' | 'keep' | 'lock_again' | null;
 
 /** What changes while an unlock is on its way: read only these again. */
 const READ_BACK = ['control', 'lock', 'overview', 'meters', 'device'];
@@ -66,6 +68,8 @@ export default function DoorPage(props: DoorPageProps) {
                 now={now}
                 onTab={go}
                 onUnlock={() => open('unlock')}
+                onKeepUnlocked={() => open('keep')}
+                onLockAgain={() => open('lock_again')}
                 onCheck={() => checkNow(READ_BACK)}
             />
         );
@@ -118,6 +122,12 @@ export default function DoorPage(props: DoorPageProps) {
             <WatchDevice open={popup === 'watch'} device={popup === 'watch' ? self : null} form={form} onClose={close} />
             {control.unlock && can.unlock && control.seconds ? (
                 <UnlockDoor open={popup === 'unlock'} door={door} action={control.unlock} seconds={control.seconds} confirmUrl={control.confirm_identity_url} onClose={close} />
+            ) : null}
+            {control.keep_unlocked && can.keep_unlocked ? (
+                <KeepDoorUnlocked open={popup === 'keep'} door={door} action={control.keep_unlocked} confirmUrl={control.confirm_identity_url} onClose={close} />
+            ) : null}
+            {control.lock_again && can.lock_again ? (
+                <LockDoorAgain open={popup === 'lock_again'} door={door} action={control.lock_again} confirmUrl={control.confirm_identity_url} onClose={close} />
             ) : null}
         </AppLayout>
     );

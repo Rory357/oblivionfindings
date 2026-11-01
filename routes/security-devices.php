@@ -381,6 +381,11 @@ Route::middleware([
             Route::post('/arm', [SafetyKitCommandController::class, 'arm'])->name('security-devices.devices.safety.arm');
             Route::post('/disarm', [SafetyKitCommandController::class, 'disarm'])->name('security-devices.devices.safety.disarm');
             Route::post('/unlock', [SafetyKitCommandController::class, 'unlock'])->name('security-devices.devices.safety.unlock');
+            // S&D Phase H (pop-up 70): keep a UniFi Access door unlocked for a while, or lock it again early.
+            Route::post('/keep-unlocked', [SafetyKitCommandController::class, 'keepUnlocked'])->name('security-devices.devices.safety.keep-unlocked');
+            Route::post('/keep-unlocked/end', [SafetyKitCommandController::class, 'keepUnlockedEnd'])->name('security-devices.devices.safety.keep-unlocked-end');
+            // S&D Phase H (pop-up 86): lock down, evacuate or end, on a Site's UniFi Access console.
+            Route::post('/site/{mode}', [SafetyKitCommandController::class, 'siteEmergency'])->whereIn('mode', ['lockdown', 'evacuate', 'end'])->name('security-devices.devices.safety.site');
             Route::post('/commands/{command}/run', [SafetyKitCommandController::class, 'run'])->whereNumber('command')->name('security-devices.devices.safety.run');
         });
     });

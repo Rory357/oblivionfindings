@@ -18,6 +18,16 @@ final class SafetyEventObserver
     public function created(DeviceEvent $event): void
     {
         $type = strtolower(trim((string) $event->event_type));
+        if ($type === 'management_command_reconciled' && $event->device_id !== null) {
+            // S&D Phase H: the hub confirmed a lockdown, evacuation or its end: tell Control Room and staff.
+            $mode = \App\Domain\SecurityDevices\Access\AccessEmergency::CAPABILITY_MODES[(string) data_get($event->payload, 'capability')] ?? null;
+            $console = $mode !== null ? \App\Domain\SecurityDevices\Access\AccessConsoles::consoleFor(Device::query()->find($event->device_id) ?? new Device) : null;
+            if ($console !== null) {
+                app(\App\Domain\SecurityDevices\Access\AccessEmergency::class)->changed($console, $mode, 'oblivion');
+            }
+
+            return;
+        }
         if ($type === 'door_opened' && $event->device_id !== null) {
             // S&D Phase F: a door contact linked to someone's wandering plan tells staff at night.
             $door = Device::query()->find($event->device_id);
