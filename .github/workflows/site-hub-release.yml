@@ -45,7 +45,8 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
-          extensions: curl, json, mbstring, openssl, sodium, sockets
+          # snmp: Phase A, item A7 — the collector's SNMP v2c/v3 checks run for real in these tests.
+          extensions: curl, json, mbstring, openssl, sodium, sockets, snmp
           coverage: none
 
       - name: Setup Go
@@ -56,6 +57,8 @@ jobs:
 
       - name: Install collector dependencies & run collector unit tests
         working-directory: collector
+        env:
+          OBLIVION_REQUIRE_SNMP: "1"
         run: |
           composer install --no-interaction --prefer-dist
           composer test
@@ -111,7 +114,8 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
-          extensions: curl, mbstring, openssl, sodium, sockets
+          # snmp: Phase A, item A7 — php_snmp.dll is copied into the hub runtime below.
+          extensions: curl, mbstring, openssl, sodium, sockets, snmp
           coverage: none
 
       - name: Prepare collector production vendor tree
@@ -128,13 +132,17 @@ jobs:
 
       - name: Build Windows binaries, unsigned Obli.Setup installer, and signed release manifests
         shell: pwsh
+        # Only a push to main (or a manual run on main) may sign with the real publisher keys. Every
+        # other branch, tag and pull request builds with throwaway keys and uploads no signed catalogue,
+        # so an unreviewed branch can never produce a release the server would trust
+        # (MASTER's condition for pushing S&D build branches, 30 Oct 2026; docs/security-devices/GOAL.md).
         env:
           INPUT_VERSION: ${{ inputs.version || '0.2.0' }}
           INPUT_REVISION: ${{ inputs.revision || '1' }}
-          PUBLISHER_PACKAGE_SEED: ${{ secrets.ENDPOINT_PACKAGE_SIGNING_SEED }}
-          PUBLISHER_CATALOGUE_SEED: ${{ secrets.ENDPOINT_CATALOGUE_SIGNING_SEED }}
-          PUBLISHER_PACKAGE_PUBKEY: ${{ secrets.ENDPOINT_PACKAGE_PUBLIC_KEY }}
-          PUBLISHER_CATALOGUE_PUBKEY: ${{ secrets.ENDPOINT_RELEASE_PUBLIC_KEY }}
+          PUBLISHER_PACKAGE_SEED: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_PACKAGE_SIGNING_SEED || '' }}
+          PUBLISHER_CATALOGUE_SEED: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_CATALOGUE_SIGNING_SEED || '' }}
+          PUBLISHER_PACKAGE_PUBKEY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_PACKAGE_PUBLIC_KEY || '' }}
+          PUBLISHER_CATALOGUE_PUBKEY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_RELEASE_PUBLIC_KEY || '' }}
         run: |
           $ErrorActionPreference = 'Stop'
           $version = '0.2.0'
@@ -221,9 +229,17 @@ jobs:
             Copy-Item collector\composer.json (Join-Path $siteStage 'composer.json')
             Copy-Item $phpExe (Join-Path $runtimeStage 'php.exe')
             Get-ChildItem -Path $phpDir -Filter '*.dll' -File | ForEach-Object { Copy-Item $_.FullName (Join-Path $runtimeStage $_.Name) }
-            foreach ($ext in @('php_curl.dll', 'php_openssl.dll', 'php_sodium.dll', 'php_sockets.dll')) {
+            foreach ($ext in @('php_curl.dll', 'php_openssl.dll', 'php_sodium.dll', 'php_sockets.dll', 'php_snmp.dll')) {
               Copy-Item (Join-Path $phpDir "ext\$ext") (Join-Path $extStage $ext)
             }
+            # Phase A, item A7: prove the staged hub runtime loads SNMP with the hub's own flags. The probe
+            # file lives outside the staged runtime so it is never packaged.
+            $snmpProbe = Join-Path $env:RUNNER_TEMP "snmp-probe-$arch.php"
+            Set-Content -LiteralPath $snmpProbe -Value "<?php echo (function_exists('snmp2_get') && function_exists('snmp3_get')) ? 'snmp-ok' : 'snmp-missing';" -Encoding ascii
+            $snmpCheck = & (Join-Path $runtimeStage 'php.exe') -n -d "extension_dir=$extStage" -d extension=php_sockets.dll -d extension=php_snmp.dll $snmpProbe
+            Remove-Item -LiteralPath $snmpProbe -Force
+            if ("$snmpCheck".Trim() -ne 'snmp-ok') { throw "Hub runtime ($arch) cannot load the SNMP module: $snmpCheck" }
+            Write-Host "Hub runtime ($arch) loads SNMP: $snmpCheck"
             $caCandidate = @(
               (Join-Path $phpDir 'extras\ssl\cacert.pem'),
               (Join-Path $phpDir 'cacert.pem')
@@ -272,7 +288,7 @@ jobs:
             Invoke-BuildWindowsZip $siteOnlyAmd64Stage 'amd64' @('site') (Join-Path $stageCatalogue 'oblivion-site-windows-amd64.zip')
           }
 
-          # Windows arm64 computer archive
+          # Windows arm64 computer archive: Obli and the computer agent only. There is no Windows arm64 hub.
           $arm64Stage = Join-Path $workRoot 'pkg-computer-arm64'
           New-Item -ItemType Directory -Force -Path (Join-Path $arm64Stage 'computer') | Out-Null
           Copy-Item (Join-Path $toolsOut 'obli-windows-arm64\obli.exe') (Join-Path $arm64Stage 'computer\obli.exe')
@@ -346,7 +362,7 @@ jobs:
           "UPLOAD_SIGNED_CATALOGUE=$uploadFlag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Upload signed release catalogue
-        if: ${{ env.UPLOAD_SIGNED_CATALOGUE == 'true' }}
+        if: ${{ env.UPLOAD_SIGNED_CATALOGUE == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v4
         with:
           name: signed-endpoint-and-site-hub-catalogue

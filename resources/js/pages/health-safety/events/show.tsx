@@ -31,6 +31,8 @@ export function actionFromUrl(url: string): EventActionKey | null {
                 investigation: 'investigation',
                 close: 'close',
                 'add-action': 'add_action',
+                // Decision 3 (G3): the closing check "Choose an owner" links here.
+                'choose-owner': 'choose_owner',
             } as const
         )[action?.replaceAll('_', '-') ?? ''] ?? null
     );
@@ -47,6 +49,7 @@ export function sectionFromUrl(url: string): EventSectionKey | null {
         'risk',
         'timeline',
         'evidence',
+        'history',
     ];
 
     return sections.includes(section as EventSectionKey)

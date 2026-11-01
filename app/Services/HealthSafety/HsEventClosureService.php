@@ -249,6 +249,30 @@ final class HsEventClosureService
             HsClosureReadiness::EXCEPTIONAL,
         );
 
+        // Q11 (G3): a check that said an action didn't work blocks closing until a revised action replacing it has
+        // been done and checked as working (or its own failed check is itself replaced, and so on). Hard: no
+        // close-anyway category covers it.
+        $unresolvedFailures = HsCorrectiveAction::unresolvedFailedReferences((int) $event->id);
+        $requirements[] = $this->requirement(
+            'revised_actions',
+            $unresolvedFailures === [],
+            $unresolvedFailures === []
+                ? 'Every action whose check said it didn\'t work has a revised action that worked'
+                : 'Add a revised action for '.implode(', ', $unresolvedFailures).' (its check said it didn\'t work), then do it and check it worked.',
+            "/health-safety/events/{$event->id}?section=actions",
+            HsClosureReadiness::HARD,
+        );
+
+        // Decision 3 (G3): a safety review needs an owner before it can close. Hard: no close-anyway category covers it.
+        $hasOwner = $event->owner_user_id !== null;
+        $requirements[] = $this->requirement(
+            'has_owner',
+            $hasOwner,
+            $hasOwner ? 'The safety review has an owner' : 'Choose an owner for this safety review before closing it.',
+            "/health-safety/events/{$event->id}?action=choose-owner",
+            HsClosureReadiness::HARD,
+        );
+
         return new HsClosureReadiness((int) $event->id, $event->site_id ? (int) $event->site_id : null, $requirements);
     }
 

@@ -24,7 +24,7 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-// Milesight LoRaWAN Gateway (UG56/UG65/UG67) local HTTP(S) Push receiver (HMAC-SHA256 / Bearer, CSRF exempt)
+// Milesight LoRaWAN Gateway (UG56/UG65/UG67) HTTP(S) push: private network only (D23), Site secret (CSRF exempt)
 Route::post('/webhooks/milesight-gateway/{site}', MilesightGatewayWebhookController::class)
     ->whereNumber('site')
     ->middleware('throttle:120,1')

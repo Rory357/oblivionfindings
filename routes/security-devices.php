@@ -30,6 +30,7 @@ use App\Domain\SecurityDevices\Http\Controllers\DeviceController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceDocumentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceGroupController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceOfflineAlertController;
+use App\Domain\SecurityDevices\Http\Controllers\SshHostKeyTrustController;
 use App\Domain\SecurityDevices\Http\Controllers\DevicePingController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCandidateReviewController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCollectorController;
@@ -209,6 +210,15 @@ Route::middleware([
         ])
         ->name('security-devices.devices.offline-alert');
 
+    // Phase A, item A6: trust (or, as an IT admin, replace) the SSH key a device offered.
+    Route::post('/devices/{device}/ssh-host-key/trust', SshHostKeyTrustController::class)
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.commands.manage',
+            'throttle:20,1',
+        ])
+        ->name('security-devices.devices.ssh-host-key.trust');
+
     Route::post('/devices/{device}/camera/snapshot', [DeviceCameraOnvifController::class, 'snapshot'])
         ->whereNumber('device')
         ->middleware([
@@ -217,6 +227,16 @@ Route::middleware([
             'throttle:20,1',
         ])
         ->name('security-devices.devices.camera.snapshot');
+
+    // Phase A, item A5: trust (or, as an IT admin, replace) the certificate a camera or Protect console offered.
+    Route::post('/devices/{device}/camera/certificate/trust', [DeviceCameraOnvifController::class, 'trustCertificate'])
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.commands.manage',
+            'throttle:20,1',
+        ])
+        ->name('security-devices.devices.camera.certificate.trust');
 
     Route::get('/devices/{device}/camera/streams', [DeviceCameraOnvifController::class, 'streams'])
         ->whereNumber('device')

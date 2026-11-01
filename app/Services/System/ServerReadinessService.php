@@ -7,6 +7,7 @@ use App\Domain\Monitoring\Services\MonitoringRuntimeHealthService;
 use App\Domain\Monitoring\Transports\NativeIcmpTransport;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerRestoreProbe;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointReleaseCatalogue;
+use App\Domain\SecurityDevices\Services\ListenerHeartbeat;
 use App\Jobs\System\RecordDefaultWorkerHeartbeatJob;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -72,6 +73,7 @@ final class ServerReadinessService
             $this->checkCollectorKeys(),
             $this->checkReleaseKey(),
             $this->checkCredentialStore(),
+            ...$this->checkEnabledListeners(),
         ];
 
         $passedCount = collect($checks)->where('status', 'pass')->count();
@@ -128,19 +130,21 @@ final class ServerReadinessService
             // Fall through to local evaluation.
         }
 
+        $listenerChecks = $this->checkEnabledListeners();
         $fastChecks = [
             $this->checkScheduler(),
             $this->checkWorkerPools(),
             $this->checkCollectorKeys(),
             $this->checkReleaseKey(),
             $this->checkCredentialStore(),
+            ...$listenerChecks,
         ];
 
         if (collect($fastChecks)->contains(fn (array $check): bool => ($check['status'] ?? 'fail') !== 'pass')) {
             return [
                 'ready' => false,
                 'passed_count' => null,
-                'total_count' => 7,
+                'total_count' => 7 + count($listenerChecks),
             ];
         }
 
@@ -433,6 +437,67 @@ final class ServerReadinessService
     }
 
     /** @return array<string, mixed> */
+    /**
+     * One check per S&D listener that is switched on (Phase A, items A3 and A4). Listeners that are off
+     * aren't listed, so a server that doesn't use them isn't marked as failing.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function checkEnabledListeners(): array
+    {
+        $listeners = [
+            ListenerHeartbeat::SIA_DC09 => [
+                'enabled' => (bool) config('security_devices.listeners.sia_dc09.enabled', false),
+                'title' => 'Alarm receiver',
+                'program' => 'oblivion-sd-alarm-receiver',
+            ],
+            ListenerHeartbeat::MQTT_SENSORS => [
+                'enabled' => (bool) config('security_devices.listeners.mqtt_sensors.enabled', false),
+                'title' => 'MQTT sensor listener',
+                'program' => 'oblivion-sd-mqtt-sensors',
+            ],
+        ];
+
+        $checks = [];
+        foreach ($listeners as $listener => $listenerConfig) {
+            if ($listenerConfig['enabled']) {
+                $checks[] = $this->checkListener($listener, $listenerConfig['title'], $listenerConfig['program']);
+            }
+        }
+
+        return $checks;
+    }
+
+    /** @return array<string, mixed> */
+    private function checkListener(string $listener, string $title, string $program): array
+    {
+        $lastBeat = app(ListenerHeartbeat::class)->lastBeat($listener);
+        $ageSeconds = $lastBeat !== null ? max(0, (int) $lastBeat->diffInSeconds(now())) : null;
+        $staleAfter = max(60, (int) config('security_devices.listeners.heartbeat_stale_seconds', 120));
+
+        if ($ageSeconds !== null && $ageSeconds <= $staleAfter) {
+            return [
+                'key' => 'listener_'.$listener,
+                'title' => $title,
+                'status' => 'pass',
+                'summary' => 'Running',
+                'detail' => sprintf('Last sign of life %s.', $this->formatAge($ageSeconds)),
+                'fix' => null,
+            ];
+        }
+
+        return [
+            'key' => 'listener_'.$listener,
+            'title' => $title,
+            'status' => 'fail',
+            'summary' => $ageSeconds !== null ? 'Stopped' : 'Not running',
+            'detail' => $ageSeconds !== null
+                ? sprintf('It last ran %s; it should check in every 30 seconds.', $this->formatAge($ageSeconds))
+                : 'It is switched on, but it has never run on this server.',
+            'fix' => sprintf('Ask whoever looks after the server to add the "%s" program to supervisor (see ops/supervisor/README.md), then refresh this page.', $program),
+        ];
+    }
+
     private function checkReleaseKey(): array
     {
         $publicKey = config('endpoint_management.release_public_key');

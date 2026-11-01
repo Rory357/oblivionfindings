@@ -89,6 +89,12 @@ class HsCorrectiveActionPresenter
             'verified_at' => $action->verified_at?->toIso8601String(),
             'verified_by_name' => $action->verifiedBy?->name,
             'effectiveness_confirmed' => $action->effectiveness_confirmed,
+            // G3 board M5: the check's own words ("Check result: …"), under the same rule as the action's history,
+            // which already carries them.
+            'check_notes' => $evidenceLoaded && in_array($action->status, [
+                HsCorrectiveAction::STATUS_VERIFIED,
+                HsCorrectiveAction::STATUS_CLOSED,
+            ], true) ? $action->verification_notes : null,
             'hs_investigation_id' => $action->hs_investigation_id,
             'recommendation_index' => $action->recommendation_index,
             'recommendation' => $this->recommendation($action),

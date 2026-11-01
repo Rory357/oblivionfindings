@@ -71,6 +71,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     Route::middleware('permission:hazards.view')->group(function () {
         Route::get('/events', [HsEventController::class, 'index'])->name('events.index');
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
+        // G3 History tab: the review's activity log (read only, the event read).
+        Route::get('/events/{hsEvent}/activity', [HsEventController::class, 'activity'])->whereNumber('hsEvent')->name('events.activity');
         Route::get('/events/{hsEvent}/incident-attachments/{attachment}/download', [HsEventController::class, 'downloadIncidentAttachment'])->name('events.incident-attachments.download');
         Route::get('/events/{hsEvent}/control-room-evidence/{item}/download', [HsEventController::class, 'downloadControlRoomEvidence'])->name('events.control-room-evidence.download');
         Route::get('/corrective-actions', [HsEventController::class, 'correctiveActions'])->name('corrective-actions.index');
@@ -94,6 +96,13 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Events governance write actions (gated) ──
     Route::middleware('permission:hazards.manage')->group(function () {
         Route::post('/events/{hsEvent}/accept-handover', [HsEventController::class, 'acceptHandover'])->name('events.handover.accept');
+        // Q2 (G3): change a safety review's owner, with a reason.
+        Route::post('/events/{hsEvent}/owner', [HsEventController::class, 'changeOwner'])->name('events.owner.change');
+        // Answer 20 (G3): corrections to agreed findings go through independent review and approval.
+        Route::post('/events/{event}/investigations/{investigation}/corrections', [\App\Http\Controllers\HealthSafety\HsInvestigationCorrectionController::class, 'store'])->whereNumber('event')->name('events.investigations.corrections.store');
+        Route::post('/events/{event}/corrections/{correction}/review', [\App\Http\Controllers\HealthSafety\HsInvestigationCorrectionController::class, 'review'])->whereNumber('event')->name('events.corrections.review');
+        Route::post('/events/{event}/corrections/{correction}/approve', [\App\Http\Controllers\HealthSafety\HsInvestigationCorrectionController::class, 'approve'])->whereNumber('event')->name('events.corrections.approve');
+        Route::post('/events/{event}/corrections/{correction}/reject', [\App\Http\Controllers\HealthSafety\HsInvestigationCorrectionController::class, 'reject'])->whereNumber('event')->name('events.corrections.reject');
         Route::post('/events/{hsEvent}/worksafe/decision', HsWorksafeDecisionController::class)->name('events.worksafe.decision');
         Route::post('/events/{hsEvent}/worksafe/notify', [HsEventController::class, 'worksafeNotify'])->name('events.worksafe.notify');
         Route::post('/events/{hsEvent}/worksafe/acknowledge', [HsEventController::class, 'worksafeAcknowledge'])->name('events.worksafe.acknowledge');

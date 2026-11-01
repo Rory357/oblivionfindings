@@ -383,5 +383,7 @@ func (p *Package) ExtractTo(target ProtectedTarget) error {
 // All transitive DLLs, source, vendor and licence files must also be inventoried.
 func SiteRuntimeFiles() []string {
 	return []string{"site/oblivion-collector.exe", "site/oblivion-media.exe", "site/runtime/php.exe", "site/bin/oblivion-collector", "site/vendor/autoload.php",
-		"site/runtime/cacert.pem", "site/runtime/ext/php_curl.dll", "site/runtime/ext/php_openssl.dll", "site/runtime/ext/php_sodium.dll", "site/runtime/ext/php_sockets.dll"}
+		"site/runtime/cacert.pem", "site/runtime/ext/php_curl.dll", "site/runtime/ext/php_openssl.dll", "site/runtime/ext/php_sodium.dll", "site/runtime/ext/php_sockets.dll",
+		// Phase A, item A7: SNMP checks on hubs (docs/security-devices/GOAL.md).
+		"site/runtime/ext/php_snmp.dll"}
 }

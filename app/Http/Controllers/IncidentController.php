@@ -8,6 +8,7 @@ use App\Http\Requests\HealthSafety\StoreHsCorrectiveActionRequest;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\ClientIncidentNote;
 use App\Models\ControlRoom\EvidenceItem;
 use App\Models\HsEvent;
 use App\Models\IncidentFollowup;
@@ -326,6 +327,25 @@ class IncidentController extends Controller
                 ->map(fn ($e) => ['at' => $e->created_at?->toIso8601String()]))
             ->sortBy('at')->values()->all();
 
+        // Answer 20 / board M14: dated notes beside the reporter's words, for everyone who can open the incident.
+        // Adding one follows the note endpoint's own rule (incidents.approve + this view + not a draft).
+        $reportNotes = ClientIncidentNote::query()
+            ->where('client_incident_id', $incident->id)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get(['id', 'field', 'note', 'author_name', 'created_at'])
+            ->map(fn (ClientIncidentNote $note): array => [
+                'id' => $note->id,
+                'field' => $note->field,
+                'note' => $note->note,
+                'author_name' => $note->author_name,
+                'created_at' => $note->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+        $canAddNote = $user->canDo('incidents.approve')
+            && ! in_array($incident->status, [null, '', 'draft'], true);
+
         return [
             'id' => $incident->id,
             'ref' => $incident->reference_number,
@@ -473,7 +493,9 @@ class IncidentController extends Controller
             // First-aid treatments escalated to / linked with this incident — reciprocal
             // of the first-aid register's incident link (FirstAidRecord.related_incident_id).
             'first_aid_records' => $firstAidRecords,
+            'notes' => $reportNotes,
             'can' => [
+                'add_note' => $canAddNote,
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),
                 'review' => $user->can('review', $incident),
