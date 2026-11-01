@@ -25,6 +25,8 @@ final readonly class CollectorConfig
         public array $checks,
         public array $discoveryRuns = [],
         public array $commands = [],
+        /** S&D Phase B (D21): the sensor gateways this hub relays for, as bcrypt hashes only. */
+        public ?array $sensorRelay = null,
     ) {}
 
     /** @return list<int> */
@@ -47,17 +49,23 @@ final readonly class CollectorConfig
                 throw new ConfigurationRejected('Configuration scope is missing.');
             }
 
-            $cidrs = self::stringList($scope['cidrs'] ?? null, 'network scope');
-            $protocols = self::stringList($scope['protocols'] ?? null, 'protocol scope');
             $version = self::positiveInt($payload, 'version');
             $siteId = self::positiveInt($payload, 'site_id');
             $coveredSiteIds = self::coveredSiteIds($scope['covered_site_ids'] ?? [], $siteId);
             $allowedSiteIds = array_values(array_unique([$siteId, ...$coveredSiteIds]));
+            $sensorRelay = self::sensorRelay($payload['sensor_relay'] ?? null, $allowedSiteIds);
+            // A hub that only relays sensor readings has no network targets of its own.
+            $relayOnly = $sensorRelay !== null && ($scope['cidrs'] ?? null) === [];
+            $cidrs = $relayOnly ? [] : self::stringList($scope['cidrs'] ?? null, 'network scope');
+            $protocols = self::stringList($scope['protocols'] ?? null, 'protocol scope');
+            if ($sensorRelay !== null && ! in_array('sensor_relay', $protocols, true)) {
+                throw new ConfigurationRejected('Configuration sensor relay is outside the signed protocol scope.');
+            }
             $discoveryRuns = self::discoveryRuns($payload['discovery_runs'] ?? [], $version, $allowedSiteIds);
             $commands = self::commands($payload['commands'] ?? [], $version);
             $devices = $scope['devices'] ?? null;
             if (! is_array($devices) || (array_is_list($devices) && $devices !== []) || count($devices) > 4096
-                || ($devices === [] && $discoveryRuns === [] && $commands === [])) {
+                || ($devices === [] && $discoveryRuns === [] && $commands === [] && $sensorRelay === null)) {
                 throw new ConfigurationRejected('Configuration Device scope is invalid.');
             }
 
@@ -72,7 +80,7 @@ final readonly class CollectorConfig
 
             $checks = $payload['checks'] ?? null;
             if (! is_array($checks) || ! array_is_list($checks) || count($checks) > 10_000
-                || ($checks === [] && $discoveryRuns === [] && $commands === [])) {
+                || ($checks === [] && $discoveryRuns === [] && $commands === [] && $sensorRelay === null)) {
                 throw new ConfigurationRejected('Configuration checks are invalid.');
             }
             foreach ($checks as $check) {
@@ -118,12 +126,45 @@ final readonly class CollectorConfig
                 checks: array_values($checks),
                 discoveryRuns: $discoveryRuns,
                 commands: $commands,
+                sensorRelay: $sensorRelay,
             );
         } catch (ConfigurationRejected $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
             throw new ConfigurationRejected('Configuration payload is malformed.', previous: $exception);
         }
+    }
+
+    /**
+     * @param  list<int>  $allowedSiteIds
+     * @return array{listen_port: int, max_payload_bytes: int, logins: list<array{username: string, password_hash: string, site_id: int, topic_prefix: string}>}|null
+     */
+    public static function sensorRelay(mixed $value, array $allowedSiteIds): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (! is_array($value) || array_keys($value) !== ['listen_port', 'max_payload_bytes', 'logins']
+            || ! is_int($value['listen_port']) || $value['listen_port'] < 1 || $value['listen_port'] > 65535
+            || ! is_int($value['max_payload_bytes']) || $value['max_payload_bytes'] < 1024 || $value['max_payload_bytes'] > 65_536
+            || ! is_array($value['logins']) || ! array_is_list($value['logins'])
+            || $value['logins'] === [] || count($value['logins']) > 256) {
+            throw new ConfigurationRejected('Configuration sensor relay is invalid.');
+        }
+        $usernames = [];
+        foreach ($value['logins'] as $login) {
+            if (! is_array($login) || array_keys($login) !== ['username', 'password_hash', 'site_id', 'topic_prefix']
+                || ! is_string($login['username']) || preg_match('/\Agw-[a-z0-9]{12}\z/', $login['username']) !== 1
+                || ! is_string($login['password_hash']) || preg_match('/\A\$2y\$\d{2}\$[.\/A-Za-z0-9]{53}\z/', $login['password_hash']) !== 1
+                || ! is_int($login['site_id']) || ! in_array($login['site_id'], $allowedSiteIds, true)
+                || $login['topic_prefix'] !== 'oblivion/'.$login['site_id'].'/'.$login['username'].'/'
+                || isset($usernames[$login['username']])) {
+                throw new ConfigurationRejected('Configuration sensor relay login is invalid.');
+            }
+            $usernames[$login['username']] = true;
+        }
+
+        return $value;
     }
 
     /** @return list<array<string, mixed>> */

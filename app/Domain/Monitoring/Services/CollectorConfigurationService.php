@@ -13,6 +13,7 @@ use App\Domain\SecurityDevices\Hubs\Exceptions\HubAwaitingApproval;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
+use App\Domain\SecurityDevices\Iot\Relay\Models\SensorGatewayLogin;
 use App\Domain\SecurityDevices\Management\Services\CollectorCommandDescriptorRegistry;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -186,8 +187,28 @@ final readonly class CollectorConfigurationService
                     $commands[] = $command;
                 });
 
-            if ($checks === [] && $discoveryRuns === [] && $commands === []) {
+            // S&D Phase B (D21): the sensor gateways whose readings this hub relays. Hashes only.
+            $relayLogins = SensorGatewayLogin::query()
+                ->active()
+                ->whereIn('site_id', $locked->authorisedSiteIds())
+                ->orderBy('id')
+                ->limit(256)
+                ->get(['username', 'password_hash', 'site_id', 'topic_prefix'])
+                ->map(fn (SensorGatewayLogin $login): array => [
+                    'username' => (string) $login->username,
+                    'password_hash' => (string) $login->password_hash,
+                    'site_id' => (int) $login->site_id,
+                    'topic_prefix' => (string) $login->topic_prefix,
+                ])
+                ->values()
+                ->all();
+
+            if ($checks === [] && $discoveryRuns === [] && $commands === [] && $relayLogins === []) {
                 throw new DomainException('Collector has no executable work in its approved Site scope.');
+            }
+            if ($relayLogins !== []) {
+                // The hub runs its relay only when the signed scope says so.
+                $protocols[] = 'sensor_relay';
             }
             $maximumChecks = max(1, min(10_000, (int) config(
                 'monitoring.collector.max_checks_per_configuration',
@@ -227,6 +248,13 @@ final readonly class CollectorConfigurationService
             }
             if ($commands !== []) {
                 $payload['commands'] = $commands;
+            }
+            if ($relayLogins !== []) {
+                $payload['sensor_relay'] = [
+                    'listen_port' => 1883,
+                    'max_payload_bytes' => 65_536,
+                    'logins' => $relayLogins,
+                ];
             }
             $json = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
             $secret = $this->signingSecretKey();

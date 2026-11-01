@@ -5,12 +5,16 @@ namespace Oblivion\Collector;
 use DateTimeImmutable;
 use JsonException;
 use Oblivion\Collector\Config\SignedConfigLoader;
+use Oblivion\Collector\Data\CollectorConfig;
 use Oblivion\Collector\Discovery\LanDiscoveryScanner;
 use Oblivion\Collector\Enrollment\InstallationProfile;
 use Oblivion\Collector\Enrollment\RecoverableEnrollment;
 use Oblivion\Collector\Exceptions\CentralApiFailure;
 use Oblivion\Collector\Http\HttpsCentralApi;
+use Oblivion\Collector\Exceptions\SpoolFull;
 use Oblivion\Collector\Media\MediaLane;
+use Oblivion\Collector\Mqtt\MqttRelayServer;
+use Oblivion\Collector\Mqtt\RelayInbox;
 use Oblivion\Collector\Runtime\CameraSnapshotRunner;
 use Oblivion\Collector\Runtime\CollectorCommandExecutor;
 use Oblivion\Collector\Runtime\CommandJournal;
@@ -67,6 +71,7 @@ final class CollectorApplication
                 'run' => $this->collect($options),
                 'update-fetch' => $this->updateFetch($options),
                 'update-report' => $this->updateReport($options),
+                'relay' => $this->relay($options),
                 'verify-transport' => $this->verifyTransport($options),
                 default => $this->usage(),
             };
@@ -367,7 +372,12 @@ final class CollectorApplication
                 throw $exception;
             }
         }
+        if ($config !== null) {
+            // S&D Phase B (D21): the relay works from this file, so it keeps taking readings offline.
+            $this->writeRelayLogins($stateDirectory, $config);
+        }
         $spool = new EncryptedSpool($stateDirectory, $checkpoint);
+        $this->moveRelayedReadings($stateDirectory, $spool, $secretKey);
         $uploadError = $this->flush($central, $identity['collector_id'], $spool);
         $uploadError ??= $configurationError;
 
@@ -388,10 +398,10 @@ final class CollectorApplication
                     $credentialDecryptor,
                     new NativeCollectorCommandTransport,
                 ),
-            );
                 // S&D Phase B: settings backups and camera pictures run here, through the hub, not from the server.
                 new SshConfigBackupRunner($scope, $credentialDecryptor),
                 new CameraSnapshotRunner($scope, $credentialDecryptor),
+            );
             foreach ($config->commands as $command) {
                 if ($spool->status()['state'] === 'buffer_full') {
                     break;
@@ -483,12 +493,136 @@ final class CollectorApplication
      * The hub has been removed in Oblivion: wipe the saved logins it held (the encrypted work
      * list and anything the host keeps for it), leave a note, and stop.
      */
-    private function wipeRemovedHub(string $configPath, string $stateDirectory, string &$secretKey): int
+    /**
+     * S&D Phase B (D21): the sensor relay. A long-running process beside the normal cycle, kept
+     * running by the Windows service or the Linux launcher. It listens on the house network only
+     * while the signed config names gateway logins.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function relay(array $options): int
     {
-        foreach ([$configPath, $stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json'] as $path) {
+        if (array_keys($options) !== ['identity']) {
+            throw new RuntimeException('Relay takes only --identity.');
+        }
+        $identityPath = $this->requiredPath($options, 'identity');
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $stateDirectory = $this->stateDirectory($identity, $identityPath);
+        $secretKey = base64_decode($identity['request_signing_secret_key'], true);
+        if (! is_string($secretKey) || strlen($secretKey) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
+            throw new RuntimeException('Collector request signing key is invalid.');
+        }
+        $inbox = new RelayInbox($stateDirectory.DIRECTORY_SEPARATOR.'relay-inbox', RelayInbox::keyFor($secretKey));
+        sodium_memzero($secretKey);
+        $loginsFile = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE;
+        $relay = null;
+        $readAt = 0;
+        $logins = function () use (&$relay, &$readAt, $loginsFile): ?array {
+            if (time() - $readAt >= 30) {
+                $readAt = time();
+                $relay = $this->readRelayLogins($loginsFile);
+            }
+
+            return $relay;
+        };
+        $server = new MqttRelayServer($inbox, $logins, log: fn (string $line) => $this->write($line.PHP_EOL));
+        $listening = null;
+        while (! is_file($stateDirectory.DIRECTORY_SEPARATOR.'removed.json')) {
+            $port = $logins()['listen_port'] ?? null;
+            if ($port !== $listening) {
+                $server->close();
+                $listening = null;
+                if (is_int($port)) {
+                    try {
+                        // The house network only reaches it through the installer's firewall rule.
+                        $server->listen('0.0.0.0', $port);
+                        $listening = $port;
+                        $this->write("relay: listening on {$port}".PHP_EOL);
+                    } catch (RuntimeException $exception) {
+                        $this->write('relay: '.$exception->getMessage().PHP_EOL, STDERR);
+                        sleep(10);
+                    }
+                }
+            }
+            $server->poll($listening === null ? 5.0 : 1.0);
+        }
+        $server->close();
+
+        return 3;
+    }
+
+    private const string RELAY_LOGINS_FILE = 'sensor-relay.json';
+
+    private function writeRelayLogins(string $stateDirectory, CollectorConfig $config): void
+    {
+        $path = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE;
+        if ($config->sensorRelay === null) {
             if (is_file($path)) {
                 @unlink($path);
             }
+
+            return;
+        }
+        $this->writePrivateFile($path, json_encode([
+            'version' => 1,
+            'allowed_site_ids' => $config->allowedSiteIds(),
+            'relay' => $config->sensorRelay,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+    }
+
+    /** @return array{listen_port: int, max_payload_bytes: int, logins: list<array{username: string, password_hash: string, site_id: int, topic_prefix: string}>}|null */
+    private function readRelayLogins(string $path): ?array
+    {
+        try {
+            $stored = is_file($path) ? json_decode($this->readBounded($path), true, 16, JSON_THROW_ON_ERROR) : null;
+            if (! is_array($stored) || ($stored['version'] ?? null) !== 1 || ! is_array($stored['allowed_site_ids'] ?? null)) {
+                return null;
+            }
+
+            return CollectorConfig::sensorRelay($stored['relay'] ?? null, array_values(array_filter($stored['allowed_site_ids'], 'is_int')));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** Readings the relay took since the last cycle go into the upload spool, with their real times. */
+    private function moveRelayedReadings(string $stateDirectory, EncryptedSpool $spool, string $secretKey): void
+    {
+        $directory = $stateDirectory.DIRECTORY_SEPARATOR.'relay-inbox';
+        if (! is_dir($directory)) {
+            return;
+        }
+        $inbox = new RelayInbox($directory, RelayInbox::keyFor($secretKey));
+        for ($round = 0; $round < 20; $round++) {
+            $taken = $inbox->take(500);
+            if ($taken === []) {
+                return;
+            }
+            foreach ($taken as $held) {
+                if ($spool->status()['state'] === 'buffer_full') {
+                    return; // They stay in the inbox until there's room.
+                }
+                try {
+                    $receivedAt = new DateTimeImmutable((string) ($held['item']['received_at'] ?? 'now'));
+                    $spool->append('sensor-reading:'.$held['file'], $spool->nextSourceSequence(), $held['item'], $receivedAt);
+                } catch (SpoolFull) {
+                    return;
+                }
+                $inbox->remove($held['file']);
+            }
+        }
+    }
+
+    private function wipeRemovedHub(string $configPath, string $stateDirectory, string &$secretKey): int
+    {
+        foreach ([$configPath, $stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json', $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE] as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
+        // Sensor readings still waiting to upload go too: a removed hub keeps nothing.
+        foreach (glob($stateDirectory.DIRECTORY_SEPARATOR.'relay-inbox'.DIRECTORY_SEPARATOR.'*') ?: [] as $held) {
+            @unlink($held);
         }
         $this->writePrivateFile($stateDirectory.DIRECTORY_SEPARATOR.'removed.json', json_encode([
             'removed' => true,

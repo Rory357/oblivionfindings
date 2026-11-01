@@ -9,6 +9,7 @@ import (
 	"io"
 	"oblivion.local/endpoint-agent/internal/cctv"
 	"oblivion.local/endpoint-agent/internal/hubupdate"
+	"oblivion.local/endpoint-agent/internal/sensorrelay"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -230,6 +231,22 @@ func run(ctx context.Context, args []string) error {
 	} else {
 		close(mediaDone)
 	}
+	// S&D Phase B (D21): the sensor relay runs beside the cycles and keeps readings while offline.
+	relayContext, stopRelay := context.WithCancel(ctx)
+	relayDone := make(chan struct{})
+	defer func() {
+		stopRelay()
+		select {
+		case <-relayDone:
+		case <-time.After(4 * time.Second):
+		}
+	}()
+	go func() {
+		defer close(relayDone)
+		sensorrelay.Supervise(relayContext, func(ctx context.Context) (uint32, error) {
+			return exitCode(updates.php(ctx, "relay").Run())
+		}, 5*time.Second, time.Minute)
+	}()
 	// D3: after each cycle the hub may update itself overnight, and rolls back if it fails.
 	updater := &hubupdate.Updater{Host: updates, Platform: "linux", Arch: runtime.GOARCH, Now: time.Now, Log: func(message string) { fmt.Println(message) }}
 	for {

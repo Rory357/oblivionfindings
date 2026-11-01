@@ -16,6 +16,7 @@ use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
 use App\Domain\Monitoring\Protocols\Flow\FlowIntakeService;
 use App\Domain\Monitoring\Protocols\Syslog\SyslogIntakeService;
+use App\Domain\SecurityDevices\Iot\Relay\Services\SensorRelayIntakeService;
 use App\Domain\SecurityDevices\Management\Services\CollectorCommandResultService;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -162,6 +163,12 @@ final readonly class CollectorIngestService
         }
         if ($itemType === 'command_result') {
             $this->commands->record($collector, $sequence, $payload);
+
+            return;
+        }
+        if ($itemType === 'sensor_reading') {
+            // S&D Phase B (D21): a reading the Site hub relayed from a sensor gateway.
+            app(SensorRelayIntakeService::class)->record($collector, $payload);
 
             return;
         }

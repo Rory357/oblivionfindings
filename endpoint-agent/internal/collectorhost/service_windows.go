@@ -41,6 +41,14 @@ func Run() error {
 		} else {
 			close(mediaDone)
 		}
+		// S&D Phase B (D21): the sensor relay runs beside the cycles and keeps readings while offline.
+		relayContext, stopRelay := context.WithCancel(ctx)
+		relayDone := make(chan struct{})
+		defer func() { stopRelay(); <-relayDone }()
+		go func() {
+			defer close(relayDone)
+			state.runRelay(relayContext)
+		}()
 		// D3: after each cycle the hub may update itself overnight, and rolls back if it fails.
 		err = runCycles(ctx, state, ready, report, productionTimings, newUpdater(state, report))
 		if err != nil && ctx.Err() == nil && log != nil {
