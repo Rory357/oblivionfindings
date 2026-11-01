@@ -8,6 +8,7 @@ use App\Models\WorkplaceInjury;
 use App\Services\HealthSafety\OwnInjuryReadService;
 use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * My Day's "What you reported" and "Your workplace injury" (board G4-1, approved by Stephan 1 Nov 2026; Q3, D-5).
@@ -30,27 +31,36 @@ final class MyReportsReadService
     /** @return list<array<string, mixed>> */
     public function recent(User $user, int $limit = 5): array
     {
+        $gate = Gate::forUser($user);
         $incidents = $this->ownIncidents($user)
-            ->with(['client:id,first_name,last_name', 'site:id,name'])
+            ->with(['client', 'site:id,name'])
             ->orderByDesc('occurred_at')
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
-            ->map(fn (ClientIncident $incident): array => [
-                'kind' => 'incident',
-                'id' => (int) $incident->id,
-                'type' => $incident->type,
-                'client_name' => $incident->client
-                    ? trim($incident->client->first_name.' '.$incident->client->last_name)
-                    : null,
-                // A report about no particular person names its place instead.
-                'site_name' => $incident->client ? null : $incident->site?->name,
-                'at' => $incident->occurred_at?->utc()->toIso8601String(),
-                'status' => self::incidentWord($incident->status, $incident->incident_owner_user_id !== null),
-                'finish_url' => $incident->status === 'draft' && $incident->client_id
-                    ? '/incidents/'.$incident->id.'?return_to=%2Fmy-day'
-                    : null,
-            ]);
+            ->map(function (ClientIncident $incident) use ($gate): array {
+                // Privacy (Stephan, 1 Nov 2026): a person's name shows only while the reporter may still open that
+                // person today (the client view rule). Someone they no longer support is "a person you no longer
+                // support", and a draft about them has no Finish link.
+                $current = $incident->client !== null && $gate->allows('view', $incident->client);
+
+                return [
+                    'kind' => 'incident',
+                    'id' => (int) $incident->id,
+                    'type' => $incident->type,
+                    'client_name' => $current
+                        ? trim($incident->client->first_name.' '.$incident->client->last_name)
+                        : null,
+                    'former_client' => $incident->client !== null && ! $current,
+                    // A report about no particular person names its place instead.
+                    'site_name' => $incident->client ? null : $incident->site?->name,
+                    'at' => $incident->occurred_at?->utc()->toIso8601String(),
+                    'status' => self::incidentWord($incident->status, $incident->incident_owner_user_id !== null),
+                    'finish_url' => $incident->status === 'draft' && $current
+                        ? '/incidents/'.$incident->id.'?return_to=%2Fmy-day'
+                        : null,
+                ];
+            });
 
         $injuries = WorkplaceInjury::query()
             ->where('created_by', $user->id)

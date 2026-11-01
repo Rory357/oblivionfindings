@@ -164,7 +164,8 @@ describe('My Day: What you reported', () => {
                         kind: 'incident',
                         id: 392,
                         type: 'fall',
-                        client_name: 'Aroha Kingi',
+                        client_name: null,
+                        former_client: true,
                         site_name: null,
                         at: '2026-10-26T06:40:00Z',
                         status: 'closed',
@@ -187,6 +188,10 @@ describe('My Day: What you reported', () => {
         expect(rows[1]).toHaveTextContent('Being followed up');
         expect(rows[2]).toHaveTextContent('26 Oct');
         expect(rows[2]).toHaveTextContent('Closed');
+        // Privacy: someone she no longer supports is never named.
+        expect(rows[2]).toHaveTextContent(
+            'Fall — a person you no longer support',
+        );
         expect(
             within(rows[2]).queryByRole('link', { name: 'Finish' }),
         ).toBeNull();

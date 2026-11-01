@@ -23,6 +23,8 @@ class HsReviewTitleTest extends TestCase
             'safeguarding, cannot read' => [['safeguarding', false, null, 'Aroha Kingi', null, 'Kauri House'], 'Safeguarding — Kauri House'],
             'first aid by direct link, cannot read' => [['injury', false, null, 'Oliver Chen', 'Jordan Peri', 'Rimu House', true], 'Injury — Rimu House'],
             'injury names the worker' => [['injury', true, null, 'Oliver Chen', 'Sam Wong', 'Rimu House'], 'Injury — Sam Wong'],
+            'restraint with its summary, reader' => [['restraint', true, 'Held arm to stop a fall', 'Aroha Kingi', null, 'Kauri House'], 'Held arm to stop a fall — Aroha Kingi'],
+            'restraint with no summary (older record)' => [['restraint', true, null, 'Aroha Kingi', null, 'Kauri House'], 'Restraint — Aroha Kingi'],
             'hazard with no person' => [['hazard', false, null, null, null, 'Rimu House'], 'Hazard — Rimu House'],
             'nothing to name' => [['vehicle_incident', false, null, null, null, null], 'Vehicle incident'],
         ];

@@ -1775,8 +1775,12 @@ class IncidentController extends Controller
         // Audit guardrail: attachments are only mutable while the incident is in draft.
         abort_unless($incident->status === 'draft', 403);
 
+        // The same file types as a safety review's files (HsEventFile::MIMES): photos, videos, PDFs and Word files.
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:10240'],
+            'file' => ['required', 'file', 'mimes:'.implode(',', array_merge(...array_values(\App\Models\HsEventFile::MIMES))), 'max:10240'],
+        ], [
+            'file.mimes' => 'Add photos, videos, PDFs or Word files.',
+            'file.max' => 'Files can be up to 10 MB.',
         ]);
 
         $file = $request->file('file');

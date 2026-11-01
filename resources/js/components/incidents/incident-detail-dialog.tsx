@@ -1739,7 +1739,8 @@ export function PhotosSection({ d }: { d: IncidentDetail }) {
                     <div className="border-b border-border p-4">
                         <AttachmentUploader
                             endpoint={`/incidents/${d.id}/attachments`}
-                            hint="PDF, Word, images — up to 10 MB each"
+                            accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx"
+                            hint="Photos, videos, PDFs or Word files — up to 10 MB each"
                         />
                     </div>
                 ) : null}

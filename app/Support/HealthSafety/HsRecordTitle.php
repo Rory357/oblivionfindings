@@ -7,7 +7,9 @@ namespace App\Support\HealthSafety;
  * record, their safety review and every list. The record's title is made by the same builder as the safety review's
  * (HsReviewTitle), so the two can never drift:
  *
- *  - a restraint: "Restraint — Aroha Kingi" (the restraint type, e.g. "physical", sits in the subline, not the title);
+ *  - a restraint: its summary and the person, "Held arm to stop a fall — Aroha Kingi" (Stephan, 2 Nov 2026: "Add a
+ *    summary box"); an older record with no summary reads "Restraint — Aroha Kingi". The restraint type sits in the
+ *    subline, not the title;
  *  - an injury: the injury in plain words and the worker, "Cut left index finger — Mere Tane".
  *
  * Only for people who can already read the record (the record page, its register rows). A safety review shows the same
@@ -27,9 +29,10 @@ final class HsRecordTitle
     /** Types that read naturally with the body part straight after them ("Cut left index finger"). */
     private const WITH_BODY_PART = ['strain', 'laceration', 'fracture', 'burn', 'contusion'];
 
-    public static function restraint(?string $client, ?string $site): string
+    /** With its summary: "Held arm to stop a fall — Aroha Kingi"; without one (older records): "Restraint — Aroha Kingi". */
+    public static function restraint(?string $client, ?string $site, ?string $summary = null): string
     {
-        return HsReviewTitle::make('restraint', true, null, $client, null, $site);
+        return HsReviewTitle::make('restraint', true, $summary, $client, null, $site);
     }
 
     public static function injury(?string $injuryType, ?string $bodyPart, ?string $worker, ?string $site): string

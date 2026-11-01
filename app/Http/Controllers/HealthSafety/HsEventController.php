@@ -1088,10 +1088,18 @@ class HsEventController extends Controller
         $injury = $basename === 'WorkplaceInjury' && $source !== null
             ? \App\Models\WorkplaceInjury::query()->find($event->source_id, ['id', 'injury_type', 'body_part_affected'])
             : null;
+        // Restraint summary (Stephan, 2 Nov 2026): a restraint review reads like its record ("Held arm to stop a fall —
+        // Aroha Kingi"), only for a viewer who can read the restraint; no summary keeps "Restraint — Aroha Kingi".
+        $restraintSummary = $basename === 'RestraintEvent' && $source !== null
+            ? \App\Models\RestraintEvent::withTrashed()->whereKey($event->source_id)->value('summary')
+            : null;
 
         return \App\Support\HealthSafety\HsReviewTitle::make((string) $event->event_category, $readable,
-            $basename === 'ClientIncident' ? $readableIncident?->title
-                : ($injury !== null ? \App\Support\HealthSafety\HsRecordTitle::injuryWords($injury->injury_type, $injury->body_part_affected) : null),
+            match (true) {
+                $basename === 'ClientIncident' => $readableIncident?->title,
+                $injury !== null => \App\Support\HealthSafety\HsRecordTitle::injuryWords($injury->injury_type, $injury->body_part_affected),
+                default => $restraintSummary,
+            },
             $firstAid && $source === null ? null : $client, $event->staff?->name, $event->site?->name, $firstAid);
     }
 
