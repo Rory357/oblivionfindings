@@ -110,7 +110,8 @@ final class AuditLogViewService
                     ->orWhere('auditable_type', 'like', "%{$needle}%")
                     ->orWhereHas('user', fn (Builder $users) => $users->where('name', 'like', "%{$needle}%"))
                     // #13: risk assessment rows never show a client, so a client's name can't find them either.
-                    ->orWhere(fn (Builder $byClient) => $byClient->whereNotIn('auditable_type', self::riskAssessmentTypes())
+                    ->orWhere(fn (Builder $byClient) => $byClient
+                        ->where(fn (Builder $notRisk) => $notRisk->whereNull('auditable_type')->orWhereNotIn('auditable_type', self::riskAssessmentTypes()))
                         ->whereHas('client', fn (Builder $clients) => $clients
                             ->where('first_name', 'like', "%{$needle}%")
                             ->orWhere('last_name', 'like', "%{$needle}%")));

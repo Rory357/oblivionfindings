@@ -371,7 +371,9 @@ export default function AuditIndex({ logs, filters, filter_options }: Props) {
                                         {l.properties.fields.length > 0 ? (
                                             <div className="text-xs text-muted-foreground">
                                                 {l.values_hidden ? 'Changed' : 'Fields'}:{' '}
-                                                {l.properties.fields.map((field) => field.replaceAll('_', ' ')).join(', ')}
+                                                {l.subject_label
+                                                    ? l.properties.fields.map((field) => field.replaceAll('_', ' ')).join(', ')
+                                                    : l.properties.fields.join(', ')}
                                             </div>
                                         ) : null}
                                         {l.values_hidden === 'linked_person' ? (
