@@ -183,8 +183,10 @@ final class RiskAssessmentAcceptanceService
         if ($type === Site::class) {
             abort_unless(in_array($id, $sites, true), 404); $site = $id;
         } elseif ($type === Client::class) {
+            // Stephan (2 Nov): the history follows "can open this assessment". A client-attached assessment opens (and is
+            // written) on its client's Site, so the seal uses that same rule rather than the separate client-view rule.
             $row = $reads->query(Client::query())->whereIn('site_id', $sites)->whereKey($id)->first(['id', 'site_id']);
-            abort_unless($row && app(ClientPolicy::class)->viewFromCurrentEvidence($current, $row, $reads), 404);
+            abort_unless($row && $row->site_id !== null, 404);
             $site = (int) $row->site_id; $client = (int) $row->id;
         } elseif ($type !== null && ! in_array($type, $eventTypes, true)) {
             abort(404);
@@ -404,7 +406,9 @@ final class RiskAssessmentAcceptanceService
             throw new LogicException('Risk semantic audit was changed after acceptance.');
         }
         if ($marker->prior_id === null) {
-            if ($marker->sequence !== 1 || $marker->prior_digest !== null || $marker->before_business !== null) {
+            // A chain starts at 1, or (#13) right after an administrator's recorded reset, and nowhere else.
+            $start = $this->resetAfter($assessmentId, $reads) + 1;
+            if (($marker->sequence !== 1 && $marker->sequence !== $start) || $marker->prior_digest !== null || $marker->before_business !== null) {
                 throw new LogicException('Risk first prospective acceptance has a fabricated prior milestone.');
             }
         } else {

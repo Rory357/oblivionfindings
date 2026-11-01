@@ -22,11 +22,11 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 final class RiskAssessmentSealedHistoryTest extends ChemicalExposureCommandTestCase
 {
-    private function service(): HsRiskAssessmentService { return app(HsRiskAssessmentService::class); }
+    private function risks(): HsRiskAssessmentService { return app(HsRiskAssessmentService::class); }
 
     private function siteRisk(): HsRiskAssessment
     {
-        return $this->service()->create(['title' => 'Hoist transfers in the bathroom', 'risk_description' => 'Two-person transfers',
+        return $this->risks()->create(['title' => 'Hoist transfers in the bathroom', 'risk_description' => 'Two-person transfers',
             'assessable_type' => Site::class, 'assessable_id' => $this->site->id, 'likelihood' => 3, 'consequence' => 3], $this->manager);
     }
 
@@ -40,7 +40,7 @@ final class RiskAssessmentSealedHistoryTest extends ChemicalExposureCommandTestC
     public function test_each_change_is_sealed_in_its_save_and_the_history_checks_out_with_what_changed(): void
     {
         $risk = $this->siteRisk();
-        $this->service()->activate($risk->fresh(), ['approver_note' => 'Approved for use'], $this->manager);
+        $this->risks()->activate($risk->fresh(), ['approver_note' => 'Approved for use'], $this->manager);
 
         $markers = HsRiskAssessmentAcceptance::where('assessment_id', $risk->id)->orderBy('sequence')->get();
         $this->assertSame([1, 2], $markers->pluck('sequence')->all());
@@ -69,7 +69,7 @@ final class RiskAssessmentSealedHistoryTest extends ChemicalExposureCommandTestC
         $this->assertFalse($detail['can']['activate']);
 
         try {
-            $this->service()->activate($risk->fresh(), [], $this->manager);
+            $this->risks()->activate($risk->fresh(), [], $this->manager);
             $this->fail('A broken chain must refuse the change.');
         } catch (HttpException $refused) {
             $this->assertSame(409, $refused->getStatusCode());
@@ -83,7 +83,7 @@ final class RiskAssessmentSealedHistoryTest extends ChemicalExposureCommandTestC
         $this->assertSame(1, $reset['after_sequence']);
         $this->assertDatabaseHas('audit_logs', ['action' => 'risk_assessment.history_reset', 'auditable_id' => $risk->id]);
 
-        $this->service()->activate($risk->fresh(), [], $this->manager);
+        $this->risks()->activate($risk->fresh(), [], $this->manager);
         $this->assertSame('active', $risk->fresh()->status);
         $next = HsRiskAssessmentAcceptance::where('assessment_id', $risk->id)->orderByDesc('sequence')->firstOrFail();
         $this->assertSame(2, $next->sequence);
@@ -104,13 +104,13 @@ final class RiskAssessmentSealedHistoryTest extends ChemicalExposureCommandTestC
     {
         $this->allow($this->manager, 'clients.viewAny');
         $client = Client::factory()->create(['site_id' => $this->site->id, 'first_name' => 'Aroha', 'last_name' => 'Kingi']);
-        $linked = $this->service()->create(['title' => 'Aroha Kingi moving and handling', 'risk_description' => 'Private',
+        $linked = $this->risks()->create(['title' => 'Aroha Kingi moving and handling', 'risk_description' => 'Private',
             'assessable_type' => Client::class, 'assessable_id' => $client->id, 'likelihood' => 2, 'consequence' => 4], $this->manager);
-        $this->service()->activate($linked->fresh(), [], $this->manager);
-        $this->service()->updateResidualRisk($linked->fresh(), 1, 4, true, $this->manager, 'Hoist sling replaced');
+        $this->risks()->activate($linked->fresh(), [], $this->manager);
+        $this->risks()->updateResidualRisk($linked->fresh(), 1, 4, true, $this->manager, 'Hoist sling replaced');
         $ordinary = $this->siteRisk();
-        $this->service()->activate($ordinary->fresh(), [], $this->manager);
-        $this->service()->updateResidualRisk($ordinary->fresh(), 2, 2, true, $this->manager);
+        $this->risks()->activate($ordinary->fresh(), [], $this->manager);
+        $this->risks()->updateResidualRisk($ordinary->fresh(), 2, 2, true, $this->manager);
 
         $present = fn (HsRiskAssessment $risk) => app(AuditLogViewService::class)->present(AuditLog::query()
             ->where('auditable_id', $risk->id)->where('action', 'risk_assessment.residual_recorded')->latest('id')->firstOrFail());
