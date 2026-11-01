@@ -19,18 +19,23 @@ import {
 import {
     PageHeader,
     PageHeaderGlassButton,
-    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
 import {
     PageHeaderFacts,
-    PageHeaderStages,
+    PageHeaderSteps,
     type PageHeaderFact,
-    type PageHeaderNextStep,
-    type PageHeaderStage,
+    type PageHeaderStep,
 } from '@/components/page/page-header-strip';
+import {
+    PaneLink,
+    RecordProgress,
+    type RecordProgressActivity,
+    type RecordProgressNext,
+    type RecordProgressPane,
+} from '@/components/signature/record-progress';
 import {
     FactRows,
     Log,
@@ -100,6 +105,8 @@ export type CorrectiveActionWorkspace = {
     /** K1a: the next step the server names for this action. */
     next_step?: { key: 'choose_owner'; can: boolean } | null;
 };
+type ActionStepKey = 'agreed' | 'owner' | 'done' | 'checked' | 'closed';
+
 const PRIORITY_TONE: Record<string, PageHeaderFact['tone']> = {
     low: 'success',
     medium: 'warning',
@@ -182,6 +189,7 @@ function ActionRecord({
         null,
     );
     const command = useSafetyForm({});
+    const [picked, setPicked] = useState<ActionStepKey | null>(null);
     useEffect(() => {
         registerDraft('lifecycle-command', {
             dirty: false,
@@ -314,62 +322,72 @@ function ActionRecord({
         ...lifecycle.slice(1),
     ];
 
-    /* ---- the stage line and who does what next ---- */
-    const stage = correctiveActionStage(ca);
-    const stageState = (index: number): PageHeaderStage['state'] =>
-        ca.status === 'closed' || index < stage.stage
-            ? 'done'
-            : index === stage.stage
-              ? 'now'
-              : 'todo';
-    const steps: PageHeaderStage[] = [
+    /* ---- decision 26: round status steps in the header, the Progress card under it ---- */
+    // An owner who can no longer own it puts the action back on the Owner step (M13).
+    const stage =
+        replacementNeeded && ca.status !== 'closed'
+            ? { stage: 2 }
+            : correctiveActionStage(ca);
+    const didntWork = ca.effectiveness_confirmed === false;
+    const stepState = (index: number): PageHeaderStep['state'] =>
+        index === 4 && didntWork && stage.stage >= 4 && ca.status !== 'completed'
+            ? 'failed'
+            : ca.status === 'closed' || index < stage.stage
+              ? 'done'
+              : index === stage.stage
+                ? 'now'
+                : 'todo';
+    const steps: PageHeaderStep[] = [
         {
+            key: 'agreed',
             label: 'Agreed',
             meta: `From ${review.reference_number}`,
-            state: stageState(1),
+            state: stepState(1),
         },
         {
+            key: 'owner',
             label: 'Owner',
-            meta: owner ?? 'Needs an owner',
-            state: stageState(2),
+            meta: replacementNeeded ? 'Needs a new owner' : (owner ?? 'Needs an owner'),
+            state: stepState(2),
         },
         {
+            key: 'done',
             label: 'Done',
             meta: ca.completed_at
-                ? [
-                      ca.completed_by_name,
-                      formatDate(ca.completed_at),
-                  ]
+                ? [ca.completed_by_name, formatDate(ca.completed_at)]
                       .filter(Boolean)
                       .join(' · ')
                 : ca.status === 'in_progress'
                   ? 'In progress'
-                  : undefined,
-            state: stageState(3),
+                  : 'Not yet',
+            state: stepState(3),
         },
         {
+            key: 'checked',
             label: 'Checked',
-            meta: ca.verified_at
-                ? [ca.verified_by_name, formatDate(ca.verified_at)]
-                      .filter(Boolean)
-                      .join(' · ')
-                : ca.status === 'completed'
-                  ? 'Waiting'
-                  : undefined,
-            state: stageState(4),
+            meta: didntWork
+                ? 'Didn’t work'
+                : ca.verified_at
+                  ? [ca.verified_by_name, formatDate(ca.verified_at)]
+                        .filter(Boolean)
+                        .join(' · ')
+                  : ca.status === 'completed'
+                    ? 'Waiting'
+                    : 'Not yet',
+            state: stepState(4),
         },
         {
+            key: 'closed',
             label: 'Closed',
-            meta: ca.closed_at ? formatDate(ca.closed_at) : undefined,
-            state: stageState(5),
+            meta: ca.closed_at ? formatDate(ca.closed_at) : 'Not yet',
+            state: stepState(5),
         },
-    ].map((step) => ({
-        ...step,
-        tone:
-            step.state === 'now' && stage.tone !== 'success'
-                ? stage.tone
-                : undefined,
-    }));
+    ];
+    const currentStep: ActionStepKey =
+        ca.status === 'closed'
+            ? 'closed'
+            : ((steps.find((s) => s.state === 'now')?.key as ActionStepKey | undefined) ?? 'agreed');
+    const shownStep: ActionStepKey = picked ?? currentStep;
     const dueNote = overdue
         ? ' · overdue'
         : dueToday
@@ -377,28 +395,44 @@ function ActionRecord({
           : ca.due_date
             ? ` · due ${formatDateOnly(ca.due_date)}`
             : '';
-    const next: PageHeaderNextStep | null =
+    // The record's one filled button lives in the next-step bar; everything else is quiet (DESIGN.md).
+    const nextButton = primary ? (
+        <Button onClick={primary.run} disabled={primary.disabled}>
+            {primary.icon ? <primary.icon aria-hidden="true" /> : null}
+            {primary.label}
+        </Button>
+    ) : undefined;
+    const next: RecordProgressNext =
         ca.status === 'closed'
-            ? null
-            : ownership.state === 'replacement_needed'
+            ? {
+                  kicker: 'Closed',
+                  title: 'This action is closed',
+                  text: ca.closed_at
+                      ? `Closed ${formatDate(ca.closed_at)}. Closing it doesn’t close its safety review.`
+                      : 'Closing it doesn’t close its safety review.',
+                  tone: 'done',
+              }
+            : replacementNeeded
               ? {
-                    label: 'Owner needs replacing',
-                    text: 'Choose a new owner',
-                    meta: 'Then they start the action and mark it done.',
-                    tone: 'warning',
+                    kicker: 'Owner needs replacing',
+                    title: 'Choose a new owner',
+                    text: ownership.can_assign
+                        ? 'Then they start the action and mark it done.'
+                        : `Someone who manages health and safety at ${review.site_name ?? 'this site'} chooses the new owner.`,
+                    action: nextButton,
                 }
               : !ca.owner || ownership.state === 'unassigned'
                 ? {
-                      label: 'Needs an owner',
-                      text: 'Choose who owns this action',
-                      meta: 'Assign an accountable owner before starting this action.',
-                      tone: 'critical',
+                      kicker: 'Needs an owner',
+                      title: 'Choose who owns this action',
+                      text: 'Assign an accountable owner before starting this action.',
+                      action: nextButton,
                   }
                 : ca.status === 'completed'
                   ? {
-                        label: `Next step${dueNote}`,
-                        text: 'Someone checks the work is done and working',
-                        meta: (
+                        kicker: `Next step${dueNote}`,
+                        title: 'Someone checks the work is done and working',
+                        text: (
                             <>
                                 Not <b>{owner}</b> (owner)
                                 {ca.completed_by_name &&
@@ -412,25 +446,175 @@ function ActionRecord({
                                 — an independent check
                             </>
                         ),
-                        tone: 'warning',
+                        action: nextButton,
                     }
                   : ca.status === 'verified'
                     ? {
-                          label: 'Next step',
-                          text: 'Close the action',
-                          meta: ca.verified_by_name
-                              ? `Checked by ${ca.verified_by_name}`
-                              : undefined,
+                          kicker: 'Next step',
+                          title: 'Close the action',
+                          text: didntWork
+                              ? 'The check found it didn’t work. The safety review adds a revised action.'
+                              : ca.verified_by_name
+                                ? `Checked by ${ca.verified_by_name}`
+                                : undefined,
+                          action: nextButton,
                       }
                     : {
-                          label: `Next step${dueNote}`,
-                          text:
+                          kicker: `Next step${dueNote}`,
+                          title:
                               ca.status === 'open'
                                   ? `${owner} starts the action`
                                   : `${owner} finishes the work and adds evidence`,
-                          meta: 'Someone else checks it once it’s done',
-                          tone: overdue ? 'critical' : undefined,
+                          text: 'Someone else checks it once it’s done',
+                          action: nextButton,
                       };
+
+    /* ---- the picked step's pane: what was added there, then its activity ---- */
+    const stepOf = (label: string): ActionStepKey => {
+        const text = label.toLowerCase();
+        if (/created/.test(text)) return 'agreed';
+        if (/verified|returned/.test(text)) return 'checked';
+        if (/closed/.test(text)) return 'closed';
+        return 'done';
+    };
+    const actionActivity: Array<RecordProgressActivity & { step: ActionStepKey }> = [
+        ...ca.history.map((entry, index) => ({
+            key: `h${index}`,
+            step: stepOf(entry.label),
+            time: entry.occurred_at ? formatDateTime(entry.occurred_at) : '',
+            who: entry.actor ?? undefined,
+            what: entry.detail ? `${entry.label.toLowerCase()}: ${entry.detail}` : entry.label.toLowerCase(),
+        })),
+        ...ownership.history.map((change) => ({
+            key: `o${change.id}`,
+            step: 'owner' as const,
+            time: formatDateTime(change.changed_at),
+            who: change.changed_by,
+            what: `${change.previous_owner ? `handed the action from ${change.previous_owner} to ${change.owner}` : `made ${change.owner} the owner`}${change.reason ? ` — ${change.reason}` : ''}`,
+        })),
+    ];
+    const ownerLink = ownership.can_assign ? (
+        <PaneLink onClick={() => select('overview', 'owner')}>
+            {replacementNeeded ? 'Choose a new owner' : ca.owner ? 'Hand over' : 'Assign owner'}
+        </PaneLink>
+    ) : undefined;
+    const paneByStep: Record<ActionStepKey, Omit<RecordProgressPane, 'title' | 'meta' | 'onBack' | 'activity'>> = {
+        agreed: {
+            items: [
+                { key: 'action', label: 'The action', value: ca.description ?? ca.title },
+                ...(ca.recommendation
+                    ? [{ key: 'why', label: 'Why', value: ca.recommendation }]
+                    : ca.source.type === 'new_responsibility'
+                      ? [{ key: 'why', label: 'Why', value: `New responsibility: ${ca.source.reason ?? 'Reason not recorded'}` }]
+                      : []),
+                {
+                    key: 'from',
+                    label: 'From',
+                    value: `Safety review ${review.reference_number} · ${reviewStage}`,
+                    action: <PaneLink href={review.url}>Open</PaneLink>,
+                },
+                {
+                    key: 'due',
+                    label: 'Due',
+                    value: ca.due_date ? `${formatDateOnly(ca.due_date)}${overdue ? ' · overdue' : ''}` : 'Not recorded',
+                },
+            ],
+        },
+        owner: {
+            items: [
+                {
+                    key: 'owner',
+                    label: 'Owner',
+                    value: replacementNeeded
+                        ? `${owner ?? 'The owner'} can no longer own this action`
+                        : (owner ?? 'Needs an owner'),
+                    action: ownerLink,
+                },
+            ],
+            children: blockedStart ? (
+                <div className="flex flex-wrap items-center gap-2 px-[18px] pb-3">
+                    <Button variant="outline" disabled>
+                        Start action
+                    </Button>
+                    <span className="text-caption text-muted-foreground">
+                        {blockedStart.reason}
+                    </span>
+                </div>
+            ) : undefined,
+        },
+        done: {
+            items: ca.completed_at || ca.evidence.completion_notes
+                ? [
+                      {
+                          key: 'what',
+                          label: 'What was done',
+                          value:
+                              ca.evidence.completion_notes ??
+                              (loaded ? 'No completion notes recorded.' : 'Completion details need separate access.'),
+                          meta: [
+                              ca.evidence.completed_by?.name ?? ca.completed_by_name,
+                              ca.evidence.completed_at ? formatDateTime(ca.evidence.completed_at) : null,
+                          ]
+                              .filter(Boolean)
+                              .join(' · ') || undefined,
+                      },
+                      {
+                          key: 'files',
+                          label: 'Files',
+                          value: evidenceCount
+                              ? `${evidenceCount} ${evidenceCount === 1 ? 'file' : 'files'}`
+                              : 'None added',
+                          action: <PaneLink onClick={() => select('evidence')}>{evidenceCount ? 'See files' : 'Files'}</PaneLink>,
+                      },
+                      ...(ca.rework.latest_reason
+                          ? [{ key: 'rework', label: 'Changes asked for', value: ca.rework.latest_reason }]
+                          : []),
+                  ]
+                : ca.rework.latest_reason
+                  ? [{ key: 'rework', label: 'Changes asked for', value: ca.rework.latest_reason }]
+                  : [],
+            empty:
+                ca.status === 'in_progress'
+                    ? `${owner ?? 'The owner'} is doing the work. They mark it done and add evidence.`
+                    : 'Nothing added yet. The owner starts the action, then marks it done.',
+        },
+        checked: {
+            items: ca.verified_at
+                ? [
+                      {
+                          key: 'by',
+                          label: 'Checked by',
+                          value: ca.verified_by_name ?? 'Not recorded',
+                          meta: formatDateTime(ca.verified_at),
+                      },
+                      ...(ca.effectiveness_confirmed !== null
+                          ? [{ key: 'worked', label: 'Did it work?', value: ca.effectiveness_confirmed ? 'Yes, it worked' : 'No, it didn’t work' }]
+                          : []),
+                  ]
+                : [],
+            empty:
+                ca.status === 'completed'
+                    ? 'Waiting for an independent check: not the owner or the person who did it.'
+                    : 'Not checked yet. Someone else checks it once it’s done.',
+        },
+        closed: {
+            items: ca.closed_at ? [{ key: 'closed', label: 'Closed', value: formatDateTime(ca.closed_at) }] : [],
+            empty: 'Not closed yet. It closes after the check.',
+            note: 'Closing this action doesn’t close its safety review.',
+        },
+    };
+    const shownMeta = steps.find((s) => s.key === shownStep)?.meta;
+    const stepPane: RecordProgressPane = {
+        title: steps.find((s) => s.key === shownStep)?.label ?? 'Step',
+        meta: shownMeta,
+        onBack: shownStep !== currentStep ? () => setPicked(null) : undefined,
+        ...paneByStep[shownStep],
+        activity: {
+            items: actionActivity.filter((entry) => entry.step === shownStep),
+            state: loaded || shownStep === 'owner' ? 'ready' : 'error',
+            onAll: () => select('history'),
+        },
+    };
 
     const facts: PageHeaderFact[] = [
         {
@@ -667,43 +851,7 @@ function ActionRecord({
             </>
         ) : (
             <>
-                {replacementNeeded && ca.status !== 'closed' ? (
-                    // M13 "What happens next": the step with its button, and Start saying why it waits (IR3a).
-                    <Surface title="What happens next">
-                        <div className="space-y-3 px-[18px] pt-1 pb-4">
-                            <p className="text-sm">
-                                <b>Choose a new owner.</b> The person who owned
-                                this action can no longer own it. The new owner
-                                starts the action and marks it done.
-                            </p>
-                            {ownership.can_assign ? (
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <Button
-                                        onClick={() => select('overview', 'owner')}
-                                    >
-                                        Choose a new owner
-                                    </Button>
-                                    {blockedStart ? (
-                                        <>
-                                            <Button variant="outline" disabled>
-                                                Start action
-                                            </Button>
-                                            <span className="text-caption text-muted-foreground">
-                                                {blockedStart.reason}
-                                            </span>
-                                        </>
-                                    ) : null}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    Someone who manages health and safety at{' '}
-                                    {review.site_name ?? 'this site'} chooses the
-                                    new owner.
-                                </p>
-                            )}
-                        </div>
-                    </Surface>
-                ) : null}
+                <RecordProgress next={next} pane={stepPane} />
                 <Story title="What we agreed" facts={storyFacts} paras={storyParas} />
             </>
         );
@@ -855,7 +1003,7 @@ function ActionRecord({
                             .filter(Boolean)
                             .join(' · ')}
                         actions={
-                            pane || !(primary || glass.length) ? undefined : (
+                            pane || !glass.length ? undefined : (
                                 <>
                                     {glass.map((item) => (
                                         <PageHeaderGlassButton
@@ -866,32 +1014,22 @@ function ActionRecord({
                                             {item.label}
                                         </PageHeaderGlassButton>
                                     ))}
-                                    {primary ? (
-                                        <PageHeaderPrimaryButton
-                                            icon={primary.icon}
-                                            disabled={primary.disabled}
-                                            onClick={primary.run}
-                                        >
-                                            {primary.label}
-                                        </PageHeaderPrimaryButton>
-                                    ) : null}
                                 </>
                             )
                         }
                         facts={<PageHeaderFacts items={facts} />}
                         strip={
-                            !pane && !(rawAction && !canOpenPane) && next ? (
-                                <PageHeaderStages
+                            rawAction && !canOpenPane ? undefined : (
+                                <PageHeaderSteps
                                     steps={steps}
-                                    next={next}
-                                    ariaLabel="Corrective action stage"
+                                    selected={!pane && section === 'overview' ? shownStep : null}
+                                    onSelect={(key) => {
+                                        setPicked(key === currentStep ? null : (key as ActionStepKey));
+                                        if (pane || section !== 'overview') select('overview');
+                                    }}
+                                    ariaLabel="Corrective action steps"
                                 />
-                            ) : !pane && ca.status === 'closed' ? (
-                                <PageHeaderStages
-                                    steps={steps}
-                                    ariaLabel="Corrective action stage"
-                                />
-                            ) : undefined
+                            )
                         }
                         rail={
                             <PageHeaderRail<CorrectiveActionSection>
