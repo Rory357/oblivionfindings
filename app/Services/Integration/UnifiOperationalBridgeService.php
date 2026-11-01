@@ -101,6 +101,8 @@ class UnifiOperationalBridgeService
                     'model_long' => $payload['model'] ?? $payload['model_long_name'] ?? null,
                     'product_line' => $productLine !== '' ? $productLine : null,
                     'firmware_status' => $payload['firmwareStatus'] ?? null,
+                    // S&D Phase G (pg-sdr-2d): the version UniFi says is ready ("updateAvailable"), if any.
+                    'firmware_update_version' => is_scalar($payload['updateAvailable'] ?? null) ? (string) $payload['updateAvailable'] : null,
                     'uptime' => $payload['uptime'] ?? null,
                     'experience_score' => $payload['satisfaction'] ?? null,
                     'host_id' => $payload['_resolved_host_id'] ?? null,

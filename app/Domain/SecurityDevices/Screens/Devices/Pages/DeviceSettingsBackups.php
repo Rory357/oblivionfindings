@@ -12,6 +12,7 @@ use App\Domain\SecurityDevices\Management\Services\CommandExecutionRouteResolver
 use App\Domain\SecurityDevices\Management\Services\DeclaredDeviceCommandCapabilities;
 use App\Domain\SecurityDevices\Management\Services\DeviceManagementAuthorizationService;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\NetworkConfig\Services\SettingsBackupLines;
 use App\Domain\SecurityDevices\NetworkConfig\Services\SshHostKeyTrust;
 use App\Models\User;
 use DomainException;
@@ -35,6 +36,7 @@ final class DeviceSettingsBackups
         private readonly DeviceManagementAuthorizationService $authorization,
         private readonly CommandExecutionRouteResolver $routes,
         private readonly SshHostKeyTrust $hostKeys,
+        private readonly SettingsBackupLines $lines,
     ) {}
 
     /**
@@ -49,17 +51,32 @@ final class DeviceSettingsBackups
         }
         $canOpen = $this->snapshots->canViewSnapshots($viewer);
 
-        return ConfigurationSnapshot::query()
+        $copies = ConfigurationSnapshot::query()
             ->where('device_id', $device->id)
             ->where('site_id', $siteId)
             ->latest('captured_at')
             ->latest('id')
             ->limit($limit)
+            ->get();
+        // S&D Phase G: "N lines changed" is a real line count against the copy before (pop-up 24).
+        $previousIds = $copies->pluck('previous_snapshot_id')->filter()->unique()->values();
+        $previous = $previousIds->isEmpty() ? collect() : ConfigurationSnapshot::query()
+            ->whereIn('id', $previousIds)
+            ->where('device_id', $device->id)
+            ->where('site_id', $siteId)
             ->get()
-            ->map(function (ConfigurationSnapshot $snapshot) use ($canOpen): array {
+            ->keyBy('id');
+
+        return $copies
+            ->map(function (ConfigurationSnapshot $snapshot) use ($canOpen, $previous): array {
                 $diff = is_array($snapshot->diff_summary) ? $snapshot->diff_summary : [];
                 $changed = collect(['added', 'removed', 'changed'])
                     ->sum(fn (string $key): int => count(array_filter((array) ($diff[$key] ?? []), 'is_string')));
+                $before = $snapshot->previous_snapshot_id === null ? null : $previous->get($snapshot->previous_snapshot_id);
+                $lines = $before instanceof ConfigurationSnapshot ? $this->lines->changedLines($before, $snapshot) : null;
+                if ($lines !== null && ! $lines['too_many'] && $lines['lines'] !== null) {
+                    $changed = $lines['lines'];
+                }
 
                 return [
                     'id' => (int) $snapshot->id,

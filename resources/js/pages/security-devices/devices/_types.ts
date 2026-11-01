@@ -1,3 +1,4 @@
+import type { FirmwareUpdate } from '@/components/security-devices/firmware-update-popup';
 import type { StatusVariant } from '@/components/ui/status-badge';
 import type {
     DeviceKind,
@@ -157,7 +158,13 @@ export type DevicesIndexProps = {
     list: { rows: DeviceRowData[]; meta: PageMeta } | null;
     batteries: { forecast: boolean; rows: BatteryRow[]; meta: PageMeta } | null;
     updates: {
+        /** Whether any device here has a source that reports its updates (UniFi). */
         source: boolean;
+        /** S&D Phase G (2d): devices a maker's source says have newer software. */
+        rows: FirmwareUpdate[];
+        /** Network gear and cameras no update check here covers yet. */
+        unchecked: number;
+        can: { quiet_time: boolean };
         recent: {
             id: number;
             device_id: number;

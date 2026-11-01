@@ -476,4 +476,16 @@ return [
             'topic' => (string) env('MQTT_SENSORS_TOPIC', 'oblivion/sensors/#'),
         ],
     ],
+
+    /*
+     * S&D Phase G (G1): nightly settings backups for routers and switches. Governed commands always
+     * have a person behind them, so the nightly run asks in the name of the Oblivion user named here
+     * (their permissions and Site access are checked again every night). Nobody named: off.
+     * The window is NZ time; security-devices:nightly-settings-backups runs every ten minutes in it.
+     */
+    'nightly_settings_backups' => [
+        'requested_by_user_id' => (int) env('SECURITY_DEVICES_NIGHTLY_BACKUP_USER_ID', 0),
+        'from' => (string) env('SECURITY_DEVICES_NIGHTLY_BACKUP_FROM', '02:00'),
+        'until' => (string) env('SECURITY_DEVICES_NIGHTLY_BACKUP_UNTIL', '05:00'),
+    ],
 ];

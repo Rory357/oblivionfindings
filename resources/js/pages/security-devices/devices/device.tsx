@@ -4,9 +4,9 @@
  * sensor gateways and other devices. The kind decides the tabs and the overview. Cameras and the
  * safety kit keep today's profile (show.tsx) until Phase E.
  *
- * Not offered here, on purpose: the terminal and the device's own web page (Phase G), firmware
- * updates (no source), port on/off/restart (never), acknowledge and quiet time (Phase D), and
- * Obli help (Phase I).
+ * Not offered here, on purpose: installing firmware (pop-up 62 shows an update a maker's source
+ * reports and opens the maker's app), port on/off/restart (never), acknowledge and quiet time
+ * (Phase D), and Obli help (Phase I).
  */
 import {
     PageHeader,
@@ -33,13 +33,15 @@ import {
     type DeviceAction,
     type PopupDevice,
 } from '@/components/security-devices/device-popups';
-import { ConfigurationDiffDialog, type ConfigurationDiffTarget } from '@/components/security-devices/configuration-diff-dialog';
+import { FirmwareUpdatePopup } from '@/components/security-devices/firmware-update-popup';
 import AppLayout from '@/layouts/app-layout';
 import { durationWords, timedText } from '@/lib/security-devices/device-time';
 import { Head, router } from '@inertiajs/react';
-import { Activity, BellPlus, Globe, HardDriveDownload, MonitorUp, Pencil } from 'lucide-react';
+import { Activity, BellPlus, CircleArrowUp, Globe, HardDriveDownload, KeyRound, MonitorUp, Pencil } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BackupSettings } from './_device-backup';
+import { SavedLoginPopup } from './_device-saved-login';
+import { SettingsChangedPopup } from './_device-settings-changed';
 import { ChecksTabView } from './_device-checks';
 import { ComputerHealthTab, ComputerOverviewTab, RemoteSupportTab } from './_device-overview-computer';
 import { GatewayOverviewTab } from './_gateway-overview';
@@ -59,7 +61,9 @@ type Popup =
     | { kind: 'move'; device: PopupDevice }
     | { kind: 'remove'; device: PopupDevice }
     | { kind: 'backup' }
-    | { kind: 'compare'; target: ConfigurationDiffTarget }
+    | { kind: 'compare'; snapshotId: number }
+    | { kind: 'update' }
+    | { kind: 'login' }
     | null;
 
 function useNow(): Date {
@@ -120,7 +124,8 @@ export default function DevicePage(props: DevicePageProps) {
         if (action === 'remove') open({ kind: 'remove', device: target });
     };
     const menuFor = (target: PopupDevice) => deviceMenu(target, can, act);
-    const compare = (snapshotId: number) => open({ kind: 'compare', target: { deviceId: device.id, deviceName: device.name, snapshotId } });
+    // S&D Phase G (pop-up 24): a backup beside the one before it.
+    const compare = (snapshotId: number) => open({ kind: 'compare', snapshotId });
 
     const watchable = can.watch && device.state === 'not_watched';
     const primary = actions.remote_href ? (
@@ -157,6 +162,16 @@ export default function DevicePage(props: DevicePageProps) {
                     {actions.web?.ok ? (
                         <PageHeaderGlassButton icon={Globe} onClick={() => setWebOpen(true)}>
                             Open web page
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {actions.update ? (
+                        <PageHeaderGlassButton icon={CircleArrowUp} onClick={() => open({ kind: 'update' })}>
+                            Firmware update
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {actions.login?.failed_at ? (
+                        <PageHeaderGlassButton icon={KeyRound} onClick={() => open({ kind: 'login' })}>
+                            Update saved login
                         </PageHeaderGlassButton>
                     ) : null}
                     {can.edit ? (
@@ -255,7 +270,25 @@ export default function DevicePage(props: DevicePageProps) {
             {actions.backup ? (
                 <BackupSettings open={popup?.kind === 'backup'} device={device} backup={actions.backup} onClose={close} />
             ) : null}
-            <ConfigurationDiffDialog target={popup?.kind === 'compare' ? popup.target : null} onClose={close} />
+            <SettingsChangedPopup
+                open={popup?.kind === 'compare'}
+                deviceId={device.id}
+                deviceName={device.name}
+                snapshotId={popup?.kind === 'compare' ? popup.snapshotId : null}
+                onBackup={actions.backup?.available ? () => open({ kind: 'backup' }) : null}
+                onClose={close}
+                now={now}
+            />
+            {actions.update ? <FirmwareUpdatePopup open={popup?.kind === 'update'} update={actions.update} onClose={close} now={now} /> : null}
+            {actions.login ? (
+                <SavedLoginPopup
+                    open={popup?.kind === 'login'}
+                    device={{ id: device.id, name: device.name, model: device.model, kind: device.kind, site: device.site }}
+                    login={actions.login}
+                    onClose={close}
+                    now={now}
+                />
+            ) : null}
         </AppLayout>
     );
 }

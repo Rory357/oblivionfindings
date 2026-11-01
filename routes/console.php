@@ -1056,6 +1056,11 @@ app(Schedule::class)->command('security-devices:house-modes-tick')->everyMinute(
 // S&D Phase F: house automations that start at a time of day (safe actions only, D12), once per start.
 app(Schedule::class)->command('security-devices:automations-tick')->everyMinute()->withoutOverlapping()->onOneServer();
 
+// S&D Phase G (G1): nightly settings backups through the governed request and the Site's hub (off until someone is named).
+app(Schedule::class)->command('security-devices:nightly-settings-backups')->everyTenMinutes()
+    ->between(...App\Domain\SecurityDevices\NetworkConfig\Services\NightlySettingsBackups::window())
+    ->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+
 // Native attempt expiry is bookkeeping only; it never retries a computer action.
 app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
 

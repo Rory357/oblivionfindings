@@ -172,6 +172,10 @@ final class DevicePagePresenter
                 'web' => $group !== 'computer' && $viewer->canDo('securityDevices.webPage.open')
                     ? app(\App\Domain\SecurityDevices\WebPages\WebPages::class)->readiness($viewer, $device)
                     : null,
+                // S&D Phase G (pop-up 62): newer software a maker's source says is ready (UniFi today).
+                'update' => $group !== 'computer' ? app(\App\Domain\SecurityDevices\Screens\Devices\DeviceUpdates::class)->forPage($device, $entry, $now) : null,
+                // S&D Phase G (pop-up 63): the saved login the hub uses to reach it, for people who may replace it.
+                'login' => $group !== 'computer' ? app(\App\Domain\SecurityDevices\Credentials\Services\DeviceSavedLogin::class)->present($viewer, $device, $siteId) : null,
             ],
             'trouble' => $trouble,
             'overview' => $tab === 'overview'

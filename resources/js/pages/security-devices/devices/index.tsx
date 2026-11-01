@@ -33,8 +33,10 @@ import {
     type DeviceAction,
     type PopupDevice,
 } from '@/components/security-devices/device-popups';
+import { QuietTime } from '@/components/security-devices/alert-popups';
 import { ConnectService } from '@/components/security-devices/connect-service-popup';
 import { iconForKind } from '@/components/security-devices/device-kind-icon';
+import { FirmwareUpdatePopup, type FirmwareUpdate } from '@/components/security-devices/firmware-update-popup';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { QuietLine } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
@@ -44,12 +46,13 @@ import {
     devicesTabLabel,
     type DevicesTab,
 } from '@/lib/security-devices/device-words';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
     BatteryMedium,
     BellPlus,
     Cpu,
+    ExternalLink,
     HardDriveDownload,
     LayoutGrid,
     List,
@@ -65,7 +68,7 @@ import { DeviceCard } from './_device-card';
 import { DEFAULT_LIST_COLUMNS, DevicesList, LIST_COLUMNS } from './_devices-list';
 import { BlockHead, ColumnsMenu, ListPager, useColumns, ViewSwitch } from './_parts';
 import type { DevicesIndexProps } from './_types';
-import { BatteriesView, UpdatesView } from './_upkeep';
+import { BatteriesView, UPDATE_COLUMNS, UpdatesView } from './_upkeep';
 
 export type { DevicesIndexProps } from './_types';
 
@@ -109,6 +112,17 @@ export default function DevicesIndex(props: DevicesIndexProps) {
     const menu = useEntityContextMenu<PopupDevice>();
     const { form, load } = useDeviceFormOptions();
     const columns = useColumns('sd.devices.list.columns', LIST_COLUMNS, DEFAULT_LIST_COLUMNS);
+    // S&D Phase G (2d): Upkeep › Updates opens pop-up 62; Quiet time is pop-up 44 for the listed devices.
+    const updateColumns = useColumns('sd.devices.updates.columns', UPDATE_COLUMNS, UPDATE_COLUMNS.map((column) => column.key));
+    const updateMenu = useEntityContextMenu<FirmwareUpdate>();
+    const [update, setUpdate] = useState<FirmwareUpdate | null>(null);
+    const [quietOpen, setQuietOpen] = useState(false);
+    const actorId = (usePage().props as { auth?: { user?: { id?: number } } }).auth?.user?.id;
+    const updateActions = (row: FirmwareUpdate): MenuItem[] => [
+        { label: 'See the update', icon: HardDriveDownload, onClick: () => setUpdate(row) },
+        { label: 'Open device', icon: Cpu, onClick: () => router.visit(row.href) },
+        { label: row.install.label, icon: ExternalLink, onClick: () => window.open(row.install.href, '_blank', 'noopener,noreferrer') },
+    ];
 
     // A new view clears what was ticked.
     const viewKey = `${tab}|${layout}|${filters.site}|${filters.status}|${filters.q}`;
@@ -317,7 +331,28 @@ export default function DevicesIndex(props: DevicesIndexProps) {
         ) : props.updates ? (
             <UpdatesView
                 data={props.updates}
-                head={<BlockHead title="Updates ready" sub="Newer software from the maker · Oblivion shows them, you update in the maker’s app" right={upkeepSwitch} />}
+                shown={updateColumns.shown}
+                now={now}
+                onOpen={(row) => setUpdate(row)}
+                actionsFor={updateActions}
+                onContextMenu={(event, row) => updateMenu.open(event, row)}
+                head={
+                    <BlockHead
+                        title="Updates ready"
+                        sub="Newer software from the maker · Oblivion shows them, you update in the maker’s app"
+                        right={
+                            <>
+                                {upkeepSwitch}
+                                <ColumnsMenu all={UPDATE_COLUMNS} shown={updateColumns.shown} onToggle={updateColumns.toggle} />
+                                {props.updates.can.quiet_time && props.updates.rows.some((row) => row.site_id !== null) ? (
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setQuietOpen(true)}>
+                                        Quiet time
+                                    </Button>
+                                ) : null}
+                            </>
+                        }
+                    />
+                }
             />
         ) : null;
     } else if (props.cameras) {
@@ -492,6 +527,33 @@ export default function DevicesIndex(props: DevicesIndexProps) {
                     title={menu.ctx.record.name}
                     items={actionsFor(menu.ctx.record)}
                     onClose={menu.close}
+                />
+            ) : null}
+
+            {updateMenu.ctx ? (
+                <EntityContextMenu
+                    x={updateMenu.ctx.x}
+                    y={updateMenu.ctx.y}
+                    icon={iconForKind(updateMenu.ctx.record.kind)}
+                    title={updateMenu.ctx.record.name}
+                    items={updateActions(updateMenu.ctx.record)}
+                    onClose={updateMenu.close}
+                />
+            ) : null}
+            <FirmwareUpdatePopup open={update !== null} update={update} onClose={() => setUpdate(null)} now={now} />
+            {props.updates?.can.quiet_time ? (
+                <QuietTime
+                    open={quietOpen}
+                    devices={props.updates.rows
+                        .filter((row) => row.site_id !== null)
+                        .map((row) => ({ id: row.id, name: row.name, site_id: row.site_id as number, site: row.where ?? '', kind: row.kind, domain: row.domain }))}
+                    devicesFailed={false}
+                    loadDevices={() => undefined}
+                    actorId={actorId}
+                    onClose={() => {
+                        setQuietOpen(false);
+                        router.reload({ only: ['updates'] });
+                    }}
                 />
             ) : null}
 

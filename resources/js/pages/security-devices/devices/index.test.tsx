@@ -212,7 +212,7 @@ describe('Devices page', () => {
         expect(screen.getByText(/No forecast yet/)).toBeTruthy();
         unmount();
 
-        render(<DevicesIndex {...fixture({ tab: 'upkeep', upkeep: 'updates', cards: null, updates: { source: false, recent: [] } })} />);
+        render(<DevicesIndex {...fixture({ tab: 'upkeep', upkeep: 'updates', cards: null, updates: { source: false, rows: [], unchecked: 0, can: { quiet_time: false }, recent: [] } })} />);
         expect(screen.getByText(/Oblivion can’t tell yet which devices have newer software/)).toBeTruthy();
         expect(screen.getByText(/it doesn’t install them/)).toBeTruthy();
     });

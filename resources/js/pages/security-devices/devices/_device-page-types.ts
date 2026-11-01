@@ -3,6 +3,8 @@ import type { SshHostKeyState } from '@/components/security-devices/ssh-host-key
 import type { SgTone } from '@/components/signature/blocks';
 import type { DeviceKind, DeviceState } from '@/lib/security-devices/device-words';
 import type { DeviceCardData, DeviceFormData, TimedText } from './_types';
+import type { FirmwareUpdate } from '@/components/security-devices/firmware-update-popup';
+import type { SavedLogin } from './_device-saved-login';
 
 /**
  * The device page (S&D rebuild C2): one page per kind for network gear, computers, printers,
@@ -288,6 +290,10 @@ export type DevicePageProps = {
         remote_href: string | null;
         /** S&D Phase G (pop-up 61): whether the device's web page can open through the hub, and why not. */
         web?: { ok: boolean; reason: string | null; hub: string | null } | null;
+        /** S&D Phase G (pop-up 62): newer software a maker's source says is ready. */
+        update?: FirmwareUpdate | null;
+        /** S&D Phase G (pop-up 63): the saved login the hub uses, for people who may replace it. */
+        login?: SavedLogin | null;
     };
     trouble: TroubleState | null;
     overview: DeviceOverview | null;

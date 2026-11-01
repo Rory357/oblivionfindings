@@ -649,6 +649,22 @@ Route::middleware([
         Route::post('/close', [\App\Domain\SecurityDevices\Terminal\Http\TerminalController::class, 'close'])->middleware('throttle:30,1')->name('security-devices.terminal.close');
     });
 
+    // S&D Phase G (pop-up 24): a settings backup beside the one before it, and both as one file. The presenter checks Site and snapshot access.
+    Route::get('/devices/{device}/settings-backups/{snapshot}/changes', [\App\Domain\SecurityDevices\Screens\Http\SettingsBackupsController::class, 'changes'])
+        ->whereNumber(['device', 'snapshot'])
+        ->middleware(['permission:securityDevices.devices.view', 'throttle:30,1'])
+        ->name('security-devices.devices.settings-backups.changes');
+    Route::get('/devices/{device}/settings-backups/{snapshot}/download', [\App\Domain\SecurityDevices\Screens\Http\SettingsBackupsController::class, 'download'])
+        ->whereNumber(['device', 'snapshot'])
+        ->middleware(['permission:securityDevices.devices.view', 'throttle:30,1'])
+        ->name('security-devices.devices.settings-backups.download');
+
+    // S&D Phase G (pop-up 63): replace the saved login the hub uses for a device (savedLogins.manage; the manager also checks commands.admin).
+    Route::put('/devices/{device}/saved-login', [\App\Domain\SecurityDevices\Screens\Http\SavedLoginController::class, 'update'])
+        ->whereNumber('device')
+        ->middleware(['permission:securityDevices.savedLogins.manage', 'throttle:10,1'])
+        ->name('security-devices.devices.saved-login.update');
+
     // S&D Phase F: link a sensor to a person's care (pop-up 65, consent checked) and the scald watch.
     Route::prefix('/devices/{device}')->whereNumber('device')->middleware('throttle:30,1')->group(function (): void {
         Route::get('/care-link/options', [CareLinkController::class, 'options'])->name('security-devices.devices.care-link.options');

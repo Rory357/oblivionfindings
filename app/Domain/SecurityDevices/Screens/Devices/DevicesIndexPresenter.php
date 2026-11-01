@@ -685,14 +685,16 @@ final class DevicesIndexPresenter
     }
 
     /**
-     * Updates. No source tells Oblivion yet which devices have newer software, so the table
-     * says so; software changes the devices reported in the last 30 days are real events.
+     * Updates (drawing 2d, S&D Phase G): the devices a maker's source says have newer software
+     * (UniFi today), how many can't be checked here, and the software changes devices reported in
+     * the last 30 days. Nothing is listed that no source said.
      *
      * @param  Collection<int, DeviceEntry>  $entries
      * @return array<string, mixed>
      */
     private function updates(User $viewer, Collection $entries): array
     {
+        $ready = app(DeviceUpdates::class)->present($viewer, $entries, CarbonImmutable::now());
         $names = $entries->mapWithKeys(fn (DeviceEntry $entry): array => [$entry->id() => $entry->name()]);
         $recent = [];
         if ($names->isNotEmpty()) {
@@ -721,8 +723,11 @@ final class DevicesIndexPresenter
         }
 
         return [
-            'source' => false,
+            'source' => $ready['source'],
+            'rows' => $ready['rows'],
+            'unchecked' => $ready['unchecked'],
             'recent' => $recent,
+            'can' => ['quiet_time' => $viewer->canDo('securityDevices.monitoring.manage')],
         ];
     }
 }
