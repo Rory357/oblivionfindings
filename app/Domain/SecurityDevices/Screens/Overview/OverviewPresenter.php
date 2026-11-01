@@ -26,12 +26,43 @@ use Illuminate\Support\Str;
 
 /**
  * Security & devices home (S&D rebuild drawings pg-sdr-1 with its first-time view 1b, and the
- * Trends tab pg-sdr-18). Scoped by SecurityDevicesAccessService. The support worker's view (1c)
- * and the Reports tab (18b) come later; the Activity tab (18c) waits for its drawing's approval.
+ * Trends tab pg-sdr-18). Scoped by SecurityDevicesAccessService. The support worker's view (1c) is
+ * WorkerOverviewPresenter (see showsWorkerView); the Reports tab (18b) comes later; the Activity tab
+ * (18c) waits for its drawing's approval.
  */
 final class OverviewPresenter
 {
     public const array TABS = ['overview', 'trends'];
+
+    /**
+     * The keys of people who look after devices (IT, managers, facilities, H&S, auditors). Someone with
+     * none of them, such as a support worker or team lead (viewAny and devices.view only), gets the
+     * support worker's Overview (pg-sdr-1c, WorkerOverviewPresenter) on the same URL instead.
+     */
+    public const array LOOK_AFTER_KEYS = [
+        'securityDevices.devices.viewAllSites', 'securityDevices.devices.viewUnassigned',
+        'securityDevices.devices.create', 'securityDevices.devices.update', 'securityDevices.devices.delete',
+        'securityDevices.devices.assign', 'securityDevices.groups.manage', 'securityDevices.alerts.acknowledge',
+        'securityDevices.cctv.media.view', 'securityDevices.cctv.recordingReferences.view',
+        'securityDevices.accessControl.view', 'securityDevices.accessControl.manage',
+        'securityDevices.maintenance.view', 'securityDevices.maintenance.manage',
+        'securityDevices.integrations.view', 'securityDevices.integrations.manage', 'securityDevices.monitoring.manage',
+        'securityDevices.automations.manage', 'securityDevices.reports.view', 'securityDevices.hubs.approve',
+        'securityDevices.savedLogins.manage', 'securityDevices.commands.observe', 'securityDevices.commands.operate',
+        'securityDevices.commands.manage', 'securityDevices.commands.control', 'securityDevices.commands.approve',
+        'securityDevices.commands.admin',
+    ];
+
+    public static function showsWorkerView(User $viewer): bool
+    {
+        foreach (self::LOOK_AFTER_KEYS as $key) {
+            if ($viewer->canDo($key)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     public function __construct(
         private readonly SecurityDevicesAccessService $access,

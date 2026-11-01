@@ -45,7 +45,9 @@ class OverviewScreenTest extends TestCase
             'secondary_site_ids' => [],
             'is_active' => true,
         ]);
-        foreach (['securityDevices.viewAny', 'securityDevices.devices.view'] as $key) {
+        // reports.view: someone who looks after devices gets this Overview; viewAny and devices.view
+        // alone (a support worker) get pg-sdr-1c instead (WorkerOverviewAndConnectServiceTest).
+        foreach (['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.reports.view'] as $key) {
             $this->viewer->permissionOverrides()->attach(Permission::query()->where('key', $key)->firstOrFail()->id, ['allowed' => true]);
         }
     }

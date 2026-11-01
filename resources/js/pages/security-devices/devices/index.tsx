@@ -33,6 +33,7 @@ import {
     type DeviceAction,
     type PopupDevice,
 } from '@/components/security-devices/device-popups';
+import { ConnectService } from '@/components/security-devices/connect-service-popup';
 import { iconForKind } from '@/components/security-devices/device-kind-icon';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { QuietLine } from '@/components/signature/blocks';
@@ -83,6 +84,7 @@ type Popup =
     | { kind: 'remove'; device: PopupDevice }
     | { kind: 'move'; devices: PopupDevice[] }
     | { kind: 'watch-many'; devices: PopupDevice[] }
+    | { kind: 'connect' }
     | null;
 
 function useNow(): Date {
@@ -498,7 +500,9 @@ export default function DevicesIndex(props: DevicesIndexProps) {
                 can={can}
                 onClose={close}
                 onChoose={(choice) => open(choice === 'scan' ? { kind: 'scan' } : { kind: 'add' })}
+                onConnect={() => open({ kind: 'connect' })}
             />
+            {can.connect ? <ConnectService open={popup?.kind === 'connect'} onClose={close} onChanged={() => router.reload({ except: ['deviceForm'] })} /> : null}
             <DeviceFormPopup open={popup?.kind === 'add'} mode="add" form={form} canAssign={can.assign} onClose={close} />
             <DeviceFormPopup
                 open={popup?.kind === 'edit'}

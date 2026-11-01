@@ -14,6 +14,7 @@ import {
     PageHeaderSearch,
 } from '@/components/page/page-header';
 import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
+import { ConnectService } from '@/components/security-devices/connect-service-popup';
 import { useDeviceFormOptions } from '@/components/security-devices/device-popups';
 import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
 import { AddNetwork } from '@/components/security-devices/scan-popups';
@@ -52,6 +53,7 @@ export default function SetupPage(props: SetupProps) {
     const [query, setQuery] = useState('');
     const [addingNetwork, setAddingNetwork] = useState(false);
     const [addingGateway, setAddingGateway] = useState(false);
+    const [connecting, setConnecting] = useState(false);
     const [leaving, setLeaving] = useState<string | null>(null);
     const allowLeave = useRef(false);
     // Times are read once per visit, so "6:00 am" and "3 min ago" agree across the page.
@@ -179,7 +181,7 @@ export default function SetupPage(props: SetupProps) {
                         }}
                     />
                 ) : null}
-                {props.connected ? <ConnectedServices data={props.connected} query={query} now={now} /> : null}
+                {props.connected ? <ConnectedServices data={props.connected} query={query} now={now} onConnect={can.manage ? () => setConnecting(true) : undefined} /> : null}
                 {props.logins ? <SavedLogins data={props.logins} query={query} now={now} /> : null}
                 {props.supported ? <SupportedDevices data={props.supported} query={query} canOpenDevices={can.open_devices} /> : null}
                 {props.history ? (
@@ -213,6 +215,7 @@ export default function SetupPage(props: SetupProps) {
                 }}
             />
             <AddSensorGateway open={addingGateway} form={form} onClose={() => setAddingGateway(false)} />
+            {can.manage ? <ConnectService open={connecting} onClose={() => setConnecting(false)} onChanged={() => router.reload({ except: ['deviceForm'] })} /> : null}
             <HubPopups state={hubs} form={form} canApprove={can.approve_hubs} canStopScan={can.manage} />
             <ConfirmDialog
                 open={leaving !== null}

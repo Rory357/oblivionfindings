@@ -1,6 +1,7 @@
 /**
  * Security & devices home (S&D rebuild drawings pg-sdr-1, its first-time view 1b, and the Trends
  * tab pg-sdr-18): what needs attention, the Sites, cameras and hubs, then trends and activity.
+ * A support worker gets their own house instead (pg-sdr-1c, _worker.tsx); the server decides.
  */
 import { DonutChart } from '@/components/dashboard/donut-chart';
 import {
@@ -14,6 +15,7 @@ import {
     PageHeaderRail,
     PageLayout,
 } from '@/components/page';
+import { ConnectService } from '@/components/security-devices/connect-service-popup';
 import { AddDeviceChooser, DeviceFormPopup, useDeviceFormOptions } from '@/components/security-devices/device-popups';
 import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
@@ -27,9 +29,10 @@ import { Monitor, Network, Plus, Radar, RefreshCw, ShieldCheck } from 'lucide-re
 import { useEffect, useState, type ReactNode } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { FactText, SiteFlagBadge } from '../sites/_parts';
-import type { ActivityRow, OverviewProps, OverviewTab } from './_types';
+import type { ActivityRow, OverviewProps, OverviewTab, SecurityDevicesHomeProps } from './_types';
+import { WorkerOverview } from './_worker';
 
-export type { OverviewProps } from './_types';
+export type { OverviewProps, WorkerOverviewProps } from './_types';
 
 const BASE = '/security-devices';
 
@@ -49,9 +52,13 @@ function useNow(): Date {
     return now;
 }
 
-type Popup = { kind: 'chooser' } | { kind: 'add' } | { kind: 'scan' } | { kind: 'scanning'; runId: number } | null;
+type Popup = { kind: 'chooser' } | { kind: 'add' } | { kind: 'scan' } | { kind: 'scanning'; runId: number } | { kind: 'connect' } | null;
 
-export default function Overview(props: OverviewProps) {
+export default function Overview(props: SecurityDevicesHomeProps) {
+    return props.view === 'worker' ? <WorkerOverview {...props} /> : <ItOverview {...props} />;
+}
+
+function ItOverview(props: OverviewProps) {
     const { tab, site, sites, meters, can } = props;
     const now = useNow();
     const [popup, setPopup] = useState<Popup>(null);
@@ -141,7 +148,8 @@ export default function Overview(props: OverviewProps) {
     );
 
     let body: ReactNode = null;
-    if (tab === 'overview' && props.first_time) body = <FirstTime firstTime={props.first_time} canConnect={can.connect} onAddHub={can.add_hub ? addHub : null} />;
+    if (tab === 'overview' && props.first_time)
+        body = <FirstTime firstTime={props.first_time} onConnect={can.connect ? () => setPopup({ kind: 'connect' }) : null} onAddHub={can.add_hub ? addHub : null} />;
     else if (tab === 'overview' && props.overview) body = <OverviewBody overview={props.overview} now={now} />;
     else if (tab === 'trends' && props.trends) body = <Trends trends={props.trends} />;
 
@@ -157,10 +165,14 @@ export default function Overview(props: OverviewProps) {
 
             <AddDeviceChooser
                 open={popup?.kind === 'chooser'}
-                can={{ add: can.add, scan: can.scan, connect: false }}
+                can={{ add: can.add, scan: can.scan, connect: can.connect }}
                 onClose={() => setPopup(null)}
                 onChoose={(choice) => setPopup(choice === 'scan' ? { kind: 'scan' } : { kind: 'add' })}
+                onConnect={() => setPopup({ kind: 'connect' })}
             />
+            {can.connect ? (
+                <ConnectService open={popup?.kind === 'connect'} onClose={() => setPopup(null)} onChanged={() => router.reload({ except: ['deviceForm'] })} />
+            ) : null}
             <DeviceFormPopup
                 open={popup?.kind === 'add'}
                 mode="add"
@@ -182,7 +194,7 @@ export default function Overview(props: OverviewProps) {
     );
 }
 
-function FirstTime({ firstTime, canConnect, onAddHub }: { firstTime: NonNullable<OverviewProps['first_time']>; canConnect: boolean; onAddHub: (() => void) | null }) {
+function FirstTime({ firstTime, onConnect, onAddHub }: { firstTime: NonNullable<OverviewProps['first_time']>; onConnect: (() => void) | null; onAddHub: (() => void) | null }) {
     return (
         <SideBySide cols="minmax(0, 1fr) 360px">
             <div className="flex flex-col gap-5">
@@ -214,7 +226,7 @@ function FirstTime({ firstTime, canConnect, onAddHub }: { firstTime: NonNullable
                 <QuietLine
                     title="Have UniFi, Milesight or alarm accounts?"
                     text="Connect them and their devices appear here straight away."
-                    action={canConnect ? { label: 'Connect a service', href: '/security-devices/integrations' } : null}
+                    action={onConnect ? { label: 'Connect a service', onClick: onConnect } : null}
                 />
             </SideColumn>
         </SideBySide>

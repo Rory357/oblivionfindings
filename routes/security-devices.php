@@ -552,6 +552,15 @@ Route::middleware([
     Route::get('/setup/broker/sensors-certificate', [SetupController::class, 'sensorsCertificate'])
         ->middleware('throttle:30,1')
         ->name('security-devices.setup.broker.sensors-certificate');
+    // S&D Phase E (E8): pop-up 15, Connect a service. Each step runs the service's own settings action.
+    Route::get('/setup/services/connect', [\App\Domain\SecurityDevices\Screens\Http\ConnectServiceController::class, 'show'])
+        ->middleware(['permission:securityDevices.integrations.manage', 'throttle:60,1'])
+        ->name('security-devices.setup.services.connect');
+    Route::post('/setup/services/connect/{service}/{step}', [\App\Domain\SecurityDevices\Screens\Http\ConnectServiceController::class, 'run'])
+        ->where('service', 'unifi|intune')
+        ->where('step', 'key|test|sites|match|bring-in|find')
+        ->middleware(['permission:securityDevices.integrations.manage', 'throttle:30,1'])
+        ->name('security-devices.setup.services.connect.run');
     Route::get('/setup/{section}', [SetupController::class, 'show'])
         ->where('section', 'hubs|services|alerts|history')
         ->name('security-devices.setup.section');

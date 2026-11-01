@@ -41,4 +41,67 @@ export type OverviewProps = {
     } | null;
     /** add_hub / approve_hub: Add a hub (sdr-12) and approving it (sdr-79). */
     can: { add: boolean; scan: boolean; connect: boolean; assign: boolean; add_hub?: boolean; approve_hub?: boolean };
+    view?: 'it';
 };
+
+/* ------------------------------------------------------------------ */
+/*  pg-sdr-1c: the support worker's Overview (WorkerOverviewPresenter)  */
+/* ------------------------------------------------------------------ */
+
+export type WorkerTone = 'success' | 'warning' | 'critical' | 'info' | 'neutral';
+
+/** A line from the server; "{time}" is filled from `at` in NZ time. */
+export type WorkerLine = { tone: WorkerTone | 'brand' | 'none'; text: string; at: string | null };
+
+export type WorkerMeter = {
+    key: 'alarm' | 'safety' | 'panic';
+    label: string;
+    value: string;
+    caption: { text: string; at: string | null };
+    tone: 'success' | 'warning' | 'critical' | null;
+    /** The alarm meter opens its panel's page. */
+    device_id: number | null;
+};
+
+export type WorkerAlert = { id: number; title: string; tone: 'critical' | 'warning'; safety: boolean; at: string; sub: string; then: string };
+
+export type WorkerKitItem = {
+    key: string;
+    kind: 'alarm' | 'zone' | 'panic' | 'door';
+    /** The device's id (a zone's is its panel's). */
+    id: number;
+    name: string;
+    sub: string;
+    flag: { tone: WorkerTone; text: string };
+    facts: WorkerLine[];
+    panel: { state: string; label: string; tone: WorkerTone; since: string | null; by: string | null } | null;
+    ready?: boolean;
+};
+
+export type WorkerPlace = {
+    key: string;
+    name: string;
+    sub: string;
+    flag: { tone: WorkerTone; text: string };
+    facts: WorkerLine[];
+    href: string | null;
+};
+
+export type WorkerTold = { id: string; at: string | null; tone: 'critical' | 'warning' | 'info'; title: string; sub: string };
+
+export type WorkerOverviewProps = {
+    view: 'worker';
+    tab: 'overview';
+    site: { id: number; name: string } | null;
+    sites: { value: string; label: string }[];
+    shift: { starts_at: string; ends_at: string } | null;
+    on_shift: boolean;
+    meters: WorkerMeter[];
+    safety: WorkerAlert[];
+    kit: { brand: string | null; reported_at: string | null; items: WorkerKitItem[] };
+    around: WorkerPlace[];
+    told: WorkerTold[];
+    can: { open_devices: boolean; open_alerts: boolean };
+};
+
+export type SecurityDevicesHomeProps = OverviewProps | WorkerOverviewProps;

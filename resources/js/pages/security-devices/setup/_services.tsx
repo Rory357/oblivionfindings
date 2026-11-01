@@ -12,17 +12,20 @@ import type { LoginRow, SetupProps, SupportedRow } from './_types';
 
 const RING = { success: 'success', warning: 'warning', critical: 'critical', info: 'info', neutral: 'none' } as const;
 
-export function ConnectedServices({ data, query, now }: { data: NonNullable<SetupProps['connected']>; query: string; now: Date }) {
+export function ConnectedServices({ data, query, now, onConnect }: { data: NonNullable<SetupProps['connected']>; query: string; now: Date; onConnect?: () => void }) {
     const cards = data.cards.filter((card) => matches(query, card.name, card.sub, card.flag.text));
+    // Pop-up 15, for someone who can manage services (securityDevices.integrations.manage).
+    const connect = onConnect ? { label: 'Connect a service', onClick: onConnect } : null;
 
     return (
         <div className="space-y-5">
             {cards.length === 0 ? (
-                <QuietLine title="Connected services" text={query ? 'No service matches your search.' : 'No services yet.'} />
+                <QuietLine title="Connected services" text={query ? 'No service matches your search.' : 'No services yet.'} action={connect} />
             ) : (
                 <PlaceCards
                     title="Connected services"
                     sub="Accounts and receivers that bring devices in without scanning"
+                    action={connect}
                     cols={3}
                     items={cards.map((card) => ({
                         id: card.key,

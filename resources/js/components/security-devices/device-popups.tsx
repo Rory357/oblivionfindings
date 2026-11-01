@@ -125,7 +125,7 @@ export function ChoiceTiles<K extends string>({
     options: ChoiceTile<K>[];
     value: K | '';
     onChange: (value: K) => void;
-    columns?: 1 | 2 | 4;
+    columns?: 1 | 2 | 3 | 4;
     label: string;
 }) {
     return (
@@ -135,6 +135,7 @@ export function ChoiceTiles<K extends string>({
             className={cn(
                 'grid gap-2',
                 columns === 2 && 'sm:grid-cols-2',
+                columns === 3 && 'sm:grid-cols-3',
                 columns === 4 && 'grid-cols-2 sm:grid-cols-4',
             )}
         >
@@ -218,11 +219,14 @@ export function AddDeviceChooser({
     can,
     onClose,
     onChoose,
+    onConnect,
 }: {
     open: boolean;
     can: Pick<DevicesCan, 'add' | 'scan' | 'connect'>;
     onClose: () => void;
     onChoose: (choice: AddChoice) => void;
+    /** Connect a service opens pop-up 15 here; without it, the old services page. */
+    onConnect?: () => void;
 }) {
     const options = ADD_CHOICES.filter(
         (choice) =>
@@ -251,7 +255,8 @@ export function AddDeviceChooser({
             onSubmit={() => {
                 if (!picked) return;
                 if (picked.value === 'service') {
-                    router.visit('/security-devices/integrations');
+                    if (onConnect) onConnect();
+                    else router.visit('/security-devices/integrations');
                     return;
                 }
                 onChoose(picked.value);
