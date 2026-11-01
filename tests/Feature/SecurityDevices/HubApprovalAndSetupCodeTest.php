@@ -214,3 +214,24 @@ it('holds updates for every hub and tells each hub its ring and night window', f
         ->and($instruction['window'])->toMatchArray(['start' => '01:30', 'end' => '04:00'])
         ->and($instruction['rollback_after_minutes'])->toBe(5);
 });
+
+it('serves the Pi one-liner for a Linux hub code, and a plain refusal for anything else', function () {
+    $issued = $this->actingAs($this->admin)->postJson(route('security-devices.hubs.setup-codes.issue'), [
+        'site_id' => $this->site->id, 'platform' => 'linux', 'name' => 'Kauri House hub',
+    ])->assertCreated();
+    $code = (string) $issued->json('code');
+    expect($issued->json('linux_command'))->toBe("curl -fsSL https://oblivion.test/h/{$code} | sudo sh")
+        ->and($issued->json('download_url'))->toBeNull();
+
+    auth()->logout();
+    $script = $this->get("/h/{$code}")->assertOk()->assertHeader('Content-Type', 'text/x-shellscript; charset=utf-8')->getContent();
+    expect($script)->toContain("CODE='{$code}'")
+        ->and($script)->toContain("SERVER='https://oblivion.test'")
+        ->and($script)->toContain('sha256sum')
+        ->and($script)->not->toContain('apt-get');
+
+    $windows = sdHubIssueCode($this);
+    auth()->logout();
+    $refusal = $this->get('/h/'.$windows['code'])->assertOk()->getContent();
+    expect($refusal)->toContain('exit 1')->and($refusal)->toContain('isn’t for a Linux hub');
+});

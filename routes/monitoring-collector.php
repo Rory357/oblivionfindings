@@ -2,6 +2,7 @@
 
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\CollectorMediaController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\HikvisionDiscoveryController;
+use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubLinuxSetupController;
 use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubRuntimeController;
 use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubSetupRedeemController;
 use App\Http\Controllers\Api\Monitoring\CollectorEnrollmentController;
@@ -32,4 +33,7 @@ Route::prefix('monitoring/collectors')->name('api.monitoring.collectors.')->grou
     // No sign-in exists yet, so it's throttled hard; the hub still waits for approval after.
     Route::post('setup/redeem', HubSetupRedeemController::class)
         ->middleware('throttle:10,1')->name('setup.redeem');
+    // The Pi/Linux one-liner downloads its package with the same code.
+    Route::post('setup/package', [HubLinuxSetupController::class, 'package'])
+        ->middleware('throttle:10,1')->name('setup.package');
 });

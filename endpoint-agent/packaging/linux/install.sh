@@ -8,11 +8,22 @@ fi
 
 PROFILE_PATH=""
 SETUP_CODE=""
+SHORT_CODE=""
+SERVER=""
 INSTALL_ONLY=0
 NO_APT=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        # The one-command install (S&D Phase B): the 8-character setup code and the server.
+        --setup-code)
+            SHORT_CODE="${2:-}"
+            shift 2
+            ;;
+        --server)
+            SERVER="${2:-}"
+            shift 2
+            ;;
         --profile)
             PROFILE_PATH="${2:-}"
             shift 2
@@ -44,7 +55,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ "$INSTALL_ONLY" -eq 0 && -z "$PROFILE_PATH" && -z "$SETUP_CODE" ]]; then
+if [[ -n "$SHORT_CODE" ]]; then
+    # The one-command install brings its own runtime: nothing comes from apt.
+    if [[ -z "$SERVER" || "$SERVER" != https://* ]]; then
+        echo "Supply --server https://… with --setup-code." >&2
+        exit 2
+    fi
+    if [[ ! -x "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/runtime/php" ]]; then
+        echo "This hub package has no runtime of its own, so it can't install without apt. Download the current release from Oblivion." >&2
+        exit 1
+    fi
+fi
+
+if [[ "$INSTALL_ONLY" -eq 0 && -z "$PROFILE_PATH" && -z "$SETUP_CODE" && -z "$SHORT_CODE" ]]; then
     echo "Supply --code <one-time-code> or --profile <profile.json> from Oblivion Findings." >&2
     exit 2
 fi
@@ -145,7 +168,31 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [[ -n "$SETUP_CODE" ]]; then
+if [[ -n "$SHORT_CODE" ]]; then
+    # Swap the 8-character code for this hub's setup profile, over HTTPS.
+    TEMP_PROFILE="$(mktemp "${STATE_ROOT}/enrol-profile.XXXXXX.json")"
+    chmod 0600 "$TEMP_PROFILE"
+    chown root:root "$TEMP_PROFILE"
+    REDEEMED="$(mktemp "${STATE_ROOT}/redeem.XXXXXX.json")"
+    chmod 0600 "$REDEEMED"
+    if ! curl -fsS --proto '=https' --tlsv1.2 -H 'Content-Type: application/json' \
+        --data "{\"code\":\"${SHORT_CODE}\"}" -o "$REDEEMED" \
+        "${SERVER}/api/monitoring/collectors/setup/redeem"; then
+        rm -f "$REDEEMED"
+        echo "Oblivion refused the setup code (it may be used, expired or cancelled)." >&2
+        exit 1
+    fi
+    REDEEMED_ENV="$REDEEMED" TARGET_FILE="$TEMP_PROFILE" "$PHP_BIN" -r '
+        $reply = json_decode((string) file_get_contents((string) getenv("REDEEMED_ENV")), true, 16, JSON_THROW_ON_ERROR);
+        if (($reply["state"] ?? null) !== "ok" || ($reply["role"] ?? null) !== "hub" || !is_array($reply["profile"] ?? null)) {
+            fwrite(STDERR, (string) ($reply["message"] ?? "Oblivion refused the setup code.")."\n");
+            exit(1);
+        }
+        file_put_contents((string) getenv("TARGET_FILE"), json_encode($reply["profile"], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+    '
+    rm -f "$REDEEMED"
+    PROFILE_PATH="$TEMP_PROFILE"
+elif [[ -n "$SETUP_CODE" ]]; then
     TEMP_PROFILE="$(mktemp "${STATE_ROOT}/enrol-profile.XXXXXX.json")"
     chmod 0600 "$TEMP_PROFILE"
     chown root:root "$TEMP_PROFILE"
@@ -210,4 +257,7 @@ cleanup
     "--config=${STATE_ROOT}/collector.json" || true
 
 systemctl enable --now oblivion-site-collector.service
-echo "Oblivion Site hub enrolled and service started."
+echo "✓ Installed to ${INSTALL_ROOT}"
+echo "✓ Started oblivion-site-collector (starts on boot, updates itself)"
+echo "✓ Connected to ${DEPLOYMENT_URL#https://}"
+echo "Waiting for an admin to approve this hub in Oblivion › Setup › Hubs."

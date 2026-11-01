@@ -62,6 +62,7 @@ use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteHubWizardController;
 use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubAdminController;
+use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubLinuxSetupController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
 use App\Domain\SecurityDevices\Http\Controllers\SupportedDevicesController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandApprovalController;
@@ -75,6 +76,14 @@ use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandExecutio
 use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceCommandRequest;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+
+// Raspberry Pi or Linux hub, one command (S&D Phase B, windows tab screen D):
+// curl -fsSL https://<server>/h/<CODE> | sudo sh. No sign-in exists yet; the 8-character code
+// is the key (one computer, 24 hours), it's throttled, and the hub still waits for approval.
+Route::get('/h/{code}', [HubLinuxSetupController::class, 'script'])
+    ->where('code', '[0-9A-Za-z-]{8,9}')
+    ->middleware('throttle:20,1')
+    ->name('security-devices.hubs.linux-script');
 
 Route::middleware([
     'auth',
