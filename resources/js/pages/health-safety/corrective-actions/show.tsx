@@ -469,6 +469,10 @@ function ActionRecord({
                           action: nextButton,
                       };
 
+    // Off the overview the Progress card isn't shown, so its step stays reachable as a quiet header button.
+    const progressShown = !pane && section === 'overview' && !(rawAction && !canOpenPane);
+    const headerItems = primary && !progressShown ? [primary, ...glass] : glass;
+
     /* ---- the picked step's pane: what was added there, then its activity ---- */
     const stepOf = (label: string): ActionStepKey => {
         const text = label.toLowerCase();
@@ -1003,9 +1007,9 @@ function ActionRecord({
                             .filter(Boolean)
                             .join(' · ')}
                         actions={
-                            pane || !glass.length ? undefined : (
+                            pane || !headerItems.length ? undefined : (
                                 <>
-                                    {glass.map((item) => (
+                                    {headerItems.map((item) => (
                                         <PageHeaderGlassButton
                                             key={item.key}
                                             disabled={item.disabled}

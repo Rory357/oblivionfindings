@@ -40,19 +40,24 @@ import {
 import {
     PageHeader,
     PageHeaderGlassButton,
-    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
 import {
     PageHeaderFacts,
-    PageHeaderStages,
+    PageHeaderSteps,
     type PageHeaderFact,
-    type PageHeaderNextStep,
-    type PageHeaderStage,
+    type PageHeaderStep,
 } from '@/components/page/page-header-strip';
 import { SideColumn, Surface } from '@/components/signature/blocks';
+import {
+    PaneLink,
+    RecordProgress,
+    type RecordProgressNext,
+    type RecordProgressPane,
+} from '@/components/signature/record-progress';
+import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -80,7 +85,7 @@ import {
     MoreHorizontal,
     Plus,
 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { outcomeLabel, outcomeTone } from './options';
 
 const SECTIONS = [
@@ -100,6 +105,8 @@ const MORE_ICONS: Partial<Record<FirstAidCommand, typeof Link2>> = {
     archive: Archive,
 };
 
+type FirstAidStepKey = 'treated' | 'recorded' | 'incident' | 'followups' | 'archived';
+
 type Props = {
     detail: FirstAidRecord;
     pickers: FirstAidPickers;
@@ -116,6 +123,7 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
     const drafts = useSafetyWorkspaceDrafts();
     const panel = useRef<HTMLDivElement>(null);
     const interacted = useRef(false);
+    const [picked, setPicked] = useState<FirstAidStepKey | null>(null);
     const reference = d.reference ?? `FA-${d.id}`;
     const childId = command === 'remove-evidence' ? attachment : followup;
     const open = d.followups.filter((item) => !item.completed_at);
@@ -189,7 +197,7 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
         },
     ];
 
-    /* ---- the stage line and the next step ---- */
+    /* ---- decision 26: round status steps in the header, the Progress card under it ---- */
     const delivery = d.source_delivery;
     const incident = d.related_incident;
     const incidentRef = incident
@@ -216,36 +224,44 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
         archived,
     ];
     const nowAt = reached.indexOf(false);
-    const state = (index: number): PageHeaderStage['state'] =>
+    const state = (index: number): PageHeaderStep['state'] =>
         nowAt === -1 || index < nowAt
             ? 'done'
             : index === nowAt
               ? 'now'
               : 'todo';
-    const steps: PageHeaderStage[] = [
+    const incidentMeta = incidentRef
+        ? `${incidentRef}${delivery ? ` · ${firstAidDeliveryLabel(delivery.status).toLowerCase()}` : ''}`
+        : d.incident_reported
+          ? d.incident_link_state === 'unavailable'
+              ? 'Incident reported · you don’t have access to it — ask your health and safety manager'
+              : 'Incident reported · not linked yet'
+          : 'No incident reported';
+    const steps: PageHeaderStep[] = [
         {
+            key: 'treated',
             label: 'Treated',
             meta: d.first_aider?.name ?? 'First aider not recorded',
             state: state(0),
         },
         {
+            key: 'recorded',
             label: 'Recorded',
             meta: d.created_at ? formatDate(d.created_at) : undefined,
             state: state(1),
         },
         {
+            key: 'incident',
             label: 'Incident and review',
             meta: incidentRef
-                ? `${incidentRef}${delivery ? ` · ${firstAidDeliveryLabel(delivery.status).toLowerCase()}` : ''}`
+                ? incidentRef
                 : d.incident_reported
-                  ? d.incident_link_state === 'unavailable'
-                      ? 'Incident reported · you don’t have access to it — ask your health and safety manager'
-                      : 'Incident reported · not linked yet'
-                  : 'No incident reported',
+                  ? 'Not linked yet'
+                  : 'None reported',
             state: state(2),
-            tone: 'warning',
         },
         {
+            key: 'followups',
             label: 'Follow-ups',
             meta: open.length
                 ? `${open.length} open`
@@ -253,47 +269,192 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
                   ? 'All done'
                   : 'None recorded',
             state: state(3),
-            tone: overdue ? 'critical' : 'warning',
         },
         {
+            key: 'archived',
             label: 'Archived',
-            meta: d.archived_at ? formatDate(d.archived_at) : undefined,
+            meta: d.archived_at ? formatDate(d.archived_at) : 'Not yet',
             state: state(4),
         },
     ];
-    const next: PageHeaderNextStep | null = archived
-        ? null
+    const currentStep: FirstAidStepKey = nowAt === -1 ? 'archived' : (steps[nowAt].key as FirstAidStepKey);
+    const shownStep: FirstAidStepKey = picked ?? currentStep;
+
+    // The record's one filled button lives in the next-step bar (DESIGN.md); the rest stay quiet in the header.
+    const completeNext =
+        nextItem && firstAidCommandAllowed(d, 'complete-followup', nextItem.id) ? nextItem : null;
+    const linkNext = !nextItem && incidentWaiting && allowed.includes('link-incident');
+    const nextButton = completeNext ? (
+        <Button onClick={() => move('followups', 'complete-followup', completeNext.id)}>
+            <CheckCircle2 aria-hidden="true" />
+            Record the outcome
+        </Button>
+    ) : linkNext ? (
+        <Button onClick={() => run('link-incident')}>
+            <Link2 aria-hidden="true" />
+            {FIRST_AID_COMMAND_LABELS['link-incident']}
+        </Button>
+    ) : primary ? (
+        <Button onClick={() => run(primary)}>
+            <Plus aria-hidden="true" />
+            {FIRST_AID_COMMAND_LABELS[primary]}
+        </Button>
+    ) : undefined;
+    const nextUsesPrimary = !completeNext && !linkNext && !!primary;
+    const progressShown = section === 'overview' && (!command || command === 'edit');
+    const otherUnowned = nextItem ? unowned.filter((item) => item.id !== nextItem.id).length : 0;
+    const next: RecordProgressNext = archived
+        ? {
+              kicker: 'Archived',
+              title: 'This treatment record is archived',
+              text: d.archived_at ? `Archived ${formatDate(d.archived_at)}.` : undefined,
+              tone: 'done',
+          }
         : nextItem
           ? {
-                label: overdue
+                kicker: overdue
                     ? 'Next step · overdue'
                     : nextItem.due_at
                       ? `Next step · due ${dueToday ? 'today' : formatDate(nextItem.due_at)}, ${formatTime(nextItem.due_at)}`
                       : 'Next step',
-                text: nextItem.notes,
-                meta: [
+                title: nextItem.notes,
+                text: [
                     `${nextItem.assigned_to?.name ?? 'Needs an owner'} · Ref ${nextItem.id}`,
-                    unowned.filter((item) => item.id !== nextItem.id).length
-                        ? `${plural(unowned.filter((item) => item.id !== nextItem.id).length, 'other follow-up')} still ${unowned.filter((item) => item.id !== nextItem.id).length === 1 ? 'needs' : 'need'} an owner`
+                    otherUnowned
+                        ? `${plural(otherUnowned, 'other follow-up')} still ${otherUnowned === 1 ? 'needs' : 'need'} an owner`
                         : null,
                 ]
                     .filter(Boolean)
                     .join(' · '),
-                tone:
-                    overdue || !nextItem.assigned_to
-                        ? 'critical'
-                        : dueToday
-                          ? 'warning'
-                          : undefined,
+                action: nextButton,
             }
           : incidentWaiting
             ? {
-                  label: 'Incident and review',
-                  text: 'An incident was reported but isn’t linked to this treatment yet',
-                  meta: 'The incident still needs its own review — recording first aid doesn’t close it.',
-                  tone: 'warning',
+                  kicker: 'Incident and review',
+                  title: 'An incident was reported but isn’t linked to this treatment yet',
+                  text: 'The incident still needs its own review — recording first aid doesn’t close it.',
+                  action: nextButton,
               }
-            : null;
+            : {
+                  kicker: 'Next step',
+                  title: 'Nothing waiting',
+                  text: d.followups.length
+                      ? 'All follow-ups are done. The record can be archived.'
+                      : 'Add a follow-up if the person needs checking on later.',
+                  action: nextButton,
+              };
+
+    /* ---- the picked step's pane: what was added there, then its activity ---- */
+    const stepOf = (action: string): FirstAidStepKey =>
+        /archived/.test(action)
+            ? 'archived'
+            : /followup/.test(action)
+              ? 'followups'
+              : /incident/.test(action)
+                ? 'incident'
+                : /created/.test(action)
+                  ? 'recorded'
+                  : 'treated';
+    const sectionLink = (target: FirstAidSection, label: string) => (
+        <PaneLink onClick={() => move(target)}>{label}</PaneLink>
+    );
+    const paneByStep: Record<FirstAidStepKey, Omit<RecordProgressPane, 'title' | 'meta' | 'onBack' | 'activity'>> = {
+        treated: {
+            items: [
+                { key: 'aider', label: 'First aider', value: d.first_aider?.name ?? 'Not recorded' },
+                {
+                    key: 'when',
+                    label: 'Treated at',
+                    value: d.treatment_date ? dateTimeWithYear(d.treatment_date) : 'Not recorded',
+                },
+                {
+                    key: 'given',
+                    label: 'Treatment given',
+                    value: d.treatment_given ?? 'Not recorded',
+                    action: sectionLink('injury', 'Injury and treatment'),
+                },
+                { key: 'outcome', label: 'Outcome', value: outcomeLabel(d.treatment_outcome) },
+                ...(d.ambulance_called ? [{ key: 'ambulance', label: 'Ambulance', value: 'Called' }] : []),
+            ],
+        },
+        recorded: {
+            items: [
+                {
+                    key: 'recorded',
+                    label: 'Recorded',
+                    value: d.created_at ? dateTimeWithYear(d.created_at) : 'Not recorded',
+                },
+                {
+                    key: 'evidence',
+                    label: 'Evidence',
+                    value: d.attachments.length ? plural(d.attachments.length, 'file') : 'None added',
+                    action: sectionLink('evidence', d.attachments.length ? 'See evidence' : 'Evidence'),
+                },
+            ],
+        },
+        incident: {
+            items: d.incident_reported || incident
+                ? [
+                      {
+                          key: 'incident',
+                          label: 'Incident',
+                          value: incidentMeta,
+                          action: sectionLink('incident', 'Incident and review'),
+                      },
+                  ]
+                : [],
+            empty: 'No incident was reported with this treatment.',
+            note: 'Recording first aid doesn’t close an incident. The incident has its own review.',
+        },
+        followups: {
+            children: open.length ? (
+                <ul className="grid gap-1 px-[18px] pb-3 text-sm">
+                    {open.map((item) => (
+                        <li key={item.id}>
+                            <b className="font-medium">{item.notes}</b>
+                            <span className="text-muted-foreground">
+                                {' · '}
+                                {item.assigned_to?.name ?? 'Needs an owner'}
+                                {item.due_at ? ` · due ${formatDate(item.due_at)}` : ''}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            ) : undefined,
+            items: open.length
+                ? [
+                      {
+                          key: 'all',
+                          label: 'Follow-ups',
+                          value: `${open.length} open of ${d.followups.length}`,
+                          action: sectionLink('followups', 'All follow-ups'),
+                      },
+                  ]
+                : [],
+            empty: d.followups.length ? 'All follow-ups are done.' : 'No follow-ups recorded.',
+        },
+        archived: {
+            items: d.archived_at ? [{ key: 'archived', label: 'Archived', value: dateTimeWithYear(d.archived_at) }] : [],
+            empty: 'Not archived. A record is archived once nothing more is needed.',
+        },
+    };
+    const stepPane: RecordProgressPane = {
+        title: steps.find((s) => s.key === shownStep)?.label ?? 'Step',
+        meta: shownStep === 'incident' ? undefined : steps.find((s) => s.key === shownStep)?.meta,
+        onBack: shownStep !== currentStep ? () => setPicked(null) : undefined,
+        ...paneByStep[shownStep],
+        activity: {
+            items: d.history
+                .filter((entry) => stepOf(entry.action) === shownStep)
+                .map((entry) => ({
+                    key: entry.id,
+                    time: entry.occurred_at ? dateTimeWithYear(entry.occurred_at) : '',
+                    who: entry.actor?.name,
+                    what: entry.title.toLowerCase(),
+                })),
+            onAll: () => move('history'),
+        },
+    };
 
     const main =
         command && command !== 'edit' ? (
@@ -332,7 +493,10 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
         ) : section === 'connections' ? (
             <FirstAidConnections detail={d} />
         ) : (
-            <FirstAidOverview detail={d} />
+            <>
+                <RecordProgress next={next} pane={stepPane} />
+                <FirstAidOverview detail={d} />
+            </>
         );
 
     return (
@@ -380,7 +544,7 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
                                         aria-label="Treatment record actions"
                                         className="contents"
                                     >
-                                        {glass.map((action) => (
+                                        {(primary && (!nextUsesPrimary || !progressShown) ? [primary, ...glass] : glass).map((action) => (
                                             <PageHeaderGlassButton
                                                 key={action}
                                                 onClick={() => run(action)}
@@ -420,23 +584,19 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         ) : null}
-                                        {primary ? (
-                                            <PageHeaderPrimaryButton
-                                                icon={Plus}
-                                                onClick={() => run(primary)}
-                                            >
-                                                {FIRST_AID_COMMAND_LABELS[primary]}
-                                            </PageHeaderPrimaryButton>
-                                        ) : null}
                                     </div>
                                 ) : undefined
                             }
                             facts={<PageHeaderFacts items={facts} />}
                             strip={
-                                <PageHeaderStages
+                                <PageHeaderSteps
                                     steps={steps}
-                                    next={next}
-                                    ariaLabel="Treatment record stage"
+                                    selected={section === 'overview' && !command ? shownStep : null}
+                                    onSelect={(key) => {
+                                        setPicked(key === currentStep ? null : (key as FirstAidStepKey));
+                                        if (section !== 'overview' || command) move('overview');
+                                    }}
+                                    ariaLabel="Treatment record steps"
                                 />
                             }
                             rail={
