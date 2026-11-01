@@ -563,6 +563,10 @@ export interface MyDayPageProps {
     first_aid_followups?: MyDayFirstAidFollowup[];
     /** The worker's own open workplace injuries (count only); links to My HR › Injuries. */
     own_open_injuries?: number;
+    /** G4-1: the person's own last 5 reports, status only. */
+    my_reports?: MyDayReport[];
+    /** G4-1: the person's own open workplace injury. */
+    own_injury?: MyDayOwnInjury | null;
     my_ppe?: MyDayPpe[];
     myTasks?: MyDayMyTasks;
     shiftChecklists?: ShiftChecklistRun[];
@@ -602,3 +606,41 @@ export interface MyDayWorker {
     hue: number;
     role?: string;
 }
+
+/** Her four status words (board G4-1): Draft · Sent · Being followed up · Closed. */
+export type MyDayReportWord = 'draft' | 'sent' | 'followed_up' | 'closed';
+
+/** One of the person's own reports on "What you reported" (status only). */
+export type MyDayReport =
+    | {
+          kind: 'incident';
+          id: number;
+          type: string;
+          client_name: string | null;
+          /** Only for a report about no particular person. */
+          site_name: string | null;
+          at: string | null;
+          status: MyDayReportWord;
+          finish_url: string | null;
+      }
+    | {
+          kind: 'injury';
+          id: number;
+          injury_type: string | null;
+          body_part: string | null;
+          own: boolean;
+          at: string | null;
+          status: MyDayReportWord;
+          finish_url: null;
+      };
+
+/** "Your workplace injury": duties for now, the next review date and who coordinates. */
+export type MyDayOwnInjury = {
+    id: number;
+    injury_type: string | null;
+    body_part: string | null;
+    injury_date: string | null;
+    on_modified_duties: boolean;
+    next_review_date: string | null;
+    coordinator: string | null;
+};

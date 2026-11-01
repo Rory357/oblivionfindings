@@ -1,5 +1,15 @@
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
+import {
+    emptyImmediateResponse,
+    IMMEDIATE_RESPONSE,
+    immediateResponsePayload,
+    wallTime,
+    type ImmediateResponseRow,
+} from '@/components/incidents/immediate-response';
+import { ReportSentPane } from '@/components/incidents/report-sent-pane';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -27,10 +37,14 @@ import {
     ReviewRow,
     WizardShell,
     WizardStepPane,
-    WizardSuccessPane,
 } from '@/components/wizard/shell';
 import { useIncidentReportDraft } from '@/hooks/use-incident-report-draft';
-import { formatDateOnly, formatTime, toDatetimeLocal } from '@/lib/datetime';
+import {
+    formatDateOnly,
+    formatTime,
+    toDatetimeLocal,
+    WORKER_TIMEZONE,
+} from '@/lib/datetime';
 import { useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -116,9 +130,10 @@ function errorStepKey(errorKey: string, isNearMiss: boolean): string {
             'medical_treatment_type',
         ].includes(rootKey)
     ) {
-        return isNearMiss && rootKey === 'immediate_action_taken'
-            ? 'could'
-            : 'severity';
+        if (rootKey === 'immediate_action_taken') {
+            return isNearMiss ? 'could' : 'straight';
+        }
+        return 'severity';
     }
 
     if (
@@ -136,7 +151,21 @@ function errorStepKey(errorKey: string, isNearMiss: boolean): string {
         return 'followups';
     }
 
+    if (rootKey === 'immediate_response') {
+        return 'straight';
+    }
+
     return 'review';
+}
+
+/** The worker's wall-clock time now (HH:mm), for a tick's starting time. */
+function nowWallTime(): string {
+    return new Date().toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: WORKER_TIMEZONE,
+    });
 }
 
 function firstInvalidStepIndex(
@@ -197,6 +226,7 @@ export type IncidentReportDefaults = Partial<{
     worksafe_notification_status: string;
     site_preserved: boolean;
     followups: FollowupDraft[];
+    immediate_response: ImmediateResponseRow[];
 }>;
 
 type IncidentReportResult = {
@@ -205,6 +235,7 @@ type IncidentReportResult = {
     hs_reference?: string | null;
     handover_state?: string | null;
     incident_url?: string | null;
+    site_name?: string | null;
 };
 
 type ReportForm = {
@@ -228,6 +259,8 @@ type ReportForm = {
     worksafe_notification_status: string;
     site_preserved: boolean;
     followups: FollowupDraft[];
+    /** Decision 18: the "Straight away" ticks (incidents only). */
+    immediate_response: ImmediateResponseRow[];
     stay: boolean;
 };
 
@@ -299,6 +332,8 @@ export function IncidentReportDialog({
             defaults?.worksafe_notification_status ?? '',
         site_preserved: defaults?.site_preserved ?? false,
         followups: defaults?.followups ?? [],
+        immediate_response:
+            defaults?.immediate_response ?? emptyImmediateResponse(),
         stay: true,
     });
     const d = form.data;
@@ -387,6 +422,12 @@ export function IncidentReportDialog({
                           icon: Activity,
                       },
                       {
+                          key: 'straight',
+                          label: 'Straight away',
+                          blurb: 'What was done, and when',
+                          icon: Clock3,
+                      },
+                      {
                           key: 'notifiable',
                           label: 'WorkSafe check',
                           blurb: 'NZ HSWA notifiable',
@@ -426,7 +467,8 @@ export function IncidentReportDialog({
         d.consequence.trim() ||
         d.is_notifiable ||
         d.worksafe_reference.trim() ||
-        d.followups.length > 0,
+        d.followups.length > 0 ||
+        d.immediate_response.some((row) => row.done || row.detail.trim()),
     );
     const hasDraftScope = Boolean(d.client_id || d.site_id || d.shift_id);
     const draftRecovery = useIncidentReportDraft<ReportForm>({
@@ -477,6 +519,15 @@ export function IncidentReportDialog({
                 return !!d.severity;
             case 'could':
                 return !!d.potential_severity;
+            case 'straight':
+                // A tick needs the time it was done; a high or critical incident also says it in words.
+                return (
+                    d.immediate_response.every(
+                        (row) => !row.done || /^\d{2}:\d{2}$/.test(row.time),
+                    ) &&
+                    (!['high', 'critical'].includes(d.severity) ||
+                        !!d.immediate_action_taken.trim())
+                );
             default:
                 return true;
         }
@@ -525,6 +576,10 @@ export function IncidentReportDialog({
                     ? data.worksafe_reference || null
                     : null,
                 followups,
+                // Decision 18: incidents ask the timed ticks; a near miss doesn't.
+                immediate_response: isNearMiss
+                    ? []
+                    : immediateResponsePayload(data.immediate_response),
             };
         });
         form.post('/incidents', {
@@ -690,103 +745,41 @@ export function IncidentReportDialog({
             d.followups.filter((_, idx) => idx !== i),
         );
 
-    const isAwaitingHsAcceptance =
-        result?.handover_state === 'awaiting_hs_acceptance' ||
-        result?.handover_state === 'awaiting_acceptance';
-    const success = result ? (
-        <WizardSuccessPane
-            title={
-                result.result === 'draft'
-                    ? 'Draft saved'
-                    : isNearMiss
-                      ? 'Near miss submitted'
-                      : 'Incident submitted'
-            }
-            blurb={
-                <span className="flex flex-col items-center gap-2">
-                    {result.result === 'draft' ? (
-                        <span>
-                            {result.incident_reference ? (
-                                <>
-                                    Reference{' '}
-                                    <span className="font-semibold text-foreground">
-                                        {result.incident_reference}
-                                    </span>
-                                    .{' '}
-                                </>
-                            ) : null}
-                            You can return to finish and submit it later.
-                        </span>
-                    ) : (
-                        <>
-                            <span>
-                                {result.incident_reference ? (
-                                    <>
-                                        Incident{' '}
-                                        <span className="font-semibold text-foreground">
-                                            {result.incident_reference}
-                                        </span>
-                                    </>
-                                ) : (
-                                    'The incident'
-                                )}{' '}
-                                has been submitted.
-                                {result.hs_reference ? (
-                                    <>
-                                        {' '}
-                                        H&amp;S reference{' '}
-                                        <span className="font-semibold text-foreground">
-                                            {result.hs_reference}
-                                        </span>
-                                        .
-                                    </>
-                                ) : null}
-                            </span>
-                            {isAwaitingHsAcceptance ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-status-warning-bg px-3 py-1 font-semibold text-status-warning">
-                                    <Clock3
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Awaiting H&amp;S acceptance</span>
-                                </span>
-                            ) : null}
-                        </>
-                    )}
-                </span>
-            }
-            actions={
-                <>
-                    {result.result === 'draft' ? (
-                        <Button
-                            onClick={() => submit('submit')}
-                            disabled={form.processing}
-                        >
-                            Submit incident
-                        </Button>
-                    ) : null}
-                    {result.incident_url && onOpenIncident ? (
-                        <Button
-                            onClick={() => onOpenIncident(result.incident_url!)}
-                        >
-                            Open incident
-                        </Button>
-                    ) : null}
-                    <Button variant="outline" onClick={reset}>
-                        Report another
-                    </Button>
-                    <Button variant="ghost" onClick={requestClose}>
-                        {doneLabel}
-                    </Button>
-                </>
-            }
-        />
-    ) : undefined;
+    // G4-3: after a report, one plain pane says where it went and goes back to where the person started.
+    const sentPane = (inline: boolean) =>
+        result ? (
+            <ReportSentPane
+                inline={inline}
+                open={open}
+                outcome={result.result === 'draft' ? 'draft' : 'sent'}
+                kind={isNearMiss ? 'near_miss' : 'incident'}
+                siteName={
+                    result.site_name ??
+                    siteOptions.find((site) => site.value === d.site_id)
+                        ?.label ??
+                    null
+                }
+                reference={result.incident_reference}
+                doneLabel={doneLabel}
+                onDone={requestClose}
+                onReportAnother={reset}
+                onSendNow={() => submit('submit')}
+                sending={form.processing}
+                onOpenRecord={
+                    result.incident_url && onOpenIncident
+                        ? () => onOpenIncident(result.incident_url!)
+                        : undefined
+                }
+            />
+        ) : null;
+    const success =
+        presentation === 'page' && result ? sentPane(true) : undefined;
 
     return (
         <>
             <Shell
-                open={open}
+                // The wizard steps aside for the 480 sent pane (G4-3); the page keeps its card.
+                open={presentation === 'page' ? open : open && !result}
                 onClose={requestClose}
                 title={isNearMiss ? 'Report a near miss' : 'Report an incident'}
                 description={
@@ -842,7 +835,9 @@ export function IncidentReportDialog({
                                         !stepValid(stepKey)
                                     }
                                 >
-                                    Next
+                                    {steps[stepIndex + 1]?.key === 'review'
+                                        ? 'Next: check and send'
+                                        : 'Next'}
                                 </Button>
                             ) : (
                                 <>
@@ -951,6 +946,29 @@ export function IncidentReportDialog({
                             {stepKey === 'severity' ? (
                                 <SeverityStep d={d} setData={form.setData} />
                             ) : null}
+                            {stepKey === 'straight' ? (
+                                <StraightStep
+                                    d={d}
+                                    serious={['high', 'critical'].includes(
+                                        d.severity,
+                                    )}
+                                    setData={form.setData}
+                                    errors={form.errors}
+                                    context={[
+                                        clientOptions.find(
+                                            (c) => c.value === d.client_id,
+                                        )?.label,
+                                        siteOptions.find(
+                                            (s) => s.value === d.site_id,
+                                        )?.label,
+                                        d.occurred_date
+                                            ? `${formatDateOnly(d.occurred_date)}${d.occurred_time ? `, ${wallTime(d.occurred_time)}` : ''}`
+                                            : null,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                />
+                            ) : null}
                             {stepKey === 'could' ? (
                                 <CouldStep d={d} setData={form.setData} />
                             ) : null}
@@ -979,13 +997,23 @@ export function IncidentReportDialog({
                                     clients={clients}
                                     staff={staff}
                                     canManageFollowups={canManageFollowups}
-                                    goto={setStepIndex}
+                                    goto={(key) =>
+                                        setStepIndex(
+                                            Math.max(
+                                                0,
+                                                steps.findIndex(
+                                                    (step) => step.key === key,
+                                                ),
+                                            ),
+                                        )
+                                    }
                                 />
                             ) : null}
                         </>
                     ) : null}
                 </WizardStepPane>
             </Shell>
+            {presentation === 'page' ? null : sentPane(false)}
 
             <AlertDialog
                 open={closePrompt}
@@ -1264,13 +1292,155 @@ const SEVERITY_TILES = [
     },
 ];
 
+/**
+ * Decision 18 (board G4-2): quick ticks, each with the time it was done; a tick left unticked didn't happen. The
+ * times open the approved clock picker. The incident page shows them under "Done straight away".
+ */
+function StraightStep({
+    d,
+    serious,
+    setData,
+    errors,
+    context,
+}: {
+    d: { immediate_response: ImmediateResponseRow[]; immediate_action_taken: string };
+    /** A high or critical incident still says in words what was done (the ticks add to it). */
+    serious: boolean;
+    setData: SetData;
+    errors: Partial<Record<string, string>>;
+    context: string;
+}) {
+    const fieldId = useId();
+    const update = (index: number, patch: Partial<ImmediateResponseRow>) =>
+        setData(
+            'immediate_response',
+            d.immediate_response.map((row, i) =>
+                i === index ? { ...row, ...patch } : row,
+            ),
+        );
+    return (
+        <div className="flex flex-col gap-5">
+            <StepHead
+                icon={Clock3}
+                title="Straight away"
+                blurb="Tick what was done and when. Leave it unticked if it didn’t happen."
+            />
+            {context ? <p className="text-caption">{context}</p> : null}
+            <ul aria-label="Done straight away" className="grid gap-2">
+                {d.immediate_response.map((row, index) => {
+                    const item = IMMEDIATE_RESPONSE.find(
+                        (option) => option.key === row.key,
+                    );
+                    if (!item) return null;
+                    const id = `${fieldId}-${row.key}`;
+                    const timeError =
+                        errors[`immediate_response.${index}.time`] ??
+                        (row.done && !row.time
+                            ? 'Choose the time it was done.'
+                            : undefined);
+                    return (
+                        <li
+                            key={row.key}
+                            className="grid gap-2 rounded-xl border border-border p-3"
+                        >
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="frontline-tap flex min-w-0 flex-1 items-center gap-3">
+                                    <Checkbox
+                                        id={id}
+                                        checked={row.done}
+                                        onCheckedChange={(value) =>
+                                            update(index, {
+                                                done: value === true,
+                                                time:
+                                                    value === true && !row.time
+                                                        ? nowWallTime()
+                                                        : row.time,
+                                            })
+                                        }
+                                        className="frontline-hit"
+                                    />
+                                    <label
+                                        htmlFor={id}
+                                        className="cursor-pointer text-sm font-medium text-foreground"
+                                    >
+                                        {item.label}
+                                    </label>
+                                </div>
+                                {row.done ? (
+                                    <div className="w-40">
+                                        <TimePicker
+                                            compact
+                                            id={`${id}-time`}
+                                            label={`${item.label} — time`}
+                                            value={row.time}
+                                            invalid={Boolean(timeError)}
+                                            onChange={(value) =>
+                                                update(index, { time: value })
+                                            }
+                                        />
+                                    </div>
+                                ) : (
+                                    <span className="text-caption">Not yet</span>
+                                )}
+                            </div>
+                            {item.detail ? (
+                                <Input
+                                    aria-label={`${item.label} — ${item.detail.toLowerCase()}`}
+                                    value={row.detail}
+                                    maxLength={255}
+                                    onChange={(event) =>
+                                        update(index, {
+                                            detail: event.target.value,
+                                        })
+                                    }
+                                    placeholder={`${item.detail} (${item.placeholder ?? 'optional'})`}
+                                />
+                            ) : null}
+                            {row.done && timeError ? (
+                                <FieldErr>{timeError}</FieldErr>
+                            ) : null}
+                        </li>
+                    );
+                })}
+            </ul>
+            <Field
+                label={
+                    serious
+                        ? 'What you did straight away'
+                        : 'Anything else you did? (optional)'
+                }
+                required={serious}
+                hint={
+                    serious
+                        ? 'A high or critical incident needs this in words, as well as the ticks.'
+                        : undefined
+                }
+                error={errors.immediate_action_taken}
+            >
+                <Textarea
+                    aria-label={
+                        serious
+                            ? 'What you did straight away'
+                            : 'Anything else you did?'
+                    }
+                    rows={3}
+                    value={d.immediate_action_taken}
+                    onChange={(e) =>
+                        setData('immediate_action_taken', e.target.value)
+                    }
+                    placeholder="e.g. Moved the rug out of the lounge."
+                />
+            </Field>
+        </div>
+    );
+}
+
 function SeverityStep({
     d,
     setData,
 }: {
     d: {
         severity: string;
-        immediate_action_taken: string;
         witnesses: string;
         harm_or_injury: string;
         consequence: string;
@@ -1315,16 +1485,6 @@ function SeverityStep({
                         setData('consequence', event.target.value)
                     }
                     placeholder="e.g. Clinical review arranged and mobility plan paused"
-                />
-            </Field>
-            <Field label="Immediate action taken">
-                <Textarea
-                    rows={3}
-                    value={d.immediate_action_taken}
-                    onChange={(e) =>
-                        setData('immediate_action_taken', e.target.value)
-                    }
-                    placeholder="First aid given, area made safe, GP called…"
                 />
             </Field>
             <Field label="Witnesses">
@@ -1711,7 +1871,7 @@ function ReviewStep({
     clients: IncidentReportClient[];
     staff: StaffOpt[];
     canManageFollowups: boolean;
-    goto: (i: number) => void;
+    goto: (key: string) => void;
 }) {
     const client = clients.find((c) => String(c.id) === d.client_id);
     const clientName = client
@@ -1733,7 +1893,7 @@ function ReviewStep({
                 <ReviewCard
                     icon={Users}
                     title={isNearMiss ? 'Who & where' : 'Type & people'}
-                    onEdit={() => goto(0)}
+                    onEdit={() => goto('people')}
                 >
                     {!isNearMiss ? (
                         <ReviewRow
@@ -1750,7 +1910,7 @@ function ReviewStep({
                 <ReviewCard
                     icon={Search}
                     title="What happened"
-                    onEdit={() => goto(1)}
+                    onEdit={() => goto('what')}
                 >
                     <ReviewRow
                         label="Occurred"
@@ -1766,7 +1926,7 @@ function ReviewStep({
                     <ReviewCard
                         icon={AlertTriangle}
                         title="Potential"
-                        onEdit={() => goto(2)}
+                        onEdit={() => goto('could')}
                     >
                         <ReviewRow
                             label="Could have been"
@@ -1782,7 +1942,7 @@ function ReviewStep({
                     <ReviewCard
                         icon={Activity}
                         title="Severity & actions"
-                        onEdit={() => goto(2)}
+                        onEdit={() => goto('severity')}
                     >
                         <ReviewRow label="Severity" value={d.severity} />
                         <ReviewRow
@@ -1790,16 +1950,49 @@ function ReviewStep({
                             value={d.harm_or_injury}
                         />
                         <ReviewRow label="Consequence" value={d.consequence} />
+                    </ReviewCard>
+                )}
+                {!isNearMiss ? (
+                    <ReviewCard
+                        icon={Clock3}
+                        title="Straight away"
+                        onEdit={() => goto('straight')}
+                    >
+                        {IMMEDIATE_RESPONSE.map((item) => {
+                            const row = d.immediate_response.find(
+                                (value) => value.key === item.key,
+                            );
+                            return (
+                                <ReviewRow
+                                    key={item.key}
+                                    label={item.label}
+                                    value={
+                                        row?.done
+                                            ? [
+                                                  row.time
+                                                      ? wallTime(row.time)
+                                                      : 'Time not chosen',
+                                                  row.detail.trim(),
+                                              ]
+                                                  .filter(Boolean)
+                                                  .join(' · ')
+                                            : row?.detail.trim()
+                                              ? `Not yet · ${row.detail.trim()}`
+                                              : 'Not yet'
+                                    }
+                                />
+                            );
+                        })}
                         <ReviewRow
-                            label="Immediate action"
+                            label="Anything else"
                             value={d.immediate_action_taken}
                         />
                     </ReviewCard>
-                )}
+                ) : null}
                 <ReviewCard
                     icon={ShieldAlert}
                     title="WorkSafe"
-                    onEdit={() => goto(3)}
+                    onEdit={() => goto('notifiable')}
                 >
                     <ReviewRow
                         label="Notifiable"
@@ -1830,7 +2023,7 @@ function ReviewStep({
                         icon={ListTodo}
                         title="Follow-ups"
                         span
-                        onEdit={() => goto(4)}
+                        onEdit={() => goto('followups')}
                     >
                         {d.followups
                             .filter((f) => f.notes.trim())
@@ -1882,4 +2075,5 @@ type IncidentReportData = {
     worksafe_notification_status: string;
     site_preserved: boolean;
     followups: FollowupDraft[];
+    immediate_response: ImmediateResponseRow[];
 };

@@ -39,6 +39,7 @@ use App\Services\Incidents\IncidentResponseEscalationService;
 use App\Services\Medication\MedicationErrorSummary;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
+use App\Support\Incidents\ImmediateResponse;
 use App\Support\Incidents\IncidentOccurrencePeriod;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 use App\Support\Inertia\SharedDeferredReload;
@@ -358,6 +359,8 @@ class IncidentController extends Controller
             'occurred_at' => $incident->occurred_at,
             'description' => $incident->description,
             'immediate_action_taken' => $incident->immediate_action_taken,
+            // Decision 18: the reporter's timed ticks, shown under "Done straight away" on the incident page.
+            'immediate_response' => array_values((array) ($incident->immediate_response ?? [])),
             'witnesses' => $incident->witnesses,
             'is_notifiable' => $journeyRepairRequired || ($hsEvent && ! $canOpenHsEvent)
                 ? null
@@ -692,6 +695,7 @@ class IncidentController extends Controller
             'description' => ['nullable', 'string'],
             'requires_followup' => ['sometimes', 'boolean'],
             'immediate_action_taken' => [
+                // A serious report keeps its written immediate action; the timed ticks (decision 18) add to it.
                 Rule::requiredIf(fn () => $request->input('intent') === 'submit'
                     && (
                         $request->input('severity') === 'high'
@@ -702,6 +706,7 @@ class IncidentController extends Controller
                 'string',
                 'max:5000',
             ],
+            ...ImmediateResponse::rules(),
             'witnesses' => ['nullable', 'string'],
             'harm_or_injury' => ['nullable', 'string', 'max:2000'],
             'consequence' => ['nullable', 'string', 'max:2000'],
@@ -783,6 +788,8 @@ class IncidentController extends Controller
         $storedSeverity = ($data['reported_severity'] ?? null) === HsEvent::SEVERITY_CRITICAL
             ? 'high'
             : $data['severity'];
+        $occurredAt = WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now()->toImmutable();
+        $immediateResponse = ImmediateResponse::normalise($data['immediate_response'] ?? null, $occurredAt);
 
         $attributes = [
             'report_request_uuid' => $data['report_request_uuid'] ?? null,
@@ -796,12 +803,13 @@ class IncidentController extends Controller
             'status' => $isSubmit ? 'submitted' : 'draft',
             'submitted_at' => $isSubmit ? now() : null,
             'source' => 'manual',
-            'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
+            'occurred_at' => $occurredAt,
             'description' => $data['description'] ?? null,
             'requires_followup' => (bool) ($data['requires_followup'] ?? false) || ! empty($data['followups']),
             'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)
                 ? trim((string) $data['immediate_action_taken'])
                 : null,
+            'immediate_response' => $immediateResponse,
             'witnesses' => $data['witnesses'] ?? null,
             'title' => $data['type'].' incident',
             'metadata' => $metadata,
@@ -1134,6 +1142,10 @@ class IncidentController extends Controller
             'result' => $incident->status === 'draft' ? 'draft' : 'submitted',
             'incident_reference' => (string) $incident->reference_number,
             'incident_url' => route('incidents.show', $incident),
+            // G4-3: the success pane says which Site's managers it went to (the reporter chose or was given it).
+            'site_name' => $incident->site_id
+                ? Site::query()->whereKey($incident->site_id)->value('name')
+                : null,
         ];
 
         if (! $journey?->hsEvent) {

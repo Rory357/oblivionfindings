@@ -24,10 +24,30 @@ import {
 } from '@/components/signature/record-progress';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { formatDate, formatDateTime } from '@/lib/datetime';
+import { formatDate, formatDateTime, formatTime } from '@/lib/datetime';
 import { hsLabel, hsVariant } from '@/lib/health-safety/hs-labels';
 
+import { immediateResponseLabel, type ImmediateResponseTick } from './immediate-response';
 import { ownerNeeded, plural } from './incident-stages';
+
+/** "Done straight away" (decision 18): each tick with its time, as the reporter recorded it. */
+function DoneStraightAway({ ticks }: { ticks: ImmediateResponseTick[] }) {
+    return (
+        <ul aria-label="Done straight away" className="grid gap-1">
+            {ticks.map((tick) => (
+                <li key={tick.key} className="flex flex-wrap items-baseline gap-x-2">
+                    <span className={tick.done ? 'text-foreground' : 'text-muted-foreground'}>
+                        {immediateResponseLabel(tick.key)}
+                        {tick.detail ? ` · ${tick.detail}` : ''}
+                    </span>
+                    <span className="text-caption tabular-nums">
+                        {tick.done && tick.at ? formatTime(tick.at) : 'Not yet'}
+                    </span>
+                </li>
+            ))}
+        </ul>
+    );
+}
 
 export type IncidentNoteField = 'what_happened' | 'done_straight_away';
 
@@ -42,6 +62,8 @@ export type IncidentReportNote = {
 
 export type IncidentProgressDetail = IncidentDetail & {
     notes?: IncidentReportNote[];
+    /** Decision 18: the reporter's timed "Straight away" ticks. */
+    immediate_response?: ImmediateResponseTick[];
     can: IncidentDetail['can'] & { add_note?: boolean };
 };
 
@@ -340,6 +362,15 @@ export function incidentStepPane(d: IncidentProgressDetail, step: IncidentStepKe
         const healthLinked = firstAid.length + restraints.length + hidden.length;
         const items: RecordProgressItem[] = [
             noteRow('what_happened', d.description),
+            ...(d.immediate_response?.length
+                ? [
+                      {
+                          key: 'straight_away_ticks',
+                          label: 'Done straight away',
+                          value: <DoneStraightAway ticks={d.immediate_response} />,
+                      },
+                  ]
+                : []),
             noteRow('done_straight_away', d.immediate_action_taken),
             ...(d.witnesses ? [{ key: 'witnesses', label: 'Witnesses', value: d.witnesses }] : []),
             ...(d.type === 'near_miss' && d.potential_consequence
