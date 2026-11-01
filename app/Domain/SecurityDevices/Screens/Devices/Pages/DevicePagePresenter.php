@@ -168,6 +168,10 @@ final class DevicePagePresenter
                 'ping' => $device->ip_address !== null && $device->ip_address !== '',
                 'backup' => $backup,
                 'remote_href' => $remote['start_href'] ?? null,
+                // S&D Phase G (pop-up 61): the device's own web page, through the hub (webPage.open).
+                'web' => $group !== 'computer' && $viewer->canDo('securityDevices.webPage.open')
+                    ? app(\App\Domain\SecurityDevices\WebPages\WebPages::class)->readiness($viewer, $device)
+                    : null,
             ],
             'trouble' => $trouble,
             'overview' => $tab === 'overview'

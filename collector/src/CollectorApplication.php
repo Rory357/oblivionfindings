@@ -17,6 +17,7 @@ use Oblivion\Collector\Mqtt\MqttRelayServer;
 use Oblivion\Collector\Mqtt\RelayInbox;
 use Oblivion\Collector\Mqtt\RelayTlsIdentity;
 use Oblivion\Collector\Terminal\TerminalLane;
+use Oblivion\Collector\WebPages\WebLane;
 use Oblivion\Collector\Runtime\CameraSnapshotRunner;
 use Oblivion\Collector\Runtime\CollectorCommandExecutor;
 use Oblivion\Collector\Runtime\CommandJournal;
@@ -487,7 +488,7 @@ final class CollectorApplication
                 'commands_executed' => $commandsExecuted,
                 // The job types (and newer config sections) this hub can run: the server sends a new
                 // kind only to hubs that list it.
-                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE]),
+                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE, self::WEB_PAGE_FEATURE]),
                 'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
@@ -540,6 +541,11 @@ final class CollectorApplication
             new CredentialLeaseDecryptor($secretKey),
             new EnvelopeVerifier((string) $identity['central_signing_public_key']),
             (string) $identity['collector_id'],
+        );
+        // S&D Phase G (pop-up 61): device web pages, in the same process.
+        $web = new WebLane(
+            fn (array $report): array => $central->webWork((string) $identity['collector_id'], bin2hex(random_bytes(16)), $report),
+            new EnvelopeVerifier((string) $identity['central_signing_public_key']),
         );
         sodium_memzero($secretKey);
         $loginsFile = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE;
@@ -601,6 +607,11 @@ final class CollectorApplication
             } catch (\Throwable $exception) {
                 $this->write('terminal: '.$exception->getMessage().PHP_EOL, STDERR);
             }
+            try {
+                $web->tick();
+            } catch (\Throwable $exception) {
+                $this->write('web page: '.$exception->getMessage().PHP_EOL, STDERR);
+            }
             $port = $logins()['listen_port'] ?? null;
             if ($port !== $listening) {
                 $server->close();
@@ -618,7 +629,7 @@ final class CollectorApplication
                 }
             }
             // A live terminal wants a quick round; otherwise the relay's usual pace.
-            $server->poll($terminal->active() ? 0.1 : ($listening === null ? ($tlsServer === null ? 2.0 : 0.0) : 0.8));
+            $server->poll($terminal->active() || $web->active() ? 0.1 : ($listening === null ? ($tlsServer === null ? 2.0 : 0.0) : 0.8));
         }
         $server->close();
         $tlsServer?->close();
@@ -636,6 +647,9 @@ final class CollectorApplication
 
     /** S&D Phase G (D5): this hub opens Terminal tabs (TerminalLane, inside the relay process). */
     private const string TERMINAL_FEATURE = 'terminal_v1';
+
+    /** S&D Phase G (pop-up 61): this hub opens device web pages (WebLane, inside the relay process). */
+    private const string WEB_PAGE_FEATURE = 'web_page_v1';
 
     private function writeRelayTls(string $stateDirectory, CollectorConfig $config, RelayTlsIdentity $relayTls): void
     {

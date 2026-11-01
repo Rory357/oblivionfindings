@@ -23,6 +23,8 @@ final class SecurityDeviceAlertsTick extends Command
         $cool = $scald->tick();
         // S&D Phase G: terminals past their idle or hour limit close; what devices sent is dropped an hour after.
         $terminals = app(\App\Domain\SecurityDevices\Terminal\TerminalSessions::class)->sweep();
+        // S&D Phase G: idle device web pages close; any answer never served is dropped.
+        app(\App\Domain\SecurityDevices\WebPages\WebPages::class)->sweep();
         $this->info("Back from snooze: {$result['back']} · reminders sent: {$result['reminded']} · unlinked (consent ended): {$unlinked} · out of bed: {$outOfBed} · scald alerts closed: {$cool} · terminals closed: {$terminals}");
 
         return self::SUCCESS;

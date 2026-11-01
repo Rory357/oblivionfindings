@@ -98,6 +98,16 @@ Route::middleware('throttle:20,1')->group(function () {
         ->name('security-devices.hubs.linux-script');
 });
 
+// S&D Phase G (pop-up 61): a device's web page, served to a sandboxed frame. The frame can't carry
+// Oblivion's sign-in, so the unguessable link is the key (only its hash is stored); the person who
+// opened it must still hold webPage.open, and every answer is sandboxed into an origin of its own.
+Route::match(['GET', 'HEAD', 'POST'], '/security-devices/web/{token}/{path?}', [\App\Domain\SecurityDevices\WebPages\Http\WebPageController::class, 'serve'])
+    ->where('token', '[A-Za-z0-9_-]{43}')
+    ->where('path', '.*')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class, \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->middleware('throttle:600,1')
+    ->name('security-devices.web.serve');
+
 Route::middleware([
     'auth',
     'permission:securityDevices.viewAny',
@@ -578,6 +588,12 @@ Route::middleware([
         // S&D Phase F: raise the H&S hazard from a scald-risk alert (the person is its reporter).
         Route::post('/hazard', [AlertsController::class, 'raiseHazard'])->name('security-devices.alerts.hazard');
     });
+
+    // S&D Phase G (pop-up 61): open a device's web page through the hub (webPage.open).
+    Route::post('/devices/{device}/web', [\App\Domain\SecurityDevices\WebPages\Http\WebPageController::class, 'open'])
+        ->whereNumber('device')
+        ->middleware(['permission:securityDevices.webPage.open', 'throttle:20,1'])
+        ->name('security-devices.devices.web.open');
 
     // S&D Phase G (D5): a device's Terminal tab, through the hub, for IT admins (terminal.use).
     Route::post('/devices/{device}/terminal', [\App\Domain\SecurityDevices\Terminal\Http\TerminalController::class, 'open'])

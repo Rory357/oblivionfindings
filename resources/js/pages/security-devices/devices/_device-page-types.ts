@@ -286,6 +286,8 @@ export type DevicePageProps = {
         ping: boolean;
         backup: BackupAction | null;
         remote_href: string | null;
+        /** S&D Phase G (pop-up 61): whether the device's web page can open through the hub, and why not. */
+        web?: { ok: boolean; reason: string | null; hub: string | null } | null;
     };
     trouble: TroubleState | null;
     overview: DeviceOverview | null;

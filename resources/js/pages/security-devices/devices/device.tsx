@@ -37,7 +37,7 @@ import { ConfigurationDiffDialog, type ConfigurationDiffTarget } from '@/compone
 import AppLayout from '@/layouts/app-layout';
 import { durationWords, timedText } from '@/lib/security-devices/device-time';
 import { Head, router } from '@inertiajs/react';
-import { Activity, BellPlus, HardDriveDownload, MonitorUp, Pencil } from 'lucide-react';
+import { Activity, BellPlus, Globe, HardDriveDownload, MonitorUp, Pencil } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BackupSettings } from './_device-backup';
 import { ChecksTabView } from './_device-checks';
@@ -47,6 +47,7 @@ import { NetworkOverviewTab, TroubleOverview } from './_device-overview-network'
 import { OtherOverviewTab } from './_device-overview-other';
 import { NotesTabView } from './_device-notes';
 import { TerminalTab } from './_device-terminal';
+import { WebPagePopup } from './_device-web-page';
 import type { DevicePageMeter, DevicePageProps, DevicePageTab } from './_device-page-types';
 
 export type { DevicePageProps } from './_device-page-types';
@@ -81,6 +82,7 @@ export default function DevicePage(props: DevicePageProps) {
     const { device, tab, can, actions } = props;
     const now = useNow();
     const [popup, setPopup] = useState<Popup>(null);
+    const [webOpen, setWebOpen] = useState(false);
     const { form, load } = useDeviceFormOptions();
     const base = `/security-devices/devices/${device.id}`;
 
@@ -150,6 +152,11 @@ export default function DevicePage(props: DevicePageProps) {
                     {actions.backup ? (
                         <PageHeaderGlassButton icon={HardDriveDownload} onClick={() => open({ kind: 'backup' })}>
                             Back up settings
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {actions.web?.ok ? (
+                        <PageHeaderGlassButton icon={Globe} onClick={() => setWebOpen(true)}>
+                            Open web page
                         </PageHeaderGlassButton>
                     ) : null}
                     {can.edit ? (
@@ -232,6 +239,7 @@ export default function DevicePage(props: DevicePageProps) {
             <PageLayout hero={header}>{body}</PageLayout>
 
             <PingViewer open={popup?.kind === 'ping'} device={popup?.kind === 'ping' ? popup.device : null} onClose={close} />
+            {actions.web?.ok ? <WebPagePopup open={webOpen} device={{ id: device.id, name: device.name, address: device.address }} hub={actions.web.hub} onClose={() => setWebOpen(false)} /> : null}
             <DeviceFormPopup
                 open={popup?.kind === 'edit'}
                 mode="edit"

@@ -277,6 +277,17 @@ final readonly class HttpsCentralApi implements CentralApi
         return $this->request('POST', '/api/monitoring/collectors/terminal/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
     }
 
+    /**
+     * S&D Phase G (pop-up 61): the device web page poll. Answers go in; page requests come back.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    public function webWork(string $collectorId, string $requestKey, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/web/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
+    }
+
     public function discoveryWork(string $collectorId, string $requestKey, array $capability): array
     {
         return $this->request('POST', '/api/monitoring/collectors/media/discovery/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'capability' => $capability]);
