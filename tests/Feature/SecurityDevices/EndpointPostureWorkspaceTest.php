@@ -466,21 +466,17 @@ it('governs Microsoft Intune link creation, conflict rejection, UUID replacement
         ->and(DeviceEvent::query()->where('device_id', $computer->id)->where('event_type', 'endpoint_intune_unlinked')->exists())->toBeTrue();
 });
 
-it('surfaces non-diagnostic agent badges in Network & IT and Remote Support without leaking inventory', function () {
+it('surfaces non-diagnostic agent badges on the computer page and Remote Support without leaking inventory', function () {
     $computer = endpointPostureComputer($this->site);
     endpointPostureAgent($computer, $this->site, $this->admin);
 
-    $netResponse = $this->actingAs($this->admin)
+    // S&D rebuild C6: the Network & IT workspace is gone; the computer's own page carries its agent.
+    $this->actingAs($this->admin)
         ->get('/security-devices/network-it')
-        ->assertOk()
-        ->assertInertia(function ($page) use ($computer): void {
-            $devices = collect($page->toArray()['props']['networkItWorkspace']['activeTab']['devices']);
-            $row = $devices->firstWhere('id', $computer->id);
-
-            expect($row)->not->toBeNull()
-                ->and($row['endpointAgent']['state'])->toBe('fresh')
-                ->and($row['endpointAgent']['agentVersion'])->toBe('1.2.0');
-        });
+        ->assertRedirect('/security-devices/devices?tab=network');
+    $netResponse = $this->actingAs($this->admin)
+        ->get('/security-devices/devices/'.$computer->id)
+        ->assertOk();
     $netResponse->assertDontSee('KAURI-SECRET-HOSTNAME-01');
     $netResponse->assertDontSee('Confidential Diagnostic Tool');
 

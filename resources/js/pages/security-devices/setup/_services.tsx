@@ -33,6 +33,7 @@ export function ConnectedServices({ data, query, now, onConnect }: { data: NonNu
                         sub: card.sub,
                         flag: <StatusBadge variant={card.flag.tone}>{card.flag.text}</StatusBadge>,
                         facts: card.facts.map((fact) => ({ tone: RING[fact.tone], text: <LineText line={fact} now={now} /> })),
+                        href: card.href ?? undefined,
                     }))}
                 />
             )}

@@ -10,6 +10,7 @@ use App\Domain\SecurityDevices\Management\Data\CommandRequestInput;
 use App\Domain\SecurityDevices\Management\Enums\CommandConfirmationMode;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandBatch;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -33,7 +34,7 @@ final class DeviceCommandBatchService
         'network-it' => ['capability_domain' => 'network_it', 'device_domain' => 'it_infrastructure'],
         'security' => ['capability_domain' => 'security', 'device_domain' => 'security'],
         'healthcare' => ['capability_domain' => 'healthcare', 'device_domain' => 'iot_healthcare'],
-        'tracking' => ['capability_domain' => 'tracking', 'device_domain' => 'tracking'],
+        // No "tracking": trackers are owned by Fleet and read-only in Security & devices (Stephan, 1 Nov).
         'facilities-iot' => ['capability_domain' => 'facilities', 'device_domain' => 'facilities'],
     ];
 
@@ -265,9 +266,48 @@ final class DeviceCommandBatchService
                 'impact_acknowledged_at' => $input->impactAcknowledged ? $now : null,
             ]);
             $batch->targets()->createMany($targets);
+            $this->writeLogbookLines($targets, $actor, $capability, $batchUuid, $now);
 
             return $batch;
         });
+    }
+
+    /**
+     * S&D rebuild C6 (plan: "results land in the device logbooks"): one line in each target
+     * device's logbook, saying it was asked to take the action or was left out and why. It is a
+     * record, not a signal: saved quietly and marked processed, so it never reaches Control Room
+     * or opens an alert. The operator's own reason stays on the batch, not in the logbook.
+     *
+     * @param  list<array<string, mixed>>  $targets
+     */
+    private function writeLogbookLines(
+        array $targets,
+        User $actor,
+        CommandCapabilityDefinition $capability,
+        string $batchUuid,
+        CarbonImmutable $now,
+    ): void {
+        foreach ($targets as $target) {
+            $included = $target['inclusion_status'] === 'included';
+            (new DeviceEvent([
+                'device_id' => (int) $target['device_id'],
+                'event_type' => $included ? 'bulk_action_requested' : 'bulk_action_left_out',
+                'severity' => 'info',
+                'source' => 'oblivion_command_plane',
+                'occurred_at' => $now,
+                'processed_at' => $now,
+                'payload' => array_filter([
+                    'batch_uuid' => $batchUuid,
+                    'capability' => $capability->key,
+                    'action' => $capability->label,
+                    'requested_by_user_id' => (int) $actor->id,
+                    'site_id' => $target['site_id'],
+                    'command_request_id' => $target['device_command_request_id'],
+                    'left_out_code' => $target['safe_exclusion_code'],
+                    'left_out_reason' => $target['safe_exclusion_reason'],
+                ], fn (mixed $value): bool => $value !== null),
+            ]))->saveQuietly();
+        }
     }
 
     /** @return array{available: bool, code: string, reason: string, site_id: int|null} */
@@ -334,12 +374,7 @@ final class DeviceCommandBatchService
         int $targetCount,
         int $siteCount,
     ): void {
-        $elevated = $capability->isHighRisk()
-            || $capability->requiresStepUp
-            || $capability->requiresMfa
-            || $siteCount > 1
-            || in_array($capability->sensitivity, self::ELEVATED_BULK_SENSITIVITIES, true);
-        if (! $elevated) {
+        if (! self::elevated($capability, $siteCount)) {
             return;
         }
         if (! $input->impactAcknowledged) {
@@ -367,6 +402,21 @@ final class DeviceCommandBatchService
                 'confirmation_text' => 'Configured multi-factor authentication is required for this critical bulk action.',
             ]);
         }
+    }
+
+    /**
+     * Whether a bulk action needs the elevated checks: recent identity confirmation, the combined
+     * impact acknowledged and the exact target count typed. `$siteCount` counts the Sites of the
+     * targets that can currently take the action. Shared with the Devices bulk bar (S&D rebuild C6),
+     * so the confirm asks for exactly what this service will check.
+     */
+    public static function elevated(CommandCapabilityDefinition $capability, int $siteCount): bool
+    {
+        return $capability->isHighRisk()
+            || $capability->requiresStepUp
+            || $capability->requiresMfa
+            || $siteCount > 1
+            || in_array($capability->sensitivity, self::ELEVATED_BULK_SENSITIVITIES, true);
     }
 
     public static function confirmationPhrase(int $targetCount): string

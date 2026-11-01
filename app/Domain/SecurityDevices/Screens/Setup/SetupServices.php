@@ -38,8 +38,15 @@ final class SetupServices
         $cards = [];
         $attention = [];
 
+        // S&D rebuild C6: until each service's panel is built, its card opens today's settings page for
+        // that service (UniFi, Queclink, Milesight, Intune), which needs integrations.manage as before.
+        $opensSettings = $viewer->canDo('securityDevices.integrations.manage');
         foreach ($workspace['providers'] as $provider) {
             $card = $this->providerCard($provider);
+            $slug = (string) $provider['slug'];
+            $card['href'] = $opensSettings && in_array($slug, ['unifi', 'queclink', 'milesight', 'intune'], true)
+                ? '/security-devices/integrations/'.$slug
+                : null;
             $cards[] = $card;
             if (in_array($card['flag']['tone'], ['critical', 'warning'], true)) {
                 $attention[] = ['name' => $card['name'], 'text' => $card['flag']['text'], 'tone' => $card['flag']['tone']];

@@ -4,7 +4,6 @@ import {
     buildSecurityDevicesNavigationGroups,
     isSecurityDevicesDestinationActive,
     securityDevicesDomainHref,
-    securityDevicesWorkspaceLabel,
 } from './security-devices-navigation';
 
 const allPermissions = {
@@ -19,6 +18,9 @@ const allPermissions = {
     monitoringManage: true,
     reportsView: true,
     commandsAdmin: true,
+    alertsAcknowledge: true,
+    accessControlView: true,
+    setupOpen: true,
 };
 
 describe('Security & Devices navigation contract', () => {
@@ -43,19 +45,7 @@ describe('Security & Devices navigation contract', () => {
         );
     });
 
-    it('preserves readable labels for legacy workspace slugs on retained batches', () => {
-        expect(securityDevicesWorkspaceLabel('network-it')).toBe(
-            'Network & IT',
-        );
-        expect(securityDevicesWorkspaceLabel('security')).toBe('Security');
-        expect(securityDevicesWorkspaceLabel('healthcare')).toBe('Healthcare');
-        expect(securityDevicesWorkspaceLabel('tracking')).toBe('Tracking');
-        expect(securityDevicesWorkspaceLabel('facilities-iot')).toBe(
-            'Facilities & IoT',
-        );
-    });
-
-    it('uses the five menu entries in exact order', () => {
+    it('uses the six menu entries in exact order (C6, the menu switch)', () => {
         const groups = buildSecurityDevicesNavigationGroups(allPermissions);
 
         expect(groups.map((group) => group.label)).toEqual([
@@ -66,10 +56,42 @@ describe('Security & Devices navigation contract', () => {
                 ['Overview', '/security-devices'],
                 ['Devices', '/security-devices/devices'],
                 ['Sites', '/security-devices/sites'],
+                ['Access', '/security-devices/access'],
                 ['Alerts', '/security-devices/alerts'],
                 ['Setup', '/security-devices/setup'],
             ],
         );
+    });
+
+    it('never points an entry at a retired page', () => {
+        const retired = [
+            '/network-it',
+            '/security?',
+            '/healthcare',
+            '/tracking',
+            '/facilities-iot',
+            '/device-groups',
+            '/command-batches',
+            '/alerts-events',
+            '/monitoring',
+            '/maintenance',
+            '/discovery',
+            '/settings',
+        ];
+        const shapes = [
+            allPermissions,
+            { viewAny: true, devicesView: true, maintenanceView: true, maintenanceManage: true },
+            { viewAny: true, reportsView: true, setupOpen: true },
+            { viewAny: true, eventsView: true },
+        ];
+
+        for (const can of shapes) {
+            for (const item of buildSecurityDevicesNavigationGroups(can)[0]?.items ?? []) {
+                for (const path of retired) {
+                    expect(item.href).not.toContain(`/security-devices${path}`);
+                }
+            }
+        }
     });
 
     it('removes destinations the actor cannot view and resolves permitted landing URLs', () => {
@@ -85,12 +107,23 @@ describe('Security & Devices navigation contract', () => {
             ['Sites', '/security-devices/sites'],
         ]);
 
+        // Upkeep moved to Devices › Upkeep: a maintenance-only person no longer gets an Alerts entry.
         const maintenanceOnly = buildSecurityDevicesNavigationGroups({
+            viewAny: true,
+            devicesView: true,
             maintenanceView: true,
+            maintenanceManage: true,
         });
         expect(
-            maintenanceOnly[0]?.items.map((item) => [item.title, item.href]),
-        ).toEqual([['Alerts', '/security-devices/maintenance']]);
+            maintenanceOnly[0]?.items.map((item) => item.title),
+        ).toEqual(['Overview', 'Devices', 'Sites']);
+
+        const alertsOnly = buildSecurityDevicesNavigationGroups({
+            alertsAcknowledge: true,
+        });
+        expect(
+            alertsOnly[0]?.items.map((item) => [item.title, item.href]),
+        ).toEqual([['Alerts', '/security-devices/alerts']]);
 
         const collectorManager = buildSecurityDevicesNavigationGroups({
             integrationsManage: true,
@@ -99,34 +132,35 @@ describe('Security & Devices navigation contract', () => {
             collectorManager[0]?.items.map((item) => [item.title, item.href]),
         ).toEqual([['Setup', '/security-devices/setup']]);
 
-        const monitoringManagerOnly = buildSecurityDevicesNavigationGroups({
-            monitoringManage: true,
+        // The old Settings & audit readers reach Setup › Change history.
+        const historyReader = buildSecurityDevicesNavigationGroups({
+            reportsView: true,
+            setupOpen: true,
         });
         expect(
-            monitoringManagerOnly[0]?.items.map((item) => [
-                item.title,
-                item.href,
-            ]),
+            historyReader[0]?.items.map((item) => [item.title, item.href]),
         ).toEqual([['Setup', '/security-devices/setup']]);
+
+        // The server's answer wins over the fallback.
+        expect(
+            buildSecurityDevicesNavigationGroups({ reportsView: true, setupOpen: false }),
+        ).toEqual([]);
+
+        // IT admins who can't open Setup still reach the Obli downloads (kept until pop-up 23 has a place).
+        const downloadsOnly = buildSecurityDevicesNavigationGroups({
+            commandsAdmin: true,
+            setupOpen: false,
+        });
+        expect(
+            downloadsOnly[0]?.items.map((item) => [item.title, item.href]),
+        ).toEqual([['Setup', '/security-devices/agent-downloads']]);
     });
 
-    it('matches hub pages and preserved legacy routes without making Overview greedy', () => {
+    it('matches hub pages and the pages still under an entry without making Overview greedy', () => {
         expect(
             isSecurityDevicesDestinationActive(
                 '/security-devices',
                 '/security-devices',
-            ),
-        ).toBe(true);
-        expect(
-            isSecurityDevicesDestinationActive(
-                '/security-devices/security?tab=cctv',
-                '/security-devices/devices',
-            ),
-        ).toBe(true);
-        expect(
-            isSecurityDevicesDestinationActive(
-                '/security-devices/cctv?site=4',
-                '/security-devices/devices',
             ),
         ).toBe(true);
         expect(
@@ -137,49 +171,31 @@ describe('Security & Devices navigation contract', () => {
         ).toBe(true);
         expect(
             isSecurityDevicesDestinationActive(
-                '/security-devices/maintenance-health',
-                '/security-devices/monitoring',
+                '/security-devices/scans/7',
+                '/security-devices/devices',
             ),
         ).toBe(true);
         expect(
             isSecurityDevicesDestinationActive(
-                '/security-devices/maintenance-health',
-                '/security-devices/maintenance',
+                '/security-devices/integrations/queclink',
+                '/security-devices/setup',
             ),
         ).toBe(true);
         expect(
             isSecurityDevicesDestinationActive(
-                '/security-devices/alerts-events',
-                '/security-devices/monitoring',
-            ),
-        ).toBe(true);
-        expect(
-            isSecurityDevicesDestinationActive(
-                '/security-devices/integrations',
-                '/security-devices/discovery',
-            ),
-        ).toBe(true);
-        expect(
-            isSecurityDevicesDestinationActive(
-                '/security-devices/supported-devices',
-                '/security-devices/discovery',
-            ),
-        ).toBe(true);
-        expect(
-            isSecurityDevicesDestinationActive(
-                '/security-devices/settings',
                 '/security-devices/agent-downloads',
+                '/security-devices/setup',
             ),
         ).toBe(true);
         expect(
             isSecurityDevicesDestinationActive(
-                '/security-devices/alerts-events',
+                '/security-devices/alerts',
                 '/security-devices/devices',
             ),
         ).toBe(false);
         expect(
             isSecurityDevicesDestinationActive(
-                '/security-devices/security',
+                '/security-devices/sites/3',
                 '/security-devices',
             ),
         ).toBe(false);

@@ -42,11 +42,13 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Support\AuthoritativeConsentFixture;
+use Tests\Feature\SecurityDevices\Concerns\ReadsRetiredWorkspaceProps;
 use Tests\TestCase;
 
 class QueclinkHubControllerTest extends TestCase
 {
     use RefreshDatabase;
+    use ReadsRetiredWorkspaceProps;
 
     private User $admin;
 
@@ -1921,12 +1923,12 @@ class QueclinkHubControllerTest extends TestCase
 
         $oldViewer = $this->siteRestrictedViewer($oldSite);
         $newViewer = $this->siteRestrictedViewer($newSite);
-        $this->actingAs($oldViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($assignment): void {
+        $this->retiredSettingsAudit($oldViewer)->assertOk()->assertInertia(function ($page) use ($assignment): void {
             $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])
                 ->where('action', 'deviceassignment.update')
                 ->contains('record_reference', '#'.$assignment->id));
         });
-        $this->actingAs($newViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($assignment): void {
+        $this->retiredSettingsAudit($newViewer)->assertOk()->assertInertia(function ($page) use ($assignment): void {
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])
                 ->where('action', 'deviceassignment.update')
                 ->contains('record_reference', '#'.$assignment->id));
@@ -2212,20 +2214,24 @@ class QueclinkHubControllerTest extends TestCase
         ]);
     }
 
-    public function test_bulk_action_hands_all_selected_devices_to_governed_bulk_management()
+    public function test_bulk_action_for_several_trackers_is_refused_until_the_devices_bulk_bar_can_review_it()
     {
+        // S&D rebuild C6: the old Tracking workspace's bulk review is gone; nothing is written.
         $this->seed(QueclinkPresetSeeder::class);
         $devices = collect(range(1, 5))->map(fn (int $index) => $this->pairedCanonicalGl30('86796306991699'.$index));
+        $profiles = DB::table('device_configuration_profiles')->count();
 
         $this->actingAs($this->admin)
+            ->from('/security-devices/integrations/queclink')
             ->post('/security-devices/integrations/queclink/bulk', [
                 'device_ids' => $devices->pluck('id')->all(),
                 'action' => 'resident_safety_profile',
             ])
-            ->assertRedirectContains('/security-devices/tracking')
-            ->assertRedirectContains('bulk_action=configuration.apply');
+            ->assertRedirect('/security-devices/integrations/queclink')
+            ->assertSessionHasErrors('device_ids');
 
         $this->assertDatabaseCount('queclink_pending_commands', 0);
+        $this->assertSame($profiles, DB::table('device_configuration_profiles')->count());
     }
 
     public function test_update_server_registration_authors_profile_without_provider_work()

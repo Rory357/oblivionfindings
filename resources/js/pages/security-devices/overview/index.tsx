@@ -1,7 +1,8 @@
 /**
- * Security & devices home (S&D rebuild drawings pg-sdr-1, its first-time view 1b, and the Trends
- * tab pg-sdr-18): what needs attention, the Sites, cameras and hubs, then trends and activity.
- * A support worker gets their own house instead (pg-sdr-1c, _worker.tsx); the server decides.
+ * Security & devices home (S&D rebuild drawings pg-sdr-1, its first-time view 1b, the Trends tab
+ * pg-sdr-18 and the Reports tab 18b): what needs attention, the Sites, cameras and hubs, then trends,
+ * activity and the monthly report. A support worker gets their own house instead (pg-sdr-1c,
+ * _worker.tsx); the server decides.
  */
 import { DonutChart } from '@/components/dashboard/donut-chart';
 import {
@@ -29,6 +30,7 @@ import { Monitor, Network, Plus, Radar, RefreshCw, ShieldCheck } from 'lucide-re
 import { useEffect, useState, type ReactNode } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { FactText, SiteFlagBadge } from '../sites/_parts';
+import { ReportsBody } from './_reports';
 import type { ActivityRow, OverviewProps, OverviewTab, SecurityDevicesHomeProps } from './_types';
 import { WorkerOverview } from './_worker';
 
@@ -36,8 +38,8 @@ export type { OverviewProps, WorkerOverviewProps } from './_types';
 
 const BASE = '/security-devices';
 
-// Reports (18b) comes later; Activity (18c) waits for its drawing's approval.
-const TAB_LABEL: Record<OverviewTab, string> = { overview: 'Overview', trends: 'Trends' };
+// Reports (18b) is for people who may see reports; Activity (18c) waits for its drawing's approval.
+const TAB_LABEL: Record<OverviewTab, string> = { overview: 'Overview', trends: 'Trends', reports: 'Reports' };
 
 const KIND_COLOURS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
@@ -71,11 +73,14 @@ function ItOverview(props: OverviewProps) {
     // First time (pg-sdr-1b): Add a hub is the header's one action and Get started step 1.
     const addHubFirst = !!props.first_time && tab === 'overview' && !!can.add_hub;
     const addHub = () => hubs.openAdd(site !== 'all' ? Number(site) : null);
-    const go = (changes: { tab?: OverviewTab; site?: string }) => {
-        const next = { tab: changes.tab ?? tab, site: changes.site ?? site };
+    const reports = props.reports ?? null;
+    const go = (changes: { tab?: OverviewTab; site?: string; month?: string }) => {
+        const next = { tab: changes.tab ?? tab, site: changes.site ?? site, month: changes.month ?? reports?.month.key };
+        // The month is the Reports tab's own filter; this month is the default.
+        const month = next.tab === 'reports' && next.month && next.month !== reports?.months[0]?.value ? next.month : undefined;
         router.get(
             BASE,
-            Object.fromEntries(Object.entries({ tab: next.tab === 'overview' ? undefined : next.tab, site: next.site === 'all' ? undefined : next.site }).filter(([, v]) => v !== undefined)),
+            Object.fromEntries(Object.entries({ tab: next.tab === 'overview' ? undefined : next.tab, site: next.site === 'all' ? undefined : next.site, month }).filter(([, v]) => v !== undefined)),
             { preserveState: true, preserveScroll: true },
         );
     };
@@ -135,11 +140,26 @@ function ItOverview(props: OverviewProps) {
                     </PageHeaderMeterBlock>
                 </>
             }
-            filters={sites.length > 1 ? <PageHeaderFilterSelect label="All Sites" value={site} options={sites} onChange={(value) => go({ site: value })} /> : undefined}
+            filters={
+                sites.length > 1 || (tab === 'reports' && reports) ? (
+                    <>
+                        {sites.length > 1 ? <PageHeaderFilterSelect label="All Sites" value={site} options={sites} onChange={(value) => go({ site: value })} /> : null}
+                        {tab === 'reports' && reports && reports.months.length > 0 ? (
+                            <PageHeaderFilterSelect
+                                label={reports.months[0].label}
+                                allValue={reports.months[0].value}
+                                value={reports.month.key}
+                                options={reports.months}
+                                onChange={(value) => go({ month: value })}
+                            />
+                        ) : null}
+                    </>
+                ) : undefined
+            }
             rail={
                 <PageHeaderRail<OverviewTab>
                     ariaLabel="Security & devices views"
-                    items={(Object.keys(TAB_LABEL) as OverviewTab[]).map((key) => ({ key, label: TAB_LABEL[key] }))}
+                    items={(Object.keys(TAB_LABEL) as OverviewTab[]).filter((key) => key !== 'reports' || can.reports).map((key) => ({ key, label: TAB_LABEL[key] }))}
                     value={tab}
                     onSelect={(key) => go({ tab: key })}
                 />
@@ -152,6 +172,7 @@ function ItOverview(props: OverviewProps) {
         body = <FirstTime firstTime={props.first_time} onConnect={can.connect ? () => setPopup({ kind: 'connect' }) : null} onAddHub={can.add_hub ? addHub : null} />;
     else if (tab === 'overview' && props.overview) body = <OverviewBody overview={props.overview} now={now} />;
     else if (tab === 'trends' && props.trends) body = <Trends trends={props.trends} />;
+    else if (tab === 'reports' && reports) body = <ReportsBody reports={reports} now={now} />;
 
     return (
         <AppLayout

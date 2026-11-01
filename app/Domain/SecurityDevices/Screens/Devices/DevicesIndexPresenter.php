@@ -12,6 +12,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -28,7 +29,7 @@ final class DevicesIndexPresenter
     public const int PER_PAGE = 25;
 
     /** Every prop present() returns, so the controller can hand each one over lazily. */
-    public const array PROPS = ['tab', 'layout', 'upkeep', 'filters', 'tabs', 'meters', 'sites', 'statuses', 'can', 'cards', 'cameras', 'list', 'batteries', 'updates'];
+    public const array PROPS = ['tab', 'layout', 'upkeep', 'filters', 'tabs', 'meters', 'sites', 'statuses', 'groups', 'can', 'cards', 'cameras', 'list', 'batteries', 'updates'];
 
     /** Cards drawn per group before "Show all"; the rest stay one click away in the list. */
     public const int CARD_LIMIT = 200;
@@ -42,7 +43,7 @@ final class DevicesIndexPresenter
     ) {}
 
     /**
-     * @param  array{tab?: mixed, layout?: mixed, upkeep?: mixed, site?: mixed, status?: mixed, q?: mixed, page?: mixed}  $input
+     * @param  array{tab?: mixed, layout?: mixed, upkeep?: mixed, site?: mixed, status?: mixed, group?: mixed, q?: mixed, page?: mixed}  $input
      * @return array<string, mixed>
      */
     public function present(User $viewer, array $input, string $layout): array
@@ -58,8 +59,11 @@ final class DevicesIndexPresenter
         $scoped = $this->directory->entries($viewer, $siteId)
             ->sortBy(fn (DeviceEntry $entry): string => $entry->sortKey())
             ->values();
+        $groups = $this->groupOptions($scoped);
+        $group = $this->groupFilter($input['group'] ?? null, $groups);
         $filtered = $scoped
             ->filter(fn (DeviceEntry $entry): bool => $status === 'all' || $entry->state->value === $status)
+            ->filter(fn (DeviceEntry $entry): bool => $this->inGroup($entry, $group, $groups))
             ->filter(fn (DeviceEntry $entry): bool => $this->matches($entry, $search))
             ->values();
         $inTab = $tab === 'all' || $tab === 'upkeep'
@@ -73,7 +77,13 @@ final class DevicesIndexPresenter
             'filters' => [
                 'site' => $siteId === null ? 'all' : (string) $siteId,
                 'status' => $status,
+                'group' => $group,
                 'q' => $search,
+            ],
+            // S&D rebuild C6: Health kit (Stephan, 1 Nov) and today's device groups (D8), read-only.
+            'groups' => $groups === [] ? [] : [
+                ['value' => 'all', 'label' => 'Any group'],
+                ...array_map(fn (array $option): array => ['value' => $option['value'], 'label' => $option['label']], $groups),
             ],
             'tabs' => $this->tabs($filtered),
             'meters' => $this->meters($scoped),
@@ -119,6 +129,81 @@ final class DevicesIndexPresenter
         abort_unless($siteId > 0 && in_array($siteId, $this->access->accessibleSiteIds($viewer), true), 404);
 
         return $siteId;
+    }
+
+    /**
+     * The "Any group" choices, only for what this person can already see: "Health kit" when any of
+     * their devices is health kit (the old Healthcare workspace, Stephan 1 Nov), then each of today's
+     * device groups (D8) that holds at least one of their devices. The group tables are only read.
+     *
+     * @param  Collection<int, DeviceEntry>  $entries
+     * @return list<array{value: string, label: string, ids: ?array<int, true>}>
+     */
+    private function groupOptions(Collection $entries): array
+    {
+        $options = [];
+        if ($entries->contains(fn (DeviceEntry $entry): bool => self::isHealthKit($entry))) {
+            $options[] = ['value' => 'health', 'label' => 'Health kit', 'ids' => null];
+        }
+
+        $ids = $entries->map(fn (DeviceEntry $entry): int => (int) $entry->device->id)->all();
+        if ($ids === []) {
+            return $options;
+        }
+        $members = DB::table('device_group_members')
+            ->join('device_groups', 'device_groups.id', '=', 'device_group_members.device_group_id')
+            ->whereNull('device_groups.deleted_at')
+            ->whereIn('device_group_members.device_id', $ids)
+            ->orderBy('device_groups.name')
+            ->orderBy('device_groups.id')
+            ->get(['device_groups.id', 'device_groups.name', 'device_group_members.device_id']);
+
+        foreach ($members->groupBy('id') as $groupId => $rows) {
+            $options[] = [
+                'value' => (string) $groupId,
+                'label' => (string) $rows->first()->name,
+                'ids' => $rows->mapWithKeys(fn (object $row): array => [(int) $row->device_id => true])->all(),
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * @param  list<array{value: string, label: string, ids: ?array<int, true>}>  $options
+     */
+    private function groupFilter(mixed $raw, array $options): string
+    {
+        $value = is_scalar($raw) ? (string) $raw : '';
+
+        return in_array($value, array_column($options, 'value'), true) ? $value : 'all';
+    }
+
+    /**
+     * @param  list<array{value: string, label: string, ids: ?array<int, true>}>  $options
+     */
+    private function inGroup(DeviceEntry $entry, string $group, array $options): bool
+    {
+        if ($group === 'all') {
+            return true;
+        }
+        if ($group === 'health') {
+            return self::isHealthKit($entry);
+        }
+        foreach ($options as $option) {
+            if ($option['value'] === $group) {
+                return isset($option['ids'][(int) $entry->device->id]);
+            }
+        }
+
+        return false;
+    }
+
+    private static function isHealthKit(DeviceEntry $entry): bool
+    {
+        $domain = $entry->device->domain;
+
+        return ($domain instanceof \BackedEnum ? $domain->value : (string) $domain) === 'iot_healthcare';
     }
 
     private function matches(DeviceEntry $entry, string $search): bool
@@ -241,6 +326,10 @@ final class DevicesIndexPresenter
             'move' => $viewer->canDo('securityDevices.devices.assign'),
             'retire' => $viewer->canDo('securityDevices.devices.delete'),
             'watch' => $viewer->canDo('securityDevices.monitoring.manage'),
+            // pg-sdr-18b: Export (the device list and upkeep log CSVs that Reports had), same key as before.
+            'export' => $viewer->canDo('securityDevices.reports.view'),
+            // S&D rebuild C6: the bulk bar's "Run action", with the keys that may start a command batch.
+            'commands' => BulkActionOptions::allowed($viewer),
         ];
     }
 

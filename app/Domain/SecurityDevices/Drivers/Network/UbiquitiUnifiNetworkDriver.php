@@ -44,7 +44,7 @@ final class UbiquitiUnifiNetworkDriver implements DeviceDriver
             officialDocs: [
                 ['label' => 'Ubiquiti Developer Documentation', 'url' => 'https://developer.ui.com/'],
             ],
-            setupHref: '/security-devices/integrations',
+            setupHref: '/security-devices/integrations/unifi',
         );
     }
 

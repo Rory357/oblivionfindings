@@ -34,12 +34,22 @@ import {
     type PopupDevice,
 } from '@/components/security-devices/device-popups';
 import { QuietTime } from '@/components/security-devices/alert-popups';
+import {
+    BulkActionConfirm,
+    BulkActionsMenu,
+    bulkResultLines,
+    takeBulkResume,
+    type BulkAction,
+    type BulkOptions,
+    type BulkResult,
+} from '@/components/security-devices/bulk-action-popups';
 import { ConnectService } from '@/components/security-devices/connect-service-popup';
 import { iconForKind } from '@/components/security-devices/device-kind-icon';
 import { FirmwareUpdatePopup, type FirmwareUpdate } from '@/components/security-devices/firmware-update-popup';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { QuietLine } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { timedText } from '@/lib/security-devices/device-time';
 import {
@@ -52,6 +62,7 @@ import {
     BatteryMedium,
     BellPlus,
     Cpu,
+    Download,
     ExternalLink,
     HardDriveDownload,
     LayoutGrid,
@@ -88,6 +99,8 @@ type Popup =
     | { kind: 'move'; devices: PopupDevice[] }
     | { kind: 'watch-many'; devices: PopupDevice[] }
     | { kind: 'connect' }
+    // S&D rebuild C6: a governed action on the ticked devices (the bulk bar's one confirm).
+    | { kind: 'bulk'; action: BulkAction; stepUpCurrent: boolean; ticked: number[] }
     | null;
 
 function useNow(): Date {
@@ -125,7 +138,8 @@ export default function DevicesIndex(props: DevicesIndexProps) {
     ];
 
     // A new view clears what was ticked.
-    const viewKey = `${tab}|${layout}|${filters.site}|${filters.status}|${filters.q}`;
+    const group = filters.group ?? 'all';
+    const viewKey = `${tab}|${layout}|${filters.site}|${filters.status}|${group}|${filters.q}`;
     useEffect(() => {
         setSelected(new Set());
         setSelecting(false);
@@ -136,6 +150,7 @@ export default function DevicesIndex(props: DevicesIndexProps) {
             tab: tab === 'all' ? undefined : tab,
             site: filters.site === 'all' ? undefined : filters.site,
             status: filters.status === 'all' ? undefined : filters.status,
+            group: group === 'all' ? undefined : group,
             q: filters.q || undefined,
             upkeep: tab === 'upkeep' && upkeep === 'updates' ? 'updates' : undefined,
             ...changes,
@@ -198,7 +213,36 @@ export default function DevicesIndex(props: DevicesIndexProps) {
         return [];
     }, [props.list, props.cards]);
     const selectedDevices = visibleDevices.filter((device) => selected.has(device.id));
-    const canSelect = (can.watch || can.move) && (props.cards !== null || props.list !== null);
+    const canSelect = (can.watch || can.move || !!can.commands) && (props.cards !== null || props.list !== null);
+    const tickedIds = useMemo(() => [...selected], [selected]);
+
+    // Back from "Confirm it’s you": the same devices ticked and the same action's confirm open.
+    const resumed = useRef(false);
+    useEffect(() => {
+        if (resumed.current) return;
+        resumed.current = true;
+        const resume = takeBulkResume();
+        if (!resume || !can.commands) return;
+        setSelecting(true);
+        setSelected(new Set(resume.ids));
+        if (!resume.action) return;
+        axios
+            .get<BulkOptions>('/security-devices/devices/bulk-actions', { params: { ids: resume.ids }, headers: { Accept: 'application/json' } })
+            .then(({ data }) => {
+                const action = data.actions.find((candidate) => candidate.key === resume.action);
+                if (action) setPopup({ kind: 'bulk', action, stepUpCurrent: data.step_up_current, ticked: resume.ids });
+            })
+            .catch(() => toast.warning('Couldn’t reopen the action. Choose it again from Run action.'));
+    }, [can.commands]);
+
+    const finishBulk = (result: BulkResult) => {
+        close();
+        setSelected(new Set());
+        const lines = bulkResultLines(result);
+        if (lines.done) toast.success(lines.done);
+        if (lines.warning) toast.warning(lines.warning);
+        router.reload();
+    };
 
     const watchMany = async (devices: PopupDevice[]) => {
         setWatchingMany(true);
@@ -253,6 +297,26 @@ export default function DevicesIndex(props: DevicesIndexProps) {
             actions={
                 <>
                     <PageHeaderSearch value={search} onChange={updateSearch} placeholder="Search devices" />
+                    {can.export ? (
+                        // pg-sdr-18b: today's Reports CSVs live here now (the device list and the upkeep log).
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <PageHeaderGlassButton icon={Download}>Export</PageHeaderGlassButton>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                    <a href="/security-devices/exports/devices.csv" download>
+                                        Device list (CSV)
+                                    </a>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <a href="/security-devices/exports/upkeep.csv" download>
+                                        Upkeep log (CSV)
+                                    </a>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
                     {can.scan ? (
                         <PageHeaderGlassButton icon={Radar} onClick={() => open({ kind: 'scan' })}>
                             Scan network
@@ -289,6 +353,9 @@ export default function DevicesIndex(props: DevicesIndexProps) {
                 <>
                     <PageHeaderFilterSelect label="All Sites" value={filters.site} options={props.sites} onChange={(value) => go({ site: value })} />
                     <PageHeaderFilterSelect label="Any status" value={filters.status} options={props.statuses} onChange={(value) => go({ status: value })} />
+                    {props.groups && props.groups.length > 0 ? (
+                        <PageHeaderFilterSelect label="Any group" value={group} options={props.groups} onChange={(value) => go({ group: value })} />
+                    ) : null}
                 </>
             }
             rail={
@@ -382,7 +449,7 @@ export default function DevicesIndex(props: DevicesIndexProps) {
                 </div>
                 {props.list.rows.length === 0 ? (
                     <p className="text-subtle px-4 py-6">
-                        {filters.q || filters.status !== 'all' ? 'No devices match. Try another search or status.' : 'No devices here yet.'}
+                        {filters.q || filters.status !== 'all' || group !== 'all' ? 'No devices match. Try another search, status or group.' : 'No devices here yet.'}
                     </p>
                 ) : (
                     <DevicesList
@@ -408,7 +475,7 @@ export default function DevicesIndex(props: DevicesIndexProps) {
                 <BlockHead title={tabTitle} sub="Problems first · each card shows its last 24 hours" right={<>{layoutSwitch}{selectButton}</>} />
                 {nothing && notWatched.count === 0 ? (
                     <QuietLine
-                        text={filters.q || filters.status !== 'all' ? 'No devices match. Try another search or status.' : 'No devices here yet.'}
+                        text={filters.q || filters.status !== 'all' || group !== 'all' ? 'No devices match. Try another search, status or group.' : 'No devices here yet.'}
                         action={can.add || can.scan ? { label: 'Add device', onClick: () => open({ kind: 'chooser' }) } : null}
                     />
                 ) : null}
@@ -513,6 +580,22 @@ export default function DevicesIndex(props: DevicesIndexProps) {
                                     Move to Site
                                 </Button>
                             ) : null}
+                            {can.commands && selected.size >= 2 ? (
+                                <BulkActionsMenu
+                                    ids={tickedIds}
+                                    onChoose={(action: BulkAction, options: BulkOptions) =>
+                                        open({ kind: 'bulk', action, stepUpCurrent: options.step_up_current, ticked: tickedIds })
+                                    }
+                                />
+                            ) : null}
+                            {can.export && selectedDevices.length > 0 ? (
+                                <Button variant="outline" asChild>
+                                    <a href={`/security-devices/exports/devices.csv?ids=${selectedDevices.map((device) => device.id).join(',')}`} download>
+                                        <Download className="size-4" />
+                                        Export
+                                    </a>
+                                </Button>
+                            ) : null}
                         </PopupSelectionBar>
                     ) : null}
                     {body}
@@ -587,6 +670,16 @@ export default function DevicesIndex(props: DevicesIndexProps) {
             <WatchDevice open={popup?.kind === 'watch'} device={popup?.kind === 'watch' ? popup.device : null} form={form} onClose={close} />
             <RetireDevice open={popup?.kind === 'remove'} device={popup?.kind === 'remove' ? popup.device : null} onClose={close} />
             <MoveDevices open={popup?.kind === 'move'} devices={popup?.kind === 'move' ? popup.devices : []} form={form} onClose={close} />
+            {can.commands ? (
+                <BulkActionConfirm
+                    open={popup?.kind === 'bulk'}
+                    action={popup?.kind === 'bulk' ? popup.action : null}
+                    ticked={popup?.kind === 'bulk' ? popup.ticked : []}
+                    stepUpCurrent={popup?.kind === 'bulk' ? popup.stepUpCurrent : false}
+                    onClose={close}
+                    onDone={finishBulk}
+                />
+            ) : null}
             <PopupConfirm
                 open={popup?.kind === 'watch-many'}
                 onClose={close}

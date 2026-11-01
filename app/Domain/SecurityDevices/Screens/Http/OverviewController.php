@@ -11,7 +11,7 @@ use Illuminate\Routing\Controller;
 use Inertia\Inertia;
 use Inertia\Response;
 
-/** Security & devices home (S&D rebuild drawings pg-sdr-1, 1b, 1c and 18). */
+/** Security & devices home (S&D rebuild drawings pg-sdr-1, 1b, 1c, 18 and 18b). */
 final class OverviewController extends Controller
 {
     public function __invoke(Request $request, OverviewPresenter $overview, DeviceFormOptions $formOptions, WorkerOverviewPresenter $worker): Response
@@ -25,7 +25,7 @@ final class OverviewController extends Controller
         }
 
         return Inertia::render('security-devices/overview/index', [
-            ...$overview->present($user, $request->only(['tab', 'site'])),
+            ...$overview->present($user, $request->only(['tab', 'site', 'month'])),
             // Add a device and Scan a network load their choices only when one opens.
             'deviceForm' => Inertia::optional(fn (): array => $formOptions->present($user)),
         ]);

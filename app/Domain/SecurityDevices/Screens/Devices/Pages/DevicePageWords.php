@@ -15,6 +15,9 @@ final class DevicePageWords
         'recovered' => 'Back online',
         'tamper' => 'Tampered with',
         'management_command_reconciled' => 'A change was checked',
+        // S&D rebuild C6: the Devices bulk bar's result for this device.
+        'bulk_action_requested' => 'Asked to run an action with other devices',
+        'bulk_action_left_out' => 'Left out of an action run on several devices',
         'firmware_updated' => 'Software updated',
         'firmware.updated' => 'Software updated',
         'reboot' => 'Restarted',

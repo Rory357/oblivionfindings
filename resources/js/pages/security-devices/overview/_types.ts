@@ -1,8 +1,44 @@
-/** Props for the Security & devices home (S&D rebuild drawings pg-sdr-1, 1b and 18). */
+/** Props for the Security & devices home (S&D rebuild drawings pg-sdr-1, 1b, 18 and 18b). */
 import type { DeviceState, DevicesTab } from '@/lib/security-devices/device-words';
 import type { FactTone, SiteCard } from '../sites/_types';
 
-export type OverviewTab = 'overview' | 'trends';
+export type OverviewTab = 'overview' | 'trends' | 'reports';
+
+/** A person who gets, or may get, the monthly email. */
+export type ReportPerson = { id: number; name: string };
+
+/** pg-sdr-18b: one row of the camera viewing log. */
+export type CameraViewRow = {
+    key: string;
+    at: string;
+    who: string;
+    camera: string;
+    camera_id: number;
+    kind: 'live' | 'clip';
+    from: string | null;
+    to: string | null;
+    reason: string;
+};
+
+/** pg-sdr-18b: the monthly report (MonthlyReport::present). A null figure means "Not available". */
+export type ReportsData = {
+    month: { key: string; label: string; short: string; range: string; current: boolean; ready_at: string | null };
+    months: { value: string; label: string }[];
+    site_label: string;
+    device_count: number;
+    offline: { sites: { name: string; minutes: number; still_offline: boolean }[] } | null;
+    alerts: { total: number; kinds: { label: string; count: number }[] };
+    safety: {
+        weeks: { label: string; minutes: number | null }[];
+        month: { count: number; picked: number; not_picked: number; average_minutes: number | null };
+    } | null;
+    upkeep: { batteries: number; software: number; settings: number } | null;
+    cameras: { cameras: number; with_hours: number; without_hours: number; percent: number | null; worst: { name: string; hours: number }[] } | null;
+    camera_views: { rows: CameraViewRow[]; total: number; live: boolean; clips: boolean; export: string } | null;
+    kept: { door_names_days: number; audit_years: number; months: number };
+    links: { pdf: string; csv: string; devices: string; events: string; upkeep: string };
+    email: { on: boolean; recipients: ReportPerson[]; next_at: string; can_change: boolean; choices: ReportPerson[] };
+};
 
 export type TimedLine = { text: string; at: string | null };
 
@@ -39,8 +75,10 @@ export type OverviewProps = {
         batteries: { id: number; name: string; site: string | null; battery: number | null; href: string }[];
         slowest: { id: number; name: string; model: string; kind: string; site: string | null; week_ms: number; usual_ms: number | null; href: string }[];
     } | null;
-    /** add_hub / approve_hub: Add a hub (sdr-12) and approving it (sdr-79). */
-    can: { add: boolean; scan: boolean; connect: boolean; assign: boolean; add_hub?: boolean; approve_hub?: boolean };
+    /** pg-sdr-18b: only on the Reports tab, for people who may see reports. */
+    reports?: ReportsData | null;
+    /** add_hub / approve_hub: Add a hub (sdr-12) and approving it (sdr-79). reports: the Reports tab (18b). */
+    can: { add: boolean; scan: boolean; connect: boolean; assign: boolean; add_hub?: boolean; approve_hub?: boolean; reports?: boolean };
     view?: 'it';
 };
 

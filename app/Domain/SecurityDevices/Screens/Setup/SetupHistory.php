@@ -221,6 +221,9 @@ final class SetupHistory
             SecurityDevicesSettings::SAFETY_ROSTER => "Turned {$state} using the roster for safety alerts",
             SecurityDevicesSettings::WATCH_ON_ADD => "Turned {$state} watching devices as soon as they’re added",
             SecurityDevicesSettings::WATCH_PHONES => "Turned {$state} watching phones and tablets",
+            // pg-sdr-18b: Overview › Reports, the monthly email (MonthlyReportEmail).
+            \App\Domain\SecurityDevices\Reports\MonthlyReportEmail::ON => "Turned the monthly report email {$state}",
+            \App\Domain\SecurityDevices\Reports\MonthlyReportEmail::RECIPIENTS => 'Changed who gets the monthly report email',
             // S&D Phase H (D15): clock-ins from doors (DoorClockinSetup).
             'clockins.on' => ($meta['to'] ?? false) === false ? 'Turned clock-ins from doors off' : 'Sent the notice and turned on clock-ins from doors'.(is_string($meta['starts_on'] ?? null) ? ', starting '.\Carbon\CarbonImmutable::parse($meta['starts_on'])->format('D j M Y') : ''),
             'clockins.doors' => 'Changed the doors that count for clock-ins'.(($meta['notice_id'] ?? null) !== null ? ' and sent the notice' : ''),

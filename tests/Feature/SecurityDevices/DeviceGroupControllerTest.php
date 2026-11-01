@@ -59,50 +59,10 @@ class DeviceGroupControllerTest extends TestCase
 
     public function test_index_accessible_with_permission(): void
     {
+        // S&D rebuild C6 (D8): the group pages are gone; a group is a filter on Devices.
         $this->actingAs($this->admin)
             ->get('/security-devices/device-groups')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('security-devices/device-groups/index')
-                ->has('groups.data')
-                ->has('groups.meta')
-            );
-    }
-
-    public function test_index_returns_groups_with_member_count(): void
-    {
-        $group = DeviceGroup::create(['name' => 'Test Group', 'type' => 'custom']);
-        $device = Device::factory()->create();
-        $group->devices()->attach($device);
-
-        $response = $this->actingAs($this->admin)->get('/security-devices/device-groups');
-
-        $response->assertInertia(fn ($page) => $page
-            ->has('groups.data', 1)
-            ->where('groups.data.0.devices_count', 1)
-        );
-    }
-
-    public function test_index_search_by_name(): void
-    {
-        DeviceGroup::create(['name' => 'Auckland Office', 'type' => 'location']);
-        DeviceGroup::create(['name' => 'Server Room', 'type' => 'location']);
-
-        $response = $this->actingAs($this->admin)
-            ->get('/security-devices/device-groups?search=Auckland');
-
-        $response->assertInertia(fn ($page) => $page->has('groups.data', 1));
-    }
-
-    public function test_index_filter_by_type(): void
-    {
-        DeviceGroup::create(['name' => 'Location Group', 'type' => 'location']);
-        DeviceGroup::create(['name' => 'Vendor Group', 'type' => 'vendor']);
-
-        $response = $this->actingAs($this->admin)
-            ->get('/security-devices/device-groups?type=vendor');
-
-        $response->assertInertia(fn ($page) => $page->has('groups.data', 1));
+            ->assertRedirect('/security-devices/devices');
     }
 
     // ── Show ──────────────────────────────────────────────────────
@@ -111,48 +71,10 @@ class DeviceGroupControllerTest extends TestCase
     {
         $group = DeviceGroup::create(['name' => 'Test Group', 'type' => 'custom']);
 
+        // S&D rebuild C6 (D8): a group's page opens Devices filtered to that group.
         $this->actingAs($this->admin)
             ->get("/security-devices/device-groups/{$group->id}")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('security-devices/device-groups/show')
-                ->where('group.name', 'Test Group')
-                ->has('members.data')
-                ->has('availableDevices')
-            );
-    }
-
-    public function test_show_lists_group_members(): void
-    {
-        $group = DeviceGroup::create(['name' => 'Test Group', 'type' => 'custom']);
-        $device1 = Device::factory()->create(['name' => 'Device A']);
-        $device2 = Device::factory()->create(['name' => 'Device B']);
-        $group->devices()->attach([$device1->id, $device2->id]);
-
-        $response = $this->actingAs($this->admin)
-            ->get("/security-devices/device-groups/{$group->id}");
-
-        $response->assertInertia(fn ($page) => $page
-            ->has('members.data', 2)
-            ->where('members.meta.total', 2)
-        );
-    }
-
-    public function test_show_excludes_members_from_available_devices(): void
-    {
-        $group = DeviceGroup::create(['name' => 'Test Group', 'type' => 'custom']);
-        $member = Device::factory()->create();
-        $nonMember = Device::factory()->create();
-        $group->devices()->attach($member);
-
-        $response = $this->actingAs($this->admin)
-            ->get("/security-devices/device-groups/{$group->id}");
-
-        $response->assertInertia(function ($page) use ($nonMember, $member) {
-            $available = collect($page->toArray()['props']['availableDevices']);
-            $this->assertTrue($available->contains('id', $nonMember->id));
-            $this->assertFalse($available->contains('id', $member->id));
-        });
+            ->assertRedirect("/security-devices/devices?group={$group->id}");
     }
 
     // ── Store ─────────────────────────────────────────────────────
@@ -380,24 +302,17 @@ class DeviceGroupControllerTest extends TestCase
         $this->assertFalse(Gate::forUser($actor)->allows('view', $privateMember));
         $this->assertFalse(Gate::forUser($actor)->allows('update', $privateMember));
 
+        // S&D rebuild C6 (D8): the group pages are gone; the group is a Devices filter that lists
+        // only the members this person may see.
         $this->actingAs($actor)
-            ->get('/security-devices/device-groups')
+            ->get("/security-devices/devices?layout=list&group={$group->id}")
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('groups.data.0.devices_count', 1));
-
-        $this->actingAs($actor)
-            ->get("/security-devices/device-groups/{$group->id}")
-            ->assertOk()
-            ->assertInertia(function ($page) use ($visibleMember, $visibleCandidate, $privateMember, $privateCandidate): void {
+            ->assertInertia(function ($page) use ($group, $visibleMember, $privateMember): void {
                 $props = $page->toArray()['props'];
-                $memberIds = collect($props['members']['data'])->pluck('id');
-                $availableIds = collect($props['availableDevices'])->pluck('id');
-
-                $this->assertSame([$visibleMember->id], $memberIds->all());
-                $this->assertSame(1, $props['members']['meta']['total']);
-                $this->assertTrue($availableIds->contains($visibleCandidate->id));
-                $this->assertFalse($availableIds->contains($privateMember->id));
-                $this->assertFalse($availableIds->contains($privateCandidate->id));
+                $this->assertSame((string) $group->id, $props['filters']['group']);
+                $this->assertSame([$visibleMember->id], collect($props['list']['rows'])->pluck('id')->all());
+                $this->assertSame(1, $props['list']['meta']['total']);
+                $this->assertNotContains($privateMember->id, collect($props['list']['rows'])->pluck('id')->all());
                 $this->assertStringNotContainsString('Private Client', json_encode($props, JSON_THROW_ON_ERROR));
             });
 

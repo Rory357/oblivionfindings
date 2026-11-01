@@ -20,8 +20,6 @@ use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointScriptPolicyCo
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointSoftwareCatalogueController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointSoftwarePolicyController;
 use App\Domain\SecurityDevices\Endpoints\Http\Middleware\EndpointTransport;
-use App\Domain\SecurityDevices\Http\Controllers\AlertsEventsController;
-use App\Domain\SecurityDevices\Http\Controllers\CategoryPageController;
 use App\Domain\SecurityDevices\Http\Controllers\CollectorInstallationController;
 use App\Domain\SecurityDevices\Http\Controllers\ConfigurationSnapshotComparisonController;
 use App\Domain\SecurityDevices\Http\Controllers\ConfigurationSnapshotController;
@@ -33,16 +31,13 @@ use App\Domain\SecurityDevices\Http\Controllers\DeviceOfflineAlertController;
 use App\Domain\SecurityDevices\Http\Controllers\SshHostKeyTrustController;
 use App\Domain\SecurityDevices\Http\Controllers\DevicePingController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCandidateReviewController;
-use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCollectorController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryScopeLifecycleController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\IntuneController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\MilesightController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController;
-use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
-use App\Domain\SecurityDevices\Http\Controllers\MaintenanceOperationsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringAlertRouteSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringCollectorLifecycleController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringCoverageSettingsController;
@@ -51,7 +46,6 @@ use App\Domain\SecurityDevices\Http\Controllers\MonitoringDependencySettingsCont
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringEffectivePolicyPreviewController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringHistoryController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringMaintenanceSettingsController;
-use App\Domain\SecurityDevices\Http\Controllers\MonitoringOperationsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringProfileSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringRetentionSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringRuntimeHealthController;
@@ -59,7 +53,6 @@ use App\Domain\SecurityDevices\Http\Controllers\MonitoringThresholdSettingsContr
 use App\Domain\SecurityDevices\Http\Controllers\NativeMonitorLifecycleController;
 use App\Domain\SecurityDevices\Http\Controllers\QueclinkUnitConsoleController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
-use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteHubWizardController;
 use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubAdminController;
 use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubLinuxSetupController;
@@ -74,10 +67,14 @@ use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandExecutio
 use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceCommandRequest;
 use App\Domain\SecurityDevices\Screens\Http\AlertsController;
 use App\Domain\SecurityDevices\Screens\Http\CareLinkController;
+use App\Domain\SecurityDevices\Screens\Http\BulkActionsController;
 use App\Domain\SecurityDevices\Screens\Http\DevicesController;
 use App\Domain\SecurityDevices\Screens\Http\FoundDevicesController;
 use App\Domain\SecurityDevices\Screens\Http\HubPanelController;
+use App\Domain\SecurityDevices\Screens\Http\ListExportsController;
+use App\Domain\SecurityDevices\Screens\Http\MonthlyReportController;
 use App\Domain\SecurityDevices\Screens\Http\OverviewController;
+use App\Domain\SecurityDevices\Screens\Http\RetiredPagesController;
 use App\Domain\SecurityDevices\Screens\Http\SafetyKitCommandController;
 use App\Domain\SecurityDevices\Screens\Http\SetupController;
 use App\Domain\SecurityDevices\Screens\Http\SitesController;
@@ -115,6 +112,18 @@ Route::middleware([
     // S&D rebuild C4: the Security & devices home.
     Route::get('/', OverviewController::class)
         ->name('security-devices.index');
+
+    // S&D rebuild C4b: Overview › Reports (pg-sdr-18b) as PDF or CSV, its camera viewing log, the monthly email,
+    // and "Export" on the Devices and Alerts lists (today's three Reports CSVs, same key and scope).
+    Route::middleware('permission:securityDevices.reports.view')->group(function (): void {
+        Route::get('/monthly-report.pdf', [MonthlyReportController::class, 'pdf'])->middleware('throttle:10,1')->name('security-devices.monthly-report.pdf');
+        Route::get('/monthly-report.csv', [MonthlyReportController::class, 'csv'])->middleware('throttle:20,1')->name('security-devices.monthly-report.csv');
+        Route::get('/monthly-report/camera-views.csv', [MonthlyReportController::class, 'cameraViews'])->middleware('throttle:20,1')->name('security-devices.monthly-report.camera-views');
+        Route::patch('/monthly-report/email', [MonthlyReportController::class, 'email'])->middleware('throttle:20,1')->name('security-devices.monthly-report.email');
+        Route::get('/exports/devices.csv', [ListExportsController::class, 'devices'])->middleware('throttle:20,1')->name('security-devices.exports.devices');
+        Route::get('/exports/events.csv', [ListExportsController::class, 'events'])->middleware('throttle:20,1')->name('security-devices.exports.events');
+        Route::get('/exports/upkeep.csv', [ListExportsController::class, 'upkeep'])->middleware('throttle:20,1')->name('security-devices.exports.upkeep');
+    });
 
     Route::middleware([EndpointTransport::class, 'permission:securityDevices.commands.admin', 'throttle:10,1'])->group(function (): void {
         Route::post('/devices/{device}/endpoint/enrolments', [EndpointLifecycleController::class, 'issue'])->name('security-devices.devices.endpoint.enrolments');
@@ -155,6 +164,9 @@ Route::middleware([
     $softwarePolicy = EndpointSoftwarePolicyController::class;
     Route::get('/devices/{device}/endpoint/software-policy', [$softwarePolicy, 'show'])->middleware(EndpointTransport::class)->name('security-devices.devices.endpoint.software-policy');
     Route::put('/devices/{device}/endpoint/software-policy', [$softwarePolicy, 'update'])->middleware(EndpointTransport::class)->name('security-devices.devices.endpoint.software-policy.update');
+    // S&D rebuild C6: kept for now (verdict "Drop page"). Its new homes aren't reachable yet: pop-up 23
+    // (Install Oblivion on a computer) isn't placed on any page and the Setup › Hubs list (15p) isn't
+    // built, so this is still the only place to get the Obli installer for a staff computer.
     Route::get('/agent-downloads', [EndpointDownloadsController::class, 'index'])
         ->middleware('permission:securityDevices.commands.admin|securityDevices.integrations.manage')
         ->name('security-devices.agent-downloads.index');
@@ -206,6 +218,16 @@ Route::middleware([
     Route::post('/devices/move', [DevicesController::class, 'move'])
         ->middleware(['permission:securityDevices.devices.assign', 'throttle:20,1'])
         ->name('security-devices.devices.move');
+
+    // S&D rebuild C6: the bulk bar's governed actions for the ticked devices. Running one posts to
+    // /command-batches below (same keys), so every batch check stays in one place.
+    Route::get('/devices/bulk-actions', [BulkActionsController::class, 'options'])
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin',
+            'throttle:30,1',
+        ])
+        ->name('security-devices.devices.bulk-actions');
 
     Route::get('/scans/{run}', [FoundDevicesController::class, 'show'])
         ->whereNumber('run')
@@ -449,7 +471,9 @@ Route::middleware([
         ])
         ->name('security-devices.command-batches.store');
 
-    Route::get('/command-batches/{batch}', [DeviceCommandBatchController::class, 'show'])
+    // S&D rebuild C6 (Drop): the batch page goes; results are in each device's logbook. Starting,
+    // approving, sending and exporting a batch stay on their routes (no new screen does them yet).
+    Route::get('/command-batches/{batch}', [RetiredPagesController::class, 'commandBatch'])
         ->middleware('permission:securityDevices.commands.observe|securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin')
         ->name('security-devices.command-batches.show');
 
@@ -697,38 +721,29 @@ Route::middleware([
         Route::put('/scald-watch', [CareLinkController::class, 'scaldWatch'])->name('security-devices.devices.scald-watch');
     });
 
-    Route::get('/network-it', [CategoryPageController::class, 'networkIt'])
-        ->middleware('permission:securityDevices.devices.view')
-        ->name('security-devices.network-it');
+    // ── S&D rebuild C6: the old pages send people to the six-entry menu ──
+    // Each keeps its name and permission; RetiredPagesController only redirects the page view.
+    // The five workspaces (Drop) → the matching Devices tab; the global map → each Site's Network map.
+    Route::middleware('permission:securityDevices.devices.view')->group(function (): void {
+        Route::get('/network-it', [RetiredPagesController::class, 'networkIt'])->name('security-devices.network-it');
+        Route::get('/security', [RetiredPagesController::class, 'security'])->name('security-devices.security');
+        // Stephan, 1 Nov: Health kit becomes a Devices › Sensors filter; trackers are Fleet's, read-only here.
+        Route::get('/healthcare', [RetiredPagesController::class, 'healthcare'])->name('security-devices.healthcare');
+        Route::get('/tracking', [RetiredPagesController::class, 'tracking'])->name('security-devices.tracking');
+        Route::get('/facilities-iot', [RetiredPagesController::class, 'facilitiesIot'])->name('security-devices.facilities-iot');
 
-    Route::get('/security', [CategoryPageController::class, 'security'])
-        ->middleware('permission:securityDevices.devices.view')
-        ->name('security-devices.security');
+        // The 7 old category links (Keep redirects), now straight to the matching Devices tab.
+        Route::get('/alarms', [RetiredPagesController::class, 'alarms'])->name('security-devices.alarms');
+        Route::get('/cctv', [RetiredPagesController::class, 'cctv'])->name('security-devices.cctv');
+        Route::get('/access-control', [RetiredPagesController::class, 'accessControl'])->name('security-devices.access-control');
+        Route::get('/tracking-devices', [RetiredPagesController::class, 'trackingDevices'])->name('security-devices.tracking-devices');
+        Route::get('/smart-iot-healthcare', [RetiredPagesController::class, 'smartIotHealthcare'])->name('security-devices.smart-iot-healthcare');
+        Route::get('/it-infrastructure', [RetiredPagesController::class, 'itInfrastructure'])->name('security-devices.it-infrastructure');
+        Route::get('/facilities', [RetiredPagesController::class, 'facilities'])->name('security-devices.facilities');
+    });
 
-    Route::get('/healthcare', [CategoryPageController::class, 'healthcare'])
-        ->middleware('permission:securityDevices.devices.view')
-        ->name('security-devices.healthcare');
-
-    Route::get('/tracking', [CategoryPageController::class, 'tracking'])
-        ->middleware('permission:securityDevices.devices.view')
-        ->name('security-devices.tracking');
-
-    Route::get('/facilities-iot', [CategoryPageController::class, 'facilitiesIot'])
-        ->middleware('permission:securityDevices.devices.view')
-        ->name('security-devices.facilities-iot');
-
-    // ── Legacy category compatibility redirects ──────────────────
-    // Route names remain stable, while the controller preserves filters and
-    // device context when moving users into the matching canonical local tab.
-
-    Route::get('/alarms', [CategoryPageController::class, 'alarms'])
-        ->name('security-devices.alarms');
-
-    Route::get('/cctv', [CategoryPageController::class, 'cctv'])
-        ->name('security-devices.cctv');
-
-    Route::get('/access-control', [CategoryPageController::class, 'accessControl'])
-        ->name('security-devices.access-control');
+    // Today's local door schedules and cards (not sent to UniFi). Kept: the Access page has no
+    // screen for these local records yet (the plan's data move matches them to UniFi first).
 
     Route::post('/access-control/schedules', [AccessControlController::class, 'storeSchedule'])
         ->middleware('permission:securityDevices.accessControl.manage')
@@ -750,27 +765,19 @@ Route::middleware([
         ->middleware('permission:securityDevices.accessControl.manage')
         ->name('security-devices.access-control.credentials.revoke');
 
-    Route::get('/tracking-devices', [CategoryPageController::class, 'trackingDevices'])
-        ->name('security-devices.tracking-devices');
-
-    Route::get('/smart-iot-healthcare', [CategoryPageController::class, 'smartIotHealthcare'])
-        ->name('security-devices.smart-iot-healthcare');
-
-    Route::get('/it-infrastructure', [CategoryPageController::class, 'itInfrastructure'])
-        ->name('security-devices.it-infrastructure');
-
-    Route::get('/facilities', [CategoryPageController::class, 'facilities'])
-        ->name('security-devices.facilities');
-
     // ── Operations pages (specific permission gates) ──────────────
 
     // ── Device Groups ───────────────────────────────────────────
+    // S&D rebuild C6 (D8, Fold in): the group pages go; each group is a filter on Devices
+    // (Devices › "Any group"), rooms are on the Site page. The tables stay, read-only for one
+    // release: no screen writes to them any more. The write routes below are kept, unused, until
+    // Stephan says yes to dropping the tables (decision for him, not removed here).
 
-    Route::get('/device-groups', [DeviceGroupController::class, 'index'])
+    Route::get('/device-groups', [RetiredPagesController::class, 'deviceGroups'])
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups');
 
-    Route::get('/device-groups/create', [DeviceGroupController::class, 'create'])
+    Route::get('/device-groups/create', [RetiredPagesController::class, 'deviceGroups'])
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.create');
 
@@ -782,7 +789,7 @@ Route::middleware([
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.auto-rules.preview-draft');
 
-    Route::get('/device-groups/{group}', [DeviceGroupController::class, 'show'])
+    Route::get('/device-groups/{group}', [RetiredPagesController::class, 'deviceGroups'])
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.show');
 
@@ -792,7 +799,7 @@ Route::middleware([
         ->missing(static fn () => DeviceGroupController::previewUnavailable(404))
         ->name('security-devices.device-groups.maintenance-policy-preview');
 
-    Route::get('/device-groups/{group}/edit', [DeviceGroupController::class, 'edit'])
+    Route::get('/device-groups/{group}/edit', [RetiredPagesController::class, 'deviceGroups'])
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.edit');
 
@@ -823,11 +830,13 @@ Route::middleware([
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.auto-rules.sync');
 
-    Route::get('/alerts-events', [AlertsEventsController::class, 'index'])
+    // S&D rebuild C6: /alerts-events and /monitoring are rebuilt as Alerts. Their JSON reads
+    // (monitor history, runtime health) and write endpoints (native monitors, dead letters) stay.
+    Route::get('/alerts-events', [RetiredPagesController::class, 'alerts'])
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.alerts-events');
 
-    Route::get('/monitoring', MonitoringOperationsController::class)
+    Route::get('/monitoring', [RetiredPagesController::class, 'alerts'])
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.monitoring');
 
@@ -874,11 +883,13 @@ Route::middleware([
                 ->name('security-devices.monitoring.dead-letters.discard');
         });
 
-    Route::get('/maintenance-health', [MaintenanceHealthController::class, 'index'])
+    // S&D rebuild C6 (Merge): both maintenance pages → Devices › Upkeep. Recording maintenance
+    // (below) stays: the old device profile (?section=maintenance) still uses it.
+    Route::get('/maintenance-health', [RetiredPagesController::class, 'maintenance'])
         ->middleware('permission:securityDevices.maintenance.view')
         ->name('security-devices.maintenance-health');
 
-    Route::get('/maintenance', MaintenanceOperationsController::class)
+    Route::get('/maintenance', [RetiredPagesController::class, 'maintenance'])
         ->middleware('permission:securityDevices.maintenance.view')
         ->name('security-devices.maintenance');
 
@@ -894,11 +905,16 @@ Route::middleware([
         ->middleware('permission:securityDevices.maintenance.manage')
         ->name('security-devices.maintenance.complete');
 
-    Route::get('/integrations', IntegrationsHubController::class)
+    // S&D rebuild C6: the integrations hub → Setup › Connected services. Each service's own page
+    // (UniFi, Queclink, Milesight, Intune, below) stays and opens from its Connected services card:
+    // the service panels that replace them aren't built yet.
+    Route::get('/integrations', [RetiredPagesController::class, 'integrations'])
         ->middleware('permission:securityDevices.integrations.view')
         ->name('security-devices.integrations');
 
-    Route::get('/discovery', DiscoveryCollectorController::class)
+    // S&D rebuild C6: Discovery & collectors → Setup › Hubs & networks. Its scope, candidate and
+    // collector endpoints stay (Found devices and the hub pop-ups use them).
+    Route::get('/discovery', [RetiredPagesController::class, 'hubsAndNetworks'])
         ->middleware('permission:securityDevices.integrations.view')
         ->name('security-devices.discovery');
 
@@ -1010,7 +1026,11 @@ Route::middleware([
             ->name('security-devices.hubs.panel');
     });
 
-    Route::get('/settings', SettingsAuditController::class)
+    // S&D rebuild C6: Settings & audit → Setup (Alert rules, Checks, Saved logins, Change history).
+    // Same people as before; Setup checks its own sections. The monitoring-policy and
+    // credential-reference endpoints below stay (no screen of the new Setup replaces them yet).
+    Route::get('/settings', [RetiredPagesController::class, 'settings'])
+        ->middleware('permission:securityDevices.groups.manage|securityDevices.reports.view|securityDevices.commands.admin|securityDevices.monitoring.manage')
         ->name('security-devices.settings');
 
     // Rebuilt as Setup › Services & logins › Supported devices (C5).

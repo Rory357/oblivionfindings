@@ -411,7 +411,7 @@ export default function Api() {
                                     </div>
                                 </div>
                                 <Button asChild variant="outline">
-                                    <Link href="/security-devices/integrations">
+                                    <Link href="/security-devices/setup/services?tab=connected">
                                         Open Security & Devices
                                     </Link>
                                 </Button>

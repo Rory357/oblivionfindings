@@ -1064,6 +1064,10 @@ app(Schedule::class)->command('security-devices:door-clockins-tick')->everyMinut
 // Rows that aren't time records go at 90 days, like the names on door events (D14).
 app(Schedule::class)->command('security-devices:door-clockins-tick --prune')->dailyAt('03:50')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 
+// S&D rebuild pg-sdr-18b: last month's report by email on the 1st, 7:00 am NZ (off until turned on in Overview › Reports).
+// Hourly on the 1st to the 3rd, so a run missed at 7 am is caught up; the command sends each month once.
+app(Schedule::class)->command('security-devices:monthly-report-email')->cron('5 * 1-3 * *')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+
 // S&D Phase G (G1): nightly settings backups through the governed request and the Site's hub (off until someone is named).
 app(Schedule::class)->command('security-devices:nightly-settings-backups')->everyTenMinutes()
     ->between(...App\Domain\SecurityDevices\NetworkConfig\Services\NightlySettingsBackups::window())

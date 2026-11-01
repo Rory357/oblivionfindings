@@ -119,15 +119,6 @@ it('keeps Control Room Device pages focused on signal activity instead of duplic
         ->not->toContain('Low Battery');
 });
 
-it('keeps Security and Devices command batch navigation free of inert hash targets', function () {
-    $root = str_replace('\\', '/', dirname(__DIR__, 2));
-    $batchPage = file_get_contents($root.'/resources/js/pages/security-devices/command-batches/show.tsx');
-
-    expect($batchPage)
-        ->not->toContain("href: '#'")
-        ->not->toContain('href="#"');
-});
-
 it('keeps Device assignment history in the canonical Device profile payload only', function () {
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
     $routes = file_get_contents($root.'/routes/security-devices.php');
@@ -1012,7 +1003,6 @@ it('pins the exact compatibility evidence files excluded from active source scan
         'tests/Feature/Monitoring/MonitoringObservationProvenanceReconciliationTest.php',
         'tests/Feature/Monitoring/MonitoringSchemaTest.php',
         'tests/Feature/Monitoring/RuntimeEnvelopePersistenceTest.php',
-        'resources/js/components/security-devices/collector-installation-profile.test.ts',
         'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php',
         'tests/Feature/SecurityDevices/HikvisionDiscoveryTest.php',
         'tests/Unit/SecurityDevices/HikvisionDiscoveryMigrationTest.php',
@@ -1496,12 +1486,7 @@ function itSecurityCompatibilityEvidenceFingerprints(): array
         // no-effect assertions changed; the three legacy storage writes remain.
         'tests/Feature/Monitoring/MonitoringSchemaTest.php' => '3159c9921ee8f28862c9234c2386233d249ab011919c709b793f2c5f3db2a6cd',
         'tests/Feature/Monitoring/RuntimeEnvelopePersistenceTest.php' => 'af83c6c0b9e9cd1dcd91aa27740df2a2ebaad85462926a9a49b3878751aeada2',
-        // Reviewed 23 Oct 2026: each mention is a single-tenant negative check —
-        // a request carrying tenant_id is rejected (400 / invalid profile), a
-        // response has no tenant_id key, or a migration's SQL contains neither
-        // tenant_id nor organization_id. No tenant storage or comparison.
-        'resources/js/components/security-devices/collector-installation-profile.test.ts' => 'cd5256ee9c0fa8510d1d6c7956c14290ef5cec982a0db1cc20ac69dd09ab8184',
-        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php' => '45cb962c87812d1a51f9d32135f6e5ac763a14ee845f56460d5f6f6a2ab591c9',
+        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php' => '7806861b4bfebd475b15fcfbff40439ee20f40e20deb55d6fa79f29b64523a69',
         'tests/Feature/SecurityDevices/HikvisionDiscoveryTest.php' => '9f8026a7a883a95d888572e0a5fcadb54c161c59f169d66ec0587e871bb52360',
         'tests/Unit/SecurityDevices/HikvisionDiscoveryMigrationTest.php' => '0953f8d830067600a33153b476e216f726fe0a42ae7da6af5b9eba865dc98866',
         'tests/Unit/SecurityDevices/HikvisionSourceMigrationTest.php' => '150ebfb00b38ee3d835bf80898e7d3868c50228ccfc30bb79960fcd7d66e444d',

@@ -9,6 +9,8 @@ use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Hubs\Services\HubActionRules;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Domain\SecurityDevices\Reports\MonthlyReport;
+use App\Domain\SecurityDevices\Reports\MonthlyReportEmail;
 use App\Domain\SecurityDevices\Screens\Alerts\AlertsPresenter;
 use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Screens\DeviceState;
@@ -25,14 +27,14 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
- * Security & devices home (S&D rebuild drawings pg-sdr-1 with its first-time view 1b, and the
- * Trends tab pg-sdr-18). Scoped by SecurityDevicesAccessService. The support worker's view (1c) is
- * WorkerOverviewPresenter (see showsWorkerView); the Reports tab (18b) comes later; the Activity tab
- * (18c) waits for its drawing's approval.
+ * Security & devices home (S&D rebuild drawings pg-sdr-1 with its first-time view 1b, the Trends
+ * tab pg-sdr-18 and the Reports tab 18b). Scoped by SecurityDevicesAccessService. The support
+ * worker's view (1c) is WorkerOverviewPresenter (see showsWorkerView); Reports is for people who
+ * may see reports (MonthlyReport); the Activity tab (18c) waits for its drawing's approval.
  */
 final class OverviewPresenter
 {
-    public const array TABS = ['overview', 'trends'];
+    public const array TABS = ['overview', 'trends', 'reports'];
 
     /**
      * The keys of people who look after devices (IT, managers, facilities, H&S, auditors). Someone with
@@ -70,15 +72,20 @@ final class OverviewPresenter
         private readonly CoveringHubResolver $hubs,
         private readonly ControlRoomAlertAccessService $alertAccess,
         private readonly SitesIndexPresenter $sites,
+        private readonly MonthlyReport $reports,
+        private readonly MonthlyReportEmail $reportEmail,
     ) {}
 
     /**
-     * @param  array{tab?: mixed, site?: mixed}  $input
+     * @param  array{tab?: mixed, site?: mixed, month?: mixed}  $input
      * @return array<string, mixed>
      */
     public function present(User $viewer, array $input): array
     {
         $tab = in_array($input['tab'] ?? null, self::TABS, true) ? $input['tab'] : 'overview';
+        if ($tab === 'reports' && ! MonthlyReport::canView($viewer)) {
+            $tab = 'overview';
+        }
         $siteId = is_scalar($input['site'] ?? null) && ctype_digit((string) $input['site']) ? (int) $input['site'] : null;
         if ($siteId !== null) {
             $this->access->assertCanViewSite($viewer, $siteId);
@@ -107,7 +114,13 @@ final class OverviewPresenter
             'meters' => $this->meters($entries, $alerts),
             'overview' => $tab === 'overview' && ! $firstTime ? $this->overview($viewer, $entries, $hubs, $alerts, $siteId) : null,
             'trends' => $tab === 'trends' ? $this->trends($viewer, $entries, $alerts) : null,
+            // pg-sdr-18b: the monthly report for managers and the board, with its email switch.
+            'reports' => $tab === 'reports' ? [
+                ...$this->reports->present($viewer, $siteId, $input['month'] ?? null, $entries),
+                'email' => $this->reportEmail->forViewer($viewer, CarbonImmutable::now('UTC')),
+            ] : null,
             'can' => [
+                'reports' => MonthlyReport::canView($viewer),
                 'add' => $viewer->canDo('securityDevices.devices.create'),
                 'scan' => $viewer->canDo('securityDevices.integrations.manage'),
                 'connect' => $viewer->canDo('securityDevices.integrations.manage'),

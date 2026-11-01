@@ -259,18 +259,12 @@ class Phase1DeviceBasicsTest extends TestCase
         $this->assertFalse((bool) $monitor->fresh()->is_enabled);
     }
 
-    public function test_monitoring_workspace_exposes_always_visible_add_check_missing_reason_when_no_site_devices_exist(): void
+    public function test_monitoring_workspace_is_rebuilt_as_alerts(): void
     {
-        $response = $this->actingAs($this->admin)
+        // S&D rebuild C6: the monitoring workspace and its Add check panel are gone; checks are set
+        // on each device (Watch this device) and listed in Setup › Alerts & checks › Checks.
+        $this->actingAs($this->admin)
             ->get('/security-devices/monitoring')
-            ->assertOk();
-
-        $props = $response->viewData('page')['props'];
-        $management = $props['workspace']['monitor_management'];
-
-        $this->assertTrue($management['can_manage']);
-        $this->assertSame([], $management['devices']);
-        $this->assertNotEmpty($management['missing_reason']);
-        $this->assertSame('/security-devices/devices', $management['fix_href']);
+            ->assertRedirect('/security-devices/alerts');
     }
 }

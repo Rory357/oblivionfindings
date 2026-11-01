@@ -256,6 +256,8 @@ export type AlertsProps = {
         report_incident: boolean;
         /** securityDevices.automations.manage: add, change, test, turn off and remove automations. */
         add_automation?: boolean;
+        /** pg-sdr-18b: Export (device events, last 90 days), for people who may see reports. */
+        export?: boolean;
     };
     /** Optional, loaded when Quiet time or Add alert rule opens. */
     alertDevices?: PickableDevice[];

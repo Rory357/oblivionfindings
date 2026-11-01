@@ -85,7 +85,8 @@ enum DeviceKind: string
             in_array($sub, ['switch', 'poe_switch'], true) => self::Switch,
             in_array($sub, ['router', 'gateway', 'firewall'], true) => self::Router,
             in_array($sub, ['wireless_ap', 'access_point', 'wifi'], true) => self::WifiPoint,
-            in_array($sub, ['nvr', 'dvr', 'recorder'], true) => self::Recorder,
+            // IT infrastructure's own recorders (NVR, DVR, video server) are recorders too, not "Other".
+            in_array($sub, ['nvr', 'dvr', 'recorder', 'nvr_infrastructure', 'dvr_infrastructure', 'video_server'], true) || $category === 'recording' => self::Recorder,
             $category === 'cctv' || str_contains($sub, 'camera') => self::Camera,
             in_array($category, ['alarm', 'alarm_panel', 'intrusion'], true) || str_contains($sub, 'alarm') => self::AlarmPanel,
             in_array($category, ['access_control', 'door'], true) || str_contains($sub, 'door') || str_contains($sub, 'reader') => self::Door,

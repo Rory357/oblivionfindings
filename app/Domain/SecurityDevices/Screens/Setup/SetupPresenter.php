@@ -56,8 +56,10 @@ final class SetupPresenter
 
     public static function canOpen(User $viewer): bool
     {
+        // S&D rebuild C6: Change history counts too, so the people who read the old Settings & audit
+        // (reports.view) still reach its change history now that page sends them here.
         return self::canSeeServices($viewer) || self::canSeeAlerts($viewer) || self::canSeeAccess($viewer) || SetupRemoteSupport::canSee($viewer)
-            || \App\Domain\Obli\Fixes\Screens\SetupObli::canSee($viewer);
+            || \App\Domain\Obli\Fixes\Screens\SetupObli::canSee($viewer) || self::canSeeHistory($viewer);
     }
 
     public static function canSeeServices(User $viewer): bool

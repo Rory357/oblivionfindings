@@ -34,6 +34,7 @@ import { ChangeHistory } from './_history';
 import { SetupNetworks } from './_networks';
 import { SetupOverview } from './_overview';
 import { SetupRemote } from './_remote';
+import { ServerCheck } from './_server-check';
 import { SetupObli } from './_obli';
 import { SetupFixes } from './_fixes';
 import { ConnectedServices, SavedLogins, SupportedDevices } from './_services';
@@ -189,6 +190,7 @@ export default function SetupPage(props: SetupProps) {
                         }}
                     />
                 ) : null}
+                {can.server_check ? <ServerCheck /> : null}
                 {props.connected ? <ConnectedServices data={props.connected} query={query} now={now} onConnect={can.manage ? () => setConnecting(true) : undefined} /> : null}
                 {props.logins ? <SavedLogins data={props.logins} query={query} now={now} /> : null}
                 {props.supported ? <SupportedDevices data={props.supported} query={query} canOpenDevices={can.open_devices} /> : null}

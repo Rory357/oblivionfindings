@@ -82,7 +82,7 @@ class ClientProfileHealthcareDevicesPresenter
             'truncated' => $workspace['activeTab']['inventoryTruncated'],
             'permissions' => $workspace['permissions'],
             'links' => [
-                'healthcare' => '/security-devices/healthcare?tab=client-devices',
+                'healthcare' => '/security-devices/devices?tab=sensors&group=health',
                 'clinical' => $canViewClinical
                     ? "/operations/clients/{$client->getKey()}?tab=health_monitoring"
                     : null,

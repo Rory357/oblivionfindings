@@ -35,9 +35,23 @@ final class SetupController extends Controller
     public function show(Request $request, ?string $section = null): Response
     {
         $user = $this->viewer($request);
+        $props = $this->setup->present($user, $section ?? 'overview', $request->query('tab'), ['page' => $request->query('page')]);
+        // S&D rebuild C6 ("Keep, move"): Settings › Server readiness as a Server check card on Hubs &
+        // networks › Networks & scans, for admins only (settings.access.manage, as that page). It loads
+        // after the page so the live checks never hold Setup up.
+        $serverCheck = $props['section'] === 'hubs' && $props['tab'] === 'networks' && $user->canDo('settings.access.manage');
 
         return Inertia::render('security-devices/setup/index', [
-            ...$this->setup->present($user, $section ?? 'overview', $request->query('tab'), ['page' => $request->query('page')]),
+            ...$props,
+            'can' => [...$props['can'], 'server_check' => $serverCheck],
+            'server_check' => $serverCheck
+                ? Inertia::defer(fn (): array => app(\App\Services\System\ServerReadinessService::class)->evaluate(true))
+                : null,
+            // S&D rebuild C6 gap: the old Monitoring page's runtime health (service heartbeat, work
+            // waiting, failed deliveries, outage watchdog) on the same card, same admins, own load.
+            'server_health' => $serverCheck
+                ? Inertia::defer(fn (): array => app(\App\Domain\SecurityDevices\Screens\Setup\ServerHealth::class)->present($user), 'server-health')
+                : null,
             // Add a network loads its Site and hub choices only when it opens.
             'deviceForm' => Inertia::optional(fn (): array => $this->formOptions->present($user)),
         ]);

@@ -129,13 +129,18 @@ export type DevicesCan = {
     move: boolean;
     retire: boolean;
     watch: boolean;
+    /** pg-sdr-18b: Export (the device list and upkeep log CSVs), for people who may see reports. */
+    export?: boolean;
+    /** S&D rebuild C6: the bulk bar's "Run action" (the keys that may start a command batch). */
+    commands?: boolean;
 };
 
 export type DevicesIndexProps = {
     tab: DevicesTab;
     layout: 'cards' | 'list';
     upkeep: 'batteries' | 'updates';
-    filters: { site: string; status: string; q: string };
+    /** `group`: "all", "health" (Health kit) or a device group's id (S&D rebuild C6). Optional for older fixtures. */
+    filters: { site: string; status: string; group?: string; q: string };
     tabs: { key: DevicesTab; count: number | null }[];
     meters: {
         online: Meter;
@@ -145,6 +150,8 @@ export type DevicesIndexProps = {
     };
     sites: { value: string; label: string }[];
     statuses: { value: string; label: string }[];
+    /** Health kit and today's device groups (D8), read-only; empty when there are none. */
+    groups?: { value: string; label: string }[];
     can: DevicesCan;
     cards: {
         groups: CardGroup[];

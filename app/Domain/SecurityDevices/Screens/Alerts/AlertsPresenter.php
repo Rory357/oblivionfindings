@@ -128,6 +128,8 @@ final class AlertsPresenter
                 'add_rule' => $viewer->canDo('securityDevices.monitoring.manage'),
                 'report_incident' => $viewer->canDo('incidents.create'),
                 'add_automation' => AutomationsPresenter::canManage($viewer),
+                // pg-sdr-18b: Export (the device events CSV that Reports had), same key as before.
+                'export' => $viewer->canDo('securityDevices.reports.view'),
             ],
         ];
     }

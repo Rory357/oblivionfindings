@@ -65,6 +65,8 @@ final class DevicesController extends Controller
             'upkeep' => $request->query('upkeep'),
             'site' => $request->query('site') ?? $request->query('site_id'),
             'status' => $request->query('status') ?? self::LEGACY_VIEW_STATUS[(string) $request->query('view')] ?? null,
+            // S&D rebuild C6: Health kit and today's device groups (D8) as a filter.
+            'group' => $request->query('group') ?? ($request->query('domain') === 'iot_healthcare' ? 'health' : null),
             'q' => $request->query('q') ?? $request->query('search'),
             'page' => $request->query('page'),
         ];

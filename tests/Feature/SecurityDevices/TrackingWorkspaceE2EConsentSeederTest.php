@@ -17,7 +17,10 @@ use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Database\Seeders\StandardConsentTypesSeeder;
 use Database\Seeders\TrackingWorkspaceE2EConsentSeeder;
 use Illuminate\Support\Facades\DB;
+use Tests\Feature\SecurityDevices\Concerns\ReadsRetiredWorkspaceProps;
 use Tests\Support\AuthoritativeConsentFixture;
+
+uses(ReadsRetiredWorkspaceProps::class);
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -114,8 +117,9 @@ it('repairs the exact legacy synthetic self-decisions while preserving withdrawn
         ->and(DB::table('role_user')->count())->toBe($roleCount)
         ->and(DB::table('permission_user')->count())->toBe($overrideCount);
 
-    $this->actingAs($this->trackingAdmin)
-        ->get('/security-devices/tracking?tab=personal-safety')
+    // S&D rebuild C6: the Tracking workspace redirects to Devices › Trackers; its presenter still
+    // feeds the Control Room map, so its privacy projection is read straight from it.
+    $this->retiredWorkspace($this->trackingAdmin, 'tracking', 'tab=personal-safety')
         ->assertOk()->assertInertia(function ($page) use ($current, $withdrawnAssignment, $stopped): void {
             $props = $page->toArray()['props'];
             $rows = collect($props['trackingWorkspace']['activeTab']['devices']);
@@ -143,7 +147,7 @@ it('repairs the exact legacy synthetic self-decisions while preserving withdrawn
         ->where('location.trackingRestricted', false)
         ->where('location.tracker.id', $current->device_id)
         ->where('location.tracker.detail_url', '/security-devices/devices/'.$current->device_id)
-        ->where('location.tracker.tracking_workspace_url', '/security-devices/tracking?tab=personal-safety')
+        ->where('location.tracker.tracking_workspace_url', '/security-devices/devices?tab=trackers')
         ->where('location.trackingConsent.status', 'given')
         ->where('location.accessFingerprint', fn ($value): bool => is_string($value) && $value !== ''));
     $this->getJson("/operations/clients/{$this->trackingActive->id}/location/privacy-status")

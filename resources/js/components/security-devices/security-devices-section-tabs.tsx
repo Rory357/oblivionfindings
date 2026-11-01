@@ -4,173 +4,84 @@ import {
 } from '@/components/page/grouped-profile-nav';
 import type { SecurityDevicesPermissions } from '@/components/security-devices/security-devices-navigation';
 import { Link, router, usePage } from '@inertiajs/react';
-import {
-    Activity,
-    BatteryWarning,
-    Bell,
-    Cpu,
-    Download,
-    Plug,
-    Radar,
-    Server,
-    Settings,
-    Wrench,
-} from 'lucide-react';
+import { Cpu, Download, Plug, Settings } from 'lucide-react';
 
-export type SecurityDevicesAlertsTabKey =
-    | 'monitoring'
-    | 'alerts-events'
-    | 'maintenance'
-    | 'maintenance-health';
-
+/**
+ * The tabs above the Setup pages that aren't part of the new Setup yet: the Obli downloads and each
+ * connected service's own page. S&D rebuild C6: the old Discovery, Integrations and Settings & audit
+ * pages are gone (they redirect into Setup), so these tabs point at their new homes. The old
+ * "Alerts & upkeep" tabs went with the pages they joined up.
+ */
 export type SecurityDevicesSetupTabKey =
-    | 'discovery'
+    | 'setup'
     | 'integrations'
     | 'supported-devices'
-    | 'agent-downloads'
-    | 'settings'
-    | 'server-readiness';
+    | 'agent-downloads';
 
 type SectionPageProps = {
     auth?: {
         can?: {
             securityDevices?: SecurityDevicesPermissions;
-            settings?: {
-                manageAccess?: boolean;
-            };
         };
     };
 };
 
-export function SecurityDevicesSectionTabs(
-    props:
-        | {
-              section: 'alerts-upkeep';
-              activeTab: SecurityDevicesAlertsTabKey;
-          }
-        | {
-              section: 'setup';
-              activeTab: SecurityDevicesSetupTabKey;
-          },
-) {
+export function SecurityDevicesSectionTabs(props: {
+    section: 'setup';
+    activeTab: SecurityDevicesSetupTabKey;
+}) {
     const page = usePage<SectionPageProps>();
     const sd = page?.props?.auth?.can?.securityDevices ?? {};
-    const canManageSettings = Boolean(
-        page?.props?.auth?.can?.settings?.manageAccess,
-    );
+    const seesServices = Boolean(sd.integrationsView || sd.integrationsManage);
 
-    const tabs: GroupedProfileNavTab[] =
-        props.section === 'alerts-upkeep'
+    const tabs: GroupedProfileNavTab[] = [
+        ...(sd.setupOpen
             ? [
-                  ...(sd.eventsView
-                      ? [
-                            {
-                                key: 'monitoring',
-                                label: 'Monitors',
-                                href: '/security-devices/monitoring',
-                                icon: Activity,
-                            },
-                            {
-                                key: 'alerts-events',
-                                label: 'Events',
-                                href: '/security-devices/alerts-events',
-                                icon: Bell,
-                            },
-                        ]
-                      : []),
-                  ...(sd.maintenanceView || sd.maintenanceManage
-                      ? [
-                            {
-                                key: 'maintenance',
-                                label: 'Maintenance',
-                                href: '/security-devices/maintenance',
-                                icon: Wrench,
-                            },
-                            {
-                                key: 'maintenance-health',
-                                label: 'Upkeep & battery',
-                                href: '/security-devices/maintenance-health',
-                                icon: BatteryWarning,
-                            },
-                        ]
-                      : []),
+                  {
+                      key: 'setup',
+                      label: 'Setup',
+                      href: '/security-devices/setup',
+                      icon: Settings,
+                  },
               ]
-            : [
-                  ...(sd.integrationsView
-                      ? [
-                            {
-                                key: 'discovery',
-                                label: 'Discovery & hubs',
-                                href: '/security-devices/discovery',
-                                icon: Radar,
-                            },
-                            {
-                                key: 'integrations',
-                                label: 'Integrations',
-                                href: '/security-devices/integrations',
-                                icon: Plug,
-                            },
-                        ]
-                      : []),
-                  ...(sd.integrationsView || sd.integrationsManage
-                      ? [
-                            {
-                                key: 'supported-devices',
-                                label: 'Supported devices',
-                                href: '/security-devices/setup/services?tab=supported',
-                                icon: Cpu,
-                            },
-                        ]
-                      : []),
-                  ...(sd.commandsAdmin || sd.integrationsManage
-                      ? [
-                            {
-                                key: 'agent-downloads',
-                                label: 'Downloads',
-                                href: '/security-devices/agent-downloads',
-                                icon: Download,
-                            },
-                        ]
-                      : []),
-                  ...(sd.groupsManage ||
-                  sd.reportsView ||
-                  sd.commandsAdmin ||
-                  sd.monitoringManage
-                      ? [
-                            {
-                                key: 'settings',
-                                label: 'Settings & audit',
-                                href: '/security-devices/settings',
-                                icon: Settings,
-                            },
-                        ]
-                      : []),
-                  ...(canManageSettings
-                      ? [
-                            {
-                                key: 'server-readiness',
-                                label: 'Server readiness',
-                                href: '/settings/server-readiness',
-                                icon: Server,
-                            },
-                        ]
-                      : []),
-              ];
+            : []),
+        ...(seesServices
+            ? [
+                  {
+                      key: 'integrations',
+                      label: 'Connected services',
+                      href: '/security-devices/setup/services?tab=connected',
+                      icon: Plug,
+                  },
+                  {
+                      key: 'supported-devices',
+                      label: 'Supported devices',
+                      href: '/security-devices/setup/services?tab=supported',
+                      icon: Cpu,
+                  },
+              ]
+            : []),
+        ...(sd.commandsAdmin || sd.integrationsManage
+            ? [
+                  {
+                      key: 'agent-downloads',
+                      label: 'Downloads',
+                      href: '/security-devices/agent-downloads',
+                      icon: Download,
+                  },
+              ]
+            : []),
+    ];
 
     if (tabs.length <= 1) {
         return null;
     }
 
-    const ariaLabel =
-        props.section === 'alerts-upkeep'
-            ? 'Alerts & upkeep sections'
-            : 'Setup sections';
-
     return (
         <TierTwoTabs
             tabs={tabs}
             activeTab={props.activeTab}
-            ariaLabel={ariaLabel}
+            ariaLabel="Setup sections"
             testIdPrefix={`sd-${props.section}`}
             onTab={(key) => {
                 const target = tabs.find((item) => item.key === key);

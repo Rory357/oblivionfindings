@@ -256,7 +256,7 @@ export function AddDeviceChooser({
                 if (!picked) return;
                 if (picked.value === 'service') {
                     if (onConnect) onConnect();
-                    else router.visit('/security-devices/integrations');
+                    else router.visit('/security-devices/setup/services?tab=connected');
                     return;
                 }
                 onChoose(picked.value);

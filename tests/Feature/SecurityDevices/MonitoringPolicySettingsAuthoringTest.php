@@ -15,11 +15,13 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\SecurityDevices\Concerns\ReadsRetiredWorkspaceProps;
 use Tests\TestCase;
 
 class MonitoringPolicySettingsAuthoringTest extends TestCase
 {
     use RefreshDatabase;
+    use ReadsRetiredWorkspaceProps;
 
     protected function setUp(): void
     {
@@ -39,11 +41,13 @@ class MonitoringPolicySettingsAuthoringTest extends TestCase
 
         $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
         $manager = $this->siteManager($site);
-        $this->actingAs($manager)
-            ->get('/security-devices/settings')
+        // S&D rebuild C6: Settings & audit redirects to Setup › Alerts & checks; the policy projection
+        // it showed is read straight from its presenter.
+        $this->actingAs($manager)->get('/security-devices/settings?tab=monitoring')->assertRedirect('/security-devices/setup/alerts');
+        $this->assertTrue($manager->canDo('securityDevices.monitoring.manage'));
+        $this->retiredSettingsAudit($manager)
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('auth.can.securityDevices.monitoringManage', true)
                 ->where('monitoringPolicyWorkspace.can_manage', true)
                 ->where('monitoringPolicyWorkspace.can_manage_application', false));
 
@@ -214,8 +218,7 @@ class MonitoringPolicySettingsAuthoringTest extends TestCase
             ->assertJsonPath('policy.version', 3)
             ->assertJsonPath('policy.state', 'active');
 
-        $this->actingAs($admin)
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($admin)
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $workspace = $page->toArray()['props']['monitoringPolicyWorkspace'];

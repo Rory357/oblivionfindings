@@ -2,6 +2,8 @@
 import type { StatusVariant } from '@/components/ui/status-badge';
 import type { SetupClockinsData } from '@/lib/security-devices/door-clockins';
 import type { ObliFixesSetupData, ObliSetupData } from '@/lib/security-devices/obli-fixes';
+import type { ServerReadinessPayload } from '@/pages/settings/server-readiness';
+import type { ServerHealthPayload } from './_server-check';
 
 export type SetupSection = 'overview' | 'hubs' | 'services' | 'alerts' | 'access' | 'computers' | 'history';
 
@@ -125,6 +127,8 @@ export type ServiceCard = {
     sub: string;
     flag: { tone: StatusVariant; text: string };
     facts: SetupLine[];
+    /** S&D rebuild C6: today's settings page for this service, until its panel is built (integrations.manage only). */
+    href?: string | null;
 };
 
 export type LoginRow = {
@@ -170,7 +174,12 @@ export type SetupProps = {
     tab: string | null;
     sections: { key: SetupSection; label: string; tabs: { key: string; label: string }[] }[];
     meters: SetupMeter[];
-    can: { manage: boolean; add_network: boolean; add_hub: boolean; approve_hubs: boolean; export_history: boolean; open_devices: boolean };
+    /** `server_check`: S&D rebuild C6, the Server check card on Hubs & networks › Networks & scans (admins). */
+    can: { manage: boolean; add_network: boolean; add_hub: boolean; approve_hubs: boolean; export_history: boolean; open_devices: boolean; server_check?: boolean };
+    /** Deferred: absent until it loads after the page, null for everyone else. */
+    server_check?: ServerReadinessPayload | null;
+    /** Deferred, same people: the monitoring service's heartbeat, work waiting, failed deliveries and outage watchdog. */
+    server_health?: ServerHealthPayload | null;
     overview: { todo: TodoItem[]; cards: ReviewCardData[] } | null;
     settings: Record<string, SettingRow> | null;
     alerts: { rules: number } | null;

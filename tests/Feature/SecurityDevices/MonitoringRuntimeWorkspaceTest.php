@@ -52,6 +52,7 @@ if (getenv('MONITORING_USE_PREBUILT_TEST_DATABASE') === '1') {
 class MonitoringRuntimeWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
+    use ReadsRetiredWorkspaceProps;
 
     protected function setUp(): void
     {
@@ -251,44 +252,13 @@ class MonitoringRuntimeWorkspaceTest extends TestCase
             'linkable_id' => $alert->id,
         ]);
 
-        $monitoring = $this->actingAs($viewer)->get('/security-devices/monitoring');
-        $monitoring->assertOk()->assertInertia(function ($page) use ($ticket): void {
-            $workspace = $page->toArray()['props']['workspace'];
-            $rootMonitor = collect($workspace['monitors'])->firstWhere('name', 'WAN path');
+        // S&D rebuild C6: the monitoring and discovery workspaces are gone (Alerts; Setup › Hubs &
+        // networks). The Integrations hub's presenter still feeds Setup › Connected services.
+        $this->actingAs($viewer)->get('/security-devices/monitoring')->assertRedirect('/security-devices/alerts');
+        $this->actingAs($viewer)->get('/security-devices/discovery')->assertRedirect('/security-devices/setup/hubs?tab=networks');
+        $alerts = $this->actingAs($viewer)->get('/security-devices/alerts')->assertOk();
 
-            $this->assertTrue($workspace['dependencies']['canonical_model_available']);
-            $this->assertCount(1, $workspace['dependencies']['records']);
-            $this->assertSame(1, $workspace['dependencies']['suppressed_symptoms']);
-            $this->assertStringContainsString('bounded retained summaries', $workspace['boundary']['privacy_note']);
-            $this->assertSame('available', $workspace['storage']['time_series']['state']);
-            $this->assertSame(1, $workspace['storage']['time_series']['series']);
-            $this->assertNotContains(
-                'hidden.capacity.sentinel',
-                collect($workspace['storage']['time_series']['capacity_evidence'])->pluck('metric')->all(),
-            );
-            $this->assertSame(
-                ['events', 'checks', 'discovery', 'provider', 'topology', 'maintenance', 'orchestration', 'commands'],
-                array_keys($workspace['runtime']['queues']),
-            );
-            $this->assertSame('resolved', $rootMonitor['correlation']['control_room']['status']);
-            $this->assertSame('available', $rootMonitor['correlation']['control_room']['access']['state']);
-            $this->assertNotNull($rootMonitor['correlation']['control_room']['href']);
-            $this->assertSame($ticket->reference, $rootMonitor['correlation']['it_incident']['reference']);
-            $this->assertNotNull($rootMonitor['correlation']['it_incident']['monitoring_recovered_at']);
-        });
-
-        $discovery = $this->actingAs($viewer)->get('/security-devices/discovery');
-        $discovery->assertOk()->assertInertia(function ($page) use ($allowedSite): void {
-            $workspace = $page->toArray()['props']['workspace'];
-
-            $this->assertSame(1, $workspace['summary']['scopes']);
-            $this->assertSame(1, $workspace['summary']['runs']);
-            $this->assertSame(1, $workspace['summary']['candidates']);
-            $this->assertSame($allowedSite->id, $workspace['scopes'][0]['site']['id']);
-            $this->assertSame(['serial_match'], $workspace['candidates'][0]['reasons']);
-        });
-
-        $integrations = $this->actingAs($viewer)->get('/security-devices/integrations');
+        $integrations = $this->retiredIntegrationsHub($viewer);
         $integrations->assertOk()->assertInertia(function ($page): void {
             $provider = collect($page->toArray()['props']['providers'])->firstWhere('slug', 'unifi');
 
@@ -300,96 +270,11 @@ class MonitoringRuntimeWorkspaceTest extends TestCase
             $this->assertSame(1, $provider['runtime']['exception_count']);
         });
 
-        foreach ([$monitoring, $discovery, $integrations] as $response) {
-            $response
-                ->assertDontSee('Hidden core switch', false)
-                ->assertDontSee('Hidden monitor sentinel', false)
-                ->assertDontSee('collector-runtime-secret', false)
-                ->assertDontSee('candidate-evidence-secret', false)
-                ->assertDontSee('hidden.capacity.sentinel', false)
-                ->assertDontSee('provider-secret-cursor', false);
+        foreach ([(string) $alerts->getContent(), json_encode($integrations->props(), JSON_THROW_ON_ERROR)] as $content) {
+            foreach (['Hidden core switch', 'Hidden monitor sentinel', 'collector-runtime-secret', 'candidate-evidence-secret', 'hidden.capacity.sentinel', 'provider-secret-cursor'] as $secret) {
+                $this->assertStringNotContainsString($secret, $content);
+            }
         }
-    }
-
-    public function test_monitoring_exposes_the_control_room_destination_only_with_its_exact_permission(): void
-    {
-        [$deniedViewer] = $this->siteScopedViewer([
-            'securityDevices.events.view',
-        ]);
-        [$allowedViewer] = $this->siteScopedViewer([
-            'securityDevices.events.view',
-            'controlRoom.viewAny',
-        ]);
-
-        $this->actingAs($deniedViewer)
-            ->get('/security-devices/monitoring')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('workspace.can.view_control_room', false));
-
-        $this->actingAs($allowedViewer)
-            ->get('/security-devices/monitoring')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('workspace.can.view_control_room', true));
-    }
-
-    public function test_all_sites_monitoring_scope_does_not_emit_an_unreadable_control_room_correlation_link(): void
-    {
-        [$viewer, , $hiddenSite] = $this->siteScopedViewer([
-            'securityDevices.events.view',
-            'securityDevices.devices.viewAllSites',
-            'controlRoom.viewAny',
-            'controlRoom.alerts.view',
-        ]);
-        $device = Device::factory()->itInfrastructure()->create(['name' => 'Restricted Site gateway']);
-        $this->assignToSite($device, $hiddenSite);
-        $profile = MonitoringProfile::factory()->create();
-        $monitor = Monitor::factory()->create([
-            'device_id' => $device->id,
-            'profile_id' => $profile->id,
-            'name' => 'Restricted Site path',
-            'current_state' => MonitorState::Failed,
-            'effective_state' => MonitorState::Failed->value,
-        ]);
-        $alert = ControlRoomAlert::factory()->create([
-            'site_id' => $hiddenSite->id,
-            'status' => ControlRoomAlert::STATUS_OPEN,
-        ]);
-        $source = SignalSource::create([
-            'name' => 'Restricted monitoring correlation',
-            'slug' => 'restricted_monitoring_correlation',
-            'status' => 'active',
-        ]);
-        Signal::create([
-            'signal_source_id' => $source->id,
-            'signal_type_code' => 'device_offline',
-            'site_id' => $hiddenSite->id,
-            'severity_hint' => 'high',
-            'normalized_data' => [
-                'monitor_correlation_key' => hash(
-                    'sha256',
-                    "site:{$hiddenSite->id}:device:{$device->id}:root:{$monitor->id}:condition:availability",
-                ),
-            ],
-            'status' => 'processed',
-            'alert_id' => $alert->id,
-            'processed_at' => now(),
-        ]);
-
-        $this->actingAs($viewer)
-            ->get('/security-devices/monitoring')
-            ->assertOk()
-            ->assertInertia(function ($page): void {
-                $workspace = $page->toArray()['props']['workspace'];
-                $monitor = collect($workspace['monitors'])->firstWhere('name', 'Restricted Site path');
-                $correlation = $monitor['correlation']['control_room'];
-
-                $this->assertSame('restricted', $correlation['access']['state']);
-                $this->assertNull($correlation['href']);
-                $this->assertNull($correlation['reference']);
-                $this->assertNull($correlation['status']);
-            });
     }
 
     public function test_runtime_health_is_authenticated_bounded_and_does_not_leak_global_or_secret_configuration(): void

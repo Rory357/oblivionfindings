@@ -571,25 +571,14 @@ final class CctvLiveSessionTest extends TestCase
     {
         $base = '/security-devices/devices/'.$this->camera->id.'/live';
         $this->get('/security-devices/devices/'.$this->camera->id)->assertOk()->assertInertia(fn ($page) => $page->where('profile.cctv.live_href', $base)->where('profile.cctv.setup_href', $base.'/source'));
-        $this->get('/security-devices/security?tab=cctv')->assertOk()->assertInertia(function ($page) use ($base): void {
-            $rows = collect($page->toArray()['props']['securityWorkspace']['activeTab']['devices'])->keyBy('id');
-            $this->assertSame($base, $rows[$this->camera->id]['live_href']);
-            $this->assertSame($base.'/source', $rows[$this->camera->id]['setup_href']);
-            $this->assertNull($rows[$this->recorder->id]['live_href']);
-            $this->assertNull($rows[$this->recorder->id]['setup_href']);
-        });
+        // S&D rebuild C6: the Security workspace's CCTV tab is gone (it opens Devices › Cameras).
+        $this->get('/security-devices/security?tab=cctv')->assertRedirect('/security-devices/devices?tab=cameras');
         foreach (['securityDevices.cctv.media.view', 'securityDevices.integrations.manage'] as $key) {
             $permission = Permission::query()->where('key', $key)->firstOrFail();
             $this->actor->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
         }
         $this->actor->unsetRelations();
         $this->get('/security-devices/devices/'.$this->camera->id)->assertOk()->assertInertia(fn ($page) => $page->where('profile.cctv.live_href', null)->where('profile.cctv.setup_href', null));
-        $this->get('/security-devices/security?tab=cctv')->assertOk()->assertInertia(function ($page): void {
-            $row = collect($page->toArray()['props']['securityWorkspace']['activeTab']['devices'])->firstWhere('id', $this->camera->id);
-            $this->assertNull($row['live_href']);
-            $this->assertNull($row['setup_href']);
-            $this->assertArrayNotHasKey('href', $row['media']);
-        });
     }
 
     #[DataProvider('liveDecommissionCases')]

@@ -53,6 +53,7 @@ import { durationWords, timedText } from '@/lib/security-devices/device-time';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     BellRing,
+    Download,
     Eye,
     FlaskConical,
     Pencil,
@@ -418,6 +419,18 @@ export default function AlertsIndex(props: AlertsProps) {
                         onChange={updateSearch}
                         placeholder="Search alerts"
                     />
+                    {can.export ? (
+                        // pg-sdr-18b: today's Reports "Device events" CSV lives here now.
+                        <PageHeaderGlassButton icon={Download} asChild>
+                            <a
+                                href="/security-devices/exports/events.csv"
+                                download
+                                aria-label="Export device events from the last 90 days (CSV)"
+                            >
+                                Export
+                            </a>
+                        </PageHeaderGlassButton>
+                    ) : null}
                     {can.quiet_time ? (
                         <PageHeaderGlassButton onClick={openQuiet}>
                             Quiet time
