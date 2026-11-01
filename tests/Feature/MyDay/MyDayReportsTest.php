@@ -106,6 +106,7 @@ class MyDayReportsTest extends TestCase
         $former->supportWorkers()->attach($this->worker->id);
         $draft = $this->incident(['client_id' => $former->id, 'status' => 'draft', 'occurred_at' => '2026-10-31T01:00:00Z']);
         $this->assertSame('Noah Williams', app(MyReportsReadService::class)->recent($this->worker)[0]['client_name'], 'Named while she supports him.');
+        $this->actingAs($this->worker)->get('/my-day')->assertOk()->assertSee('Noah Williams', false);
 
         $former->supportWorkers()->detach($this->worker->id);
         [$row] = app(MyReportsReadService::class)->recent($this->worker->fresh());

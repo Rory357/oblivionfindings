@@ -149,7 +149,7 @@ class MyTasksController extends Controller
         $timesheets = $this->getTimesheets($user);
 
         // 5. Incidents
-        $incidents = $this->getIncidents($userId, $queryNow);
+        $incidents = $this->getIncidents($user, $queryNow);
 
         // 6. Tasks (CR alerts + followups + notes - existing aggregation)
         $tasks = $this->getCrTasks($user);
@@ -1445,15 +1445,22 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getIncidents(int $userId, Carbon $now): array
+    private function getIncidents(User $user, Carbon $now): array
     {
         try {
-            return ClientIncident::where('reported_by', $userId)
+            $gate = Gate::forUser($user);
+
+            return ClientIncident::where('reported_by', $user->id)
                 ->whereNotIn('status', ['closed'])
                 ->where('occurred_at', '>=', $now->copy()->subDays(14))
-                ->with('client:id,first_name,last_name')
+                ->with('client')
                 ->orderByDesc('occurred_at')
                 ->get()
+                // Privacy: an open report about someone the worker no longer supports leaves this list. Its title and
+                // notes can name that person, and the follow-up is no longer theirs. "What you reported" still lists
+                // it as "a person you no longer support".
+                ->filter(fn (ClientIncident $incident) => $incident->client === null || $gate->allows('view', $incident->client))
+                ->values()
                 ->map(function (ClientIncident $incident) {
                     $clientName = $incident->client
                         ? trim($incident->client->first_name.' '.$incident->client->last_name)
