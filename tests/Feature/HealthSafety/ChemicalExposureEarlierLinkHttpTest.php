@@ -56,6 +56,19 @@ final class ChemicalExposureEarlierLinkHttpTest extends ChemicalExposureRecovery
         $this->assertSame($before, $root->fresh()->getRawOriginal(), 'The old record is never changed.');
     }
 
+    public function test_a_photo_is_refused_with_a_plain_message_because_review_files_are_pdf_or_word(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('private');
+        $root = $this->legacy();
+        $this->actingAs($this->manager);
+        $this->review($root->id, ['expected_version' => 0, 'decision' => 'unresolved', 'reason' => 'Waiting for the roster'])->assertSessionHasNoErrors();
+
+        $this->post('/health-safety/chemical-exposures/'.$root->id.'/earlier-link/files', [
+            'idempotency_key' => (string) Str::uuid(),
+            'file' => \Illuminate\Http\UploadedFile::fake()->image('what-we-checked.jpg', 40, 40),
+        ])->assertSessionHasErrors(['file' => 'Choose a PDF or Word file.']);
+    }
+
     public function test_a_stale_version_is_refused_and_the_form_keeps_its_words(): void
     {
         $root = $this->legacy();

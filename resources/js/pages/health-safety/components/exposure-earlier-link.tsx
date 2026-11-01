@@ -47,7 +47,8 @@ const TILES: { value: EarlierLinkDecision; title: string; body: string; icon: ty
     { value: 'reviewed_no_association', title: 'It isn’t linked to an incident', body: 'The exposure stands on its own', icon: X },
     { value: 'unresolved', title: 'Can’t tell yet', body: 'Leave it unconfirmed for now', icon: Info },
 ];
-const ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
+// The server keeps review evidence to the chemical evidence rule: PDF or Word only (ChemicalEvidenceStorage).
+const ACCEPT = '.pdf,.doc,.docx';
 
 /** "Earlier provenance unconfirmed" until a later review is recorded. */
 export function earlierLinkChip(link: EarlierLink | null | undefined): string | null {
@@ -253,7 +254,7 @@ function EarlierLinkReviewForm({ link, exposureId, onClose }: { link: EarlierLin
                 <Field label="Notes" error={errors.notes} hint="Optional">
                     <Textarea value={notes} maxLength={5000} onChange={(event) => setNotes(event.target.value)} rows={2} />
                 </Field>
-                <Field label="What you checked, as a file" error={errors.file} hint="Optional · photos, PDFs or Word files, up to 10 MB">
+                <Field label="What you checked, as a file" error={errors.file} hint="Optional · a PDF or Word file, up to 10 MB">
                     {file ? (
                         <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm">
                             <FileText className="size-4 text-muted-foreground" aria-hidden="true" />
@@ -262,7 +263,7 @@ function EarlierLinkReviewForm({ link, exposureId, onClose }: { link: EarlierLin
                             <Button type="button" variant="ghost" size="sm" className="ml-auto" onClick={() => setFile(null)}>Remove</Button>
                         </div>
                     ) : (
-                        <FileDropzone accept={ACCEPT} multiple={false} title="Drop a file here, or choose one" hint="Photos, PDFs or Word files" onFiles={(files) => setFile(files[0] ?? null)} />
+                        <FileDropzone accept={ACCEPT} multiple={false} title="Drop a file here, or choose one" hint="PDF or Word files" onFiles={(files) => setFile(files[0] ?? null)} />
                     )}
                 </Field>
                 {errors.command || errors.expected_version || errors.source ? (

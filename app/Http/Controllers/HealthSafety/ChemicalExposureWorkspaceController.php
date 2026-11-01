@@ -131,11 +131,12 @@ final class ChemicalExposureWorkspaceController extends Controller
         return $this->headers(response()->json(['items' => $this->recovery->incidentChoices($r->user(), $exposure, (string) ($search ?? ''))]));
     }
 
-    /** #15: one file kept with the latest review (photos, PDFs or Word files, up to 10 MB). */
+    /** #15: one file kept with the latest review (a PDF or Word file, up to 10 MB — the chemical evidence rule). */
     public function addEarlierLinkFile(Request $r, string|int $exposure)
     {
         $exposure = $this->id($exposure);
-        $r->validate(['file' => ['required', 'file']]);
+        $r->validate(['file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:10240']],
+            ['file.mimes' => 'Choose a PDF or Word file.', 'file.max' => 'Choose a file up to 10 MB.']);
         app(\App\Services\HealthSafety\ChemicalExposureRecoveryEvidenceService::class)->upload($r->user(), $exposure, $r->file('file'), $this->input($r, ['file']));
 
         return redirect()->to('/health-safety/chemical-exposures/'.$exposure.'?section=connections')->with('success', 'File added to the review.');
