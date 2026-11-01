@@ -45,6 +45,8 @@ return [
             'incidents.high_unreviewed_reminder',
             // #16: in the app only; the named person, while they can open the private exposure.
             'health_safety.chemical_exposure_followup_assigned',
+            // #14: worker participation meetings — invited attendees (app + email) and the Site's workforce notice (app).
+            'healthSafety.meeting_update',
         ],
 
         // --- HR Module ---

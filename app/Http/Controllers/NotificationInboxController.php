@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\User;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
-use App\Services\HealthSafety\ChemicalExposureInboxReads;
+use App\Services\HealthSafety\HealthSafetyInboxReads;
 use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\Medication\Alerts\MedicationAlertAttendance;
 use App\Support\ControlRoom\BroadcastRecipientReadHttp;
@@ -34,7 +34,7 @@ class NotificationInboxController extends Controller
             return back()->with('info', 'Staff messages are marked as read separately.');
         }
 
-        $inbox = app(ChemicalExposureInboxReads::class);
+        $inbox = app(HealthSafetyInboxReads::class);
         $n = DatabaseNotification::query()->findOrFail($inbox->within($user, function (?HealthSafetyReadContext $context) use ($user, $notification, $inbox): string {
             $n = $this->boardPackAccess
                 ->visibleNotificationQuery($user, healthSafetyContext: $context)
@@ -63,7 +63,7 @@ class NotificationInboxController extends Controller
         }
 
         // Only notices the viewer can see right now; a hidden private notice stays unread.
-        app(ChemicalExposureInboxReads::class)->within($user, fn (?HealthSafetyReadContext $context): int => $this->boardPackAccess
+        app(HealthSafetyInboxReads::class)->within($user, fn (?HealthSafetyReadContext $context): int => $this->boardPackAccess
             ->visibleNotificationQuery($user, unreadOnly: true, healthSafetyContext: $context)
             ->update(['read_at' => now()]));
 
@@ -79,7 +79,7 @@ class NotificationInboxController extends Controller
             return $response;
         }
 
-        $acknowledged = app(ChemicalExposureInboxReads::class)->within($user, function (?HealthSafetyReadContext $context) use ($user, $notification): ?string {
+        $acknowledged = app(HealthSafetyInboxReads::class)->within($user, function (?HealthSafetyReadContext $context) use ($user, $notification): ?string {
             $n = $this->boardPackAccess
                 ->visibleNotificationQuery($user, healthSafetyContext: $context)
                 ->where('notifications.id', $notification)

@@ -157,6 +157,29 @@ final class WorkerParticipationNotificationReadService
         return $notifications;
     }
 
+    /**
+     * #14: for a viewer with no participation notice, the shared query skips preparation (it opens an H&S read) and only
+     * hides the private marker, so a notice written after that check still can't show unproven.
+     */
+    public function excludePrivate(MorphMany $notifications): MorphMany
+    {
+        $deliverySchema = SchemaCache::hasTable('worker_participation_meeting_deliveries');
+        // The same marker as privateMarker(), without its share lock: this path reads no private row.
+        $notifications->whereNot(function (Builder $private) use ($deliverySchema): void {
+            $data = "CASE WHEN JSON_VALID(notifications.data) THEN notifications.data ELSE '{}' END";
+            $private->whereIn('notifications.type', [CommitteeMeetingScheduled::class, WorkerParticipationMeetingNotice::class])
+                ->orWhereRaw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT($data, '$.type')), '') = ?", ['hs_committee_meeting'])
+                ->orWhereRaw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT($data, '$.kind')), '') = ?", [WorkerParticipationMeetingNotice::KIND]);
+            if ($deliverySchema) {
+                $private->orWhereExists(fn (QueryBuilder $delivery) => $delivery->selectRaw('1')
+                    ->from('worker_participation_meeting_deliveries as private_delivery')
+                    ->whereColumn('private_delivery.id', 'notifications.id'));
+            }
+        });
+
+        return $notifications;
+    }
+
     /** Public only for the compiler Expression; this is an original identity check, not admission. */
     public function assertRequest(array $frame): void
     {

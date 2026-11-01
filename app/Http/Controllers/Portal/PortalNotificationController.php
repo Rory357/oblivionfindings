@@ -6,7 +6,7 @@ use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Http\Controllers\Controller;
 use App\Services\ControlRoom\BroadcastRecipientReadContext;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
-use App\Services\HealthSafety\ChemicalExposureInboxReads;
+use App\Services\HealthSafety\HealthSafetyInboxReads;
 use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Support\ControlRoom\BroadcastRecipientReadHttp;
 use Illuminate\Http\Request;
@@ -15,7 +15,7 @@ class PortalNotificationController extends Controller
 {
     public function __construct(
         private readonly BoardPackAccessService $boardPackAccess,
-        private readonly ChemicalExposureInboxReads $inbox,
+        private readonly HealthSafetyInboxReads $inbox,
     ) {}
 
     public function index(Request $request)

@@ -28,7 +28,7 @@ use App\Services\ControlRoom\BroadcastRecipientReadContext;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\GuidedRoundService;
 use App\Services\HandoverWorkerNotes;
-use App\Services\HealthSafety\ChemicalExposureInboxReads;
+use App\Services\HealthSafety\HealthSafetyInboxReads;
 use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\HealthSafety\FirstAidService;
 use App\Services\HealthSafety\FirstAidSourceProjectionService;
@@ -1737,7 +1737,7 @@ class MyTasksController extends Controller
     private function getUnreadNotificationCount(User $user, BroadcastRecipientReadContext $broadcastContext): int
     {
         // Private exposure follow-up notices count only inside their H&S context (#16), same as the header bell.
-        return app(ChemicalExposureInboxReads::class)->within($user, function (?HealthSafetyReadContext $hs) use ($user, $broadcastContext): int {
+        return app(HealthSafetyInboxReads::class)->within($user, function (?HealthSafetyReadContext $hs) use ($user, $broadcastContext): int {
             $visible = $this->boardPackAccess
                 ->visibleNotificationQuery($user, true, $hs, $broadcastContext)
                 ->reorder();
@@ -1760,12 +1760,12 @@ class MyTasksController extends Controller
 
     private function getDigestNotifications(User $user, BroadcastRecipientReadContext $broadcastContext): array
     {
-        $inbox = app(ChemicalExposureInboxReads::class);
+        $inbox = app(HealthSafetyInboxReads::class);
 
         return $inbox->within($user, fn (?HealthSafetyReadContext $hs): array => $this->digestNotificationRows($user, $broadcastContext, $inbox, $hs));
     }
 
-    private function digestNotificationRows(User $user, BroadcastRecipientReadContext $broadcastContext, ChemicalExposureInboxReads $inbox, ?HealthSafetyReadContext $hs): array
+    private function digestNotificationRows(User $user, BroadcastRecipientReadContext $broadcastContext, HealthSafetyInboxReads $inbox, ?HealthSafetyReadContext $hs): array
     {
         $workerNow = Carbon::now($this->workerTimezone());
 

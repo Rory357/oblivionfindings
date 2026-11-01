@@ -259,7 +259,7 @@ Route::middleware(['auth'])->group(function () {
             $filter = $request->query('filter', 'all');
             $type = $request->query('type', 'all');
             // Private exposure follow-up notices are read inside their H&S context (#16); everyone else reads as before.
-            $inbox = app(\App\Services\HealthSafety\ChemicalExposureInboxReads::class);
+            $inbox = app(\App\Services\HealthSafety\HealthSafetyInboxReads::class);
             $read = $inbox->within($user, function (?\App\Services\HealthSafety\HealthSafetyReadContext $hs) use ($user, $boardPackAccess, $context, $filter, $type, $inbox): array {
                 $query = $boardPackAccess->visibleNotificationQuery($user, healthSafetyContext: $hs, broadcastContext: $context);
                 if ($filter === 'unread') {

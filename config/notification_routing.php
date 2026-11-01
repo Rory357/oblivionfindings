@@ -83,6 +83,11 @@ return [
             'include_managers' => false,
             'target_groups' => ['entity_user'],
         ],
+        // #14: the meeting's own audience (named attendees, and the Site's current workforce on first scheduling).
+        'healthSafety.meeting_update' => [
+            'include_managers' => false,
+            'target_groups' => ['entity_user'],
+        ],
 
         // --- HR: Leave ---
         'hr.leave.requested' => [

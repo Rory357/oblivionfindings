@@ -22,7 +22,7 @@ use App\Services\Assurance\NzsAssuranceResolver;
 use App\Services\Clients\ClientPortalMembershipService;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\Fleet\FleetMapSettings;
-use App\Services\HealthSafety\ChemicalExposureInboxReads;
+use App\Services\HealthSafety\HealthSafetyInboxReads;
 use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\MedicationBellOrder;
@@ -510,7 +510,7 @@ class HandleInertiaRequests extends Middleware
                 // already active for this request; otherwise they stay excluded.
                 $broadcastContext = BroadcastRecipientReadService::current($user);
                 // Private exposure follow-up notices are read inside their H&S context (#16); everyone else reads as before.
-                $inbox = app(ChemicalExposureInboxReads::class);
+                $inbox = app(HealthSafetyInboxReads::class);
                 $notifications = $hasNotificationsTable
                     ? $inbox->within($user, fn (?HealthSafetyReadContext $hs): array => [
                         'unread_count' => $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, healthSafetyContext: $hs, broadcastContext: $broadcastContext)->count(),
