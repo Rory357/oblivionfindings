@@ -4,13 +4,12 @@ namespace App\Domain\SecurityDevices\Hubs\Http\Controllers;
 
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\CollectorEnrollmentService;
-use App\Domain\SecurityDevices\Endpoints\Services\EndpointReleaseCatalogue;
-use App\Domain\SecurityDevices\Endpoints\Services\EndpointReleaseUnavailable;
 use App\Domain\SecurityDevices\Hubs\Models\SetupCode;
 use App\Domain\SecurityDevices\Hubs\Services\HubApprovalService;
 use App\Domain\SecurityDevices\Hubs\Services\HubInstallationSettings;
 use App\Domain\SecurityDevices\Hubs\Services\HubUpdatePolicy;
 use App\Domain\SecurityDevices\Hubs\Services\SetupCodeService;
+use App\Domain\SecurityDevices\Hubs\Services\SetupDownloads;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
@@ -86,41 +85,14 @@ final class HubAdminController extends Controller
     }
 
     /** The installer, named for this Site with its code, e.g. "Oblivion-Setup (Tōtara House) [oblivionfindings.com T6WD-3KQN].exe". */
-    public function download(Request $request, SetupCode $setupCode): Response
+    public function download(Request $request, SetupCode $setupCode, SetupDownloads $downloads): Response
     {
         $actor = $this->actor($request, $setupCode->role === 'computer' ? 'securityDevices.commands.admin' : 'securityDevices.integrations.manage');
         $this->assertOwnSiteCode($actor, $setupCode);
-        abort_unless($setupCode->platform === 'windows', 404);
-        $plain = $this->codes->plainCode($setupCode);
-        abort_if($plain === null, 410, 'This setup code can no longer be used. Make a new download.');
-
-        try {
-            $catalogue = EndpointReleaseCatalogue::configured();
-            $artifact = collect($catalogue->catalogue()['artifacts'])
-                ->filter(fn (array $item): bool => $item['platform'] === 'windows' && str_ends_with($item['filename'], '.exe')
-                    && in_array($setupCode->role === 'hub' ? 'site' : 'computer', $item['roles'], true))
-                ->sortByDesc('release_revision')
-                ->first();
-            abort_if($artifact === null, 409, 'No Windows installer has been published yet.');
-            $download = $catalogue->download((string) $artifact['id'], (string) $artifact['sha256']);
-        } catch (EndpointReleaseUnavailable) {
-            abort(409, 'No Windows installer has been published yet.');
-        }
+        $response = $downloads->windowsInstaller($setupCode);
         AuditLogger::logOrFail('security_devices.setup_code.downloaded', $setupCode, ['actor_id' => (int) $actor->id, 'site_id' => (int) $setupCode->site_id]);
-        $stream = $download['stream'];
 
-        return response()->streamDownload(function () use ($stream): void {
-            try {
-                fpassthru($stream);
-            } finally {
-                fclose($stream);
-            }
-        }, $this->codes->installerFileName($setupCode, $plain), [
-            'Content-Type' => 'application/vnd.microsoft.portable-executable',
-            'Content-Length' => (string) $download['artifact']['size'],
-            'X-Content-Type-Options' => 'nosniff',
-            ...$this->noStore(),
-        ]);
+        return $response;
     }
 
     /** Add a hub, step 4: waits live for the hub, then asks for approval. */
@@ -248,8 +220,10 @@ final class HubAdminController extends Controller
             'expires_at' => $code->expires_at->toIso8601String(),
             'file_name' => $code->platform === 'windows' ? $this->codes->installerFileName($code, $plain) : null,
             'download_url' => $code->platform === 'windows' ? route('security-devices.hubs.setup-codes.download', $code) : null,
-            // windows tab, screen D: the code is in the address; nothing comes from apt.
-            'linux_command' => $code->platform === 'linux' ? "curl -fsSL https://{$host}/h/{$plain} | sudo sh" : null,
+            // Pop-up 12: a link to send to whoever installs it (works until used, 24 hours) …
+            'share_link' => $code->platform === 'windows' ? "https://{$host}/h/{$plain}" : null,
+            // … and the one command for a Raspberry Pi or NUC; nothing comes from apt.
+            'linux_command' => $code->platform === 'linux' ? "curl -fsSL https://{$host}/h/{$plain}/linux | sudo bash" : null,
         ];
     }
 

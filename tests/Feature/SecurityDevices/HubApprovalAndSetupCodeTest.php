@@ -220,18 +220,22 @@ it('serves the Pi one-liner for a Linux hub code, and a plain refusal for anythi
         'site_id' => $this->site->id, 'platform' => 'linux', 'name' => 'Kauri House hub',
     ])->assertCreated();
     $code = (string) $issued->json('code');
-    expect($issued->json('linux_command'))->toBe("curl -fsSL https://oblivion.test/h/{$code} | sudo sh")
-        ->and($issued->json('download_url'))->toBeNull();
+    expect($issued->json('linux_command'))->toBe("curl -fsSL https://oblivion.test/h/{$code}/linux | sudo bash")
+        ->and($issued->json('download_url'))->toBeNull()
+        ->and($issued->json('share_link'))->toBeNull();
 
     auth()->logout();
-    $script = $this->get("/h/{$code}")->assertOk()->assertHeader('Content-Type', 'text/x-shellscript; charset=utf-8')->getContent();
+    $script = $this->get("/h/{$code}/linux")->assertOk()->assertHeader('Content-Type', 'text/x-shellscript; charset=utf-8')->getContent();
     expect($script)->toContain("CODE='{$code}'")
         ->and($script)->toContain("SERVER='https://oblivion.test'")
         ->and($script)->toContain('sha256sum')
         ->and($script)->not->toContain('apt-get');
 
     $windows = sdHubIssueCode($this);
+    expect($windows['response']->json('share_link'))->toBe('https://oblivion.test/h/'.$windows['code']);
     auth()->logout();
-    $refusal = $this->get('/h/'.$windows['code'])->assertOk()->getContent();
+    $refusal = $this->get('/h/'.$windows['code'].'/linux')->assertOk()->getContent();
     expect($refusal)->toContain('exit 1')->and($refusal)->toContain('isn’t for a Linux hub');
+    // A Linux code has no Windows download link.
+    $this->get("/h/{$code}")->assertNotFound();
 });

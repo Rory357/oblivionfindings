@@ -77,13 +77,18 @@ use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceComma
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// Raspberry Pi or Linux hub, one command (S&D Phase B, windows tab screen D):
-// curl -fsSL https://<server>/h/<CODE> | sudo sh. No sign-in exists yet; the 8-character code
-// is the key (one computer, 24 hours), it's throttled, and the hub still waits for approval.
-Route::get('/h/{code}', [HubLinuxSetupController::class, 'script'])
-    ->where('code', '[0-9A-Za-z-]{8,9}')
-    ->middleware('throttle:20,1')
-    ->name('security-devices.hubs.linux-script');
+// Setup links (S&D Phase B, pop-up 12). No sign-in exists yet: the 8-character code is the key
+// (one computer, 24 hours), they're throttled, and a new hub still waits for approval.
+//   /h/<CODE>        the Windows installer, named for its Site (to send to whoever installs it)
+//   /h/<CODE>/linux  curl -fsSL https://<server>/h/<CODE>/linux | sudo bash (Raspberry Pi or NUC)
+Route::middleware('throttle:20,1')->group(function () {
+    Route::get('/h/{code}', [HubLinuxSetupController::class, 'link'])
+        ->where('code', '[0-9A-Za-z-]{8,9}')
+        ->name('security-devices.hubs.setup-link');
+    Route::get('/h/{code}/linux', [HubLinuxSetupController::class, 'script'])
+        ->where('code', '[0-9A-Za-z-]{8,9}')
+        ->name('security-devices.hubs.linux-script');
+});
 
 Route::middleware([
     'auth',

@@ -7,15 +7,16 @@ use App\Domain\SecurityDevices\Endpoints\Services\EndpointReleaseUnavailable;
 use App\Domain\SecurityDevices\Hubs\Models\SetupCode;
 use App\Domain\SecurityDevices\Hubs\Services\HubInstallationSettings;
 use App\Domain\SecurityDevices\Hubs\Services\SetupCodeService;
+use App\Domain\SecurityDevices\Hubs\Services\SetupDownloads;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Raspberry Pi or Linux hub, one command (windows tab, screen D):
+ * Raspberry Pi or Linux hub, one command (pop-up 12, "Raspberry Pi or NUC"):
  *
- *     curl -fsSL https://oblivionfindings.com/h/7Q2M-K9TX | sudo sh
+ *     curl -fsSL https://oblivionfindings.com/h/7Q2M-K9TX/linux | sudo bash
  *
  * The script downloads the hub for this computer's architecture (checked against the signed
  * release list), installs it with its own runtime (nothing from apt) and enrols with the code.
@@ -23,6 +24,21 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class HubLinuxSetupController extends Controller
 {
+    /**
+     * Pop-up 12, "Or send it to whoever will install it": https://<server>/h/<CODE> downloads
+     * the Windows installer named for the Site. It works while the code does: until a computer
+     * uses it, at most 24 hours (D2).
+     */
+    public function link(Request $request, string $code, SetupCodeService $codes, SetupDownloads $downloads): Response
+    {
+        abort_unless($request->isSecure() || app()->environment(['local', 'testing']), 400);
+        $record = $codes->find($code);
+        abort_if($record === null || $record->platform !== 'windows', 404);
+        abort_unless($record->state() === 'waiting', 410, 'This link has been used, has expired or was cancelled. Ask for a new one.');
+
+        return $downloads->windowsInstaller($record);
+    }
+
     public function script(Request $request, string $code, SetupCodeService $codes, HubInstallationSettings $settings): HttpResponse
     {
         abort_unless($request->isSecure() || app()->environment(['local', 'testing']), 400);
