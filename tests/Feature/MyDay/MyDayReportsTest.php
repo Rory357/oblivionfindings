@@ -63,7 +63,8 @@ class MyDayReportsTest extends TestCase
     {
         $owner = User::factory()->create(['name' => 'Hemi Walker']);
         $draft = $this->incident(['status' => 'draft', 'occurred_at' => '2026-10-31T17:52:00Z']);
-        // Her own report for someone she no longer supports: the Incidents list can't open it, My Day still shows it.
+        // Her own report for someone she doesn't support: the Incidents list can't open it, My Day still shows it
+        // (without their name).
         $elsewhere = Client::factory()->create(['site_id' => $this->site->id, 'first_name' => 'Noah', 'last_name' => 'Williams']);
         $tap = $this->incident(['client_id' => $elsewhere->id, 'type' => 'property_damage', 'occurred_at' => '2026-10-29T01:00:00Z']);
         $fall = $this->incident(['incident_owner_user_id' => $owner->id, 'occurred_at' => '2026-10-26T06:40:00Z']);
@@ -83,9 +84,41 @@ class MyDayReportsTest extends TestCase
         );
         $this->assertSame('/incidents/'.$draft->id.'?return_to=%2Fmy-day', $reports[0]['finish_url']);
         $this->assertNull($reports[1]['finish_url']);
-        $this->assertSame('Noah Williams', $reports[1]['client_name']);
+        $this->assertNull($reports[1]['client_name']);
+        $this->assertTrue($reports[1]['former_client']);
         $this->assertSame('Aroha Kingi', $reports[2]['client_name']);
         $this->assertNull($reports[2]['site_name']);
+    }
+
+    public function test_a_person_she_still_supports_is_named(): void
+    {
+        $this->incident(['occurred_at' => '2026-10-31T01:00:00Z']);
+
+        [$row] = app(MyReportsReadService::class)->recent($this->worker);
+
+        $this->assertSame('Aroha Kingi', $row['client_name']);
+        $this->assertFalse($row['former_client']);
+    }
+
+    public function test_a_person_she_no_longer_supports_is_never_named_and_her_draft_about_them_has_no_finish(): void
+    {
+        $former = Client::factory()->create(['site_id' => $this->site->id, 'first_name' => 'Noah', 'last_name' => 'Williams']);
+        $former->supportWorkers()->attach($this->worker->id);
+        $draft = $this->incident(['client_id' => $former->id, 'status' => 'draft', 'occurred_at' => '2026-10-31T01:00:00Z']);
+        $this->assertSame('Noah Williams', app(MyReportsReadService::class)->recent($this->worker)[0]['client_name'], 'Named while she supports him.');
+
+        $former->supportWorkers()->detach($this->worker->id);
+        [$row] = app(MyReportsReadService::class)->recent($this->worker->fresh());
+
+        $this->assertSame($draft->id, $row['id']);
+        $this->assertNull($row['client_name']);
+        $this->assertTrue($row['former_client']);
+        $this->assertNull($row['finish_url']);
+        $this->assertStringNotContainsString('Noah', json_encode($row));
+
+        $this->actingAs($this->worker->fresh())->get('/my-day')->assertOk()
+            ->assertDontSee('Noah Williams', false)
+            ->assertDontSee('Williams', false);
     }
 
     public function test_her_own_injury_report_shows_with_its_word_and_only_the_last_five(): void

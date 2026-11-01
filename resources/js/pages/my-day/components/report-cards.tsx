@@ -119,7 +119,10 @@ export function reportTitle(report: MyDayReport): string {
         return report.own ? `${what} (your injury)` : what;
     }
     const type = incidentTypeLabel(report.type);
-    return report.client_name ? `${type} — ${report.client_name}` : type;
+    if (report.client_name) return `${type} — ${report.client_name}`;
+    return report.former_client
+        ? `${type} — a person you no longer support`
+        : type;
 }
 
 export function WhatYouReported({ reports }: { reports: MyDayReport[] }) {

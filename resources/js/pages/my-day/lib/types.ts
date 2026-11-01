@@ -617,6 +617,8 @@ export type MyDayReport =
           id: number;
           type: string;
           client_name: string | null;
+          /** About someone the reporter no longer supports: their name is never sent. */
+          former_client?: boolean;
           /** Only for a report about no particular person. */
           site_name: string | null;
           at: string | null;
