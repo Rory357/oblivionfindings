@@ -36,6 +36,7 @@ final class DevicePagePresenter
         'health' => 'Health',
         'remote' => 'Remote support',
         'checks' => 'Checks & alerts',
+        'terminal' => 'Terminal',
         'notes' => 'Notes & documents',
     ];
 
@@ -112,11 +113,14 @@ final class DevicePagePresenter
             : null;
         $inTrouble = $group === 'network' && $state === DeviceState::Offline && $entry !== null;
 
+        // S&D Phase G (D5): the Terminal tab, for IT admins only, on network devices.
+        $canTerminal = $group === 'network' && $viewer->canDo('securityDevices.terminal.use');
         $tabs = array_values(array_filter([
             'overview',
             $group === 'computer' && $posture !== null ? 'health' : null,
             $remote !== null ? 'remote' : null,
             $canSeeChecks ? 'checks' : null,
+            $canTerminal ? 'terminal' : null,
             'notes',
         ]));
         $tab = in_array($input['tab'] ?? null, $tabs, true) ? (string) $input['tab'] : 'overview';
@@ -178,6 +182,39 @@ final class DevicePagePresenter
                 ]
                 : null,
             'notes' => $tab === 'notes' ? $this->notes->present($viewer, $device, $now) : null,
+            'terminal' => $tab === 'terminal' ? $this->terminal($viewer, $device) : null,
+        ];
+    }
+
+    /**
+     * S&D Phase G (pg-sdr-3b): whether the terminal can open and why not, the session already open
+     * for this viewer, and the last commands typed on this device.
+     *
+     * @return array<string, mixed>
+     */
+    private function terminal(User $viewer, Device $device): array
+    {
+        $terminals = app(\App\Domain\SecurityDevices\Terminal\TerminalSessions::class);
+        $ready = $terminals->readiness($viewer, $device);
+        $live = \App\Domain\SecurityDevices\Terminal\Models\TerminalSession::query()->live()
+            ->where('device_id', $device->id)->where('user_id', $viewer->id)->latest('id')->first();
+        $recent = \App\Domain\SecurityDevices\Terminal\Models\TerminalSession::query()
+            ->where('device_id', $device->id)->with(['user:id,name', 'lines' => fn ($query) => $query->where('direction', 'in')->orderBy('seq')->limit(40)])
+            ->latest('id')->limit(5)->get();
+
+        return [
+            'ready' => $ready['ok'],
+            'reason' => $ready['reason'],
+            'hub' => $ready['hub'],
+            'host' => trim((string) (data_get($device->config ?? [], 'ssh.host') ?? $device->ip_address ?? '')),
+            'session' => $live ? ['id' => $live->uuid, 'state' => $live->state] : null,
+            'history' => $recent->map(fn ($session): array => [
+                'id' => $session->uuid,
+                'who' => (string) ($session->user?->name ?? 'Someone'),
+                'at' => $session->created_at?->toIso8601String(),
+                'reason' => $session->close_reason,
+                'commands' => $session->lines->map(fn ($line): string => $line->text === "\x03" ? 'Ctrl+C' : (string) $line->text)->values()->all(),
+            ])->values()->all(),
         ];
     }
 

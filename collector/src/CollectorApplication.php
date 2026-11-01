@@ -16,6 +16,7 @@ use Oblivion\Collector\Media\MediaLane;
 use Oblivion\Collector\Mqtt\MqttRelayServer;
 use Oblivion\Collector\Mqtt\RelayInbox;
 use Oblivion\Collector\Mqtt\RelayTlsIdentity;
+use Oblivion\Collector\Terminal\TerminalLane;
 use Oblivion\Collector\Runtime\CameraSnapshotRunner;
 use Oblivion\Collector\Runtime\CollectorCommandExecutor;
 use Oblivion\Collector\Runtime\CommandJournal;
@@ -486,7 +487,7 @@ final class CollectorApplication
                 'commands_executed' => $commandsExecuted,
                 // The job types (and newer config sections) this hub can run: the server sends a new
                 // kind only to hubs that list it.
-                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE]),
+                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE]),
                 'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
@@ -532,6 +533,14 @@ final class CollectorApplication
             throw new RuntimeException('Collector request signing key is invalid.');
         }
         $inbox = new RelayInbox($stateDirectory.DIRECTORY_SEPARATOR.'relay-inbox', RelayInbox::keyFor($secretKey));
+        // S&D Phase G (D5): the Terminal tab's hub side lives in this always-on process.
+        $central = $this->central($identity, $secretKey);
+        $terminal = new TerminalLane(
+            fn (array $report): array => $central->terminalWork((string) $identity['collector_id'], bin2hex(random_bytes(16)), $report),
+            new CredentialLeaseDecryptor($secretKey),
+            new EnvelopeVerifier((string) $identity['central_signing_public_key']),
+            (string) $identity['collector_id'],
+        );
         sodium_memzero($secretKey);
         $loginsFile = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE;
         $relay = null;
@@ -587,6 +596,11 @@ final class CollectorApplication
                 }
             }
             $tlsServer?->poll(0.2);
+            try {
+                $terminal->tick();
+            } catch (\Throwable $exception) {
+                $this->write('terminal: '.$exception->getMessage().PHP_EOL, STDERR);
+            }
             $port = $logins()['listen_port'] ?? null;
             if ($port !== $listening) {
                 $server->close();
@@ -603,10 +617,12 @@ final class CollectorApplication
                     }
                 }
             }
-            $server->poll($listening === null ? ($tlsServer === null ? 5.0 : 0.0) : 0.8);
+            // A live terminal wants a quick round; otherwise the relay's usual pace.
+            $server->poll($terminal->active() ? 0.1 : ($listening === null ? ($tlsServer === null ? 2.0 : 0.0) : 0.8));
         }
         $server->close();
         $tlsServer?->close();
+        $terminal->closeAll();
 
         return 3;
     }
@@ -617,6 +633,9 @@ final class CollectorApplication
     private const string RELAY_TLS_LOGINS_FILE = 'sensor-relay-tls.json';
 
     private const string RELAY_TLS_FEATURE = 'sensor_relay_tls_v1';
+
+    /** S&D Phase G (D5): this hub opens Terminal tabs (TerminalLane, inside the relay process). */
+    private const string TERMINAL_FEATURE = 'terminal_v1';
 
     private function writeRelayTls(string $stateDirectory, CollectorConfig $config, RelayTlsIdentity $relayTls): void
     {

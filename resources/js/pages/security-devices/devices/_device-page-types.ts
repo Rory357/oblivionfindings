@@ -10,7 +10,17 @@ import type { DeviceCardData, DeviceFormData, TimedText } from './_types';
  * open tab's data is filled in. A null value means "Not available", never 0.
  */
 
-export type DevicePageTab = 'overview' | 'health' | 'remote' | 'checks' | 'notes';
+export type DevicePageTab = 'overview' | 'health' | 'remote' | 'checks' | 'terminal' | 'notes';
+
+/** S&D Phase G (pg-sdr-3b): the Terminal tab, through the hub, for IT admins. */
+export type TerminalTabData = {
+    ready: boolean;
+    reason: string | null;
+    hub: string | null;
+    host: string;
+    session: { id: string; state: string } | null;
+    history: { id: string; who: string; at: string | null; reason: string | null; commands: string[] }[];
+};
 export type DevicePageGroup = 'network' | 'computer' | 'other';
 export type TrendRange = '24h' | '7d' | '30d';
 
@@ -282,6 +292,7 @@ export type DevicePageProps = {
     health: ComputerHealth | null;
     remote: RemoteSupport | null;
     checks: ChecksTab | null;
+    terminal?: TerminalTabData | null;
     notes: NotesTab | null;
     deviceForm?: DeviceFormData;
 };

@@ -265,6 +265,18 @@ final readonly class HttpsCentralApi implements CentralApi
         return $this->request('POST', '/api/monitoring/collectors/media/results', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'results' => $results]);
     }
 
+    /**
+     * S&D Phase G (D5): the terminal poll. What the hub's terminals sent back goes in; lines to
+     * type, terminals to open (signed) and to close come back.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    public function terminalWork(string $collectorId, string $requestKey, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/terminal/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
+    }
+
     public function discoveryWork(string $collectorId, string $requestKey, array $capability): array
     {
         return $this->request('POST', '/api/monitoring/collectors/media/discovery/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'capability' => $capability]);

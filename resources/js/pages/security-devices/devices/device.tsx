@@ -46,6 +46,7 @@ import { GatewayOverviewTab } from './_gateway-overview';
 import { NetworkOverviewTab, TroubleOverview } from './_device-overview-network';
 import { OtherOverviewTab } from './_device-overview-other';
 import { NotesTabView } from './_device-notes';
+import { TerminalTab } from './_device-terminal';
 import type { DevicePageMeter, DevicePageProps, DevicePageTab } from './_device-page-types';
 
 export type { DevicePageProps } from './_device-page-types';
@@ -214,6 +215,8 @@ export default function DevicePage(props: DevicePageProps) {
         );
     } else if (tab === 'notes' && props.notes) {
         body = <NotesTabView props={props} notes={props.notes} now={now} />;
+    } else if (tab === 'terminal' && props.terminal) {
+        body = <TerminalTab deviceId={device.id} deviceName={device.name} terminal={props.terminal} now={now} />;
     }
 
     return (

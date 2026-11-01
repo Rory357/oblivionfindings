@@ -579,6 +579,17 @@ Route::middleware([
         Route::post('/hazard', [AlertsController::class, 'raiseHazard'])->name('security-devices.alerts.hazard');
     });
 
+    // S&D Phase G (D5): a device's Terminal tab, through the hub, for IT admins (terminal.use).
+    Route::post('/devices/{device}/terminal', [\App\Domain\SecurityDevices\Terminal\Http\TerminalController::class, 'open'])
+        ->whereNumber('device')
+        ->middleware(['permission:securityDevices.terminal.use', 'throttle:10,1'])
+        ->name('security-devices.devices.terminal.open');
+    Route::prefix('/terminal/{session}')->middleware('permission:securityDevices.terminal.use')->group(function (): void {
+        Route::post('/input', [\App\Domain\SecurityDevices\Terminal\Http\TerminalController::class, 'input'])->middleware('throttle:240,1')->name('security-devices.terminal.input');
+        Route::get('/output', [\App\Domain\SecurityDevices\Terminal\Http\TerminalController::class, 'output'])->middleware('throttle:600,1')->name('security-devices.terminal.output');
+        Route::post('/close', [\App\Domain\SecurityDevices\Terminal\Http\TerminalController::class, 'close'])->middleware('throttle:30,1')->name('security-devices.terminal.close');
+    });
+
     // S&D Phase F: link a sensor to a person's care (pop-up 65, consent checked) and the scald watch.
     Route::prefix('/devices/{device}')->whereNumber('device')->middleware('throttle:30,1')->group(function (): void {
         Route::get('/care-link/options', [CareLinkController::class, 'options'])->name('security-devices.devices.care-link.options');
