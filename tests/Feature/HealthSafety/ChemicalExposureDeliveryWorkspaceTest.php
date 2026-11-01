@@ -114,7 +114,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_actual_inbox_retry_and_inspection_distinguish_read_from_source_completion(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned();
         $this->assertSame('unconfirmed', $this->workspace()->detail($this->manager, $root->id, $row->id)['destination']['state']);
         $r = $this->workspace()->retry($this->manager, $root->id, $row->id); $n = DatabaseNotification::sole();
@@ -125,7 +124,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_inbox_opt_out_blocks_new_send_but_does_not_complete_or_reroute_source_work(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->optOut($receiver, false);
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
         $this->assertSame('recipient_opted_out', $dto['blocked_reason']); $this->assertFalse($dto['can']['retry']);
@@ -135,7 +133,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_existing_verified_inbox_can_be_reconciled_after_new_message_opt_out(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->workspace()->retry($this->manager, $root->id, $row->id); $id = DatabaseNotification::sole()->id;
         $this->optOut($receiver, false); $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
         $this->assertSame('inbox_present', $dto['destination']['state']); $this->assertSame('disabled', $dto['destination']['notification_preference']);
@@ -143,7 +140,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_missing_inbox_is_unconfirmed_and_explicit_retry_recreates_only_exact_destination(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->workspace()->retry($this->manager, $root->id, $row->id); $id = DatabaseNotification::sole()->id;
         DB::table('notifications')->where('id', $id)->delete();
         $this->assertSame('unconfirmed', $this->workspace()->detail($this->manager, $root->id, $row->id)['destination']['state']);
@@ -152,7 +148,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_notification_payload_corruption_is_repair_not_automatically_resent(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->workspace()->retry($this->manager, $root->id, $row->id);
         DB::table('notifications')->where('id', DatabaseNotification::sole()->id)->update(['data' => json_encode(['body' => 'PRIVATE-INJECTED'])]);
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
@@ -160,7 +155,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_receiver_grant_site_or_hr_withdrawal_removes_confirmation_without_rerouting(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->workspace()->retry($this->manager, $root->id, $row->id);
         $this->allow($receiver, 'hr.wellbeing.view', false);
         $this->assertSame('restricted', $this->workspace()->detail($this->manager, $root->id, $row->id)['destination']['state']);
@@ -289,7 +283,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_new_recipient_requires_its_original_client_grant_before_destination_confirmation(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         foreach (['incidents.viewAny','clients.viewAny'] as $key) { $this->allow($this->manager, $key); }
         $receiver = $this->staff(['hazards.view','hazards.manage','hr.wellbeing.view','incidents.viewAny','clients.viewAny']);
         $client = \App\Models\Client::factory()->create(['site_id' => $this->site->id]);
@@ -332,7 +325,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_same_callback_source_mutation_during_attempt_hydration_withholds_count_and_confirmation(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $row] = $this->pending(); $changed = false;
         $dispatcher = ChemicalExposureSourceDelivery::getEventDispatcher(); ChemicalExposureSourceDelivery::setEventDispatcher(clone $dispatcher);
         ChemicalExposureSourceDelivery::retrieved(function ($model) use ($root, $row, &$changed): void {

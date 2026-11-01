@@ -22,6 +22,8 @@ use App\Services\Assurance\NzsAssuranceResolver;
 use App\Services\Clients\ClientPortalMembershipService;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\Fleet\FleetMapSettings;
+use App\Services\HealthSafety\ChemicalExposureInboxReads;
+use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\MedicationBellOrder;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
@@ -507,30 +509,32 @@ class HandleInertiaRequests extends Middleware
                 // Staff broadcast notices appear here only when a broadcast reader is
                 // already active for this request; otherwise they stay excluded.
                 $broadcastContext = BroadcastRecipientReadService::current($user);
+                // Private exposure follow-up notices are read inside their H&S context (#16); everyone else reads as before.
+                $inbox = app(ChemicalExposureInboxReads::class);
+                $notifications = $hasNotificationsTable
+                    ? $inbox->within($user, fn (?HealthSafetyReadContext $hs): array => [
+                        'unread_count' => $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, healthSafetyContext: $hs, broadcastContext: $broadcastContext)->count(),
+                        'items' => app(MedicationBellOrder::class)->apply($this->boardPackAccess->visibleNotificationQuery($user, healthSafetyContext: $hs, broadcastContext: $broadcastContext))
+                            ->latest()
+                            ->limit(8)
+                            ->get(['notifications.id', 'notifications.type', 'notifications.data', 'notifications.read_at', 'notifications.acknowledged_at', 'notifications.escalation_count', 'notifications.created_at', 'notifications.updated_at', 'notifications.notifiable_type', 'notifications.notifiable_id'])
+                            ->map(fn ($n) => $broadcastContext?->project($n) ?? [
+                                'id' => $n->id,
+                                'type' => $n->type,
+                                'data' => $inbox->data($n, $user, $hs),
+                                'read_at' => optional($n->read_at)->toISOString(),
+                                'acknowledged_at' => optional($n->acknowledged_at)->toISOString(),
+                                'escalation_count' => (int) ($n->escalation_count ?? 0),
+                                'created_at' => optional($n->created_at)->toISOString(),
+                            ])
+                            ->values()
+                            ->all(),
+                    ])
+                    : ['unread_count' => 0, 'items' => []];
 
                 return [
                     'broadcast_reader' => $broadcastContext?->envelope(),
-                    'notifications' => [
-                        'unread_count' => $hasNotificationsTable
-                            ? $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, broadcastContext: $broadcastContext)->count()
-                            : 0,
-                        'items' => $hasNotificationsTable
-                            ? app(MedicationBellOrder::class)->apply($this->boardPackAccess->visibleNotificationQuery($user, broadcastContext: $broadcastContext))
-                                ->latest()
-                                ->limit(8)
-                                ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
-                                ->map(fn ($n) => $broadcastContext?->project($n) ?? [
-                                    'id' => $n->id,
-                                    'type' => $n->type,
-                                    'data' => $n->data,
-                                    'read_at' => optional($n->read_at)->toISOString(),
-                                    'acknowledged_at' => optional($n->acknowledged_at)->toISOString(),
-                                    'escalation_count' => (int) ($n->escalation_count ?? 0),
-                                    'created_at' => optional($n->created_at)->toISOString(),
-                                ])
-                                ->values()
-                            : collect(),
-                    ],
+                    'notifications' => $notifications,
                     'announcements' => $hasAnnouncementsTables
                         ? Announcement::inboxFor($user)
                         : ['unread_count' => 0, 'items' => []],

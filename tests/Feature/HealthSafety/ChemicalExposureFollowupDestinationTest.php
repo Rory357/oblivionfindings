@@ -41,7 +41,6 @@ final class ChemicalExposureFollowupDestinationTest extends ChemicalExposureComm
 
     public function test_assignment_is_pending_until_actual_inbox_persistence_and_confirmation_is_database_only(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned();
         $this->assertSame('pending', $row->state); $this->assertSame(0, DatabaseNotification::count());
         $this->assertSame('unconfirmed', $this->destination()->confirmationForViewer($this->manager, $row->id)['destination_confirmation']);

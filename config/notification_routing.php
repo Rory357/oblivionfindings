@@ -78,6 +78,11 @@ return [
         'incidents.high_unreviewed_reminder' => [
             'target_groups' => ['managers_core', 'coordinators'],
         ],
+        // #16: only the person the follow-up is assigned to; never managers (it's private health information).
+        'health_safety.chemical_exposure_followup_assigned' => [
+            'include_managers' => false,
+            'target_groups' => ['entity_user'],
+        ],
 
         // --- HR: Leave ---
         'hr.leave.requested' => [

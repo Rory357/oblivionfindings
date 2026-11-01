@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\User;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
+use App\Services\HealthSafety\ChemicalExposureInboxReads;
+use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\Medication\Alerts\MedicationAlertAttendance;
 use App\Support\ControlRoom\BroadcastRecipientReadHttp;
 use Illuminate\Http\Request;
@@ -32,11 +34,18 @@ class NotificationInboxController extends Controller
             return back()->with('info', 'Staff messages are marked as read separately.');
         }
 
-        $n = $this->boardPackAccess
-            ->visibleNotificationQuery($user)
-            ->where('id', $notification)
-            ->firstOrFail();
-        $n->markAsRead();
+        $inbox = app(ChemicalExposureInboxReads::class);
+        $n = DatabaseNotification::query()->findOrFail($inbox->within($user, function (?HealthSafetyReadContext $context) use ($user, $notification, $inbox): string {
+            $n = $this->boardPackAccess
+                ->visibleNotificationQuery($user, healthSafetyContext: $context)
+                ->where('notifications.id', $notification)
+                ->firstOrFail();
+            $n->markAsRead();
+            // A private follow-up notice: the read flag is all that changes; the follow-up stays open.
+            $inbox->assertRead($n, $user, $context);
+
+            return (string) $n->id;
+        }));
         // Opening a medication alert can attend it (P11 B2 chunk 3).
         $this->attend($n, $user, MedicationAlertAttendance::OPENED);
 
@@ -53,9 +62,10 @@ class NotificationInboxController extends Controller
             return $response;
         }
 
-        $this->boardPackAccess
-            ->visibleNotificationQuery($user, unreadOnly: true)
-            ->update(['read_at' => now()]);
+        // Only notices the viewer can see right now; a hidden private notice stays unread.
+        app(ChemicalExposureInboxReads::class)->within($user, fn (?HealthSafetyReadContext $context): int => $this->boardPackAccess
+            ->visibleNotificationQuery($user, unreadOnly: true, healthSafetyContext: $context)
+            ->update(['read_at' => now()]));
 
         return back()->with('success', 'Other notifications marked as read. Staff messages have a separate read action.');
     }
@@ -69,21 +79,26 @@ class NotificationInboxController extends Controller
             return $response;
         }
 
-        $n = $this->boardPackAccess
-            ->visibleNotificationQuery($user)
-            ->where('id', $notification)
-            ->firstOrFail();
+        $acknowledged = app(ChemicalExposureInboxReads::class)->within($user, function (?HealthSafetyReadContext $context) use ($user, $notification): ?string {
+            $n = $this->boardPackAccess
+                ->visibleNotificationQuery($user, healthSafetyContext: $context)
+                ->where('notifications.id', $notification)
+                ->firstOrFail();
 
-        // Only acknowledge if this notification requests acknowledgement.
-        $ackRequired = (bool) data_get($n->data, 'ack_required', false);
-        if (! $ackRequired) {
+            // Only acknowledge if this notification requests acknowledgement.
+            if (! (bool) data_get($n->data, 'ack_required', false)) {
+                return null;
+            }
+            if (is_null($n->acknowledged_at)) {
+                $n->forceFill(['acknowledged_at' => now()])->save();
+            }
+
+            return (string) $n->id;
+        });
+        if ($acknowledged === null) {
             return back()->with('info', 'No acknowledgement required for this notification.');
         }
-
-        if (is_null($n->acknowledged_at)) {
-            $n->forceFill(['acknowledged_at' => now()])->save();
-        }
-        $this->attend($n, $user, MedicationAlertAttendance::ACKNOWLEDGED);
+        $this->attend(DatabaseNotification::query()->findOrFail($acknowledged), $user, MedicationAlertAttendance::ACKNOWLEDGED);
 
         return back()->with('success', 'Notification acknowledged.');
     }

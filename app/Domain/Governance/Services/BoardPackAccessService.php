@@ -13,6 +13,8 @@ use App\Models\User;
 use App\Services\Chat\ChatMessageDelivery;
 use App\Services\ControlRoom\BroadcastRecipientReadContext;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
+use App\Services\HealthSafety\ChemicalExposureNotificationAccessService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\Medication\Alerts\MedicationNotificationVisibility;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -219,21 +221,18 @@ final class BoardPackAccessService
      * no implicit opt-in: generic read/acknowledge writes pass nothing and never see
      * typed broadcast notices, even inside an active reader response.
      *
-     * The third argument is reserved for the H&S read context of the H&S rebuild
-     * (not on main yet); on main it must be null.
+     * Private exposure follow-up notices (#16) show only inside the H&S read context
+     * passed as the third argument (ChemicalExposureInboxReads opens it for a viewer
+     * who has one); without it, every private notice stays hidden.
      *
      * @return MorphMany<DatabaseNotification, User>
      */
     public function visibleNotificationQuery(
         User $viewer,
         bool $unreadOnly = false,
-        mixed $healthSafetyContext = null,
+        ?HealthSafetyReadContext $healthSafetyContext = null,
         ?BroadcastRecipientReadContext $broadcastContext = null,
     ): MorphMany {
-        if ($healthSafetyContext !== null) {
-            throw new \LogicException('The H&S read context is not available on this branch.');
-        }
-
         $visiblePacks = $this->visibleQuery($viewer);
         $visiblePackIds = (clone $visiblePacks)
             ->select($visiblePacks->getModel()->qualifyColumn('id'));
@@ -264,6 +263,9 @@ final class BoardPackAccessService
                         ->whereIn('data->meeting_id', $visibleMeetingIds);
                 });
         });
+
+        // Private exposure follow-ups: hidden unless the H&S context proves each one for this viewer now.
+        $query = app(ChemicalExposureNotificationAccessService::class)->scope($query, $viewer, $healthSafetyContext);
 
         // The broadcast context intersects last, after every other family's filter.
         return $broadcastContext ? $broadcastContext->scope($query) : $query;

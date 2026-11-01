@@ -43,6 +43,8 @@ return [
         'Audit & Safety' => [
             'breakglass.daily_report',
             'incidents.high_unreviewed_reminder',
+            // #16: in the app only; the named person, while they can open the private exposure.
+            'health_safety.chemical_exposure_followup_assigned',
         ],
 
         // --- HR Module ---

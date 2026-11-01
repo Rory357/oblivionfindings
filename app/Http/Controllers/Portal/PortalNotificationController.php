@@ -6,6 +6,8 @@ use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Http\Controllers\Controller;
 use App\Services\ControlRoom\BroadcastRecipientReadContext;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
+use App\Services\HealthSafety\ChemicalExposureInboxReads;
+use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Support\ControlRoom\BroadcastRecipientReadHttp;
 use Illuminate\Http\Request;
 
@@ -13,6 +15,7 @@ class PortalNotificationController extends Controller
 {
     public function __construct(
         private readonly BoardPackAccessService $boardPackAccess,
+        private readonly ChemicalExposureInboxReads $inbox,
     ) {}
 
     public function index(Request $request)
@@ -22,27 +25,31 @@ class PortalNotificationController extends Controller
 
         return app(BroadcastRecipientReadService::class)->respond($user, $request, function (BroadcastRecipientReadContext $context) use ($request, $user) {
             $filter = $request->input('filter', 'all');
-            $query = $this->boardPackAccess->visibleNotificationQuery($user, broadcastContext: $context);
+            // Private exposure follow-up notices are read inside their H&S context (#16); everyone else reads as before.
+            $props = $this->inbox->within($user, function (?HealthSafetyReadContext $hs) use ($context, $filter, $user): array {
+                $query = $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: $filter === 'unread',
+                    healthSafetyContext: $hs, broadcastContext: $context);
 
-            if ($filter === 'unread') {
-                $query = $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, broadcastContext: $context);
-            }
-
-            $notifications = $query->orderByDesc('created_at')
-                ->paginate(30)
-                ->through(fn ($notification) => $context->project($notification) ?? [
-                    'id' => $notification->id,
-                    'type' => class_basename($notification->type),
-                    'data' => $notification->data,
-                    'read_at' => $notification->read_at?->toISOString(),
-                    'created_at' => $notification->created_at?->toISOString(),
-                ]);
+                return [
+                    'notifications' => $query->orderByDesc('created_at')
+                        ->paginate(30)
+                        ->through(fn ($notification) => $context->project($notification) ?? [
+                            'id' => $notification->id,
+                            'type' => class_basename($notification->type),
+                            'data' => $this->inbox->data($notification, $user, $hs),
+                            'read_at' => $notification->read_at?->toISOString(),
+                            'created_at' => $notification->created_at?->toISOString(),
+                        ])->toArray(),
+                    'unreadCount' => $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true,
+                        healthSafetyContext: $hs, broadcastContext: $context)->count(),
+                ];
+            });
 
             return inertia('portal/notifications', [
-                'notifications' => $notifications,
+                'notifications' => $props['notifications'],
                 'filter' => $filter,
                 'broadcast_reader' => $context->envelope(),
-                'unreadCount' => $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, broadcastContext: $context)->count(),
+                'unreadCount' => $props['unreadCount'],
             ]);
         });
     }
@@ -56,11 +63,16 @@ class PortalNotificationController extends Controller
             return $response;
         }
 
-        $notification = $this->boardPackAccess
-            ->visibleNotificationQuery($user)
-            ->where('id', $notificationId)
-            ->firstOrFail();
-        $notification->update(['read_at' => now()]);
+        $this->inbox->within($user, function (?HealthSafetyReadContext $hs) use ($user, $notificationId): string {
+            $notification = $this->boardPackAccess
+                ->visibleNotificationQuery($user, healthSafetyContext: $hs)
+                ->where('notifications.id', $notificationId)
+                ->firstOrFail();
+            $notification->update(['read_at' => now()]);
+            $this->inbox->assertRead($notification, $user, $hs);
+
+            return (string) $notification->id;
+        });
 
         return redirect()->back();
     }
@@ -74,9 +86,10 @@ class PortalNotificationController extends Controller
             return $response;
         }
 
-        $this->boardPackAccess
-            ->visibleNotificationQuery($user, unreadOnly: true)
-            ->update(['read_at' => now()]);
+        // Only notices the viewer can see right now; a hidden private notice stays unread.
+        $this->inbox->within($user, fn (?HealthSafetyReadContext $hs): int => $this->boardPackAccess
+            ->visibleNotificationQuery($user, unreadOnly: true, healthSafetyContext: $hs)
+            ->update(['read_at' => now()]));
 
         return redirect()->back();
     }

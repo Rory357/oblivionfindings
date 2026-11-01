@@ -28,6 +28,8 @@ use App\Services\ControlRoom\BroadcastRecipientReadContext;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\GuidedRoundService;
 use App\Services\HandoverWorkerNotes;
+use App\Services\HealthSafety\ChemicalExposureInboxReads;
+use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\HealthSafety\FirstAidService;
 use App\Services\HealthSafety\FirstAidSourceProjectionService;
 use App\Services\HealthSafety\LoneWorkerSessionAccessService;
@@ -1734,38 +1736,48 @@ class MyTasksController extends Controller
 
     private function getUnreadNotificationCount(User $user, BroadcastRecipientReadContext $broadcastContext): int
     {
-        $visible = $this->boardPackAccess
-            ->visibleNotificationQuery($user, true, null, $broadcastContext)
-            ->reorder();
+        // Private exposure follow-up notices count only inside their H&S context (#16), same as the header bell.
+        return app(ChemicalExposureInboxReads::class)->within($user, function (?HealthSafetyReadContext $hs) use ($user, $broadcastContext): int {
+            $visible = $this->boardPackAccess
+                ->visibleNotificationQuery($user, true, $hs, $broadcastContext)
+                ->reorder();
 
-        // One count over the same visible set (the header bell counts the same
-        // way) — never page through every unread row just to count it.
-        $count = (clone $visible)->count();
+            // One count over the same visible set (the header bell counts the same
+            // way) — never page through every unread row just to count it.
+            $count = (clone $visible)->count();
 
-        // Counted typed rows also reveal their existence, including rows beyond the five previews.
-        // Register each with the same final proof, then discard the projected message body. Only an
-        // admitted staff-message notice can be typed in this set; ordinary rows project to nothing.
-        (clone $visible)
-            ->where('notifications.type', BroadcastRecipientNotice::class)
-            ->get()
-            ->each(fn (DatabaseNotification $notification) => $broadcastContext->project($notification));
+            // Counted typed rows also reveal their existence, including rows beyond the five previews.
+            // Register each with the same final proof, then discard the projected message body. Only an
+            // admitted staff-message notice can be typed in this set; ordinary rows project to nothing.
+            (clone $visible)
+                ->where('notifications.type', BroadcastRecipientNotice::class)
+                ->get()
+                ->each(fn (DatabaseNotification $notification) => $broadcastContext->project($notification));
 
-        return $count;
+            return $count;
+        });
     }
 
     private function getDigestNotifications(User $user, BroadcastRecipientReadContext $broadcastContext): array
     {
+        $inbox = app(ChemicalExposureInboxReads::class);
+
+        return $inbox->within($user, fn (?HealthSafetyReadContext $hs): array => $this->digestNotificationRows($user, $broadcastContext, $inbox, $hs));
+    }
+
+    private function digestNotificationRows(User $user, BroadcastRecipientReadContext $broadcastContext, ChemicalExposureInboxReads $inbox, ?HealthSafetyReadContext $hs): array
+    {
         $workerNow = Carbon::now($this->workerTimezone());
 
         return $this->boardPackAccess
-            ->visibleNotificationQuery($user, true, null, $broadcastContext)
+            ->visibleNotificationQuery($user, true, $hs, $broadcastContext)
             ->latest()
             ->limit(5)
             ->get()
-            ->map(function ($notification) use ($workerNow, $broadcastContext) {
+            ->map(function ($notification) use ($workerNow, $broadcastContext, $inbox, $user, $hs) {
                 $broadcast = $broadcastContext->project($notification);
                 $data = $broadcast === null
-                    ? (is_array($notification->data) ? $notification->data : [])
+                    ? $inbox->data($notification, $user, $hs)
                     : $broadcast['data'];
                 $createdAt = $broadcast === null
                     ? $this->digestNotificationCreatedAt($notification)
