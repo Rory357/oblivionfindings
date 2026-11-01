@@ -24,6 +24,8 @@ public sealed class DiagnosticSnapshot
     public DateTimeOffset ObservedAt {get;}
     public IReadOnlyList<string> Groups => GroupNames.Where(name=>data.TryGetProperty(name,out _)).ToArray();
     public string ProviderText => Prefix+data.GetRawText();
+    /// <summary>S&D Phase I: the same approved checks, sent with a fix request so Obli plans from them.</summary>
+    internal JsonElement Json => data;
     public override string ToString() => "Selected computer diagnostics";
     DiagnosticSnapshot(JsonElement element, DateTimeOffset observed) { data=element.Clone();ObservedAt=observed; }
     static Dictionary<string,JsonElement> Fields(JsonElement element, params string[] allowed)
