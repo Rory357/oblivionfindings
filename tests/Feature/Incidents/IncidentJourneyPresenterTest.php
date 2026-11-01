@@ -284,10 +284,14 @@ class IncidentJourneyPresenterTest extends TestCase
             $presenter->journeyState($incident->fresh(), $alert->fresh(), $hsEvent),
         );
 
-        $hsEvent->forceFill([
+        // Fresh copy: the stored review lost its factory owner when the incident routed it, so an unchanged in-memory
+        // owner would not be saved.
+        $hsEvent->refresh()->forceFill([
             'handover_status' => HsEvent::HANDOVER_ACCEPTED,
             'accepted_by_user_id' => $acceptor->id,
             'accepted_at' => now(),
+            // Decision 3 (G3): accepting gives the review its owner; it can't close without one.
+            'owner_user_id' => $owner->id,
         ])->save();
         $this->assertSame(
             'H&S governance active',
