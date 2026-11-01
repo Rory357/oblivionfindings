@@ -715,6 +715,7 @@ Route::middleware([
     // add and edit; hubs.approve to approve, replace, remove and hold updates).
     Route::prefix('/hubs')->middleware('throttle:30,1,security-device-hubs:')->group(function () {
         Route::post('/setup-codes', [HubAdminController::class, 'issue'])->name('security-devices.hubs.setup-codes.issue');
+        Route::post('/computer-setup-codes', [HubAdminController::class, 'issueComputer'])->name('security-devices.computers.setup-codes.issue');
         Route::get('/setup-codes/{setupCode}', [HubAdminController::class, 'status'])->whereNumber('setupCode')
             ->withoutMiddleware('throttle:30,1,security-device-hubs:')->middleware('throttle:90,1,security-device-hubs-status:')
             ->name('security-devices.hubs.setup-codes.status');

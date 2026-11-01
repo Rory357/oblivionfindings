@@ -40,6 +40,9 @@ return new class extends Migration
             $table->id();
             $table->string('role', 16); // hub | computer
             $table->string('platform', 16)->default('windows'); // windows | linux
+            // Computers only: "staff" installs Obli for the signed-in person, no admin needed;
+            // "full" is IT's install with the service (pop-up 23).
+            $table->string('install_mode', 16)->nullable();
             $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
             $table->foreignId('issued_by_user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('collector_enrollment_id')->nullable()->constrained('monitoring_collector_enrollments')->nullOnDelete();

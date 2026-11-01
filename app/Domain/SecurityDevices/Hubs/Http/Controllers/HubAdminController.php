@@ -64,10 +64,31 @@ final class HubAdminController extends Controller
         return response()->json($this->codePayload($issued['code'], $issued['plain'], $settings), 201, $this->noStore());
     }
 
+    /** Pop-up 23, "Install Oblivion on a computer": a download for this Site, staff (Obli only) or full (IT). */
+    public function issueComputer(Request $request, HubInstallationSettings $settings): JsonResponse
+    {
+        $actor = $this->actor($request, 'securityDevices.commands.admin');
+        $validated = $request->validate([
+            'site_id' => ['required', 'integer', 'min:1'],
+            'install_mode' => ['required', 'in:staff,full'],
+        ]);
+        $this->access->assertCanViewSite($actor, (int) $validated['site_id']);
+        try {
+            $issued = $this->codes->issueComputer($actor, $this->operationalSite((int) $validated['site_id']), (string) $validated['install_mode']);
+        } catch (RuntimeException|DomainException $exception) {
+            throw ValidationException::withMessages(['site_id' => $exception->getMessage()]);
+        }
+
+        return response()->json([
+            ...$this->codePayload($issued['code'], $issued['plain'], $settings),
+            'install_mode' => $issued['code']->install_mode,
+        ], 201, $this->noStore());
+    }
+
     /** The installer, named for this Site with its code, e.g. "Oblivion-Setup (Tōtara House) [oblivionfindings.com T6WD-3KQN].exe". */
     public function download(Request $request, SetupCode $setupCode): Response
     {
-        $actor = $this->actor($request, 'securityDevices.integrations.manage');
+        $actor = $this->actor($request, $setupCode->role === 'computer' ? 'securityDevices.commands.admin' : 'securityDevices.integrations.manage');
         $this->assertOwnSiteCode($actor, $setupCode);
         abort_unless($setupCode->platform === 'windows', 404);
         $plain = $this->codes->plainCode($setupCode);

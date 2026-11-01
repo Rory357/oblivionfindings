@@ -19,16 +19,19 @@ final class HubSetupRedeemController extends Controller
     {
         abort_unless($request->isSecure() || app()->environment(['local', 'testing']), 400);
         $code = $request->input('code');
-        if (! is_string($code) || strlen($code) > 32) {
+        $computerName = $request->input('computer_name');
+        if (! is_string($code) || strlen($code) > 32 || ($computerName !== null && (! is_string($computerName) || strlen($computerName) > 63))) {
             return response()->json(['state' => 'unknown', 'message' => (new SetupCodeRefused('unknown'))->getMessage()], 422, $this->noStore());
         }
         try {
-            $profile = $codes->redeem($code);
+            $result = $codes->redeem($code, $computerName);
         } catch (SetupCodeRefused $refused) {
             return response()->json(['state' => $refused->reason, 'message' => $refused->getMessage()], $refused->reason === 'unknown' ? 422 : 410, $this->noStore());
         }
 
-        return response()->json(['state' => 'ok', 'profile' => $profile], 200, $this->noStore());
+        // role: hub | computer. install_mode (computers): staff = Obli for this person, no admin;
+        // full = IT's install with the service.
+        return response()->json(['state' => 'ok', ...$result], 200, $this->noStore());
     }
 
     /** @return array<string, string> */

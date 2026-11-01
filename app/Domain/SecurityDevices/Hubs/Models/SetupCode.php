@@ -27,7 +27,7 @@ class SetupCode extends Model
     protected $table = 'security_device_setup_codes';
 
     protected $fillable = [
-        'role', 'platform', 'site_id', 'issued_by_user_id', 'collector_enrollment_id', 'replaces_collector_id',
+        'role', 'platform', 'install_mode', 'site_id', 'issued_by_user_id', 'collector_enrollment_id', 'replaces_collector_id',
         'intended_name', 'code_hash', 'code_ciphertext', 'profile_ciphertext', 'expires_at',
     ];
 

@@ -5,7 +5,12 @@ namespace App\Domain\SecurityDevices\Hubs\Services;
 use App\Domain\Monitoring\Models\CollectorEnrollment;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\CollectorEnrollmentService;
+use App\Domain\SecurityDevices\Endpoints\Models\EndpointAgent;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointBootstrap;
 use App\Domain\SecurityDevices\Hubs\Models\SetupCode;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -34,6 +39,7 @@ final readonly class SetupCodeService
     public function __construct(
         private CollectorEnrollmentService $enrollments,
         private HubInstallationSettings $settings,
+        private DeviceRegistryService $devices,
     ) {}
 
     /**
@@ -106,16 +112,56 @@ final readonly class SetupCodeService
     }
 
     /**
+     * A setup code for a staff computer at this Site (pop-up 23). "staff" installs Obli for the
+     * signed-in person with no admin prompt; "full" is IT's install with the service.
+     *
+     * @return array{code: SetupCode, plain: string}
+     */
+    public function issueComputer(User $actor, Site $site, string $mode): array
+    {
+        if (! in_array($mode, ['staff', 'full'], true)) {
+            throw new DomainException('Choose who the install is for.');
+        }
+        HubInstallationSettings::assertLabel($site->name);
+        $expiresAt = CarbonImmutable::now('UTC')->addHours(self::LIFETIME_HOURS)->subSecond();
+        $plain = $this->newCode();
+        $code = SetupCode::query()->create([
+            'role' => 'computer',
+            'platform' => 'windows',
+            'install_mode' => $mode,
+            'site_id' => (int) $site->id,
+            'issued_by_user_id' => (int) $actor->id,
+            'code_hash' => self::hash($plain),
+            'code_ciphertext' => Crypt::encryptString($plain),
+            'expires_at' => $expiresAt,
+        ]);
+        AuditLogger::logOrFail('security_devices.setup_code.issued', $code, [
+            'actor_id' => (int) $actor->id,
+            'site_id' => (int) $site->id,
+            'role' => 'computer',
+            'install_mode' => $mode,
+            'expires_at' => $expiresAt->toISOString(),
+        ]);
+
+        return ['code' => $code, 'plain' => $plain];
+    }
+
+    /**
      * The installer swaps its code for its setup profile. Refused once used, cancelled or
      * expired; the message says which, so "This installer was already used" shows on a second PC.
+     * A computer code also needs the computer's name: its device record is made at that moment.
      *
-     * @return array<string, mixed>
+     * @return array{role: string, install_mode: string|null, profile: array<string, mixed>}
      */
-    public function redeem(string $rawCode): array
+    public function redeem(string $rawCode, ?string $computerName = null): array
     {
         $code = self::normalise($rawCode);
         if ($code === null) {
             throw new SetupCodeRefused('unknown');
+        }
+        $record = SetupCode::query()->where('code_hash', self::hash($code))->first();
+        if ($record?->role === 'computer') {
+            return $this->redeemComputer($record, $computerName);
         }
 
         // The refusal is thrown after the transaction commits, so a spent code's secrets are
@@ -145,7 +191,78 @@ final readonly class SetupCodeService
             throw new SetupCodeRefused($outcome['refused']);
         }
 
-        return $outcome['profile'];
+        return ['role' => 'hub', 'install_mode' => null, 'profile' => $outcome['profile']];
+    }
+
+    /**
+     * A staff computer: find or make its device at the Site (by computer name), then issue the
+     * computer agent's own short-lived enrolment as the person who made the download. The code
+     * is spent at once; the enrolment inside the profile works once too.
+     *
+     * @return array{role: string, install_mode: string|null, profile: array<string, mixed>}
+     */
+    private function redeemComputer(SetupCode $record, ?string $computerName): array
+    {
+        $name = is_string($computerName) ? strtoupper(trim($computerName)) : '';
+        if (preg_match('/\A[A-Z0-9][A-Z0-9-]{0,62}\z/', $name) !== 1) {
+            throw new SetupCodeRefused('unknown');
+        }
+        $outcome = DB::transaction(function () use ($record, $name): array {
+            $locked = SetupCode::query()->whereKey($record->id)->lockForUpdate()->firstOrFail();
+            $state = $locked->state();
+            if ($state !== 'waiting') {
+                $this->forget($locked);
+
+                return ['refused' => $state];
+            }
+            $issuer = User::query()->whereKey($locked->issued_by_user_id)->whereNotNull('approved_at')->first();
+            if ($issuer === null) {
+                return ['refused' => 'cancelled'];
+            }
+            $device = $this->computerDevice((int) $locked->site_id, $name, $issuer);
+            $profile = app(EndpointBootstrap::class)->issue($issuer, $device);
+            $locked->forceFill([
+                'redeemed_at' => now(),
+                'redeem_count' => (int) $locked->redeem_count + 1,
+                'consumed_at' => now(),
+                'code_ciphertext' => null,
+                'profile_ciphertext' => null,
+            ])->save();
+            AuditLogger::logOrFail('security_devices.setup_code.used', $locked, [
+                'site_id' => (int) $locked->site_id,
+                'role' => 'computer',
+                'device_id' => (int) $device->id,
+            ]);
+
+            return ['profile' => $profile, 'install_mode' => (string) $locked->install_mode];
+        }, 3);
+        if (isset($outcome['refused'])) {
+            throw new SetupCodeRefused($outcome['refused']);
+        }
+
+        return ['role' => 'computer', 'install_mode' => $outcome['install_mode'], 'profile' => $outcome['profile']];
+    }
+
+    /** The Site's computer with this name and no working Obli, or a new one. */
+    private function computerDevice(int $siteId, string $name, User $issuer): Device
+    {
+        $existing = Device::query()
+            ->where('domain', 'it_infrastructure')
+            ->where('category', 'endpoint')
+            ->where('name', $name)
+            ->whereHas('assignments', fn ($query) => $query->active()
+                ->where('assignable_type', DeviceAssignment::TARGET_SITE)
+                ->where('assignable_id', $siteId))
+            ->whereNotIn('id', EndpointAgent::query()->whereNull('revoked_at')->whereNotNull('enrolled_at')->select('device_id'))
+            ->first();
+
+        return $existing ?? $this->devices->registerDiscoveredDevice([
+            'name' => $name,
+            'domain' => 'it_infrastructure',
+            'category' => 'endpoint',
+            'subcategory' => 'windows_computer',
+            'provider' => 'oblivion_endpoint',
+        ], $siteId, (int) $issuer->id);
     }
 
     public function cancel(SetupCode $code, User $actor): SetupCode
