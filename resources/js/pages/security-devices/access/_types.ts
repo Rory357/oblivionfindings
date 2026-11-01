@@ -1,3 +1,4 @@
+import type { GovernedAction } from '@/pages/security-devices/devices/_safety-kit-types';
 /** What AccessPagePresenter sends (S&D rebuild drawings pg-sdr-19, 19b, 19c, 19d, 19f). */
 import type { StatusVariant } from '@/components/ui/status-badge';
 
@@ -130,7 +131,24 @@ export type ActivityData = {
 
 export type StaffOption = { id: number; name: string; sub: string; employee_number: string | null; in_access: boolean };
 
+/** S&D Phase H (pop-up 86): one Site's lockdown, evacuation and end, as governed command summaries. */
+export type EmergencyActions = {
+    console_id: number;
+    device_id: number;
+    site_id: number;
+    site: string;
+    mode: string;
+    type_name: string;
+    lockdown: GovernedAction | null;
+    evacuate: GovernedAction | null;
+    end: GovernedAction | null;
+    commands: { id: number; phase: string; words: string; at: string | null }[];
+    confirm_identity_url: string;
+};
+
 export type AccessPageProps = {
+    /** S&D Phase H (pop-up 86): only on the Doors tab, only for people who may lock down a Site. */
+    emergency_actions?: EmergencyActions[];
     tab: AccessTab;
     filters: { site: string; q: string | null; state: string; status: string; when: string };
     sites: Option[];

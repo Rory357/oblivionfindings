@@ -15,7 +15,7 @@ import { useState, type MouseEvent, type ReactNode } from 'react';
 import { Spark } from '../devices/_device-card';
 import { BlockHead, ViewSwitch } from '../devices/_parts';
 import { lineText, StatusCell } from './_parts';
-import type { DoorCard as DoorCardData, DoorsData } from './_types';
+import type { DoorCard as DoorCardData, DoorsData, EmergencyActions } from './_types';
 
 const VIEW_KEY = 'sd.access.doors.view';
 const CARDS_PER_GROUP = 9;
@@ -114,6 +114,52 @@ export function DoorCard({ door, actions, onOpen, onContextMenu, now }: { door: 
     );
 }
 
+/** What the Site's mode means, and any lockdown or evacuation request still on its way. */
+function emergencySub(mode: string, actions: EmergencyActions | undefined): string | undefined {
+    const words =
+        mode === 'lockdown'
+            ? 'Cards, PINs and phones don’t open the doors from outside. Every door still opens from the inside.'
+            : mode === 'evacuation'
+              ? 'Every door at this Site is unlocked.'
+              : undefined;
+    const pending = actions?.commands.find((command) => !['done', 'stopped', 'mismatch'].includes(command.phase));
+    return pending ? [words, pending.words].filter(Boolean).join(' · ') : words;
+}
+
+function emergencyButtons(
+    site: { site_id: number; mode: string },
+    actions: EmergencyActions | undefined,
+    canRollCall: boolean,
+    onRollCall: (siteId: number) => void,
+    onEmergency?: (siteId: number, what: 'start' | 'end') => void,
+) {
+    const rollCall =
+        site.mode === 'evacuation' && canRollCall ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => onRollCall(site.site_id)}>
+                Open the roll call
+            </Button>
+        ) : null;
+    const start =
+        onEmergency && actions && site.mode === 'normal' && (actions.lockdown || actions.evacuate) ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => onEmergency(site.site_id, 'start')}>
+                Lockdown or evacuation…
+            </Button>
+        ) : null;
+    const end =
+        onEmergency && actions?.end && site.mode !== 'normal' ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => onEmergency(site.site_id, 'end')}>
+                {site.mode === 'evacuation' ? 'End evacuation…' : 'End lockdown…'}
+            </Button>
+        ) : null;
+    return rollCall || start || end ? (
+        <>
+            {rollCall}
+            {start}
+            {end}
+        </>
+    ) : undefined;
+}
+
 export function DoorsView({
     data,
     actionsFor,
@@ -121,6 +167,8 @@ export function DoorsView({
     onContextMenu,
     onRollCall,
     canRollCall,
+    emergencyActions = [],
+    onEmergency,
     filtered,
     now,
 }: {
@@ -130,6 +178,9 @@ export function DoorsView({
     onContextMenu: (event: MouseEvent, door: DoorCardData) => void;
     onRollCall: (siteId: number) => void;
     canRollCall: boolean;
+    /** S&D Phase H (pop-up 86): who may lock down or evacuate each Site. */
+    emergencyActions?: EmergencyActions[];
+    onEmergency?: (siteId: number, what: 'start' | 'end') => void;
     filtered: boolean;
     now: Date;
 }) {
@@ -256,20 +307,8 @@ export function DoorsView({
                                         ? 'Evacuation on'
                                         : 'Normal: no lockdown or evacuation'
                             }
-                            sub={
-                                site.mode === 'lockdown'
-                                    ? 'Cards, PINs and phones don’t open the doors from outside. Every door still opens from the inside.'
-                                    : site.mode === 'evacuation'
-                                      ? 'Every door at this Site is unlocked.'
-                                      : undefined
-                            }
-                            actions={
-                                site.mode === 'evacuation' && canRollCall ? (
-                                    <Button type="button" variant="outline" size="sm" onClick={() => onRollCall(site.site_id)}>
-                                        Open the roll call
-                                    </Button>
-                                ) : undefined
-                            }
+                            sub={emergencySub(site.mode, emergencyActions.find((item) => item.site_id === site.site_id))}
+                            actions={emergencyButtons(site, emergencyActions.find((item) => item.site_id === site.site_id), canRollCall, onRollCall, onEmergency)}
                         />
                     ))}
                 </div>

@@ -158,6 +158,37 @@ describe('Access › Doors', () => {
         expect(screen.queryByRole('button', { name: /give someone access/i })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /add visitor pass/i })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: /roll call/i })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /lockdown or evacuation/i })).not.toBeInTheDocument();
+    });
+
+    it('offers lockdown or evacuation (pop-up 86) only to people who may, with the governed steps', () => {
+        const action = { available: true, reason: null, step_up: false, approval: true, type_name: true, via: 'Synthetic House hub' };
+        render(
+            <AccessIndex
+                {...fixture({
+                    emergency_actions: [
+                        {
+                            console_id: 1,
+                            device_id: 90,
+                            site_id: 4,
+                            site: 'Synthetic House',
+                            mode: 'normal',
+                            type_name: 'Synthetic House doors',
+                            lockdown: action,
+                            evacuate: action,
+                            end: action,
+                            commands: [{ id: 3, phase: 'approval', words: 'Waiting for a second person to approve it', at: null }],
+                            confirm_identity_url: '/security-devices/devices/90/safety/confirm-identity',
+                        },
+                    ],
+                })}
+            />,
+        );
+
+        expect(screen.getByText(/Waiting for a second person to approve it/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Lockdown or evacuation…' }));
+        const popup = screen.getByRole('alertdialog', { name: 'Lockdown at Synthetic House?' });
+        expect(within(popup).getByLabelText(/Type Synthetic House doors to confirm/)).toBeInTheDocument();
     });
 });
 

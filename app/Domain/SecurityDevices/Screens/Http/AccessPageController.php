@@ -32,6 +32,13 @@ final class AccessPageController extends Controller
             ...$presenter->present($user, $request->only(['tab', 'site', 'q', 'page', 'state', 'status', 'when', 'door', 'kind', 'days', 'person'])),
             // Give someone access (81) and Match (90) pick staff at the Site, loaded when one opens.
             'staff' => Inertia::optional(fn (): array => $presenter->staffOptions($user)),
+            // S&D Phase H (pop-up 86): lockdown, evacuation and ending either, per Site, as governed commands.
+            'emergency_actions' => ($request->query('tab') ?? 'doors') === 'doors'
+                ? app(\App\Domain\SecurityDevices\Access\AccessEmergencyActions::class)->present(
+                    $user,
+                    is_numeric($confirmed = $request->session()->get('auth.password_confirmed_at')) ? CarbonImmutable::createFromTimestampUTC((int) $confirmed) : null,
+                )
+                : [],
         ]);
     }
 

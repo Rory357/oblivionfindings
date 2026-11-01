@@ -32,6 +32,7 @@ import {
     type CardTarget,
 } from '@/components/security-devices/access-popups';
 import { RollCall } from '@/components/security-devices/access-roll-call';
+import { EndSiteEmergency, SiteEmergency, type SiteEmergencySite } from '@/components/security-devices/site-emergency-popup';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -113,6 +114,8 @@ type Popup =
     | { kind: 'unmatch'; person: PersonRow }
     | { kind: 'cancel-visitor'; visitor: VisitorRow }
     | { kind: 'roll'; siteId: string | null }
+    | { kind: 'emergency'; siteId: number }
+    | { kind: 'emergency-end'; siteId: number }
     | null;
 
 function useNow(): Date {
@@ -345,6 +348,21 @@ export default function AccessIndex(props: AccessPageProps) {
         />
     );
 
+    // Pop-up 86: the Site whose lockdown or evacuation is being asked for.
+    const emergencyFor = popup?.kind === 'emergency' || popup?.kind === 'emergency-end' ? (props.emergency_actions ?? []).find((item) => item.site_id === popup.siteId) : undefined;
+    const emergencySite: SiteEmergencySite | null = emergencyFor
+        ? {
+              deviceId: emergencyFor.device_id,
+              site: emergencyFor.site,
+              mode: emergencyFor.mode,
+              typeName: emergencyFor.type_name,
+              lockdown: emergencyFor.lockdown,
+              evacuate: emergencyFor.evacuate,
+              end: emergencyFor.end,
+              confirmUrl: emergencyFor.confirm_identity_url,
+          }
+        : null;
+
     /* -------------------------------- body -------------------------------- */
 
     const searching = Boolean(filters.q);
@@ -365,6 +383,8 @@ export default function AccessIndex(props: AccessPageProps) {
                 onContextMenu={(event, door) => doorMenu.open(event, door)}
                 onRollCall={(site) => open({ kind: 'roll', siteId: String(site) })}
                 canRollCall={can.roll_call}
+                emergencyActions={props.emergency_actions ?? []}
+                onEmergency={(site, what) => open({ kind: what === 'start' ? 'emergency' : 'emergency-end', siteId: site })}
                 filtered={searching || filters.state !== 'all' || filters.site !== 'all'}
                 now={now}
             />
@@ -479,6 +499,12 @@ export default function AccessIndex(props: AccessPageProps) {
                 </>
             ) : null}
             {can.roll_call ? <RollCall open={popup?.kind === 'roll'} sites={sites} initialSiteId={popup?.kind === 'roll' ? popup.siteId : null} onClose={close} /> : null}
+            {emergencySite ? (
+                <>
+                    <SiteEmergency open={popup?.kind === 'emergency'} site={emergencySite} onClose={close} />
+                    <EndSiteEmergency open={popup?.kind === 'emergency-end'} site={emergencySite} onClose={close} />
+                </>
+            ) : null}
         </AppLayout>
     );
 }
