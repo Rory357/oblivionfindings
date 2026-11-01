@@ -99,6 +99,17 @@ it('never links someone at another Site, and needs the people.link permission', 
     $this->actingAs($this->keeper)->getJson("/security-devices/devices/{$farSensor->id}/care-link/options")->assertNotFound();
 });
 
+it('reads in or out of bed the way bed sensors send it', function (array $data, ?bool $expected): void {
+    expect(\App\Domain\SecurityDevices\Iot\Mqtt\MqttSensorIntakeService::bedOccupancy($data))->toBe($expected);
+})->with([
+    'in_bed true' => [['in_bed' => true], true],
+    'bed_status out' => [['bed_status' => 'out_of_bed'], false],
+    'occupancy occupied' => [['occupancy' => 'occupied'], true],
+    'occupancy 0' => [['occupancy' => 0], false],
+    'nothing about a bed' => [['temperature' => 21.5], null],
+    'an unknown word' => [['bed_status' => 'maybe'], null],
+]);
+
 it('tells night staff when someone is out of bed past their plan’s minutes, and closes it when they’re back', function (): void {
     ($this->consent)($this->hemi);
     ($this->link)()->assertCreated();

@@ -137,6 +137,19 @@ final class MqttSensorIntakeService
             }
         }
 
+        // S&D Phase F: a bed sensor's in or out of bed, kept as 1 (in bed) or 0 (out of bed) so a
+        // linked falls plan can tell night staff (Care\CareRules). No alert limits of its own.
+        $inBed = self::bedOccupancy($data);
+        if ($inBed !== null) {
+            $newReadings['occupancy'] = [
+                'label' => 'In bed',
+                'value' => $inBed ? 1.0 : 0.0,
+                'unit' => '',
+                'state' => 'healthy',
+                'observed_at' => $at->toISOString(),
+            ];
+        }
+
         $battery = null;
         $rawBattery = $data['battery'] ?? $data['battery_level'] ?? null;
         if (is_int($rawBattery) || is_float($rawBattery) || (is_string($rawBattery) && is_numeric($rawBattery))) {
@@ -349,6 +362,37 @@ final class MqttSensorIntakeService
      * @param  array<string, mixed>  $data
      * @return list<array{event_type: string, severity: string, payload: array<string, scalar|null>}>
      */
+    /**
+     * In bed (true), out of bed (false), or null when the message says nothing about a bed. Reads
+     * `in_bed`, `bed_status` and `occupancy` (occupied / vacant), as bed sensors send them.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function bedOccupancy(array $data): ?bool
+    {
+        foreach (['in_bed', 'bed_status', 'occupancy'] as $key) {
+            if (! array_key_exists($key, $data)) {
+                continue;
+            }
+            $raw = $data[$key];
+            if (is_bool($raw)) {
+                return $raw;
+            }
+            if (is_int($raw) || (is_string($raw) && in_array($raw, ['0', '1'], true))) {
+                return (int) $raw === 1;
+            }
+            $word = is_string($raw) ? strtolower(trim($raw)) : '';
+
+            return match ($word) {
+                'in_bed', 'in bed', 'occupied', 'on', 'true', 'present' => true,
+                'out_of_bed', 'out of bed', 'leave', 'left', 'vacant', 'off', 'false', 'absent', 'empty' => false,
+                default => null,
+            };
+        }
+
+        return null;
+    }
+
     private function extractDiscreteEvents(array $data): array
     {
         $events = [];
