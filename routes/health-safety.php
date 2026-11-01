@@ -70,6 +70,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── PR5: H&S Backbone Views (Events, Actions, Risk Assessments) ──
     Route::middleware('permission:hazards.view')->group(function () {
         Route::get('/events', [HsEventController::class, 'index'])->name('events.index');
+        // Board M11: "close anyway" requests waiting for this person's decision (the Overview's worklist).
+        Route::get('/events/close-anyway-requests', [HsEventController::class, 'closeAnywayRequests'])->name('events.close-anyway-requests');
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
         // G3 History tab: the review's activity log (read only, the event read).
         Route::get('/events/{hsEvent}/activity', [HsEventController::class, 'activity'])->whereNumber('hsEvent')->name('events.activity');

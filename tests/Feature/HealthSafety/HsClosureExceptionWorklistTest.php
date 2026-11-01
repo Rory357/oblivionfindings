@@ -83,4 +83,23 @@ class HsClosureExceptionWorklistTest extends RestraintEventCommandTestCase
         app(HsEventClosureService::class)->decideException($event, $request, $compliance, 'approved', 'Found before harm and replaced the same day.');
         $this->assertSame([], $ids($compliance), 'Decided requests leave the list.');
     }
+
+    public function test_the_overview_worklist_lists_requests_this_person_may_decide_and_never_their_own(): void
+    {
+        $compliance = $this->as('compliance_lead');
+        $asker = $this->as('admin');
+        [$event, $request] = $this->ask($asker);
+
+        $rows = $this->actingAs($compliance)->getJson('/health-safety/events/close-anyway-requests')->assertOk()->json('requests');
+        $this->assertCount(1, $rows);
+        $this->assertSame([$event->id, $request->id], [$rows[0]['review']['id'], $rows[0]['exception']['id']]);
+        $this->assertTrue($rows[0]['exception']['can_decide']);
+        $this->assertNotEmpty($rows[0]['review']['close_readiness']['requirements'], 'The Decide pop-up shows what is covered and what can’t be skipped.');
+
+        $this->actingAs($asker)->getJson('/health-safety/events/close-anyway-requests')->assertOk()->assertJsonPath('requests', []);
+        $this->actingAs($this->as('health_safety_officer'))->getJson('/health-safety/events/close-anyway-requests')->assertForbidden();
+
+        app(HsEventClosureService::class)->decideException($event, $request, $compliance, 'approved', 'Found before harm and replaced the same day.');
+        $this->actingAs($compliance)->getJson('/health-safety/events/close-anyway-requests')->assertOk()->assertJsonPath('requests', []);
+    }
 }

@@ -752,6 +752,12 @@ export function WorksafeDecisionDialog({
 }
 
 /** "Decide: close anyway?" (board M11, 720). Approving records a decision and closes nothing. */
+/** What the Decide pop-up reads from a review: the page's detail, or the Overview worklist's slim copy of it (M11). */
+export type DecideReview = Pick<EventDetail, 'id' | 'title' | 'reference_number' | 'site'> & {
+    handover: { owner: EventDetail['handover']['owner'] };
+    close_readiness: { requirements: EventDetail['close_readiness']['requirements'] };
+};
+
 export function DecideCloseAnywayDialog({
     open,
     onClose,
@@ -761,7 +767,7 @@ export function DecideCloseAnywayDialog({
 }: {
     open: boolean;
     onClose: () => void;
-    d: EventDetail;
+    d: DecideReview;
     exception: EventDetail['closure_exceptions'][number];
     viewerName?: string | null;
 }) {

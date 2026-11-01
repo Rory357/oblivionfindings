@@ -698,6 +698,71 @@ class HsEventController extends Controller
     }
 
     /**
+     * Board M11 (G3, approved by Stephan 1 Nov 2026): the "close anyway" requests waiting for this person's decision,
+     * for the Overview's worklist and its Decide pop-up. Only people who approve them, never for their own request;
+     * each review is read exactly as its page reads it (one read per review, as the PDF does), and a row is listed only
+     * when that read says this person may decide it now. At most 10.
+     */
+    public function closeAnywayRequests(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $viewer = $request->user();
+        abort_unless($viewer->canDo('hazards.view') && $viewer->canDo('healthSafety.closureExceptions.approve'), 403);
+        $viewerId = (int) $viewer->id;
+
+        $ids = DB::transaction(fn () => HealthSafetyReadContext::within($viewer, $this->detailReadPermissionKeys(),
+            function (HealthSafetyReadContext $context) use ($request, $viewerId): array {
+                $context->assertCurrentStaff();
+
+                return $this->scopedBase($request, $context)
+                    ->where('hs_events.status', '!=', HsEvent::STATUS_CLOSED)
+                    ->whereHas('closureExceptions', fn (Builder $waiting) => $waiting
+                        ->whereDoesntHave('decisions')
+                        ->where('expires_at', '>', now())
+                        ->where('review_at', '>', now())
+                        ->where('requested_by_user_id', '!=', $viewerId))
+                    ->orderBy('hs_events.id')
+                    ->limit(10)
+                    ->pluck('hs_events.id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->all();
+            }));
+
+        $rows = [];
+        foreach ($ids as $id) {
+            $detail = DB::transaction(fn () => HealthSafetyReadContext::within($viewer, $this->detailReadPermissionKeys(),
+                function (HealthSafetyReadContext $context) use ($request, $id): ?array {
+                    $context->assertCurrentStaff();
+                    try {
+                        $event = $this->resolveAccessibleEvent($request, $id, $context);
+                    } catch (NotFoundHttpException|\Illuminate\Database\Eloquent\ModelNotFoundException) {
+                        return null;
+                    }
+
+                    return $context->consumeViewer($this->detailReadPermissionKeys(),
+                        fn (User $current): array => $this->buildEventDetail($event, $current, $context));
+                }));
+            $exception = $detail === null ? null : collect($detail['closure_exceptions'] ?? [])
+                ->first(fn (array $row): bool => $row['status'] === 'pending' && ($row['can_decide'] ?? false) === true);
+            if ($exception === null) {
+                continue;
+            }
+            $rows[] = [
+                'review' => [
+                    'id' => $detail['id'],
+                    'title' => $detail['title'] ?? null,
+                    'reference_number' => $detail['reference_number'],
+                    'site' => $detail['site'] ?? null,
+                    'handover' => ['owner' => $detail['handover']['owner'] ?? null],
+                    'close_readiness' => ['requirements' => $detail['close_readiness']['requirements'] ?? []],
+                ],
+                'exception' => $exception,
+            ];
+        }
+
+        return response()->json(['requests' => $rows]);
+    }
+
+    /**
      * Q2 (Stephan, 31 Oct; G3 boards approved 1 Nov 2026): change the owner of a safety review, with a reason. The same
      * people may be chosen as for taking it on (handover owner rules), each change is kept in hs_event_owner_changes and
      * the audit log, and the previous and new owners are told.
