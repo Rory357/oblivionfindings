@@ -67,6 +67,10 @@ final class AccessJobs
     public function queue(AccessConsole $console, string $kind, array $params, ?User $actor, ?string $reason = null, int $ttlSeconds = self::DEFAULT_TTL_SECONDS): AccessJob
     {
         $sent = self::validate($kind, $params);
+        // A person's change waits on Setup's switch; turning a leaver off (no person) never does.
+        if ($actor !== null && ! app(\App\Domain\SecurityDevices\Setup\SecurityDevicesSettings::class)->bool(\App\Domain\SecurityDevices\Setup\SecurityDevicesSettings::ACCESS_CHANGES)) {
+            throw new DomainException('Changes to UniFi Access from Oblivion are turned off in Setup › Doors & access.');
+        }
         $hub = $this->hubs->forSite((int) $console->site_id);
         if (! $hub instanceof MonitoringCollector) {
             throw new DomainException('No hub covers this Site, so UniFi Access can’t be changed from Oblivion.');
@@ -244,7 +248,7 @@ final class AccessJobs
         if ($reference === null || $capabilities === []) {
             throw new DomainException('Save the UniFi Access login in Setup first.');
         }
-        $lease = $this->leases->acquire((int) $console->site_id, $reference->reference_key, [$capabilities[0]]);
+        $lease = $this->leases->acquire((int) $console->site_id, $reference->reference_key, [in_array('write:access.admin', $capabilities, true) ? 'write:access.admin' : $capabilities[0]]);
         $details = [
             'job' => $job->uuid,
             'kind' => $job->kind,

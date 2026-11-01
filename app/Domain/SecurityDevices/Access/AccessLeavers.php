@@ -27,6 +27,10 @@ final class AccessLeavers
     public function tick(?CarbonImmutable $now = null): int
     {
         $now ??= CarbonImmutable::now('UTC');
+        $settings = app(\App\Domain\SecurityDevices\Setup\SecurityDevicesSettings::class);
+        if (! $settings->bool(\App\Domain\SecurityDevices\Setup\SecurityDevicesSettings::ACCESS_LEAVERS)) {
+            return 0;
+        }
         $queued = 0;
         AccessPerson::query()
             ->with('console')

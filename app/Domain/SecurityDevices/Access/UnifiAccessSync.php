@@ -65,7 +65,7 @@ final class UnifiAccessSync
                     if (! $reference || $capabilities === [] || filter_var($console->address, FILTER_VALIDATE_IP) === false) {
                         return;
                     }
-                    $lease = $this->leases->acquire((int) $console->site_id, $reference->reference_key, [$capabilities[0]]);
+                    $lease = $this->leases->acquire((int) $console->site_id, $reference->reference_key, [in_array('read:access.sync', $capabilities, true) ? 'read:access.sync' : $capabilities[0]]);
                     $pin = $this->trust->record((int) $console->site_id, $console->address, (int) $console->port)?->trusted_pin;
                     $entries[] = [
                         'console_id' => (string) $console->id,

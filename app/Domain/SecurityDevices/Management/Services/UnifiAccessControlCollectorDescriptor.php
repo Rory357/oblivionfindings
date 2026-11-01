@@ -220,6 +220,10 @@ abstract class UnifiAccessControlCollectorDescriptor implements CollectorCommand
         if (! $console instanceof AccessConsole || (int) $console->site_id !== $siteId) {
             throw new RuntimeException('The UniFi Access console isn’t at this Site.');
         }
+        if ($this->operation() === 'lockdown' && $console->exit_buttons_confirmed_at === null) {
+            // Lockdown never shuts anyone in: it waits until every door is confirmed to open from inside.
+            throw new RuntimeException('Nobody has confirmed every door has an exit button and a handle yet.');
+        }
         $pin = $this->trust->record($siteId, $console->address, (int) $console->port)?->trusted_pin;
         if (! is_string($pin) || preg_match(CameraEndpointTrustService::PIN_PATTERN, $pin) !== 1) {
             throw new RuntimeException('The UniFi Access console’s certificate isn’t trusted yet.');

@@ -33,6 +33,8 @@ final class SetupPresenter
         'hubs' => ['label' => 'Hubs & networks', 'tabs' => ['networks' => 'Networks & scans', 'broker' => 'Sensor broker']],
         'services' => ['label' => 'Services & logins', 'tabs' => ['connected' => 'Connected services', 'logins' => 'Saved logins', 'supported' => 'Supported devices']],
         'alerts' => ['label' => 'Alerts & checks', 'tabs' => ['rules' => 'Alert rules', 'checks' => 'Checks']],
+        // S&D Phase H (pg-sdr-15m): each Site's UniFi Access console, through its hub.
+        'access' => ['label' => 'Doors & access', 'tabs' => ['unifi' => 'UniFi Access']],
         'history' => ['label' => 'Change history', 'tabs' => []],
     ];
 
@@ -52,7 +54,7 @@ final class SetupPresenter
 
     public static function canOpen(User $viewer): bool
     {
-        return self::canSeeServices($viewer) || self::canSeeAlerts($viewer);
+        return self::canSeeServices($viewer) || self::canSeeAlerts($viewer) || self::canSeeAccess($viewer);
     }
 
     public static function canSeeServices(User $viewer): bool
@@ -65,6 +67,13 @@ final class SetupPresenter
     {
         return $viewer->canDo('securityDevices.automations.manage')
             || $viewer->canDo('securityDevices.monitoring.manage');
+    }
+
+    /** S&D Phase H: Doors & access, for people who look after services or door access. */
+    public static function canSeeAccess(User $viewer): bool
+    {
+        return self::canSeeServices($viewer)
+            || $viewer->canDo('securityDevices.accessControl.manage');
     }
 
     public static function canSeeHistory(User $viewer): bool
@@ -86,6 +95,9 @@ final class SetupPresenter
         }
         if (! self::canSeeHistory($viewer)) {
             unset($sections['history']);
+        }
+        if (! self::canSeeAccess($viewer)) {
+            unset($sections['access']);
         }
 
         return $sections;
@@ -147,6 +159,8 @@ final class SetupPresenter
             'logins' => $section === 'services' && $tab === 'logins' ? ['rows' => $logins['rows'], 'kept' => $logins['kept']] : null,
             'supported' => $section === 'services' && $tab === 'supported' ? $this->supportedTables($viewer) : null,
             'history' => $section === 'history' ? $this->history->present($viewer, (int) ($query['page'] ?? 1)) : null,
+            // S&D Phase H (pg-sdr-15m): the Sites' UniFi Access consoles and what Oblivion keeps in step.
+            'access' => $section === 'access' && $tab === 'unifi' ? app(\App\Domain\SecurityDevices\Access\AccessSetup::class)->present($viewer) : null,
         ];
     }
 

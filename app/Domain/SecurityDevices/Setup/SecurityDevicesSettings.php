@@ -60,6 +60,12 @@ final class SecurityDevicesSettings
     /** Phones and tablets found by a scan are watched too (off: found, never watched or alerted on). */
     public const string WATCH_PHONES = 'devices.watch_phones';
 
+    /** S&D Phase H (D20): a matched leaver is turned off in UniFi Access after their last day. */
+    public const string ACCESS_LEAVERS = 'access.leavers_off';
+
+    /** S&D Phase H: people, cards and visitor passes may be changed in UniFi Access from Oblivion. */
+    public const string ACCESS_CHANGES = 'access.changes_from_oblivion';
+
     private const string MANAGE_SCANS = 'securityDevices.integrations.manage';
 
     private const string MANAGE_ALERTS = 'securityDevices.automations.manage';
@@ -85,6 +91,9 @@ final class SecurityDevicesSettings
         self::MQTT_PLAIN => ['type' => 'bool', 'permission' => self::MANAGE_SCANS, 'loosens' => true],
         self::WATCH_ON_ADD => ['type' => 'bool', 'permission' => 'securityDevices.monitoring.manage', 'loosens' => false],
         self::WATCH_PHONES => ['type' => 'bool', 'permission' => 'securityDevices.monitoring.manage', 'loosens' => null],
+        // Turning leavers off automatically is a safety check: switching it off loosens it.
+        self::ACCESS_LEAVERS => ['type' => 'bool', 'permission' => 'securityDevices.accessControl.manage', 'loosens' => false],
+        self::ACCESS_CHANGES => ['type' => 'bool', 'permission' => 'securityDevices.accessControl.manage', 'loosens' => null],
     ];
 
     /** @var array<string, mixed>|null */
@@ -244,7 +253,8 @@ final class SecurityDevicesSettings
     private function default(string $key): mixed
     {
         return match ($key) {
-            self::DAILY_SCANS, self::DEVICES_APP, self::DEVICES_EMAIL, self::NEW_DEVICES_APP, self::WATCH_ON_ADD, self::SAFETY_EMAIL, self::SAFETY_PUSH, self::SAFETY_ROSTER => true,
+            self::DAILY_SCANS, self::DEVICES_APP, self::DEVICES_EMAIL, self::NEW_DEVICES_APP, self::WATCH_ON_ADD, self::SAFETY_EMAIL, self::SAFETY_PUSH, self::SAFETY_ROSTER,
+            self::ACCESS_LEAVERS, self::ACCESS_CHANGES => true,
             self::DEVICES_PUSH, self::NEW_DEVICES_EMAIL, self::NEW_DEVICES_PUSH, self::WATCH_PHONES, self::MQTT_PLAIN => false,
             self::DEVICES_ROLE => null,
             // Off for new organisations. Where the server already scanned networks itself

@@ -580,6 +580,16 @@ Route::middleware([
     Route::get('/setup/broker/sensors-certificate', [SetupController::class, 'sensorsCertificate'])
         ->middleware('throttle:30,1')
         ->name('security-devices.setup.broker.sensors-certificate');
+    // S&D Phase H (pg-sdr-15m, pop-up 91): Setup › Doors & access. The controller and AccessSetup check who may do what.
+    Route::prefix('/setup/access')->middleware('throttle:30,1')->group(function (): void {
+        $setup = \App\Domain\SecurityDevices\Access\Http\AccessSetupController::class;
+        Route::post('/consoles', [$setup, 'store'])->name('security-devices.setup.access.consoles.store');
+        Route::get('/consoles/{console}', [$setup, 'show'])->whereNumber('console')->withoutMiddleware('throttle:30,1')->middleware('throttle:120,1')->name('security-devices.setup.access.consoles.show');
+        Route::put('/consoles/{console}/token', [$setup, 'token'])->whereNumber('console')->middleware('throttle:10,1')->name('security-devices.setup.access.consoles.token');
+        Route::post('/consoles/{console}/trust', [$setup, 'trust'])->whereNumber('console')->name('security-devices.setup.access.consoles.trust');
+        Route::post('/consoles/{console}/doors-confirmed', [$setup, 'confirmDoors'])->whereNumber('console')->name('security-devices.setup.access.consoles.doors');
+        Route::put('/settings', [$setup, 'settings'])->name('security-devices.setup.access.settings');
+    });
     // S&D Phase E (E8): pop-up 15, Connect a service. Each step runs the service's own settings action.
     Route::get('/setup/services/connect', [\App\Domain\SecurityDevices\Screens\Http\ConnectServiceController::class, 'show'])
         ->middleware(['permission:securityDevices.integrations.manage', 'throttle:60,1'])

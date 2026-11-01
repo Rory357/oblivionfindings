@@ -42,6 +42,10 @@ final class AccessEmergencyActions
             ->map(function (AccessConsole $console) use ($viewer, $stepUpAt, $now): array {
                 $device = $this->consoles->device($console);
                 $siteId = (int) $console->site_id;
+                $lockdown = $this->commands->action($viewer, $device, $siteId, 'access.site.lockdown', $stepUpAt);
+                if ($lockdown !== null && $console->exit_buttons_confirmed_at === null) {
+                    $lockdown = [...$lockdown, 'available' => false, 'reason' => 'Lockdown is offered once someone confirms every door has an exit button and a handle (Setup › Doors & access).'];
+                }
 
                 return [
                     'console_id' => (int) $console->id,
@@ -50,7 +54,7 @@ final class AccessEmergencyActions
                     'site' => (string) \App\Models\Site::query()->whereKey($siteId)->value('name'),
                     'mode' => (string) $console->emergency_mode,
                     'type_name' => (string) $device->name,
-                    'lockdown' => $this->commands->action($viewer, $device, $siteId, 'access.site.lockdown', $stepUpAt),
+                    'lockdown' => $lockdown,
                     'evacuate' => $this->commands->action($viewer, $device, $siteId, 'access.site.evacuate', $stepUpAt),
                     'end' => $this->commands->action($viewer, $device, $siteId, 'access.site.emergency_end', $stepUpAt),
                     'commands' => $this->commands->recent($viewer, $device, self::CAPABILITIES, $now),
