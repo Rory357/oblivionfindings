@@ -150,7 +150,7 @@ export function DrillPlanningForm({
                 );
                 if (!instant) {
                     setFailure(
-                        'Choose a valid New Zealand date and time and its clock occurrence if requested.',
+                        'Choose the date and time the drill is planned for. When the clocks change that night, also choose which one.',
                     );
                     return;
                 }
@@ -273,6 +273,7 @@ export function DrillPlanningForm({
             </fieldset>
             <DrillTimeField
                 pickers
+                required
                 label="Planned for"
                 value={form.data.scheduled_at}
                 offset={form.data.time_offset}

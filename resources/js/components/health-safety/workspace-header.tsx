@@ -67,7 +67,10 @@ export function SafetyWorkspaceRail({
     onSelect?: (key: string) => boolean;
 }) {
     const can = usePage<SharedData>().props.auth.can;
-    const fetched = useConcernsRailCounts(hub === 'concerns' && counts === undefined);
+    // The counts route needs hazards.view; without it (e.g. a support worker on Incidents) nothing is asked for.
+    const fetched = useConcernsRailCounts(
+        hub === 'concerns' && counts === undefined && !!(can as SafetyNavigationPermissions | undefined)?.hazards?.view,
+    );
     // Fetched counts are attention counts (work waiting), so they take the alert pair; a page's own counts stay neutral.
     const attention = counts === undefined && fetched !== undefined;
     counts = counts ?? fetched;

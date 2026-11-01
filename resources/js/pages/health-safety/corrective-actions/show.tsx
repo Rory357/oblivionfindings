@@ -603,7 +603,12 @@ function ActionRecord({
         },
         closed: {
             items: ca.closed_at ? [{ key: 'closed', label: 'Closed', value: formatDateTime(ca.closed_at) }] : [],
-            empty: 'Not closed yet. It closes after the check.',
+            empty:
+                ca.effectiveness_confirmed === false
+                    ? 'Not closed. The check found it didn’t work, so the safety review adds a revised action.'
+                    : ca.verified_at
+                      ? 'Not closed yet. It can close now that it has been checked.'
+                      : 'Not closed yet. It closes after the check.',
             note: 'Closing this action doesn’t close its safety review.',
         },
     };

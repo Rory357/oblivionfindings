@@ -2651,7 +2651,7 @@ function ReviewHandover({ d }: { d: EventDetail }) {
         summary.potential_consequence
             ? {
                   icon: TriangleAlert,
-                  text: `Could have caused: ${summary.potential_consequence}`,
+                  text: `Consequence: ${summary.potential_consequence}`,
               }
             : null,
     ].filter((fact) => fact !== null);
@@ -4277,7 +4277,7 @@ function AcceptHandoverPane({
             </InfoCard>
             <Field
                 label="H&S owner"
-                hint="Optional — leave blank to assign yourself if you work at this site"
+                hint="Choose who owns it. You can leave it blank only if you work at this Site — then it is yours."
                 error={form.errors.owner_user_id}
             >
                 <StaffSelect
