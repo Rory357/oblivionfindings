@@ -533,6 +533,19 @@ Route::middleware([
         ->whereNumber('site')
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.sites.show');
+    // S&D Phase F (pg-sdr-12c, pop-ups 42 and 43): a Site's house modes. Safe actions only; another Site's mode is 404.
+    Route::post('/sites/{site}/modes', [\App\Domain\SecurityDevices\Screens\Http\SiteModesController::class, 'store'])
+        ->whereNumber('site')
+        ->middleware(['permission:securityDevices.automations.manage', 'throttle:20,1'])
+        ->name('security-devices.sites.modes.store');
+    Route::put('/sites/{site}/modes/{mode}', [\App\Domain\SecurityDevices\Screens\Http\SiteModesController::class, 'update'])
+        ->whereNumber(['site', 'mode'])
+        ->middleware(['permission:securityDevices.automations.manage', 'throttle:20,1'])
+        ->name('security-devices.sites.modes.update');
+    Route::post('/sites/{site}/modes/{mode}/switch', [\App\Domain\SecurityDevices\Screens\Http\SiteModesController::class, 'switch'])
+        ->whereNumber(['site', 'mode'])
+        ->middleware(['permission:securityDevices.modes.switch', 'throttle:20,1'])
+        ->name('security-devices.sites.modes.switch');
 
     // S&D rebuild C5: Setup. The controller checks who may open it and each section.
     Route::get('/setup', [SetupController::class, 'show'])

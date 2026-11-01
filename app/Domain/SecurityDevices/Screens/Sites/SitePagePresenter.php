@@ -25,13 +25,13 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
- * One Site (S&D rebuild drawing pg-sdr-12, with its Network map 12b, Internet 12e and "hub stopped
- * answering" 12f views). Only the open tab's data is worked out. Rooms and house modes (12c, 12d)
- * are Phase F. The Devices, Alerts and Logbook tabs (12g–12i) wait for their drawings' approval.
+ * One Site (S&D rebuild drawing pg-sdr-12, with its Network map 12b, Internet 12e, Rooms 12d, Modes
+ * 12c and "hub stopped answering" 12f views). Only the open tab's data is worked out. The Devices,
+ * Alerts and Logbook tabs (12g–12i) wait for their drawings' approval.
  */
 final class SitePagePresenter
 {
-    public const array TABS = ['overview', 'network', 'internet'];
+    public const array TABS = ['overview', 'network', 'internet', 'rooms', 'modes'];
 
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
@@ -40,6 +40,8 @@ final class SitePagePresenter
         private readonly ControlRoomAlertAccessService $alertAccess,
         private readonly SiteNetworkWeek $week,
         private readonly SiteTopologyMapService $topology,
+        private readonly SiteRoomsPresenter $rooms,
+        private readonly SiteModesPresenter $modes,
     ) {}
 
     public function site(User $viewer, int $siteId): Site
@@ -86,15 +88,22 @@ final class SitePagePresenter
                 'seen_at' => $hub->last_seen_at?->toIso8601String(),
             ],
             'meters' => $this->meters($entries, $alerts, $site),
+            // S&D Phase F: the header's House mode block and Change mode (pop-up 42), on every tab.
+            'house' => $this->modes->house($site, $entries),
             'overview' => $tab === 'overview' ? $this->overview($entries, $hub, $hubDown) : null,
             'network' => $tab === 'network' ? $this->network($site, $entries) : null,
             'internet' => $tab === 'internet' ? $this->internet($entries) : null,
+            'rooms' => $tab === 'rooms' ? $this->rooms->present($viewer, $site, $entries) : null,
+            'modes' => $tab === 'modes' ? $this->modes->present($site, $entries, $viewer->canDo('securityDevices.automations.manage')) : null,
             'can' => [
                 'add_device' => $viewer->canDo('securityDevices.devices.create'),
                 'assign' => $viewer->canDo('securityDevices.devices.assign'),
                 'scan' => $viewer->canDo('securityDevices.integrations.manage'),
                 'add_hub' => HubActionRules::allows($viewer, 'securityDevices.integrations.manage'),
                 'approve_hub' => HubActionRules::allows($viewer, 'securityDevices.hubs.approve'),
+                // S&D Phase F: switch a house mode by hand (pop-up 42), and add or edit one (pop-up 43).
+                'switch_mode' => $viewer->canDo('securityDevices.modes.switch'),
+                'edit_modes' => $viewer->canDo('securityDevices.automations.manage'),
             ],
         ];
     }

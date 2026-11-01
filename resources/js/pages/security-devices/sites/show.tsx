@@ -1,6 +1,6 @@
 /**
- * One Site (S&D rebuild drawing pg-sdr-12, with Network map 12b, Internet 12e and "hub stopped
- * answering" 12f). Rooms and house modes (12c, 12d) come with Phase F.
+ * One Site (S&D rebuild drawing pg-sdr-12, with Network map 12b, Internet 12e, Rooms 12d, Modes 12c
+ * and "hub stopped answering" 12f). House modes switch by hand with pop-up 42 and are edited with 43.
  */
 import { DonutChart } from '@/components/dashboard/donut-chart';
 import {
@@ -15,19 +15,23 @@ import {
     PageLayout,
 } from '@/components/page';
 import { AddDeviceChooser, DeviceFormPopup, useDeviceFormOptions } from '@/components/security-devices/device-popups';
+import { EditHouseMode, modeIcon, SwitchHouseMode } from '@/components/security-devices/house-mode-popups';
 import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { SiteTopologyTreeCard } from '@/components/security-devices/site-topology-tree';
 import type { SiteTopologyTree } from '@/components/security-devices/topology-types';
 import { KnowList, Log, PointBars, QuietLine, SideBySide, SideColumn, Story, Surface } from '@/components/signature/blocks';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { agoWords, seenTime, timedText } from '@/lib/security-devices/device-time';
 import { deviceStateLabel, deviceStateTone, type DeviceState } from '@/lib/security-devices/device-words';
 import { Head, Link, router } from '@inertiajs/react';
-import { House, Plus, Radar } from 'lucide-react';
+import { House, Plus, Radar, SunMoon } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import type { SitePageProps, SitePageTab } from './_types';
+import { ModesTab } from './_modes';
+import { RoomsTab } from './_rooms';
+import type { HouseSummary, SitePageProps, SitePageTab } from './_types';
 
 export type { SitePageProps } from './_types';
 
@@ -36,7 +40,11 @@ const TAB_LABEL: Record<SitePageTab, string> = {
     overview: 'Overview',
     network: 'Network map',
     internet: 'Internet',
+    rooms: 'Rooms',
+    modes: 'Modes',
 };
+
+const NO_HOUSE: HouseSummary = { current: null, next: null, modes: [] };
 
 /** Each state's ring colour, from the status tokens (never the brand). */
 const STATE_COLOUR: Record<DeviceState, string> = {
@@ -57,13 +65,33 @@ function useNow(): Date {
     return now;
 }
 
-type Popup = { kind: 'chooser' } | { kind: 'add' } | { kind: 'scan' } | { kind: 'scanning'; runId: number } | null;
+type Popup =
+    | { kind: 'chooser' }
+    | { kind: 'add' }
+    | { kind: 'scan' }
+    | { kind: 'scanning'; runId: number }
+    | { kind: 'switch_mode' }
+    | { kind: 'edit_mode' }
+    | null;
 
 export default function SiteShow(props: SitePageProps) {
     const { site, tab, flag, hub, meters, can } = props;
+    const house = props.house ?? NO_HOUSE;
+    // Change mode offers every mode but the one the house is in.
+    const switchable = can.switch_mode ? house.modes.filter((mode) => mode.id !== house.current?.id) : [];
     const now = useNow();
     const base = `/security-devices/sites/${site.id}`;
     const [popup, setPopup] = useState<Popup>(null);
+    // The mode a house mode pop-up is about; kept while it closes so its words don't change.
+    const [modeTarget, setModeTarget] = useState<number | null>(null);
+    const switchMode = (modeId: number) => {
+        setModeTarget(modeId);
+        setPopup({ kind: 'switch_mode' });
+    };
+    const editMode = (modeId: number | null) => {
+        setModeTarget(modeId);
+        setPopup({ kind: 'edit_mode' });
+    };
     const { form, load } = useDeviceFormOptions();
     const open = (next: Exclude<Popup, null>) => {
         load();
@@ -117,6 +145,24 @@ export default function SiteShow(props: SitePageProps) {
                             Scan now
                         </PageHeaderGlassButton>
                     ) : null}
+                    {switchable.length > 0 ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <PageHeaderGlassButton icon={SunMoon}>Change mode</PageHeaderGlassButton>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                {switchable.map((mode) => {
+                                    const Icon = modeIcon(mode.name);
+                                    return (
+                                        <DropdownMenuItem key={mode.id} onSelect={() => switchMode(mode.id)}>
+                                            <Icon aria-hidden="true" />
+                                            Switch to {mode.name}
+                                        </DropdownMenuItem>
+                                    );
+                                })}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
                     {can.add_device || can.scan ? (
                         <PageHeaderPrimaryButton icon={Plus} onClick={() => open({ kind: 'chooser' })}>
                             Add device
@@ -134,6 +180,20 @@ export default function SiteShow(props: SitePageProps) {
                     >
                         <PageHeaderMeterBig>{meters.online.of > 0 ? `${meters.online.count} of ${meters.online.of}` : 'Not available'}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>{timedText(meters.online.caption, now)}</PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock label="House mode" onClick={() => go('modes')} ariaLabel="Show this Site’s house modes">
+                        <PageHeaderMeterBig>{house.current ? house.current.name : house.modes.length > 0 ? 'Not set yet' : 'None yet'}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {house.next
+                                ? timedText({ text: `${house.next.name} starts {time}`, at: house.next.at }, now)
+                                : house.current
+                                  ? timedText({ text: 'Since {time}', at: house.current.since }, now)
+                                  : house.modes.length > 0
+                                    ? 'Switched by hand only'
+                                    : can.edit_modes
+                                      ? 'Add one on the Modes tab'
+                                      : 'No house modes yet'}
+                        </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock label="Alerts open" tone={meters.alerts.count > 0 ? 'warning' : 'success'} onClick={() => router.visit(`/security-devices?site=${site.id}`)} ariaLabel="Show what needs attention at this Site">
                         <PageHeaderMeterBig>{meters.alerts.count}</PageHeaderMeterBig>
@@ -173,6 +233,17 @@ export default function SiteShow(props: SitePageProps) {
     if (tab === 'overview' && props.overview) body = <OverviewTab overview={props.overview} siteName={site.name} now={now} onDevices={() => router.visit(`/security-devices/devices?site=${site.id}`)} />;
     if (tab === 'network' && props.network) body = <NetworkTab tree={props.network.tree as SiteTopologyTree | undefined} siteName={site.name} />;
     if (tab === 'internet' && props.internet) body = <InternetTab internet={props.internet} now={now} />;
+    if (tab === 'rooms' && props.rooms) body = <RoomsTab rooms={props.rooms} siteName={site.name} />;
+    if (tab === 'modes' && props.modes)
+        body = (
+            <ModesTab
+                modes={props.modes}
+                can={{ switch_mode: !!can.switch_mode }}
+                now={now}
+                onSwitch={switchMode}
+                onEdit={editMode}
+            />
+        );
 
     return (
         <AppLayout
@@ -202,6 +273,26 @@ export default function SiteShow(props: SitePageProps) {
             />
             <ScanningViewer open={popup?.kind === 'scanning'} runId={popup?.kind === 'scanning' ? popup.runId : null} canStop={can.scan} onClose={() => setPopup(null)} />
             <HubPopups state={hubs} form={form} canApprove={!!can.approve_hub} canStopScan={can.scan} />
+            {can.switch_mode ? (
+                <SwitchHouseMode
+                    open={popup?.kind === 'switch_mode'}
+                    onClose={() => setPopup(null)}
+                    siteId={site.id}
+                    siteName={site.name}
+                    house={house}
+                    modeId={modeTarget}
+                />
+            ) : null}
+            {props.modes?.edit ? (
+                <EditHouseMode
+                    open={popup?.kind === 'edit_mode'}
+                    onClose={() => setPopup(null)}
+                    siteId={site.id}
+                    siteName={site.name}
+                    mode={modeTarget !== null ? (props.modes.items.find((mode) => mode.id === modeTarget) ?? null) : null}
+                    options={props.modes.edit}
+                />
+            ) : null}
         </AppLayout>
     );
 }

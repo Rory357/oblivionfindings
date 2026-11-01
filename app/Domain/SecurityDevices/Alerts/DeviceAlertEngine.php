@@ -211,6 +211,28 @@ final class DeviceAlertEngine
         }
     }
 
+    /** S&D Phase F: what a house mode's check found: a door not locked, or an alarm area not armed. */
+    public const array MODE_CHECK_KINDS = ['mode_door_check', 'mode_alarm_check'];
+
+    /**
+     * S&D Phase F: open (or refresh) an alert for what a house mode's check found, for the staff on
+     * shift at the house (in the app). A person marks it done once they've locked or armed by hand.
+     * Returns the new alert, or null when one was already open.
+     */
+    public function openModeCheck(Device $device, string $kind, string $title, CarbonImmutable $at, string $what, ?string $detail): ?DeviceAlert
+    {
+        if (! in_array($kind, self::MODE_CHECK_KINDS, true)) {
+            throw new \InvalidArgumentException('Not a house mode check kind.');
+        }
+        try {
+            return $this->openForHouse($device, $kind, 'warning', $title, $at, $what, $detail);
+        } catch (Throwable $exception) {
+            Log::error('House mode check alert could not be opened', ['device_id' => $device->id, 'kind' => $kind, 'error' => $exception->getMessage()]);
+
+            return null;
+        }
+    }
+
     /** @param  callable(DeviceAlert): string  $words */
     public function closeCare(Device $device, string $kind, CarbonImmutable $at, callable $words): void
     {
@@ -612,7 +634,8 @@ final class DeviceAlertEngine
     {
         // Wrong sensor logins are an event too: someone says when they've looked into it. So are the
         // Phase F care and scald alerts: a person says they've checked.
-        return array_values(array_unique([...array_column(self::SAFETY_EVENTS, 0), 'mqtt_logins', ...self::CARE_KINDS]));
+        // A house mode's check finding too: a person locks or arms by hand, then says so.
+        return array_values(array_unique([...array_column(self::SAFETY_EVENTS, 0), 'mqtt_logins', ...self::CARE_KINDS, ...self::MODE_CHECK_KINDS]));
     }
 
     /** @return list<string> the kinds that share one open alert per device */

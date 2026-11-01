@@ -178,6 +178,29 @@ final class AlarmPagePresenter
         return array_map('strval', array_keys($this->areas($device, $events)));
     }
 
+    /**
+     * S&D Phase F: the panel's areas right now, read from its reports exactly as its page does, for a
+     * house mode's "Check the alarm is armed". No viewer: `armed` is null for an area with no report.
+     *
+     * @return list<array{id: string, name: string, armed: ?bool, since: ?string}>
+     */
+    public function areasNow(Device $device): array
+    {
+        $custody = DeviceObservations::custodyStart($device);
+        $events = DeviceEvent::query()->where('device_id', $device->id)
+            // Only reports from while it has been at its current place.
+            ->when($custody !== null, fn ($query) => $query->where('occurred_at', '>=', $custody))
+            ->latest('occurred_at')
+            ->latest('id')
+            ->limit(300)
+            ->get(['id', 'event_type', 'payload', 'source', 'occurred_at']);
+
+        return array_values(array_map(
+            fn (array $area): array => ['id' => (string) $area['id'], 'name' => (string) $area['name'], 'armed' => $area['armed'], 'since' => $area['since']],
+            $this->areas($device, $events),
+        ));
+    }
+
     private function monitors(Device $device): Collection
     {
         return $device->monitors()

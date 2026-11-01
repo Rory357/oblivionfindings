@@ -443,8 +443,8 @@ final class DevicesIndexPresenter
         return null;
     }
 
-    /** @return list<string> e.g. ["21.4 °C", "48% humidity", "CO₂ 620 ppm"] */
-    private function sensorReadings(DeviceEntry $entry): array
+    /** @return list<string> e.g. ["21.4 °C", "48% humidity", "CO₂ 620 ppm"] (also the Site page's Rooms tab) */
+    public static function sensorReadings(DeviceEntry $entry): array
     {
         $order = ['temperature', 'humidity', 'co2', 'tvoc', 'pm25', 'pressure', 'illuminance', 'people_count'];
         $words = [];

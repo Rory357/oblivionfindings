@@ -142,6 +142,44 @@ final class DoorPagePresenter
     }
 
     /**
+     * S&D Phase F: the door's lock right now, worked out exactly as its page does, for a house mode's
+     * "Check doors are locked". No viewer and no names: only whether it is locked. `locked` is null
+     * when the door hasn't reported its lock.
+     *
+     * @return array{locked: ?bool, title: string, checked_at: ?string}
+     */
+    public function lockNow(Device $device): array
+    {
+        $now = CarbonImmutable::now();
+        $custody = DeviceObservations::custodyStart($device);
+        $since = $now->subDays(self::NAME_DAYS);
+        $from = $custody !== null && $custody->greaterThan($since) ? $custody : $since;
+        $nobody = ['staff' => [], 'residents' => []];
+        $rows = DeviceEvent::query()->where('device_id', $device->id)->where('occurred_at', '>=', $from)
+            ->latest('occurred_at')->limit(200)->get(['id', 'event_type', 'payload', 'occurred_at'])
+            ->map(fn (DeviceEvent $event): array => $this->row('d'.$event->id, (string) $event->event_type, $event->occurred_at, is_array($event->payload) ? $event->payload : [], $nobody, $now))
+            ->concat(IntegrationEvent::query()->where('canonical_device_id', $device->id)->where('occurred_at', '>=', $from)
+                ->latest('occurred_at')->limit(200)->get(['id', 'event_type', 'normalized_payload', 'occurred_at'])
+                ->map(fn (IntegrationEvent $event): array => $this->row('i'.$event->id, (string) $event->event_type, $event->occurred_at, is_array($event->normalized_payload) ? $event->normalized_payload : [], $nobody, $now)))
+            ->filter(fn (array $row): bool => $row['kind'] !== 'heartbeat')
+            ->sortByDesc('at')
+            ->values();
+        $lock = $this->lockState($device, $rows);
+
+        return [
+            'locked' => match ($lock['chip']['label']) {
+                'Locked' => true,
+                'Unlocked' => false,
+                // Forced or open: not locked shut, whatever the lock says.
+                'Forced open', 'Open' => false,
+                default => null,
+            },
+            'title' => (string) $lock['title'],
+            'checked_at' => $lock['checked_at'],
+        ];
+    }
+
+    /**
      * Staff (named) and residents (never named) at the Site, as lower-case names for matching what the
      * door's maker reports. A resident match always wins.
      *

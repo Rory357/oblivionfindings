@@ -1050,6 +1050,9 @@ app(Schedule::class)->command('security-devices:alerts-tick')->everyFiveMinutes(
 // S&D Phase E: sensor readings are kept 13 months (Setup › Change history says so).
 app(Schedule::class)->command('security-devices:prune-readings')->dailyAt('03:40')->withoutOverlapping()->onOneServer();
 
+// S&D Phase F: house modes switch at their start times (safe actions only, D12); alarm checks run when due.
+app(Schedule::class)->command('security-devices:house-modes-tick')->everyMinute()->withoutOverlapping()->onOneServer();
+
 // Native attempt expiry is bookkeeping only; it never retries a computer action.
 app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
 

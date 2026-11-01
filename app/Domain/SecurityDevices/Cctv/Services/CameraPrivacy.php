@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Cctv\Services;
 
 use App\Domain\SecurityDevices\Cctv\Models\CameraPrivacyHours;
+use App\Domain\SecurityDevices\Cctv\Models\CameraPrivacyOverride;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -86,8 +87,37 @@ final class CameraPrivacy
                     $out[(int) $row->device_id] = $until;
                 }
             });
+        // S&D Phase F: privacy a house mode turned on until a time counts the same, so every refusal covers it.
+        CameraPrivacyOverride::query()
+            ->whereIn('device_id', array_values(array_unique(array_map('intval', $deviceIds))))
+            ->where('until', '>', $now)
+            ->get(['device_id', 'until'])
+            ->each(function (CameraPrivacyOverride $row) use (&$out): void {
+                $id = (int) $row->device_id;
+                $until = $row->until->utc();
+                if (! isset($out[$id]) || $until->greaterThan($out[$id])) {
+                    $out[$id] = $until;
+                }
+            });
 
         return $out;
+    }
+
+    /**
+     * S&D Phase F: turn camera privacy on until a time (a house mode's "Turn camera privacy on"). It
+     * only ever adds privacy: an earlier "until" never shortens a later one, and nothing ends it early.
+     */
+    public function holdUntil(int $deviceId, CarbonImmutable $until, ?int $houseModeEventId = null): void
+    {
+        if ($until->lessThanOrEqualTo(CarbonImmutable::now())) {
+            return;
+        }
+        CameraPrivacyOverride::query()->create([
+            'device_id' => $deviceId,
+            'until' => $until->utc(),
+            'source' => 'house_mode',
+            'house_mode_event_id' => $houseModeEventId,
+        ]);
     }
 
     /**

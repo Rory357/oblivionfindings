@@ -45,7 +45,7 @@ afterEach(() => {
 });
 
 describe('Site page', () => {
-    it('shows the Site, how it is watched, and its overview without rooms or house modes', () => {
+    it('shows the Site, how it is watched, and its overview, with the Rooms and Modes tabs (Phase F)', () => {
         render(<SiteShow {...fixture()} />);
 
         expect(screen.getByRole('heading', { name: 'Synthetic House' })).toBeInTheDocument();
@@ -53,8 +53,13 @@ describe('Site page', () => {
         expect(screen.getByText('Devices at Synthetic House')).toBeInTheDocument();
         expect(screen.getByText('Synthetic front door camera')).toBeInTheDocument();
         expect(screen.getByText('Lowest on Wed, when 99.2% of checks answered.')).toBeInTheDocument();
-        expect(screen.queryByRole('tab', { name: /rooms|modes|devices|alerts|logbook/i })).not.toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Rooms' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Modes' })).toBeInTheDocument();
+        // The Devices, Alerts and Logbook tabs wait for their drawings' approval.
+        expect(screen.queryByRole('tab', { name: /devices|alerts|logbook/i })).not.toBeInTheDocument();
+        // No modes and no switch permission: no Change mode.
         expect(screen.queryByText(/change mode/i)).not.toBeInTheDocument();
+        expect(screen.getByText('No house modes yet')).toBeInTheDocument();
     });
 
     it('says plainly what still works when the hub stops answering', () => {
