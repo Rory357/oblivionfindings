@@ -26,7 +26,6 @@ function fixture(overrides: Partial<SitePageProps> = {}): SitePageProps {
             alerts: { count: 0, caption: 'None open' },
             scan: null,
         },
-        tabs: { devices: 3, alerts: 0 },
         overview: {
             states: [{ state: 'online', count: 3 }],
             cameras: [{ id: 9, name: 'Synthetic front door camera', state: 'online', href: '/security-devices/devices/9' }],
@@ -36,9 +35,6 @@ function fixture(overrides: Partial<SitePageProps> = {}): SitePageProps {
         },
         network: null,
         internet: null,
-        devices: null,
-        alerts: null,
-        logbook: null,
         can: { add_device: true, assign: true, scan: true },
         ...overrides,
     };
@@ -57,7 +53,7 @@ describe('Site page', () => {
         expect(screen.getByText('Devices at Synthetic House')).toBeInTheDocument();
         expect(screen.getByText('Synthetic front door camera')).toBeInTheDocument();
         expect(screen.getByText('Lowest on Wed, when 99.2% of checks answered.')).toBeInTheDocument();
-        expect(screen.queryByRole('tab', { name: /rooms|modes/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: /rooms|modes|devices|alerts|logbook/i })).not.toBeInTheDocument();
         expect(screen.queryByText(/change mode/i)).not.toBeInTheDocument();
     });
 
@@ -80,25 +76,6 @@ describe('Site page', () => {
         expect(screen.getByText('Synthetic House hub has stopped answering')).toBeInTheDocument();
         expect(screen.getByText(/2 devices it watches can’t be checked until it’s back/)).toBeInTheDocument();
         expect(screen.getByText('No cameras at this Site.')).toBeInTheDocument();
-    });
-
-    it('lists the Site’s devices with their state and opens none of another Site', () => {
-        render(
-            <SiteShow
-                {...fixture({
-                    tab: 'devices',
-                    overview: null,
-                    devices: [
-                        { id: 11, name: 'Synthetic router', kind: 'Router', kind_key: 'router', state: 'offline', subline: 'Synthetic R1 · 10.0.0.1', seen_at: null, behind: null, href: '/security-devices/devices/11' },
-                        { id: 12, name: 'Synthetic switch', kind: 'Switch', kind_key: 'switch', state: 'cant_check', subline: 'Synthetic S1', seen_at: null, behind: 'Synthetic router', href: '/security-devices/devices/12' },
-                    ],
-                })}
-            />,
-        );
-
-        expect(screen.getByRole('link', { name: 'Synthetic router' })).toHaveAttribute('href', '/security-devices/devices/11');
-        expect(screen.getByText('Behind Synthetic router')).toBeInTheDocument();
-        expect(screen.getAllByText('Not available')).toHaveLength(2);
     });
 
     it('is honest about what it doesn’t know about the internet line', () => {

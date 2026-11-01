@@ -136,9 +136,7 @@ class SitesScreensTest extends TestCase
                 ->where('hub.label', 'Aurora House hub')
                 ->where('hub.own', true)
                 ->where('meters.online.count', 1)
-                ->where('tabs.devices', 1)
                 ->where('overview.states.0.state', 'online')
-                ->where('devices', null)
                 ->where('network', null));
     }
 
@@ -156,18 +154,19 @@ class SitesScreensTest extends TestCase
                 ->where('overview.hub_down.hub', 'Aurora House hub'));
     }
 
-    public function test_the_devices_tab_lists_only_this_sites_devices(): void
+    public function test_tabs_still_waiting_for_their_drawings_fall_back_to_the_overview(): void
     {
         $this->device($this->home, ['name' => 'Aurora House switch', 'subcategory' => 'switch']);
         $this->device($this->other, ['name' => 'Kōwhai Lodge router']);
 
-        $response = $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab=devices');
+        foreach (['devices', 'alerts', 'logbook'] as $tab) {
+            $response = $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab='.$tab);
 
-        $response->assertOk()->assertInertia(fn ($page) => $page
-            ->where('tab', 'devices')
-            ->has('devices', 1)
-            ->where('devices.0.name', 'Aurora House switch')
-            ->where('overview', null));
-        $this->assertStringNotContainsString('Kōwhai Lodge router', $response->getContent());
+            $response->assertOk()->assertInertia(fn ($page) => $page
+                ->where('tab', 'overview')
+                ->missing('devices')
+                ->missing('logbook'));
+            $this->assertStringNotContainsString('Kōwhai Lodge router', $response->getContent());
+        }
     }
 }

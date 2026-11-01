@@ -2,7 +2,7 @@
 import type { DeviceState, DevicesTab } from '@/lib/security-devices/device-words';
 import type { FactTone, SiteCard } from '../sites/_types';
 
-export type OverviewTab = 'overview' | 'trends' | 'activity';
+export type OverviewTab = 'overview' | 'trends';
 
 export type TimedLine = { text: string; at: string | null };
 
@@ -39,6 +39,5 @@ export type OverviewProps = {
         batteries: { id: number; name: string; site: string | null; battery: number | null; href: string }[];
         slowest: { id: number; name: string; model: string; kind: string; site: string | null; week_ms: number; usual_ms: number | null; href: string }[];
     } | null;
-    activity: ActivityRow[] | null;
     can: { add: boolean; scan: boolean; connect: boolean; assign: boolean };
 };

@@ -24,11 +24,11 @@ use Illuminate\Support\Str;
 /**
  * Security & devices home (S&D rebuild drawings pg-sdr-1 with its first-time view 1b, and the
  * Trends tab pg-sdr-18). Scoped by SecurityDevicesAccessService. The support worker's view (1c)
- * and the Reports tab (18b) come later.
+ * and the Reports tab (18b) come later; the Activity tab (18c) waits for its drawing's approval.
  */
 final class OverviewPresenter
 {
-    public const array TABS = ['overview', 'trends', 'activity'];
+    public const array TABS = ['overview', 'trends'];
 
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
@@ -73,7 +73,6 @@ final class OverviewPresenter
             'meters' => $this->meters($entries, $alerts),
             'overview' => $tab === 'overview' && ! $firstTime ? $this->overview($viewer, $entries, $hubs, $alerts, $siteId) : null,
             'trends' => $tab === 'trends' ? $this->trends($viewer, $entries, $alerts) : null,
-            'activity' => $tab === 'activity' ? $this->activity($entries, 100) : null,
             'can' => [
                 'add' => $viewer->canDo('securityDevices.devices.create'),
                 'scan' => $viewer->canDo('securityDevices.integrations.manage'),

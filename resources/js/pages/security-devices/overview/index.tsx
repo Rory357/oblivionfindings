@@ -32,7 +32,8 @@ export type { OverviewProps } from './_types';
 
 const BASE = '/security-devices';
 
-const TAB_LABEL: Record<OverviewTab, string> = { overview: 'Overview', trends: 'Trends', activity: 'Activity' };
+// Reports (18b) comes later; Activity (18c) waits for its drawing's approval.
+const TAB_LABEL: Record<OverviewTab, string> = { overview: 'Overview', trends: 'Trends' };
 
 const KIND_COLOURS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
@@ -132,7 +133,6 @@ export default function Overview(props: OverviewProps) {
     if (tab === 'overview' && props.first_time) body = <FirstTime firstTime={props.first_time} canConnect={can.connect} />;
     else if (tab === 'overview' && props.overview) body = <OverviewBody overview={props.overview} now={now} />;
     else if (tab === 'trends' && props.trends) body = <Trends trends={props.trends} />;
-    else if (tab === 'activity' && props.activity) body = <Activity rows={props.activity} now={now} limit={100} title="Activity" sub="What happened to your devices, newest first" />;
 
     return (
         <AppLayout
@@ -276,7 +276,7 @@ function OverviewBody({ overview, now }: { overview: NonNullable<OverviewProps['
                         calm={overview.hubs.calm ?? undefined}
                     />
                 ) : null}
-                <Activity rows={overview.activity} now={now} limit={6} title="Recent activity" sub={undefined} action={{ label: 'All activity', href: '/security-devices?tab=activity' }} />
+                <Activity rows={overview.activity} now={now} limit={6} title="Recent activity" />
             </SideColumn>
         </SideBySide>
     );

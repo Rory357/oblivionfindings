@@ -3,7 +3,6 @@
  * answering" 12f). Rooms and house modes (12c, 12d) come with Phase F.
  */
 import { DonutChart } from '@/components/dashboard/donut-chart';
-import { EntityContextMenu, EntityKebab, useEntityContextMenu, type MenuItem } from '@/components/lists';
 import {
     PageHeader,
     PageHeaderGlassButton,
@@ -16,32 +15,26 @@ import {
     PageLayout,
 } from '@/components/page';
 import { AddDeviceChooser, DeviceFormPopup, useDeviceFormOptions } from '@/components/security-devices/device-popups';
-import { iconForKind } from '@/components/security-devices/device-kind-icon';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { SiteTopologyTreeCard } from '@/components/security-devices/site-topology-tree';
 import type { SiteTopologyTree } from '@/components/security-devices/topology-types';
 import { KnowList, Log, PointBars, QuietLine, SideBySide, SideColumn, Story, Surface } from '@/components/signature/blocks';
-import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { agoWords, seenTime, timedText } from '@/lib/security-devices/device-time';
 import { deviceStateLabel, deviceStateTone, type DeviceState } from '@/lib/security-devices/device-words';
 import { Head, Link, router } from '@inertiajs/react';
-import { Cpu, House, Plus, Radar } from 'lucide-react';
+import { House, Plus, Radar } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import type { SiteDeviceRow, SitePageProps, SitePageTab } from './_types';
+import type { SitePageProps, SitePageTab } from './_types';
 
 export type { SitePageProps } from './_types';
 
-const PAGE_SIZE = 25;
-
+// The Devices, Alerts and Logbook tabs (12g–12i) wait for their drawings' approval.
 const TAB_LABEL: Record<SitePageTab, string> = {
     overview: 'Overview',
     network: 'Network map',
     internet: 'Internet',
-    devices: 'Devices',
-    alerts: 'Alerts',
-    logbook: 'Logbook',
 };
 
 /** Each state's ring colour, from the status tokens (never the brand). */
@@ -66,7 +59,7 @@ function useNow(): Date {
 type Popup = { kind: 'chooser' } | { kind: 'add' } | { kind: 'scan' } | { kind: 'scanning'; runId: number } | null;
 
 export default function SiteShow(props: SitePageProps) {
-    const { site, tab, flag, hub, meters, tabs, can } = props;
+    const { site, tab, flag, hub, meters, can } = props;
     const now = useNow();
     const base = `/security-devices/sites/${site.id}`;
     const [popup, setPopup] = useState<Popup>(null);
@@ -106,13 +99,13 @@ export default function SiteShow(props: SitePageProps) {
                     <PageHeaderMeterBlock
                         label="Devices online"
                         tone={meters.online.of > 0 && meters.online.count === meters.online.of ? 'success' : meters.online.of > 0 ? 'warning' : 'brand'}
-                        onClick={() => go('devices')}
+                        onClick={() => router.visit(`/security-devices/devices?site=${site.id}`)}
                         ariaLabel="Show this Site’s devices"
                     >
                         <PageHeaderMeterBig>{meters.online.of > 0 ? `${meters.online.count} of ${meters.online.of}` : 'Not available'}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>{timedText(meters.online.caption, now)}</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock label="Alerts open" tone={meters.alerts.count > 0 ? 'warning' : 'success'} onClick={() => go('alerts')} ariaLabel="Show this Site’s open alerts">
+                    <PageHeaderMeterBlock label="Alerts open" tone={meters.alerts.count > 0 ? 'warning' : 'success'} onClick={() => router.visit(`/security-devices?site=${site.id}`)} ariaLabel="Show what needs attention at this Site">
                         <PageHeaderMeterBig>{meters.alerts.count}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>{meters.alerts.caption}</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
@@ -138,11 +131,7 @@ export default function SiteShow(props: SitePageProps) {
             rail={
                 <PageHeaderRail<SitePageTab>
                     ariaLabel="About this Site"
-                    items={(Object.keys(TAB_LABEL) as SitePageTab[]).map((key) => ({
-                        key,
-                        label: TAB_LABEL[key],
-                        count: key === 'devices' ? tabs.devices : key === 'alerts' ? tabs.alerts : undefined,
-                    }))}
+                    items={(Object.keys(TAB_LABEL) as SitePageTab[]).map((key) => ({ key, label: TAB_LABEL[key] }))}
                     value={tab}
                     onSelect={go}
                 />
@@ -154,45 +143,6 @@ export default function SiteShow(props: SitePageProps) {
     if (tab === 'overview' && props.overview) body = <OverviewTab overview={props.overview} siteName={site.name} now={now} onDevices={() => go('devices')} />;
     if (tab === 'network' && props.network) body = <NetworkTab tree={props.network.tree as SiteTopologyTree | undefined} siteName={site.name} />;
     if (tab === 'internet' && props.internet) body = <InternetTab internet={props.internet} now={now} />;
-    if (tab === 'devices' && props.devices) body = <DevicesTab rows={props.devices} now={now} siteId={site.id} />;
-    if (tab === 'alerts' && props.alerts)
-        body =
-            props.alerts.length === 0 ? (
-                <QuietLine title="Alerts" text="Nothing is open about this Site’s devices." />
-            ) : (
-                <Log
-                    title="Open alerts"
-                    sub="About this Site’s devices, newest first"
-                    limit={100}
-                    items={props.alerts.map((alert) => ({
-                        key: alert.id,
-                        time: alert.at ? seenTime(alert.at, now) : '',
-                        tone: 'warning',
-                        title: alert.title,
-                        sub: alert.device,
-                        action: { label: 'Open', href: alert.href, ariaLabel: `Open alert: ${alert.title}` },
-                    }))}
-                />
-            );
-    if (tab === 'logbook' && props.logbook)
-        body =
-            props.logbook.length === 0 ? (
-                <QuietLine title="Logbook" text="Nothing has been recorded about this Site’s devices yet." />
-            ) : (
-                <Log
-                    title="Logbook"
-                    sub="What happened to this Site’s devices, newest first"
-                    limit={50}
-                    items={props.logbook.map((event) => ({
-                        key: event.id,
-                        time: event.at ? seenTime(event.at, now) : '',
-                        tone: event.tone,
-                        title: event.title,
-                        sub: event.device,
-                        action: event.href ? { label: 'Open', href: event.href, ariaLabel: `Open ${event.device}` } : null,
-                    }))}
-                />
-            );
 
     return (
         <AppLayout
@@ -370,86 +320,5 @@ function InternetTab({ internet, now }: { internet: NonNullable<SitePageProps['i
                 />
             </SideColumn>
         </SideBySide>
-    );
-}
-
-function DevicesTab({ rows, now, siteId }: { rows: SiteDeviceRow[]; now: Date; siteId: number }) {
-    const [page, setPage] = useState(0);
-    const menu = useEntityContextMenu<SiteDeviceRow>();
-    const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-    const shown = rows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-    const actionsFor = (row: SiteDeviceRow): MenuItem[] => [
-        { label: 'Open', icon: iconForKind(row.kind_key), onClick: () => router.visit(row.href) },
-        { label: 'Show on the Devices list', icon: Cpu, onClick: () => router.visit(`/security-devices/devices?site=${siteId}&view=list`) },
-    ];
-
-    if (rows.length === 0) {
-        return <QuietLine title="Devices" text="No devices at this Site yet." />;
-    }
-
-    return (
-        <section className="overflow-hidden rounded-[14px] border border-border bg-card shadow-sm">
-            <div className="flex items-baseline justify-between gap-3 border-b border-border px-4 py-3.5">
-                <h2 className="text-section-title">Devices</h2>
-                <p className="text-caption">Problems first, then by name</p>
-            </div>
-            <table className="w-full text-sm">
-                <thead className="bg-muted text-left text-muted-foreground">
-                    <tr>
-                        <th className="px-4 py-2.5 font-medium">Device</th>
-                        <th className="px-4 py-2.5 font-medium">Kind</th>
-                        <th className="px-4 py-2.5 font-medium">State</th>
-                        <th className="px-4 py-2.5 font-medium">Last seen</th>
-                        <th className="w-12 px-2 py-2.5">
-                            <span className="sr-only">Actions</span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                    {shown.map((row) => (
-                        <tr
-                            key={row.id}
-                            className="cursor-pointer hover:bg-muted/50"
-                            onClick={() => router.visit(row.href)}
-                            onContextMenu={(event) => menu.open(event, row)}
-                        >
-                            <td className="px-4 py-2.5">
-                                <Link href={row.href} className="font-medium underline-offset-2 hover:underline" onClick={(event) => event.stopPropagation()}>
-                                    {row.name}
-                                </Link>
-                                <p className="text-caption">{row.subline}</p>
-                            </td>
-                            <td className="px-4 py-2.5">{row.kind}</td>
-                            <td className="px-4 py-2.5">
-                                <StatusBadge variant={deviceStateTone[row.state]}>{deviceStateLabel[row.state]}</StatusBadge>
-                                {row.state === 'cant_check' && row.behind ? <p className="text-caption">Behind {row.behind}</p> : null}
-                            </td>
-                            <td className="px-4 py-2.5 text-muted-foreground">{row.seen_at ? agoWords(row.seen_at, now) : 'Not available'}</td>
-                            <td className="px-2 py-2.5" onClick={(event) => event.stopPropagation()}>
-                                <EntityKebab actions={actionsFor(row)} label={`Actions for ${row.name}`} />
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            {pages > 1 ? (
-                <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 text-sm">
-                    <span className="text-muted-foreground">
-                        {page * PAGE_SIZE + 1}–{Math.min(rows.length, (page + 1) * PAGE_SIZE)} of {rows.length} devices
-                    </span>
-                    <span className="flex gap-2">
-                        <Button type="button" variant="ghost" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
-                            Previous
-                        </Button>
-                        <Button type="button" variant="ghost" size="sm" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>
-                            Next
-                        </Button>
-                    </span>
-                </div>
-            ) : null}
-            {menu.ctx ? (
-                <EntityContextMenu x={menu.ctx.x} y={menu.ctx.y} icon={iconForKind(menu.ctx.record.kind_key)} title={menu.ctx.record.name} items={actionsFor(menu.ctx.record)} onClose={menu.close} />
-            ) : null}
-        </section>
     );
 }

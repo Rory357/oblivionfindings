@@ -23,11 +23,11 @@ use Illuminate\Support\Str;
 /**
  * One Site (S&D rebuild drawing pg-sdr-12, with its Network map 12b, Internet 12e and "hub stopped
  * answering" 12f views). Only the open tab's data is worked out. Rooms and house modes (12c, 12d)
- * are Phase F and aren't shown.
+ * are Phase F. The Devices, Alerts and Logbook tabs (12g–12i) wait for their drawings' approval.
  */
 final class SitePagePresenter
 {
-    public const array TABS = ['overview', 'network', 'internet', 'devices', 'alerts', 'logbook'];
+    public const array TABS = ['overview', 'network', 'internet'];
 
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
@@ -78,13 +78,9 @@ final class SitePagePresenter
                 'seen_at' => $hub->last_seen_at?->toIso8601String(),
             ],
             'meters' => $this->meters($entries, $alerts, $site),
-            'tabs' => ['devices' => $entries->count(), 'alerts' => count($alerts)],
             'overview' => $tab === 'overview' ? $this->overview($entries, $hub, $hubDown) : null,
             'network' => $tab === 'network' ? $this->network($site, $entries) : null,
             'internet' => $tab === 'internet' ? $this->internet($entries) : null,
-            'devices' => $tab === 'devices' ? $entries->map(fn (DeviceEntry $entry): array => $this->deviceRow($entry))->all() : null,
-            'alerts' => $tab === 'alerts' ? $alerts : null,
-            'logbook' => $tab === 'logbook' ? $this->logbook($entries) : null,
             'can' => [
                 'add_device' => $viewer->canDo('securityDevices.devices.create'),
                 'assign' => $viewer->canDo('securityDevices.devices.assign'),
@@ -216,38 +212,6 @@ final class SitePagePresenter
                 'device' => (string) ($names[(int) $event->device_id] ?? ''),
             ])->all(),
         ];
-    }
-
-    /**
-     * @param  Collection<int, DeviceEntry>  $entries
-     * @return list<array<string, mixed>>
-     */
-    private function logbook(Collection $entries): array
-    {
-        $names = $entries->mapWithKeys(fn (DeviceEntry $entry): array => [$entry->id() => $entry->name()]);
-        if ($names->isEmpty()) {
-            return [];
-        }
-
-        return DeviceEvent::query()
-            ->whereIn('device_id', $names->keys()->all())
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('id')
-            ->limit(50)
-            ->get(['id', 'device_id', 'event_type', 'severity', 'occurred_at'])
-            ->map(fn (DeviceEvent $event): array => [
-                'id' => (int) $event->id,
-                'at' => $event->occurred_at?->toIso8601String(),
-                'tone' => match ((string) $event->severity) {
-                    'critical', 'error', 'high' => 'critical',
-                    'warning', 'medium' => 'warning',
-                    default => 'info',
-                },
-                'title' => self::eventWords((string) $event->event_type),
-                'device' => (string) ($names[(int) $event->device_id] ?? ''),
-                'href' => '/security-devices/devices/'.$event->device_id,
-            ])
-            ->all();
     }
 
     /**

@@ -39,7 +39,6 @@ function fixture(overrides: Partial<OverviewProps> = {}): OverviewProps {
             activity: [],
         },
         trends: null,
-        activity: null,
         can: { add: true, scan: true, connect: true, assign: true },
         ...overrides,
     };

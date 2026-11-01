@@ -38,7 +38,7 @@ export type SitesIndexProps = {
     can: { add_device: boolean; scan: boolean };
 };
 
-export type SitePageTab = 'overview' | 'network' | 'internet' | 'devices' | 'alerts' | 'logbook';
+export type SitePageTab = 'overview' | 'network' | 'internet';
 
 export type SiteDeviceRow = {
     id: number;
@@ -58,10 +58,7 @@ export type SiteEventRow = {
     tone: FactTone;
     title: string;
     device: string;
-    href?: string;
 };
-
-export type SiteAlertRow = { id: number; title: string; at: string | null; device: string; href: string };
 
 export type SitePageProps = {
     site: { id: number; name: string; address: string };
@@ -73,7 +70,6 @@ export type SitePageProps = {
         alerts: { count: number; caption: string };
         scan: { at: string | null; caption: string; href: string } | null;
     };
-    tabs: { devices: number; alerts: number };
     overview: {
         states: { state: DeviceState; count: number }[];
         cameras: { id: number; name: string; state: DeviceState; href: string }[];
@@ -88,8 +84,5 @@ export type SitePageProps = {
     } | null;
     network: { tree: unknown } | null;
     internet: { gateways: SiteDeviceRow[]; outages: SiteEventRow[] } | null;
-    devices: SiteDeviceRow[] | null;
-    alerts: SiteAlertRow[] | null;
-    logbook: SiteEventRow[] | null;
     can: { add_device: boolean; assign: boolean; scan: boolean };
 };
