@@ -17,9 +17,9 @@ import { formatDateOnly, formatDateTime, toDateInput, WORKER_TIMEZONE } from '@/
 import { CHEMICAL_EXPOSURES } from '@/lib/health-safety/chemical-exposure-navigation';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
+import axios from 'axios';
 import { Check, FileText, Info, PencilLine, X } from 'lucide-react';
-import { useState } from 'react';
-import { useExposureChoices } from './use-exposure-choices';
+import { useEffect, useState } from 'react';
 
 export type EarlierLinkDecision = 'reviewed_association' | 'reviewed_no_association' | 'unresolved';
 type IncidentRef = { id: number | null; reference: string | null; title: string | null; occurred_at: string | null; readable: boolean };
@@ -74,14 +74,14 @@ function Rows({ rows }: { rows: [string, React.ReactNode][] }) {
     );
 }
 
-export function ExposureEarlierLink({ link, exposureId, siteId, actorId }: { link: EarlierLink; exposureId: number; siteId: number; actorId: number }) {
+export function ExposureEarlierLink({ link, exposureId }: { link: EarlierLink; exposureId: number }) {
     const [open, setOpen] = useState(false);
     const latest = link.reviews[0];
     const earlier = link.reviews.slice(1);
     const action = link.can.record_review && !open ? { label: latest ? 'Record a new review' : 'Record a review', onClick: () => setOpen(true) } : null;
     return (
         <div className="grid gap-5">
-            {open ? <EarlierLinkReviewForm link={link} exposureId={exposureId} siteId={siteId} actorId={actorId} onClose={() => setOpen(false)} /> : null}
+            {open ? <EarlierLinkReviewForm link={link} exposureId={exposureId} onClose={() => setOpen(false)} /> : null}
             <Surface title="Earlier link to an incident" sub={latest ? 'Reviewed later' : 'Recorded before link checks existed'}>
                 {action ? (
                     <div className="-mt-1 flex justify-end px-[18px] pb-2">
@@ -147,7 +147,27 @@ function today(): string {
     return new Intl.DateTimeFormat('en-CA', { timeZone: WORKER_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
-function EarlierLinkReviewForm({ link, exposureId, siteId, actorId, onClose }: { link: EarlierLink; exposureId: number; siteId: number; actorId: number; onClose: () => void }) {
+type IncidentChoice = { id: number; reference: string; title: string | null; occurred_at: string | null };
+
+/** Incidents at the exposure's own Site that this manager can open (the review proves the picked one again). */
+function useIncidentChoices(exposureId: number, enabled: boolean, search: string) {
+    const [state, setState] = useState<{ key: string; items: IncidentChoice[]; error: boolean } | null>(null);
+    const key = `${exposureId}:${search}`;
+    useEffect(() => {
+        if (!enabled) return;
+        const controller = new AbortController();
+        const timer = setTimeout(() => {
+            axios.get(`${CHEMICAL_EXPOSURES}/${exposureId}/earlier-link/incidents`, { params: { search }, headers: { Accept: 'application/json' }, signal: controller.signal })
+                .then(({ data }) => { if (!controller.signal.aborted) setState({ key, items: Array.isArray(data?.items) ? data.items : [], error: false }); })
+                .catch(() => { if (!controller.signal.aborted) setState({ key, items: [], error: true }); });
+        }, 250);
+        return () => { clearTimeout(timer); controller.abort(); };
+    }, [enabled, exposureId, search, key]);
+    const current = state?.key === key ? state : null;
+    return { items: current?.items ?? [], loading: enabled && current === null, error: current?.error ?? false };
+}
+
+function EarlierLinkReviewForm({ link, exposureId, onClose }: { link: EarlierLink; exposureId: number; onClose: () => void }) {
     const [decision, setDecision] = useState<EarlierLinkDecision | null>(null);
     const [incident, setIncident] = useState('');
     const [day, setDay] = useState(today());
@@ -158,9 +178,8 @@ function EarlierLinkReviewForm({ link, exposureId, siteId, actorId, onClose }: {
     const [saving, setSaving] = useState(false);
     // One key per draft, so saving twice by accident records it once.
     const [keys] = useState(() => ({ review: uuid(), file: uuid() }));
-    const choices = useExposureChoices({ actorId, rootId: exposureId, sourceRevision: link.expected_version ?? 0, siteId: String(siteId),
-        enabled: decision === 'reviewed_association' });
-    const incidentOptions = choices.choices && 'receivers' in choices.choices ? choices.choices.incidents : null;
+    const [incidentSearch, setIncidentSearch] = useState('');
+    const choices = useIncidentChoices(exposureId, decision === 'reviewed_association', incidentSearch);
 
     const submit = () => {
         const invalid: Record<string, string> = {};
@@ -214,12 +233,12 @@ function EarlierLinkReviewForm({ link, exposureId, siteId, actorId, onClose }: {
                     {decision === 'reviewed_association' ? (
                         <Field label="Incident" required error={errors.incident_id} hint="Only incidents at this exposure’s Site that you can open">
                             <div className="grid gap-2">
-                                <Input value={choices.incidentSearch} onChange={(event) => choices.setIncidentSearch(event.target.value)} placeholder="Find an incident reference" aria-label="Find an incident reference" />
-                                {incidentOptions?.access === 'restricted' ? (
-                                    <p role="status" className="text-subtle text-status-warning">You need incident and Client access at this Site to pick an incident.</p>
+                                <Input value={incidentSearch} maxLength={100} onChange={(event) => setIncidentSearch(event.target.value)} placeholder="Find an incident by reference or title" aria-label="Find an incident by reference or title" />
+                                {choices.error ? (
+                                    <p role="status" className="text-subtle text-status-warning">Incidents couldn’t be loaded. Check your access and try again.</p>
                                 ) : (
-                                    <SelectInput value={incident} onChange={setIncident} placeholder={choices.loading ? 'Loading incidents…' : 'Choose an incident'} ariaLabel="Incident"
-                                        options={(incidentOptions?.items ?? []).map((row) => ({ value: String(row.id), label: `${row.reference} · ${row.client.name}` }))} />
+                                    <SelectInput value={incident} onChange={setIncident} placeholder={choices.loading ? 'Loading incidents…' : choices.items.length ? 'Choose an incident' : 'No incidents you can open match'} ariaLabel="Incident"
+                                        options={choices.items.map((row) => ({ value: String(row.id), label: [row.reference, row.title, row.occurred_at ? formatDateOnly(toDateInput(row.occurred_at)) : null].filter(Boolean).join(' · ') }))} />
                                 )}
                             </div>
                         </Field>

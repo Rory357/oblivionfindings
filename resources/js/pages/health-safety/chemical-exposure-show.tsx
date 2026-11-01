@@ -232,10 +232,10 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
         { title: 'Private exposures', href: CHEMICAL_EXPOSURES }, { title, href: exposureHref(detail.id) }]}>
         <Head title={title} /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" wrapTitle title={title} icon={LockKeyhole} backHref={returnTo}
-                subline={admitted ? `${detail.record!.substance.name} · ${detail.record!.site.name}` : 'Current access or source history could not be confirmed'}
+                subline={admitted ? `${detail.record!.substance.name} · ${detail.record!.site.name}` : earlier_link ? 'An older record saved with an unconfirmed link to an incident · its private details stay withheld' : 'Current access or source history could not be confirmed'}
                 actions={actions}
                 titleChip={<PageHeaderStatusChip variant={admitted && (detail.source_integrity === 'recorded' || earlier_link?.state === 'reviewed') ? 'neutral' : 'warning'}>
-                    {admitted ? detail.source_integrity === 'legacy_unknown' ? earlierLinkChip(earlier_link) ?? 'Earlier provenance unconfirmed' : 'Private recorded source' : 'Details withheld'}</PageHeaderStatusChip>}
+                    {admitted ? detail.source_integrity === 'legacy_unknown' ? earlierLinkChip(earlier_link) ?? 'Earlier provenance unconfirmed' : 'Private recorded source' : earlierLinkChip(earlier_link) ?? 'Details withheld'}</PageHeaderStatusChip>}
                 strip={stages ? <PageHeaderSteps steps={stages.steps} selected={progressShown ? shownStep : null} onSelect={(key) => { setPicked(key === stages.current ? null : key as ExposureStepKey); if (section !== 'overview' || action) drafts.request(() => move('overview')); }} ariaLabel="Exposure steps" /> : undefined}
                 rail={<PageHeaderRail items={rail} value={section} onSelect={(next) => move(next)} ariaLabel="Private exposure sections" />} />}>
                 <div className="grid min-w-0 gap-5">
@@ -262,10 +262,12 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
                             {admitted ? <>{requestedFocus !== null && focusedFollowupId === null && <p role="status" className="text-subtle text-status-warning">The linked follow-up cannot currently be confirmed. No follow-up has been selected.</p>}
                                 {progressShown && stages && shownStep ? <ExposureProgress next={next} detail={detail} stages={stages} shown={shownStep} onGo={(target) => drafts.request(() => move(target))} onBack={shownStep !== stages.current ? () => setPicked(null) : undefined} /> : null}
                                 <ExposureRecordPanel detail={current} section={section} open={open} onPage={onPage} focusedFollowupId={focusedFollowupId} /></>
-                                : <div role="status"><Note tone="warning">Saved private details and changes are withheld. Retained entries stay in memory until you leave or discard them.</Note></div>}
+                                : earlier_link ? (
+                                    // #15: the private details of an older record with an unconfirmed link stay sealed; its link can still be reviewed.
+                                    <ExposureEarlierLink key={`${shared.auth.user.id}:${earlier_link.expected_version ?? 'r'}`} link={earlier_link} exposureId={detail.id} />
+                                ) : <div role="status"><Note tone="warning">Saved private details and changes are withheld. Retained entries stay in memory until you leave or discard them.</Note></div>}
                             {admitted && section === 'connections' && earlier_link ? (
-                                <ExposureEarlierLink key={`${shared.auth.user.id}:${earlier_link.expected_version ?? 'r'}`} link={earlier_link}
-                                    exposureId={detail.id} siteId={detail.record!.site.id} actorId={shared.auth.user.id} />
+                                <ExposureEarlierLink key={`${shared.auth.user.id}:${earlier_link.expected_version ?? 'r'}`} link={earlier_link} exposureId={detail.id} />
                             ) : null}
                             <ExposureDeliveryPanel key={shared.auth.user.id} actorId={shared.auth.user.id} detail={current} active={admitted && section === 'connections'} autoCheck={!!delivery_alert} onWithdraw={onWithdraw} />
                         </div>

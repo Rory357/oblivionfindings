@@ -387,6 +387,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::post('/{exposure}/evidence', [ChemicalExposureWorkspaceController::class, 'uploadEvidence'])->whereNumber('exposure')->name('evidence.store');
             Route::delete('/{exposure}/evidence/{evidence}', [ChemicalExposureWorkspaceController::class, 'removeEvidence'])->whereNumber(['exposure', 'evidence'])->name('evidence.destroy');
             // #15: a later review of an earlier, unconfirmed link to an incident (exposure managers; the service re-checks).
+            Route::get('/{exposure}/earlier-link/incidents', [ChemicalExposureWorkspaceController::class, 'earlierLinkIncidents'])->whereNumber('exposure')->name('earlier-link.incidents');
             Route::post('/{exposure}/earlier-link/reviews', [ChemicalExposureWorkspaceController::class, 'reviewEarlierLink'])->whereNumber('exposure')->middleware('throttle:30,1')->name('earlier-link.reviews.store');
             Route::post('/{exposure}/earlier-link/files', [ChemicalExposureWorkspaceController::class, 'addEarlierLinkFile'])->whereNumber('exposure')->middleware('throttle:30,1')->name('earlier-link.files.store');
             Route::get('/{exposure}/earlier-link/files/{file}/download', [ChemicalExposureWorkspaceController::class, 'downloadEarlierLinkFile'])->whereNumber(['exposure', 'file'])->name('earlier-link.files.download');

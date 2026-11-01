@@ -27,7 +27,7 @@ final class ChemicalExposureAssociationRecoveryTest extends ChemicalExposureReco
     }
     public function test_unresolved_review_has_real_receipt_but_no_saved_reason_or_evidence_self_read_grant(): void
     {
-        $root = $this->legacy(); $before = $root->getRawOriginal();
+        $root = $this->legacy(); $before = $root->fresh()->getRawOriginal();
         [$receipt, $queries] = $this->capturedQueries(fn () => $this->recovery()->recordReview($this->manager, $root->id,
             $this->reviewInput(['reason' => 'SEALED-NEW-UNRESOLVED-BASIS'])));
         $this->noOldBody($queries); $this->assertSame(ChemicalExposureRecoveryLedger::KEYS, array_keys($receipt));
@@ -40,7 +40,7 @@ final class ChemicalExposureAssociationRecoveryTest extends ChemicalExposureReco
     }
     public function test_explicit_later_new_association_preserves_original_unknown_and_reads_only_newly_entered_review_facts(): void
     {
-        $root = $this->legacy(); $before = $root->getRawOriginal(); $incident = $this->selectedIncident();
+        $root = $this->legacy(); $before = $root->fresh()->getRawOriginal(); $incident = $this->selectedIncident();
         $r = $this->recovery()->recordReview($this->manager, $root->id, $this->reviewInput([
             'decision' => 'reviewed_association', 'incident_id' => $incident->id, 'notes' => 'Actual later review observation']));
         $dto = $this->recovery()->inspect($this->manager, $root->id);

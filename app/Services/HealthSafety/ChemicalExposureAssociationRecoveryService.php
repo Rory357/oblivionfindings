@@ -133,7 +133,7 @@ final class ChemicalExposureAssociationRecoveryService
                 $row = app(IncidentAccessService::class)->apply(ClientIncident::query(), $current, $reads)
                     ->whereKey($id)->first(['id', 'reference_number', 'title', 'occurred_at']);
                 return $row === null ? ['id' => null, 'reference' => null, 'title' => null, 'occurred_at' => null, 'readable' => false]
-                    : ['id' => (int) $row->id, 'reference' => (string) $row->reference_number, 'title' => $row->title === null ? null : (string) $row->title,
+                    : ['id' => (int) $row->id, 'reference' => $row->reference_number === null ? null : (string) $row->reference_number, 'title' => $row->title === null ? null : (string) $row->title,
                         'occurred_at' => $row->occurred_at?->toISOString(), 'readable' => true];
             };
             $reviews = []; $files = [];
@@ -171,6 +171,28 @@ final class ChemicalExposureAssociationRecoveryService
                 'expected_version' => (int) ($case?->revision ?? 0), 'reviews' => array_reverse($reviews), 'files' => array_reverse($files),
                 'can' => ['record_review' => true, 'add_file' => $case !== null]];
         }, $context);
+    }
+
+    /**
+     * #15: the review form's incident choices: incidents at the exposure's own Site that this manager can open now,
+     * newest first, by reference or title. The review itself proves the picked incident again.
+     *
+     * @return list<array{id: int, reference: string, title: string|null, occurred_at: string|null}>
+     */
+    public function incidentChoices(User $viewer, int $exposureId, string $search = ''): array
+    {
+        return $this->within($viewer, $exposureId, function ($identity, $case, $current, $reads) use ($search): array {
+            $query = app(IncidentAccessService::class)->apply(ClientIncident::query(), $current, $reads)
+                ->where('site_id', $identity['site_id'])->orderByDesc('occurred_at')->orderByDesc('id')->limit(25);
+            $search = trim(mb_substr($search, 0, 100));
+            if ($search !== '') {
+                $query->where(fn ($match) => $match->where('reference_number', 'like', '%'.$search.'%')->orWhere('title', 'like', '%'.$search.'%'));
+            }
+
+            return $query->get(['id', 'reference_number', 'title', 'occurred_at'])->map(fn (ClientIncident $row): array => ['id' => (int) $row->id,
+                'reference' => $row->reference_number === null ? null : (string) $row->reference_number, 'title' => $row->title === null ? null : (string) $row->title,
+                'occurred_at' => $row->occurred_at?->toISOString()])->values()->all();
+        });
     }
 
     public function recordReview(User $actor, int $exposureId, array $input, ?HealthSafetyReadContext $context = null): array

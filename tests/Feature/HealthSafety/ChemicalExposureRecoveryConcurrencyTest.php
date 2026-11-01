@@ -46,7 +46,8 @@ final class ChemicalExposureRecoveryConcurrencyTest extends ChemicalExposureReco
         $this->assertSame(0, DB::transactionLevel()); $this->assertSame('mysql', DB::connection()->getDriverName());
         // Child processes write to this database: only ever a disposable test database (this repo's per-process
         // test database or Codex's oblivion_hs_ ones), never a real one.
-        $this->assertMatchesRegularExpression('/^(oblivion_hs_|oblivion_findings_codex_test_\d+$)/', DB::connection()->getDatabaseName());
+        // Parallel lanes name theirs oblivion_findings_codex_test_<run>_<n>.
+        $this->assertMatchesRegularExpression('/^(oblivion_hs_|oblivion_findings_codex_test_(?:[a-z0-9]+_)?\d+$)/', DB::connection()->getDatabaseName());
         $prefix = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-chemical-recovery-race-'.Str::uuid(); $go = $prefix.'-go'; $processes = []; $signals = [];
         try {
             foreach ($jobs as $index => [$actor, $source, $values]) {

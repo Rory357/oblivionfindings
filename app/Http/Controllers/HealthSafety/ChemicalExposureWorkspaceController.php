@@ -41,8 +41,15 @@ final class ChemicalExposureWorkspaceController extends Controller
             if (array_key_exists($field, $r->query())) { $this->selection($r->input($field)); }
         }
         $followup = array_key_exists('followup', $r->query()) ? (int) $r->input('followup') : null;
-        $detail = $this->workspace->detail($r->user(), $exposure,
-            $r->only(ChemicalExposureWorkspaceService::PAGES), $followup);
+        try {
+            $detail = $this->workspace->detail($r->user(), $exposure,
+                $r->only(ChemicalExposureWorkspaceService::PAGES), $followup);
+        } catch (\Illuminate\Validation\ValidationException $refused) {
+            if (($refused->errors()['source'][0] ?? null) !== self::UNPROVED_LEGACY_LINK) { throw $refused; }
+            // #15: an older exposure saved with an unconfirmed link keeps its private details sealed (after the viewer's
+            // access and Site were checked). The page opens withheld, with the "Earlier link to an incident" card.
+            $detail = $this->withheldLegacyLink($exposure);
+        }
         return $this->present($r, 'health-safety/chemical-exposure-show', ['detail' => $detail,
             'return_to' => ChemicalExposureReturn::sanitize($r->input('return_to')),
             'chemical_exposure_confirmation' => $this->confirmation($r, $exposure),
@@ -84,9 +91,23 @@ final class ChemicalExposureWorkspaceController extends Controller
 
         return ['state' => $reviewed ? 'reviewed' : 'unreviewed', 'manager' => false, 'expected_version' => null,
             'linked_incident' => $incident === null ? ['id' => null, 'reference' => null, 'title' => null, 'occurred_at' => null, 'readable' => false]
-                : ['id' => (int) $incident->id, 'reference' => (string) $incident->reference_number, 'title' => $incident->title,
+                : ['id' => (int) $incident->id, 'reference' => $incident->reference_number === null ? null : (string) $incident->reference_number, 'title' => $incident->title,
                     'occurred_at' => $incident->occurred_at?->toISOString(), 'readable' => true],
             'reviews' => [], 'files' => [], 'can' => ['record_review' => false, 'add_file' => false]];
+    }
+
+    private const UNPROVED_LEGACY_LINK = 'Original legacy association is unproved. Review its source before private body access.';
+
+    /** The withheld page for an older exposure with an unconfirmed link: no record, no sections, nothing private. */
+    private function withheldLegacyLink(int $exposure): array
+    {
+        $none = ['items' => null, 'page' => null, 'source_integrity' => 'repair_required'];
+
+        return ['exposure_access' => 'readable', 'id' => $exposure, 'record' => null, 'source_integrity' => 'legacy_unknown',
+            'command_context' => null, 'history' => $none, 'reviews' => $none, 'followups' => $none, 'attachments' => $none,
+            'delivery' => ['state' => 'unconfirmed', 'attempts' => null],
+            'can' => ['correct' => false, 'review' => false, 'assign_followup' => false, 'upload_evidence' => false],
+            'focused_followup_id' => null, 'followup_focus_state' => 'not_requested'];
     }
 
     /** #15: record a later review of the earlier link (exposure managers; the service proves access and the version). */
@@ -97,6 +118,17 @@ final class ChemicalExposureWorkspaceController extends Controller
 
         return redirect()->to('/health-safety/chemical-exposures/'.$exposure.'?section=connections')
             ->with('success', 'Review saved. The old record is unchanged; your review sits beside it.');
+    }
+
+    /** #15: the review form's incident search (JSON; exposure managers; the service re-checks access). */
+    public function earlierLinkIncidents(Request $r, string|int $exposure)
+    {
+        $exposure = $this->id($exposure);
+        $this->jsonOnly($r); $this->queryKeys($r, ['search']);
+        $search = $r->query('search');
+        abort_unless($search === null || is_string($search), 422);
+
+        return $this->headers(response()->json(['items' => $this->recovery->incidentChoices($r->user(), $exposure, (string) ($search ?? ''))]));
     }
 
     /** #15: one file kept with the latest review (photos, PDFs or Word files, up to 10 MB). */
