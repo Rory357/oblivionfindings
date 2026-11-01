@@ -159,18 +159,19 @@ it('uses one review header, four linked numbers and the shared sibling rail', ()
         screen.getByRole('tablist', { name: 'Incidents and safety reviews views' }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /^View / })).toHaveLength(4);
-    fireEvent.click(
-        screen.getByRole('button', { name: 'View investigation needed' }),
-    );
+    // G3 board M6: the boxes are the same lists as the G2 Overview's.
+    fireEvent.click(screen.getByRole('button', { name: 'View need an owner' }));
     expect(state.get).toHaveBeenCalledWith(
         '/health-safety/events',
-        { ...props.filters, tab: 'investigation_due' },
+        { ...props.filters, tab: 'needs_owner' },
         { preserveScroll: true },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Review view' }));
-    expect(screen.getByText('Being investigated (3)')).toBeInTheDocument();
-    expect(screen.getByText('Actions under way (2)')).toBeInTheDocument();
-    expect(screen.getByText('Closed (1)')).toBeInTheDocument();
+    // The status views are the built tier-2 tabs under the header, with their counts.
+    const status = screen.getByRole('tablist', { name: 'Safety review status' });
+    expect(within(status).getByRole('tab', { name: /Being investigated/ })).toHaveTextContent('3');
+    expect(within(status).getByRole('tab', { name: /Actions under way/ })).toHaveTextContent('2');
+    expect(within(status).getByRole('tab', { name: /Closed/ })).toHaveTextContent('1');
+    expect(within(status).getByRole('tab', { name: /Blocked/ })).toBeInTheDocument();
 });
 
 it('links to readable report pages and hides the report launcher without permission', () => {

@@ -122,6 +122,16 @@ class HsEventController extends Controller
                     ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
                 'correctiveActions as awaiting_verification_count' => fn (Builder $q) => $q
                     ->where('status', HsCorrectiveAction::STATUS_COMPLETED),
+                // G3 board M6: where each review is up to and its next step.
+                'investigations as completed_investigations_count' => fn (Builder $q) => $q
+                    ->where('status', HsInvestigation::STATUS_COMPLETED),
+                'correctiveActions as actions_count',
+                'correctiveActions as done_actions_count' => fn (Builder $q) => $q
+                    ->whereIn('status', [HsCorrectiveAction::STATUS_COMPLETED, HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
+                'correctiveActions as failed_unrevised_count' => fn (Builder $q) => $q
+                    ->whereIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                    ->where('effectiveness_confirmed', false)
+                    ->whereDoesntHave('revisions'),
             ])
             ->orderByDesc('reported_at');
 
@@ -177,6 +187,7 @@ class HsEventController extends Controller
                 ],
                 'has_investigation' => $e->investigations_count > 0,
                 'has_open_actions' => $e->open_actions_count > 0,
+                ...$this->listProgress($e, $request->user()),
             ];
         });
 
@@ -200,7 +211,7 @@ class HsEventController extends Controller
                 ->count(),
             'worksafe' => (int) $this->scopedBase($request, $context)->where('worksafe_notifiable', true)->count(),
         ];
-        foreach (['investigation_due', 'awaiting_verification', 'worksafe_pending'] as $attentionTab) {
+        foreach (['investigation_due', 'awaiting_verification', 'worksafe_pending', 'needs_owner', 'decide_or_tell', 'not_closed', 'blocked'] as $attentionTab) {
             $attentionQuery = $this->scopedBase($request, $context);
             $this->applyTab($attentionQuery, $attentionTab);
             $tabCounts[$attentionTab] = $attentionQuery->count();
@@ -325,8 +336,76 @@ class HsEventController extends Controller
             'decide_or_tell' => $query->worksafeDecideOrTell(),
             'not_closed' => $query->where('status', '!=', HsEvent::STATUS_CLOSED),
             'close_anyway' => $query->whereHas('closureExceptions', fn (Builder $q) => $q->where('status', HsClosureException::STATUS_PENDING)),
+            // G3 board M6 (decision 17): "Blocked" = can't move until someone chooses its owner (open, no owner, not
+            // waiting on a handover). Each row says who chooses, for this viewer.
+            'blocked' => $query->where('status', '!=', HsEvent::STATUS_CLOSED)->whereNull('owner_user_id')
+                ->whereIn('handover_status', [HsEvent::HANDOVER_ACCEPTED, HsEvent::HANDOVER_NOT_REQUIRED]),
             default => $query, // 'all'
         };
+    }
+
+    /**
+     * G3 board M6: one row's "where it's up to" and its one next step — the same order as the review page's next step
+     * (HsEventController::buildEventDetail). `can` is the route's own permission for this viewer; the review page opened
+     * by `href` checks everything again before anything is recorded. A step this viewer can't take says who does.
+     *
+     * @return array{summary: string, next: ?array{key: string, label: string, can: bool, who: ?string, href: string}, blocked: ?string}
+     */
+    private function listProgress(HsEvent $e, User $viewer): array
+    {
+        $base = "/health-safety/events/{$e->id}";
+        $site = $e->site?->name ?? 'this site';
+        $manages = $viewer->canDo('hazards.manage');
+        $owner = $e->owner?->name;
+        $who = $owner ? "{$owner} or a health and safety manager at {$site}" : "A health and safety manager at {$site}";
+        $signed = $e->hasSignedWorksafeDecision();
+        $handoverDone = in_array($e->handover_status, [HsEvent::HANDOVER_ACCEPTED, HsEvent::HANDOVER_NOT_REQUIRED], true);
+        $actions = (int) $e->actions_count;
+        $done = (int) $e->done_actions_count;
+        $failed = (int) $e->failed_unrevised_count;
+
+        if ($e->status === HsEvent::STATUS_CLOSED) {
+            return ['summary' => 'Closed'.($e->closed_at ? ' '.$e->closed_at->timezone('Pacific/Auckland')->format('j M Y') : ''), 'next' => null, 'blocked' => null];
+        }
+
+        $step = fn (string $key, string $label, bool $can, string $href, ?string $doer = null): array => [
+            'key' => $key, 'label' => $label, 'can' => $can, 'who' => $can ? null : ($doer ?? "{$who} does it"), 'href' => $href,
+        ];
+        $next = match (true) {
+            $e->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE => $step('take_on', 'Take it on', $manages,
+                "{$base}?action=accept-handover", "A health and safety manager at {$site} takes it on"),
+            ! $signed => $step('worksafe_decision', 'Record WorkSafe decision', $manages && $handoverDone, "{$base}?action=worksafe-decision"),
+            $e->worksafe_notifiable === true && $e->worksafe_status === HsEvent::WORKSAFE_PENDING => $step('worksafe_notify',
+                'Record that WorkSafe was told', $manages, "{$base}?action=worksafe-notify"),
+            $e->worksafe_status === HsEvent::WORKSAFE_NOTIFIED => $step('worksafe_acknowledge', 'Record the acknowledgement',
+                $manages, "{$base}?action=worksafe-acknowledge"),
+            $e->owner_user_id === null => $step('choose_owner', 'Choose owner', $manages && $handoverDone, "{$base}?action=choose-owner",
+                "A health and safety manager at {$site} chooses the owner"),
+            $e->investigation_required && (int) $e->completed_investigations_count === 0 => $step('investigation',
+                'Open the investigation', $manages, "{$base}?section=investigation"),
+            $failed > 0 => $step('revised_action', 'Add revised action', $manages, $base),
+            (int) $e->open_actions_count > 0 => $step('actions', 'Open actions', true, "{$base}?section=actions"),
+            default => $step('close', 'Close safety review', $viewer->canDo('healthSafety.events.close'), "{$base}?action=close",
+                ($owner ? "{$owner}, the owner, or someone" : 'Someone')." who closes safety reviews at {$site} closes it"),
+        };
+
+        $summary = match (true) {
+            $e->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE => 'Waiting for Health and safety',
+            ! $signed => 'WorkSafe decision still to record',
+            $e->worksafe_notifiable === true && $e->worksafe_status === HsEvent::WORKSAFE_PENDING => 'Notifiable — WorkSafe still to be told',
+            $e->owner_user_id === null => 'Owner still needed',
+            $failed > 0 => ($failed === 1 ? 'A fix didn’t work' : "{$failed} fixes didn’t work").' · revised action needed',
+            $actions > 0 => "{$done} of {$actions} ".($actions === 1 ? 'action' : 'actions').' done',
+            $e->investigation_required && (int) $e->completed_investigations_count === 0 => 'Investigation under way',
+            default => 'Ready to close',
+        };
+
+        // Decision 17: "Blocked" shows the real status plus why it can't move, for this viewer.
+        $blocked = $e->owner_user_id === null && $handoverDone
+            ? ($manages ? 'Owner still needed — choose one' : "Owner still needed — a health and safety manager at {$site} chooses")
+            : null;
+
+        return ['summary' => $summary, 'next' => $next, 'blocked' => $blocked];
     }
 
     private function validateRegisterPeriod(Request $request): void
