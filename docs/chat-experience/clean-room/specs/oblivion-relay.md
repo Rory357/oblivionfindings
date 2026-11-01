@@ -11,13 +11,15 @@ The Settings › Obli remote-support card shows a coturn configuration snippet. 
 
 **Spec provenance.** Written by the Oblivion Relay spec-writer session, a side session of the Chat rebuild session (`local_fae95f7b`), on 1 November 2026, on branch `claude/oblivion-relay-spec`. Sources read: RFC 8489, RFC 8656, RFC 5769 and RFC 7983 from rfc-editor.org, RFC 6062 (only to leave it out of scope), draft-uberti-behave-turn-rest-00, and the Oblivion code and documents named in section 1. This session opened, searched and fetched no code, examples or built files from any TURN or STUN implementation. It does not build the relay.
 
-**Updated the same day** with the user's answers to five open questions:
+**Updated the same day** with the user's answers to all seven open questions:
 
 - STUN Binding is on by default.
 - Five hours is the longest Chat call.
 - The app gets an instant cut-off, through the control channel in 3.7.
 - Fuller logs record the client IP of every allocation, with restricted access (section 9).
 - That log is kept for 14 days.
+- It runs beside nginx on the test server (10.3).
+- Version 1 serves Chat calls only. CCTV and remote support are deferred (3.2).
 
 The answers are listed in section 13.
 
@@ -36,7 +38,9 @@ Two other Oblivion features already issue TURN credentials and expect a TURN ser
 - **CCTV live view** (`app/Domain/SecurityDevices/Cctv/Services/CctvSessions.php`, `turn()`; contract in `docs/native-endpoint-management/CCTV-CONTRACT.md`). The browser and the on-site collector both use relay-only ICE. Their relayed addresses must fall inside `CCTV_TURN_RELAY_CIDRS` and the `CCTV_TURN_RELAY_PORT_MIN`–`MAX` range.
 - **IT remote support** (`app/Domain/SecurityDevices/Endpoints/Services/EndpointRemoteRelay.php`, settings in `EndpointRemoteSupportSettings.php` and `config/endpoint_management.php`; behaviour in `docs/native-endpoint-management/REMOTE-RELAY.md`). The agent and the technician each get their own credential. It lasts until the session deadline, at most 120 minutes.
 
-Both use the TURN REST format (section 3): the username is `expiry:opaque-id`, and the password is the Base64 HMAC-SHA1 of the username under a shared secret. Oblivion Relay accepts their credentials as they are today.
+Both use the TURN REST format (section 3): the username is `expiry:opaque-id`, and the password is the Base64 HMAC-SHA1 of the username under a shared secret. Oblivion Relay is designed to accept their credentials as they are today.
+
+**Both are deferred.** On 1 November 2026 the user decided that CCTV and remote support do not move to Oblivion Relay with Chat: "cctv and remote support needs to be deffered". Version 1 is built and tested for Chat calls only. The spec keeps their classes and the `relay-only` peer policy, so that they can join later without a redesign, but they are switched off in version 1 (3.2).
 
 **What it is:** one long-running Node.js program (Node 22 LTS or later) in `relay/` at the repository root, using Node's built-in modules only. It answers STUN Binding requests (optional) and serves TURN allocations that relay UDP. Clients reach it over UDP, TCP or TLS. It also has a health endpoint on localhost only, and a signed control channel on a private address, which the app uses to end a person's relay use at once (3.7).
 
@@ -50,14 +54,14 @@ Both use the TURN REST format (section 3): the username is `expiry:opaque-id`, a
 
 ## 2. Requirements
 
-1. It relays UDP media for Chat calls of up to 8 voice or 4 video participants, for CCTV live view and for IT remote support.
+1. It relays UDP media for Chat calls of up to 8 voice or 4 video participants. CCTV live view and IT remote support are deferred: the design leaves room for them, but version 1 doesn't serve them (3.2).
 2. It works from networks that allow only TCP 443. TURN over TLS on 443 is always available. TURN over plain TCP on 443 is available where the relay owns that port.
-3. It accepts only time-limited TURN REST credentials. Chat, CCTV and remote support each have their own secret, and each class can hold a current and a previous secret for rotation. There are no static users, no anonymous use and no unauthenticated allocations.
+3. It accepts only time-limited TURN REST credentials. Each class (Chat now; CCTV and remote support later) has its own secret, and each can hold a current and a previous secret for rotation. There are no static users, no anonymous use and no unauthenticated allocations.
 4. It never opens a way into a private network. It refuses to relay to loopback, private, link-local, multicast, CGNAT, reserved or tunnel addresses, or to its own addresses, unless an explicit allowlist names them (section 6).
 5. It never amplifies or reflects attacks on others (section 7).
 6. No single person, credential or network can use it up. There are allocation quotas per credential and in total, bandwidth caps, and fixed lifetimes for allocations, permissions and channels.
 7. Logs never contain credentials, keys, nonces or message content. They record the client IP of every allocation, so abuse can be traced, and that log is deleted after a set number of days and readable only by named people (section 9). The health and metrics endpoint listens on localhost only.
-8. It runs on its own small server or beside nginx on the app server, from the same code and settings (section 10). **Where it runs is not decided. The user chooses before stage 5 network testing.**
+8. It runs beside nginx on the test server that runs main (oblivionfindings.com), as the user chose on 1 November 2026 (10.3). It does so without slowing main: memory is capped and the host's own services are out of reach. The same code and settings also run on a server of its own (10.4).
 9. Rotating a secret or renewing the certificate never drops a call: both reload on SIGHUP.
 10. One node with 2 vCPUs and 2 GB of memory carries at least 1,000 allocations and 150 Mbit/s of relayed traffic in each direction (section 12).
 11. The app can end a person's relay use at once, for example when someone is offboarded during a call. It does this over a signed control channel that is never internet-facing (3.7). When the relay is reachable, the person's relayed media stops within 5 seconds of the app's decision.
@@ -93,8 +97,15 @@ The tag in the opaque-id selects the class, and the class selects the secrets. A
 | Class | Tags | Issued by | Relay secrets | App setting with the same secret | Longest credential | Grace after expiry | Peers |
 |---|---|---|---|---|---|---|---|
 | `chat` | `chat` | `ChatRelayCredentials` (3.6) | `RELAY_CHAT_SECRET`, `RELAY_CHAT_PREVIOUS_SECRET` | `CHAT_RELAY_SECRET` | 3,600 s | 14,400 s | `public` |
-| `cctv` | `cctv` | `CctvSessions::turn()` | `RELAY_CCTV_SECRET`, `RELAY_CCTV_PREVIOUS_SECRET` | `CCTV_TURN_REST_SECRET` | 3,600 s | 0 | `relay-only` |
-| `remote` | `agent`, `technician` | `EndpointRemoteRelay::grant()` | `RELAY_REMOTE_SECRET`, `RELAY_REMOTE_PREVIOUS_SECRET` | `ENDPOINT_REMOTE_RELAY_SECRET`, or the encrypted app setting | 7,200 s | 0 | `relay-only` |
+| `cctv` (deferred) | `cctv` | `CctvSessions::turn()` | `RELAY_CCTV_SECRET`, `RELAY_CCTV_PREVIOUS_SECRET` | `CCTV_TURN_REST_SECRET` | 3,600 s | 0 | `relay-only` |
+| `remote` (deferred) | `agent`, `technician` | `EndpointRemoteRelay::grant()` | `RELAY_REMOTE_SECRET`, `RELAY_REMOTE_PREVIOUS_SECRET` | `ENDPOINT_REMOTE_RELAY_SECRET`, or the encrypted app setting | 7,200 s | 0 | `relay-only` |
+
+**Deferred, not enabled in version 1: `cctv` and `remote`.** Version 1 builds the class mechanism as data: tags, secrets, lifetimes, grace, peer policy and limits per class. It also builds the `relay-only` peer policy. Only `chat` can be switched on.
+
+- The `cctv` and `remote` rows above, and their defaults in sections 6, 7 and 10, record what those classes will need. They are not enabled.
+- If any `RELAY_CCTV_*` or `RELAY_REMOTE_*` setting is present, the relay refuses to start and names the setting.
+- A username with the `cctv`, `agent` or `technician` tag gets 401, as for any switched-off class.
+- Turning either class on later is a separate change, with its own tests and the user's yes. It also brings the follow-ups listed in section 14.
 
 - **Longest credential** (`RELAY_<CLASS>_MAX_CREDENTIAL_SECONDS`). An `expiry` further ahead than this, plus the clock allowance, is refused with 401, so a faulty issuer can't hand out year-long credentials. CCTV's 3,600 s matches `CCTV_LIVE_MAX_SESSION_SECONDS`, which is at most 3,600. Remote support's 7,200 s matches its 120-minute ceiling.
 - **Grace after expiry** (`RELAY_<CLASS>_GRACE_SECONDS`). This is how long an allocation made before `expiry` may keep refreshing after it. The TURN REST draft lets existing allocations carry on after expiry, because a browser can't change the username of a live allocation. Oblivion puts a limit on that. With a grace of 0, the relay ends the allocation at `expiry`. The CCTV and remote-support contracts already expect this: CCTV's "worker and browser both close by it", and remote support's local deadline. For Chat, a one-hour credential with four hours' grace keeps a call alive for up to five hours, while a leaked credential can open new allocations for at most an hour.
@@ -137,7 +148,7 @@ A TURN REST credential can't be withdrawn once it has been issued. The normal wa
 
 ### 3.6 What the app issues for Chat
 
-The CCTV and remote-support issuers stay as they are. Chat gets its own issuer in this item, so that the relay and the app are tested against each other:
+The CCTV and remote-support issuers stay as they are and are not pointed at this relay (deferred). Chat gets its own issuer in this item, so that the relay and the app are tested against each other:
 
 - `App\Services\Chat\ChatRelayCredentials::for(User $user, string $callUuid): array` returns `{urls, username, credential, expires_at}`.
 - `username` is `<now + CHAT_RELAY_CREDENTIAL_SECONDS>:obli-chat-<hash_hmac('sha256', 'chat|'.$callUuid.'|'.$user->id, app.key)>`. `CHAT_RELAY_CREDENTIAL_SECONDS` defaults to 3,600 and may not exceed it. Each person gets one id per call. The relay can then apply the per-person quota within a call, but can't link one person's calls together.
@@ -158,8 +169,8 @@ On 1 November 2026 the user decided that the app must be able to end a person's 
 - It may bind to a loopback address or a private one: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 (for a private overlay such as WireGuard) or fc00::/7. The relay refuses to start if it is set to a public address, `0.0.0.0` or `::`. It is never internet-facing.
 - It answers only sources in `RELAY_CONTROL_ALLOWED_SOURCES` (default `127.0.0.1/32,::1/128`), which may list loopback and private CIDRs only. Connections from anywhere else close without a reply. The host firewall also allows the control port only from the app server.
 - Where it listens:
-  - Beside nginx (shape B): on loopback.
-  - On its own server (shape A): on the relay's address on a private network it shares with the app server, such as a cloud private network or a WireGuard tunnel. Where there is no private network, use an SSH or WireGuard tunnel that ends on loopback. The port is never opened publicly.
+  - Beside nginx on the test server (shape B, the chosen setup): on loopback.
+  - On its own server (shape A, the alternative): on the relay's address on a private network it shares with the app server, such as a cloud private network or a WireGuard tunnel. Where there is no private network, use an SSH or WireGuard tunnel that ends on loopback. The port is never opened publicly.
 - It speaks plain HTTP/1.1. The HMAC gives authenticity and integrity. Bodies hold only opaque ids, times and a reason word, never names or user ids.
 
 **Authentication.**
@@ -204,7 +215,7 @@ Known-answer vector, shared by the Node and PHP tests. Both were computed with `
 | `POST /control/revoke` | `{"revocations":[{"id":"obli-<tag>-<64 hex>","expires_up_to":<Unix seconds>}],"reason":"offboarded"\|"left_call"\|"call_ended"\|"access_removed"\|"hand"}`. 1–500 entries, at most 64 KiB, `Content-Type: application/json` | 200 `{"ended": <allocations ended>, "held": <revocations now held>}`, sent once the work is done. 400 if any entry is invalid, and then nothing is applied. 413 if the body is too large |
 | `GET /control/status` | empty | 200 with the `/health` body, plus `revocations_held` and `control: {key_id, previous_key}` |
 
-**What a revoke names.** The opaque id from the username, `obli-<tag>-<64 hex>`. The tag tells the relay the class. `expires_up_to` is the latest credential expiry the app could have issued for that id so far: the app's clock now, plus its credential lifetime. If `expires_up_to` is further ahead of the relay's clock than the class's longest credential plus the clock allowance, the request gets 400.
+**What a revoke names.** The opaque id from the username, `obli-<tag>-<64 hex>`. The tag tells the relay the class. In version 1 only `obli-chat-` ids are valid; an id with a deferred class's tag makes the whole request a 400. `expires_up_to` is the latest credential expiry the app could have issued for that id so far: the app's clock now, plus its credential lifetime. If `expires_up_to` is further ahead of the relay's clock than the class's longest credential plus the clock allowance, the request gets 400.
 
 **What the relay does** before it answers, within 1 second:
 
@@ -345,7 +356,7 @@ The allocation remembers its 5-tuple, username, class, opaque-id, key, secret sl
 
 - **Client to peer.** A Send indication (XOR-PEER-ADDRESS and DATA) or ChannelData on a bound channel is relayed only if all of these hold: the allocation exists; a current permission covers the peer IP; section 6 still allows the peer address and port (the settings can change on reload); the payload is at most 1,500 bytes; and the bandwidth buckets allow it (section 7). Otherwise it is dropped without an answer, since indications never get one. A Send indication carrying DONT-FRAGMENT is dropped, because that attribute is unknown and comprehension-required for this relay.
 - **Peer to client.** A datagram arriving on a relayed port is relayed only if all of these hold: section 6 allows its source address and port; a current permission covers the source IP; and the buckets allow it. It goes to the client as ChannelData when a channel is bound to that exact source address and port, and otherwise as a Data indication (XOR-PEER-ADDRESS and DATA). Otherwise it is dropped.
-- **Relay to itself.** Sometimes the peer address is one of this relay's own relayed addresses (6.3). The datagram is then handed straight to the allocation that owns that port, inside the process, as if it had arrived from the sender's relayed address. Nothing goes through the network. If no allocation owns the port, or the receiving allocation has no permission for the sender's relayed IP, the datagram is dropped. This is the usual path when both callers are on strict networks, and the only path for CCTV and remote support. It also avoids hairpin problems behind a cloud's 1:1 NAT.
+- **Relay to itself.** Sometimes the peer address is one of this relay's own relayed addresses (6.3). The datagram is then handed straight to the allocation that owns that port, inside the process, as if it had arrived from the sender's relayed address. Nothing goes through the network. If no allocation owns the port, or the receiving allocation has no permission for the sender's relayed IP, the datagram is dropped. This is the usual path when both callers are on strict networks, and it will be the only path for CCTV and remote support once they join. It also avoids hairpin problems behind a cloud's 1:1 NAT.
 - **TCP and TLS back-pressure.** When a client connection already has more than 256 KiB waiting to be written, relayed data for it is dropped rather than queued, as UDP would lose it. Responses to requests are always queued; if they can't be, the connection closes.
 - Node can't receive ICMP, so the relay never sends the ICMP attribute. It doesn't change the TTL or DSCP of relayed packets.
 
@@ -404,7 +415,7 @@ Port rules apply to the destinations of ChannelBind, Send and ChannelData, and t
 
 - **The own relayed pool** is this relay's external and bound addresses (`RELAY_EXTERNAL_IP`, `RELAY_LISTEN_IP` and the IPv6 pair), with a port inside `RELAY_PORT_MIN`–`MAX`. Every class may use it, and the relay delivers to it internally (5.6). It is what `CCTV_TURN_RELAY_CIDRS` and the CCTV port range describe, so those settings must cover the relay's external address and equal its port range.
 - **`public`** (the Chat default) allows global unicast addresses that aren't in 6.1 or 6.2, the own relayed pool, and `RELAY_CHAT_ALLOWED_PEER_CIDRS`.
-- **`relay-only`** (the CCTV and remote-support default) allows the own relayed pool and `RELAY_<CLASS>_ALLOWED_PEER_CIDRS` only. When there is more than one Oblivion Relay node, use the allowlist for the other nodes' pools.
+- **`relay-only`** (the default for CCTV and remote support, both deferred) allows the own relayed pool and `RELAY_<CLASS>_ALLOWED_PEER_CIDRS` only. When there is more than one Oblivion Relay node, use the allowlist for the other nodes' pools.
 - The setting is `RELAY_<CLASS>_PEERS=public|relay-only`.
 - **Allowlists** (`RELAY_<CLASS>_ALLOWED_PEER_CIDRS`) are comma-separated literal CIDRs, at most 8 of them. IPv4 prefixes must be /24 or narrower and IPv6 prefixes /120 or narrower, the same bounds as `CCTV_TURN_RELAY_CIDRS`. None may overlap 6.1. They are empty by default. An allowlist opens a range only for the class that names it.
 
@@ -509,7 +520,7 @@ The events are `start`, `reload`, `listener_error`, `allocation_start`, `allocat
 
 **Health and metrics.** The endpoint listens on `RELAY_HEALTH_LISTEN` (default `127.0.0.1:9478`) using `node:http`. The relay refuses to start if that address isn't loopback. It has no authentication, because it shows nothing secret. It answers GET only, and 404 for any other path.
 
-- `GET /health` returns 200 with `{status, version, uptime_s, listeners: [{transport, port, ok}], classes: {chat: {enabled, previous_secret}, cctv: {…}, remote: {…}}, allocations: {chat, cctv, remote}, capacity: {allocations_max, ports_free}, tls: {not_after}}`.
+- `GET /health` returns 200 with `{status, version, uptime_s, listeners: [{transport, port, ok}], classes: {chat: {enabled, previous_secret}, cctv: "deferred", remote: "deferred"}, allocations: {chat}, capacity: {allocations_max, ports_free}, memory: {rss_mb, heap_used_mb}, tls: {not_after}}`.
   - `status` is `ok`, or `degraded` when the certificate expires within 14 days or fewer than 10% of relayed ports are free.
   - It returns 503 with `status: "down"` when a listener has failed.
 - `GET /metrics` returns JSON counters since start:
@@ -555,7 +566,7 @@ Both probes are written in PHP with its built-in sockets. The same row shows how
 | `RELAY_TLS_CERT_FILE`, `RELAY_TLS_KEY_FILE` | required with a TLS listener | PEM full chain and key |
 | `RELAY_TRUSTED_PROXIES` | `127.0.0.1/32,::1/128` | Who may send a PROXY header |
 | `RELAY_CHAT_SECRET[_FILE]`, `RELAY_CHAT_PREVIOUS_SECRET[_FILE]` | empty, so the class is off | Chat secrets (3.2) |
-| `RELAY_CCTV_…`, `RELAY_REMOTE_…` | the same | CCTV and remote-support secrets |
+| `RELAY_CCTV_…`, `RELAY_REMOTE_…` | not read in version 1 | Deferred (3.2). Setting any of them stops start-up |
 | `RELAY_<CLASS>_MAX_CREDENTIAL_SECONDS` | chat 3600, cctv 3600, remote 7200 | 3.2 |
 | `RELAY_<CLASS>_GRACE_SECONDS` | chat 14400, cctv 0, remote 0 | 3.2 |
 | `RELAY_<CLASS>_PEERS` | chat `public`, cctv `relay-only`, remote `relay-only` | 6.3 |
@@ -578,7 +589,71 @@ Both probes are written in PHP with its built-in sockets. The same row shows how
 | `RELAY_CONTROL_PREVIOUS_SECRET[_FILE]`, `RELAY_CONTROL_PREVIOUS_KEY_ID` | empty | Set only during rotation |
 | `RELAY_STATE_DIR` | `/var/lib/oblivion-relay` | Holds `revocations.json` (3.7) |
 
-### 10.3 Shape A: its own small server
+### 10.3 Chosen: beside nginx on the test server (shape B)
+
+On 1 November 2026 the user chose this setup: the relay runs on the test server, the same machine that runs main at oblivionfindings.com. Stephan runs that server and installs the relay (section 14).
+
+**Names and listeners.** Until C4.10 removes LiveKit, LiveKit's built-in TURN owns `turn.<domain>`, `127.0.0.1:5349` and UDP 3478 on this host, so the relay uses its own name and ports:
+
+- **DNS:** `relay.oblivionfindings.com`, an A record pointing at the test server's public address.
+- **Certificate:** issued by the server's existing Let's Encrypt setup (HTTP-01 over the app's port 80). The renewal hook sends SIGHUP.
+- **Listeners:** `RELAY_LISTEN=udp://0.0.0.0:3479,tls://127.0.0.1:5350?proxy=required`, with `RELAY_REALM=relay.oblivionfindings.com`.
+- **Addresses:** `RELAY_EXTERNAL_IP` is the server's public IPv4. If the provider maps that address one-to-one onto a private interface address, `RELAY_LISTEN_IP` is the private address. IPv6 stays off unless the server has it.
+- **App URLs:** `turn:relay.oblivionfindings.com:3479?transport=udp` and `turns:relay.oblivionfindings.com:443?transport=tcp`.
+- This shape has no plain TURN over TCP: nginx needs TLS's SNI name to route port 443, and TURN over TLS on 443 already covers strict networks.
+- After LiveKit is removed, the relay may move to UDP 3478. Change `RELAY_LISTEN` and `CHAT_RELAY_URLS` together. The name can stay.
+
+**nginx on 443.** TLS for the relay arrives through nginx's stream SNI router, as one more line beside LiveKit's existing `turn.` entry:
+
+```
+map $ssl_preread_server_name $oblivion_voice_destination {
+    # existing entries stay, including LiveKit's turn.<domain> 127.0.0.1:5349;
+    relay.oblivionfindings.com 127.0.0.1:5350;
+}
+```
+
+The `listen 443; ssl_preread on; proxy_protocol on;` server block stays as it is, and `RELAY_TRUSTED_PROXIES` keeps its loopback default. Stephan first checks how port 443 is shared on this host today, because the relay's line belongs in an existing stream map. If 443 is served by the `http` block alone, adding a stream router changes how main itself is reached. That needs its own plan and a test before the relay goes in. At C4.10 only LiveKit's `turn.` line is removed.
+
+**Relayed UDP range and firewall.**
+
+- **Range:** `RELAY_PORT_MIN=61000` and `RELAY_PORT_MAX=64999`, which is 4,000 ports.
+  - It sits above Linux's default ephemeral range (32768–60999), so other programs' short-lived UDP sockets, such as DNS lookups, never land in the open range.
+  - It stays clear of LiveKit's ports: UDP 7882 and 3478, and TCP 7881.
+  - Before opening it, Stephan checks `sysctl net.ipv4.ip_local_port_range` and `ss -lunp` to confirm that nothing else uses 61000–64999.
+- **Allocations:** `RELAY_MAX_ALLOCATIONS=3000`, which leaves ports spare. Browsers gather relay candidates for every peer connection, even when the call ends up direct. A full 8-person call can therefore hold about 170 allocations (8 people × 7 connections × 2 URLs × up to 1.5 network interfaces).
+- **Open inbound:** UDP 3479 and UDP 61000–64999, and nothing else new. Port 443 is already open for nginx. The relay's TLS (5350), health (9478) and control (9479) ports stay on loopback and are never opened.
+- If CCTV joins later (deferred, 3.2), `CCTV_TURN_RELAY_PORT_MIN`/`MAX` become 61000 and 64999, and `CCTV_TURN_RELAY_CIDRS` lists the server's public address as a /32.
+
+**What the peer rules protect on this host.** The relay only ever sends UDP, so the app's TCP services can't be reached through it at all. That covers:
+
+- SSH (22) and nginx (80, 443);
+- MySQL (3306), Redis (6379), and PHP-FPM (9000, if it isn't on a socket);
+- Oblivion Live (8091 for browsers, 8092 internal);
+- LiveKit (7880, 7881, 8443, 8444);
+- the relay's own TLS, health and control ports (5350, 9478, 9479).
+
+On top of that, the address rules in 6.1 refuse every UDP destination on the host itself: loopback, and the host's own public and private addresses at any port outside 61000–64999. That covers DNS (53), NTP (123), LiveKit's UDP 3478 and 7882, and the relay's own 3479. The host's private network (6.2) and the cloud metadata address (6.1) are refused too. Acceptance check 8 probes this list on the server itself.
+
+**Memory and the shared host.** The test server already uses swap, and the relay must never push main into it.
+
+- **systemd caps:** `MemoryHigh=384M`, `MemoryMax=512M` and `MemorySwapMax=0`, plus `--max-old-space-size=256` for Node's heap in `ExecStart`. Media can't tolerate swapping. If the relay ever reaches the hard cap, systemd restarts it and the calls reconnect, rather than the host slowing down.
+- **Limits:** `RELAY_MAX_ALLOCATIONS=3000` and the other limits in section 7 bound the relay's memory. Acceptance check 14 measures it during a 4-person video call.
+- **Bandwidth:** `RELAY_TOTAL_MBPS=100`, or half the server's link speed if that is lower, so relayed media can't starve main's own traffic.
+- **Reporting:** `/health` and `/control/status` report `memory: {rss_mb, heap_used_mb}`, and Service health shows it.
+- **CPU:** Node runs the relay on one main thread, so it uses at most about one CPU core.
+
+**Control channel and app settings.**
+
+- The relay sets `RELAY_CONTROL_LISTEN=127.0.0.1:9479`.
+- The app's `.env` on the same host sets:
+  - `CHAT_RELAY_URLS=turn:relay.oblivionfindings.com:3479?transport=udp,turns:relay.oblivionfindings.com:443?transport=tcp`;
+  - `CHAT_RELAY_CONTROL_URLS=http://127.0.0.1:9479`;
+  - the two secrets.
+- Service health reads `/health` on localhost.
+
+### 10.4 Alternative: its own small server (shape A)
+
+This setup stays documented in case the relay later needs its own server: for more load, or to keep it off the host that holds care records.
 
 - A small virtual machine with a public IPv4 address, and optionally IPv6. DNS points `turn.<domain>` at it. It runs no app code: copy only `relay/`.
 - The default listeners are UDP 3478, TCP 3478 and `tcp+tls` on 443. Port 443 carries both TURN over TLS and plain TURN over TCP (the first-byte check), so `turn:turn.<domain>:443?transport=tcp` also works on networks that allow port 443 without checking for TLS.
@@ -588,30 +663,31 @@ Both probes are written in PHP with its built-in sockets. The same row shows how
 - To bind 443 as a non-root user, the service needs `CAP_NET_BIND_SERVICE`.
 - **Certificate:** Let's Encrypt, with an HTTP-01 challenge (TCP 80 open briefly) or a DNS-01 challenge. The renewal hook sends SIGHUP.
 - **App URLs:** `turn:turn.<domain>:3478?transport=udp`, `turn:turn.<domain>:3478?transport=tcp` and `turns:turn.<domain>:443?transport=tcp`.
-
-### 10.4 Shape B: beside nginx on the app server
-
-- nginx keeps TCP 443. It routes the `turn.<domain>` SNI name to the relay with the PROXY protocol, as `gateway.nginx.conf.example` already does (`turn.example.invalid 127.0.0.1:5349;` with `proxy_protocol on;`).
-- Set `RELAY_LISTEN=udp://0.0.0.0:3478,tls://127.0.0.1:5349?proxy=required`, and add `tcp://0.0.0.0:3478` if TCP 3478 is opened.
-- **Open inbound, in addition:** UDP 3478, TCP 3478 if used, and the relayed UDP range. Choose a narrower range here, for example 50000–53999, so that less of the app server is open. `RELAY_MAX_ALLOCATIONS` must fit inside it.
-- Plain TURN over TCP on 443 isn't possible in this shape, because nginx needs TLS's SNI name to route. TURN over TLS on 443 covers strict networks.
-- The peer rules refuse the app server's own addresses and private networks, so the relay can't reach MySQL, Redis or anything else on the host or its private network.
-- The control channel stays on the default `127.0.0.1:9479`, and the app uses `CHAT_RELAY_CONTROL_URLS=http://127.0.0.1:9479`.
-- **App URLs:** `turn:turn.<domain>:3478?transport=udp` and `turns:turn.<domain>:443?transport=tcp`, plus TCP 3478 if opened.
-- **While LiveKit still runs** (until C4.10), LiveKit's built-in TURN owns `turn.<domain>`, `127.0.0.1:5349` and UDP 3478. Until LiveKit is removed, give the relay its own name (for example `relay.<domain>`), loopback port (`127.0.0.1:5350`) and UDP port (3479), with its own SNI line in nginx. Move it over afterwards.
+- Its memory caps can be higher than shape B's, since nothing else shares the host.
 
 ### 10.5 Files the builder writes in `deploy/chat-calling/`
 
-- **`oblivion-relay.env.example`**: every setting from 10.2 with a one-line comment. Secrets are left empty and the `_FILE` form is shown. It includes both shapes as commented blocks, and the matching app `.env` keys: the new `CHAT_RELAY_URLS`, `CHAT_RELAY_SECRET`, `CHAT_RELAY_CREDENTIAL_SECONDS`, `CHAT_RELAY_CONTROL_URLS`, `CHAT_RELAY_CONTROL_SECRET` and `CHAT_RELAY_CONTROL_KEY_ID`, and the existing `CCTV_TURN_*` and `ENDPOINT_REMOTE_RELAY_*`.
+- **`oblivion-relay.env.example`**: every setting from 10.2 with a one-line comment. Secrets are left empty and the `_FILE` form is shown. The test server's values from 10.3 are the main example, and shape A is a commented block. It also includes the matching app `.env` keys: the new `CHAT_RELAY_URLS`, `CHAT_RELAY_SECRET`, `CHAT_RELAY_CREDENTIAL_SECONDS`, `CHAT_RELAY_CONTROL_URLS`, `CHAT_RELAY_CONTROL_SECRET` and `CHAT_RELAY_CONTROL_KEY_ID`. A comment notes that the existing `CCTV_TURN_*` and `ENDPOINT_REMOTE_RELAY_*` keys are not pointed at this relay in version 1.
 - **`oblivion-relay.service.example`**: shaped like `oblivion-live.service.example`, with these additions:
-  - its own user, `oblivion-relay`, not `www-data`, because it may share the app server;
-  - `EnvironmentFile=/etc/oblivion/relay.env` and `ExecStart=/usr/bin/node relay/server.mjs`;
+  - its own user, `oblivion-relay`, not `www-data`, because it shares the test server with the app;
+  - `EnvironmentFile=/etc/oblivion/relay.env` and `ExecStart=/usr/bin/node --max-old-space-size=256 relay/server.mjs`;
   - `ExecReload=/bin/kill -HUP $MAINPID`;
   - `AmbientCapabilities=CAP_NET_BIND_SERVICE` and `CapabilityBoundingSet=CAP_NET_BIND_SERVICE`, needed only for 443 in shape A;
   - `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK` (`AF_NETLINK` is needed to read interface addresses);
-  - `PrivateDevices=true`, `MemoryMax=1G` and `LimitNOFILE=65536`, alongside Oblivion Live's hardening lines;
+  - `MemoryHigh=384M`, `MemoryMax=512M` and `MemorySwapMax=0`, the test server's caps from 10.3;
+  - `PrivateDevices=true` and `LimitNOFILE=65536`, alongside Oblivion Live's hardening lines;
   - `StateDirectory=oblivion-relay` for the revocation state, `ReadWritePaths=/var/log/oblivion-relay` and `UMask=0027`. The install steps create the log directory as `oblivion-relay:oblivion-relay-logs` with mode 2750 (section 9).
-- **`oblivion-relay.md`** covers:
+- **`oblivion-relay.md`** is written for Stephan, who installs the relay on the test server (section 14). It gives the steps in order, ready to copy:
+  - the users, group and directories;
+  - the secret files and `/etc/oblivion/relay.env`;
+  - the DNS record and certificate;
+  - the nginx map line;
+  - the firewall rules and the port checks;
+  - the systemd unit;
+  - the app's `.env` keys;
+  - the checks in section 12.
+
+  It also covers:
   - the two shapes, the ports and certificates;
   - the rotation steps for credential secrets (3.4) and the control secret (3.7);
   - setting up the control channel's private network or tunnel;
@@ -637,14 +713,15 @@ The tests use `node --test` in `relay/test/`. They use a fake clock for lifetime
    - Each of these is dropped without crashing: a truncated header, a wrong cookie, an odd length, an overrunning attribute, a duplicate integrity attribute, an oversized request, a non-STUN datagram, and a TCP stream split at every byte boundary.
    - A randomised fuzz test of datagrams and TCP streams never crashes the process, never creates an allocation without valid credentials and never breaks the 4× reply rule.
 4. **Credentials.**
-   - Accepted: a valid credential for each class, using the formats the existing CCTV and remote-support issuers produce. Generate one fixture by running each PHP formula once, and paste the results in.
+   - Accepted: a valid `chat` credential, including the known-answer vector in 3.1.
+   - Refused with 401 because their classes are deferred (3.2): credentials in the exact formats the CCTV and remote-support issuers produce (`obli-cctv-`, `obli-agent-` and `obli-technician-`). Generate one fixture by running each PHP formula once, and paste the results in. The same fixtures prove those formats parse, ready for when the classes are turned on.
    - Refused with 401:
      - an expired credential (skew allowed at the boundary);
      - one beyond the longest credential;
      - an unknown tag;
      - a class that is switched off;
      - uppercase hex, a missing colon, a leading zero, a non-ASCII byte or more than 128 bytes;
-     - a chat username signed with the CCTV secret;
+     - a chat username signed with a secret other than the chat secrets;
      - a denied id.
 5. **Nonces.**
    - The first request gets 401 with REALM and NONCE.
@@ -684,7 +761,7 @@ The tests use `node --test` in `relay/test/`. They use a fake clock for lifetime
     - The own pool inside the range is delivered internally. The relay's own address outside the range (3478, the health port) is refused.
     - An allowlisted CIDR is accepted for its class only.
     - An allowlist overlapping 6.1, or wider than /24 or /120, stops start-up.
-    - `relay-only` refuses a public peer.
+    - `relay-only` refuses a public peer. This is tested at the level of the peer module, with a test class, because no enabled class uses `relay-only` in version 1.
 11. **Limits.**
     - Each row in section 7 is reached and gives the stated result. The per-opaque-id quota gives 486; the per-address cap and the total give 508.
     - With the fake clock, the bandwidth buckets drop the excess and pass traffic under the cap. Drops are counted in the metrics.
@@ -722,7 +799,8 @@ The tests use `node --test` in `relay/test/`. They use a fake clock for lifetime
     - A second test covers the network path. It injects a peer policy that allows 127.0.0.1 for that test only, and checks that a plain UDP socket outside the relayed range gets and answers datagrams. `relay/server.mjs` never accepts an injected policy.
 17. **Settings.** Every invalid value in 10.2 stops start-up with the setting's name, and never the value of a secret. Some examples:
     - a missing realm, or a range smaller than the allocation total;
-    - two classes sharing a secret, or both a secret and its `_FILE` set;
+    - both a secret and its `_FILE` set;
+    - any `RELAY_CCTV_*` or `RELAY_REMOTE_*` setting, since those classes are deferred;
     - a TLS listener without a certificate, or a non-loopback health address;
     - `chat` switched on without a control secret, or a control secret equal to a credential secret;
     - a control listener on a public address, `0.0.0.0` or `::`, or a public CIDR in the allowed sources;
@@ -766,32 +844,44 @@ The tests use `node --test` in `relay/test/`. They use a fake clock for lifetime
 
 ## 12. Acceptance checks for later
 
-These run during stage 5 network testing, on the server the user chooses.
+These run during stage 5 network testing, on the test server (10.3), after Stephan has installed the relay. The test server also serves main, so run checks 3, 10 and 14 at a quiet time.
 
 1. **Two browsers, relay forced.** Chrome and Firefox, then Safari and Edge, each with `iceTransportPolicy: "relay"`. One is on home broadband and the other on 4G. Run a 10-minute voice call, then a video call. Audio and video flow both ways, `chrome://webrtc-internals` (or the equivalent) shows relay candidates selected, and the call's quality signal stays good.
 2. **Strict network.** Repeat check 1 with one laptop's firewall allowing only outgoing TCP 443. The call connects over `turns:` on 443 within 5 seconds. This also confirms that each browser's Allocate succeeds after the 420 for DONT-FRAGMENT, if the browser sends it.
 3. **Four-browser video and eight-browser voice.** A full mesh with two people on 4G and two on home networks (eight for voice), relay forced. Every pair connects, no allocation hits a quota, and the relay's metrics show no bandwidth drops under normal use.
 4. **Without forcing.** The same calls with the default ICE policy. Most pairs go direct (Binding on), and only strict-network pairs use the relay.
 5. **Credential expiry.** A call stays up past its credential's expiry, and ends at expiry plus grace. New allocations with the expired credential are refused, and an ICE restart with fresh credentials works.
-6. **nginx shape**, if chosen. `turns:` through nginx's SNI route on 443 with PROXY. XOR-MAPPED-ADDRESS shows the browser's real public address, and the per-address limits use it.
+6. **Through nginx.**
+   - `turns:relay.oblivionfindings.com:443` goes through nginx's SNI route with PROXY.
+   - XOR-MAPPED-ADDRESS shows the browser's real public address, and the per-address limits use it.
+   - LiveKit's `turn.` route and main's own HTTPS still work.
 7. **Reload during a call.** A SIGHUP for secret rotation and certificate renewal during check 1 doesn't interrupt it.
 8. **Probe from outside.**
    - An unauthenticated Allocate gets 401 and nothing more.
-   - With valid credentials, peers at 127.0.0.1, 10.0.0.1, 169.254.169.254, a CGNAT address and the relay's own 3478 and SSH ports are all refused.
+   - With valid credentials, these peers are all refused (403 for CreatePermission and ChannelBind, dropped for Send):
+     - 127.0.0.1, 10.0.0.1, 169.254.169.254 and a CGNAT address;
+     - the test server's own public and private addresses at ports 22, 53, 123, 3306, 3478, 3479, 5350, 6379, 7882, 8091, 8092, 9000, 9478 and 9479;
+     - the server's private network.
    - Measured reply-to-request size stays at or under 4×, and the rate limits hold under a flood from one address.
-9. **CCTV and remote support**, when those features are switched on. Relay-only sessions work with their existing credentials, and the relayed addresses fall inside `CCTV_TURN_RELAY_CIDRS`.
-10. **Capacity.** On a 2 vCPU, 2 GB node: 1,000 allocations, 150 Mbit/s each way and 30,000 packets a second, with under 0.5% loss, under 5 ms added p99 latency and under 600 MB of memory.
+9. **CCTV and remote support: deferred.** This doesn't run for version 1. When a later change turns those classes on, it checks that relay-only sessions work with their existing credentials, and that the relayed addresses fall inside `CCTV_TURN_RELAY_CIDRS`.
+10. **Capacity.** On a 2 vCPU, 2 GB node: 1,000 allocations, 150 Mbit/s each way and 30,000 packets a second, with under 0.5% loss and under 5 ms added p99 latency. On the test server, the relay stays inside its 512 MB cap while doing this. Run it at a quiet time, or on a separate machine, because it loads the host that serves main.
 11. **Offboarded during a call.** A test staff member is in a relayed call (relay forced) and is offboarded through Chat offboarding. Their relayed media stops within 5 seconds, they can't rejoin, and the others' call carries on. The allocation log shows `revoked`, and the audit log shows `chat.relay.revoked`.
 12. **Control channel down.** Block the control port, then offboard a test person mid-call. Service health shows the waiting revocation and the call continues through the relay. Unblock the port, and the revoke lands within a minute and the media stops.
 13. **Log handling.** The allocation log holds the client IPs from checks 1–3, and no peer addresses or credentials. Only `oblivion-relay-logs` members and root can read it. Files older than the retention limit are gone after the hourly sweep.
+14. **Memory during a 4-person video call.** Run a 30-minute, 4-person video call with the relay forced, plus screen share for part of it. Read the relay's memory from systemd (`MemoryCurrent`, `MemorySwapCurrent`) and from `/health` every minute.
+    - It stays under `MemoryHigh` (384 MB), its swap use stays at 0, and it is never restarted.
+    - Memory falls back near its starting level within 15 minutes of the call ending.
+    - Main's page response times during the call stay within its normal range.
 
 ## 13. Open questions for the user
 
-1. **Where does it run?** Shape A (its own small server) or shape B (beside nginx on the app server). Recommendation: shape A. It keeps an internet-facing UDP service with a wide port range off the host that holds care records, it allows plain TCP on 443, and it can grow on its own. The cost is one more small server. This is needed before stage 5 network testing.
-2. **CCTV and remote support.** Should they move to Oblivion Relay at the same time as Chat, or later? Both features are off today and have no relay installed. Moving them also means rewording the Settings › Obli card, which shows a coturn snippet. If they move, their own stop flows (CCTV stop, the remote-support Stop that REMOTE-RELAY.md says "does not erase a previously issued bearer credential") could use the control channel's revoke too.
+None. The user answered all seven on 1 November 2026.
 
 **Answered by the user on 1 November 2026:**
 
+- **CCTV and remote support:** deferred. They don't move to Oblivion Relay with Chat: "cctv and remote support needs to be deffered". Version 1 is built and tested for Chat only. Their classes and the `relay-only` policy stay in the spec, and stay switched off until a later change turns them on (3.2). That change could also let their own stop flows use the control channel's revoke: CCTV stop, and the remote-support Stop that REMOTE-RELAY.md says "does not erase a previously issued bearer credential".
+
+- **Where it runs:** on the test server, the machine that runs main: "its going to run on our test server where main runs on currently". That is shape B, beside nginx (10.3). Shape A stays documented as the alternative (10.4).
 - **STUN Binding:** on by default, with the limits in section 7 (4.4).
 - **Longest Chat call:** five hours (one-hour credentials plus four hours' grace) is fine. There is no extra cap in the app (3.2).
 - **Ending relay use at once:** yes, an instant cut-off. Version 1 has the signed control channel and the app hooks (3.7).
@@ -800,10 +890,18 @@ These run during stage 5 network testing, on the server the user chooses.
 
 ## 14. When it lands
 
+- **Who installs it.** Stephan runs the test server and installs the relay from `deploy/chat-calling/oblivion-relay.md`. Stephan sets up:
+  - the DNS record, the certificate and the nginx map line;
+  - the firewall rules, the secrets and the systemd unit;
+  - the app's `.env` keys.
+
+  Rory has no SSH access to the server yet. The builder and checker sessions install nothing and change no server settings. Stephan is the first member of `oblivion-relay-logs`, and others are added as section 9 describes.
+- **Before Stephan installs it:** the builder's tests pass, the checker has signed it off, and the user has said yes. Merging to main deploys the app's side to the test server, and the relay's `.env` keys stay empty until the relay is running.
 - The checker compares `relay/` with the source of coturn, pion/turn and other TURN servers, as README "Checking" describes, keeping that source outside the repository. Once satisfied, the checker marks Oblivion Relay "signed off" in REGISTER.md with the provenance note.
 - Add a guard: a test that fails if any file in `relay/` imports anything other than `node:` modules or relative paths inside `relay/`.
-- The LiveKit server's TURN role ends with C4.10. The nginx template's `turn.` line then points at the relay.
+- The LiveKit server's TURN role ends with C4.10. LiveKit's `turn.` line comes out of nginx's map, and the relay keeps `relay.oblivionfindings.com`. It may move to UDP 3478 then (10.3).
 - No licence notice is needed, since the relay contains no outside code.
-- Follow-ups outside Chat, each needing the user's yes:
-  - reword `docs/native-endpoint-management/REMOTE-RELAY.md` and the Settings › Obli card (its coturn snippet becomes an Oblivion Relay settings snippet);
+- **Later work, deferred with CCTV and remote support.** Each part needs the user's yes, and none of it is part of version 1:
+  - turn on the `cctv` and `remote` classes (3.2), with their own tests and acceptance check 9;
+  - reword `docs/native-endpoint-management/REMOTE-RELAY.md` and the Settings › Obli card, whose coturn snippet becomes an Oblivion Relay settings snippet;
   - update the "Coturn" wording in `EndpointRemoteSupportSettings`.
