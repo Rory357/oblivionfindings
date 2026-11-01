@@ -62,7 +62,6 @@ use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteHubWizardController;
 use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubAdminController;
 use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubLinuxSetupController;
-use App\Domain\SecurityDevices\Http\Controllers\SupportedDevicesController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandApprovalController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBatchController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBatchDecisionController;
@@ -76,6 +75,7 @@ use App\Domain\SecurityDevices\Screens\Http\DevicesController;
 use App\Domain\SecurityDevices\Screens\Http\FoundDevicesController;
 use App\Domain\SecurityDevices\Screens\Http\HubPanelController;
 use App\Domain\SecurityDevices\Screens\Http\OverviewController;
+use App\Domain\SecurityDevices\Screens\Http\SetupController;
 use App\Domain\SecurityDevices\Screens\Http\SitesController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -494,6 +494,23 @@ Route::middleware([
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.sites.show');
 
+    // S&D rebuild C5: Setup. The controller checks who may open it and each section.
+    Route::get('/setup', [SetupController::class, 'show'])
+        ->name('security-devices.setup');
+    Route::get('/setup/history/export', [SetupController::class, 'exportHistory'])
+        ->middleware('throttle:10,1')
+        ->name('security-devices.setup.history.export');
+    Route::patch('/setup/settings', [SetupController::class, 'settings'])
+        ->middleware('throttle:20,1')
+        ->name('security-devices.setup.settings');
+    Route::post('/setup/networks/{scope}/scan', [SetupController::class, 'scan'])
+        ->whereNumber('scope')
+        ->middleware('throttle:20,1')
+        ->name('security-devices.setup.networks.scan');
+    Route::get('/setup/{section}', [SetupController::class, 'show'])
+        ->where('section', 'hubs|services|history')
+        ->name('security-devices.setup.section');
+
     Route::get('/network-it', [CategoryPageController::class, 'networkIt'])
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.network-it');
@@ -810,7 +827,8 @@ Route::middleware([
     Route::get('/settings', SettingsAuditController::class)
         ->name('security-devices.settings');
 
-    Route::get('/supported-devices', SupportedDevicesController::class)
+    // Rebuilt as Setup › Services & logins › Supported devices (C5).
+    Route::get('/supported-devices', fn () => redirect('/security-devices/setup/services?tab=supported'))
         ->name('security-devices.supported-devices');
 
     Route::get('/settings/monitoring/effective-preview/{monitor}', [MonitoringEffectivePolicyPreviewController::class, 'show'])

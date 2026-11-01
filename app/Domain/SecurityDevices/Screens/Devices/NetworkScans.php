@@ -7,6 +7,7 @@ use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Discovery\Services\DiscoveryRunner;
 use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -42,6 +43,7 @@ final class NetworkScans
         private readonly NativeMonitoringDefinitionService $definitions,
         private readonly DiscoveryRunner $runner,
         private readonly SecurityDevicesAccessService $access,
+        private readonly SecurityDevicesSettings $settings,
     ) {}
 
     /**
@@ -120,6 +122,11 @@ final class NetworkScans
     private function network(User $actor, int $siteId, string $range, ?int $hubId, array $lookFor, ?string $dailyAt): DiscoveryScope
     {
         $this->access->assertCanViewSite($actor, $siteId);
+        if ($hubId === null && ! $this->settings->serverMayScan()) {
+            throw ValidationException::withMessages([
+                'hub_id' => 'Choose the hub that checks this network. The Oblivion server scans networks itself only when Setup › Networks & scans allows it.',
+            ]);
+        }
         $site = Site::query()
             ->whereKey($siteId)
             ->where('is_active', true)

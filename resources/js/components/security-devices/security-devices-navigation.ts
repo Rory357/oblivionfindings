@@ -134,24 +134,28 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
             },
             {
                 title: 'Setup',
-                href: '/security-devices/discovery',
+                href: '/security-devices/setup',
                 hubHrefs: [
+                    '/security-devices/setup',
                     '/security-devices/discovery',
                     '/security-devices/agent-downloads',
                     '/security-devices/settings',
                 ],
+                // S&D rebuild C5: the new Setup for whoever can open it; the old pages stay for
+                // people who reach only them until their sections are rebuilt.
                 resolveHref: (can) => {
-                    if (can.integrationsView) {
-                        return '/security-devices/discovery';
+                    if (can.integrationsView || can.integrationsManage) {
+                        return '/security-devices/setup';
                     }
 
-                    if (can.commandsAdmin || can.integrationsManage) {
+                    if (can.commandsAdmin) {
                         return '/security-devices/agent-downloads';
                     }
 
                     return '/security-devices/settings';
                 },
                 aliases: [
+                    '/security-devices/setup',
                     '/security-devices/discovery',
                     '/security-devices/integrations',
                     '/security-devices/supported-devices',

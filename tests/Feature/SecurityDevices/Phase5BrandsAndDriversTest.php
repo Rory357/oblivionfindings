@@ -137,20 +137,31 @@ class Phase5BrandsAndDriversTest extends TestCase
             }
         }
 
+        // S&D rebuild C5: the catalogue lives in Setup › Services & logins › Supported devices.
         $this->actingAs($this->worker)
-            ->get('/security-devices/supported-devices')
+            ->get('/security-devices/setup/services?tab=supported')
             ->assertForbidden();
-
         $this->actingAs($this->admin)
             ->get('/security-devices/supported-devices')
+            ->assertRedirect('/security-devices/setup/services?tab=supported');
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/setup/services?tab=supported')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('security-devices/supported-devices')
-                ->where('summary.total_drivers', count($all))
-                // Phase A: nothing is walked on real hardware yet (docs/security-devices/HARDWARE-WALKS.md).
-                ->where('summary.tested_on_hardware', 0)
-                ->where('summary.built_from_docs', fn (int $count): bool => $count >= 16)
-                ->where('summary.planned', fn (int $count): bool => $count >= 7));
+                ->component('security-devices/setup/index')
+                ->where('supported.tables', function ($tables) use ($all): bool {
+                    $rows = collect($tables)->flatMap(fn (array $table): array => $table['rows']);
+                    $levels = $rows->countBy(fn (array $row): string => $row['level']['text']);
+
+                    return $rows->count() === count($all)
+                        // Phase A: nothing is walked on real hardware yet (docs/security-devices/HARDWARE-WALKS.md).
+                        && ($levels['Tested on real hardware'] ?? 0) === 0
+                        && ($levels['Built from vendor docs'] ?? 0) >= 16
+                        && ($levels['Planned'] ?? 0) >= 7
+                        // How we know: every row cites the maker's or the standard's documents.
+                        && $rows->every(fn (array $row): bool => $row['docs'] !== [] && str_starts_with($row['docs'][0]['url'], 'https://'));
+                }));
     }
 
     public function test_camera_drivers_match_brands_and_probe_onvif_profile_t_media2_streams_with_rfc7616_digest_auth_and_sanitised_uris(): void

@@ -22,6 +22,7 @@ use App\Domain\SecurityDevices\Credentials\Enums\CredentialReferenceStatus;
 use App\Domain\SecurityDevices\Credentials\Enums\CredentialRotationStatus;
 use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
 use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
+use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -39,6 +40,7 @@ final class DiscoveryRunner
         private readonly DiscoveryScopeValidator $scopeValidator,
         private readonly DeviceIdentityMatcher $identityMatcher,
         private readonly DiscoveryCandidateService $candidates,
+        private readonly SecurityDevicesSettings $settings,
     ) {}
 
     public function start(DiscoveryScope $scope, string $trigger): DiscoveryRun
@@ -52,6 +54,10 @@ final class DiscoveryRunner
         $run = DB::transaction(function () use ($scope, $trigger, &$created): DiscoveryRun {
             $locked = DiscoveryScope::query()->lockForUpdate()->findOrFail($scope->id);
             $this->assertScope($locked);
+            // Setup: the server scans a network itself only when an admin allows it.
+            if ($locked->collector_id === null && ! $this->settings->serverMayScan()) {
+                throw new UnexpectedValueException('The Oblivion server doesn’t scan networks itself. A hub scans this network, or turn on server scans in Setup › Networks & scans.');
+            }
 
             $active = DiscoveryRun::query()
                 ->where('discovery_scope_id', $locked->id)

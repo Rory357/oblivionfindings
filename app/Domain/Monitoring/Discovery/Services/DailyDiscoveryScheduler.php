@@ -4,6 +4,7 @@ namespace App\Domain\Monitoring\Discovery\Services;
 
 use App\Domain\Monitoring\Discovery\Models\DiscoveryRun;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
+use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -14,16 +15,24 @@ use UnexpectedValueException;
  *
  * It uses the same DiscoveryRunner path as "Run now", so the hub picks the run up as normal
  * work. A scan area only scans daily when someone has set its daily time; empty means off.
+ * Setup's "Scan every day" switch (on by default) pauses every daily scan while it is off.
  */
 final class DailyDiscoveryScheduler
 {
     public const string TRIGGER = 'schedule:daily';
 
-    public function __construct(private readonly DiscoveryRunner $runner) {}
+    public function __construct(
+        private readonly DiscoveryRunner $runner,
+        private readonly SecurityDevicesSettings $settings,
+    ) {}
 
     /** Start today's scan for every scan area that is due. Returns how many runs were started. */
     public function startDue(?CarbonImmutable $now = null): int
     {
+        if (! $this->settings->dailyScans()) {
+            return 0;
+        }
+
         $zone = (string) config('app.worker_timezone', 'Pacific/Auckland');
         $localNow = ($now ?? CarbonImmutable::now('UTC'))->setTimezone($zone);
         $started = 0;

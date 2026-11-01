@@ -117,7 +117,7 @@ export function SecurityDevicesSectionTabs(
                             {
                                 key: 'supported-devices',
                                 label: 'Supported devices',
-                                href: '/security-devices/supported-devices',
+                                href: '/security-devices/setup/services?tab=supported',
                                 icon: Cpu,
                             },
                         ]

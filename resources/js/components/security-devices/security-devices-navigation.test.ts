@@ -67,7 +67,7 @@ describe('Security & Devices navigation contract', () => {
                 ['Devices', '/security-devices/devices'],
                 ['Sites', '/security-devices/sites'],
                 ['Alerts & upkeep', '/security-devices/monitoring'],
-                ['Setup', '/security-devices/discovery'],
+                ['Setup', '/security-devices/setup'],
             ],
         );
     });
@@ -97,7 +97,7 @@ describe('Security & Devices navigation contract', () => {
         });
         expect(
             collectorManager[0]?.items.map((item) => [item.title, item.href]),
-        ).toEqual([['Setup', '/security-devices/agent-downloads']]);
+        ).toEqual([['Setup', '/security-devices/setup']]);
 
         const monitoringManagerOnly = buildSecurityDevicesNavigationGroups({
             monitoringManage: true,
