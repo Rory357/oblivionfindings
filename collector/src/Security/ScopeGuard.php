@@ -26,6 +26,10 @@ final readonly class ScopeGuard
         'camera_snapshot_v1' => [
             'capability' => 'camera.snapshot.capture', 'provider' => 'unifi_protect', 'protocol' => 'command.camera_snapshot',
         ],
+        // S&D Phase E (R5): one still picture from a standard ONVIF camera (any maker).
+        'camera_snapshot_onvif_v1' => [
+            'capability' => 'camera.snapshot.capture', 'provider' => 'onvif', 'protocol' => 'command.camera_onvif',
+        ],
         // S&D Phase E (R6): arm or disarm one area of an Inner Range Inception or Gallagher panel.
         'alarm_area_control_v1' => [
             'capability' => ['alarm.arm', 'alarm.disarm'], 'provider' => ['inception', 'gallagher'], 'protocol' => 'command.alarm_rest',
@@ -129,6 +133,7 @@ final readonly class ScopeGuard
         match ($command['adapter']) {
             'ssh_config_backup_v1' => $this->assertSshConfigBackupCommand($command),
             'camera_snapshot_v1' => $this->assertCameraSnapshotCommand($command),
+            'camera_snapshot_onvif_v1' => $this->assertOnvifSnapshotCommand($command),
             'alarm_area_control_v1' => $this->assertAlarmAreaCommand($command),
             default => $this->assertUnifiAccessCommand($command),
         };
@@ -195,6 +200,37 @@ final readonly class ScopeGuard
                 || preg_match('/\A[A-Za-z0-9_-]{4,64}\z/', $endpoint['camera_id']) !== 1))
             || ($endpoint['mac'] !== null && (! is_string($endpoint['mac']) || preg_match('/\A[0-9A-F]{12}\z/', $endpoint['mac']) !== 1))
             || ($endpoint['camera_id'] === null && $endpoint['mac'] === null)
+            || ! is_int($endpoint['connect_timeout_seconds']) || $endpoint['connect_timeout_seconds'] < 1 || $endpoint['connect_timeout_seconds'] > 10
+            || ! is_int($endpoint['response_timeout_seconds']) || $endpoint['response_timeout_seconds'] < 1 || $endpoint['response_timeout_seconds'] > 30
+            || ! is_int($endpoint['max_image_bytes']) || $endpoint['max_image_bytes'] < 1024 || $endpoint['max_image_bytes'] > 1_048_576) {
+            throw new ScopeViolation('Command endpoint is invalid or unbounded.');
+        }
+    }
+
+    /**
+     * S&D Phase E (R5): an ONVIF camera picture. Only the two media service paths may be asked, at
+     * the camera's own address and port; https only on 443/8443, with a trusted key or none.
+     *
+     * @param  array<string, mixed>  $command
+     */
+    private function assertOnvifSnapshotCommand(array $command): void
+    {
+        if ($command['parameters'] !== ['method' => 'onvif_media_v1']
+            || $command['expected_state'] !== ['picture_captured' => true]) {
+            throw new ScopeViolation('Command parameters or expected state are invalid.');
+        }
+        $endpoint = $command['endpoint'];
+        $keys = ['scheme', 'address', 'port', 'trusted_pin', 'media_path', 'media2_path', 'connect_timeout_seconds', 'response_timeout_seconds', 'max_image_bytes'];
+        $path = '/\A\/[A-Za-z0-9_.\/-]{1,120}\z/';
+        if (! is_array($endpoint) || array_keys($endpoint) !== $keys
+            || $endpoint['address'] !== $command['target']
+            || ! is_string($endpoint['address']) || filter_var($endpoint['address'], FILTER_VALIDATE_IP) === false
+            || ! in_array($endpoint['port'], [80, 443, 2020, 8000, 8080, 8443, 8899], true)
+            || $endpoint['scheme'] !== (in_array($endpoint['port'], [443, 8443], true) ? 'https' : 'http')
+            || ($endpoint['trusted_pin'] !== null && ($endpoint['scheme'] !== 'https' || ! is_string($endpoint['trusted_pin'])
+                || preg_match('/\Asha256\/\/[A-Za-z0-9+\/]{43}=\z/', $endpoint['trusted_pin']) !== 1))
+            || ! is_string($endpoint['media_path']) || preg_match($path, $endpoint['media_path']) !== 1 || str_contains($endpoint['media_path'], '..')
+            || ! is_string($endpoint['media2_path']) || preg_match($path, $endpoint['media2_path']) !== 1 || str_contains($endpoint['media2_path'], '..')
             || ! is_int($endpoint['connect_timeout_seconds']) || $endpoint['connect_timeout_seconds'] < 1 || $endpoint['connect_timeout_seconds'] > 10
             || ! is_int($endpoint['response_timeout_seconds']) || $endpoint['response_timeout_seconds'] < 1 || $endpoint['response_timeout_seconds'] > 30
             || ! is_int($endpoint['max_image_bytes']) || $endpoint['max_image_bytes'] < 1024 || $endpoint['max_image_bytes'] > 1_048_576) {

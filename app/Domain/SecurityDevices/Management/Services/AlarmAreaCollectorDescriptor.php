@@ -92,9 +92,7 @@ abstract class AlarmAreaCollectorDescriptor implements CollectorCommandDescripto
      */
     public static function hubRunsIt(MonitoringCollector $collector): bool
     {
-        $adapters = $collector->runtime_status['command_adapters'] ?? null;
-
-        return is_string($adapters) && in_array(self::ADAPTER, explode(',', $adapters), true);
+        return HubJobTypes::runs($collector, self::ADAPTER);
     }
 
     public function interpret(

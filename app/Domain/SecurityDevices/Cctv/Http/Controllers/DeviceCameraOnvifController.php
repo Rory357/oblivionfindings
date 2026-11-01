@@ -64,7 +64,7 @@ final class DeviceCameraOnvifController extends Controller
             AuditLogger::logOrFail('camera.onvif.snapshot', $device, [
                 'actor_id' => (int) $user->id,
                 'device_id' => (int) $device->id,
-                'driver_key' => 'unifi-protect-through-hub',
+                'driver_key' => $this->hubPictures->routeKind($device) === 'onvif' ? 'camera-onvif-through-hub' : 'unifi-protect-through-hub',
                 'ok' => $pending,
                 'reason_code' => $pending ? 'checking_through_hub' : 'hub_unavailable',
             ]);

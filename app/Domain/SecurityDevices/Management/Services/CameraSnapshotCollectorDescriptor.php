@@ -8,7 +8,9 @@ use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\CollectorCredentialLeaseSealer;
 use App\Domain\SecurityDevices\Cctv\Services\CameraEndpointTrustService;
 use App\Domain\SecurityDevices\Cctv\Services\CameraPrivacy;
+use App\Domain\SecurityDevices\Cctv\Services\OnvifCameraProfileClient;
 use App\Domain\SecurityDevices\Cctv\Services\UniFiProtectLocalCameraClient;
+use App\Domain\SecurityDevices\Drivers\Cameras\AbstractOnvifCameraDriver;
 use App\Domain\SecurityDevices\Drivers\Cameras\UniFiProtectCameraDriver;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
@@ -49,6 +51,20 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
         'snapshot_too_large', 'invalid_image', 'precheck_failed', 'interrupted',
     ];
 
+    /** S&D Phase E (R5): the hub job for standard ONVIF cameras (any maker but UniFi Protect). */
+    public const string ONVIF_PROTOCOL = 'command.camera_onvif';
+
+    public const string ONVIF_ADAPTER = 'camera_snapshot_onvif_v1';
+
+    public const array ONVIF_FAILURE_CODES = [
+        'camera_certificate_untrusted', 'camera_certificate_changed', 'camera_tls_unreachable',
+        'authentication_required', 'basic_auth_refused', 'not_supported', 'no_media_profile',
+        'snapshot_uri_unavailable', 'invalid_snapshot_uri', 'snapshot_fetch_failed', 'unreachable',
+        'snapshot_too_large', 'invalid_image', 'precheck_failed', 'interrupted',
+    ];
+
+    private const array ONVIF_PORTS = [80, 443, 2020, 8000, 8080, 8443, 8899];
+
     private const array MIME_MAGIC = [
         'image/jpeg' => "\xFF\xD8\xFF",
         'image/png' => "\x89PNG\r\n\x1A\n",
@@ -63,18 +79,38 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
         private readonly CollectorCredentialLeaseSealer $sealer,
         private readonly CollectorCommandContract $contracts,
         private readonly CoveringHubResolver $hubs,
+        private readonly OnvifCameraProfileClient $onvif,
     ) {}
+
+    /** 'protect' or 'onvif': which hub job takes this camera's picture; null when it isn't a camera. */
+    public function routeKind(Device $device): ?string
+    {
+        return match (true) {
+            $this->protectCamera($device) => 'protect',
+            $this->onvifCamera($device) => 'onvif',
+            default => null,
+        };
+    }
+
+    /**
+     * S&D Phase E (R5): an ONVIF camera at a hub whose software doesn't list the ONVIF job yet. The
+     * job is never sent to it (it would refuse its whole config); the screen says why instead.
+     */
+    public function needsHubUpdate(Device $device, MonitoringCollector $hub): bool
+    {
+        return $this->onvifCamera($device) && ! HubJobTypes::runs($hub, self::ONVIF_ADAPTER);
+    }
 
     public static function pictureCacheKey(string $commandUuid): string
     {
         return 'security-devices:camera-picture:'.strtolower($commandUuid);
     }
 
-    /** A UniFi Protect camera at a Site some hub covers (whether or not that hub is online now). */
+    /** A UniFi Protect or ONVIF camera at a Site some hub covers (whether or not that hub is online now). */
     public function eligible(Device $device): bool
     {
         try {
-            return $this->protectCamera($device)
+            return $this->routeKind($device) !== null
                 && $this->hubs->forSite($this->sites->resolve((int) $device->id)) instanceof MonitoringCollector;
         } catch (Throwable) {
             return false;
@@ -93,6 +129,9 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
 
     public function supports(Device $device, MonitoringCollector $collector, int $siteId): bool
     {
+        if ($this->onvifCamera($device)) {
+            return $this->supportsOnvif($device, $collector, $siteId);
+        }
         try {
             $endpoint = $this->protect->authoriseConsoleEndpoint($device, checkCertificate: false);
 
@@ -122,6 +161,9 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
         $siteId = (int) $request->site_id;
         if ($request->capability !== self::CAPABILITY || ! $device instanceof Device || ! $this->supports($device, $collector, $siteId)) {
             throw new RuntimeException('The hub camera job no longer matches its request.');
+        }
+        if ($this->onvifCamera($device)) {
+            return $this->buildOnvif($request, $attempt, $collector, $device, $siteId);
         }
         $endpoint = $this->protect->authoriseConsoleEndpoint($device, checkCertificate: false);
         $address = (string) $endpoint['ip'];
@@ -210,6 +252,7 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
                 'data_uri' => 'data:'.$mime.';base64,'.base64_encode($attachment),
                 'captured_at' => $capturedAt->toIso8601String(),
                 'hub' => CoveringHubResolver::label($collector),
+                'maker' => $this->onvifCamera($device) ? 'ONVIF' : 'UniFi Protect',
             ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)), self::PICTURE_SECONDS);
         }
 
@@ -243,9 +286,16 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
                 : ($stored['reason_code'] ?? null) === ($safeResult['reason_code'] ?? false));
     }
 
-    /** Where a refused certificate's "Trust this camera?" prompt points: the Protect console. */
+    /** Where a refused certificate's "Trust this camera?" prompt points: the Protect console, or the ONVIF camera itself. */
     public function trustTarget(Device $device): ?array
     {
+        if ($this->onvifCamera($device)) {
+            $endpoint = $this->onvif->authoriseHubEndpoint($device);
+
+            return ($endpoint['ok'] ?? false) === true && ($endpoint['scheme'] ?? null) === 'https'
+                ? ['site_id' => (int) $endpoint['site_id'], 'host' => (string) $endpoint['ip'], 'port' => (int) $endpoint['port']]
+                : null;
+        }
         $endpoint = $this->protect->authoriseConsoleEndpoint($device, checkCertificate: false);
         if (($endpoint['ok'] ?? false) !== true) {
             return null;
@@ -258,11 +308,12 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
     private function failedFromHub(DeviceCommandRequest $request, Device $device, array $safeResult, ?string $providerReference, ?string $attachment): CollectorCommandOutcome
     {
         $code = $safeResult['reason_code'] ?? null;
+        $onvif = $this->onvifCamera($device);
         $certificateCase = in_array($code, ['camera_certificate_untrusted', 'camera_certificate_changed'], true);
         $expectedKeys = $certificateCase
             ? ['reason_code', 'offered_pin', 'offered_fingerprint', 'offered_subject', 'offered_valid_to']
             : ['reason_code'];
-        if (! is_string($code) || ! in_array($code, self::FAILURE_CODES, true)
+        if (! is_string($code) || ! in_array($code, $onvif ? self::ONVIF_FAILURE_CODES : self::FAILURE_CODES, true)
             || array_keys($safeResult) !== $expectedKeys
             || $providerReference !== null || $attachment !== null) {
             throw new RuntimePayloadInvalid('Collector camera failure evidence is invalid.');
@@ -284,9 +335,31 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
             executionStatus: 'failed',
             safeResult: ['reason_code' => $code, 'routed_through' => 'hub'],
             providerReference: null,
-            failure: self::failureText($code),
+            failure: $onvif ? self::onvifFailureText($code) : self::failureText($code),
             reconciliation: null,
         );
+    }
+
+    /** S&D Phase E (R5): what an ONVIF camera's hub failure means, in words. */
+    public static function onvifFailureText(string $code): string
+    {
+        return match ($code) {
+            'camera_certificate_untrusted' => 'This camera’s certificate isn’t trusted yet, so the Site hub sent no login. Check it and choose Trust this camera.',
+            'camera_certificate_changed' => 'This camera’s certificate has changed since it was trusted, so the Site hub sent no login. If the change was planned, an IT admin can replace the trusted certificate.',
+            'camera_tls_unreachable' => 'The Site hub couldn’t open a secure connection to the camera, so nothing was sent.',
+            'authentication_required' => 'The camera rejected the saved login.',
+            'basic_auth_refused' => 'This camera asks for a plain (Basic) password, which anyone on the network could read, so the Site hub didn’t send it. Turn on Digest authentication in the camera’s settings.',
+            'not_supported' => 'This camera didn’t answer the ONVIF picture request.',
+            'no_media_profile' => 'The camera answered, but has no ONVIF media profile.',
+            'snapshot_uri_unavailable' => 'This camera didn’t give an ONVIF picture address.',
+            'invalid_snapshot_uri' => 'The camera gave a picture address outside its own address, so the Site hub didn’t use it.',
+            'unreachable' => 'The Site hub couldn’t reach the camera.',
+            'snapshot_too_large' => 'The camera picture was larger than the hub’s 1 MB limit.',
+            'invalid_image' => 'The camera didn’t return a valid picture.',
+            'precheck_failed' => 'The Site hub couldn’t complete its safety and login checks, so nothing was sent.',
+            'interrupted' => 'The Site hub restarted before the picture came back. Check the camera again.',
+            default => 'The camera did not return a picture.',
+        };
     }
 
     public static function failureText(string $code): string
@@ -304,6 +377,91 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
             'interrupted' => 'The Site hub restarted before the picture came back. Check the camera again.',
             default => 'The UniFi Protect console did not return a camera picture.',
         };
+    }
+
+    /** A camera on the standard ONVIF path: no driver of its own, or one of the ONVIF makers' drivers. */
+    private function onvifCamera(Device $device): bool
+    {
+        if ($device->domain !== 'security' || $device->category !== 'cctv' || $device->status === DeviceStatus::Decommissioned) {
+            return false;
+        }
+        $driver = $this->drivers->resolveCameraDriver($device);
+
+        return $driver === null || $driver instanceof AbstractOnvifCameraDriver;
+    }
+
+    private function supportsOnvif(Device $device, MonitoringCollector $collector, int $siteId): bool
+    {
+        try {
+            $endpoint = $this->onvif->authoriseHubEndpoint($device);
+
+            return ! app(CameraPrivacy::class)->active((int) $device->id)
+                && HubJobTypes::runs($collector, self::ONVIF_ADAPTER)
+                && ($endpoint['ok'] ?? false) === true
+                && (int) ($endpoint['site_id'] ?? 0) === $siteId
+                && $this->sites->resolve((int) $device->id) === $siteId
+                && in_array($siteId, $collector->authorisedSiteIds(), true)
+                && $collector->isApprovedForWork()
+                && $collector->revoked_at === null
+                && is_string($collector->public_key)
+                && in_array((string) $collector->status, ['online', 'degraded'], true)
+                && $this->onvif->hasCameraCredential($device, $siteId);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function buildOnvif(DeviceCommandRequest $request, DeviceCommandAttempt $attempt, MonitoringCollector $collector, Device $device, int $siteId): array
+    {
+        $endpoint = $this->onvif->authoriseHubEndpoint($device);
+        $address = (string) ($endpoint['ip'] ?? '');
+        $port = (int) ($endpoint['port'] ?? 0);
+        $scheme = (string) ($endpoint['scheme'] ?? '');
+        $mediaPath = (string) ($endpoint['media_path'] ?? '');
+        $media2Path = (string) ($endpoint['media2_path'] ?? '');
+        $trustedPin = $scheme === 'https' ? $this->trust->record($siteId, $address, $port)?->trusted_pin : null;
+        $path = '/\A\/[A-Za-z0-9_.\/-]{1,120}\z/';
+        // Never build a job the hub's scope guard would refuse: one bad job makes it refuse the whole config.
+        if (filter_var($address, FILTER_VALIDATE_IP) === false || ! in_array($port, self::ONVIF_PORTS, true)
+            || $scheme !== (in_array($port, [443, 8443], true) ? 'https' : 'http')
+            || ($trustedPin !== null && preg_match(CameraEndpointTrustService::PIN_PATTERN, $trustedPin) !== 1)
+            || preg_match($path, $mediaPath) !== 1 || str_contains($mediaPath, '..')
+            || preg_match($path, $media2Path) !== 1 || str_contains($media2Path, '..')) {
+            throw new RuntimeException('The camera job would not pass the hub’s checks.');
+        }
+        $lease = $this->onvif->acquireCameraCredentialForHub($device, $siteId)
+            ?? throw new RuntimeException('The Site has no usable saved camera login.');
+
+        return [
+            'command_uuid' => (string) $request->command_uuid,
+            'attempt_uuid' => (string) $attempt->attempt_uuid,
+            'attempt_number' => (int) $attempt->attempt_number,
+            'site_id' => $siteId,
+            'device_id' => (string) $request->device_id,
+            'capability' => self::CAPABILITY,
+            'provider' => 'onvif',
+            'adapter' => self::ONVIF_ADAPTER,
+            'protocol' => self::ONVIF_PROTOCOL,
+            'target' => $address,
+            'expires_at' => $request->expires_at->utc()->format(DATE_ATOM),
+            'idempotency_hash' => hash('sha256', (string) $request->idempotency_key),
+            'contract_hash' => $this->contracts->hash($request, $attempt, $collector),
+            'parameters' => ['method' => 'onvif_media_v1'],
+            'expected_state' => ['picture_captured' => true],
+            'endpoint' => [
+                'scheme' => $scheme,
+                'address' => $address,
+                'port' => $port,
+                'trusted_pin' => $trustedPin,
+                'media_path' => $mediaPath,
+                'media2_path' => $media2Path,
+                'connect_timeout_seconds' => 5,
+                'response_timeout_seconds' => 10,
+                'max_image_bytes' => self::MAX_IMAGE_BYTES,
+            ],
+            'credential_lease' => $this->sealer->seal($collector, (string) $request->device_id, self::ONVIF_PROTOCOL, $address, $lease, $siteId),
+        ];
     }
 
     private function protectCamera(Device $device): bool

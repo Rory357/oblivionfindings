@@ -68,6 +68,12 @@ final class HubCameraPictureService
         return ['state' => 'pending', 'message' => "Checking through {$label}…", 'command_id' => (int) $request->id];
     }
 
+    /** 'protect' or 'onvif': which hub job takes this camera's picture (S&D Phase E, R5). */
+    public function routeKind(Device $device): ?string
+    {
+        return $this->descriptor->routeKind($device);
+    }
+
     /**
      * A camera action the server would run by connecting straight to the camera. At a Site a hub
      * covers it never does; this says so in words, or returns null where no hub covers the Site.
@@ -121,7 +127,7 @@ final class HubCameraPictureService
                 'state' => 'done',
                 'data_uri' => $picture['data_uri'],
                 'captured_at' => (string) ($picture['captured_at'] ?? ''),
-                'source' => 'UniFi Protect, through '.($picture['hub'] ?? 'the Site hub'),
+                'source' => ($picture['maker'] ?? 'UniFi Protect').', through '.($picture['hub'] ?? 'the Site hub'),
             ];
         }
 

@@ -24,6 +24,7 @@ use Oblivion\Collector\Runtime\ProbeRunner;
 use Oblivion\Collector\Runtime\RemoteDiscoveryRunner;
 use Oblivion\Collector\Runtime\SshConfigBackupRunner;
 use Oblivion\Collector\Runtime\AlarmAreaCommandRunner;
+use Oblivion\Collector\Runtime\OnvifSnapshotRunner;
 use Oblivion\Collector\Runtime\UnifiAccessCommandRunner;
 use Oblivion\Collector\Security\CredentialLeaseDecryptor;
 use Oblivion\Collector\Security\EnvelopeVerifier;
@@ -409,6 +410,8 @@ final class CollectorApplication
                 new CameraSnapshotRunner($scope, $credentialDecryptor),
                 // S&D Phase E (R6): arming and disarming Inception / Gallagher areas.
                 new AlarmAreaCommandRunner($scope, $credentialDecryptor),
+                // S&D Phase E (R5): pictures from standard ONVIF cameras.
+                new OnvifSnapshotRunner($scope, $credentialDecryptor),
             );
             foreach ($config->commands as $command) {
                 if ($spool->status()['state'] === 'buffer_full') {

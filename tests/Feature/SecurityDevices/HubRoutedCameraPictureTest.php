@@ -203,7 +203,7 @@ it('sends the trusted pin to the hub once the console is trusted', function (): 
     expect(($this->hubJob)()['commands'][0]['endpoint']['trusted_pin'])->toBe(HUB_CAMERA_PIN);
 });
 
-it('says plainly that other camera actions don’t run through a hub yet and an older hub can’t arm alarms, and never goes direct', function (): void {
+it('says plainly that other camera actions don’t run through a hub yet and an older hub can’t take ONVIF pictures or arm alarms, and never goes direct', function (): void {
     $onvifCamera = Device::factory()->create([
         'name' => 'Kowhai Villa garage camera', 'domain' => 'security', 'category' => 'cctv', 'subcategory' => 'camera',
         'manufacturer' => 'Hikvision', 'model' => 'DS-2CD2143G2', 'provider' => 'onvif', 'ip_address' => '10.88.0.40', 'last_seen_at' => now(),
@@ -213,9 +213,11 @@ it('says plainly that other camera actions don’t run through a hub yet and an 
         'assignment_type' => 'permanent', 'assigned_at' => now()->subHour(),
     ]);
 
+    // S&D Phase E (R5): ONVIF pictures go through the hub, but only once its software lists the job.
     $this->actingAs($this->it)->postJson("/security-devices/devices/{$onvifCamera->id}/camera/snapshot")
         ->assertStatus(409)
-        ->assertJsonPath('reason_code', 'hub_route_not_built');
+        ->assertJsonPath('reason_code', 'hub_unavailable')
+        ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'needs its software update before it can take pictures'));
     $this->actingAs($this->it)->getJson("/security-devices/devices/{$this->camera->id}/camera/streams")
         ->assertStatus(409)
         ->assertJsonPath('reason_code', 'hub_route_not_built');

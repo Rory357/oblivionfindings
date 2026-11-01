@@ -131,6 +131,11 @@ final class CommandExecutionRouteResolver
                 "{$label} isn’t connected right now, so this can’t run until it’s back. Oblivion doesn’t reach into the house directly.",
             );
         }
+        if ($descriptor instanceof CameraSnapshotCollectorDescriptor && $descriptor->needsHubUpdate($device, $hub)) {
+            return CommandExecutionRoute::unavailable(
+                "{$label} needs its software update before it can take pictures from this camera. Oblivion doesn’t reach into the house directly.",
+            );
+        }
         if ($descriptor instanceof AlarmAreaCollectorDescriptor && ! AlarmAreaCollectorDescriptor::hubRunsIt($hub)) {
             return CommandExecutionRoute::unavailable(
                 "{$label} needs its software update before it can arm or disarm the alarm. Oblivion doesn’t reach into the house directly.",
