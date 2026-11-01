@@ -2737,8 +2737,8 @@ describe('G3 safety review page: the ways through rules 1 and 2', () => {
         expect(within(progress).getAllByText('Choose the owner').length).toBeGreaterThan(0);
         fireEvent.click(within(progress).getAllByRole('button', { name: 'Choose owner' })[0]);
         const dialog = screen.getByRole('dialog', { name: 'Choose the owner' });
-        fireEvent.click(within(dialog).getByRole('combobox', { name: 'Choose a person' }));
-        fireEvent.click(screen.getByRole('option', { name: 'Moana Rangi' }));
+        // Board M8: one list of the people who can own it; "Note for the history" is optional for a first owner.
+        fireEvent.click(within(dialog).getByRole('radio', { name: /Moana Rangi/ }));
         fireEvent.click(within(dialog).getByRole('button', { name: 'Choose owner' }));
         expect(inertia.post).toHaveBeenCalledWith('/health-safety/events/17/owner', {
             owner_user_id: '8',
@@ -2795,14 +2795,20 @@ describe('G3 safety review page: the ways through rules 1 and 2', () => {
         const progress = screen.getByRole('region', { name: 'Progress' });
         fireEvent.click(within(progress).getAllByRole('button', { name: /Add revised action/ })[0]);
         expect(onPaneChange).toHaveBeenCalledWith({ kind: 'ca_add', replacesActionId: 141 }, 'overview');
-        expect(screen.getByText('Add a revised action')).toBeInTheDocument();
-        fireEvent.change(screen.getByPlaceholderText(/Install a grab rail/), {
+        // Board M8: the Add action pop-up, naming the failed action and its check result.
+        const dialog = screen.getByRole('dialog', { name: 'Add a revised action' });
+        expect(within(dialog).getByText(/Replaces CA-2026-0141/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/Check result: The rug still slides/)).toBeInTheDocument();
+        fireEvent.change(within(dialog).getByLabelText(/What needs to happen/), {
             target: { value: 'Replace the lounge rug with a non-slip rug' },
         });
-        fireEvent.change(screen.getByLabelText(/^Due/), { target: { value: '2026-08-01' } });
-        fireEvent.click(screen.getByRole('combobox', { name: /Choose owner/ }));
+        fireEvent.click(within(dialog).getByRole('combobox', { name: 'Choose the owner' }));
         fireEvent.click(screen.getByRole('option', { name: 'Moana Rangi' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Add action' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: /^Due date/ }));
+        const days = screen.getAllByRole('button').filter((button) => /\b20\d\d$/.test(button.getAttribute('aria-label') ?? ''));
+        fireEvent.click(days[days.length - 1]);
+        fireEvent.click(screen.getByRole('button', { name: 'Use date' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Add action' }));
         expect(inertia.post).toHaveBeenCalledWith(
             '/health-safety/events/17/corrective-actions',
             expect.objectContaining({

@@ -1033,14 +1033,29 @@ class HsEventController extends Controller
 
         $assignableStaff = [];
         if ($canManage) {
-            $assignableStaff = $this->handoverOwnerQuery($hsEvent, $currentUser)
-                ->with(['permissionOverrides', 'roles.permissions'])
+            $owners = $this->handoverOwnerQuery($hsEvent, $currentUser)
+                ->with(['permissionOverrides', 'roles.permissions', 'hrEmployeeProfile:id,user_id,primary_site_id,secondary_site_ids'])
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->filter(fn (User $user): bool => $this->canOwnEvent($user, $hsEvent, $currentUser))
-                ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
-                ->values()
-                ->all();
+                ->values();
+            // Board M8: each person's role and Sites under their name ("Provider manager · Kauri House, Rimu House").
+            $ownerSiteIds = $owners->flatMap(fn (User $user): array => array_filter([
+                $user->hrEmployeeProfile?->primary_site_id, ...($user->hrEmployeeProfile?->secondary_site_ids ?? []),
+            ]))->map(fn ($id): int => (int) $id)->unique()->all();
+            $ownerSiteNames = Site::query()->whereIn('id', $ownerSiteIds)->pluck('name', 'id');
+            $assignableStaff = $owners->map(function (User $user) use ($ownerSiteNames): array {
+                $role = $user->roles->first()?->name;
+                $sites = $user->canDo('sites.viewAll') ? 'all sites' : collect([
+                    $user->hrEmployeeProfile?->primary_site_id, ...($user->hrEmployeeProfile?->secondary_site_ids ?? []),
+                ])->filter()->map(fn ($id) => $ownerSiteNames[(int) $id] ?? null)->filter()->unique()->implode(', ');
+
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'detail' => collect([$role ? ucfirst(str_replace('_', ' ', $role)) : null, $sites ?: null])->filter()->implode(' · ') ?: null,
+                ];
+            })->all();
         }
 
         $correctiveActionRelations = [

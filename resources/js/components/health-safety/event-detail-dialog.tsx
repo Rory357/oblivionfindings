@@ -48,7 +48,12 @@ import {
     useReviewActivity,
     type ReviewStepKey,
 } from '@/components/health-safety/review-history';
-import { ReviewOwnerDialog } from '@/components/health-safety/review-owner-dialog';
+import {
+    AddActionDialog,
+    CloseReviewDialog,
+    ReviewOwnerDialog,
+    WorksafeToldDialog,
+} from '@/components/health-safety/review-dialogs';
 import {
     ClosureReadinessLine,
     agreedInvestigation,
@@ -556,7 +561,8 @@ export type EventDetail = {
     /** K1a: who can close this review (said to viewers who can't). */
     close_authority?: { who: 'owner_or_close_any' | 'anyone_at_site'; text: string };
     journey_state: string;
-    assignable_staff: Array<{ id: number; name: string }>;
+    /** detail: "Provider manager · Kauri House, Rimu House" (board M8). */
+    assignable_staff: Array<{ id: number; name: string; detail?: string | null }>;
     action_handover: CorrectiveActionHandover;
     can: {
         manage: boolean;
@@ -1671,7 +1677,18 @@ function SafetyReviewPage({
     const [ownerOpen, setOwnerOpen] = useState(openOwnerFirst && !!d.can.change_owner);
     const [correcting, setCorrecting] = useState<EventInvestigation | null>(null);
     const activity = useReviewActivity(d.id, true, d);
-    const viewerName = (usePage().props as { auth?: { user?: { name?: string } } }).auth?.user?.name ?? null;
+    const viewer = (usePage().props as { auth?: { user?: { id?: number; name?: string } } }).auth?.user;
+    const viewerName = viewer?.name ?? null;
+    // Board M8: adding an action, telling WorkSafe and an ordinary close open as kit pop-ups over the page; every
+    // other step (and a close that still needs "close anyway") keeps its pane.
+    const closeReady = d.can.close && d.close_readiness.hard_blockers.length === 0 && d.close_readiness.exceptional_blockers.length === 0;
+    const dialogPane =
+        pane && (pane.kind === 'ca_add' || pane.kind === 'worksafe_notify' || (pane.kind === 'close' && closeReady)) ? pane : null;
+    const inlinePane = dialogPane ? null : pane;
+    const replaced =
+        dialogPane?.kind === 'ca_add' && dialogPane.replacesActionId
+            ? (d.corrective_actions.find((action) => action.id === dialogPane.replacesActionId) ?? null)
+            : null;
     const chip = reviewStatusChip(d, stage.label);
 
     // Board M5: the header holds More (Print summary comes with the PDF round); the Progress card's next-step bar
@@ -1792,10 +1809,10 @@ function SafetyReviewPage({
         </>
     );
 
-    const main = pane ? (
+    const main = inlinePane ? (
         <Surface aria-label="Current safety review action">
             <div className="p-5">
-                <PaneRenderer pane={pane} d={d} onDone={onPaneDone} onCancel={() => onPane(null)} />
+                <PaneRenderer pane={inlinePane} d={d} onDone={onPaneDone} onCancel={() => onPane(null)} />
             </div>
         </Surface>
     ) : tab === 'investigation' ? (
@@ -1851,7 +1868,7 @@ function SafetyReviewPage({
                     ]
                         .filter(Boolean)
                         .join(' · ')}
-                    actions={pane ? undefined : headerActions}
+                    actions={inlinePane ? undefined : headerActions}
                     facts={
                         <PageHeaderFacts
                             items={[
@@ -1863,7 +1880,7 @@ function SafetyReviewPage({
                     strip={
                         <PageHeaderSteps
                             steps={reviewRoundSteps(d)}
-                            selected={!pane && tab === 'overview' ? picked : null}
+                            selected={!inlinePane && tab === 'overview' ? picked : null}
                             onSelect={(key) => {
                                 setPicked(key as ReviewStepKey);
                                 if (pane) onPane(null);
@@ -1886,7 +1903,7 @@ function SafetyReviewPage({
             <div
                 id="safety-review-panel"
                 role="tabpanel"
-                aria-label={pane ? 'Current action' : (reviewTabs(d).find((item) => item.key === tab)?.label ?? 'Overview')}
+                aria-label={inlinePane ? 'Current action' : (reviewTabs(d).find((item) => item.key === tab)?.label ?? 'Overview')}
                 className="grid min-w-0 gap-5"
             >
                 {main}
@@ -1900,6 +1917,29 @@ function SafetyReviewPage({
                 siteName={d.site?.name ?? null}
                 currentOwner={d.handover.owner}
                 candidates={d.assignable_staff}
+                viewerId={viewer?.id ?? null}
+            />
+            <AddActionDialog
+                key={dialogPane?.kind === 'ca_add' ? `add-${replaced?.id ?? 0}` : 'add'}
+                open={dialogPane?.kind === 'ca_add'}
+                onClose={() => onPane(null)}
+                onDone={onPaneDone}
+                d={d}
+                replaces={replaced}
+            />
+            <WorksafeToldDialog
+                open={dialogPane?.kind === 'worksafe_notify'}
+                onClose={() => onPane(null)}
+                onDone={onPaneDone}
+                d={d}
+                viewerName={viewerName}
+            />
+            <CloseReviewDialog
+                open={dialogPane?.kind === 'close'}
+                onClose={() => onPane(null)}
+                onDone={onPaneDone}
+                d={d}
+                incidentCloser={d.source?.type === 'ClientIncident' ? `a manager at ${d.site?.name ?? 'the site'}` : null}
             />
             {correcting ? (
                 <CorrectFindingsDialog
