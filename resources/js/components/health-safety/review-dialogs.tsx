@@ -539,3 +539,317 @@ export function CloseReviewDialog({
         </PopupForm>
     );
 }
+
+/* ------------------------------------------------------------------ */
+/*  M12: ask to close anyway; record the WorkSafe decision             */
+/*  M11: decide a close-anyway request                                  */
+/* ------------------------------------------------------------------ */
+
+const CATEGORY_BY_SCOPE: Record<string, string> = {
+    hs_acceptance: 'handover_record',
+    hs_investigation: 'investigation_record',
+    recommendation_dispositions: 'recommendation_decision',
+    corrective_actions: 'corrective_action_monitoring',
+};
+
+/** The end of a New Zealand day as an instant ("Close it by" / "Request expires": until the end of that day). */
+export function nzEndOfDay(date: string): string {
+    const local = `${date}T23:59`;
+    const offset = timeOffsetsInZone(local)[0] ?? '';
+    return `${local}:59${offset}`;
+}
+
+function nzDatePlus(days: number): string {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(new Date(Date.now() + days * 86400000));
+}
+
+/**
+ * "Ask to close anyway" (board M12, 720): one request covers one open item, so it is offered only when exactly one
+ * "close anyway" item is left and nothing that can never be skipped is open. The asker can't approve it.
+ */
+export function AskCloseAnywayDialog({
+    open,
+    onClose,
+    onDone,
+    d,
+}: {
+    open: boolean;
+    onClose: () => void;
+    onDone: () => void;
+    d: EventDetail;
+}) {
+    const item = d.close_readiness.exceptional_blockers[0] ?? null;
+    const [closeBy, setCloseBy] = useState(nzDatePlus(14));
+    const [expires, setExpires] = useState(nzDatePlus(21));
+    const form = useForm<{
+        category: string;
+        reason: string;
+        evidence_reference: string;
+        scope: string[];
+        review_at: string;
+        expires_at: string;
+    }>({
+        category: item ? (CATEGORY_BY_SCOPE[item.key] ?? '') : '',
+        reason: '',
+        evidence_reference: '',
+        scope: item ? [item.key] : [],
+        review_at: nzEndOfDay(nzDatePlus(14)),
+        expires_at: nzEndOfDay(nzDatePlus(21)),
+    });
+    useEffect(() => {
+        if (closeBy) form.setData('review_at', nzEndOfDay(closeBy));
+        if (expires) form.setData('expires_at', nzEndOfDay(expires));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [closeBy, expires]);
+    const latest = nzDatePlus(29);
+    const datesOk = !!closeBy && !!expires && closeBy <= expires && expires <= latest;
+    const ready = !!item && form.data.reason.trim().length >= 20 && form.data.evidence_reference.trim().length >= 5 && datesOk;
+
+    return (
+        <PopupForm
+            open={open}
+            onClose={onClose}
+            size="md"
+            icon={ShieldAlert}
+            title="Ask to close anyway"
+            description="For one open item that can’t be finished, or doesn’t need to be"
+            context={{
+                title: [d.title ?? d.reference_number, d.site?.name, d.reference_number].filter(Boolean).join(' · '),
+                note: d.handover.owner ? `Owned by ${d.handover.owner.name}.` : 'No owner yet.',
+            }}
+            submitLabel="Send request"
+            processingLabel="Sending…"
+            processing={form.processing}
+            submitDisabled={!ready}
+            onSubmit={() =>
+                form.post(`/health-safety/events/${d.id}/closure-exceptions`, {
+                    preserveScroll: true,
+                    onSuccess: (page) => {
+                        if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+                    },
+                })
+            }
+            dirty={form.isDirty}
+            draftName="this request"
+            footerStart={<span className="text-caption">Someone else who approves “close anyway” requests decides, never you.</span>}
+            testId="ask-close-anyway-dialog"
+        >
+            <PopupField
+                label="The open item this covers"
+                hint="WorkSafe steps, record checks and a revised action after a failed check can never be skipped. None is open here."
+                error={form.errors.scope}
+            >
+                <p className="rounded-lg border border-border px-3 py-2 text-sm">
+                    <b className="font-semibold">{item?.label ?? 'Nothing left that “close anyway” can cover.'}</b>
+                    <span className="text-caption block">It’s the only item left that “close anyway” can cover</span>
+                </p>
+            </PopupField>
+            <PopupField label="Why" htmlFor="ask-close-why" required hint="At least 20 characters." error={form.errors.reason}>
+                <Textarea id="ask-close-why" rows={3} value={form.data.reason} onChange={(event) => form.setData('reason', event.target.value)} />
+            </PopupField>
+            <PopupField label="Evidence" htmlFor="ask-close-evidence" required error={form.errors.evidence_reference}>
+                <Input
+                    id="ask-close-evidence"
+                    value={form.data.evidence_reference}
+                    placeholder="For example, the check record or a photo"
+                    onChange={(event) => form.setData('evidence_reference', event.target.value)}
+                />
+            </PopupField>
+            <div className="grid gap-3 sm:grid-cols-2">
+                <PopupField label="Close it by" htmlFor="ask-close-by" required hint="On or before the expiry date" error={form.errors.review_at}>
+                    <DatePicker
+                        id="ask-close-by"
+                        label="Close it by"
+                        value={closeBy}
+                        onChange={setCloseBy}
+                        invalid={!!closeBy && !!expires && closeBy > expires}
+                    />
+                </PopupField>
+                <PopupField label="Request expires" htmlFor="ask-close-expires" required hint="At most 29 days ahead" error={form.errors.expires_at}>
+                    <DatePicker id="ask-close-expires" label="Request expires" value={expires} onChange={setExpires} invalid={!!expires && expires > latest} />
+                </PopupField>
+            </div>
+        </PopupForm>
+    );
+}
+
+/**
+ * "Record the WorkSafe decision" (board M12, 480): the law's meaning word for word in its hint; "Yes" leads straight
+ * to "Record that WorkSafe was told". Also changes a recorded decision while the review is open (with a reason).
+ */
+export function WorksafeDecisionDialog({
+    open,
+    onClose,
+    onDone,
+    d,
+}: {
+    open: boolean;
+    onClose: () => void;
+    onDone: (notifiable: boolean) => void;
+    d: EventDetail;
+}) {
+    const revising = d.worksafe.decision_signed;
+    const [chosen, setChosen] = useState<'' | 'yes' | 'no'>(revising ? (d.worksafe.notifiable ? 'yes' : 'no') : '');
+    const form = useForm<{ notifiable: boolean; reason: string; source: string }>({
+        notifiable: d.worksafe.notifiable ?? false,
+        reason: '',
+        source: 'manual',
+    });
+    const ready = chosen !== '' && form.data.reason.trim().length >= 10;
+
+    return (
+        <PopupForm
+            open={open}
+            onClose={onClose}
+            icon={ShieldAlert}
+            title={revising ? 'Change the WorkSafe decision' : 'Record the WorkSafe decision'}
+            description="Decide whether this is a notifiable event"
+            context={{ title: [d.title ?? d.reference_number, d.site?.name, d.reference_number].filter(Boolean).join(' · ') }}
+            submitLabel={revising ? 'Save decision' : 'Record decision'}
+            processingLabel="Recording…"
+            processing={form.processing}
+            submitDisabled={!ready}
+            onSubmit={() =>
+                form.post(`/health-safety/events/${d.id}/worksafe/decision`, {
+                    preserveScroll: true,
+                    onSuccess: (page) => {
+                        if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone(form.data.notifiable);
+                    },
+                })
+            }
+            dirty={form.isDirty || chosen !== ''}
+            draftName="this decision"
+            testId="worksafe-decision-dialog"
+        >
+            <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+                <b className="font-semibold text-foreground">Notifiable event:</b> a death, or a serious injury, illness or incident that
+                the Health and Safety at Work Act 2015 (sections 23–25) says we must tell WorkSafe about straight away.
+            </p>
+            <TilePicker
+                value={chosen}
+                onChange={(value) => {
+                    setChosen(value as 'yes' | 'no');
+                    form.setData('notifiable', value === 'yes');
+                }}
+                cols={2}
+                options={[
+                    { key: 'yes', label: 'Yes, it’s a notifiable event', description: 'Next: record that WorkSafe was told' },
+                    { key: 'no', label: 'No, it isn’t notifiable', description: 'Say why below' },
+                ]}
+            />
+            <PopupField
+                label={revising ? 'Why are you changing it?' : 'Why did you decide this?'}
+                htmlFor="worksafe-decision-why"
+                required
+                hint="At least 10 characters. For example: “Admitted to hospital for immediate treatment, so this is a notifiable injury.”"
+                error={form.errors.reason}
+            >
+                <Textarea id="worksafe-decision-why" rows={3} value={form.data.reason} onChange={(event) => form.setData('reason', event.target.value)} />
+            </PopupField>
+        </PopupForm>
+    );
+}
+
+/** "Decide: close anyway?" (board M11, 720). Approving records a decision and closes nothing. */
+export function DecideCloseAnywayDialog({
+    open,
+    onClose,
+    d,
+    exception,
+    viewerName,
+}: {
+    open: boolean;
+    onClose: () => void;
+    d: EventDetail;
+    exception: EventDetail['closure_exceptions'][number];
+    viewerName?: string | null;
+}) {
+    const [choice, setChoice] = useState<'' | 'approved' | 'rejected'>('');
+    const form = useForm<{ reason: string; decision: string }>({ reason: '', decision: 'approved' });
+    const asker = exception.requester?.name ?? 'Someone';
+    const covered = d.close_readiness.requirements.filter((r) => exception.scope.includes(r.key));
+    const hard = d.close_readiness.requirements.filter((r) => r.classification === 'hard');
+    const site = d.site?.name ?? 'the site';
+    const ready = choice !== '' && form.data.reason.trim().length >= 10;
+
+    return (
+        <PopupForm
+            open={open}
+            onClose={onClose}
+            size="md"
+            icon={ShieldAlert}
+            title="Decide: close anyway?"
+            description={`${asker} asked to close this safety review with one item still open`}
+            context={{
+                title: [d.title ?? d.reference_number, d.reference_number].filter(Boolean).join(' · '),
+                note: `Asked ${exception.requested_at ? formatDate(exception.requested_at) : ''} by ${asker}${d.handover.owner ? '' : ' · no owner'}`,
+            }}
+            submitLabel={choice === 'rejected' ? 'Decline' : 'Approve'}
+            processingLabel="Saving…"
+            processing={form.processing}
+            submitDisabled={!ready}
+            onSubmit={() => {
+                form.transform((data) => ({ ...data, decision: choice }));
+                form.post(`/health-safety/events/${d.id}/closure-exceptions/${exception.id}/decision`, {
+                    preserveScroll: true,
+                    onSuccess: (page) => {
+                        if (!(page.props as { flash?: { error?: string } }).flash?.error) onClose();
+                    },
+                });
+            }}
+            dirty={form.isDirty || choice !== ''}
+            draftName="this decision"
+            footerStart={viewerName ? <span className="text-caption">Recorded as {viewerName}</span> : undefined}
+            testId="decide-close-anyway-dialog"
+        >
+            <dl className="grid gap-2 text-sm">
+                <div>
+                    <dt className="font-semibold">The request covers</dt>
+                    <dd className="text-muted-foreground">{covered.map((r) => r.label).join(' ') || exception.scope.join(', ')}</dd>
+                </div>
+                <div>
+                    <dt className="font-semibold">Can’t be skipped {hard.every((r) => r.complete) ? '— all done' : '— not all done'}</dt>
+                    <dd className="text-muted-foreground">{hard.map((r) => r.label).join(' · ')}</dd>
+                </div>
+                <div>
+                    <dt className="font-semibold">Why {asker} asked</dt>
+                    <dd className="whitespace-pre-line text-muted-foreground">{exception.reason}</dd>
+                </div>
+                <div>
+                    <dt className="font-semibold">Evidence</dt>
+                    <dd className="text-muted-foreground">{exception.evidence_reference}</dd>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                        <dt className="font-semibold">Close it by</dt>
+                        <dd className="text-muted-foreground">
+                            {exception.review_at ? formatDate(exception.review_at) : '—'} · it can be closed until the end of this day
+                        </dd>
+                    </div>
+                    <div>
+                        <dt className="font-semibold">Request expires</dt>
+                        <dd className="text-muted-foreground">
+                            {exception.expires_at ? formatDate(exception.expires_at) : '—'} · if nobody decides by then
+                        </dd>
+                    </div>
+                </div>
+            </dl>
+            <TilePicker
+                value={choice}
+                onChange={(value) => setChoice(value as 'approved' | 'rejected')}
+                cols={2}
+                options={[
+                    {
+                        key: 'approved',
+                        label: 'Approve',
+                        description: `Then the owner, or anyone who can close safety reviews at ${site}, can close it${exception.review_at ? `, until ${formatDate(exception.review_at)}` : ''}`,
+                    },
+                    { key: 'rejected', label: 'Decline — keep it open', description: `${asker} sees your reason on the record` },
+                ]}
+            />
+            <PopupField label="Your reason" htmlFor="decide-close-why" required hint="At least 10 characters." error={form.errors.reason}>
+                <Textarea id="decide-close-why" rows={3} value={form.data.reason} onChange={(event) => form.setData('reason', event.target.value)} />
+            </PopupField>
+        </PopupForm>
+    );
+}

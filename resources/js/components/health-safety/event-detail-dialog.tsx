@@ -50,8 +50,11 @@ import {
 } from '@/components/health-safety/review-history';
 import {
     AddActionDialog,
+    AskCloseAnywayDialog,
     CloseReviewDialog,
+    DecideCloseAnywayDialog,
     ReviewOwnerDialog,
+    WorksafeDecisionDialog,
     WorksafeToldDialog,
 } from '@/components/health-safety/review-dialogs';
 import {
@@ -1681,9 +1684,40 @@ function SafetyReviewPage({
     const viewerName = viewer?.name ?? null;
     // Board M8: adding an action, telling WorkSafe and an ordinary close open as kit pop-ups over the page; every
     // other step (and a close that still needs "close anyway") keeps its pane.
-    const closeReady = d.can.close && d.close_readiness.hard_blockers.length === 0 && d.close_readiness.exceptional_blockers.length === 0;
+    // An approved, current "close anyway" that covers every item left (the same test as the close pane).
+    const nowMs = Date.now();
+    const exceptionalLeft = d.close_readiness.exceptional_blockers;
+    const authorising = exceptionalLeft.length
+        ? d.closure_exceptions.find(
+              (exception) =>
+                  exception.status === 'approved' &&
+                  !!exception.expires_at &&
+                  new Date(exception.expires_at).getTime() > nowMs &&
+                  !!exception.review_at &&
+                  new Date(exception.review_at).getTime() > nowMs &&
+                  exceptionalLeft.every((blocker) => exception.scope.includes(blocker.key)),
+          )
+        : undefined;
+    const closeReady = d.can.close && d.close_readiness.hard_blockers.length === 0 && (exceptionalLeft.length === 0 || !!authorising);
     const dialogPane =
-        pane && (pane.kind === 'ca_add' || pane.kind === 'worksafe_notify' || (pane.kind === 'close' && closeReady)) ? pane : null;
+        pane &&
+        (pane.kind === 'ca_add' ||
+            pane.kind === 'worksafe_notify' ||
+            pane.kind === 'worksafe_decision' ||
+            (pane.kind === 'close' && closeReady))
+            ? pane
+            : null;
+    // M12: one request covers one item, so "Ask to close anyway" is offered only when exactly one is left.
+    const pendingException = d.closure_exceptions.find((exception) => exception.status === 'pending') ?? null;
+    const canAskCloseAnyway =
+        d.status !== 'closed' &&
+        d.can.request_closure_exception &&
+        d.close_readiness.hard_blockers.length === 0 &&
+        exceptionalLeft.length === 1 &&
+        !pendingException &&
+        !authorising;
+    const [askOpen, setAskOpen] = useState(false);
+    const [deciding, setDeciding] = useState(false);
     const inlinePane = dialogPane ? null : pane;
     const replaced =
         dialogPane?.kind === 'ca_add' && dialogPane.replacesActionId
@@ -1708,8 +1742,11 @@ function SafetyReviewPage({
         d.can.change_owner && d.status !== 'closed'
             ? { key: 'owner', label: owner ? 'Change owner…' : 'Choose owner…', icon: UserIcon, run: () => setOwnerOpen(true) }
             : null;
+    const askItem = canAskCloseAnyway
+        ? { key: 'ask-close-anyway', label: 'Ask to close anyway…', icon: ShieldCheck, run: () => setAskOpen(true) }
+        : null;
     const headerActions =
-        more.length || ownerItem ? (
+        more.length || ownerItem || askItem ? (
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <PageHeaderGlassButton icon={MoreHorizontal} aria-label="More safety review actions">
@@ -1721,6 +1758,12 @@ function SafetyReviewPage({
                         <DropdownMenuItem onSelect={ownerItem.run}>
                             <ownerItem.icon className="size-4" />
                             {ownerItem.label}
+                        </DropdownMenuItem>
+                    ) : null}
+                    {askItem ? (
+                        <DropdownMenuItem onSelect={askItem.run}>
+                            <askItem.icon className="size-4" />
+                            {askItem.label}
                         </DropdownMenuItem>
                     ) : null}
                     {more.map((action) => (
@@ -1754,6 +1797,17 @@ function SafetyReviewPage({
                 })}
             />
             <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
+            {pendingException ? (
+                <QuietLine
+                    title="“Close anyway” request"
+                    text={
+                        pendingException.can_decide
+                            ? `${pendingException.requester?.name ?? 'Someone'} asked to close this safety review with one item still open. It’s waiting for your decision.`
+                            : `${pendingException.requester?.name ?? 'Someone'} asked to close this safety review with one item still open. It’s waiting for a decision${pendingException.decide_blocked_reason ? `: ${pendingException.decide_blocked_reason}` : '.'}`
+                    }
+                    action={pendingException.can_decide ? { label: 'Decide', onClick: () => setDeciding(true) } : null}
+                />
+            ) : null}
             {picked === 'assigned' ? <ReviewHandover d={d} /> : null}
             <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
                 <div className="grid min-w-0 content-start gap-5">
@@ -1934,11 +1988,29 @@ function SafetyReviewPage({
                 d={d}
                 viewerName={viewerName}
             />
+            <WorksafeDecisionDialog
+                key={dialogPane?.kind === 'worksafe_decision' ? 'decision-open' : 'decision'}
+                open={dialogPane?.kind === 'worksafe_decision'}
+                onClose={() => onPane(null)}
+                onDone={(notifiable) => (notifiable ? onPane({ kind: 'worksafe_notify' }) : onPaneDone())}
+                d={d}
+            />
+            <AskCloseAnywayDialog open={askOpen} onClose={() => setAskOpen(false)} onDone={() => setAskOpen(false)} d={d} />
+            {pendingException?.can_decide ? (
+                <DecideCloseAnywayDialog
+                    open={deciding}
+                    onClose={() => setDeciding(false)}
+                    d={d}
+                    exception={pendingException}
+                    viewerName={viewerName}
+                />
+            ) : null}
             <CloseReviewDialog
                 open={dialogPane?.kind === 'close'}
                 onClose={() => onPane(null)}
                 onDone={onPaneDone}
                 d={d}
+                exceptionId={authorising?.id ?? null}
                 incidentCloser={d.source?.type === 'ClientIncident' ? `a manager at ${d.site?.name ?? 'the site'}` : null}
             />
             {correcting ? (
