@@ -2185,10 +2185,16 @@ class HsEventController extends Controller
         if (! $person->canDo('hazards.manage') || ! $person->canDo('hazards.view')) {
             return false;
         }
+        $source = ltrim((string) $event->getRawOriginal('source_type'), '\\');
+        // Decision 12 (Stephan, 1 Nov 2026): whoever authorised a restraint never owns its safety review (independence) —
+        // not even by taking it on themselves.
+        if ($source === RestraintEvent::class && $event->source_id !== null
+            && (int) RestraintEvent::query()->whereKey((int) $event->source_id)->value('authorised_by') === (int) $person->id) {
+            return false;
+        }
         if ((int) $person->id === (int) $viewer->id) {
             return true;
         }
-        $source = ltrim((string) $event->getRawOriginal('source_type'), '\\');
         $private = in_array($source, [ClientIncident::class, \App\Models\FirstAidRecord::class, RestraintEvent::class, WorkplaceInjury::class], true)
             || ClientIncident::query()->where('hs_event_id', $event->id)->exists();
 

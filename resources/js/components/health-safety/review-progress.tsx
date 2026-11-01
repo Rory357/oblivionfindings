@@ -55,33 +55,47 @@ function stepStates(d: EventDetail): StepState[] {
     const checked = implemented && actions.every((a) => CHECKED.includes(a.status)) && !failedAction && revisedOk;
     const anyRevision = actions.some((a) => a.replaces);
 
+    // G4-6: "Assigned" means passed to Health and safety (automatically for a restraint); a step with nothing to do
+    // (no investigation needed, no actions) is drawn as passed, so the review sits on the step that's really left.
+    const handedOver = ['accepted', 'not_required'].includes(d.handover.status);
+    const investigatedDone = closed || !invNeeded || !!agreed;
+    const nothingToDo = actions.length === 0 && investigatedDone && !(agreed?.recommendation_count ?? 0);
+
     return [
         {
             key: 'assigned',
-            done: !!d.handover.owner || closed,
-            meta: d.handover.owner ? day(d.handover.accepted_at ?? d.reported_at) : 'No owner yet',
+            done: !!d.handover.owner || handedOver || closed,
+            meta: d.handover.owner
+                ? day(d.handover.accepted_at ?? d.reported_at)
+                : d.handover.status === 'not_required'
+                  ? `Automatically${day(d.reported_at) ? ` · ${day(d.reported_at)}` : ''}`
+                  : handedOver
+                    ? 'Taken on'
+                    : 'Waiting to be taken on',
         },
         {
             key: 'investigated',
-            done: closed || (decided && (!invNeeded || !!agreed)),
+            done: investigatedDone,
             meta: agreed?.completed_at
                 ? day(agreed.completed_at)
-                : decided && !invNeeded
-                  ? 'Not needed'
+                : !invNeeded
+                  ? `Not needed${d.severity === 'low' ? ' at Low severity' : ''}`
                   : 'Not yet',
         },
         {
             key: 'implemented',
-            done: closed || implemented,
+            done: closed || implemented || nothingToDo,
             meta: implemented
                 ? day(latest(actions.map((a) => a.completed_at)))
                 : actions.length
                   ? `${doneCount} of ${actions.length} done`
-                  : 'No actions yet',
+                  : nothingToDo
+                    ? 'None'
+                    : 'No actions yet',
         },
         {
             key: 'check',
-            done: closed || checked,
+            done: closed || checked || nothingToDo,
             failed: !!failedAction && !closed,
             meta: failedAction ? (
                 <>
@@ -90,11 +104,17 @@ function stepStates(d: EventDetail): StepState[] {
                 </>
             ) : checked ? (
                 `${day(latest(actions.map((a) => a.verified_at))) ?? ''}${anyRevision ? ' · revised fix worked' : ''}`
+            ) : nothingToDo ? (
+                'Nothing to check'
             ) : (
                 'Not yet'
             ),
         },
-        { key: 'closed', done: closed, meta: closed ? day(d.closed_at) : 'Not yet' },
+        {
+            key: 'closed',
+            done: closed,
+            meta: closed ? day(d.closed_at) : !decided ? 'After the WorkSafe decision' : 'Not yet',
+        },
     ];
 }
 
