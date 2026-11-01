@@ -126,7 +126,15 @@ describe('19. The allocation log', () => {
 });
 
 describe('Guard: relay/ imports only node: modules and its own files', () => {
-    test('every import in relay/ is node: or a relative path inside relay/', () => {
+    test('every import in relay/ is node: or a relative path inside relay/, and nothing can load a package', () => {
+        // The module loader (imported, or fetched from `process` without an import) and its
+        // require maker could load any installed package, so all of them are refused. The
+        // names are built here so this file doesn't trip its own check.
+        const loader = ['node', 'module'].join(':');
+        const loaders = [
+            ['create', 'Require'].join(''),
+            ['getBuiltin', 'Module'].join(''),
+        ];
         const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
         const files = [];
         const walk = (dir) => {
@@ -142,8 +150,18 @@ describe('Guard: relay/ imports only node: modules and its own files', () => {
             /(?:^|[\s;])(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)|require\s*\(\s*['"]([^'"]+)['"]\s*\)|^import\s+['"]([^'"]+)['"]/gm;
         for (const file of files) {
             const source = readFileSync(file, 'utf8');
+            for (const name of loaders) {
+                assert.ok(
+                    !new RegExp(`\\b${name}\\b`).test(source),
+                    `${relative(root, file)} uses ${name}`,
+                );
+            }
             for (const match of source.matchAll(pattern)) {
                 const target = match[1] ?? match[2] ?? match[3] ?? match[4];
+                assert.ok(
+                    target !== loader && target !== 'module',
+                    `${relative(root, file)} imports ${target}`,
+                );
                 if (target.startsWith('node:')) continue;
                 assert.ok(
                     target.startsWith('./') || target.startsWith('../'),
