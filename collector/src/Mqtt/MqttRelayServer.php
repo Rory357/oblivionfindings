@@ -29,8 +29,10 @@ final class MqttRelayServer
     /** @var resource|null */
     private $server = null;
 
-    /** @var array<int, array{socket: resource, peer: string, buffer: string, login: ?array{username: string, topic_prefix: string}, opened: int, seen: int, keepalive: int}> */
+    /** @var array<int, array{socket: resource, peer: string, buffer: string, login: ?array{username: string, topic_prefix: string}, opened: int, seen: int, keepalive: int, secure: bool}> */
     private array $clients = [];
+
+    private const int TLS_SERVER = STREAM_CRYPTO_METHOD_TLSv1_2_SERVER | STREAM_CRYPTO_METHOD_TLSv1_3_SERVER;
 
     /** @var array<string, list<int>> failed logins per address */
     private array $failures = [];
@@ -40,12 +42,14 @@ final class MqttRelayServer
     /**
      * @param  Closure(): ?array{listen_port: int, max_payload_bytes: int, logins: list<array{username: string, password_hash: string, site_id: int, topic_prefix: string}>}  $relay
      * @param  (Closure(): int)|null  $now
+     * @param  array{certificate_file: string, key_file: string}|null  $tls  S&D Phase E (E5): TLS 1.2+ with this hub's certificate (8883)
      */
     public function __construct(
         private readonly RelayInbox $inbox,
         private readonly Closure $relay,
         ?Closure $now = null,
         private readonly ?Closure $log = null,
+        private readonly ?array $tls = null,
     ) {
         $this->now = $now ?? static fn (): int => time();
     }
@@ -54,7 +58,15 @@ final class MqttRelayServer
     {
         $this->close();
         $target = 'tcp://'.(str_contains($address, ':') ? "[{$address}]" : $address).':'.$port;
-        $server = @stream_socket_server($target, $errorNumber, $errorText);
+        $context = stream_context_create($this->tls === null ? [] : ['ssl' => [
+            // The certificate file holds this hub's certificate, then the sensors certificate.
+            'local_cert' => $this->tls['certificate_file'],
+            'local_pk' => $this->tls['key_file'],
+            'verify_peer' => false,
+            'disable_compression' => true,
+            'crypto_method' => self::TLS_SERVER,
+        ]]);
+        $server = @stream_socket_server($target, $errorNumber, $errorText, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN, $context);
         if (! is_resource($server)) {
             throw new RuntimeException("The sensor relay couldn't listen on port {$port}.");
         }
@@ -124,12 +136,25 @@ final class MqttRelayServer
         $now = ($this->now)();
         $this->clients[(int) $socket] = [
             'socket' => $socket, 'peer' => $address, 'buffer' => '', 'login' => null,
-            'opened' => $now, 'seen' => $now, 'keepalive' => 0,
+            'opened' => $now, 'seen' => $now, 'keepalive' => 0, 'secure' => $this->tls === null,
         ];
     }
 
     private function receive(int $id): void
     {
+        if (! $this->clients[$id]['secure']) {
+            // TLS first: nothing is read as MQTT until the handshake is done. A stalled handshake is
+            // dropped by expire() like a slow login.
+            $done = @stream_socket_enable_crypto($this->clients[$id]['socket'], true, self::TLS_SERVER);
+            if ($done === true) {
+                $this->clients[$id]['secure'] = true;
+                $this->clients[$id]['seen'] = ($this->now)();
+            } elseif ($done === false) {
+                $this->drop($id);
+            }
+
+            return;
+        }
         $chunk = @fread($this->clients[$id]['socket'], 65_536);
         if (! is_string($chunk) || $chunk === '') {
             if (feof($this->clients[$id]['socket'])) {

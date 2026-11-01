@@ -27,6 +27,8 @@ final readonly class CollectorConfig
         public array $commands = [],
         /** S&D Phase B (D21): the sensor gateways this hub relays for, as bcrypt hashes only. */
         public ?array $sensorRelay = null,
+        /** S&D Phase E (E5): the encrypted relay (TLS on 8883): the same logins, plus this hub's certificate. */
+        public ?array $sensorRelayTls = null,
     ) {}
 
     /** @return list<int> */
@@ -54,18 +56,23 @@ final readonly class CollectorConfig
             $coveredSiteIds = self::coveredSiteIds($scope['covered_site_ids'] ?? [], $siteId);
             $allowedSiteIds = array_values(array_unique([$siteId, ...$coveredSiteIds]));
             $sensorRelay = self::sensorRelay($payload['sensor_relay'] ?? null, $allowedSiteIds);
+            $sensorRelayTls = self::sensorRelayTls($payload['sensor_relay_tls'] ?? null, $allowedSiteIds);
+            $relays = $sensorRelay !== null || $sensorRelayTls !== null;
             // A hub that only relays sensor readings has no network targets of its own.
-            $relayOnly = $sensorRelay !== null && ($scope['cidrs'] ?? null) === [];
+            $relayOnly = $relays && ($scope['cidrs'] ?? null) === [];
             $cidrs = $relayOnly ? [] : self::stringList($scope['cidrs'] ?? null, 'network scope');
             $protocols = self::stringList($scope['protocols'] ?? null, 'protocol scope');
             if ($sensorRelay !== null && ! in_array('sensor_relay', $protocols, true)) {
                 throw new ConfigurationRejected('Configuration sensor relay is outside the signed protocol scope.');
             }
+            if ($sensorRelayTls !== null && ! in_array('sensor_relay_tls', $protocols, true)) {
+                throw new ConfigurationRejected('Configuration encrypted sensor relay is outside the signed protocol scope.');
+            }
             $discoveryRuns = self::discoveryRuns($payload['discovery_runs'] ?? [], $version, $allowedSiteIds);
             $commands = self::commands($payload['commands'] ?? [], $version);
             $devices = $scope['devices'] ?? null;
             if (! is_array($devices) || (array_is_list($devices) && $devices !== []) || count($devices) > 4096
-                || ($devices === [] && $discoveryRuns === [] && $commands === [] && $sensorRelay === null)) {
+                || ($devices === [] && $discoveryRuns === [] && $commands === [] && ! $relays)) {
                 throw new ConfigurationRejected('Configuration Device scope is invalid.');
             }
 
@@ -80,7 +87,7 @@ final readonly class CollectorConfig
 
             $checks = $payload['checks'] ?? null;
             if (! is_array($checks) || ! array_is_list($checks) || count($checks) > 10_000
-                || ($checks === [] && $discoveryRuns === [] && $commands === [] && $sensorRelay === null)) {
+                || ($checks === [] && $discoveryRuns === [] && $commands === [] && ! $relays)) {
                 throw new ConfigurationRejected('Configuration checks are invalid.');
             }
             foreach ($checks as $check) {
@@ -127,6 +134,7 @@ final readonly class CollectorConfig
                 discoveryRuns: $discoveryRuns,
                 commands: $commands,
                 sensorRelay: $sensorRelay,
+                sensorRelayTls: $sensorRelayTls,
             );
         } catch (ConfigurationRejected $exception) {
             throw $exception;
@@ -163,6 +171,33 @@ final readonly class CollectorConfig
             }
             $usernames[$login['username']] = true;
         }
+
+        return $value;
+    }
+
+    /**
+     * S&D Phase E (E5): the encrypted relay. Port 8883 only, the same login rules as the plain relay,
+     * and this hub's certificate with the sensors certificate that signed it.
+     *
+     * @param  list<int>  $allowedSiteIds
+     * @return array{listen_port: int, max_payload_bytes: int, logins: list<array{username: string, password_hash: string, site_id: int, topic_prefix: string}>, certificate: string, ca_certificate: string}|null
+     */
+    public static function sensorRelayTls(mixed $value, array $allowedSiteIds): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+        $pem = static fn (mixed $text): bool => is_string($text) && strlen($text) <= 8192
+            && preg_match('/\A-----BEGIN CERTIFICATE-----\r?\n[A-Za-z0-9+\/=\r\n]+-----END CERTIFICATE-----\r?\n?\z/', $text) === 1;
+        if (! is_array($value) || array_keys($value) !== ['listen_port', 'max_payload_bytes', 'logins', 'certificate', 'ca_certificate']
+            || $value['listen_port'] !== 8883 || ! $pem($value['certificate']) || ! $pem($value['ca_certificate'])) {
+            throw new ConfigurationRejected('Configuration encrypted sensor relay is invalid.');
+        }
+        self::sensorRelay([
+            'listen_port' => $value['listen_port'],
+            'max_payload_bytes' => $value['max_payload_bytes'],
+            'logins' => $value['logins'],
+        ], $allowedSiteIds);
 
         return $value;
     }

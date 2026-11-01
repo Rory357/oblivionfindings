@@ -15,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -116,11 +117,19 @@ final class SetupController extends Controller
         $access->assertCanViewSite($user, (int) $validated['site_id']);
         $site = \App\Models\Site::query()->whereKey((int) $validated['site_id'])->where('is_active', true)->where('archived', false)->whereNull('archived_at')->firstOrFail();
         $hub = app(\App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver::class)->forSite((int) $site->id);
+        // S&D Phase E (E5): encrypted (TLS on 8883) is the default once the hub has its certificate;
+        // unencrypted on the house network only while Setup allows it and no other Site shares the range.
+        $authority = app(\App\Domain\SecurityDevices\Iot\Relay\Services\SensorsCertificateAuthority::class);
+        $tlsCapable = $hub !== null && \App\Domain\SecurityDevices\Management\Services\HubJobTypes::runs($hub, \App\Domain\SecurityDevices\Iot\Relay\Services\SensorsCertificateAuthority::HUB_FEATURE);
+        $encrypted = $tlsCapable && $authority->currentFor($hub) !== null && $authority->existingFingerprint() !== null;
+        $plainOn = $settings->bool(SecurityDevicesSettings::MQTT_PLAIN);
+        $clash = in_array((int) $site->id, \App\Domain\SecurityDevices\Iot\Relay\Services\SensorRelaySites::clashing(), true);
         $refusal = match (true) {
             $hub === null => 'This Site has no hub yet. Add a hub first: sensor readings never cross the public internet.',
-            ! $settings->bool(SecurityDevicesSettings::MQTT_PLAIN) => 'Gateways send to the hub unencrypted on the house network, and that’s off. Turn on “Allow unencrypted MQTT through a Site’s hub” in Setup › Sensor broker first.',
-            in_array((int) $site->id, \App\Domain\SecurityDevices\Iot\Relay\Services\SensorRelaySites::clashing(), true) => 'Another Site uses the same address range, so unencrypted MQTT is refused here. Give one of them a different range first.',
-            default => null,
+            $encrypted, $plainOn && ! $clash => null,
+            $plainOn && $clash => 'Another Site uses the same address range, so unencrypted MQTT is refused here, and the hub can’t take encrypted readings yet. Give one of them a different range, or wait for the hub’s certificate.',
+            $tlsCapable => 'The Site’s hub hasn’t got its certificate for encrypted readings yet. It asks within a day of its update; try again then.',
+            default => \App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver::label($hub).' needs its software update before gateways can send to it encrypted.',
         };
         if ($refusal !== null) {
             throw ValidationException::withMessages(['site_id' => $refusal]);
@@ -135,7 +144,11 @@ final class SetupController extends Controller
             'password' => $password,
             'topic' => (string) $login->topic_prefix.'up',
             'hub' => ['label' => \App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver::label($hub), 'address' => is_string($hubAddress) && $hubAddress !== '' ? $hubAddress : null],
-            'port' => 1883,
+            'port' => $encrypted ? 8883 : 1883,
+            'tls' => $encrypted ? [
+                'fingerprint' => $authority->existingFingerprint(),
+                'download_url' => route('security-devices.setup.broker.sensors-certificate', [], false),
+            ] : null,
         ], 201)->header('Cache-Control', 'no-store');
     }
 
@@ -163,6 +176,25 @@ final class SetupController extends Controller
         app(\App\Domain\SecurityDevices\Iot\Relay\Services\SensorGatewayLoginService::class)->revoke($record, $user);
 
         return response()->json(['message' => 'Login removed.']);
+    }
+
+    /**
+     * S&D Phase E (E5): the sensors certificate, to load into a gateway so it can check it's talking
+     * to its Site's hub over TLS (port 8883). It's public; the authority's private key never leaves
+     * the server.
+     */
+    public function sensorsCertificate(Request $request, \App\Domain\SecurityDevices\Iot\Relay\Services\SensorsCertificateAuthority $authority): HttpResponse
+    {
+        $user = $this->viewer($request);
+        abort_unless($user->canDo('securityDevices.savedLogins.manage'), 403);
+        $certificate = $authority->existingCertificate();
+        abort_if($certificate === null, 404);
+
+        return response($certificate, 200, [
+            'Content-Type' => 'application/x-pem-file',
+            'Content-Disposition' => 'attachment; filename="oblivion-sensors-certificate.pem"',
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     /** Change history as a CSV file (newest first, up to 5,000 rows). */

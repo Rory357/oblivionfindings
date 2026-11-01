@@ -44,6 +44,30 @@ describe('Add a sensor gateway', () => {
         expect(screen.getByText('Waiting for its first reading')).toBeInTheDocument();
     });
 
+    it('gives port 8883 and the sensors certificate when the hub takes readings encrypted', async () => {
+        vi.spyOn(axios, 'post').mockResolvedValue({
+            data: {
+                id: 8,
+                username: 'gw-mnopqrstuvwx',
+                password: 'synthetic-once',
+                topic: 'oblivion/4/gw-mnopqrstuvwx/up',
+                hub: { label: 'Synthetic House hub', address: '10.20.0.5' },
+                port: 8883,
+                tls: { fingerprint: 'AB:CD:EF', download_url: '/security-devices/setup/broker/sensors-certificate' },
+            },
+        });
+
+        render(<AddSensorGateway open form={form} onClose={() => undefined} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Make its login' }));
+        await waitFor(() => expect(screen.getByText('synthetic-once')).toBeInTheDocument());
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+        expect(screen.getByText('8883')).toBeInTheDocument();
+        expect(screen.getByText('On. Load the sensors certificate as the CA certificate.')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Download the sensors certificate' })).toHaveAttribute('href', '/security-devices/setup/broker/sensors-certificate');
+        expect(screen.queryByText(/unencrypted/)).not.toBeInTheDocument();
+    });
+
     it('says plainly why a Site can’t take readings yet', async () => {
         vi.spyOn(axios, 'post').mockRejectedValue(
             Object.assign(new axios.AxiosError('422'), {

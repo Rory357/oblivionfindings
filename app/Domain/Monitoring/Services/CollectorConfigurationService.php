@@ -210,12 +210,48 @@ final readonly class CollectorConfigurationService
                 ->values()
                 ->all();
 
-            if ($checks === [] && $discoveryRuns === [] && $commands === [] && $relayLogins === []) {
+            // Phase E (E5): the encrypted relay (TLS on 8883), for hubs that run it and hold a relay
+            // certificate from the sensors authority. Encrypted is the default, so it needs no switch.
+            $tlsRelay = null;
+            $sensorsAuthority = app(\App\Domain\SecurityDevices\Iot\Relay\Services\SensorsCertificateAuthority::class);
+            $relayCertificate = \App\Domain\SecurityDevices\Management\Services\HubJobTypes::runs($locked, \App\Domain\SecurityDevices\Iot\Relay\Services\SensorsCertificateAuthority::HUB_FEATURE)
+                ? $sensorsAuthority->currentFor($locked)
+                : null;
+            if ($relayCertificate !== null) {
+                $tlsLogins = SensorGatewayLogin::query()
+                    ->active()
+                    ->whereIn('site_id', $locked->authorisedSiteIds())
+                    ->orderBy('id')
+                    ->limit(256)
+                    ->get(['username', 'password_hash', 'site_id', 'topic_prefix'])
+                    ->map(fn (SensorGatewayLogin $login): array => [
+                        'username' => (string) $login->username,
+                        'password_hash' => (string) $login->password_hash,
+                        'site_id' => (int) $login->site_id,
+                        'topic_prefix' => (string) $login->topic_prefix,
+                    ])
+                    ->values()
+                    ->all();
+                if ($tlsLogins !== []) {
+                    $tlsRelay = [
+                        'listen_port' => 8883,
+                        'max_payload_bytes' => 65_536,
+                        'logins' => $tlsLogins,
+                        'certificate' => (string) $relayCertificate->certificate_pem,
+                        'ca_certificate' => $sensorsAuthority->certificate(),
+                    ];
+                }
+            }
+
+            if ($checks === [] && $discoveryRuns === [] && $commands === [] && $relayLogins === [] && $tlsRelay === null) {
                 throw new DomainException('Collector has no executable work in its approved Site scope.');
             }
             if ($relayLogins !== []) {
                 // The hub runs its relay only when the signed scope says so.
                 $protocols[] = 'sensor_relay';
+            }
+            if ($tlsRelay !== null) {
+                $protocols[] = 'sensor_relay_tls';
             }
             $maximumChecks = max(1, min(10_000, (int) config(
                 'monitoring.collector.max_checks_per_configuration',
@@ -262,6 +298,10 @@ final readonly class CollectorConfigurationService
                     'max_payload_bytes' => 65_536,
                     'logins' => $relayLogins,
                 ];
+            }
+            if ($tlsRelay !== null) {
+                // A new section: older hubs ignore it, and only hubs that run it are sent it.
+                $payload['sensor_relay_tls'] = $tlsRelay;
             }
             $json = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
             $secret = $this->signingSecretKey();

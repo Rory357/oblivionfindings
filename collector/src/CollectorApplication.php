@@ -15,6 +15,7 @@ use Oblivion\Collector\Exceptions\SpoolFull;
 use Oblivion\Collector\Media\MediaLane;
 use Oblivion\Collector\Mqtt\MqttRelayServer;
 use Oblivion\Collector\Mqtt\RelayInbox;
+use Oblivion\Collector\Mqtt\RelayTlsIdentity;
 use Oblivion\Collector\Runtime\CameraSnapshotRunner;
 use Oblivion\Collector\Runtime\CollectorCommandExecutor;
 use Oblivion\Collector\Runtime\CommandJournal;
@@ -375,12 +376,16 @@ final class CollectorApplication
                 throw $exception;
             }
         }
+        $relayTls = new RelayTlsIdentity($stateDirectory, (string) $identity['collector_id']);
         if ($config !== null) {
             // S&D Phase B (D21): the relay works from this file, so it keeps taking readings offline.
             $this->writeRelayLogins($stateDirectory, $config);
+            // S&D Phase E (E5): and the encrypted relay from this one, with this hub's certificate.
+            $this->writeRelayTls($stateDirectory, $config, $relayTls);
         }
         $spool = new EncryptedSpool($stateDirectory, $checkpoint);
         $this->moveRelayedReadings($stateDirectory, $spool, $secretKey);
+        $this->requestRelayCertificate($relayTls, $spool);
         if ($config !== null) {
             // S&D Phase E (D21): once a day, check Oblivion's public address refuses MQTT.
             $this->checkBrokerExposure($stateDirectory, $spool, (string) $identity['central_url']);
@@ -479,8 +484,9 @@ final class CollectorApplication
                 'checks_executed' => $checksExecuted,
                 'discovery_targets_executed' => $discoveryTargetsExecuted,
                 'commands_executed' => $commandsExecuted,
-                // The job types this hub can run: the server sends a new kind of job only to hubs that list it.
-                'command_adapters' => implode(',', ScopeGuard::commandAdapters()),
+                // The job types (and newer config sections) this hub can run: the server sends a new
+                // kind only to hubs that list it.
+                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE]),
                 'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
@@ -540,7 +546,47 @@ final class CollectorApplication
         };
         $server = new MqttRelayServer($inbox, $logins, log: fn (string $line) => $this->write($line.PHP_EOL));
         $listening = null;
+        // S&D Phase E (E5): the encrypted relay (TLS on 8883), from its own logins file and this hub's certificate.
+        $tlsFile = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_TLS_LOGINS_FILE;
+        $tlsRelay = null;
+        $tlsReadAt = 0;
+        $tlsLogins = function () use (&$tlsRelay, &$tlsReadAt, $tlsFile): ?array {
+            if (time() - $tlsReadAt >= 30) {
+                $tlsReadAt = time();
+                $tlsRelay = $this->readRelayLogins($tlsFile);
+            }
+
+            return $tlsRelay;
+        };
+        $relayTls = new RelayTlsIdentity($stateDirectory, (string) $identity['collector_id']);
+        $tlsServer = null;
+        $tlsListening = null;
         while (! is_file($stateDirectory.DIRECTORY_SEPARATOR.'removed.json')) {
+            $tlsPort = $tlsLogins()['listen_port'] ?? null;
+            $certificate = $relayTls->certificateFile();
+            clearstatcache();
+            // A renewed certificate restarts the listener so new connections use it.
+            $wanted = is_int($tlsPort) && $certificate !== null ? $tlsPort.'|'.(int) @filemtime($certificate) : null;
+            if ($wanted !== $tlsListening) {
+                $tlsServer?->close();
+                $tlsServer = null;
+                $tlsListening = null;
+                if ($wanted !== null) {
+                    try {
+                        $tlsServer = new MqttRelayServer($inbox, $tlsLogins, log: fn (string $line) => $this->write($line.PHP_EOL), tls: [
+                            'certificate_file' => $certificate,
+                            'key_file' => $relayTls->keyFile(),
+                        ]);
+                        $tlsServer->listen('0.0.0.0', (int) $tlsPort);
+                        $tlsListening = $wanted;
+                        $this->write("relay: listening encrypted on {$tlsPort}".PHP_EOL);
+                    } catch (RuntimeException $exception) {
+                        $tlsServer = null;
+                        $this->write('relay: '.$exception->getMessage().PHP_EOL, STDERR);
+                    }
+                }
+            }
+            $tlsServer?->poll(0.2);
             $port = $logins()['listen_port'] ?? null;
             if ($port !== $listening) {
                 $server->close();
@@ -557,14 +603,56 @@ final class CollectorApplication
                     }
                 }
             }
-            $server->poll($listening === null ? 5.0 : 1.0);
+            $server->poll($listening === null ? ($tlsServer === null ? 5.0 : 0.0) : 0.8);
         }
         $server->close();
+        $tlsServer?->close();
 
         return 3;
     }
 
     private const string RELAY_LOGINS_FILE = 'sensor-relay.json';
+
+    /** S&D Phase E (E5): the encrypted relay's logins (the certificate is in RelayTlsIdentity's files). */
+    private const string RELAY_TLS_LOGINS_FILE = 'sensor-relay-tls.json';
+
+    private const string RELAY_TLS_FEATURE = 'sensor_relay_tls_v1';
+
+    private function writeRelayTls(string $stateDirectory, CollectorConfig $config, RelayTlsIdentity $relayTls): void
+    {
+        $path = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_TLS_LOGINS_FILE;
+        $tls = $config->sensorRelayTls;
+        if ($tls === null || ! $relayTls->install($tls['certificate'], $tls['ca_certificate'])) {
+            // No encrypted relay in the signed work, or a certificate that isn't for this hub's key.
+            if (is_file($path)) {
+                @unlink($path);
+            }
+
+            return;
+        }
+        $this->writePrivateFile($path, json_encode([
+            'version' => 1,
+            'allowed_site_ids' => $config->allowedSiteIds(),
+            'relay' => ['listen_port' => $tls['listen_port'], 'max_payload_bytes' => $tls['max_payload_bytes'], 'logins' => $tls['logins']],
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+    }
+
+    /** At most once a day, ask Oblivion to sign this hub's relay key when it has no current certificate. */
+    private function requestRelayCertificate(RelayTlsIdentity $relayTls, EncryptedSpool $spool): void
+    {
+        if ($spool->status()['state'] === 'buffer_full') {
+            return;
+        }
+        try {
+            $item = $relayTls->request(RelayTlsIdentity::localAddresses());
+            if ($item !== null) {
+                $now = new DateTimeImmutable('now');
+                $spool->append('relay-certificate-request:'.$now->format('YmdHis'), $spool->nextSourceSequence(), $item, $now);
+            }
+        } catch (\Throwable) {
+            // Asked again tomorrow; the plain relay (if allowed) keeps working meanwhile.
+        }
+    }
 
     private function writeRelayLogins(string $stateDirectory, CollectorConfig $config): void
     {
@@ -667,7 +755,8 @@ final class CollectorApplication
 
     private function wipeRemovedHub(string $configPath, string $stateDirectory, string &$secretKey): int
     {
-        foreach ([$configPath, $stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json', $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE] as $path) {
+        (new RelayTlsIdentity($stateDirectory, ''))->forget();
+        foreach ([$configPath, $stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json', $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE, $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_TLS_LOGINS_FILE] as $path) {
             if (is_file($path)) {
                 @unlink($path);
             }

@@ -128,6 +128,8 @@ export type SetupProps = {
     broker: {
         rows: BrokerRow[];
         check: { passed: boolean; at: string; by: string; answered: string[] } | null;
+        /** S&D Phase E (E5): the sensors certificate a gateway loads for TLS on 8883; null until the first hub asks. */
+        certificate?: { fingerprint: string; download_url: string } | null;
         clashes: string[];
         can_add: boolean;
     } | null;

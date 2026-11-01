@@ -196,6 +196,17 @@ final readonly class CollectorIngestService
 
             return;
         }
+        if ($itemType === 'relay_certificate_request') {
+            // S&D Phase E (E5): the hub's own relay key, sent as a certificate request only. A request
+            // that isn't the hub's or names an address outside its Sites is ignored; the hub asks again.
+            app(\App\Domain\SecurityDevices\Iot\Relay\Services\SensorsCertificateAuthority::class)->issue(
+                $collector,
+                is_string($payload['csr_pem'] ?? null) ? $payload['csr_pem'] : '',
+                is_array($payload['ip_addresses'] ?? null) ? array_values($payload['ip_addresses']) : [],
+            );
+
+            return;
+        }
         if ($itemType === 'relay_login_failures') {
             // S&D Phase E: 5 wrong sensor logins in 10 minutes at the hub's relay alert IT.
             $address = is_string($payload['address'] ?? null) ? mb_substr($payload['address'], 0, 64) : 'an unknown address';

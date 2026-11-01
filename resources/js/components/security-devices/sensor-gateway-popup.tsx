@@ -1,8 +1,9 @@
 /**
  * Pop-up 98, Add a sensor gateway (S&D rebuild, Phase E): choose the gateway and its Site; Oblivion
  * makes its own login on that Site's hub; it shows exactly what to type into the gateway; then it
- * waits live for the first reading. Readings never cross the public internet (D21): today they go
- * to the Site's hub on the house network, unencrypted, only while Setup allows that (D22).
+ * waits live for the first reading. Readings never cross the public internet (D21): they go to the
+ * Site's hub on the house network, encrypted (TLS on 8883) once the hub has its certificate (E5), or
+ * unencrypted on 1883 only while Setup allows that (D22).
  */
 import { PopupCallout, PopupFacts, PopupField } from '@/components/popup';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,16 @@ const MODELS = ['Milesight UG65', 'Milesight UG67', 'Milesight UG56', 'Another M
 const POLL_MS = 3_000;
 const POLL_FOR_MS = 10 * 60_000;
 
-type Made = { id: number; username: string; password: string; topic: string; hub: { label: string; address: string | null }; port: number };
+type Made = {
+    id: number;
+    username: string;
+    password: string;
+    topic: string;
+    hub: { label: string; address: string | null };
+    port: number;
+    /** S&D Phase E (E5): set when the hub takes readings encrypted (TLS on 8883). */
+    tls?: { fingerprint: string; download_url: string } | null;
+};
 
 function CopyValue({ value, label }: { value: string; label: string }) {
     const [copied, setCopied] = useState(false);
@@ -263,7 +273,20 @@ export function AddSensorGateway({ open, form, onClose }: { open: boolean; form:
                                 ['Port', String(made.port)],
                                 ['Client ID', <CopyValue key="c" value={made.username} label="client ID" />],
                                 ['Username and password', 'From the last step'],
-                                ['TLS', 'Off: the hub takes readings unencrypted on the house network'],
+                                [
+                                    'TLS',
+                                    made.tls ? (
+                                        <span key="tls" className="grid gap-1">
+                                            <span>On. Load the sensors certificate as the CA certificate.</span>
+                                            <a className="underline underline-offset-2" href={made.tls.download_url} download>
+                                                Download the sensors certificate
+                                            </a>
+                                            <span className="text-caption break-all">Fingerprint {made.tls.fingerprint}</span>
+                                        </span>
+                                    ) : (
+                                        'Off: the hub takes readings unencrypted on the house network'
+                                    ),
+                                ],
                                 ['Uplink topic', <CopyValue key="t" value={made.topic} label="uplink topic" />],
                             ]}
                         />

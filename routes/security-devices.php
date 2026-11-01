@@ -539,6 +539,10 @@ Route::middleware([
         ->whereNumber('login')
         ->middleware('throttle:20,1')
         ->name('security-devices.setup.broker.gateways.revoke');
+    // S&D Phase E (E5): the sensors certificate a gateway loads to check its hub (TLS, port 8883).
+    Route::get('/setup/broker/sensors-certificate', [SetupController::class, 'sensorsCertificate'])
+        ->middleware('throttle:30,1')
+        ->name('security-devices.setup.broker.sensors-certificate');
     Route::get('/setup/{section}', [SetupController::class, 'show'])
         ->where('section', 'hubs|services|alerts|history')
         ->name('security-devices.setup.section');

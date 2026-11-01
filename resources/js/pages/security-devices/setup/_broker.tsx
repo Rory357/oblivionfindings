@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { seenTime } from '@/lib/security-devices/device-time';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
-import { Home, KeyRound, Plus, RadioTower, ShieldCheck, Trash2 } from 'lucide-react';
+import { Download, Home, KeyRound, Plus, RadioTower, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { matches } from './_parts';
 import { SwitchGroup, type SettingsDraft } from './_settings';
@@ -56,6 +56,25 @@ export function SetupBroker({ data, draft, query, now, onAdd }: { data: NonNulla
                 draft={draft}
             />
             <SettingGroup icon={ShieldCheck} title="Safety" caption="Always on; nothing here can be switched off">
+                <SettingRow
+                    label="Encrypted by default (port 8883)"
+                    hint={
+                        data.certificate
+                            ? `Each hub has its own certificate, signed by Oblivion’s sensors certificate (fingerprint ${data.certificate.fingerprint}). Load that into the gateway so it can check it’s talking to its hub.`
+                            : 'Each hub gets its own certificate when it first connects after its update. The sensors certificate to load into gateways appears here then.'
+                    }
+                    control={
+                        data.certificate && data.can_add ? (
+                            <Button size="sm" variant="outline" asChild>
+                                <a href={data.certificate.download_url} download>
+                                    <Download className="size-4" /> Download the sensors certificate
+                                </a>
+                            </Button>
+                        ) : (
+                            <AlwaysOn />
+                        )
+                    }
+                />
                 <SettingRow label="A login can only send its own readings" hint="Its own topic only; another device’s topic ends the connection" control={<AlwaysOn />} />
                 <SettingRow label="Alert after 5 wrong logins in 10 minutes" hint="The hub ignores that address for 10 minutes and IT is told, as for a device that stops answering" control={<AlwaysOn />} />
             </SettingGroup>
