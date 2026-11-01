@@ -73,6 +73,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
         // G3 History tab: the review's activity log (read only, the event read).
         Route::get('/events/{hsEvent}/activity', [HsEventController::class, 'activity'])->whereNumber('hsEvent')->name('events.activity');
+        // G3 board M5c: the review as a PDF (the final record once closed; a summary marked in progress otherwise).
+        Route::get('/events/{hsEvent}/pdf', [HsEventController::class, 'pdf'])->whereNumber('hsEvent')->name('events.pdf');
         // G3 board M5d: open or play a file on a review's step (the review's normal read; each open is logged).
         Route::get('/events/{event}/files/{file}', [\App\Http\Controllers\HealthSafety\HsEventFileController::class, 'show'])->whereNumber('event')->name('events.files.show');
         Route::get('/events/{hsEvent}/incident-attachments/{attachment}/download', [HsEventController::class, 'downloadIncidentAttachment'])->name('events.incident-attachments.download');

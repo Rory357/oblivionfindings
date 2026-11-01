@@ -185,6 +185,9 @@ final class HsEventActivityService
             case 'healthSafety.event.closed':
             case 'healthSafety.event.closedWithException':
                 return $plain('closed the safety review', 'closed');
+            // G3 board M5c: every PDF download is logged.
+            case 'healthSafety.event.pdfDownloaded':
+                return $plain(! empty($meta['final']) ? 'downloaded the PDF' : 'downloaded a summary (in progress, not final)', 'closed');
             // G3 board M5d: each upload, open and hide of a step's file is part of the record.
             case 'healthSafety.event.fileAdded':
             case 'healthSafety.event.fileOpened':

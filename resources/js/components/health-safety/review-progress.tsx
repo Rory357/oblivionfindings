@@ -4,7 +4,7 @@
  * page opens; picking another shows what was added there. The next-step bar comes from the server's `next_step` (the
  * same order as closing needs) and holds the page's only filled button; a viewer who can't do the step is told who does.
  */
-import { CheckCircle2, ChevronDown, ClipboardCheck, ListChecks, Paperclip, PencilLine, Plus, ShieldCheck, UserRoundCheck, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ClipboardCheck, FileDown, ListChecks, Paperclip, PencilLine, Plus, ShieldCheck, UserRoundCheck, XCircle } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import type {
@@ -136,7 +136,7 @@ export function reviewNextBar(d: EventDetail, h: ReviewStepHandlers): RecordProg
             kicker: 'Closed',
             tone: 'done',
             title: 'Nothing left to do',
-            text: `Closed${d.closed_at ? ` ${formatDate(d.closed_at)}` : ''}.`,
+            text: `Closed${d.closed_at ? ` ${formatDate(d.closed_at)}` : ''}. The final record can be downloaded as a PDF from the header.`,
         };
     }
     const step = d.next_step;
@@ -239,7 +239,7 @@ export function reviewStepPane(
     d: EventDetail,
     step: ReviewStepKey,
     activity: ReviewActivity | null,
-    h: ReviewStepHandlers & { onBack?: () => void; onHistory: () => void; onAddFiles?: (step: ReviewStepKey) => void },
+    h: ReviewStepHandlers & { onBack?: () => void; onHistory: () => void; onAddFiles?: (step: ReviewStepKey) => void; onPdf?: () => void },
 ): RecordProgressPane {
     const pane = stepPaneBase(d, step, activity, h);
     const files = (d.files ?? []).filter((file) => file.step === step);
@@ -275,7 +275,7 @@ function stepPaneBase(
     d: EventDetail,
     step: ReviewStepKey,
     activity: ReviewActivity | null,
-    h: ReviewStepHandlers & { onBack?: () => void; onHistory: () => void },
+    h: ReviewStepHandlers & { onBack?: () => void; onHistory: () => void; onPdf?: () => void },
 ): RecordProgressPane {
     const base = {
         onBack: h.onBack,
@@ -467,6 +467,17 @@ function stepPaneBase(
                           key: 'before',
                           label: 'Before it could close',
                           value: `All ${d.close_readiness.requirements.length} done.`,
+                      },
+                      // Board M5c: the final record, downloadable from here and the header.
+                      {
+                          key: 'final',
+                          label: 'Final record',
+                          value: 'PDF · the record as it stood when it closed',
+                          action: h.onPdf ? (
+                              <PaneLink icon={FileDown} onClick={h.onPdf}>
+                                  Download PDF
+                              </PaneLink>
+                          ) : null,
                       },
                   ]
                 : d.close_readiness.requirements

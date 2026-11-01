@@ -5,7 +5,7 @@
  * Every command is the existing server route; the server checks everything again.
  */
 import { useForm } from '@inertiajs/react';
-import { CheckCircle2, ListChecks, Search, ShieldAlert, UserRoundCheck } from 'lucide-react';
+import { CheckCircle2, FileDown, ListChecks, Search, ShieldAlert, UserRoundCheck } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 
 import type { EventCorrectiveAction, EventDetail } from '@/components/health-safety/event-detail-dialog';
@@ -13,6 +13,7 @@ import { HazardStaffPicker } from '@/components/health-safety/hazard-staff-picke
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
 import { PopupCallout, PopupField, PopupForm } from '@/components/popup';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Segmented, TilePicker } from '@/components/wizard/primitives';
@@ -850,6 +851,52 @@ export function DecideCloseAnywayDialog({
             <PopupField label="Your reason" htmlFor="decide-close-why" required hint="At least 10 characters." error={form.errors.reason}>
                 <Textarea id="decide-close-why" rows={3} value={form.data.reason} onChange={(event) => form.setData('reason', event.target.value)} />
             </PopupField>
+        </PopupForm>
+    );
+}
+
+/**
+ * "Download PDF" (closed) / "Print summary" (open) — board M5c, decision 25: photos and video stills are a choice at
+ * download, ticked by default for people who manage health and safety. The download itself is logged by the server.
+ */
+export function DownloadPdfDialog({
+    open,
+    onClose,
+    d,
+}: {
+    open: boolean;
+    onClose: () => void;
+    d: EventDetail;
+}) {
+    const final = d.status === 'closed';
+    const [photos, setPhotos] = useState(d.can.manage);
+    const href = `/health-safety/events/${d.id}/pdf${photos ? '?photos=1' : ''}`;
+    return (
+        <PopupForm
+            open={open}
+            onClose={onClose}
+            icon={FileDown}
+            title={final ? 'Download PDF' : 'Print summary'}
+            description={final ? 'The record as it stood when it closed' : 'A summary of a review still in progress — not its final record'}
+            context={{ title: [d.title ?? d.reference_number, d.site?.name, d.reference_number].filter(Boolean).join(' · ') }}
+            submitLabel={final ? 'Download PDF' : 'Download summary'}
+            onSubmit={() => {
+                window.location.assign(href);
+                onClose();
+            }}
+            testId="download-pdf-dialog"
+        >
+            <label className="flex items-start gap-2.5 text-sm">
+                <Checkbox checked={photos} onCheckedChange={(value) => setPhotos(value === true)} aria-label="Include photos and video stills" />
+                <span>
+                    <b className="font-semibold">Include photos and video stills</b>
+                    <span className="text-caption block">Photos of a person are health information. Videos are listed with their length — a PDF can’t play them.</span>
+                </span>
+            </label>
+            <PopupCallout tone="info">
+                Every page says “Confidential — contains health information”, your name and the time. The download is kept in
+                the review’s history.
+            </PopupCallout>
         </PopupForm>
     );
 }

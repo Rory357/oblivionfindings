@@ -514,6 +514,32 @@ class HsEventController extends Controller
         return Inertia::render('health-safety/events/show', ['detail' => $projection['detail']]);
     }
 
+    /**
+     * G3 board M5c (decisions 21, 25): the review as a PDF — the final record once closed, otherwise a summary marked
+     * "In progress, not final". Built from exactly the page payload this person gets (the same read and projection as
+     * show()), so whole-record viewers only: the team-lead story view has no download. Photos only when ticked.
+     */
+    public function pdf(Request $request, int $hsEvent): \Symfony\Component\HttpFoundation\Response
+    {
+        $request->validate(['photos' => ['nullable', 'boolean']]);
+
+        return DB::transaction(function () use ($request, $hsEvent) {
+            $projection = HealthSafetyReadContext::within($request->user(), $this->detailReadPermissionKeys(), function (HealthSafetyReadContext $context) use ($request, $hsEvent): array {
+                $context->assertCurrentStaff();
+                $event = $this->resolveAccessibleEvent($request, $hsEvent, $context);
+                $detail = $context->consumeViewer($this->detailReadPermissionKeys(),
+                    fn (User $current): array => $this->buildEventDetail($event, $current, $context));
+
+                return ['event_id' => (int) $event->id, 'detail' => $detail];
+            });
+            // The read returns only materialised data; the review row for the audit entry is loaded after it.
+            $event = HsEvent::query()->findOrFail($projection['event_id']);
+
+            return app(\App\Services\HealthSafety\HsReviewPdfService::class)
+                ->download($event, $projection['detail'], $request->user(), $request->boolean('photos'));
+        });
+    }
+
     /** Close through the one canonical H&S readiness/exception aggregate. */
     public function close(Request $request, int $hsEvent)
     {

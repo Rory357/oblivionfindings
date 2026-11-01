@@ -53,6 +53,7 @@ import {
     AddActionDialog,
     AskCloseAnywayDialog,
     CloseReviewDialog,
+    DownloadPdfDialog,
     DecideCloseAnywayDialog,
     ReviewOwnerDialog,
     WorksafeDecisionDialog,
@@ -155,6 +156,7 @@ import {
     ChevronRight,
     Clock,
     ExternalLink,
+    FileDown,
     FileText,
     History,
     Link2,
@@ -1724,6 +1726,7 @@ function SafetyReviewPage({
         !authorising;
     const [askOpen, setAskOpen] = useState(false);
     const [filesStep, setFilesStep] = useState<ReviewStepKey | null>(null);
+    const [pdfOpen, setPdfOpen] = useState(false);
     const [deciding, setDeciding] = useState(false);
     const inlinePane = dialogPane ? null : pane;
     const replaced =
@@ -1752,7 +1755,13 @@ function SafetyReviewPage({
     const askItem = canAskCloseAnyway
         ? { key: 'ask-close-anyway', label: 'Ask to close anyway…', icon: ShieldCheck, run: () => setAskOpen(true) }
         : null;
-    const headerActions =
+    // Board M5c: "Download PDF" once closed (one button, no second one); open records keep "Print summary".
+    const pdfButton = (
+        <PageHeaderGlassButton icon={FileDown} onClick={() => setPdfOpen(true)}>
+            {d.status === 'closed' ? 'Download PDF' : 'Print summary'}
+        </PageHeaderGlassButton>
+    );
+    const moreMenu =
         more.length || ownerItem || askItem ? (
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1782,6 +1791,12 @@ function SafetyReviewPage({
                 </DropdownMenuContent>
             </DropdownMenu>
         ) : null;
+    const headerActions = (
+        <>
+            {pdfButton}
+            {moreMenu}
+        </>
+    );
 
     const handlers = {
         onPane: (next: SafetyReviewPane) => onPane(next),
@@ -1802,6 +1817,7 @@ function SafetyReviewPage({
                     onBack: picked !== current ? () => setPicked(current) : undefined,
                     onHistory: () => onSection('history'),
                     onAddFiles: (step) => setFilesStep(step),
+                    onPdf: () => setPdfOpen(true),
                 })}
             />
             <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
@@ -2023,6 +2039,7 @@ function SafetyReviewPage({
                     viewerName={viewerName}
                 />
             ) : null}
+            <DownloadPdfDialog open={pdfOpen} onClose={() => setPdfOpen(false)} d={d} />
             <AskCloseAnywayDialog open={askOpen} onClose={() => setAskOpen(false)} onDone={() => setAskOpen(false)} d={d} />
             {pendingException?.can_decide ? (
                 <DecideCloseAnywayDialog
