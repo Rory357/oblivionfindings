@@ -57,7 +57,11 @@ export type SelectedAlert = {
         report_incident: boolean;
         /** Safety alerts and wrong sensor logins don’t clear by themselves: a person marks them done. */
         done?: boolean;
+        /** S&D Phase F: a scald-risk alert can raise its H&S hazard once. */
+        raise_hazard?: boolean;
     };
+    /** S&D Phase F: the H&S hazard raised from this alert. */
+    hazard_url?: string | null;
 };
 
 export type DoneRow = {

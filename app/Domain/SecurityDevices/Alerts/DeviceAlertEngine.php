@@ -188,16 +188,51 @@ final class DeviceAlertEngine
         }
     }
 
-    /** Open (or refresh) an alert the staff on shift at the device's house hear about in the app. */
-    private function openForHouse(Device $device, string $kind, string $severity, string $title, CarbonImmutable $at, string $what, ?string $detail): void
+    /** S&D Phase F: care-rule alerts (a linked person's plan) and scald risk from a hot-water probe. */
+    public const array CARE_KINDS = ['care_out_of_bed', 'care_door_night', 'scald_risk'];
+
+    /**
+     * S&D Phase F: open (or refresh) a care or scald alert for the staff on shift at the house.
+     * Returns the new alert, or null when one was already open.
+     */
+    public function openCare(Device $device, string $kind, string $title, CarbonImmutable $at, string $what, ?string $detail): ?DeviceAlert
+    {
+        if (! in_array($kind, self::CARE_KINDS, true)) {
+            throw new \InvalidArgumentException('Not a care alert kind.');
+        }
+        try {
+            return $this->openForHouse($device, $kind, 'critical', $title, $at, $what, $detail, ['database', 'push']);
+        } catch (Throwable $exception) {
+            Log::error('Care alert could not be opened', ['device_id' => $device->id, 'kind' => $kind, 'error' => $exception->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /** @param  callable(DeviceAlert): string  $words */
+    public function closeCare(Device $device, string $kind, CarbonImmutable $at, callable $words): void
+    {
+        if (in_array($kind, self::CARE_KINDS, true)) {
+            $this->closeKind($device, $kind, $at, $words);
+        }
+    }
+
+    /**
+     * Open (or refresh) an alert the staff on shift at the device's house hear about in the app.
+     *
+     * @param  list<string>  $channels
+     */
+    private function openForHouse(Device $device, string $kind, string $severity, string $title, CarbonImmutable $at, string $what, ?string $detail, array $channels = ['database']): ?DeviceAlert
     {
         $siteId = $this->siteId($device);
         $people = $siteId !== null ? app(StaffOnShift::class)->toTell($siteId) : collect();
-        $told = $people->isNotEmpty() ? ['names' => $people->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all(), 'channels' => ['database']] : null;
+        $told = $people->isNotEmpty() ? ['names' => $people->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all(), 'channels' => $channels] : null;
         $created = $this->open($device, null, $kind, $severity, $title, $at, $what, $detail, $told);
         if ($created !== null && $told !== null) {
-            $this->notify($people, $created, $what, ['database']);
+            $this->notify($people, $created, $what, $channels);
         }
+
+        return $created;
     }
 
     /** @param  callable(DeviceAlert): string  $words */
@@ -573,8 +608,9 @@ final class DeviceAlertEngine
     /** @return list<string> the alert kinds a person closes (safety events) */
     public static function safetyKinds(): array
     {
-        // Wrong sensor logins are an event too: someone says when they've looked into it.
-        return array_values(array_unique([...array_column(self::SAFETY_EVENTS, 0), 'mqtt_logins']));
+        // Wrong sensor logins are an event too: someone says when they've looked into it. So are the
+        // Phase F care and scald alerts: a person says they've checked.
+        return array_values(array_unique([...array_column(self::SAFETY_EVENTS, 0), 'mqtt_logins', ...self::CARE_KINDS]));
     }
 
     /** @return list<string> the kinds that share one open alert per device */

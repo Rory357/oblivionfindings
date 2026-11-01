@@ -235,7 +235,10 @@ final class AlertsPresenter
                 'snooze' => $active && $viewer->canDo('securityDevices.alerts.acknowledge'),
                 'done' => $active && $viewer->canDo('securityDevices.alerts.acknowledge') && in_array($alert->kind, DeviceAlertEngine::safetyKinds(), true),
                 'report_incident' => $viewer->canDo('incidents.create'),
+                // S&D Phase F: a scald-risk alert raises its H&S hazard once; then it links to it.
+                'raise_hazard' => $alert->kind === 'scald_risk' && $alert->hazard_id === null && $viewer->canDo('hazards.create'),
             ],
+            'hazard_url' => $alert->hazard_id !== null ? '/hazards/'.$alert->hazard_id : null,
         ];
     }
 

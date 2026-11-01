@@ -3,6 +3,7 @@ import { EntityTable, type MenuItem } from '@/components/lists';
 import { alertLine } from '@/components/security-devices/alert-popups';
 import {
     Log,
+    Note,
     PointBars,
     QuietLine,
     Ring,
@@ -26,7 +27,9 @@ import {
     WifiOff,
     type LucideIcon,
 } from 'lucide-react';
-import { Fragment, type MouseEvent, type ReactNode } from 'react';
+import { router } from '@inertiajs/react';
+import axios from 'axios';
+import { Fragment, useState, type MouseEvent, type ReactNode } from 'react';
 import type { AlertRuleRow, AlertTone, DoneRow, SelectedAlert } from './_types';
 
 /** "**bold**" in a server line becomes the figure. */
@@ -229,6 +232,7 @@ export function AlertStory({
                     text="Nothing recorded on this alert yet."
                 />
             )}
+            <ScaldHazardLine alert={alert} />
             <QuietLine
                 title="Is someone already on it?"
                 text="Acknowledge it so others know. Report an incident only if someone was hurt or put at risk."
@@ -241,6 +245,49 @@ export function AlertStory({
                         : null
                 }
             />
+        </>
+    );
+}
+
+/**
+ * S&D Phase F (pg-sdr-7c): a scald-risk alert raises its H&S hazard in one click (the person is its
+ * reporter), then links to it. Nothing shows for other alerts.
+ */
+function ScaldHazardLine({ alert }: { alert: SelectedAlert }) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    if (alert.hazard_url) {
+        const url = alert.hazard_url;
+        return <QuietLine title="H&S hazard raised" text="The tap’s hazard is in Health & safety. Whoever has it is told when the tap stays under 45 °C for 24 hours." action={{ label: 'Open hazard', onClick: () => router.visit(url) }} />;
+    }
+    if (!alert.can.raise_hazard) {
+        return null;
+    }
+    const raise = async () => {
+        setBusy(true);
+        setError(null);
+        try {
+            const response = await axios.post<{ url: string }>(`/security-devices/alerts/${alert.id}/hazard`);
+            router.visit(response.data.url);
+        } catch (failure) {
+            const status = axios.isAxiosError(failure) ? failure.response?.status : undefined;
+            setError(status === 403 ? 'You can’t raise H&S hazards.' : status ? 'It wasn’t raised. Try again.' : 'Result not confirmed. Reload to check whether it was raised.');
+            setBusy(false);
+        }
+    };
+
+    return (
+        <>
+            <QuietLine
+                title="Scald risk"
+                text="Hot water above 45 °C can scald quickly. Raise the H&S hazard so the tempering valve gets checked; you’ll be its reporter."
+                action={{ label: busy ? 'Raising…' : 'Raise the H&S hazard', onClick: () => void raise() }}
+            />
+            {error ? (
+                <Note tone="critical">
+                    <span role="alert">{error}</span>
+                </Note>
+            ) : null}
         </>
     );
 }

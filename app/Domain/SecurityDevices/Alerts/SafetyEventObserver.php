@@ -18,6 +18,16 @@ final class SafetyEventObserver
     public function created(DeviceEvent $event): void
     {
         $type = strtolower(trim((string) $event->event_type));
+        if ($type === 'door_opened' && $event->device_id !== null) {
+            // S&D Phase F: a door contact linked to someone's wandering plan tells staff at night.
+            $door = Device::query()->find($event->device_id);
+            $at = $event->occurred_at !== null ? CarbonImmutable::parse($event->occurred_at)->setTimezone('UTC') : CarbonImmutable::now('UTC');
+            if ($door instanceof Device && $at->gte(CarbonImmutable::now('UTC')->subMinutes(30))) {
+                app(\App\Domain\SecurityDevices\Care\CareRules::class)->onDoorOpened($door, $at);
+            }
+
+            return;
+        }
         if (! array_key_exists($type, DeviceAlertEngine::SAFETY_EVENTS) || $event->device_id === null) {
             return;
         }

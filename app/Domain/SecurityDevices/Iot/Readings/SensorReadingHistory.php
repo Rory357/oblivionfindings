@@ -33,6 +33,32 @@ final class SensorReadingHistory
         }
         if ($rows !== []) {
             DB::table('security_device_sensor_readings')->insert($rows);
+            $this->afterRecorded($deviceId, $values, $at);
+        }
+    }
+
+    /**
+     * S&D Phase F: readings some care rules watch, once they're stored. A hot-water probe's
+     * temperature (scald watch) and a bed sensor's in/out of bed (a falls plan).
+     *
+     * @param  array<string, float|int>  $values
+     */
+    private function afterRecorded(int $deviceId, array $values, CarbonImmutable $at): void
+    {
+        $temperature = $values['temperature'] ?? null;
+        $occupancy = $values['occupancy'] ?? null;
+        if (! is_numeric($temperature) && ! is_numeric($occupancy)) {
+            return;
+        }
+        $device = \App\Domain\SecurityDevices\Models\Device::query()->find($deviceId);
+        if ($device === null) {
+            return;
+        }
+        if (is_numeric($temperature)) {
+            app(\App\Domain\SecurityDevices\Care\ScaldWatch::class)->onTemperature($device, (float) $temperature, $at);
+        }
+        if (is_numeric($occupancy)) {
+            app(\App\Domain\SecurityDevices\Care\CareRules::class)->onOccupancy($device, (float) $occupancy >= 0.5, $at);
         }
     }
 

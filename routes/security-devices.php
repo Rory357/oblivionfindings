@@ -73,6 +73,7 @@ use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandEvidence
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandExecutionController;
 use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceCommandRequest;
 use App\Domain\SecurityDevices\Screens\Http\AlertsController;
+use App\Domain\SecurityDevices\Screens\Http\CareLinkController;
 use App\Domain\SecurityDevices\Screens\Http\DevicesController;
 use App\Domain\SecurityDevices\Screens\Http\FoundDevicesController;
 use App\Domain\SecurityDevices\Screens\Http\HubPanelController;
@@ -557,6 +558,16 @@ Route::middleware([
         Route::post('/snooze', [AlertsController::class, 'snooze'])->name('security-devices.alerts.snooze');
         Route::post('/incident', [AlertsController::class, 'reportIncident'])->name('security-devices.alerts.incident');
         Route::post('/done', [AlertsController::class, 'done'])->name('security-devices.alerts.done');
+        // S&D Phase F: raise the H&S hazard from a scald-risk alert (the person is its reporter).
+        Route::post('/hazard', [AlertsController::class, 'raiseHazard'])->name('security-devices.alerts.hazard');
+    });
+
+    // S&D Phase F: link a sensor to a person's care (pop-up 65, consent checked) and the scald watch.
+    Route::prefix('/devices/{device}')->whereNumber('device')->middleware('throttle:30,1')->group(function (): void {
+        Route::get('/care-link/options', [CareLinkController::class, 'options'])->name('security-devices.devices.care-link.options');
+        Route::post('/care-link', [CareLinkController::class, 'store'])->name('security-devices.devices.care-link.store');
+        Route::delete('/care-link', [CareLinkController::class, 'destroy'])->name('security-devices.devices.care-link.destroy');
+        Route::put('/scald-watch', [CareLinkController::class, 'scaldWatch'])->name('security-devices.devices.scald-watch');
     });
 
     Route::get('/network-it', [CategoryPageController::class, 'networkIt'])

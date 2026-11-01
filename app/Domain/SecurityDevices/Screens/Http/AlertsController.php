@@ -121,6 +121,20 @@ final class AlertsController extends Controller
         return response()->json(['url' => '/incidents/create?type=incident']);
     }
 
+    /**
+     * S&D Phase F (pg-sdr-7c): raise the H&S hazard from a scald-risk alert. The person who clicks
+     * is its reporter; the hazard is linked to the alert so the tap's "fixed" notice reaches them.
+     */
+    public function raiseHazard(Request $request, int $alert): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User && $user->canDo('hazards.create'), 403);
+        $record = $this->alerts->scoped($user)->findOrFail($alert);
+        $hazard = app(\App\Domain\SecurityDevices\Care\ScaldWatch::class)->raiseHazard($user, $record);
+
+        return response()->json(['hazard_id' => (int) $hazard->id, 'url' => '/hazards/'.$hazard->id], 201);
+    }
+
     /** @return array{0: User, 1: DeviceAlert} */
     private function actable(Request $request, int $alert): array
     {
