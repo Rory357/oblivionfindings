@@ -86,6 +86,8 @@ export type RestraintEventRecord = {
     created_at?: string | null;
     duration_minutes: number | null;
     restraint_type: string;
+    /** One short "what happened" line for the title; older records have none. */
+    summary?: string | null;
     severity: string;
     trigger_description: string | null;
     de_escalation_attempted: string | null;
