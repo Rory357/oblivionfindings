@@ -53,7 +53,10 @@ final class PhpseclibNetworkCliTransport implements NetworkCliSshTransport
         }
 
         $started = hrtime(true);
-        $ssh = new SSH2($target->address, $target->port, max(2, min(20, $timeoutSeconds)));
+        // Connect to the address the egress check resolved and approved (no second DNS lookup).
+        // AuthorizedProbeTarget has `host` and `addresses`; there is no `address` (found on the Phase A
+        // walk, 1 Nov 2026: every real backup failed here before connecting).
+        $ssh = new SSH2($target->addresses[0] ?? $target->host, $target->port, max(2, min(20, $timeoutSeconds)));
         $ssh->disablePTY();
 
         try {
