@@ -32,17 +32,40 @@ import {
 } from '@/components/page';
 import {
     PageHeaderFacts,
+    PageHeaderSteps,
     PageHeaderStages,
     type PageHeaderNextStep,
     type PageHeaderStage,
     type PageHeaderStripTone,
 } from '@/components/page/page-header-strip';
+import type { PageHeaderRailItem } from '@/components/page/page-header';
+import {
+    CorrectFindingsDialog,
+    type InvestigationCorrection,
+} from '@/components/health-safety/review-correction';
+import {
+    ReviewHistory,
+    useReviewActivity,
+    type ReviewStepKey,
+} from '@/components/health-safety/review-history';
+import { ReviewOwnerDialog } from '@/components/health-safety/review-owner-dialog';
+import {
+    ClosureReadinessLine,
+    agreedInvestigation,
+    currentReviewStep,
+    reviewNextBar,
+    reviewRoundSteps,
+    reviewStatusChip,
+    reviewStepPane,
+} from '@/components/health-safety/review-progress';
+import { RecordProgress } from '@/components/signature/record-progress';
 import {
     ShiftContextMenu,
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
 import {
+    Checks,
     FactRows,
     JourneyLine,
     KnowList,
@@ -207,6 +230,9 @@ export type EventInvestigation = {
     submitted_by_name?: string | null;
     reviewed_by_name?: string | null;
     approved_by_name?: string | null;
+    /** Answer 20 (G3): a correction to agreed findings still waiting for review or approval. */
+    correction?: InvestigationCorrection | null;
+    can_propose_correction?: boolean;
 };
 
 export type EventCorrectiveAction = {
@@ -228,6 +254,12 @@ export type EventCorrectiveAction = {
     verified_at: string | null;
     verified_by_name?: string | null;
     effectiveness_confirmed: boolean | null;
+    /** The check's own words (G3 board M5: "Check result: …"). */
+    check_notes?: string | null;
+    /** Q11 (G3): checked and it didn't work, and no revised action yet. */
+    needs_revision?: boolean;
+    /** A revised action: the one it replaces. */
+    replaces?: { id: number; reference_number: string; title: string } | null;
     hs_investigation_id: number | null;
     recommendation_index: number | null;
     recommendation: string | null;
@@ -513,7 +545,14 @@ export type EventDetail = {
     };
     closure_exceptions: ClosureException[];
     /** B1.4: the next step for every viewer; `who` says who does it when this viewer can't. */
-    next_step?: { key: string; label: string; can: boolean; who: string } | null;
+    next_step?: {
+        key: string;
+        label: string;
+        can: boolean;
+        who: string;
+        /** revised_action: the action whose check said it didn't work. */
+        action_id?: number;
+    } | null;
     /** K1a: who can close this review (said to viewers who can't). */
     close_authority?: { who: 'owner_or_close_any' | 'anyone_at_site'; text: string };
     journey_state: string;
@@ -521,6 +560,8 @@ export type EventDetail = {
     action_handover: CorrectiveActionHandover;
     can: {
         manage: boolean;
+        /** Decision 3 + Q2 (G3): choose the first owner, or change it with a reason. */
+        change_owner?: boolean;
         request_procedure_review?: boolean;
         view_procedure_requests?: boolean;
         close: boolean;
@@ -538,7 +579,8 @@ export type EventSectionKey =
     | 'actions'
     | 'risk'
     | 'timeline'
-    | 'evidence';
+    | 'evidence'
+    | 'history';
 /** Event-level launchers (Options bar / row menu). Per-item workflow panes are
  *  opened from inside the Investigation / Corrective-actions sections. */
 export type EventActionKey =
@@ -550,7 +592,8 @@ export type EventActionKey =
     | 'worksafe_site_preservation'
     | 'worksafe_site_release'
     | 'investigation'
-    | 'add_action';
+    | 'add_action'
+    | 'choose_owner';
 
 /* ------------------------------------------------------------------ */
 /*  Token maps (semantic only)                                         */
@@ -744,7 +787,7 @@ export type SafetyReviewPane =
           investigationId: number;
           recommendationIndex: number;
       }
-    | { kind: 'ca_add' }
+    | { kind: 'ca_add'; replacesActionId?: number }
     | { kind: 'ca_complete'; actionId: number }
     | { kind: 'ca_verify'; actionId: number }
     | { kind: 'ca_return'; actionId: number };
@@ -1272,6 +1315,7 @@ function EventWorkspace({
                     rowRefs={actionRowRefs}
                     highlightActionId={highlightActionId}
                     requestDiscard={drafts.request}
+                    openOwnerFirst={initialAction === 'choose_owner'}
                 />
             ) : (
                 <WizardShell
@@ -1559,13 +1603,36 @@ function reviewHeaderActions(
     return items;
 }
 
+/** Board M5 tabs. Older links keep working: handover → Overview (Assigned step), risk → Actions, timeline → History. */
+function reviewTab(section: EventSectionKey): 'overview' | 'investigation' | 'actions' | 'evidence' | 'history' {
+    if (section === 'handover') return 'overview';
+    if (section === 'risk') return 'actions';
+    if (section === 'timeline') return 'history';
+    return section;
+}
+
+function reviewTabs(d: EventDetail): PageHeaderRailItem<EventSectionKey>[] {
+    return [
+        { key: 'overview', label: 'Overview' },
+        { key: 'investigation', label: 'Investigation' },
+        { key: 'actions', label: 'Actions', count: d.corrective_actions.length || undefined },
+        { key: 'evidence', label: 'Files', count: d.attachments.length || undefined },
+        { key: 'history', label: 'History' },
+    ];
+}
+
+/** "Incident INC-2026-0392" → "from incident INC-2026-0392". */
+function fromLabel(d: EventDetail): string | null {
+    if (!d.source) return null;
+    const label = d.source.label;
+    return `from ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+}
+
 function SafetyReviewPage({
     d,
     section,
     pane,
     returnHref,
-    openActions,
-    canAct,
     canClose,
     canReviewClosureExceptions,
     onSection,
@@ -1574,6 +1641,8 @@ function SafetyReviewPage({
     rowRefs,
     highlightActionId,
     requestDiscard,
+    openOwnerFirst = false,
+    canAct,
 }: {
     d: EventDetail;
     section: EventSectionKey;
@@ -1589,94 +1658,152 @@ function SafetyReviewPage({
     rowRefs: MutableRefObject<Record<number, HTMLElement | null>>;
     highlightActionId: number | null;
     requestDiscard: (action: () => void) => void;
+    openOwnerFirst?: boolean;
 }) {
     const sev = SEV[d.severity] ?? SEV.low;
     const stage = STAGE[d.status] ?? STAGE.open;
     const owner = d.handover.owner?.name ?? null;
-    const awaiting = isAwaitingHandover(d.handover.status);
-    const actions = reviewHeaderActions(d, canClose, canReviewClosureExceptions);
-    const [primary, ...secondary] = actions.filter((action) => !action.more);
-    const glass = secondary.slice(0, 2);
-    const overflow = [
-        ...secondary.slice(2),
-        ...actions.filter((action) => action.more),
-    ];
-    const viewerCanAct = canAct || actions.length > 0;
-    const next = reviewNextStep(d);
-    const sectionLabel =
-        REVIEW_SECTIONS.find((item) => item.key === section)?.label ??
-        'Overview';
-    const nextRows: [ReactNode, ReactNode][] = [
-        // B1.1 (H4): one status, the review stage; journey_state stays a machine state and is not shown here.
-        ['Status', hsLabel('review_status', d.status)],
-        ['Safety review owner', owner ?? 'Not assigned'],
-        ['Handover', handoverStatusLabel(d.handover.status)],
-    ];
+    const tab = reviewTab(section);
+    const current = currentReviewStep(d);
+    const [picked, setPicked] = useState<ReviewStepKey>(section === 'handover' ? 'assigned' : current);
+    // A change on the page (a step done) moves the picker to where the review now is.
+    useEffect(() => setPicked(current), [current]);
+    const [ownerOpen, setOwnerOpen] = useState(openOwnerFirst && !!d.can.change_owner);
+    const [correcting, setCorrecting] = useState<EventInvestigation | null>(null);
+    const activity = useReviewActivity(d.id, true, d);
+    const viewerName = (usePage().props as { auth?: { user?: { name?: string } } }).auth?.user?.name ?? null;
+    const chip = reviewStatusChip(d, stage.label);
 
-    const headerActions = actions.length ? (
+    // Board M5: the header holds More (Print summary comes with the PDF round); the Progress card's next-step bar
+    // holds the page's only filled button. Every action the viewer may take stays in More.
+    // The step the next-step bar already offers isn't repeated in More.
+    const inBar: Record<string, string> = {
+        take_on: 'accept',
+        worksafe_decision: 'decision',
+        worksafe_notify: 'notify',
+        worksafe_acknowledge: 'acknowledge',
+        close: 'close',
+    };
+    const more = reviewHeaderActions(d, canClose, canReviewClosureExceptions).filter(
+        (action) => !d.next_step || action.key !== inBar[d.next_step.key],
+    );
+    const ownerItem =
+        d.can.change_owner && d.status !== 'closed'
+            ? { key: 'owner', label: owner ? 'Change owner…' : 'Choose owner…', icon: UserIcon, run: () => setOwnerOpen(true) }
+            : null;
+    const headerActions =
+        more.length || ownerItem ? (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <PageHeaderGlassButton icon={MoreHorizontal} aria-label="More safety review actions">
+                        More
+                    </PageHeaderGlassButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    {ownerItem ? (
+                        <DropdownMenuItem onSelect={ownerItem.run}>
+                            <ownerItem.icon className="size-4" />
+                            {ownerItem.label}
+                        </DropdownMenuItem>
+                    ) : null}
+                    {more.map((action) => (
+                        <DropdownMenuItem key={action.key} title={action.title} onSelect={() => onPane(action.pane)}>
+                            <action.icon className="size-4" />
+                            {action.label}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        ) : null;
+
+    const handlers = {
+        onPane: (next: SafetyReviewPane) => onPane(next),
+        onSection,
+        onOwner: () => setOwnerOpen(true),
+        onCorrect: (inv: EventInvestigation) => setCorrecting(inv),
+    };
+    const agreed = agreedInvestigation(d);
+    const story = d.handover_summary.narrative ?? d.description;
+    const straightAway = d.handover_summary.immediate_controls;
+
+    const overview = (
         <>
-            {glass.map((action) => (
-                <PageHeaderGlassButton
-                    key={action.key}
-                    title={action.title}
-                    onClick={() => onPane(action.pane)}
-                >
-                    {action.label}
-                </PageHeaderGlassButton>
-            ))}
-            {overflow.length ? (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <PageHeaderGlassButton
-                            icon={MoreHorizontal}
-                            aria-label="More safety review actions"
-                        />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        {overflow.map((action) => (
-                            <DropdownMenuItem
-                                key={action.key}
-                                onSelect={() => onPane(action.pane)}
-                            >
-                                <action.icon className="size-4" />
-                                {action.label}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            ) : null}
-            {primary ? (
-                <PageHeaderPrimaryButton
-                    icon={
-                        ['close', 'exception'].includes(primary.key)
-                            ? primary.icon
-                            : Plus
-                    }
-                    title={primary.title}
-                    onClick={() => onPane(primary.pane)}
-                >
-                    {primary.label}
-                </PageHeaderPrimaryButton>
-            ) : null}
+            <RecordProgress
+                next={reviewNextBar(d, handlers)}
+                pane={reviewStepPane(d, picked, activity, {
+                    ...handlers,
+                    onBack: picked !== current ? () => setPicked(current) : undefined,
+                    onHistory: () => onSection('history'),
+                })}
+            />
+            <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
+            {picked === 'assigned' ? <ReviewHandover d={d} /> : null}
+            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+                <div className="grid min-w-0 content-start gap-5">
+                    {story || straightAway ? (
+                        <Surface title="Incident summary" aria-label="Incident summary">
+                            <dl className="sg-pane-items">
+                                {story ? (
+                                    <div>
+                                        <dt>What happened</dt>
+                                        <dd>{story}</dd>
+                                        <span />
+                                    </div>
+                                ) : null}
+                                {straightAway ? (
+                                    <div>
+                                        <dt>What we did straight away</dt>
+                                        <dd>{straightAway}</dd>
+                                        <span />
+                                    </div>
+                                ) : null}
+                            </dl>
+                        </Surface>
+                    ) : (
+                        <ReviewWhatHappened d={d} />
+                    )}
+                    {d.worksafe.notifiable === true ? <WorksafeDuty d={d} /> : null}
+                    <ReviewActionRows d={d} onPane={onPane} />
+                </div>
+                <SideColumn>
+                    <ClosureReadinessLine d={d}>
+                        <Checks items={closureCheckItems(d)} />
+                    </ClosureReadinessLine>
+                    {d.source ? (
+                        <Surface title="Linked incident" aria-label="Linked incident">
+                            <div className="grid gap-2 px-[18px] pb-4 text-sm">
+                                <p className="font-semibold">
+                                    <OriginLink d={d} />
+                                </p>
+                                <p className="text-caption">
+                                    {[d.site?.name, d.occurred_at ? formatDateTime(d.occurred_at) : null]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                </p>
+                                <p className="text-muted-foreground">
+                                    This safety review is for the incident above. The incident closes separately, after its
+                                    manager review.
+                                </p>
+                            </div>
+                        </Surface>
+                    ) : null}
+                </SideColumn>
+            </div>
         </>
-    ) : null;
+    );
 
     const main = pane ? (
         <Surface aria-label="Current safety review action">
             <div className="p-5">
-                <PaneRenderer
-                    pane={pane}
-                    d={d}
-                    onDone={onPaneDone}
-                    onCancel={() => onPane(null)}
-                />
+                <PaneRenderer pane={pane} d={d} onDone={onPaneDone} onCancel={() => onPane(null)} />
             </div>
         </Surface>
-    ) : section === 'handover' ? (
-        <ReviewHandover d={d} />
-    ) : section === 'investigation' ? (
-        <ReviewInvestigation d={d} canAct={canAct} onPane={onPane} />
-    ) : section === 'actions' ? (
+    ) : tab === 'investigation' ? (
+        <>
+            <ReviewInvestigation d={d} canAct={canAct} onPane={onPane} />
+            <WorksafeDuty d={d} />
+        </>
+    ) : tab === 'actions' ? (
         <>
             <ReviewCorrectiveActions
                 d={d}
@@ -1685,82 +1812,26 @@ function SafetyReviewPage({
                 rowRefs={rowRefs}
                 highlightActionId={highlightActionId}
             />
-            {d.can.view_procedure_requests ||
-            d.can.request_procedure_review ? (
-                <SourceProcedureRequests
-                    eventId={d.id}
-                    requestDiscard={requestDiscard}
-                />
+            {d.can.view_procedure_requests || d.can.request_procedure_review ? (
+                <SourceProcedureRequests eventId={d.id} requestDiscard={requestDiscard} />
             ) : null}
+            <ReviewRisk d={d} />
         </>
-    ) : section === 'risk' ? (
-        <ReviewRisk d={d} />
-    ) : section === 'evidence' ? (
+    ) : tab === 'evidence' ? (
         <ReviewEvidence d={d} />
-    ) : section === 'timeline' ? (
-        <ReviewTimeline d={d} />
+    ) : tab === 'history' ? (
+        <ReviewHistory activity={activity} />
     ) : (
-        <ReviewOverview d={d} />
+        overview
     );
 
-    const ring = <ClosureRing d={d} />;
-    const side = pane ? (
-        <>
-            <FactRows
-                title="Next step"
-                sub="Finish or cancel the current action before choosing another."
-                rows={nextRows}
-            />
-            {pane.kind !== 'close' ? ring : null}
-        </>
-    ) : !viewerCanAct ? (
-        <>
-            <FactRows
-                title="Next step"
-                // B1.4: who does the step is said once, on the header's next step.
-                sub={undefined}
-                rows={nextRows}
-            />
-            {ring}
-        </>
-    ) : (
-        <>
-            {owner ? (
-                <PeopleCards
-                    title="Owner"
-                    cols={1}
-                    items={[
-                        {
-                            name: owner,
-                            sub: 'Safety review owner',
-                            foot: d.handover.accepted_by
-                                ? `Accepted by ${d.handover.accepted_by.name}${d.handover.accepted_at ? ` · ${formatDateTime(d.handover.accepted_at)}` : ''}`
-                                : handoverStatusLabel(d.handover.status),
-                        },
-                    ]}
-                />
-            ) : (
-                <QuietLine
-                    title="Owner"
-                    text={
-                        awaiting
-                            ? 'No owner yet — waiting for Health & safety to accept it.'
-                            : 'No safety review owner is recorded.'
-                    }
-                    action={
-                        d.handover.can_accept
-                            ? {
-                                  label: 'Assign someone',
-                                  onClick: () =>
-                                      onPane({ kind: 'accept_handover' }),
-                              }
-                            : null
-                    }
-                />
-            )}
-            {ring}
-        </>
-    );
+    const worksafeFact = d.worksafe.decision_signed
+        ? {
+              value: 'WorkSafe decision recorded',
+              label: d.worksafe.notifiable ? '· notifiable' : '· not notifiable',
+              tone: d.worksafe.notifiable ? ('warning' as const) : undefined,
+          }
+        : { value: 'WorkSafe decision', label: 'still to record', tone: 'warning' as const };
 
     return (
         <PageLayout
@@ -1771,20 +1842,12 @@ function SafetyReviewPage({
                     backHref={returnHref}
                     icon={ShieldAlert}
                     title={safetyReviewTitle(d)}
-                    titleChip={
-                        <PageHeaderStatusChip
-                            variant={d.status === 'closed' ? 'success' : 'info'}
-                        >
-                            {stage.label}
-                        </PageHeaderStatusChip>
-                    }
+                    titleChip={<PageHeaderStatusChip variant={chip.tone}>{chip.label}</PageHeaderStatusChip>}
                     subline={[
-                        d.reference_number,
+                        `Safety review ${d.reference_number}`,
+                        fromLabel(d),
                         d.site?.name ?? 'Site not recorded',
-                        d.occurred_at
-                            ? formatDateTime(d.occurred_at)
-                            : 'Occurrence time not recorded',
-                        owner ? `Owner ${owner}` : null,
+                        owner ? `Owner ${owner}` : 'No owner yet',
                     ]
                         .filter(Boolean)
                         .join(' · ')}
@@ -1792,43 +1855,27 @@ function SafetyReviewPage({
                     facts={
                         <PageHeaderFacts
                             items={[
-                                {
-                                    value: sev.label,
-                                    label: 'Severity',
-                                    tone: levelTone(d.severity),
-                                },
-                                owner || !awaiting
-                                    ? {
-                                          value: String(openActions),
-                                          label:
-                                              openActions === 1
-                                                  ? 'Open action'
-                                                  : 'Open actions',
-                                          tone: openActions
-                                              ? 'warning'
-                                              : undefined,
-                                      }
-                                    : {
-                                          value: 'Needs an owner',
-                                          label: 'Owner',
-                                          tone: 'warning',
-                                      },
+                                { value: sev.label, label: 'severity', tone: levelTone(d.severity) },
+                                worksafeFact,
                             ]}
                         />
                     }
                     strip={
-                        !pane && (next || d.status === 'closed') ? (
-                            <PageHeaderStages
-                                steps={reviewStages(d, openActions)}
-                                next={next}
-                                ariaLabel="Safety review stage"
-                            />
-                        ) : undefined
+                        <PageHeaderSteps
+                            steps={reviewRoundSteps(d)}
+                            selected={!pane && tab === 'overview' ? picked : null}
+                            onSelect={(key) => {
+                                setPicked(key as ReviewStepKey);
+                                if (pane) onPane(null);
+                                if (tab !== 'overview') onSection('overview');
+                            }}
+                            ariaLabel="Safety review steps"
+                        />
                     }
                     rail={
                         <PageHeaderRail
-                            items={REVIEW_SECTIONS}
-                            value={section}
+                            items={reviewTabs(d)}
+                            value={tab}
                             onSelect={onSection}
                             ariaLabel="Safety review sections"
                         />
@@ -1836,25 +1883,44 @@ function SafetyReviewPage({
                 />
             }
         >
-            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
-                <div
-                    id="safety-review-panel"
-                    role="tabpanel"
-                    aria-label={pane ? 'Current action' : sectionLabel}
-                    className="grid min-w-0 gap-5"
-                >
-                    {!pane ? (
-                        <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
-                    ) : null}
-                    {main}
-                </div>
-                <aside
-                    className="min-w-0"
-                    aria-label="Safety review owner and closure"
-                >
-                    <SideColumn>{side}</SideColumn>
-                </aside>
+            <div
+                id="safety-review-panel"
+                role="tabpanel"
+                aria-label={pane ? 'Current action' : (reviewTabs(d).find((item) => item.key === tab)?.label ?? 'Overview')}
+                className="grid min-w-0 gap-5"
+            >
+                {main}
             </div>
+            <ReviewOwnerDialog
+                open={ownerOpen}
+                onClose={() => setOwnerOpen(false)}
+                eventId={d.id}
+                reference={d.reference_number}
+                title={safetyReviewTitle(d)}
+                siteName={d.site?.name ?? null}
+                currentOwner={d.handover.owner}
+                candidates={d.assignable_staff}
+            />
+            {correcting ? (
+                <CorrectFindingsDialog
+                    open
+                    onClose={() => setCorrecting(null)}
+                    eventId={d.id}
+                    investigationId={correcting.id}
+                    context={[
+                        safetyReviewTitle(d),
+                        d.site?.name,
+                        d.reference_number,
+                        `Investigated${agreed?.approved_by_name ? ` · findings agreed by ${agreed.approved_by_name}` : ''}${agreed?.completed_at ? `, ${formatDate(agreed.completed_at)}` : ''}`,
+                    ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    current={correcting.findings_summary ?? ''}
+                    agreedAt={correcting.completed_at}
+                    ownerName={owner}
+                    viewerName={viewerName}
+                />
+            ) : null}
         </PageLayout>
     );
 }
@@ -1871,6 +1937,32 @@ function ClosureRing({ d }: { d: EventDetail }) {
     const requirements = d.close_gate.requirements;
     const done = requirements.filter((requirement) => requirement.complete)
         .length;
+    const checks = closureCheckItems(d);
+    return (
+        <RingCard
+            value={requirements.length ? done : 1}
+            of={requirements.length || 1}
+            label={
+                d.status === 'closed'
+                    ? 'Closed'
+                    : requirements.length
+                      ? `To close: ${done} of ${requirements.length} done`
+                      : 'Nothing blocks closing'
+            }
+            sub={
+                // K1a (B1.5): a viewer who can't close is told once, here, who can.
+                !d.can.close && d.status !== 'closed' && d.close_authority
+                    ? d.close_authority.text
+                    : 'Resolving the response, closing the incident and closing this review are separate steps'
+            }
+            checks={checks}
+        />
+    );
+}
+
+/** The closing checks, each in the server's words (an open one links to its step). */
+function closureCheckItems(d: EventDetail): CheckItem[] {
+    const requirements = d.close_gate.requirements;
     // While the WorkSafe decision is missing, its three dependent steps say the same thing, so they show as one
     // plain line (MASTER for Stephan, 30 Oct). Every check still counts and still blocks closing exactly as before.
     const decision = requirements.find(
@@ -1906,26 +1998,7 @@ function ClosureRing({ d }: { d: EventDetail }) {
                 requirement.label
             ),
     }));
-    return (
-        <RingCard
-            value={requirements.length ? done : 1}
-            of={requirements.length || 1}
-            label={
-                d.status === 'closed'
-                    ? 'Closed'
-                    : requirements.length
-                      ? `To close: ${done} of ${requirements.length} done`
-                      : 'Nothing blocks closing'
-            }
-            sub={
-                // K1a (B1.5): a viewer who can't close is told once, here, who can.
-                !d.can.close && d.status !== 'closed' && d.close_authority
-                    ? d.close_authority.text
-                    : 'Resolving the response, closing the incident and closing this review are separate steps'
-            }
-            checks={checks}
-        />
-    );
+    return checks;
 }
 
 /* ---- Overview ---- */
@@ -2830,19 +2903,11 @@ export function correctiveActionStage(action: {
     }
 }
 
-function ReviewCorrectiveActions({
-    d,
-    canAct,
-    onPane,
-    rowRefs,
-    highlightActionId,
-}: {
-    d: EventDetail;
-    canAct: boolean;
-    onPane: (pane: ActivePane) => void;
-    rowRefs: MutableRefObject<Record<number, HTMLElement | null>>;
-    highlightActionId: number | null;
-}) {
+/**
+ * One action menu for every place a review lists its actions (the Actions table and the Overview's list): the kebab,
+ * right-click and the same guards as the per-action controls. Returns the opener and the menu/confirm nodes to render.
+ */
+function useActionMenu(d: EventDetail, onPane: (pane: ActivePane) => void) {
     const [menu, setMenu] = useState<ShiftCtxState | null>(null);
     const [confirm, setConfirm] = useState<{
         action: EventCorrectiveAction;
@@ -2900,6 +2965,15 @@ function ReviewCorrectiveActions({
                     label: 'Close action…',
                     onClick: () => setConfirm({ action, command: 'close' }),
                 });
+            // Q11 (G3): a check that said it didn't work needs a revised action.
+            if (action.needs_revision)
+                items.push({
+                    icon: <Plus className="h-3.5 w-3.5" />,
+                    label: 'Add revised action',
+                    tone: 'primary',
+                    onClick: () =>
+                        onPane({ kind: 'ca_add', replacesActionId: action.id }),
+                });
         }
         const tail: ShiftCtxItem[] = [
             {
@@ -2924,6 +2998,66 @@ function ReviewCorrectiveActions({
             meta: `${action.reference_number} · ${action.title}`,
             items: menuItems(action),
         });
+    const nodes = (
+        <>
+            {menu ? (
+                <ShiftContextMenu ctx={menu} onClose={() => setMenu(null)} />
+            ) : null}
+            <ConfirmDialog
+                open={confirm !== null}
+                onClose={() => setConfirm(null)}
+                variant="default"
+                title={
+                    confirm?.command === 'start'
+                        ? 'Start this action?'
+                        : 'Close this verified action?'
+                }
+                description={
+                    confirm?.command === 'start'
+                        ? 'Record that work on this corrective action is underway.'
+                        : 'This closes the corrective action. Incident and safety review closure remain separate decisions.'
+                }
+                confirmText={
+                    confirm?.command === 'start'
+                        ? 'Start action'
+                        : 'Close action'
+                }
+                onConfirm={() => {
+                    if (!confirm) return;
+                    router.post(
+                        `/health-safety/events/${d.id}/corrective-actions/${confirm.action.id}/${confirm.command}`,
+                        {},
+                        { preserveScroll: true, preserveState: true },
+                    );
+                    setConfirm(null);
+                }}
+            />
+        </>
+    );
+    return {
+        showMenu,
+        nodes,
+        open,
+        returnTo,
+        askClose: (action: EventCorrectiveAction) =>
+            setConfirm({ action, command: 'close' }),
+    };
+}
+
+function ReviewCorrectiveActions({
+    d,
+    canAct,
+    onPane,
+    rowRefs,
+    highlightActionId,
+}: {
+    d: EventDetail;
+    canAct: boolean;
+    onPane: (pane: ActivePane) => void;
+    rowRefs: MutableRefObject<Record<number, HTMLElement | null>>;
+    highlightActionId: number | null;
+}) {
+    const { showMenu, nodes, open, returnTo } = useActionMenu(d, onPane);
 
     if (!d.corrective_actions.length) {
         return (
@@ -3132,38 +3266,155 @@ function ReviewCorrectiveActions({
                     </TableBody>
                 </Table>
             </div>
-            {menu ? (
-                <ShiftContextMenu ctx={menu} onClose={() => setMenu(null)} />
-            ) : null}
-            <ConfirmDialog
-                open={confirm !== null}
-                onClose={() => setConfirm(null)}
-                variant="default"
-                title={
-                    confirm?.command === 'start'
-                        ? 'Start this action?'
-                        : 'Close this verified action?'
+            {nodes}
+        </Surface>
+    );
+}
+
+/**
+ * The Overview's actions (board M5): each action with its check result and who checked it, one outline button at most
+ * (Close action, Add revised action), the kebab and right-click menu, and the row opens the action.
+ */
+function ReviewActionRows({
+    d,
+    onPane,
+}: {
+    d: EventDetail;
+    onPane: (pane: ActivePane) => void;
+}) {
+    const { showMenu, nodes, open, askClose } = useActionMenu(d, onPane);
+    const writable = d.can.manage && d.status !== 'closed';
+    const actions = d.corrective_actions;
+    const closedCount = actions.filter((a) => a.status === 'closed').length;
+    if (!actions.length) {
+        return (
+            <QuietLine
+                title="Corrective actions"
+                text="No actions yet. They come from the investigation’s recommendations or are added directly."
+                action={
+                    writable
+                        ? {
+                              label: 'Add corrective action',
+                              onClick: () => onPane({ kind: 'ca_add' }),
+                          }
+                        : null
                 }
-                description={
-                    confirm?.command === 'start'
-                        ? 'Record that work on this corrective action is underway.'
-                        : 'This closes the corrective action. Incident and safety review closure remain separate decisions.'
-                }
-                confirmText={
-                    confirm?.command === 'start'
-                        ? 'Start action'
-                        : 'Close action'
-                }
-                onConfirm={() => {
-                    if (!confirm) return;
-                    router.post(
-                        `/health-safety/events/${d.id}/corrective-actions/${confirm.action.id}/${confirm.command}`,
-                        {},
-                        { preserveScroll: true, preserveState: true },
-                    );
-                    setConfirm(null);
-                }}
             />
+        );
+    }
+    return (
+        <Surface
+            title="Corrective actions"
+            sub={
+                closedCount === actions.length
+                    ? `${actions.length} ${actions.length === 1 ? 'action' : 'actions'} · all closed`
+                    : `${actions.length} ${actions.length === 1 ? 'action' : 'actions'} for this safety review`
+            }
+        >
+            <ul className="grid">
+                {actions.map((action) => {
+                    const checked = ['verified', 'closed'].includes(action.status);
+                    const worked = checked && action.effectiveness_confirmed !== false;
+                    const failed = checked && action.effectiveness_confirmed === false;
+                    const owner = action.owner?.name ?? action.assigned_to_name;
+                    const badge = failed
+                        ? { variant: 'critical' as const, label: 'Checked — it didn’t work' }
+                        : worked
+                          ? { variant: 'success' as const, label: 'Checked — it worked' }
+                          : action.status === 'completed'
+                            ? { variant: 'warning' as const, label: 'Done — waiting for check' }
+                            : action.status === 'in_progress'
+                              ? { variant: 'info' as const, label: 'In progress' }
+                              : { variant: 'neutral' as const, label: 'Not started' };
+                    const button =
+                        writable && action.needs_revision ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onPane({ kind: 'ca_add', replacesActionId: action.id });
+                                }}
+                            >
+                                <Plus className="size-4" aria-hidden="true" />
+                                Add revised action
+                            </Button>
+                        ) : writable && action.status === 'verified' && worked && d.can.manage_corrective_action_lifecycle ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    askClose(action);
+                                }}
+                            >
+                                <Lock className="size-4" aria-hidden="true" />
+                                Close action
+                            </Button>
+                        ) : null;
+                    return (
+                        <li
+                            key={action.id}
+                            className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-t border-border px-[18px] py-3.5 first:border-t-0 hover:bg-muted/40"
+                            onClick={() => open(action)}
+                            onContextMenu={(event) => {
+                                event.preventDefault();
+                                showMenu(action, event.clientX, event.clientY);
+                            }}
+                        >
+                            <div className="grid min-w-0 gap-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <b className="font-semibold [overflow-wrap:anywhere]">{action.title}</b>
+                                    <StatusBadge variant={badge.variant} size="sm">
+                                        {badge.label}
+                                    </StatusBadge>
+                                </div>
+                                <p className="text-caption flex flex-wrap gap-x-3.5">
+                                    <span>
+                                        {action.completed_at
+                                            ? `Done ${formatDateOnly(toDateInput(action.completed_at))}`
+                                            : action.due_date
+                                              ? `Due ${formatDateOnly(action.due_date)}`
+                                              : 'No due date'}
+                                    </span>
+                                    <span>{owner ?? 'Needs an owner'}</span>
+                                    <span>{action.reference_number}</span>
+                                    {action.replaces ? <span>Revised action for {action.replaces.reference_number}</span> : null}
+                                </p>
+                                {checked && action.check_notes ? (
+                                    <p className="text-sm">
+                                        <b className="font-semibold">Check result:</b> {action.check_notes}
+                                    </p>
+                                ) : null}
+                                {checked && action.verified_by_name ? (
+                                    <p className="text-caption">
+                                        Checked by: {action.verified_by_name}
+                                        {action.verified_at ? ` · ${formatDate(action.verified_at)}` : ''}
+                                    </p>
+                                ) : null}
+                            </div>
+                            <div>{button}</div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="frontline-hit size-8 text-muted-foreground"
+                                aria-label={`Options for ${action.reference_number}`}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    const rect = event.currentTarget.getBoundingClientRect();
+                                    showMenu(action, rect.left, rect.bottom);
+                                }}
+                            >
+                                <MoreVertical className="size-4" />
+                            </Button>
+                        </li>
+                    );
+                })}
+            </ul>
+            {nodes}
         </Surface>
     );
 }
@@ -4601,6 +4852,7 @@ function PaneRenderer({
             return (
                 <AddCorrectiveActionPane
                     d={d}
+                    replacesActionId={pane.replacesActionId}
                     onDone={onDone}
                     onCancel={onCancel}
                 />
@@ -5415,13 +5667,19 @@ const ACTION_TYPES = [
 
 function AddCorrectiveActionPane({
     d,
+    replacesActionId,
     onDone,
     onCancel = onDone,
 }: {
     d: EventDetail;
+    /** Q11 (G3): a revised action for one whose check said it didn't work. */
+    replacesActionId?: number;
     onDone: () => void;
     onCancel?: () => void;
 }) {
+    const replaces = replacesActionId
+        ? (d.corrective_actions.find((action) => action.id === replacesActionId) ?? null)
+        : null;
     const form = useForm<{
         title: string;
         description: string;
@@ -5429,6 +5687,7 @@ function AddCorrectiveActionPane({
         action_type: string;
         assigned_to_user_id: string;
         due_date: string;
+        replaces_action_id: number | null;
     }>({
         title: '',
         description: '',
@@ -5436,6 +5695,7 @@ function AddCorrectiveActionPane({
         action_type: 'corrective',
         assigned_to_user_id: '',
         due_date: '',
+        replaces_action_id: replaces?.id ?? null,
     });
 
     const submit = (e: FormEvent) => {
@@ -5471,9 +5731,19 @@ function AddCorrectiveActionPane({
         <form onSubmit={submit} className="flex flex-col gap-4">
             <StepHead
                 icon={ListChecks}
-                title="Add corrective action"
-                blurb="Raise a remediation action and drive it to verified. The event moves to Corrective action."
+                title={replaces ? 'Add a revised action' : 'Add corrective action'}
+                blurb={
+                    replaces
+                        ? `For ${replaces.reference_number} “${replaces.title}”: its check said it didn’t work. This review can’t close until the revised action is done and checked.`
+                        : 'Raise a remediation action and drive it to verified. The event moves to Corrective action.'
+                }
             />
+            {replaces?.check_notes ? (
+                <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    <span className="font-semibold">Check result: </span>
+                    {replaces.check_notes}
+                </p>
+            ) : null}
             <Field label="Action" required error={form.errors.title}>
                 <Input
                     value={form.data.title}
