@@ -835,7 +835,10 @@ class IncidentController extends Controller
                 : null,
         ];
 
-        [$incident, $journey, $created, $submittedNow] = DB::transaction(
+        // #255: only a draft saved before this request survives a failed submit.
+        $draftAlreadySaved = ! empty($data['incident_id']) || (! empty($data['report_request_uuid'])
+            && ClientIncident::query()->where('report_request_uuid', $data['report_request_uuid'])->exists());
+        [$incident, $journey, $created, $submittedNow] = $this->withPlainSubmitFailure(fn () => DB::transaction(
             function () use ($actor, $attributes, $client, $data, $isSubmit, $journeys, $shift, $siteId): array {
                 $created = false;
                 $submittedNow = false;
@@ -965,7 +968,7 @@ class IncidentController extends Controller
                 return [$incident->fresh(), $journey, $created, $submittedNow];
             },
             3,
-        );
+        ), $isSubmit, keepsDraft: $draftAlreadySaved);
 
         if ($submittedNow) {
             $this->notifyIncidentSubmitted($request, $incident);
@@ -1113,6 +1116,36 @@ class IncidentController extends Controller
      *
      * @param  array<string, mixed>  $input
      */
+    /**
+     * #255: a submit that fails after its own retries rolls back to the draft and says so in plain words on the form,
+     * never a 500. Access refusals, validation and missing records keep their own responses.
+     *
+     * @template T
+     * @param  callable(): T  $submit
+     * @return T
+     */
+    private function withPlainSubmitFailure(callable $submit, bool $isSubmit = true, bool $keepsDraft = true): mixed
+    {
+        try {
+            return $submit();
+        } catch (\Throwable $error) {
+            if (! $isSubmit || $error instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
+                || $error instanceof ValidationException || $error instanceof \Illuminate\Auth\Access\AuthorizationException
+                || $error instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                throw $error;
+            }
+            \Illuminate\Support\Facades\Log::error('Incident submit failed and was rolled back', [
+                'reason' => class_basename($error).': '.mb_substr($error->getMessage(), 0, 300),
+            ]);
+            throw ValidationException::withMessages([
+                'incident' => ($keepsDraft
+                    ? 'This report couldn’t be submitted just now, so it is still saved as a draft. '
+                    : 'This report couldn’t be submitted just now. ')
+                    .'Please try again. If it keeps happening, tell your administrator.',
+            ]);
+        }
+    }
+
     private function recordMissingImmediateActionForSubmission(
         ClientIncident $incident,
         array $input = [],
@@ -1464,7 +1497,7 @@ class IncidentController extends Controller
         $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
         $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
 
-        [$incident, $journey, $submittedNow] = DB::transaction(
+        [$incident, $journey, $submittedNow] = $this->withPlainSubmitFailure(fn () => DB::transaction(
             function () use ($actor, $incident, $journeys, $siteAccess, $siteBypassPermissions, $submission): array {
                 $locked = ClientIncident::query()
                     ->whereKey($incident->id)
@@ -1511,7 +1544,7 @@ class IncidentController extends Controller
                 return [$journey->incident, $journey, true];
             },
             3,
-        );
+        ));
 
         if ($submittedNow) {
             $this->notifyIncidentSubmitted($request, $incident);
