@@ -1083,9 +1083,15 @@ class HsEventController extends Controller
             default => $source !== null,
         };
         $client = $event->client ? trim($event->client->first_name.' '.$event->client->last_name) : null;
+        // Decision 15 (G4): an injury review reads like its record ("Cut left index finger — Mere Tane"), only for a
+        // viewer who can read the injury (its type and body part are already on the injury register for them).
+        $injury = $basename === 'WorkplaceInjury' && $source !== null
+            ? \App\Models\WorkplaceInjury::query()->find($event->source_id, ['id', 'injury_type', 'body_part_affected'])
+            : null;
 
         return \App\Support\HealthSafety\HsReviewTitle::make((string) $event->event_category, $readable,
-            $basename === 'ClientIncident' ? $readableIncident?->title : null,
+            $basename === 'ClientIncident' ? $readableIncident?->title
+                : ($injury !== null ? \App\Support\HealthSafety\HsRecordTitle::injuryWords($injury->injury_type, $injury->body_part_affected) : null),
             $firstAid && $source === null ? null : $client, $event->staff?->name, $event->site?->name, $firstAid);
     }
 

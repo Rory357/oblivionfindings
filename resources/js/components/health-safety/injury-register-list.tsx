@@ -22,6 +22,8 @@ export type InjuryRegisterRow = Omit<InjuryRow, 'rtw_count' | 'capacity_count' |
     rtw_count: number | null; capacity_count: number | null; attachment_count: number | null;
     count_integrity?: Record<string, string>;
     source_integrity?: 'valid' | 'unknown' | 'repair_required';
+    /** Decision 15: the record's own plain title ("Cut left index finger — Mere Tane"), the same as on the record. */
+    title?: string;
 };
 
 /** Where an injury is up to on its five stages (1-based) — shared with the injury page. */
@@ -45,9 +47,10 @@ export function InjuryRegisterList({ rows, total, returnTo, medical, sub, footer
         ...(medical ? [
             { label: 'Recovery plans', icon: HeartPulse, onClick: () => open(row, 'recovery') },
             { label: 'Fitness-for-work checks', icon: Stethoscope, onClick: () => open(row, 'capacity') },
-            { label: 'Evidence', icon: Paperclip, onClick: () => open(row, 'evidence') },
+            { label: 'Files', icon: Paperclip, onClick: () => open(row, 'evidence') },
+            // History is private (wellbeing access), so it's only offered with it.
+            { label: 'History', icon: History, onClick: () => open(row, 'history') },
         ] : []),
-        { label: 'History', icon: History, onClick: () => open(row, 'history') },
     ];
     /** A count with its noun ('1 plan', '2 plans'); an unknown count says so instead of reading as zero. */
     const count = (value: number | null, one: string, many: string) => value === null ? `${many[0].toUpperCase()}${many.slice(1)} not available` : `${value} ${value === 1 ? one : many}`;
@@ -59,12 +62,12 @@ export function InjuryRegisterList({ rows, total, returnTo, medical, sub, footer
         rowKey={(row) => row.id}
         onOpen={(row) => open(row)}
         actionsFor={actions}
-        menuTitle={(row) => `${row.injury_type_label} · ${row.reference}`}
+        menuTitle={(row) => `${row.title ?? row.injury_type_label} · ${row.reference}`}
         menuIcon={HeartPulse}
         columns={[
             { key: 'injury', label: 'Injury', className: 'min-w-[12rem]', cell: (row) => <RecordIdentity
                 title={<Link href={injuryHref(row.id, { returnTo })} onClick={(event) => event.stopPropagation()} aria-label={`Open injury ${row.reference}`}
-                    className="rounded-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{row.injury_type_label}</Link>}
+                    className="rounded-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{row.title ?? row.injury_type_label}</Link>}
                 sub={<>{row.reference}{row.source_integrity === 'repair_required' ? <span className="mt-1 flex"><StatusBadge variant="critical">Needs fixing — ask an administrator</StatusBadge></span> : null}</>} /> },
             { key: 'worker', label: 'Worker', nowrap: true, cell: (row) => row.worker?.name ? <RecordPerson name={row.worker.name} /> : <span className="text-muted-foreground">Name hidden</span> },
             { key: 'site', label: 'Site', nowrap: true, cell: (row) => row.site?.name ?? <span className="text-muted-foreground">Site hidden</span> },

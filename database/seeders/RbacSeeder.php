@@ -591,6 +591,8 @@ class RbacSeeder extends Seeder
             // Create-only reporting (MASTER for Stephan, 30 Oct): open the report form and save it. No register, no
             // evidence afterwards, no plans, no review or approval.
             ['key' => 'restraints.report', 'description' => 'Report a restraint (create only; no register, review or plans)', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'restraints.followups.own', 'description' => 'Own a restraint follow-up (such as telling the family/whānau) and record its outcome — only your own follow-ups, never the restraint record', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'injuries.dutyRestrictions.view', 'description' => 'See the duty restrictions (never medical details) for a workplace injury you coordinate', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'injuries.report', 'description' => 'Report a workplace injury (create only; no register or recovery work)', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Safe Work Procedures (controlled SWMS document library)
@@ -854,6 +856,8 @@ class RbacSeeder extends Seeder
         $syncPermissions($supportWorker, [
             // Create-only reporting of restraints and workplace injuries (MASTER for Stephan, 30 Oct).
             'restraints.report', 'injuries.report',
+            // Decision 4 (G4, Stephan 1 Nov 2026): own a restraint follow-up and record its outcome. Grant migration 2026_11_01_233000.
+            'restraints.followups.own',
             'clients.viewAssigned', 'medications.view', 'timeline.create',
             'progress_notes.viewAny', 'progress_notes.create',
             'shifts.viewAssigned', 'shifts.tasks.updateSelf', 'shifts.tasks.createSelf',
@@ -982,6 +986,9 @@ class RbacSeeder extends Seeder
             // G3 (Stephan, 1 Nov 2026): read an incident's story on its safety review (Q1), and own/finish actions there
             // (answer 23). Never the incident itself. Grant migrations 2026_11_01_110000 and 2026_11_01_120000.
             'healthSafety.events.readIncidentStory', 'healthSafety.actions.ownOnStoryReviews',
+            // Decision 10 (G4, Stephan 1 Nov 2026): the coordinator sees an injury's duty restrictions, never medical details.
+            // Grant migration 2026_11_01_234000.
+            'injuries.dutyRestrictions.view',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.schedule',
             'vendors.view', 'credentials.view', 'reports.sites.view',

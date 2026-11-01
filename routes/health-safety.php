@@ -205,6 +205,12 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Phase 5B: Restraint Register ────────────────────────────────────
     Route::prefix('restraints')->name('restraints.')->group(function () {
 
+        // Decision 4 (G4): a support worker's own restraint follow-ups — only theirs, never the restraint record.
+        Route::middleware('permission:restraints.followups.own')->group(function () {
+            Route::get('/my-followups', [\App\Http\Controllers\HealthSafety\RestraintOwnFollowupController::class, 'index'])->name('my-followups');
+            Route::post('/my-followups/{followup}/complete', [\App\Http\Controllers\HealthSafety\RestraintOwnFollowupController::class, 'complete'])->whereNumber('followup')->name('my-followups.complete');
+        });
+
         // The register, source workspaces and bounded review/signoff reads retain separate grants.
         Route::middleware('permission:restraints.view')->group(function () {
             Route::get('/', [RestraintController::class, 'workspaceIndex'])->name('index');

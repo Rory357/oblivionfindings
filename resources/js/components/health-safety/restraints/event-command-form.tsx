@@ -34,8 +34,10 @@ export const EVENT_COMMAND_LABELS: Record<
 > = {
     create: 'Record a restraint',
     correct: 'Correct what was recorded',
-    review: 'Record review',
-    'assign-review': 'Choose who reviews this',
+    // G4-5 (Stephan, 1 Nov 2026): "restraint review" is always the restraint's own step; "safety review" is only the
+    // Health and safety record.
+    review: 'Record restraint review',
+    'assign-review': 'Choose restraint review owner',
     'link-incident': 'Link an incident',
     'unlink-incident': 'Unlink the incident',
     'add-observation': 'Record a check',
@@ -44,11 +46,11 @@ export const EVENT_COMMAND_LABELS: Record<
     'correct-debrief': 'Correct debrief',
     'add-followup': 'Add follow-up',
     'reassign-followup': 'Change follow-up owner',
-    'complete-followup': 'Record follow-up outcome',
+    'complete-followup': 'Record outcome',
     'correct-followup': 'Correct follow-up outcome',
     'cancel-followup': 'Cancel follow-up',
-    'add-evidence': 'Add evidence',
-    'remove-evidence': 'Remove evidence',
+    'add-evidence': 'Add file',
+    'remove-evidence': 'Remove file',
 };
 /** The save button names what it does (never a bare "Save and confirm"). */
 const SAVE_LABELS: Record<RestraintEventCommand | 'create', string> = {
