@@ -182,18 +182,32 @@ describe('My Day audit wiring', () => {
         mocks.props = baseProps();
     });
 
-    it('keeps a My Day return when reporting for the active shift', () => {
-        render(<MyDay />);
+    // G4-1: reporting starts at "Something happened?"; the chooser is already on an incident.
+    const reportIncident = () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Report something' }));
         fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
+    };
+    const canReport = (props: Record<string, unknown>) => ({
+        ...props,
+        auth: {
+            ...(props.auth as Record<string, unknown>),
+            can: { timesheets: { create: true }, incidents: { create: true } },
+        },
+    });
+
+    it('keeps a My Day return when reporting for the active shift', () => {
+        mocks.props = canReport(baseProps());
+        render(<MyDay />);
+        reportIncident();
         expect(mocks.routerVisit).toHaveBeenCalledWith(
             '/incidents/create?shift_id=44&return_to=%2Fmy-day',
         );
     });
 
     it('keeps a My Day return without inventing a shift when none is active', () => {
-        mocks.props = { ...baseProps(), active_shift: null };
+        mocks.props = canReport({ ...baseProps(), active_shift: null });
         render(<MyDay />);
-        fireEvent.click(screen.getByRole('button', { name: 'Report incident' }));
+        reportIncident();
         expect(mocks.routerVisit).toHaveBeenCalledWith(
             '/incidents/create?return_to=%2Fmy-day',
         );

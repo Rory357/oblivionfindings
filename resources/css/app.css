@@ -1384,6 +1384,124 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
         0 0 12px color-mix(in oklch, var(--eh-crit) 55%, transparent);
 }
 
+/* A record's round status steps — and its step picker (H&S G3/G4 boards, approved 2026-11-01, decision 26). Centred
+   rings on a connecting line: done = filled with a tick, the step the record is on = a ring with a dot, a check that
+   didn't work = a critical ring with a cross, later steps hollow. The picked step's label sits on a glass chip. The
+   words always say the state too (colour is never the only signal). */
+.eh-rsteps-hint {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 4px;
+    font-size: calc(12rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 74%, transparent);
+}
+.eh-rsteps-hint > svg {
+    width: 13px;
+    height: 13px;
+}
+.eh-rsteps {
+    display: grid;
+    margin: 0 0 4px;
+    padding: 0;
+    list-style: none;
+}
+.eh-rstep {
+    position: relative;
+    text-align: center;
+    font-size: calc(12.5rem / 14);
+}
+.eh-rstep:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: calc(50% + 15px);
+    right: calc(-50% + 15px);
+    height: 2px;
+    border-radius: 2px;
+    background: color-mix(in oklch, var(--band-foreground) 28%, transparent);
+}
+.eh-rstep--done:not(:last-child)::after {
+    background: color-mix(in oklch, var(--band-foreground) 90%, transparent);
+}
+.eh-rstep-dot {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin: 0 auto 7px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in oklch, var(--band-foreground) 75%, transparent);
+    background: color-mix(in oklch, var(--band-foreground) 8%, transparent);
+}
+.eh-rstep-dot > svg {
+    width: 15px;
+    height: 15px;
+    stroke-width: 3;
+}
+.eh-rstep--done .eh-rstep-dot {
+    border-color: var(--band-foreground);
+    background: var(--band-foreground);
+    color: var(--primary-fill);
+}
+.eh-rstep--now .eh-rstep-dot {
+    border-color: var(--eh-warn);
+    background: var(--band-foreground);
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--eh-warn) 40%, transparent);
+}
+.eh-rstep--now .eh-rstep-dot > i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--status-warning);
+}
+.eh-rstep--failed .eh-rstep-dot {
+    border-color: var(--eh-crit);
+    background: var(--band-foreground);
+    color: var(--status-critical);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--eh-crit) 40%, transparent);
+}
+.eh-rstep-label {
+    all: unset;
+    display: inline-grid;
+    gap: 1px;
+    padding: 4px 12px 5px;
+    border-radius: 10px;
+}
+button.eh-rstep-label {
+    cursor: pointer;
+}
+button.eh-rstep-label:hover > b {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+button.eh-rstep-label:focus-visible {
+    outline: 2px solid var(--band-foreground);
+    outline-offset: 2px;
+}
+.eh-rstep-label > b {
+    font-size: calc(13.5rem / 14);
+    font-weight: 650;
+}
+.eh-rstep-label > span {
+    font-size: calc(12.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 78%, transparent);
+}
+.eh-rstep-bad {
+    font-weight: 650;
+    color: var(--eh-crit);
+}
+.eh-rstep--todo .eh-rstep-label > b {
+    color: color-mix(in oklch, var(--band-foreground) 80%, transparent);
+}
+.eh-rstep--picked .eh-rstep-label {
+    background: color-mix(in oklch, var(--band-foreground) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--band-foreground) 30%, transparent);
+}
+
 /* Hide scrollbars on icon sidebar */
 .scrollbar-none::-webkit-scrollbar {
     display: none;

@@ -211,6 +211,8 @@ export type IncidentDetail = {
         }>;
     } | null;
     can: {
+        /** Board M5c note: a closed incident's PDF, for whole-record viewers only. */
+        download_pdf?: boolean;
         update: boolean;
         submit: boolean;
         review: boolean;

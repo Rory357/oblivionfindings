@@ -38,6 +38,7 @@ use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\MyDay\MyReportsReadService;
 use App\Services\MyDay\ShiftTaskHelpService;
 use App\Services\MyDay\ShiftTaskWorkService;
 use App\Services\ShiftHandoverService;
@@ -241,6 +242,10 @@ class MyTasksController extends Controller
             // (Stephan, 30 Oct). Being the injured worker is the read rule.
             'own_open_injuries' => \App\Models\WorkplaceInjury::query()->where('user_id', $user->id)
                 ->whereNotIn('status', ['recovered', 'closed'])->count(),
+            // G4-1 (Stephan, 1 Nov): "What you reported" — the person's own last 5 reports, status only — and
+            // "Your workplace injury" — their own open injury's duties, next review and coordinator.
+            'my_reports' => $this->myReports($user),
+            'own_injury' => $this->ownInjury($user),
             'first_aid_confirmation' => app(FirstAidService::class)->confirmationForViewer($user, $request->session()->get('first_aid_confirmation')),
             // S&D Phase H (D15, pg-sdr-19g, pop-up 88): the worker's own clock-in suggested by their door badge, and
             // what they were told when it was turned on. Null unless they badged near a rostered start and haven't chosen.
@@ -1415,6 +1420,31 @@ class MyTasksController extends Controller
             $this->unavailableSections[] = 'Timesheets';
 
             return [];
+        }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function myReports(User $user): array
+    {
+        try {
+            return app(MyReportsReadService::class)->recent($user);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->unavailableSections[] = 'What you reported';
+
+            return [];
+        }
+    }
+
+    private function ownInjury(User $user): ?array
+    {
+        try {
+            return app(MyReportsReadService::class)->openInjury($user);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->unavailableSections[] = 'Your workplace injury';
+
+            return null;
         }
     }
 

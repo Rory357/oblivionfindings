@@ -1,4 +1,5 @@
 import type { ApprovalSnapshot } from '@/components/health-safety/settings/approval-policy';
+import type { LinkedSafetyReview } from './linked-safety-review-card';
 
 export type SourcePerson = {
     id: number | null;
@@ -72,6 +73,8 @@ export type RestraintAttachment = {
 export type RestraintEventRecord = {
     id: number;
     reference_number: string | null;
+    /** Decision 15: the same plain title as its safety review and every list (server-made). */
+    title?: string;
     client_id: number;
     site_id: number | null;
     client: { id: number; name: string };
@@ -80,6 +83,7 @@ export type RestraintEventRecord = {
     source_revision: number;
     started_at: string;
     ended_at: string | null;
+    created_at?: string | null;
     duration_minutes: number | null;
     restraint_type: string;
     severity: string;
@@ -138,7 +142,20 @@ export type RestraintEventDetail = {
         | 'control_room',
         SourceLink | null
     >;
+    /** The safety review card: only when this viewer can open the review (decision 6). */
+    safety_review?: LinkedSafetyReview | null;
     can: { review: boolean; manage: boolean; capture: boolean };
+};
+/** "Your follow-ups" (decision 4): one follow-up the viewer owns — its own words, due and outcome, nothing else. */
+export type OwnRestraintFollowup = {
+    id: number;
+    title: string;
+    due_at: string | null;
+    completed_at: string | null;
+    outcome: string | null;
+    outcome_notes: string | null;
+    expected_version: number;
+    can_complete: boolean;
 };
 export type RestraintPickers = {
     clients: { id: number; name: string; site_id: number | null }[];

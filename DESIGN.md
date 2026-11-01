@@ -499,9 +499,23 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
   four equal number boxes, number first, every box a link — for hubs and
   lists, or `<PageHeaderStages>` — a record's stage line with its next step
   ("who does what next") on top — for records with a lifecycle; record facts
-  sit above it as `<PageHeaderFacts>` chips. One banner: a record's next step
-  lives in the header, never in a second band under it; a fifth number goes
-  in the page body (a `Tally`), never a fifth box. Page bodies use the
+  sit above it as `<PageHeaderFacts>` chips. A fifth number goes in the page
+  body (a `Tally`), never a fifth box.
+  **Records: status steps in the header, the Progress card under it
+  (approved by Stephan 2026-11-01, H&S G3/G4 boards, decision 26 —
+  supersedes "the next step lives in the header").** A record with a
+  lifecycle shows its round status steps in the header, and those steps are
+  the step picker (the step the record is on is picked when the page opens).
+  Directly under the header sits one Progress card: a fixed "Next step" bar
+  holding the record's only filled button for that step (it stays put
+  whichever step is picked), then the picked step's pane — what was added at
+  that step, "Edit" where the server allows a correction (a correction keeps
+  the original and needs a reason; checks are never edited), and "Activity at
+  this step" with a link to the full log on the History tab. No "Your part"
+  card and no second next-step banner; closure readiness is one line that
+  opens its list. Every H&S record follows it: safety reviews, incidents,
+  restraints, workplace injuries, corrective actions, first aid and chemical
+  exposure. Page bodies use the
   signature blocks (`components/signature/blocks.tsx`,
   `resources/css/signature-blocks.css`): the plain surface (no coloured edge
   line, non-negotiable 8),
@@ -592,6 +606,19 @@ before.
   `border-t-[3px] border-t-primary`), or the same trick on a side or bottom
   edge. All removed 31 Oct 2026; never add one back, in any colour, on any
   box. Non-negotiable 8; ESLint `design/no-edge-accent-line`.
+
+- **Bordered status pills as list filters or tab strips** (corrected
+  2026-11-01, Stephan on the H&S Safety reviews board: "i see you not
+  following the rules here") — a row of white, bordered, rounded pills with
+  counts used as a list's status views (All · Open · Being investigated …)
+  or as any tab strip under a header, even when an example image draws
+  them that way. Status views under a header are the built tier-2 tabs
+  (`TierTwoTabs`, `components/page/grouped-profile-nav.tsx`): neutral at
+  rest, toned only when picked (positional tone), counters in the grey
+  `CountPill`, one line. Too many views for one line: first drop any view
+  that repeats a header number box (each number once), never wrap. Not
+  machine-checked: header filter chips are legitimately rounded and
+  bordered, so a lint rule can't tell the two apart.
 
 - **Generic sign-in screens** (corrected 2026-10-13: "this does not look
   unique to us") — sign-in or account pages built from stock auth layouts, a

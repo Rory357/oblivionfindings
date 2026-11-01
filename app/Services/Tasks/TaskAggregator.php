@@ -131,6 +131,8 @@ class TaskAggregator
             new Providers\ChemicalExposureDeliveryProvider,
             // H&S events whose source changed after a signed WorkSafe decision or after close (job 3).
             new Providers\HsEventReviewFlagProvider,
+            // "Close anyway" requests waiting for a decision, for the people who approve them (G3 board M11).
+            new Providers\HsClosureExceptionProvider,
         ];
     }
 

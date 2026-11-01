@@ -484,7 +484,12 @@ class HsCorrectiveActionPresentationTest extends TestCase
         $this->assertSame($independentVerifier->id, $action->verified_by_user_id);
         $this->assertTrue($action->effectiveness_confirmed);
         $this->assertNotNull($action->verified_at);
-        $this->assertSame($before[0], $event->refresh()->getRawOriginal());
+        // G3 "stage follows actions": the last action checked as working moves the review to "Checking it worked";
+        // nothing else on the review changes.
+        $after = $event->refresh()->getRawOriginal();
+        $this->assertSame(HsEvent::STATUS_MONITORING, $after['status']);
+        $unchanged = ['status' => true, 'updated_at' => true];
+        $this->assertSame(array_diff_key($before[0], $unchanged), array_diff_key($after, $unchanged));
         $this->assertSame($attachmentsBefore, $action->attachments()->count());
         $this->assertSame($rolesBefore, DB::table('role_user')->count());
         $this->assertSame($overridesBefore, DB::table('permission_user')->count());

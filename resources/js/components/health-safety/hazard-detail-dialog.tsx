@@ -4,6 +4,7 @@
  * Evidence · History. Every workflow (assign, start, mitigate, add/complete
  * action, review, close) is a pane inside the modal — nothing navigates away.
  * Read-only mode (client profile) shows the data with no actions. NZ-only. */
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { ApplicableProceduresPanel } from '@/components/health-safety/applicable-procedures-panel';
 import {
     ACTION_TYPES,
@@ -1472,12 +1473,13 @@ function AddActionPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
                     />
                 </Field>
                 <Field label="Due date" error={form.errors.due_date}>
-                    <Input
-                        type="date"
+                    <DatePicker
+                        id="hazard-action-due"
+                        label="Due date"
                         value={form.data.due_date}
-                        onChange={(e) =>
-                            form.setData('due_date', e.target.value)
-                        }
+                        allowClear
+                        invalid={!!form.errors.due_date}
+                        onChange={(value) => form.setData('due_date', value)}
                     />
                 </Field>
             </div>
