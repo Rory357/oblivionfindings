@@ -1,48 +1,55 @@
 /**
- * Chemical register (approved H&S drawing pg-hsn-125 — Stephan 23 Oct 2026): one header with search, Reports and
- * Add chemical, one number box (current safety data sheets — the other numbers are the tab counts), Site, form and
- * status filters with the quieter ones under More filters, the Risks and prevention hub on the rail and the register
- * views as tier-two tabs (drawing D4); then one table.
- * A current sheet reads green so a sheet due for review or missing stands out. The safe-use and wellbeing-access
- * line and the source-repair note keep the code's wording; identifiable exposures are never counted here.
+ * Chemical register (board G4-14, approved by Stephan 1 Nov 2026): the G2 header — four boxes (current SDS, SDS reviews
+ * overdue, no current SDS, controlled chemicals; "No trend yet" on each, the alert tone only where someone must act),
+ * then one line with the Risks and prevention pages, the site filter, More filters and Find — and the register views as
+ * tier-two tabs. Then one lead block ("Needs doing now": overdue SDS reviews, then chemicals with no current sheet), the
+ * quiet rows (storage locations, exposures in Injuries and care) and the full table. The board-report links are gone.
+ * The safe-use and wellbeing-access line and the source-repair note keep the code's wording; identifiable exposures
+ * are never counted here.
  */
 import { CHEMICAL_EXPOSURES } from '@/lib/health-safety/chemical-exposure-navigation';
 import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
-import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
 import { RecordIdentity, RecordTable, type RecordTableColumn } from '@/components/incidents/record-table';
 import type { MenuItem } from '@/components/lists';
+import {
+    LeadBlock,
+    QuietRows,
+    RegisterBlocks,
+    RegisterBoxes,
+    RegisterMoreFilters,
+    RegisterRailLine,
+    type LeadRow,
+    type QuietRow,
+} from '@/components/health-safety/register-kit';
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
-import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderSearch, PageLayout } from '@/components/page';
+import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderPrimaryButton, PageHeaderSearch, PageLayout } from '@/components/page';
 import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
-import { PageHeaderNumber, PageHeaderNumbers } from '@/components/page/page-header-strip';
 import { Note } from '@/components/signature/blocks';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { SelectInput } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
-import type { ChemicalIndexProps, ChemicalRegisterFilters, ChemicalRegisterRow, ChemicalTab } from '@/lib/health-safety/chemical-contract';
+import type { ChemicalIndexProps, ChemicalRegisterRow, ChemicalTab } from '@/lib/health-safety/chemical-contract';
 import { CHEMICAL_REGISTER, chemicalHref, chemicalReturn } from '@/lib/health-safety/chemical-navigation';
 import type { SharedData } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Archive, ClipboardCheck, Eye, FileText, FlaskConical, MapPin, Plus, Shield, ShieldAlert, SlidersHorizontal, X } from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { Activity, Archive, ClipboardCheck, Eye, FileCheck2, FileText, FileX2, FlaskConical, MapPin, Plus, Shield, ShieldAlert, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { CHEMICAL_SHEET_LABELS, PHYSICAL_FORMS, STATUS_OPTIONS, chemicalSheetLabel, chemicalSheetTone, optionLabel } from './constants';
 
-const TABS = [{ key: 'all', label: 'All references', icon: FlaskConical }, { key: 'active', label: 'Active', icon: ClipboardCheck },
-    { key: 'controlled', label: 'Controlled', icon: Shield }, { key: 'sds_expiring', label: 'Sheet reviews', icon: FileText },
-    { key: 'sds_missing', label: 'Missing sheets', icon: ShieldAlert }, { key: 'inactive', label: 'Inactive or removed', icon: Archive }] as const;
+/** The four register views drawn under the header (G4-14); the other two open from the boxes. */
+const TABS = [{ key: 'all', label: 'All chemicals', icon: FlaskConical }, { key: 'active', label: 'Active', icon: ClipboardCheck },
+    { key: 'sds_expiring', label: 'SDS reviews', icon: FileText }, { key: 'inactive', label: 'Removed', icon: Archive }] as const;
+const OTHER_TABS = [{ key: 'controlled', label: 'Controlled', icon: Shield }, { key: 'sds_missing', label: 'No current SDS', icon: ShieldAlert }] as const;
 const TABLE_TITLE: Record<ChemicalTab, string> = { all: 'All chemicals', active: 'Active chemicals', controlled: 'Controlled chemicals',
-    sds_expiring: 'Sheet reviews', sds_missing: 'Missing sheets', inactive: 'Inactive or removed chemicals' };
-const REPORTS = boardReportLinks();
+    sds_expiring: 'SDS reviews', sds_missing: 'No current SDS', inactive: 'Inactive or removed chemicals' };
 const SHEET_FILTERS = ['current', 'expiring', 'expired', 'missing', 'unknown', 'unavailable', 'not_yet_effective', 'repair_required'].map((value) => ({ value, label: CHEMICAL_SHEET_LABELS[value] }));
-const SAFE_USE = 'Recorded checks help people work safely; they don’t prove a chemical is safe to use. Exposures are counted above; each record names the worker, so only people with wellbeing access can open them.';
+const SAFE_USE = 'Recorded checks help people work safely; they don’t prove a chemical is safe to use. Exposures each name the worker, so only people with wellbeing access can open them.';
 
 export default function ChemicalRegister(props: ChemicalIndexProps) {
-    const { filters, rows, hero, sites, can, tabCounts } = props; const { props: shared } = usePage<SharedData>();
+    const { filters, rows, hero, sites, can, tabCounts } = props;
     const safetyCan = usePage<SharedData>().props.auth.can;
     const exposures = props.exposure_summary;
+    const summary = props.register_summary;
     const [search, setSearch] = useState(filters.q);
     useEffect(() => setSearch(filters.q), [filters.q]);
     const filtered = (values: Record<string, string | number | null | undefined>) => {
@@ -63,7 +70,7 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
             sub={damaged(row) ? 'Details withheld' : row.common_name ?? row.hsno_classification ?? 'Classification not recorded'} /> },
         { key: 'form', label: 'Form', nowrap: true, cell: (row) => damaged(row) ? withheld : optionLabel(PHYSICAL_FORMS, row.physical_form) },
         { key: 'status', label: 'Status', nowrap: true, cell: (row) => <StatusBadge variant={damaged(row) ? 'warning' : 'neutral'}>{damaged(row) ? 'Source needs review' : optionLabel(STATUS_OPTIONS, row.status, 'Status unconfirmed')}</StatusBadge> },
-        { key: 'sds', label: 'Safety data sheet', nowrap: true, cell: (row) => <StatusBadge variant={chemicalSheetTone(row.sds_state)}>{chemicalSheetLabel(row.sds_state)}</StatusBadge> },
+        { key: 'sds', label: 'SDS', nowrap: true, cell: (row) => <StatusBadge variant={chemicalSheetTone(row.sds_state)}>{chemicalSheetLabel(row.sds_state)}</StatusBadge> },
         { key: 'storage', label: 'Storage locations', nowrap: true, cell: (row) => row.storage_count ?? <span className="text-muted-foreground">Not available</span> },
     ];
     const pages = [rows.current_page - 1, rows.current_page, rows.current_page + 1].filter((page) => page > 0 && page <= rows.last_page);
@@ -71,59 +78,67 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
         ...pages.map((page) => ({ url: filtered({ ...filters, page }), label: String(page), active: page === rows.current_page })),
         { url: rows.current_page < rows.last_page ? filtered({ ...filters, page: rows.current_page + 1 }) : null, label: 'Next &raquo;', active: false }];
     const from = rows.data.length ? (rows.current_page - 1) * rows.per_page + 1 : 0; const to = from ? from + rows.data.length - 1 : 0;
-    const moreActive = [filters.controlled, filters.sds_state].filter(Boolean).length;
-    const narrowed = Boolean(filters.q || filters.site_id || filters.physical_form || filters.status || moreActive);
+    const narrowed = Boolean(filters.q || filters.site_id || filters.physical_form || filters.status || filters.controlled || filters.sds_state);
     const footer: ReactNode = <>
-        <p className="text-subtle">Showing {rows.data.length} of {rows.total}</p>
+        <p className="text-subtle">{rows.total ? `Showing ${from}–${to} of ${rows.total}` : 'Showing 0 of 0'}</p>
         {rows.last_page > 1 ? <LaravelPagination links={links} lastPage={rows.last_page} /> : null}
     </>;
+    const views = [...TABS, ...OTHER_TABS.filter((tab) => tab.key === filters.tab)];
+    // Lead rows (G4-14): only managers get the button; everyone else is told who does it.
+    const lead: LeadRow[] = (summary?.lead ?? []).map((row) => {
+        const title = row.name ?? `Chemical reference ${row.id}`;
+        const overdue = row.sds_state === 'expired';
+        return {
+            key: row.id,
+            title,
+            sub: overdue ? 'SDS review overdue' : 'No current safety data sheet',
+            chip: { label: overdue ? 'SDS review overdue' : 'No current SDS', tone: 'critical' },
+            action: can.manage
+                ? { label: overdue ? 'Review SDS' : 'Add SDS', href: chemicalHref(row.id, { section: 'sds', action: overdue ? undefined : 'add_sds', returnTo }), ariaLabel: `${overdue ? 'Review SDS' : 'Add SDS'}: ${title}` }
+                : null,
+            who: can.manage ? null : 'Health and safety update it',
+        };
+    });
+    const quiet: QuietRow[] = [
+        ...(hero.live.storage_locations !== null ? [{ key: 'storage', icon: MapPin, title: 'Storage locations', sub: 'Where each chemical is kept, by site', aside: String(hero.live.storage_locations), href: scopeHref('active') }] : []),
+        ...(exposures ? [{ key: 'exposures', icon: Activity, title: 'Exposures', elsewhere: true, sub: `Injuries and care · ${exposures.exposures} in the last ${exposures.period_days} days`, href: exposures.exposures_href ?? CHEMICAL_EXPOSURES }] : []),
+    ];
+    const leftOver = summary?.lead_total != null ? summary.lead_total - lead.length : 0;
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('prevention', safetyCan), { title: 'Chemical register', href: CHEMICAL_REGISTER }]}>
-        <Head title="Chemical register" /><PageLayout hero={<PageHeader title="Chemical register" icon={FlaskConical} subline="Chemicals, their safety data sheets and where each is stored"
-            actions={<><PageHeaderSearch value={search} onChange={setSearch} ariaLabel="Search chemical references" placeholder="Search references…" onKeyDown={(event) => { if (event.key === 'Enter') go({ q: search, page: 1 }); }} />
-                {shared.auth.can?.governance?.view && <DropdownMenu><DropdownMenuTrigger asChild><PageHeaderGlassButton icon={FileText}>{BOARD_REPORTS_LABEL}</PageHeaderGlassButton></DropdownMenuTrigger>
-                <DropdownMenuContent align="end">{REPORTS.map((report) => <DropdownMenuItem key={report.key} asChild><Link href={report.href}>{report.label}</Link></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}
+        <Head title="Chemical register" /><PageLayout hero={<PageHeader title="Chemical register" icon={FlaskConical} subline="Chemicals, their safety data sheets (SDS) and where each is stored"
+            actions={<><PageHeaderSearch value={search} onChange={setSearch} ariaLabel="Search chemical references" placeholder="Search chemicals…" onKeyDown={(event) => { if (event.key === 'Enter') go({ q: search, page: 1 }); }} />
                 {can.create && <PageHeaderPrimaryButton icon={Plus} onClick={() => router.get(createHref)}>Add chemical</PageHeaderPrimaryButton>}</>}
-            strip={<PageHeaderNumbers>
-                <PageHeaderNumber value={hero.live.sds_current ?? 'Not available'} label="Current safety data sheets" caption="Active chemicals" href={scopeHref('active', { sds_state: 'current' })} />
-                {exposures ? <>
-                    <PageHeaderNumber value={exposures.exposures} label="Exposures" caption={`Last ${exposures.period_days} days`} href={exposures.exposures_href ?? CHEMICAL_EXPOSURES} />
-                    <PageHeaderNumber value={exposures.awaiting_outcome} label="Awaiting a medical outcome" caption="Medical help was sought" href={exposures.exposures_href ?? CHEMICAL_EXPOSURES} />
-                    <PageHeaderNumber value={exposures.worksafe_awaiting} label="WorkSafe notification to make" caption="Exposure events" href="/health-safety/events?tab=worksafe_pending" />
-                </> : null}
-            </PageHeaderNumbers>}
-            filters={<>
-                <PageHeaderFilterSelect icon={MapPin} label="All sites" value={String(filters.site_id ?? 'all')} options={[{ value: 'all', label: 'All sites' }, ...sites.map((site) => ({ value: String(site.id), label: site.name }))]} onChange={(value) => go({ site_id: value === 'all' ? null : Number(value), page: 1 })} />
-                <PageHeaderFilterSelect label="All forms" value={filters.physical_form ?? 'all'} options={[{ value: 'all', label: 'All forms' }, ...PHYSICAL_FORMS]} onChange={(value) => go({ physical_form: value === 'all' ? null : value, page: 1 })} />
-                <PageHeaderFilterSelect label="All statuses" value={filters.status ?? 'all'} options={[{ value: 'all', label: 'All statuses' }, ...STATUS_OPTIONS]} onChange={(value) => go({ status: value === 'all' ? null : value, page: 1 })} />
-                <MoreFilters filters={filters} active={moreActive} onChange={(patch) => go({ ...patch, page: 1 })} />
+            strip={<RegisterBoxes boxes={[
+                { key: 'sds_current', label: 'Current SDS', value: hero.live.sds_current, icon: FileCheck2, href: scopeHref('active', { sds_state: 'current' }) },
+                { key: 'sds_overdue', label: 'SDS reviews overdue', value: summary?.sds_overdue ?? null, alert: true, icon: FileText, href: scopeHref('sds_expiring') },
+                { key: 'sds_missing', label: 'No current SDS', value: hero.attention.sds_missing, alert: true, icon: FileX2, href: scopeHref('sds_missing') },
+                { key: 'controlled', label: 'Controlled chemicals', value: hero.live.controlled, icon: Shield, href: scopeHref('controlled') },
+            ]} />}
+            rail={<RegisterRailLine rail={<SafetyWorkspaceRail hub="prevention" current="chemicals" />} filters={<>
+                <PageHeaderFilterSelect icon={MapPin} label={`All sites · ${sites.length}`} value={String(filters.site_id ?? 'all')} options={[{ value: 'all', label: 'All sites' }, ...sites.map((site) => ({ value: String(site.id), label: site.name }))]} onChange={(value) => go({ site_id: value === 'all' ? null : Number(value), page: 1 })} />
+                <RegisterMoreFilters groups={[
+                    { key: 'form', label: 'Form', value: filters.physical_form ?? 'all', options: [{ value: 'all', label: 'All forms' }, ...PHYSICAL_FORMS], onChange: (value) => go({ physical_form: value === 'all' ? null : value, page: 1 }) },
+                    { key: 'status', label: 'Status', value: filters.status ?? 'all', options: [{ value: 'all', label: 'All statuses' }, ...STATUS_OPTIONS], onChange: (value) => go({ status: value === 'all' ? null : value, page: 1 }) },
+                    { key: 'controlled', label: 'Controlled', value: filters.controlled ?? 'all', options: [{ value: 'all', label: 'All chemicals' }, { value: 'controlled', label: 'Controlled' }, { value: 'standard', label: 'Standard' }], onChange: (value) => go({ controlled: value === 'all' ? null : value, page: 1 }) },
+                    { key: 'sds', label: 'Safety data sheet', value: filters.sds_state ?? 'all', options: [{ value: 'all', label: 'All sheet states' }, ...SHEET_FILTERS], onChange: (value) => go({ sds_state: value === 'all' ? null : value, page: 1 }) },
+                ]} onClear={() => go({ physical_form: null, status: null, controlled: null, sds_state: null, page: 1 })} />
                 {narrowed ? <PageHeaderFilterButton icon={X} onClick={() => go({ q: null, site_id: null, physical_form: null, status: null, controlled: null, sds_state: null, page: 1 })}>Clear filters</PageHeaderFilterButton> : null}
-            </>} rail={<SafetyWorkspaceRail hub="prevention" current="chemicals" />} />}
-            tabs={<TierTwoTabs tabs={TABS.map((tab) => ({ ...tab, count: tabCounts[tab.key] ?? undefined }))} activeTab={filters.tab} onTab={(tab) => go({ tab, page: 1 })}
+            </>} />} />}
+            tabs={<TierTwoTabs tabs={views.map((tab) => ({ ...tab, count: tabCounts[tab.key] ?? undefined }))} activeTab={filters.tab} onTab={(tab) => go({ tab, page: 1 })}
                 testIdPrefix="chemical-register" ariaLabel="Chemical register views" panelId="chemical-register-panel"
                 // Views carry no href, so the strip renders its own buttons.
                 renderLink={() => null} />}>
             <div id="chemical-register-panel" role="tabpanel" aria-label={TABLE_TITLE[filters.tab] ?? 'Chemicals'} className="grid min-w-0 gap-5">
                 {props.source_integrity === 'repair_required' && <div role="status"><Note tone="warning">Some source history needs review. Those records remain visible with their details and changes withheld. A missing measure is unconfirmed.</Note></div>}
-                <RecordTable title={TABLE_TITLE[filters.tab] ?? 'Chemicals'} sub={`${rows.data.length ? `Showing ${from}–${to} of ${rows.total} · ` : ''}${SAFE_USE}`}
+                {summary ? <RegisterBlocks
+                    lead={<LeadBlock sub="SDS reviews overdue first" rows={lead} empty={summary.lead_total === null ? 'These counts can’t be confirmed until the damaged records are fixed.' : 'No SDS reviews are overdue and every active chemical has a current sheet.'}
+                        more={leftOver > 0 ? { text: `${leftOver} more ${leftOver === 1 ? 'needs' : 'need'} doing`, action: { label: 'See all', href: scopeHref('sds_expiring') } } : null} />}
+                    side={quiet.length ? <QuietRows rows={quiet} /> : undefined} /> : null}
+                <RecordTable title={TABLE_TITLE[filters.tab] ?? 'Chemicals'} sub={SAFE_USE}
                     ariaLabel="Chemical references" columns={columns} rows={rows.data} rowKey={(row) => row.id} onOpen={(row) => router.get(recordHref(row))}
                     actionsFor={actions} menuTitle={name} menuIcon={FlaskConical} footer={rows.data.length ? footer : undefined}
                     empty={<p role="status" className="sg-quiet px-4 py-6"><span>No admitted chemical references match these filters.</span></p>} />
             </div>
         </PageLayout>
     </AppLayout>;
-}
-
-/** Controlled and sheet state — the quieter filters. */
-function MoreFilters({ filters, active, onChange }: { filters: ChemicalRegisterFilters; active: number; onChange: (patch: Record<string, string | null>) => void }) {
-    const select = (key: 'controlled' | 'sds_state', label: string, all: string, options: { value: string; label: string }[]) => <div className="grid gap-1.5">
-        <span className="text-caption font-semibold">{label}</span>
-        <SelectInput ariaLabel={label} placeholder={all} value={String(filters[key] ?? 'all')} onChange={(value) => onChange({ [key]: value === 'all' ? null : value })} options={[{ value: 'all', label: all }, ...options]} />
-    </div>;
-    return <Popover>
-        <PopoverTrigger asChild><PageHeaderFilterButton icon={SlidersHorizontal} active={active > 0}>{active > 0 ? `More filters · ${active}` : 'More filters'}</PageHeaderFilterButton></PopoverTrigger>
-        <PopoverContent align="start" className="grid w-72 max-w-[calc(100vw-2rem)] gap-3">
-            {select('controlled', 'Controlled', 'All references', [{ value: 'controlled', label: 'Controlled' }, { value: 'standard', label: 'Standard' }])}
-            {select('sds_state', 'Safety data sheet', 'All sheet states', SHEET_FILTERS)}
-        </PopoverContent>
-    </Popover>;
 }

@@ -18,6 +18,8 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 
+import type { ReactNode } from 'react';
+
 import { cn } from '@/lib/utils';
 
 export interface HeaderBox {
@@ -28,6 +30,12 @@ export interface HeaderBox {
     href: string;
     trend: { delta: number; since: string } | null;
     weeks: Array<number | null>;
+    /** G4 registers (client only): the box's own icon, when its key isn't one of the Overview's. */
+    icon?: LucideIcon;
+    /** G4 registers (client only): drawn in the bars' place, such as the representatives' faces. */
+    extra?: ReactNode;
+    /** G4 registers (client only): a plain caption in place of the trend line ("None right now"). */
+    caption?: string;
 }
 
 export interface HeaderBoxes {
@@ -94,8 +102,8 @@ export function OverviewHeaderBoxes({ data }: { data: HeaderBoxes }) {
     return (
         <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="hs-header-boxes">
             {data.boxes.map((box) => {
-                const Icon = ICONS[box.key] ?? FileText;
-                const trend = trendText(box);
+                const Icon = box.icon ?? ICONS[box.key] ?? FileText;
+                const trend = box.caption ?? trendText(box);
                 return (
                     <Link
                         key={box.key}
@@ -127,7 +135,7 @@ export function OverviewHeaderBoxes({ data }: { data: HeaderBoxes }) {
                                 <Icon className="size-5" aria-hidden="true" />
                             </span>
                             <span className="col-span-2 col-start-2 justify-self-end">
-                                <WeekBars weeks={box.weeks} />
+                                {box.extra ?? <WeekBars weeks={box.weeks} />}
                             </span>
                         </span>
                     </Link>

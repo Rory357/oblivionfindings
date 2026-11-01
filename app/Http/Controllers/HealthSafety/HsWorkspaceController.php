@@ -4,6 +4,7 @@ namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
 use App\Services\HealthSafety\BehaviourSupportApprovalPolicySettings;
+use App\Services\HealthSafety\HsDashboardService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -40,9 +41,18 @@ class HsWorkspaceController extends Controller
             $report = $reports->{$method}($request)->getData(true);
         }
 
+        // G4-15: the hub page's WorkSafe row shows the one waiting item (decide or tell) the person can already read;
+        // nobody without H&S read gets it, and nothing new is granted (B2.11).
+        $worksafe = null;
+        if ($view === null && $request->user()->canDo('hazards.view')) {
+            $queue = app(HsDashboardService::class)->worksafeQueue(null, $request->user(), 1);
+            $worksafe = ['count' => (int) ($queue['count'] ?? 0), 'first' => $queue['rows'][0]['title'] ?? null];
+        }
+
         return Inertia::render('health-safety/reports/index', [
             'view' => $view,
             'report' => $report,
+            'worksafe_waiting' => $worksafe,
             'filters' => [
                 'from' => $validated['from'] ?? '',
                 'to' => $validated['to'] ?? '',
