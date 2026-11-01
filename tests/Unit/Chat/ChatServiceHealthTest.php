@@ -70,17 +70,18 @@ class ChatServiceHealthTest extends TestCase
         return array_column($snapshot['services'], null, 'id');
     }
 
-    public function test_reports_all_five_services_without_enabling_or_claiming_unavailable_features(): void
+    public function test_reports_all_six_services_without_enabling_or_claiming_unavailable_features(): void
     {
         $snapshot = $this->service()->snapshot();
         $rows = $this->rows($snapshot);
-        self::assertCount(5, $rows);
+        self::assertCount(6, $rows);
         self::assertFalse($snapshot['rollout_enabled']);
         self::assertSame('passed', $rows['messaging']['state']);
         self::assertSame('disabled', $rows['realtime']['state']);
         self::assertSame('not_available', $rows['push']['state']);
         self::assertSame('not_configured', $rows['uploads']['state']);
         self::assertSame('not_configured', $rows['calling']['state']);
+        self::assertSame('not_configured', $rows['relay']['state']);
         self::assertNull($rows['calling']['owner']);
         self::assertSame('unknown', $rows['messaging']['trend']);
         Http::assertNothingSent();
@@ -107,7 +108,7 @@ class ChatServiceHealthTest extends TestCase
         DB::swap(Mockery::mock()->shouldReceive('select')->andThrow(new \RuntimeException('secret path /private/client'))->getMock());
         $snapshot = $this->service()->snapshot();
         self::assertSame('unavailable', $this->rows($snapshot)['messaging']['state']);
-        self::assertCount(5, $snapshot['services']);
+        self::assertCount(6, $snapshot['services']);
         self::assertStringNotContainsString('secret path', json_encode($snapshot));
         self::assertStringNotContainsString('/private/client', json_encode($snapshot));
     }
@@ -186,7 +187,7 @@ class ChatServiceHealthTest extends TestCase
         $cache->method('put')->willThrowException(new \RuntimeException('cache down'));
         $service = new ChatServiceHealth($this->config, $cache, new MalwareScanner, new ChatVoiceInspector($this->config), new SelfHostedCalling);
         $snapshot = $service->snapshot();
-        self::assertCount(5, $snapshot['services']);
+        self::assertCount(6, $snapshot['services']);
         self::assertSame('passed', $this->rows($snapshot)['messaging']['state']);
         self::assertSame('unknown', $this->rows($snapshot)['messaging']['trend']);
     }

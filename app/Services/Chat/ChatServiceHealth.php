@@ -9,6 +9,7 @@ use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -17,7 +18,19 @@ class ChatServiceHealth
 {
     private const HISTORY_KEY = 'chat:service-health:last-check:v1';
 
-    public function __construct(private Config $config, private Cache $cache, private MalwareScanner $scanner, private ChatVoiceInspector $voice, private SelfHostedCalling $calling) {}
+    private OblivionRelay $relay;
+
+    private ChatRelayCredentials $relayCredentials;
+
+    private ChatRelayProbe $relayProbe;
+
+    public function __construct(private Config $config, private Cache $cache, private MalwareScanner $scanner, private ChatVoiceInspector $voice, private SelfHostedCalling $calling,
+        ?OblivionRelay $relay = null, ?ChatRelayCredentials $relayCredentials = null, ?ChatRelayProbe $relayProbe = null)
+    {
+        $this->relayCredentials = $relayCredentials ?? new ChatRelayCredentials;
+        $this->relay = $relay ?? new OblivionRelay($this->relayCredentials);
+        $this->relayProbe = $relayProbe ?? new ChatRelayProbe;
+    }
 
     public function snapshot(): array
     {
@@ -28,7 +41,7 @@ class ChatServiceHealth
             // Diagnostics remain usable without the optional comparison cache.
         }
         $rows = [];
-        foreach (['messaging' => 'Messaging', 'realtime' => 'Realtime connection', 'push' => 'Push notifications', 'uploads' => 'Uploads and scanning', 'calling' => 'Voice connections'] as $id => $name) {
+        foreach (['messaging' => 'Messaging', 'realtime' => 'Realtime connection', 'push' => 'Push notifications', 'uploads' => 'Uploads and scanning', 'calling' => 'Voice connections', 'relay' => 'Calling relay'] as $id => $name) {
             try {
                 $result = $this->{$id}();
             } catch (Throwable) {
@@ -126,5 +139,59 @@ class ChatServiceHealth
         }
 
         return ['state' => $this->calling->ready() ? 'passed' : 'partial', 'detail' => 'The calling server accepted an authenticated read. '.($this->calling->ready() ? 'Deployment verification flags are set.' : 'Deployment verification is incomplete.').' Microphone audio, network relays and real calls are not tested here.'];
+    }
+
+    /**
+     * Oblivion Relay (spec 9, "In the app"): its status from the loopback health endpoint beside the
+     * app, or the signed control status when it has its own server; then the public side as a
+     * browser sees it, and the revocations still waiting for a node.
+     */
+    protected function relay(): array
+    {
+        if (! $this->relayCredentials->configured() && ! $this->relay->configured()) {
+            return ['state' => 'not_configured', 'detail' => 'Oblivion Relay is not configured. Calls on strict networks have no relay; no outside relay is used.'];
+        }
+        if (! $this->relayCredentials->configured()) {
+            return ['state' => 'not_configured', 'detail' => 'The relay addresses or secret are missing or invalid, so calls are offered no relay.'];
+        }
+        if (! $this->relay->configured()) {
+            return ['state' => 'not_configured', 'detail' => 'The relay control channel is missing or invalid, so the app cannot end someone’s relay use at once.'];
+        }
+        $status = $this->relayStatus();
+        $waiting = $this->relay->waiting();
+        $queue = $waiting['count'] === 0 ? 'Relay: no revocations waiting.'
+            : sprintf('Relay: %d revocation%s waiting, the oldest for %d min.', $waiting['count'], $waiting['count'] === 1 ? '' : 's', intdiv((int) $waiting['oldest_age_seconds'], 60));
+        if ($status === null || ($status['status'] ?? null) === 'down') {
+            return ['state' => 'unavailable', 'detail' => 'The relay’s status could not be read, or a listener has failed. '.$queue];
+        }
+        $urls = $this->relayCredentials->urls();
+        $udp = collect($urls)->first(fn (string $url) => ChatRelayProbe::target($url)['transport'] === 'udp');
+        $tls = collect($urls)->first(fn (string $url) => ChatRelayProbe::target($url)['transport'] === 'tls');
+        $challenge = $udp ? $this->relayProbe->allocateChallenge($udp) : null;
+        $expiry = $tls ? $this->relayProbe->certificateExpiry($tls) : null;
+        $days = $expiry === null ? null : intdiv($expiry - CarbonImmutable::now()->getTimestamp(), 86_400);
+        $public = [
+            $udp === null ? 'No UDP relay address is listed.' : ($challenge === 401 ? 'The UDP address answered a test request as expected.' : 'The UDP address did not answer a test request as expected.'),
+            $tls === null ? 'No TLS relay address is listed.' : ($days === null ? 'The TLS address did not complete a verified handshake.' : sprintf('The TLS certificate expires in %d days.', $days)),
+        ];
+        $memory = is_numeric($status['memory']['rss_mb'] ?? null) ? sprintf(' Memory %d MB.', (int) $status['memory']['rss_mb']) : '';
+        $healthy = ($status['status'] ?? null) === 'ok' && $challenge === 401 && ($tls === null || ($days !== null && $days > 14)) && $waiting['count'] === 0;
+
+        return ['state' => $healthy ? 'passed' : 'partial', 'detail' => 'The relay reported its status. '.implode(' ', $public).$memory.' '.$queue.' Relayed media in a real call is not tested here.'];
+    }
+
+    /** /health on loopback when the relay runs beside the app; otherwise the signed control status. */
+    private function relayStatus(): ?array
+    {
+        $url = rtrim((string) $this->config->get('chat.relay.health_url', ''), '/');
+        if ($url === '') {
+            return $this->relay->status();
+        }
+        if (! preg_match('/\Ahttp:\/\/(127\.[0-9.]+|\[::1\]):[0-9]{1,5}\z/', $url)) {
+            return null;
+        }
+        $response = Http::timeout(3)->connectTimeout(3)->withoutRedirecting()->get($url.'/health');
+
+        return in_array($response->status(), [200, 503], true) && is_array($response->json()) ? $response->json() : null;
     }
 }

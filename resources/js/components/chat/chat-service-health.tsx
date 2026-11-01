@@ -13,6 +13,7 @@ const services = {
     push: 'Push notifications',
     uploads: 'Uploads and scanning',
     calling: 'Voice connections',
+    relay: 'Calling relay',
 } as const;
 const states = {
     passed: 'Check passed',
