@@ -45,6 +45,8 @@ use App\Domain\SecurityDevices\Drivers\Network\CiscoIosConfigDriver;
 use App\Domain\SecurityDevices\Drivers\Network\FortinetFortiOsConfigDriver;
 use App\Domain\SecurityDevices\Drivers\Network\MikroTikRouterOsConfigDriver;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
+use App\Domain\SecurityDevices\Drivers\Telemetry\HubNetflowTelemetryDriver;
+use App\Domain\SecurityDevices\Drivers\Telemetry\HubSyslogTelemetryDriver;
 use App\Domain\SecurityDevices\Iot\Milesight\MilesightLorawanPayloadDecoder;
 use App\Domain\SecurityDevices\Iot\Mqtt\MqttSensorIntakeService;
 use App\Domain\SecurityDevices\Iot\Mqtt\MqttV311Client;
@@ -830,7 +832,29 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
         $this->assertStringContainsString('vlan20-guest', $diffText);
     }
 
-    public function test_collector_ingest_isolates_site_hub_syslog_and_netflow_across_overlapping_private_lan_subnets(): void
+    /**
+     * S&D Phase B: the hub-side receiver was removed (no hub sends Syslog or flows yet), so
+     * the hub drivers must say "not built yet" and offer no setup link.
+     */
+    public function test_hub_syslog_and_netflow_drivers_are_listed_as_not_built_yet(): void
+    {
+        $registry = app(DeviceDriverRegistry::class);
+
+        foreach ([HubSyslogTelemetryDriver::KEY, HubNetflowTelemetryDriver::KEY] as $key) {
+            $meta = $registry->find($key)?->metadata();
+            $this->assertNotNull($meta, "Driver {$key} is still listed.");
+            $this->assertSame(DriverSupportLevel::Planned, $meta->supportLevel);
+            $this->assertNull($meta->setupHref);
+            $this->assertStringStartsWith('Not built yet', $meta->summary);
+            $this->assertStringNotContainsString('/security-devices/collectors', json_encode($meta->toArray(), JSON_THROW_ON_ERROR));
+        }
+    }
+
+    /**
+     * The server still accepts Syslog and flow items in a hub upload. No hub sends them today
+     * (Phase B removed the unused hub receiver); this guards the server side's Site isolation.
+     */
+    public function test_collector_ingest_isolates_uploaded_syslog_and_netflow_items_across_overlapping_private_lan_subnets(): void
     {
         $recordedMetrics = [];
         $this->app->instance(TimeSeriesStore::class, new class($recordedMetrics) implements TimeSeriesStore
@@ -937,8 +961,9 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
             'status' => 'active',
         ]);
 
-        $syslogAlpha = '<131>1 2026-10-28T08:00:00Z alpha-gw firewalld 100 - - WAN failover activated on Alpha';
-        $syslogBravo = '<130>1 2026-10-28T08:01:00Z bravo-gw firewalld 101 - - PSU fault detected on Bravo';
+        // Relative times: SyslogDecoder refuses messages more than 24 hours old, so fixed dates rot.
+        $syslogAlpha = '<131>1 '.CarbonImmutable::now('UTC')->subMinutes(2)->format('Y-m-d\TH:i:s\Z').' alpha-gw firewalld 100 - - WAN failover activated on Alpha';
+        $syslogBravo = '<130>1 '.CarbonImmutable::now('UTC')->subMinute()->format('Y-m-d\TH:i:s\Z').' bravo-gw firewalld 101 - - PSU fault detected on Bravo';
 
         // Build 1-record NetFlow v5 packet (24-byte header + 48-byte record = 72 bytes)
         $nowUnix = CarbonImmutable::now('UTC')->timestamp;

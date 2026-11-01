@@ -129,7 +129,7 @@ final class UniFiProtectLocalCameraClient
                     'ok' => false,
                     'reason_code' => $resp['status'] === 0 ? 'unreachable' : 'snapshot_fetch_failed',
                     'message' => $resp['status'] === 0
-                        ? 'Could not reach the UniFi Protect console directly. If the console is on a private Site LAN, run the Site hub.'
+                        ? 'Could not reach the UniFi Protect console from the server. Protect snapshots need the console to be reachable from the server; the Site hub cannot fetch them yet.'
                         : 'The UniFi Protect console did not return a camera snapshot.',
                     'data_uri' => null,
                     'captured_at' => $capturedAt,

@@ -605,8 +605,32 @@ final readonly class NativeMonitoringDefinitionService
             'max_targets_per_run' => $this->boundedInteger($value('max_targets_per_run', 1024), 1, 65536, 'max_targets_per_run'),
             'packets_per_second' => $this->boundedInteger($value('packets_per_second', 20), 1, 1000, 'packets_per_second'),
             'schedule_cron' => null,
+            'daily_scan_at' => $this->dailyScanTime($data, $existing, $collector),
             'status' => $existing?->status === 'inactive' ? 'inactive' : 'active',
         ];
+    }
+
+    /**
+     * The daily scan time ("HH:MM", New Zealand time) or null for off (S&D Phase B).
+     * Sending null switches it off; leaving the field out keeps what is saved.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function dailyScanTime(array $data, ?DiscoveryScope $existing, ?MonitoringCollector $collector): ?string
+    {
+        $raw = array_key_exists('daily_scan_at', $data) ? $data['daily_scan_at'] : $existing?->daily_scan_at;
+        $time = is_string($raw) ? trim($raw) : '';
+        if ($time === '') {
+            return null;
+        }
+        if (preg_match('/\A([01]\d|2[0-3]):[0-5]\d\z/', $time) !== 1) {
+            throw ValidationException::withMessages(['daily_scan_at' => 'Enter the daily scan time as HH:MM, for example 02:00.']);
+        }
+        if ($collector === null) {
+            throw ValidationException::withMessages(['daily_scan_at' => 'Daily scans run on a hub. Choose the hub that covers this Site first.']);
+        }
+
+        return $time;
     }
 
     private function resolveCollectorForSite(
@@ -673,6 +697,7 @@ final readonly class NativeMonitoringDefinitionService
             'port_count' => collect($scope->port_bounds ?? [])->flatten()->count(),
             'max_targets_per_run' => (int) $scope->max_targets_per_run,
             'packets_per_second' => (int) $scope->packets_per_second,
+            'daily_scan_at' => $scope->daily_scan_at,
         ]);
     }
 

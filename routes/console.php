@@ -1041,6 +1041,9 @@ Illuminate\Support\Facades\Schedule::command('endpoints:expire-remote-sessions')
 app(Schedule::class)->command('monitoring:prune-enrolment-recovery')
     ->everyFiveMinutes()->withoutOverlapping()->name('monitoring.enrolment-recovery.prune');
 
+// S&D Phase B: start each hub's daily network scan once its time has come (off until someone sets a time).
+app(Schedule::class)->command('monitoring:run-daily-discovery')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+
 // Native attempt expiry is bookkeeping only; it never retries a computer action.
 app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
 

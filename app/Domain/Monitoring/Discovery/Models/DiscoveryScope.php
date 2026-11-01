@@ -30,6 +30,7 @@ final class DiscoveryScope extends Model
         'max_targets_per_run',
         'packets_per_second',
         'schedule_cron',
+        'daily_scan_at',
         'status',
     ];
 
