@@ -49,13 +49,17 @@ final class DeviceDirectory
     ) {}
 
     /**
+     * @param  list<int>|null  $deviceIds  only these devices (a device page and the devices around it)
      * @return Collection<int, DeviceEntry>
      */
-    public function entries(User $viewer, ?int $siteId = null): Collection
+    public function entries(User $viewer, ?int $siteId = null, ?array $deviceIds = null): Collection
     {
         $query = $siteId === null
             ? $this->access->visibleDevices($viewer)
             : $this->access->visibleDevicesForSite($viewer, $siteId);
+        if ($deviceIds !== null) {
+            $query->whereKey($deviceIds === [] ? [0] : $deviceIds);
+        }
 
         $devices = $query
             ->select([

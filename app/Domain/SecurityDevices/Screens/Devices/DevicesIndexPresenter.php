@@ -307,7 +307,7 @@ final class DevicesIndexPresenter
      * @param  Collection<string, int>  $behindCounts
      * @return array<string, mixed>
      */
-    private function card(DeviceEntry $entry, ?array $last24, Collection $behindCounts): array
+    public function card(DeviceEntry $entry, ?array $last24, Collection $behindCounts): array
     {
         $readingAt = $this->readingAt($entry);
 

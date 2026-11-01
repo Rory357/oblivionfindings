@@ -17,6 +17,9 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceDocument;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Presenters\DeviceProfilePresenter;
+use App\Domain\SecurityDevices\Screens\DeviceKind;
+use App\Domain\SecurityDevices\Screens\Devices\Pages\DevicePagePresenter;
+use App\Domain\SecurityDevices\Screens\Http\DevicePageController;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
@@ -58,6 +61,12 @@ class DeviceController extends Controller
         $asOf = now()->toImmutable();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
         $this->access->assertCanViewDevice($user, $device);
+
+        // S&D rebuild C2: network gear, computers and other devices get their own page; cameras
+        // and the safety kit keep this profile until Phase E.
+        if (DevicePagePresenter::serves(DeviceKind::of($device)) && ! $request->has('section')) {
+            return app(DevicePageController::class)->show($request, $device);
+        }
 
         $canViewEvents = $user->canDo('securityDevices.events.view');
         $canViewMaintenance = $user->canDo('securityDevices.maintenance.view');
