@@ -42,6 +42,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { BackupSettings } from './_device-backup';
 import { ChecksTabView } from './_device-checks';
 import { ComputerHealthTab, ComputerOverviewTab, RemoteSupportTab } from './_device-overview-computer';
+import { GatewayOverviewTab } from './_gateway-overview';
 import { NetworkOverviewTab, TroubleOverview } from './_device-overview-network';
 import { OtherOverviewTab } from './_device-overview-other';
 import { NotesTabView } from './_device-notes';
@@ -193,6 +194,7 @@ export default function DevicePage(props: DevicePageProps) {
         if (props.trouble) body = <TroubleOverview props={props} trouble={props.trouble} now={now} />;
         else if (device.group === 'network') body = <NetworkOverviewTab props={props} now={now} onRange={(range) => go({ range })} onCompare={compare} />;
         else if (device.group === 'computer') body = <ComputerOverviewTab props={props} now={now} />;
+        else if (device.kind === 'sensor_gateway') body = <GatewayOverviewTab props={props} now={now} menuFor={menuFor} onWatch={can.watch ? () => open({ kind: 'watch', device: self }) : null} />;
         else body = <OtherOverviewTab props={props} now={now} onRange={(range) => go({ range })} menuFor={menuFor} />;
     } else if (tab === 'health' && props.health) {
         body = <ComputerHealthTab health={props.health} now={now} />;

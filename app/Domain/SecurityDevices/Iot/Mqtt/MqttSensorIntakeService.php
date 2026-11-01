@@ -20,6 +20,16 @@ use Illuminate\Support\Facades\DB;
  */
 final class MqttSensorIntakeService
 {
+    /**
+     * When a reading is out of its usual range (S&D Phase E): at or over `warning_at` / `critical_at`,
+     * or under `below` / over `above`. The sensor page draws these same numbers as its alert lines.
+     */
+    public const array READING_LIMITS = [
+        'co2' => ['warning_at' => 1000, 'critical_at' => 1500],
+        'temperature' => ['below' => 12, 'above' => 32],
+        'humidity' => ['below' => 25, 'above' => 75],
+    ];
+
     public function __construct(
         private readonly CanonicalDeviceSiteResolver $sites,
         private readonly MonitoringOutboxPublisher $outbox,
@@ -324,10 +334,13 @@ final class MqttSensorIntakeService
 
     private function evaluateReadingState(string $metric, float $value): string
     {
-        return match ($metric) {
-            'co2' => $value >= 1500 ? 'critical' : ($value >= 1000 ? 'warning' : 'healthy'),
-            'temperature' => ($value < 12 || $value > 32) ? 'warning' : 'healthy',
-            'humidity' => ($value < 25 || $value > 75) ? 'warning' : 'healthy',
+        $limits = self::READING_LIMITS[$metric] ?? [];
+
+        return match (true) {
+            isset($limits['critical_at']) && $value >= $limits['critical_at'] => 'critical',
+            isset($limits['warning_at']) && $value >= $limits['warning_at'] => 'warning',
+            isset($limits['below']) && $value < $limits['below'] => 'warning',
+            isset($limits['above']) && $value > $limits['above'] => 'warning',
             default => 'healthy',
         };
     }

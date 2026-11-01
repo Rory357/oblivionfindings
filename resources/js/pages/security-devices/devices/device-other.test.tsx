@@ -31,7 +31,7 @@ function other(kind: 'printer' | 'ups' | 'recorder' | 'sensor_gateway', name: st
     });
 }
 
-describe('Device page · printers, UPSs, recorders, gateways (pg-sdr-10, 16, 21, 22, 5d)', () => {
+describe('Device page · printers, UPSs, recorders (pg-sdr-10, 16, 21, 5d)', () => {
     beforeEach(() => vi.clearAllMocks());
     afterEach(cleanup);
 
@@ -83,32 +83,6 @@ describe('Device page · printers, UPSs, recorders, gateways (pg-sdr-10, 16, 21,
         expect(screen.getByText('Battery charge')).toBeInTheDocument();
         expect(screen.getByText('Power history')).toBeInTheDocument();
         expect(screen.getByText('About this UPS')).toBeInTheDocument();
-    });
-
-    it('lists a gateway’s sensors with Not available where a reading is missing', () => {
-        render(
-            <DevicePage
-                {...other('sensor_gateway', 'Synthetic gateway', {
-                    overview: {
-                        trend: null,
-                        availability: null,
-                        events: [],
-                        facts: [['Model', 'Synthetic UG']],
-                        sensors: [
-                            { id: 60, name: 'Synthetic room sensor', kind: 'sensor', model: 'Synthetic AM', state: 'online', where: 'Room 3', reading: '21.4 °C', battery: 12, battery_low: true, seen_at: minutesAgo(2), href: '/security-devices/devices/60', address: null, site: 'Synthetic House', site_id: 4 },
-                            { id: 61, name: 'Synthetic leak sensor', kind: 'sensor', model: 'Synthetic WS', state: 'online', where: null, reading: null, battery: null, battery_low: false, seen_at: null, href: '/security-devices/devices/61', address: null, site: 'Synthetic House', site_id: 4 },
-                        ],
-                    },
-                })}
-            />,
-        );
-
-        expect(screen.getByText('Sensors on this gateway')).toBeInTheDocument();
-        const row = screen.getByText('Synthetic leak sensor').closest('tr') as HTMLElement;
-        expect(within(row).getAllByText('Not available')).toHaveLength(2);
-        const low = screen.getByText('Synthetic room sensor').closest('tr') as HTMLElement;
-        expect(within(low).getByText('Low')).toBeInTheDocument();
-        expect(screen.getByText('Gateway')).toBeInTheDocument();
     });
 
     it('says when a recorder has no cameras linked yet', () => {

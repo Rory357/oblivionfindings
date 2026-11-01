@@ -23,6 +23,7 @@ use App\Domain\SecurityDevices\Screens\Devices\Pages\DevicePagePresenter;
 use App\Domain\SecurityDevices\Screens\Http\CameraPageController;
 use App\Domain\SecurityDevices\Screens\Http\DevicePageController;
 use App\Domain\SecurityDevices\Screens\Http\SafetyKitPageController;
+use App\Domain\SecurityDevices\Screens\Http\SensorTrackerPageController;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
@@ -77,6 +78,10 @@ class DeviceController extends Controller
         // S&D rebuild Phase E: alarm panels and doors get their own pages.
         if (SafetyKitPageController::serves($device) && ! $request->has('section')) {
             return app(SafetyKitPageController::class)->show($request, $device);
+        }
+        // S&D rebuild Phase E: sensors (Readings · Alerts) and care trackers (Location · Console) get their own pages.
+        if (SensorTrackerPageController::serves($device) && ! $request->has('section')) {
+            return app(SensorTrackerPageController::class)->show($request, $device);
         }
 
         $canViewEvents = $user->canDo('securityDevices.events.view');

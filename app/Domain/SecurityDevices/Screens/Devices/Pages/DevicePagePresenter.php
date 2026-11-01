@@ -305,7 +305,7 @@ final class DevicePagePresenter
             DeviceKind::Printer => [$reading('toner', 'Toner'), $reading('pages', 'Pages this month'), $reading('paper', 'Paper')],
             DeviceKind::Ups => [$reading('runtime', 'Runtime left'), $reading('load', 'Load'), $reading('battery', 'Battery'), $this->lastPowerCut($viewer, $device)],
             DeviceKind::Recorder => [$this->camerasOn($viewer, $device), $reply(), self::meter('disk', 'Disk space', null, ['text' => 'Not read from the recorder', 'at' => null], 'brand', 'overview')],
-            DeviceKind::SensorGateway => [...$this->gatewayMeters($viewer, $device), $uptime()],
+            DeviceKind::SensorGateway => app(SensorGatewayOverview::class)->meters($viewer, $device, $this->gatewayMeters($viewer, $device), $uptime()),
             DeviceKind::Other => [$reply(), $uptime()],
             default => array_values(array_filter([
                 $reply(),
@@ -463,7 +463,7 @@ final class DevicePagePresenter
             DeviceKind::Printer => [...$base, 'reading_trend' => $this->readingTrend('toner', 'Toner left', $monitors, $latest, $custody, '30d', $now)],
             DeviceKind::Ups => [...$base, 'reading_trend' => $this->readingTrend('battery', 'Battery charge', $monitors, $latest, $custody, '7d', $now)],
             DeviceKind::Recorder => [...$base, 'cameras' => $this->recorderCameras($viewer, $device, $now)],
-            DeviceKind::SensorGateway => [...$base, 'sensors' => $this->gatewaySensors($viewer, $device)],
+            DeviceKind::SensorGateway => [...$base, ...app(SensorGatewayOverview::class)->overview($viewer, $device, $this->gatewaySensors($viewer, $device))],
             DeviceKind::Other => $base,
             default => [...$base, 'connected' => $this->connected($viewer, $device, $entry)],
         };

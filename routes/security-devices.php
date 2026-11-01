@@ -81,6 +81,7 @@ use App\Domain\SecurityDevices\Screens\Http\OverviewController;
 use App\Domain\SecurityDevices\Screens\Http\SafetyKitCommandController;
 use App\Domain\SecurityDevices\Screens\Http\SetupController;
 use App\Domain\SecurityDevices\Screens\Http\SitesController;
+use App\Domain\SecurityDevices\Screens\Http\TrackerCommandController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -373,6 +374,13 @@ Route::middleware([
             Route::post('/commands/{command}/run', [SafetyKitCommandController::class, 'run'])->whereNumber('command')->name('security-devices.devices.safety.run');
         });
     });
+
+    // S&D rebuild Phase E: send a command to a care tracker (pop-up 19). Today's console command path,
+    // plus securityDevices.trackers.command; the controller checks both.
+    Route::post('/devices/{device}/tracker/commands', [TrackerCommandController::class, 'store'])
+        ->whereNumber('device')
+        ->middleware(['permission:securityDevices.devices.view', 'permission:securityDevices.trackers.command', 'throttle:15,1'])
+        ->name('security-devices.devices.tracker.commands');
 
     $restartPolicy = EndpointRestartPolicyController::class;
     Route::get('/devices/{device}/endpoint/restart-policy', [$restartPolicy, 'show'])->name('security-devices.devices.endpoint.restart-policy.show');

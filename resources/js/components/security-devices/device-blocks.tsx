@@ -69,6 +69,10 @@ export function TrendChart({
     onRange,
     peakWords = 'Highest',
     action,
+    limits = [],
+    fit = false,
+    legend,
+    ticks = 8,
 }: {
     title: string;
     sub?: ReactNode;
@@ -82,16 +86,34 @@ export function TrendChart({
     /** How the sentence names the top point, e.g. "Slowest". */
     peakWords?: string;
     action?: ReactNode;
+    /** Alert lines across the graph (e.g. "Alert above 32 °C"), each named in the legend. */
+    limits?: { value: number; label: string }[];
+    /** Fit the axis to the values and lines instead of starting at 0 (temperatures, below-zero freezers). */
+    fit?: boolean;
+    /** The line's name in the legend; the legend shows only when there are alert lines. */
+    legend?: string;
+    /** At most this many time labels under the graph (fewer for a half-width graph). */
+    ticks?: number;
 }) {
     const [hover, setHover] = useState<number | null>(null);
     const startMs = new Date(start).getTime();
     const times = useMemo(() => points.map((_, index) => new Date(startMs + index * step * 1000)), [points, startMs, step]);
     const values = points.filter((value): value is number => value !== null);
-    const max = unit === '%' ? 100 : Math.max(1, ...values) * 1.15;
+    const lines = limits.map((limit) => limit.value);
+    let min = 0;
+    let max = unit === '%' ? 100 : Math.max(1, ...values, ...lines) * 1.15;
+    if (fit) {
+        const all = [...values, ...lines];
+        const low = all.length ? Math.min(...all) : 0;
+        const high = all.length ? Math.max(...all) : 1;
+        const pad = (high - low) * 0.15 || Math.max(1, Math.abs(high) * 0.1);
+        min = low - pad;
+        max = high + pad;
+    }
     const width = 1000;
     const height = 180;
     const x = (index: number) => (points.length < 2 ? width / 2 : (index / (points.length - 1)) * width);
-    const y = (value: number) => height - (value / max) * (height - 10);
+    const y = (value: number) => height - ((value - min) / (max - min || 1)) * (height - 10);
     const suffix = unit ? (unit === '%' ? '%' : ` ${unit}`) : '';
 
     // Runs of recorded points become separate lines, so a gap stays a gap.
@@ -111,7 +133,7 @@ export function TrendChart({
     const peakIndex = peak === null ? -1 : points.indexOf(peak);
     const usual = values.length ? median(values) : null;
     const latestIndex = points.reduce<number>((found, value, index) => (value !== null ? index : found), -1);
-    const labelEvery = Math.max(1, Math.ceil(points.length / 8));
+    const labelEvery = Math.max(1, Math.ceil(points.length / ticks));
     const summary = `${title}: ${values.length} points over ${range ? TREND_RANGE_LABEL[range] : 'the period'}; usually ${usual !== null ? round(usual) : '—'}${suffix}, ${peakWords.toLowerCase()} ${peak !== null ? round(peak) : '—'}${suffix}`;
 
     return (
@@ -140,13 +162,32 @@ export function TrendChart({
             <div className="grid grid-cols-[52px_minmax(0,1fr)] gap-1.5 px-[18px] pt-3">
                 <div aria-hidden="true" className="text-caption flex h-[180px] flex-col justify-between text-right tabular-nums">
                     <span>{round(max)}{suffix}</span>
-                    <span>{round(max / 2)}{suffix}</span>
-                    <span>0{suffix}</span>
+                    <span>{round((max + min) / 2)}{suffix}</span>
+                    <span>{round(min)}{suffix}</span>
                 </div>
                 <div className="relative h-[180px]" onMouseLeave={() => setHover(null)}>
-                    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={summary} className="h-full w-full overflow-visible">
+                    <svg
+                        viewBox={`0 0 ${width} ${height}`}
+                        preserveAspectRatio="none"
+                        role="img"
+                        aria-label={limits.length ? `${summary}; ${limits.map((limit) => limit.label.toLowerCase()).join(', ')}` : summary}
+                        className="h-full w-full overflow-visible"
+                    >
                         {[0, 0.5, 1].map((fraction) => (
                             <line key={fraction} x1="0" x2={width} y1={10 + fraction * (height - 10)} y2={10 + fraction * (height - 10)} className="stroke-border" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                        ))}
+                        {limits.map((limit) => (
+                            <line
+                                key={limit.label}
+                                x1="0"
+                                x2={width}
+                                y1={y(limit.value)}
+                                y2={y(limit.value)}
+                                style={{ stroke: 'var(--status-critical)' }}
+                                strokeWidth={1.5}
+                                strokeDasharray="6 4"
+                                vectorEffect="non-scaling-stroke"
+                            />
                         ))}
                         {runs.map((line, index) =>
                             line.includes(' ') ? (
@@ -185,10 +226,26 @@ export function TrendChart({
             <div aria-hidden="true" className="text-caption flex justify-between py-1 pr-[18px] pl-[76px]">
                 {times.map((time, index) =>
                     index % labelEvery === 0 || index === points.length - 1 ? (
-                        <span key={index}>{index === points.length - 1 ? 'Now' : pointLabel(time, step)}</span>
+                        <span key={index} className="whitespace-nowrap">{index === points.length - 1 ? 'Now' : pointLabel(time, step)}</span>
                     ) : null,
                 )}
             </div>
+            {limits.length ? (
+                <ul className="text-caption flex flex-wrap gap-x-4 gap-y-1 px-[18px] pb-2" aria-label={`${title}: legend`}>
+                    <li className="inline-flex items-center gap-1.5">
+                        <span aria-hidden="true" className="h-0.5 w-4 rounded-full" style={{ background: 'var(--chart-1)' }} />
+                        {legend ?? title}
+                    </li>
+                    {limits.map((limit) => (
+                        <li key={limit.label} className="inline-flex items-center gap-1.5">
+                            <svg aria-hidden="true" viewBox="0 0 16 2" className="h-0.5 w-4 overflow-visible">
+                                <line x1="0" x2="16" y1="1" y2="1" style={{ stroke: 'var(--status-critical)' }} strokeWidth={2} strokeDasharray="4 3" />
+                            </svg>
+                            {limit.label}
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
             <p className="text-subtle border-t border-border px-[18px] py-3">
                 {peak !== null && usual !== null && peakIndex >= 0 ? (
                     <>
