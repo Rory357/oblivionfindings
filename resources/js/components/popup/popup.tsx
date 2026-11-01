@@ -546,6 +546,8 @@ export type PopupFormProps = {
     cancelLabel?: string;
     /** Left of Cancel, e.g. a ghost "Remove" in an edit form. */
     footerStart?: ReactNode;
+    /** A second way out between Cancel and the main button (as PopupConfirm), e.g. "Clock in now instead". */
+    secondary?: ReactNode;
     /** Ask "Discard this draft?" before closing. */
     dirty?: boolean;
     /** Names the draft in the discard guard; defaults to the title. */
@@ -573,6 +575,7 @@ export function PopupForm({
     onSubmit,
     cancelLabel = 'Cancel',
     footerStart,
+    secondary,
     dirty,
     draftName,
     onCloseAutoFocus,
@@ -628,6 +631,7 @@ export function PopupForm({
                         >
                             {cancelLabel}
                         </Button>
+                        {secondary}
                         <Button
                             type="submit"
                             variant={destructive ? 'destructive' : 'default'}

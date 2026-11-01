@@ -1,5 +1,6 @@
 /** Setup (S&D rebuild pg-sdr-15 and its sections): the props SetupPresenter sends. */
 import type { StatusVariant } from '@/components/ui/status-badge';
+import type { SetupClockinsData } from '@/lib/security-devices/door-clockins';
 
 export type SetupSection = 'overview' | 'hubs' | 'services' | 'alerts' | 'access' | 'computers' | 'history';
 
@@ -190,4 +191,6 @@ export type SetupProps = {
     access?: AccessSetupData | null;
     /** S&D Phase G (pg-sdr-15k): Computers & Obli › Remote support. */
     remote?: RemoteSetupData | null;
+    /** S&D Phase H (pg-sdr-15n, D15): Doors & access › Clock-ins from doors. */
+    clockins?: SetupClockinsData | null;
 };

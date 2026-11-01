@@ -1056,6 +1056,11 @@ app(Schedule::class)->command('security-devices:house-modes-tick')->everyMinute(
 // S&D Phase F: house automations that start at a time of day (safe actions only, D12), once per start.
 app(Schedule::class)->command('security-devices:automations-tick')->everyMinute()->withoutOverlapping()->onOneServer();
 
+// S&D Phase H (D15): door badges near a rostered start suggest a clock-in (off until turned on in Setup); gaps 15 min after each start.
+app(Schedule::class)->command('security-devices:door-clockins-tick')->everyMinute()->withoutOverlapping()->onOneServer();
+// Rows that aren't time records go at 90 days, like the names on door events (D14).
+app(Schedule::class)->command('security-devices:door-clockins-tick --prune')->dailyAt('03:50')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+
 // S&D Phase G (G1): nightly settings backups through the governed request and the Site's hub (off until someone is named).
 app(Schedule::class)->command('security-devices:nightly-settings-backups')->everyTenMinutes()
     ->between(...App\Domain\SecurityDevices\NetworkConfig\Services\NightlySettingsBackups::window())

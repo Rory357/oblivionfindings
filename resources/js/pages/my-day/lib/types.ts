@@ -1,4 +1,5 @@
 import type { HandoverWorkerNotes } from '@/components/handover-person-notes';
+import type { MyDayClockin } from '@/lib/security-devices/door-clockins';
 import type {
     SafetySession,
     SessionDelivery,
@@ -563,6 +564,8 @@ export interface MyDayPageProps {
     first_aid_followups?: MyDayFirstAidFollowup[];
     /** The worker's own open workplace injuries (count only); links to My HR › Injuries. */
     own_open_injuries?: number;
+    /** S&D Phase H (D15, pg-sdr-19g): their own clock-in suggested by a door badge, until they choose. */
+    door_clockin?: MyDayClockin | null;
     my_ppe?: MyDayPpe[];
     myTasks?: MyDayMyTasks;
     shiftChecklists?: ShiftChecklistRun[];

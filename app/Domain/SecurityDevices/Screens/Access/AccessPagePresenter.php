@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Access\Models\AccessJob;
 use App\Domain\SecurityDevices\Access\Models\AccessPerson;
 use App\Domain\SecurityDevices\Access\Models\AccessPolicy;
 use App\Domain\SecurityDevices\Access\Models\AccessVisitor;
+use App\Domain\SecurityDevices\DoorClockins\Screens\AccessClockinsPresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -19,11 +20,14 @@ use Throwable;
  * Access (S&D rebuild drawings pg-sdr-19, 19b, 19c, 19d, 19f): who can open which doors, their
  * cards, visitor passes, door groups and the door log, from each Site's UniFi Access console as
  * its hub last read it. Everything is scoped to the viewer's Sites; another Site's console never
- * shows. Clock-ins from doors (19e) belong to another part of the build and aren't here yet.
+ * shows. Clock-ins from doors (19e, D15) is the last tab; managers who only sort out clock-ins see
+ * just that tab, with no door, card or people data.
  */
 final class AccessPagePresenter
 {
-    public const array TABS = ['doors', 'people', 'visitors', 'schedules', 'activity'];
+    public const array DOOR_TABS = ['doors', 'people', 'visitors', 'schedules', 'activity'];
+
+    public const array TABS = [...self::DOOR_TABS, 'clockins'];
 
     public const array WHEN = ['today', 'coming', 'ended'];
 
@@ -32,26 +36,49 @@ final class AccessPagePresenter
         private readonly AccessDoorsPresenter $doors,
         private readonly AccessPeoplePresenter $people,
         private readonly AccessActivityPresenter $activity,
+        private readonly AccessClockinsPresenter $clockins,
     ) {}
 
-    public static function canOpen(User $viewer): bool
+    /** Doors, people, visitors, door groups and the door log, and the roll call. */
+    public static function canSeeDoors(User $viewer): bool
     {
         return $viewer->canDo('securityDevices.viewAny') && $viewer->canDo('securityDevices.accessControl.view');
     }
 
+    /**
+     * The page itself: door access, or (D15) sorting out clock-ins from doors. Gap notices link here,
+     * and the managers who get them hold attendance.doorClockIns.review, not always door access.
+     */
+    public static function canOpen(User $viewer): bool
+    {
+        return self::canSeeDoors($viewer) || AccessClockinsPresenter::canOpen($viewer);
+    }
+
     public static function canManage(User $viewer): bool
     {
-        return self::canOpen($viewer) && $viewer->canDo('securityDevices.accessControl.manage');
+        return self::canSeeDoors($viewer) && $viewer->canDo('securityDevices.accessControl.manage');
+    }
+
+    /** @return list<string> the tabs this viewer may open, in rail order */
+    public static function tabs(User $viewer): array
+    {
+        return [
+            ...(self::canSeeDoors($viewer) ? self::DOOR_TABS : []),
+            ...(AccessClockinsPresenter::canOpen($viewer) ? ['clockins'] : []),
+        ];
     }
 
     /**
-     * The consoles the viewer may see: their Sites' only, by Site name.
+     * The consoles the viewer may see: their Sites' only, by Site name. Someone who only sorts out
+     * clock-ins gets their attendance Sites (just for the Site filter; no door data is read).
      *
      * @return Collection<int, AccessConsole>
      */
     public function consoles(User $viewer): Collection
     {
-        $siteIds = $this->access->accessibleSiteIds($viewer);
+        $siteIds = self::canSeeDoors($viewer)
+            ? $this->access->accessibleSiteIds($viewer)
+            : \App\Domain\SecurityDevices\DoorClockins\DoorClockinRules::reviewSiteIds($viewer);
         if ($siteIds === []) {
             return collect();
         }
@@ -68,7 +95,9 @@ final class AccessPagePresenter
     public function present(User $viewer, array $query = [], ?CarbonImmutable $now = null): array
     {
         $now ??= CarbonImmutable::now('UTC');
-        $tab = in_array($query['tab'] ?? null, self::TABS, true) ? (string) $query['tab'] : 'doors';
+        $tabs = self::tabs($viewer);
+        $tab = in_array($query['tab'] ?? null, $tabs, true) ? (string) $query['tab'] : ($tabs[0] ?? 'doors');
+        $doorsVisible = self::canSeeDoors($viewer);
         $all = $this->consoles($viewer);
         $siteFilter = is_numeric($query['site'] ?? null) && $all->contains('site_id', (int) $query['site']) ? (int) $query['site'] : null;
         $consoles = $siteFilter === null ? $all : $all->where('site_id', $siteFilter)->values();
@@ -77,11 +106,13 @@ final class AccessPagePresenter
         $state = in_array($query['state'] ?? null, AccessDoorsPresenter::STATES, true) ? (string) $query['state'] : null;
         $status = in_array($query['status'] ?? null, AccessPeoplePresenter::STATUSES, true) ? (string) $query['status'] : null;
         $when = in_array($query['when'] ?? null, self::WHEN, true) ? (string) $query['when'] : null;
-        $ids = $consoles->pluck('id')->all();
+        // Clock-ins only: the Sites still filter, but no console's doors, people or log are read.
+        $ids = $doorsVisible ? $consoles->pluck('id')->all() : [];
         $manage = self::canManage($viewer);
 
         return [
             'tab' => $tab,
+            'tabs' => $tabs,
             'filters' => [
                 'site' => $siteFilter === null ? 'all' : (string) $siteFilter,
                 'q' => $search === '' ? null : $search,
@@ -90,22 +121,26 @@ final class AccessPagePresenter
                 'when' => $when ?? 'all',
             ],
             'sites' => $all->map(fn (AccessConsole $console): array => ['value' => (string) $console->site_id, 'label' => (string) ($console->site?->name ?? 'Site')])->values()->all(),
-            'consoles' => $this->consoleInfo($all, $now),
+            'consoles' => $doorsVisible ? $this->consoleInfo($all, $now) : [],
             'counts' => $this->counts($ids, $now),
             'meters' => $this->meters($ids, $now),
-            'doors' => $tab === 'doors' ? $this->doors->present($viewer, $consoles, $siteFilter, $state, $search, $now) : null,
-            'people' => $tab === 'people' ? $this->people->present($consoles, $status, $search, $page, $now) : null,
-            'visitors' => $tab === 'visitors' ? $this->visitors($consoles, $when, $search, $now) : null,
-            'schedules' => $tab === 'schedules' ? $this->schedules($consoles, $search) : null,
-            'activity' => $tab === 'activity' ? $this->activity->present($consoles, [
+            'doors' => $doorsVisible && $tab === 'doors' ? $this->doors->present($viewer, $consoles, $siteFilter, $state, $search, $now) : null,
+            'people' => $doorsVisible && $tab === 'people' ? $this->people->present($consoles, $status, $search, $page, $now) : null,
+            'visitors' => $doorsVisible && $tab === 'visitors' ? $this->visitors($consoles, $when, $search, $now) : null,
+            'schedules' => $doorsVisible && $tab === 'schedules' ? $this->schedules($consoles, $search) : null,
+            'activity' => $doorsVisible && $tab === 'activity' ? $this->activity->present($consoles, [
                 'door' => $query['door'] ?? null,
                 'kind' => $query['kind'] ?? null,
                 'days' => $query['days'] ?? null,
                 'person' => $query['person'] ?? null,
             ], $search, $page, $now) : null,
+            // S&D Phase H (pg-sdr-19e, D15): clock-ins from door badges; the rail number and header block on every tab.
+            'clockins' => $tab === 'clockins' ? $this->clockins->present($viewer, $siteFilter, $now) : null,
+            'clockins_header' => $this->clockins->header($viewer, $siteFilter, $now),
             'can' => [
                 'manage' => $manage,
-                'roll_call' => $all->isNotEmpty(),
+                'roll_call' => $doorsVisible && $all->isNotEmpty(),
+                'doors' => $doorsVisible,
             ],
         ];
     }

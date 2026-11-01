@@ -214,6 +214,13 @@ final class SetupHistory
             SecurityDevicesSettings::SAFETY_ROSTER => "Turned {$state} using the roster for safety alerts",
             SecurityDevicesSettings::WATCH_ON_ADD => "Turned {$state} watching devices as soon as they’re added",
             SecurityDevicesSettings::WATCH_PHONES => "Turned {$state} watching phones and tablets",
+            // S&D Phase H (D15): clock-ins from doors (DoorClockinSetup).
+            'clockins.on' => ($meta['to'] ?? false) === false ? 'Turned clock-ins from doors off' : 'Sent the notice and turned on clock-ins from doors'.(is_string($meta['starts_on'] ?? null) ? ', starting '.\Carbon\CarbonImmutable::parse($meta['starts_on'])->format('D j M Y') : ''),
+            'clockins.doors' => 'Changed the doors that count for clock-ins'.(($meta['notice_id'] ?? null) !== null ? ' and sent the notice' : ''),
+            'clockins.window' => 'Changed the window around a rostered start for clock-ins from doors',
+            'clockins.badge_time' => "Turned {$state} clocking in at the badge time",
+            'clockins.gap_unconfirmed_app', 'clockins.gap_unconfirmed_email', 'clockins.gap_no_badge_app', 'clockins.gap_no_badge_email',
+            'clockins.gap_not_rostered_app', 'clockins.gap_not_rostered_email' => 'Changed who hears about clock-in gaps',
             default => "Turned a setting {$state}",
         };
     }

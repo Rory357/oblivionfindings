@@ -637,9 +637,8 @@ Route::middleware([
         ->middleware(['permission:securityDevices.webPage.open', 'throttle:20,1'])
         ->name('security-devices.devices.web.open');
 
-    // S&D Phase H (pg-sdr-19, 19b–19d, 19f): the Access page, and the fire roll call (pop-up 87). The controller checks accessControl.view and the Site.
-    Route::get('/access', [\App\Domain\SecurityDevices\Screens\Http\AccessPageController::class, 'index'])
-        ->name('security-devices.access.index');
+    // S&D Phase H (pop-up 87): the fire roll call from the Access page (the page itself is at the end
+    // of this file). The controller checks accessControl.view and the Site.
     Route::get('/access/sites/{site}/roll-call', [\App\Domain\SecurityDevices\Screens\Http\AccessPageController::class, 'rollCall'])
         ->whereNumber('site')
         ->middleware('throttle:30,1')
@@ -1284,4 +1283,27 @@ Route::middleware([
             Route::get('/maintenance.csv', [ReportsController::class, 'exportMaintenance'])
                 ->name('security-devices.reports.maintenance');
         });
+});
+
+// S&D Phase H (D15): clock-ins suggested from door badges. Outside the S&D group on purpose: the
+// person answering is any staff member (it's their own row), and the managers who sort out gaps
+// hold attendance.doorClockIns.review (from timesheets.approve), not always Security & devices keys.
+// S&D Phase H (pg-sdr-19 to 19f): the Access page. Outside the group too: managers who only sort out
+// clock-ins from doors (D15) open it on the Clock-ins tab alone. The controller and presenter check
+// door access (securityDevices.viewAny + accessControl.view) for everything else, Site by Site.
+Route::get('/security-devices/access', [\App\Domain\SecurityDevices\Screens\Http\AccessPageController::class, 'index'])
+    ->middleware('auth')
+    ->name('security-devices.access.index');
+
+Route::middleware(['auth', 'throttle:30,1'])->group(function (): void {
+    $doorClockins = \App\Domain\SecurityDevices\DoorClockins\Http\DoorClockinsController::class;
+    // Pop-up 88 and the My Day band (19g): the person's own choice.
+    Route::post('/door-clockins/{clockin}/answer', [$doorClockins, 'answer'])->whereNumber('clockin')->name('door-clockins.answer');
+    // Access › Clock-ins (19e) and pop-up 89. The controller checks the review key and the Site.
+    Route::get('/security-devices/access/clockins/{clockin}/panel', [$doorClockins, 'panel'])->whereNumber('clockin')->withoutMiddleware('throttle:30,1')->middleware('throttle:120,1')->name('security-devices.access.clockins.panel');
+    Route::post('/security-devices/access/clockins/{clockin}/review', [$doorClockins, 'review'])->whereNumber('clockin')->name('security-devices.access.clockins.review');
+    // Setup › Doors & access › Clock-ins from doors (15n) and pop-up 92: door access and timesheet authority both.
+    Route::put('/security-devices/setup/clockins/doors', [$doorClockins, 'saveDoors'])->middleware('throttle:10,1')->name('security-devices.setup.clockins.doors');
+    Route::post('/security-devices/setup/clockins/off', [$doorClockins, 'turnOff'])->middleware('throttle:10,1')->name('security-devices.setup.clockins.off');
+    Route::patch('/security-devices/setup/clockins/settings', [$doorClockins, 'settings'])->name('security-devices.setup.clockins.settings');
 });

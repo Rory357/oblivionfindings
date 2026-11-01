@@ -34,7 +34,7 @@ final class SetupPresenter
         'services' => ['label' => 'Services & logins', 'tabs' => ['connected' => 'Connected services', 'logins' => 'Saved logins', 'supported' => 'Supported devices']],
         'alerts' => ['label' => 'Alerts & checks', 'tabs' => ['rules' => 'Alert rules', 'checks' => 'Checks']],
         // S&D Phase H (pg-sdr-15m): each Site's UniFi Access console, through its hub.
-        'access' => ['label' => 'Doors & access', 'tabs' => ['unifi' => 'UniFi Access']],
+        'access' => ['label' => 'Doors & access', 'tabs' => ['unifi' => 'UniFi Access', 'clockins' => 'Clock-ins from doors']],
         // S&D Phase G (pg-sdr-15k): Computers & Obli; only Remote support is built (Obli's tabs come with Phase I).
         'computers' => ['label' => 'Computers & Obli', 'tabs' => ['remote' => 'Remote support']],
         'history' => ['label' => 'Change history', 'tabs' => []],
@@ -155,7 +155,7 @@ final class SetupPresenter
                 'todo' => $todo,
                 'cards' => $this->cards($viewer, $hubs, $noHub, $services, $logins, $failedScans, $sections),
             ] : null,
-            'settings' => in_array($section, ['hubs', 'alerts', 'access'], true) ? $this->settings->forViewer($viewer) : null,
+            'settings' => in_array($section, ['hubs', 'alerts', 'access'], true) && $tab !== 'clockins' ? $this->settings->forViewer($viewer) : null,
             'alerts' => $section === 'alerts' && $tab === 'rules' ? ['rules' => $this->rules->count($viewer)] : null,
             'checks' => $section === 'alerts' && $tab === 'checks' ? $this->checks($entries) : null,
             'networks' => $section === 'hubs' && $tab === 'networks' ? $this->networks->present($viewer) : null,
@@ -166,6 +166,8 @@ final class SetupPresenter
             'history' => $section === 'history' ? $this->history->present($viewer, (int) ($query['page'] ?? 1)) : null,
             // S&D Phase H (pg-sdr-15m): the Sites' UniFi Access consoles and what Oblivion keeps in step.
             'access' => $section === 'access' && $tab === 'unifi' ? app(\App\Domain\SecurityDevices\Access\AccessSetup::class)->present($viewer) : null,
+            // S&D Phase H (pg-sdr-15n, D15): clock-ins suggested from door badges, and pop-up 92.
+            'clockins' => $section === 'access' && $tab === 'clockins' ? app(\App\Domain\SecurityDevices\DoorClockins\Screens\SetupClockinsPresenter::class)->present($viewer) : null,
             // S&D Phase G (pg-sdr-15k): remote support to staff computers.
             'remote' => $section === 'computers' && $tab === 'remote' ? app(SetupRemoteSupport::class)->present($viewer) : null,
         ];

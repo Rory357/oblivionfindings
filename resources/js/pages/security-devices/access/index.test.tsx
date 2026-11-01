@@ -73,6 +73,7 @@ function person(overrides: Partial<PersonRow> = {}): PersonRow {
 function fixture(overrides: Partial<AccessPageProps> = {}): AccessPageProps {
     return {
         tab: 'doors',
+        tabs: ['doors', 'people', 'visitors', 'schedules', 'activity'],
         filters: { site: 'all', q: null, state: 'all', status: 'all', when: 'all' },
         sites: [{ value: '4', label: 'Synthetic House' }],
         consoles: [
@@ -112,7 +113,7 @@ function fixture(overrides: Partial<AccessPageProps> = {}): AccessPageProps {
         visitors: null,
         schedules: null,
         activity: null,
-        can: { manage: true, roll_call: true },
+        can: { manage: true, roll_call: true, doors: true },
         ...overrides,
     };
 }
@@ -153,7 +154,7 @@ describe('Access › Doors', () => {
     });
 
     it('hides every change for someone who can only look', () => {
-        render(<AccessIndex {...fixture({ can: { manage: false, roll_call: true } })} />);
+        render(<AccessIndex {...fixture({ can: { manage: false, roll_call: true, doors: true } })} />);
 
         expect(screen.queryByRole('button', { name: /give someone access/i })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /add visitor pass/i })).not.toBeInTheDocument();
@@ -232,7 +233,7 @@ describe('Access › People', () => {
     });
 
     it('offers no matching to someone who can only look', () => {
-        render(<AccessIndex {...fixture({ tab: 'people', doors: null, people, can: { manage: false, roll_call: true } })} />);
+        render(<AccessIndex {...fixture({ tab: 'people', doors: null, people, can: { manage: false, roll_call: true, doors: true } })} />);
 
         expect(screen.queryByRole('button', { name: /match people/i })).not.toBeInTheDocument();
     });
@@ -315,6 +316,57 @@ describe('Access › Visitors, Schedules and Activity', () => {
         expect(screen.getByText('Synthetic front door held open')).toBeInTheDocument();
         expect(screen.getByRole('img', { name: /2 came in today/ })).toBeInTheDocument();
         expect(screen.getByText('What’s kept')).toBeInTheDocument();
+    });
+});
+
+describe('Access › Clock-ins (19e)', () => {
+    const clockins = {
+        state: 'off' as const,
+        how: { since: null, starts_on: null, places: [], before: 60, after: 30, badge_time: false },
+        week: null,
+        rows: [],
+        count: 2,
+        meter: { confirmed: 2, starts: 3 },
+        can: { review: true, setup: false },
+    };
+
+    it('adds the Clock-ins tab with its number, and the badge block in the header, beside the door views', () => {
+        render(<AccessIndex {...fixture({ tabs: ['doors', 'people', 'visitors', 'schedules', 'activity', 'clockins'], clockins_header: { count: 2, meter: { confirmed: 2, starts: 3 } } })} />);
+
+        expect(screen.getByRole('tab', { name: /Clock-inss*2/ })).toBeInTheDocument();
+        expect(screen.getByText('Clocked in from a badge')).toBeInTheDocument();
+        expect(screen.getByText('2 of 3')).toBeInTheDocument();
+        expect(screen.getByText('Doors locked')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByText('Clocked in from a badge'));
+        expect(inertia.get).toHaveBeenCalledWith('/security-devices/access', expect.objectContaining({ tab: 'clockins' }), expect.anything());
+    });
+
+    it('shows a manager who only sorts out clock-ins that tab alone, with nothing about doors, cards or people', () => {
+        render(
+            <AccessIndex
+                {...fixture({
+                    tab: 'clockins',
+                    tabs: ['clockins'],
+                    consoles: [],
+                    doors: null,
+                    clockins,
+                    clockins_header: { count: 2, meter: { confirmed: 2, starts: 3 } },
+                    can: { manage: false, roll_call: false, doors: false },
+                })}
+            />,
+        );
+
+        expect(screen.getByText(/Clock-ins from doors are off/)).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Turn on in Setup' })).not.toBeInTheDocument();
+        for (const hidden of ['Doors locked', 'Held open today', 'Cards turned off', 'People to match', 'Roll call', 'Give someone access', 'Add visitor pass']) {
+            expect(screen.queryByText(hidden)).not.toBeInTheDocument();
+        }
+        for (const tab of ['Doors', 'People', 'Visitors', 'Schedules', 'Activity']) {
+            expect(screen.queryByRole('tab', { name: new RegExp(`^${tab}`) })).not.toBeInTheDocument();
+        }
+        expect(screen.getByRole('tab', { name: /Clock-ins/ })).toBeInTheDocument();
+        expect(screen.getByText('Clocked in from a badge')).toBeInTheDocument();
     });
 });
 

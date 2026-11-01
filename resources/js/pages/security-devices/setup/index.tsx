@@ -23,12 +23,13 @@ import { AddSensorGateway } from '@/components/security-devices/sensor-gateway-p
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Bell, DoorOpen, History, KeyRound, ListChecks, MonitorSmartphone, Network, Plug, RadioTower, Settings2 } from 'lucide-react';
+import { Bell, Clock, DoorOpen, History, KeyRound, ListChecks, MonitorSmartphone, Network, Plug, RadioTower, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SetupAccess } from './_access';
 import { SetupAlertRules } from './_alerts';
 import { SetupBroker } from './_broker';
 import { SetupChecks } from './_checks';
+import { SetupClockins } from './_clockins';
 import { ChangeHistory } from './_history';
 import { SetupNetworks } from './_networks';
 import { SetupOverview } from './_overview';
@@ -37,7 +38,7 @@ import { ConnectedServices, SavedLogins, SupportedDevices } from './_services';
 import { SettingsSave, useSettingsDraft } from './_settings';
 import type { SetupMeter, SetupProps, SetupSection } from './_types';
 
-const TAB_ICONS = { networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks, rules: Bell, checks: ListChecks, broker: RadioTower, unifi: DoorOpen, remote: MonitorSmartphone } as const;
+const TAB_ICONS = { networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks, rules: Bell, checks: ListChecks, broker: RadioTower, unifi: DoorOpen, clockins: Clock, remote: MonitorSmartphone } as const;
 
 export function setupUrl(section: SetupSection, tab?: string | null, page?: number): string {
     const base = section === 'overview' ? '/security-devices/setup' : `/security-devices/setup/${section}`;
@@ -208,6 +209,7 @@ export default function SetupPage(props: SetupProps) {
                 {props.alerts ? <SetupAlertRules data={props.alerts} draft={draft} /> : null}
                 {props.remote ? <SetupRemote data={props.remote} /> : null}
                 {props.access ? <SetupAccess data={props.access} draft={draft} query={query} now={now} onConnect={(siteId) => setConnectingAccess(siteId ?? 0)} /> : null}
+                {props.clockins ? <SetupClockins data={props.clockins} /> : null}
                 {props.checks ? <SetupChecks data={props.checks} draft={draft} query={query} canOpenDevices={can.open_devices} /> : null}
 
                 {props.settings ? <SettingsSave draft={draft} what={section === 'alerts' ? (tab === 'checks' ? 'checks' : 'alert rules') : tab === 'broker' ? 'the sensor broker' : section === 'access' ? 'doors and access' : 'scans'} /> : null}

@@ -1,8 +1,15 @@
 import type { GovernedAction } from '@/pages/security-devices/devices/_safety-kit-types';
 /** What AccessPagePresenter sends (S&D rebuild drawings pg-sdr-19, 19b, 19c, 19d, 19f). */
 import type { StatusVariant } from '@/components/ui/status-badge';
+import type { AccessClockinsData } from '@/lib/security-devices/door-clockins';
 
-export type AccessTab = 'doors' | 'people' | 'visitors' | 'schedules' | 'activity';
+export type AccessTab =
+    | 'doors'
+    | 'people'
+    | 'visitors'
+    | 'schedules'
+    | 'activity'
+    | 'clockins';
 
 /** A server line: "{time}", "{ago}" and "{date}" are filled in NZ time from `at`. */
 export type TimedLine = { text: string; at: string | null };
@@ -11,13 +18,28 @@ export type Badge = { tone: StatusVariant; text: string; at?: string | null };
 
 export type Option = { value: string; label: string };
 
-export type PageMeta = { page: number; last_page: number; total: number; from: number; to: number };
+export type PageMeta = {
+    page: number;
+    last_page: number;
+    total: number;
+    from: number;
+    to: number;
+};
 
 export type ConsoleReader = { id: string; name: string };
 
-export type ConsoleDoor = { id: string; name: string; readers: ConsoleReader[] };
+export type ConsoleDoor = {
+    id: string;
+    name: string;
+    readers: ConsoleReader[];
+};
 
-export type ConsolePolicy = { id: string; name: string; doors: string; people: number };
+export type ConsolePolicy = {
+    id: string;
+    name: string;
+    doors: string;
+    people: number;
+};
 
 /** One Site's UniFi Access console: what the pop-ups choose from. */
 export type AccessConsoleInfo = {
@@ -51,12 +73,24 @@ export type DoorCard = {
     href: string | null;
 };
 
-export type DoorGroup = { key: 'attention' | 'normal'; title: string; count: number; sub: string | null; items: DoorCard[] };
+export type DoorGroup = {
+    key: 'attention' | 'normal';
+    title: string;
+    count: number;
+    sub: string | null;
+    items: DoorCard[];
+};
 
 export type DoorsData = {
     groups: DoorGroup[];
     total: number;
-    emergency: { site_id: number; site: string; doors: number; mode: 'normal' | 'lockdown' | 'evacuation'; known: boolean }[];
+    emergency: {
+        site_id: number;
+        site: string;
+        doors: number;
+        mode: 'normal' | 'lockdown' | 'evacuation';
+        known: boolean;
+    }[];
     not_managed: { count: number; names: string[] };
 };
 
@@ -105,7 +139,16 @@ export type VisitorRow = {
     can_cancel: boolean;
 };
 
-export type ScheduleRow = { id: string; name: string; site: string; site_id: number | null; sub: string; doors: string; door_count: number; when: string };
+export type ScheduleRow = {
+    id: string;
+    name: string;
+    site: string;
+    site_id: number | null;
+    sub: string;
+    doors: string;
+    door_count: number;
+    when: string;
+};
 
 export type ActivityRow = {
     id: number;
@@ -121,15 +164,32 @@ export type ActivityRow = {
 export type ActivityData = {
     rows: ActivityRow[];
     meta: PageMeta;
-    filters: { door: string; kind: string; days: string; person: string | null };
+    filters: {
+        door: string;
+        kind: string;
+        days: string;
+        person: string | null;
+    };
     person: string | null;
     doors: Option[];
-    worth_a_look: { key: string; at: string; tone: 'critical' | 'warning' | 'info'; title: string; sub: string }[];
+    worth_a_look: {
+        key: string;
+        at: string;
+        tone: 'critical' | 'warning' | 'info';
+        title: string;
+        sub: string;
+    }[];
     how_in: { total: number; parts: { label: string; value: number }[] } | null;
     events_read: boolean;
 };
 
-export type StaffOption = { id: number; name: string; sub: string; employee_number: string | null; in_access: boolean };
+export type StaffOption = {
+    id: number;
+    name: string;
+    sub: string;
+    employee_number: string | null;
+    in_access: boolean;
+};
 
 /** S&D Phase H (pop-up 86): one Site's lockdown, evacuation and end, as governed command summaries. */
 export type EmergencyActions = {
@@ -150,7 +210,15 @@ export type AccessPageProps = {
     /** S&D Phase H (pop-up 86): only on the Doors tab, only for people who may lock down a Site. */
     emergency_actions?: EmergencyActions[];
     tab: AccessTab;
-    filters: { site: string; q: string | null; state: string; status: string; when: string };
+    /** The tabs this viewer may open. Managers who only sort out clock-ins (D15) get just 'clockins'. */
+    tabs: AccessTab[];
+    filters: {
+        site: string;
+        q: string | null;
+        state: string;
+        status: string;
+        when: string;
+    };
     sites: Option[];
     consoles: AccessConsoleInfo[];
     counts: { doors: number; people: number; visitors: number };
@@ -165,7 +233,10 @@ export type AccessPageProps = {
     visitors: { rows: VisitorRow[]; total: number } | null;
     schedules: { rows: ScheduleRow[] } | null;
     activity: ActivityData | null;
+    /** S&D Phase H (pg-sdr-19e, D15): the Clock-ins tab, and its rail number and header block on every tab. */
+    clockins?: AccessClockinsData | null;
+    clockins_header?: Pick<AccessClockinsData, 'count' | 'meter'> | null;
     /** Staff at each Site (by Site id), loaded when Give someone access or Match opens. */
     staff?: Record<string, StaffOption[]>;
-    can: { manage: boolean; roll_call: boolean };
+    can: { manage: boolean; roll_call: boolean; doors: boolean };
 };

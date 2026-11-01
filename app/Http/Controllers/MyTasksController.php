@@ -242,6 +242,9 @@ class MyTasksController extends Controller
             'own_open_injuries' => \App\Models\WorkplaceInjury::query()->where('user_id', $user->id)
                 ->whereNotIn('status', ['recovered', 'closed'])->count(),
             'first_aid_confirmation' => app(FirstAidService::class)->confirmationForViewer($user, $request->session()->get('first_aid_confirmation')),
+            // S&D Phase H (D15, pg-sdr-19g, pop-up 88): the worker's own clock-in suggested by their door badge, and
+            // what they were told when it was turned on. Null unless they badged near a rostered start and haven't chosen.
+            'door_clockin' => app(\App\Domain\SecurityDevices\DoorClockins\Screens\MyDayClockinPresenter::class)->forUser($user),
             // Worker-facing "My PPE" card — the worker's own active allocations that
             // still need acknowledgement or an RPE fit-test. Empty unless action is
             // needed. One-tap acknowledge POSTs to ppe.allocations.acknowledge-own

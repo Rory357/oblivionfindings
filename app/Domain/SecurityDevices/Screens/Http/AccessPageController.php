@@ -18,8 +18,9 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Access (S&D rebuild drawings pg-sdr-19, 19b–19d, 19f) and the fire roll call (pop-up 87). The
- * changes themselves (pop-ups 81–84, 90) go through AccessPeopleController.
+ * Access (S&D rebuild drawings pg-sdr-19, 19b–19f) and the fire roll call (pop-up 87). The
+ * changes themselves (pop-ups 81–84, 90) go through AccessPeopleController; clock-ins (19e, pop-up
+ * 89) through DoorClockinsController.
  */
 final class AccessPageController extends Controller
 {
@@ -28,12 +29,14 @@ final class AccessPageController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User && AccessPagePresenter::canOpen($user), 403);
 
+        $page = $presenter->present($user, $request->only(['tab', 'site', 'q', 'page', 'state', 'status', 'when', 'door', 'kind', 'days', 'person']));
+
         return Inertia::render('security-devices/access/index', [
-            ...$presenter->present($user, $request->only(['tab', 'site', 'q', 'page', 'state', 'status', 'when', 'door', 'kind', 'days', 'person'])),
+            ...$page,
             // Give someone access (81) and Match (90) pick staff at the Site, loaded when one opens.
             'staff' => Inertia::optional(fn (): array => $presenter->staffOptions($user)),
             // S&D Phase H (pop-up 86): lockdown, evacuation and ending either, per Site, as governed commands.
-            'emergency_actions' => ($request->query('tab') ?? 'doors') === 'doors'
+            'emergency_actions' => $page['tab'] === 'doors' && AccessPagePresenter::canSeeDoors($user)
                 ? app(\App\Domain\SecurityDevices\Access\AccessEmergencyActions::class)->present(
                     $user,
                     is_numeric($confirmed = $request->session()->get('auth.password_confirmed_at')) ? CarbonImmutable::createFromTimestampUTC((int) $confirmed) : null,
@@ -46,7 +49,7 @@ final class AccessPageController extends Controller
     public function rollCall(Request $request, int $site, AccessRollCall $rollCall, SecurityDevicesAccessService $access): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user instanceof User && AccessPagePresenter::canOpen($user), 403);
+        abort_unless($user instanceof User && AccessPagePresenter::canSeeDoors($user), 403);
         abort_unless(in_array($site, $access->accessibleSiteIds($user), true) && AccessConsole::query()->where('site_id', $site)->exists(), 404);
 
         return response()->json($rollCall->present(Site::query()->findOrFail($site), CarbonImmutable::now('UTC')));

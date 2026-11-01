@@ -184,3 +184,48 @@ it('offers changes only to people who manage door access', function (): void {
     $this->actingAs($manager)->get('/security-devices/access')
         ->assertInertia(fn (Assert $page) => $page->where('can.manage', true)->where('consoles.0.policies.0.name', 'House staff'));
 });
+
+it('opens on the Clock-ins tab alone for a manager who only sorts out clock-ins from doors (D15)', function (): void {
+    $reviewer = ($this->person)(['attendance.doorClockIns.review']);
+
+    $this->actingAs($reviewer)->get('/security-devices/access?tab=people')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('tab', 'clockins')
+            ->where('tabs', ['clockins'])
+            ->where('consoles', [])
+            ->where('counts', ['doors' => 0, 'people' => 0, 'visitors' => 0])
+            ->where('people', null)
+            ->where('doors', null)
+            ->where('activity', null)
+            ->where('can.doors', false)
+            ->where('can.roll_call', false)
+            ->where('can.manage', false)
+            ->where('emergency_actions', [])
+            ->has('clockins.rows')
+            ->has('clockins_header.meter'));
+
+    // Still no door data elsewhere: the roll call names who may be in the house.
+    $this->actingAs($reviewer)->get('/security-devices/access/sites/'.$this->home->id.'/roll-call')->assertForbidden();
+});
+
+it('adds the Clock-ins tab after the door views for door viewers who also sort out clock-ins', function (): void {
+    $both = ($this->person)(['securityDevices.viewAny', 'securityDevices.accessControl.view', 'attendance.doorClockIns.review']);
+
+    $this->actingAs($both)->get('/security-devices/access')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('tab', 'doors')
+            ->where('tabs', ['doors', 'people', 'visitors', 'schedules', 'activity', 'clockins'])
+            ->where('clockins', null)
+            ->has('clockins_header.count'));
+
+    $this->actingAs($this->viewer)->get('/security-devices/access?tab=clockins')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('tab', 'doors')
+            ->where('tabs', ['doors', 'people', 'visitors', 'schedules', 'activity'])
+            ->where('clockins_header', null));
+});
+
+it('is still refused to someone with neither door access nor clock-ins review', function (): void {
+    $this->actingAs(($this->person)([]))->get('/security-devices/access')->assertForbidden();
+});
