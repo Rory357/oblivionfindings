@@ -162,4 +162,31 @@ describe('Sensor page (pg-sdr-7)', () => {
         render(<SensorPage {...sensor({ tab: 'alerts', readings: null, alerts: [] })} />);
         expect(screen.getByText('No alerts for this sensor in the last 90 days.')).toBeInTheDocument();
     });
+
+    it('shows who it is linked to with their plan’s rule, and the scald watch (Phase F)', () => {
+        render(
+            <SensorPage
+                {...sensor({
+                    care: {
+                        link: { title: 'Linked to Ana’s falls plan', rule: 'Alert night staff if Ana out of bed for over 10 minutes between 22:00 and 06:00', plan: 'Falls prevention plan', person_href: '/clients/11', linked_at: minutesAgo(60) },
+                        can_link: true,
+                        scald: { on: true, can_change: false },
+                    },
+                })}
+            />,
+        );
+
+        expect(screen.getByText('Linked to Ana’s falls plan')).toBeInTheDocument();
+        expect(screen.getByText('Alert night staff if Ana out of bed for over 10 minutes between 22:00 and 06:00')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Unlink' })).toBeInTheDocument();
+        const scald = screen.getByText('Watch this tap for scald risk').closest('span')?.parentElement as HTMLElement;
+        expect(within(scald).getByText('On')).toBeInTheDocument();
+    });
+
+    it('offers Link to a person when nobody is linked and the viewer may link', () => {
+        render(<SensorPage {...sensor({ care: { link: null, can_link: true, scald: null } })} />);
+
+        expect(screen.getByText('Not linked to anyone’s care.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Link to a person' })).toBeInTheDocument();
+    });
 });

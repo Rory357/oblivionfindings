@@ -161,7 +161,9 @@ final class DeviceAlertEngine
             $kind = mb_substr('reading_'.preg_replace('/[^a-z0-9_]/', '', strtolower($metric)), 0, 32);
             $reading = rtrim(rtrim(number_format($value, 1, '.', ''), '0'), '.').($unit !== '' ? ' '.self::unitWords($unit) : '');
             if (in_array($state, ['warning', 'critical'], true)) {
-                $this->openForHouse($device, $kind, $state, (string) $device->name.': '.lcfirst($label).' '.$reading, $at, ucfirst($label).' '.$reading, 'Out of the usual range');
+                // "Temperature" becomes "temperature", but "CO2" stays "CO2".
+                $wording = preg_match('/\A\p{Lu}\p{Ll}/u', $label) === 1 ? lcfirst($label) : $label;
+                $this->openForHouse($device, $kind, $state, (string) $device->name.': '.$wording.' '.$reading, $at, ucfirst($label).' '.$reading, 'Out of the usual range');
 
                 return;
             }

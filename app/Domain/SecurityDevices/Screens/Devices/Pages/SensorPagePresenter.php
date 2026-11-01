@@ -121,6 +121,44 @@ final class SensorPagePresenter
                 'where' => $this->where($device, $entry, $siteName, $gateway, $readings, $lastReadingAt),
             ] : null,
             'alerts' => $tab === 'alerts' ? $this->alerts($device, $now) : null,
+            'care' => $this->care($viewer, $device, $readings, $retired),
+        ];
+    }
+
+    /**
+     * S&D Phase F (7b, 7c, pop-up 65): who this sensor is linked to and their plan's rule, whether
+     * the viewer may link or unlink it, and the hot-water scald watch for temperature probes.
+     *
+     * @param  array<string, array{value: float, state: string, at: ?string}>  $readings
+     * @return array<string, mixed>
+     */
+    private function care(User $viewer, Device $device, array $readings, bool $retired): array
+    {
+        $link = app(\App\Domain\SecurityDevices\Care\DevicePersonLinks::class)->currentFor($device);
+        $name = $link?->client ? \App\Domain\SecurityDevices\Care\DevicePersonLinks::name($link->client) : null;
+        $rule = (array) ($link?->rule ?? []);
+        $purpose = [
+            'falls' => 'falls plan', 'wandering' => 'wandering plan', 'room' => 'room readings', 'other' => 'care',
+        ][$link?->purpose ?? 'other'] ?? 'care';
+        $canSeePerson = $link?->client !== null && $viewer->can('view', $link->client);
+
+        return [
+            'link' => $link === null ? null : [
+                'title' => 'Linked to '.($canSeePerson ? $name.'’s ' : 'a person’s ').$purpose,
+                'rule' => match ($link->purpose) {
+                    'falls' => 'Alert night staff if '.($canSeePerson ? $name : 'they are').' out of bed for over '.(int) ($rule['minutes'] ?? 10).' minutes between '.($rule['from'] ?? '22:00').' and '.($rule['to'] ?? '06:00'),
+                    'wandering' => 'Alert staff on shift if the door opens between '.($rule['from'] ?? '22:00').' and '.($rule['to'] ?? '06:00'),
+                    default => null,
+                },
+                'plan' => $canSeePerson && $link->carePlan ? (string) $link->carePlan->title : null,
+                'person_href' => $canSeePerson ? '/clients/'.$link->client_id : null,
+                'linked_at' => $link->linked_at?->toIso8601String(),
+            ],
+            'can_link' => $viewer->canDo('securityDevices.people.link') && ! $retired,
+            'scald' => array_key_exists('temperature', $readings) || \App\Domain\SecurityDevices\Care\ScaldWatch::watches($device) ? [
+                'on' => \App\Domain\SecurityDevices\Care\ScaldWatch::watches($device),
+                'can_change' => $viewer->canDo('securityDevices.devices.update') && ! $retired,
+            ] : null,
         ];
     }
 

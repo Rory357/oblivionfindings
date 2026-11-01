@@ -21,10 +21,14 @@ import {
 import { TrendChart, type TrendRangeKey } from '@/components/security-devices/device-blocks';
 import { iconForKind } from '@/components/security-devices/device-kind-icon';
 import { DeviceFormPopup, useDeviceFormOptions } from '@/components/security-devices/device-popups';
-import { QuietLine, SideBySide, Surface } from '@/components/signature/blocks';
+import { PersonLinkPopup } from '@/components/security-devices/person-link-popup';
+import { Note, QuietLine, SideBySide, Surface } from '@/components/signature/blocks';
+import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
+import axios from 'axios';
 import { Pencil } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { MainSide } from './_device-page-parts';
@@ -102,10 +106,84 @@ function AlertRules({ rules }: { rules: { label: string; hint: string }[] }) {
     );
 }
 
+/**
+ * S&D Phase F (7b, 7c): who this sensor is linked to and their plan's rule (or Link to a person),
+ * and for a temperature probe the hot-water scald watch.
+ */
+function CareCard({ care, deviceId, onLink }: { care: NonNullable<SensorPageProps['care']>; deviceId: number; onLink: () => void }) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const call = async (request: () => Promise<unknown>, failed: string) => {
+        setBusy(true);
+        setError(null);
+        try {
+            await request();
+            router.reload();
+        } catch (failure) {
+            const status = axios.isAxiosError(failure) ? failure.response?.status : undefined;
+            setError(status === 403 ? 'You can’t change this.' : status ? failed : 'Result not confirmed. Reload to check.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <>
+            {care.link ? (
+                <Surface title={care.link.title} sub={care.link.plan ? `From ${care.link.plan} · alerts go to whoever is on shift` : 'Alerts go to whoever is on shift'}>
+                    <div className="grid gap-3 px-[18px] pt-2 pb-4">
+                        {care.link.rule ? <p className="text-sm">{care.link.rule}</p> : null}
+                        <div className="flex flex-wrap gap-2">
+                            {care.link.person_href ? (
+                                <Button size="sm" variant="outline" onClick={() => router.visit(care.link?.person_href ?? '')}>
+                                    Open their record
+                                </Button>
+                            ) : null}
+                            {care.can_link ? (
+                                <Button size="sm" variant="ghost" disabled={busy} onClick={() => void call(() => axios.delete(`/security-devices/devices/${deviceId}/care-link`), 'It wasn’t unlinked. Try again.')}>
+                                    Unlink
+                                </Button>
+                            ) : null}
+                        </div>
+                    </div>
+                </Surface>
+            ) : care.can_link ? (
+                <QuietLine title="Care" text="Not linked to anyone’s care." action={{ label: 'Link to a person', onClick: onLink }} />
+            ) : null}
+            {care.scald ? (
+                <Surface title="Scald watch" sub="Hot water over 45 °C, three readings in a row">
+                    <div className="flex items-center gap-3 px-[18px] pt-2 pb-4">
+                        <span className="grid min-w-0 flex-1">
+                            <b className="text-sm font-semibold">Watch this tap for scald risk</b>
+                            <small className="text-caption">Opens a critical alert for the staff on shift, with the H&S hazard ready to raise</small>
+                        </span>
+                        {care.scald.can_change ? (
+                            <Switch
+                                checked={care.scald.on}
+                                disabled={busy}
+                                aria-label="Watch this tap for scald risk"
+                                onCheckedChange={(on) => void call(() => axios.put(`/security-devices/devices/${deviceId}/scald-watch`, { on }), 'It wasn’t changed. Try again.')}
+                            />
+                        ) : (
+                            <StatusBadge variant={care.scald.on ? 'success' : 'neutral'}>{care.scald.on ? 'On' : 'Off'}</StatusBadge>
+                        )}
+                    </div>
+                </Surface>
+            ) : null}
+            {error ? (
+                <Note tone="critical">
+                    <span role="alert">{error}</span>
+                </Note>
+            ) : null}
+        </>
+    );
+}
+
 export default function SensorPage(props: SensorPageProps) {
     const { device, tab, can } = props;
     const now = useNow();
     const [editing, setEditing] = useState(false);
+    const [linking, setLinking] = useState(false);
     const { form, load } = useDeviceFormOptions();
     const base = `/security-devices/devices/${device.id}`;
 
@@ -177,6 +255,7 @@ export default function SensorPage(props: SensorPageProps) {
                 main={<Readings series={readings.series} range={props.range} onRange={(range) => go({ range })} />}
                 side={
                     <>
+                        {props.care ? <CareCard care={props.care} deviceId={device.id} onLink={() => setLinking(true)} /> : null}
                         <AlertRules rules={readings.rules} />
                         <FactLines
                             title="Where it is"
@@ -212,6 +291,17 @@ export default function SensorPage(props: SensorPageProps) {
                 canAssign={can.assign}
                 onClose={() => setEditing(false)}
             />
+            {props.care?.can_link ? (
+                <PersonLinkPopup
+                    open={linking}
+                    device={{ id: device.id, name: device.name, site: device.site }}
+                    onClose={() => setLinking(false)}
+                    onLinked={() => {
+                        setLinking(false);
+                        router.reload();
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

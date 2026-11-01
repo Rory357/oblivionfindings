@@ -86,6 +86,12 @@ export type SensorPageProps = {
         where: { rows: FactLine[]; gateway_href: string | null };
     } | null;
     alerts: AlertLine[] | null;
+    /** S&D Phase F (7b, 7c, pop-up 65): the person this sensor is linked to, and the scald watch. */
+    care?: {
+        link: { title: string; rule: string | null; plan: string | null; person_href: string | null; linked_at: string | null } | null;
+        can_link: boolean;
+        scald: { on: boolean; can_change: boolean } | null;
+    };
     deviceForm?: DeviceFormData;
 };
 
