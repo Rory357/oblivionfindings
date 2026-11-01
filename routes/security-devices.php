@@ -74,6 +74,7 @@ use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandExecutio
 use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceCommandRequest;
 use App\Domain\SecurityDevices\Screens\Http\DevicesController;
 use App\Domain\SecurityDevices\Screens\Http\FoundDevicesController;
+use App\Domain\SecurityDevices\Screens\Http\HubPanelController;
 use App\Domain\SecurityDevices\Screens\Http\OverviewController;
 use App\Domain\SecurityDevices\Screens\Http\SitesController;
 use Illuminate\Support\Facades\Route;
@@ -800,6 +801,10 @@ Route::middleware([
             ->name('security-devices.hubs.check-update');
         Route::patch('/{collector}', [HubAdminController::class, 'update'])->whereNumber('collector')
             ->name('security-devices.hubs.update');
+        // Pop-up 13, the hub panel: read-only, scoped to the hub's own Site (HubPanelPresenter).
+        Route::get('/{collector}/panel', HubPanelController::class)->whereNumber('collector')
+            ->withoutMiddleware('throttle:30,1,security-device-hubs:')->middleware('throttle:90,1,security-device-hubs-panel:')
+            ->name('security-devices.hubs.panel');
     });
 
     Route::get('/settings', SettingsAuditController::class)

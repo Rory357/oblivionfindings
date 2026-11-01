@@ -21,8 +21,13 @@ export type SiteCard = {
     facts: SiteFact[];
     needs_attention: boolean;
     set_up: boolean;
+    /** The hub that watches it, when the viewer may open its panel (sdr-13). */
+    hub?: { id: number; label: string } | null;
     href: string;
 };
+
+/** Add a hub (sdr-12) and approving it (sdr-79), by the hub routes' own rule. */
+export type HubCan = { add_hub?: boolean; approve_hub?: boolean };
 
 export type SitesIndexProps = {
     tab: SitesTab;
@@ -35,7 +40,7 @@ export type SitesIndexProps = {
         attention: { count: number; caption: string };
     };
     cards: SiteCard[];
-    can: { add_device: boolean; scan: boolean };
+    can: { add_device: boolean; scan: boolean } & HubCan;
 };
 
 export type SitePageTab = 'overview' | 'network' | 'internet';
@@ -64,7 +69,8 @@ export type SitePageProps = {
     site: { id: number; name: string; address: string };
     tab: SitePageTab;
     flag: SiteFlag;
-    hub: { label: string; own: boolean; answering: boolean; version: string | null; seen_at: string | null } | null;
+    /** `id` is set when the viewer may open the hub panel (sdr-13). */
+    hub: { id?: number | null; label: string; own: boolean; answering: boolean; version: string | null; seen_at: string | null } | null;
     meters: {
         online: { count: number; of: number; caption: { text: string; at: string | null } };
         alerts: { count: number; caption: string };
@@ -84,5 +90,5 @@ export type SitePageProps = {
     } | null;
     network: { tree: unknown } | null;
     internet: { gateways: SiteDeviceRow[]; outages: SiteEventRow[] } | null;
-    can: { add_device: boolean; assign: boolean; scan: boolean };
+    can: { add_device: boolean; assign: boolean; scan: boolean } & HubCan;
 };

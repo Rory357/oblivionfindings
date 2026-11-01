@@ -4,7 +4,9 @@ namespace App\Domain\SecurityDevices\Screens\Sites;
 
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
+use App\Domain\SecurityDevices\Hubs\Services\HubActionRules;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceDirectory;
+use App\Domain\SecurityDevices\Screens\Hubs\HubPanelPresenter;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceEntry;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\ControlRoomAlert;
@@ -44,8 +46,10 @@ final class SitesIndexPresenter
         $entriesBySite = $this->directory->entries($viewer)->groupBy(fn (DeviceEntry $entry): int => (int) $entry->siteId);
         $alerts = $this->deviceAlerts($viewer, $entriesBySite);
         $hubsBySite = $sites->mapWithKeys(fn (Site $site): array => [(int) $site->id => $this->hubs->forSite((int) $site->id)]);
+        // "Watched by" opens the hub panel (sdr-13) only for a hub whose own Site the viewer sees.
+        $visibleSiteIds = HubPanelPresenter::mayView($viewer) ? $this->access->accessibleSiteIds($viewer) : [];
 
-        $cards = $sites->map(function (Site $site) use ($entriesBySite, $alerts, $hubsBySite): array {
+        $cards = $sites->map(function (Site $site) use ($entriesBySite, $alerts, $hubsBySite, $visibleSiteIds): array {
             $entries = $entriesBySite->get((int) $site->id, collect());
             $hub = $hubsBySite->get((int) $site->id);
             $siteAlerts = $alerts[(int) $site->id] ?? [];
@@ -61,6 +65,9 @@ final class SitesIndexPresenter
                 'facts' => SiteFacts::cardFacts($entries, $hub, (int) $site->id, $siteAlerts),
                 'needs_attention' => in_array($flag['tone'], ['critical', 'warning'], true),
                 'set_up' => $hub !== null,
+                'hub' => $hub !== null && in_array((int) $hub->site_id, $visibleSiteIds, true)
+                    ? ['id' => (int) $hub->id, 'label' => CoveringHubResolver::label($hub)]
+                    : null,
                 'href' => '/security-devices/sites/'.$site->id,
             ];
         })->values();
@@ -92,6 +99,9 @@ final class SitesIndexPresenter
             'can' => [
                 'add_device' => $viewer->canDo('securityDevices.devices.create'),
                 'scan' => $viewer->canDo('securityDevices.integrations.manage'),
+                // Add a hub (sdr-12) and its approval (sdr-79), by the same rule the hub routes use.
+                'add_hub' => HubActionRules::allows($viewer, 'securityDevices.integrations.manage'),
+                'approve_hub' => HubActionRules::allows($viewer, 'securityDevices.hubs.approve'),
             ],
         ];
     }

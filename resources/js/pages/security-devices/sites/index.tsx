@@ -9,16 +9,18 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { useDeviceFormOptions } from '@/components/security-devices/device-popups';
+import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
 import { PlaceCards, QuietLine } from '@/components/signature/blocks';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Cpu, House, Radar } from 'lucide-react';
+import { Cpu, House, Plus, Radar, Server } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { FactText, SiteFlagBadge } from './_parts';
 import type { SiteCard, SitesIndexProps, SitesTab } from './_types';
@@ -51,8 +53,9 @@ export default function SitesIndex({ tab, filters, regions, tabs, meters, cards,
     const searchTimer = useRef<number | null>(null);
     const menu = useEntityContextMenu<SiteCard>();
     const { form, load } = useDeviceFormOptions();
+    const hubs = useHubPopups(load);
 
-    const go = (changes: Record<string, string | undefined>) => {
+    const go =(changes: Record<string, string | undefined>) => {
         menu.close();
         const next: Record<string, string | undefined> = {
             tab: tab === 'all' ? undefined : tab,
@@ -76,6 +79,9 @@ export default function SitesIndex({ tab, filters, regions, tabs, meters, cards,
     const actionsFor = (card: SiteCard): MenuItem[] => [
         { label: 'Open', icon: House, onClick: () => router.visit(card.href) },
         { label: 'Devices at this Site', icon: Cpu, onClick: () => router.visit(`/security-devices/devices?site=${card.id}`) },
+        // The card's "Watched by" line, as the hub panel (sdr-13).
+        ...(card.hub ? [{ label: `Open ${card.hub.label}`, icon: Server, onClick: () => hubs.openPanel(card.hub!.id) }] : []),
+        ...(!card.set_up && can.add_hub ? [{ label: 'Add a hub here', icon: Plus, onClick: () => hubs.openAdd(card.id) }] : []),
         ...(can.scan
             ? [{
                 label: 'Scan its network',
@@ -93,7 +99,16 @@ export default function SitesIndex({ tab, filters, regions, tabs, meters, cards,
             icon={House}
             title="Sites"
             subline="Each house and office, how its devices are doing and which hub watches it"
-            actions={<PageHeaderSearch value={search} onChange={updateSearch} placeholder="Search Sites" />}
+            actions={
+                <>
+                    <PageHeaderSearch value={search} onChange={updateSearch} placeholder="Search Sites" />
+                    {can.add_hub ? (
+                        <PageHeaderPrimaryButton icon={Plus} onClick={() => hubs.openAdd(null)}>
+                            Add a hub
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
             meters={
                 <>
                     <PageHeaderMeterBlock label="Sites set up" onClick={() => go({ tab: 'not_set_up' })} ariaLabel="Show Sites without a hub">
@@ -191,6 +206,7 @@ export default function SitesIndex({ tab, filters, regions, tabs, meters, cards,
                 onStarted={(runId) => setPopup({ kind: 'scanning', runId })}
             />
             <ScanningViewer open={popup?.kind === 'scanning'} runId={popup?.kind === 'scanning' ? popup.runId : null} canStop={can.scan} onClose={() => setPopup(null)} />
+            <HubPopups state={hubs} form={form} canApprove={!!can.approve_hub} canStopScan={can.scan} />
         </AppLayout>
     );
 }

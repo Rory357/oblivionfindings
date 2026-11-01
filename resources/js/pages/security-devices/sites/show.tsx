@@ -15,6 +15,7 @@ import {
     PageLayout,
 } from '@/components/page';
 import { AddDeviceChooser, DeviceFormPopup, useDeviceFormOptions } from '@/components/security-devices/device-popups';
+import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { SiteTopologyTreeCard } from '@/components/security-devices/site-topology-tree';
 import type { SiteTopologyTree } from '@/components/security-devices/topology-types';
@@ -69,8 +70,32 @@ export default function SiteShow(props: SitePageProps) {
         setPopup(next);
     };
     const go = (next: SitePageTab) => router.get(base, next === 'overview' ? {} : { tab: next }, { preserveScroll: true });
+    const hubs = useHubPopups(load);
+    const hubId = hub?.id ?? null;
 
-    const hubWords = hub === null ? 'no hub watches it yet' : hub.own ? `its own hub is ${hub.label}` : `watched by ${hub.label}`;
+    // The "watched by" line opens the hub panel (sdr-13) when the viewer may see it.
+    const hubName =
+        hub === null ? null : hubId !== null ? (
+            // eslint-disable-next-line no-restricted-syntax -- the hub's name in the header line, opening its panel; a text link, not a form button.
+            <button type="button" onClick={() => hubs.openPanel(hubId)} className="rounded-sm underline underline-offset-2 outline-none hover:no-underline focus-visible:ring-2 focus-visible:ring-band-foreground">
+                {hub.label}
+            </button>
+        ) : (
+            hub.label
+        );
+    const hubWords =
+        hub === null ? (
+            'no hub watches it yet'
+        ) : hub.own ? (
+            <>its own hub is {hubName}</>
+        ) : (
+            <>watched by {hubName}</>
+        );
+    const openHub = () => {
+        if (hubId !== null) hubs.openPanel(hubId);
+        else if (hub === null && can.add_hub) hubs.openAdd(site.id);
+        else go('overview');
+    };
 
     const header = (
         <PageHeader
@@ -79,7 +104,12 @@ export default function SiteShow(props: SitePageProps) {
             icon={House}
             title={site.name}
             titleChip={<PageHeaderStatusChip variant={flag.tone}>{flag.text}</PageHeaderStatusChip>}
-            subline={[site.address, hubWords].filter(Boolean).join(' · ')}
+            subline={
+                <>
+                    {site.address ? `${site.address} · ` : null}
+                    {hubWords}
+                </>
+            }
             actions={
                 <>
                     {can.scan ? (
@@ -118,8 +148,8 @@ export default function SiteShow(props: SitePageProps) {
                     <PageHeaderMeterBlock
                         label="Hub"
                         tone={hub === null ? 'brand' : hub.answering ? 'success' : 'critical'}
-                        onClick={() => go('overview')}
-                        ariaLabel="Show how the hub is doing"
+                        onClick={openHub}
+                        ariaLabel={hubId !== null ? `Open ${hub?.label ?? 'the hub'}` : hub === null && can.add_hub ? 'Add a hub for this Site' : 'Show how the hub is doing'}
                     >
                         <PageHeaderMeterBig>{hub === null ? 'None yet' : hub.answering ? 'Answering' : 'Not answering'}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
@@ -171,6 +201,7 @@ export default function SiteShow(props: SitePageProps) {
                 onStarted={(runId) => setPopup({ kind: 'scanning', runId })}
             />
             <ScanningViewer open={popup?.kind === 'scanning'} runId={popup?.kind === 'scanning' ? popup.runId : null} canStop={can.scan} onClose={() => setPopup(null)} />
+            <HubPopups state={hubs} form={form} canApprove={!!can.approve_hub} canStopScan={can.scan} />
         </AppLayout>
     );
 }

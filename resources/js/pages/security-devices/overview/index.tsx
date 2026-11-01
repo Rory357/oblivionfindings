@@ -15,6 +15,7 @@ import {
     PageLayout,
 } from '@/components/page';
 import { AddDeviceChooser, DeviceFormPopup, useDeviceFormOptions } from '@/components/security-devices/device-popups';
+import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { Journey, Log, PlaceCards, PointBars, QuietLine, SideBySide, SideColumn, Story, Surface, Tally } from '@/components/signature/blocks';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -55,10 +56,14 @@ export default function Overview(props: OverviewProps) {
     const now = useNow();
     const [popup, setPopup] = useState<Popup>(null);
     const { form, load } = useDeviceFormOptions();
+    const hubs = useHubPopups(load);
     const open = (next: Exclude<Popup, null>) => {
         load();
         setPopup(next);
     };
+    // First time (pg-sdr-1b): Add a hub is the header's one action and Get started step 1.
+    const addHubFirst = !!props.first_time && tab === 'overview' && !!can.add_hub;
+    const addHub = () => hubs.openAdd(site !== 'all' ? Number(site) : null);
     const go = (changes: { tab?: OverviewTab; site?: string }) => {
         const next = { tab: changes.tab ?? tab, site: changes.site ?? site };
         router.get(
@@ -75,18 +80,24 @@ export default function Overview(props: OverviewProps) {
             title="Security & devices"
             subline="Your houses, devices and alerts in one place"
             actions={
-                <>
-                    {can.scan ? (
-                        <PageHeaderGlassButton icon={Radar} onClick={() => open({ kind: 'scan' })}>
-                            Scan network
-                        </PageHeaderGlassButton>
-                    ) : null}
-                    {can.add || can.scan ? (
-                        <PageHeaderPrimaryButton icon={Plus} onClick={() => open({ kind: 'chooser' })}>
-                            Add device
-                        </PageHeaderPrimaryButton>
-                    ) : null}
-                </>
+                addHubFirst ? (
+                    <PageHeaderPrimaryButton icon={Plus} onClick={addHub}>
+                        Add a hub
+                    </PageHeaderPrimaryButton>
+                ) : (
+                    <>
+                        {can.scan ? (
+                            <PageHeaderGlassButton icon={Radar} onClick={() => open({ kind: 'scan' })}>
+                                Scan network
+                            </PageHeaderGlassButton>
+                        ) : null}
+                        {can.add || can.scan ? (
+                            <PageHeaderPrimaryButton icon={Plus} onClick={() => open({ kind: 'chooser' })}>
+                                Add device
+                            </PageHeaderPrimaryButton>
+                        ) : null}
+                    </>
+                )
             }
             meters={
                 <>
@@ -130,7 +141,7 @@ export default function Overview(props: OverviewProps) {
     );
 
     let body: ReactNode = null;
-    if (tab === 'overview' && props.first_time) body = <FirstTime firstTime={props.first_time} canConnect={can.connect} />;
+    if (tab === 'overview' && props.first_time) body = <FirstTime firstTime={props.first_time} canConnect={can.connect} onAddHub={can.add_hub ? addHub : null} />;
     else if (tab === 'overview' && props.overview) body = <OverviewBody overview={props.overview} now={now} />;
     else if (tab === 'trends' && props.trends) body = <Trends trends={props.trends} />;
 
@@ -166,17 +177,19 @@ export default function Overview(props: OverviewProps) {
                 onStarted={(runId) => setPopup({ kind: 'scanning', runId })}
             />
             <ScanningViewer open={popup?.kind === 'scanning'} runId={popup?.kind === 'scanning' ? popup.runId : null} canStop={can.scan} onClose={() => setPopup(null)} />
+            <HubPopups state={hubs} form={form} canApprove={!!can.approve_hub} canStopScan={can.scan} />
         </AppLayout>
     );
 }
 
-function FirstTime({ firstTime, canConnect }: { firstTime: NonNullable<OverviewProps['first_time']>; canConnect: boolean }) {
+function FirstTime({ firstTime, canConnect, onAddHub }: { firstTime: NonNullable<OverviewProps['first_time']>; canConnect: boolean; onAddHub: (() => void) | null }) {
     return (
         <SideBySide cols="minmax(0, 1fr) 360px">
             <div className="flex flex-col gap-5">
                 <Journey
                     title="Get started in 4 steps"
                     sub="About 15 minutes for your first Site"
+                    action={onAddHub ? { label: 'Add a hub', onClick: onAddHub } : null}
                     steps={firstTime.steps}
                     caption={
                         <>

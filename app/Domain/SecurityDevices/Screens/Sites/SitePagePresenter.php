@@ -5,12 +5,14 @@ namespace App\Domain\SecurityDevices\Screens\Sites;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryRun;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
+use App\Domain\SecurityDevices\Hubs\Services\HubActionRules;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Screens\DeviceState;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceDirectory;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceEntry;
+use App\Domain\SecurityDevices\Screens\Hubs\HubPanelPresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use App\Models\ControlRoomAlert;
@@ -71,6 +73,10 @@ final class SitePagePresenter
             'tab' => $tab,
             'flag' => $flag,
             'hub' => $hub === null ? null : [
+                // The hub panel (sdr-13) opens only for a hub whose own Site the viewer sees.
+                'id' => HubPanelPresenter::mayView($viewer) && in_array((int) $hub->site_id, $this->access->accessibleSiteIds($viewer), true)
+                    ? (int) $hub->id
+                    : null,
                 'label' => CoveringHubResolver::label($hub),
                 'own' => (int) $hub->site_id === (int) $site->id,
                 'answering' => ! $hubDown,
@@ -85,6 +91,8 @@ final class SitePagePresenter
                 'add_device' => $viewer->canDo('securityDevices.devices.create'),
                 'assign' => $viewer->canDo('securityDevices.devices.assign'),
                 'scan' => $viewer->canDo('securityDevices.integrations.manage'),
+                'add_hub' => HubActionRules::allows($viewer, 'securityDevices.integrations.manage'),
+                'approve_hub' => HubActionRules::allows($viewer, 'securityDevices.hubs.approve'),
             ],
         ];
     }

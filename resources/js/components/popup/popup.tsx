@@ -685,6 +685,8 @@ export type PopupConfirmProps = {
     children?: ReactNode;
     /** A second way out between Cancel and the main button, e.g. "Retire instead". */
     secondary?: ReactNode;
+    /** Left of Cancel, e.g. a ghost "Remove it" on an approval. */
+    footerStart?: ReactNode;
     onCloseAutoFocus?: AutoFocusHandler;
     testId?: string;
 };
@@ -714,6 +716,7 @@ export function PopupConfirm({
     error,
     children,
     secondary,
+    footerStart,
     onCloseAutoFocus,
     testId,
 }: PopupConfirmProps) {
@@ -768,7 +771,7 @@ export function PopupConfirm({
                     ) : null}
                     {children}
                 </div>
-                <PopupFooter>
+                <PopupFooter start={footerStart}>
                     {variant === 'alert' ? null : (
                         <Button
                             type="button"

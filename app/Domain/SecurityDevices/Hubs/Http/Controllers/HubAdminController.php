@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Hubs\Http\Controllers;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\CollectorEnrollmentService;
 use App\Domain\SecurityDevices\Hubs\Models\SetupCode;
+use App\Domain\SecurityDevices\Hubs\Services\HubActionRules;
 use App\Domain\SecurityDevices\Hubs\Services\HubApprovalService;
 use App\Domain\SecurityDevices\Hubs\Services\HubInstallationSettings;
 use App\Domain\SecurityDevices\Hubs\Services\HubUpdatePolicy;
@@ -15,7 +16,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Support\SecurityPolicy;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -287,19 +287,8 @@ final class HubAdminController extends Controller
     {
         abort_unless($request->isSecure() || app()->environment(['local', 'testing']), 400);
         $actor = $request->user();
-        abort_unless(
-            $actor !== null
-            && $actor->approved_at !== null
-            && $actor->email_verified_at !== null
-            && ! $actor->external_clinical_account
-            && $actor->canDo('securityDevices.viewAny')
-            && $actor->canDo($permission)
-            && (! SecurityPolicy::forceTwoFactor() || $actor->two_factor_confirmed_at !== null),
-            403,
-        );
-        foreach (['client', 'next_of_kin', 'external_clinician'] as $role) {
-            abort_if($actor->role === $role || $actor->hasRole($role), 403);
-        }
+        // One rule with the screens' `can` flags (HubActionRules), so they never disagree.
+        abort_unless($actor instanceof User && HubActionRules::allows($actor, $permission), 403);
 
         return $actor;
     }

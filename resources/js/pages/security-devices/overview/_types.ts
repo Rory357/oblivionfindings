@@ -39,5 +39,6 @@ export type OverviewProps = {
         batteries: { id: number; name: string; site: string | null; battery: number | null; href: string }[];
         slowest: { id: number; name: string; model: string; kind: string; site: string | null; week_ms: number; usual_ms: number | null; href: string }[];
     } | null;
-    can: { add: boolean; scan: boolean; connect: boolean; assign: boolean };
+    /** add_hub / approve_hub: Add a hub (sdr-12) and approving it (sdr-79). */
+    can: { add: boolean; scan: boolean; connect: boolean; assign: boolean; add_hub?: boolean; approve_hub?: boolean };
 };

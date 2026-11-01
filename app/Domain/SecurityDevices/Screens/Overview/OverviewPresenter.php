@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Discovery\Models\DiscoveryRun;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
+use App\Domain\SecurityDevices\Hubs\Services\HubActionRules;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Screens\DeviceState;
@@ -78,6 +79,9 @@ final class OverviewPresenter
                 'scan' => $viewer->canDo('securityDevices.integrations.manage'),
                 'connect' => $viewer->canDo('securityDevices.integrations.manage'),
                 'assign' => $viewer->canDo('securityDevices.devices.assign'),
+                // Get started step 1 and the first-time header (pg-sdr-1b): Add a hub (sdr-12).
+                'add_hub' => HubActionRules::allows($viewer, 'securityDevices.integrations.manage'),
+                'approve_hub' => HubActionRules::allows($viewer, 'securityDevices.hubs.approve'),
             ],
         ];
     }
