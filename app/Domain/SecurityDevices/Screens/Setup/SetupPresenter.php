@@ -150,7 +150,7 @@ final class SetupPresenter
                 'todo' => $todo,
                 'cards' => $this->cards($viewer, $hubs, $noHub, $services, $logins, $failedScans, $sections),
             ] : null,
-            'settings' => in_array($section, ['hubs', 'alerts'], true) ? $this->settings->forViewer($viewer) : null,
+            'settings' => in_array($section, ['hubs', 'alerts', 'access'], true) ? $this->settings->forViewer($viewer) : null,
             'alerts' => $section === 'alerts' && $tab === 'rules' ? ['rules' => $this->rules->count($viewer)] : null,
             'checks' => $section === 'alerts' && $tab === 'checks' ? $this->checks($entries) : null,
             'networks' => $section === 'hubs' && $tab === 'networks' ? $this->networks->present($viewer) : null,

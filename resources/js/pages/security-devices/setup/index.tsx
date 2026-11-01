@@ -15,6 +15,7 @@ import {
 } from '@/components/page/page-header';
 import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { ConnectService } from '@/components/security-devices/connect-service-popup';
+import { ConnectUnifiAccess } from '@/components/security-devices/connect-unifi-access-popup';
 import { useDeviceFormOptions } from '@/components/security-devices/device-popups';
 import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
 import { AddNetwork } from '@/components/security-devices/scan-popups';
@@ -22,8 +23,9 @@ import { AddSensorGateway } from '@/components/security-devices/sensor-gateway-p
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Bell, History, KeyRound, ListChecks, Network, Plug, RadioTower, Settings2 } from 'lucide-react';
+import { Bell, DoorOpen, History, KeyRound, ListChecks, Network, Plug, RadioTower, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { SetupAccess } from './_access';
 import { SetupAlertRules } from './_alerts';
 import { SetupBroker } from './_broker';
 import { SetupChecks } from './_checks';
@@ -34,7 +36,7 @@ import { ConnectedServices, SavedLogins, SupportedDevices } from './_services';
 import { SettingsSave, useSettingsDraft } from './_settings';
 import type { SetupMeter, SetupProps, SetupSection } from './_types';
 
-const TAB_ICONS = { networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks, rules: Bell, checks: ListChecks, broker: RadioTower } as const;
+const TAB_ICONS = { networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks, rules: Bell, checks: ListChecks, broker: RadioTower, unifi: DoorOpen } as const;
 
 export function setupUrl(section: SetupSection, tab?: string | null, page?: number): string {
     const base = section === 'overview' ? '/security-devices/setup' : `/security-devices/setup/${section}`;
@@ -54,6 +56,8 @@ export default function SetupPage(props: SetupProps) {
     const [addingNetwork, setAddingNetwork] = useState(false);
     const [addingGateway, setAddingGateway] = useState(false);
     const [connecting, setConnecting] = useState(false);
+    // S&D Phase H (pop-up 91): the Site to connect, or 0 for "choose"; null when closed.
+    const [connectingAccess, setConnectingAccess] = useState<number | null>(null);
     const [leaving, setLeaving] = useState<string | null>(null);
     const allowLeave = useRef(false);
     // Times are read once per visit, so "6:00 am" and "3 min ago" agree across the page.
@@ -201,9 +205,10 @@ export default function SetupPage(props: SetupProps) {
                     />
                 ) : null}
                 {props.alerts ? <SetupAlertRules data={props.alerts} draft={draft} /> : null}
+                {props.access ? <SetupAccess data={props.access} draft={draft} query={query} now={now} onConnect={(siteId) => setConnectingAccess(siteId ?? 0)} /> : null}
                 {props.checks ? <SetupChecks data={props.checks} draft={draft} query={query} canOpenDevices={can.open_devices} /> : null}
 
-                {props.settings ? <SettingsSave draft={draft} what={section === 'alerts' ? (tab === 'checks' ? 'checks' : 'alert rules') : tab === 'broker' ? 'the sensor broker' : 'scans'} /> : null}
+                {props.settings ? <SettingsSave draft={draft} what={section === 'alerts' ? (tab === 'checks' ? 'checks' : 'alert rules') : tab === 'broker' ? 'the sensor broker' : section === 'access' ? 'doors and access' : 'scans'} /> : null}
             </div>
 
             <AddNetwork
@@ -215,6 +220,20 @@ export default function SetupPage(props: SetupProps) {
                 }}
             />
             <AddSensorGateway open={addingGateway} form={form} onClose={() => setAddingGateway(false)} />
+            {props.access ? (
+                <ConnectUnifiAccess
+                    open={connectingAccess !== null}
+                    places={props.access.places}
+                    permissions={props.access.token_permissions}
+                    canSaveToken={props.access.can.save_token}
+                    canConfirmDoors={props.access.can.confirm_doors}
+                    startSiteId={connectingAccess || null}
+                    onClose={() => {
+                        setConnectingAccess(null);
+                        router.reload({ except: ['deviceForm'] });
+                    }}
+                />
+            ) : null}
             {can.manage ? <ConnectService open={connecting} onClose={() => setConnecting(false)} onChanged={() => router.reload({ except: ['deviceForm'] })} /> : null}
             <HubPopups state={hubs} form={form} canApprove={can.approve_hubs} canStopScan={can.manage} />
             <ConfirmDialog

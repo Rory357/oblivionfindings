@@ -588,7 +588,6 @@ Route::middleware([
         Route::put('/consoles/{console}/token', [$setup, 'token'])->whereNumber('console')->middleware('throttle:10,1')->name('security-devices.setup.access.consoles.token');
         Route::post('/consoles/{console}/trust', [$setup, 'trust'])->whereNumber('console')->name('security-devices.setup.access.consoles.trust');
         Route::post('/consoles/{console}/doors-confirmed', [$setup, 'confirmDoors'])->whereNumber('console')->name('security-devices.setup.access.consoles.doors');
-        Route::put('/settings', [$setup, 'settings'])->name('security-devices.setup.access.settings');
     });
     // S&D Phase E (E8): pop-up 15, Connect a service. Each step runs the service's own settings action.
     Route::get('/setup/services/connect', [\App\Domain\SecurityDevices\Screens\Http\ConnectServiceController::class, 'show'])
@@ -600,7 +599,7 @@ Route::middleware([
         ->middleware(['permission:securityDevices.integrations.manage', 'throttle:30,1'])
         ->name('security-devices.setup.services.connect.run');
     Route::get('/setup/{section}', [SetupController::class, 'show'])
-        ->where('section', 'hubs|services|alerts|history')
+        ->where('section', 'hubs|services|alerts|access|history')
         ->name('security-devices.setup.section');
 
     // S&D rebuild Phase D: Alerts, and what people do on one. The controller checks permissions.

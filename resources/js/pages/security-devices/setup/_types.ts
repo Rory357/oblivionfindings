@@ -1,7 +1,43 @@
 /** Setup (S&D rebuild pg-sdr-15 and its sections): the props SetupPresenter sends. */
 import type { StatusVariant } from '@/components/ui/status-badge';
 
-export type SetupSection = 'overview' | 'hubs' | 'services' | 'alerts' | 'history';
+export type SetupSection = 'overview' | 'hubs' | 'services' | 'alerts' | 'access' | 'history';
+
+/** S&D Phase H (pg-sdr-15m): one Site's UniFi Access console, as Setup and pop-up 91 see it. */
+export type AccessConsoleState = {
+    id: number;
+    address: string;
+    port: number;
+    /** waiting | ok | failed | untrusted */
+    state: string;
+    last_error: string | null;
+    last_synced_at: string | null;
+    emergency_mode: string;
+    doors: number;
+    staff: number;
+    to_match: number;
+    token: { saved_at: string | null; complete: boolean } | null;
+    certificate: {
+        trusted_fingerprint: string | null;
+        offered: { fingerprint: string; subject: string | null; valid_to: string | null; seen_at: string | null; changed: boolean } | null;
+        can_trust: boolean;
+    } | null;
+    trusted: boolean;
+    doors_confirmed_at: string | null;
+};
+
+export type AccessPlace = {
+    site_id: number;
+    site: string;
+    hub: { name: string; runs: boolean; needs_update: boolean; online: boolean } | null;
+    console: AccessConsoleState | null;
+};
+
+export type AccessSetupData = {
+    places: AccessPlace[];
+    token_permissions: string[];
+    can: { connect: boolean; save_token: boolean; confirm_doors: boolean };
+};
 export type Tone = 'success' | 'warning' | 'critical' | 'info' | 'neutral';
 
 /** A line from the server: "**bold**" is the figure; "{time}" / "{ago}" are filled from `at` in NZ time. */
@@ -138,4 +174,6 @@ export type SetupProps = {
     logins: { rows: LoginRow[]; kept: [string, string][] } | null;
     supported: { tables: SupportedTable[] } | null;
     history: { rows: HistoryRow[]; page: number; pages: number; total: number; kept: [string, string][] } | null;
+    /** S&D Phase H (pg-sdr-15m): Doors & access › UniFi Access. */
+    access?: AccessSetupData | null;
 };

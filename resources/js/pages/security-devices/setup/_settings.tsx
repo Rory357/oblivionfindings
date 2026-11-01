@@ -55,6 +55,16 @@ export const SETTING_WORDS: Record<string, { label: string; hint: string; loosen
         loosens: 'Devices added from now on won’t be watched for going offline until someone turns it on for each.',
     },
     'devices.watch_phones': { label: 'Phones and tablets', hint: 'Off: found but never watched or alerted on' },
+    // S&D Phase H (pg-sdr-15m): Setup › Doors & access.
+    'access.changes_from_oblivion': {
+        label: 'People and their cards',
+        hint: 'Give access, add a card at a reader, turn a lost card off and make visitor passes, from Oblivion',
+    },
+    'access.leavers_off': {
+        label: 'Turn cards and PINs off when someone leaves',
+        hint: 'From HR, just after midnight at the end of their last day (decision D20). Only people matched to staff',
+        loosens: 'Leavers’ cards and PINs would keep opening doors until someone turns them off by hand.',
+    },
 };
 
 const ROLE_IT = '__it_for_site__';
