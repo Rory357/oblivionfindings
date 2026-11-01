@@ -73,6 +73,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
         // G3 History tab: the review's activity log (read only, the event read).
         Route::get('/events/{hsEvent}/activity', [HsEventController::class, 'activity'])->whereNumber('hsEvent')->name('events.activity');
+        // G3 board M5d: open or play a file on a review's step (the review's normal read; each open is logged).
+        Route::get('/events/{event}/files/{file}', [\App\Http\Controllers\HealthSafety\HsEventFileController::class, 'show'])->whereNumber('event')->name('events.files.show');
         Route::get('/events/{hsEvent}/incident-attachments/{attachment}/download', [HsEventController::class, 'downloadIncidentAttachment'])->name('events.incident-attachments.download');
         Route::get('/events/{hsEvent}/control-room-evidence/{item}/download', [HsEventController::class, 'downloadControlRoomEvidence'])->name('events.control-room-evidence.download');
         Route::get('/corrective-actions', [HsEventController::class, 'correctiveActions'])->name('corrective-actions.index');
@@ -98,6 +100,9 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::post('/events/{hsEvent}/accept-handover', [HsEventController::class, 'acceptHandover'])->name('events.handover.accept');
         // Q2 (G3): change a safety review's owner, with a reason.
         Route::post('/events/{hsEvent}/owner', [HsEventController::class, 'changeOwner'])->name('events.owner.change');
+        // G3 board M5d: add photos, videos and documents to a review's step, or hide one with a reason.
+        Route::post('/events/{event}/files', [\App\Http\Controllers\HealthSafety\HsEventFileController::class, 'store'])->whereNumber('event')->name('events.files.store');
+        Route::post('/events/{event}/files/{file}/hide', [\App\Http\Controllers\HealthSafety\HsEventFileController::class, 'hide'])->whereNumber('event')->name('events.files.hide');
         // Answer 20 (G3): corrections to agreed findings go through independent review and approval.
         Route::post('/events/{event}/investigations/{investigation}/corrections', [\App\Http\Controllers\HealthSafety\HsInvestigationCorrectionController::class, 'store'])->whereNumber('event')->name('events.investigations.corrections.store');
         Route::post('/events/{event}/corrections/{correction}/review', [\App\Http\Controllers\HealthSafety\HsInvestigationCorrectionController::class, 'review'])->whereNumber('event')->name('events.corrections.review');

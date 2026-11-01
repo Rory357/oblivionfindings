@@ -5,6 +5,7 @@ namespace App\Services\HealthSafety;
 use App\Models\AuditLog;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Models\HsEventFile;
 use App\Models\HsEventOwnerChange;
 use App\Models\HsInvestigation;
 use App\Models\HsInvestigationCorrection;
@@ -184,6 +185,21 @@ final class HsEventActivityService
             case 'healthSafety.event.closed':
             case 'healthSafety.event.closedWithException':
                 return $plain('closed the safety review', 'closed');
+            // G3 board M5d: each upload, open and hide of a step's file is part of the record.
+            case 'healthSafety.event.fileAdded':
+            case 'healthSafety.event.fileOpened':
+            case 'healthSafety.event.fileHidden':
+                $file = isset($meta['file_id']) ? HsEventFile::query()->find((int) $meta['file_id'], ['id', 'original_name', 'kind', 'step', 'hidden_reason']) : null;
+                $name = $file ? '“'.$file->original_name.'”' : 'a file';
+                $step = in_array($meta['step'] ?? $file?->step, HsEventFile::STEPS, true) ? (string) ($meta['step'] ?? $file?->step) : 'investigated';
+
+                return match ($row->action) {
+                    'healthSafety.event.fileAdded' => $plain('added '.match ($file?->kind) {
+                        HsEventFile::KIND_PHOTO => 'a photo ', HsEventFile::KIND_VIDEO => 'a video ', default => 'a document ',
+                    }.$name, $step),
+                    'healthSafety.event.fileOpened' => $plain(($file?->kind === HsEventFile::KIND_VIDEO ? 'played ' : 'opened ').$name, $step),
+                    default => $plain('hid '.$name, $step, 'edit', ['why' => $meta['reason'] ?? $file?->hidden_reason]),
+                };
             case 'hscorrectiveaction.update':
                 return $this->actionStatus($meta, $title);
             case 'hsevent.update':

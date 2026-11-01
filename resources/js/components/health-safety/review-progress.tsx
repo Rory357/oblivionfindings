@@ -4,7 +4,7 @@
  * page opens; picking another shows what was added there. The next-step bar comes from the server's `next_step` (the
  * same order as closing needs) and holds the page's only filled button; a viewer who can't do the step is told who does.
  */
-import { CheckCircle2, ChevronDown, ClipboardCheck, ListChecks, PencilLine, Plus, ShieldCheck, UserRoundCheck, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ClipboardCheck, ListChecks, Paperclip, PencilLine, Plus, ShieldCheck, UserRoundCheck, XCircle } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import type {
@@ -15,6 +15,7 @@ import type {
     SafetyReviewPane,
 } from '@/components/health-safety/event-detail-dialog';
 import { PendingCorrection } from '@/components/health-safety/review-correction';
+import { filesSummary } from '@/components/health-safety/review-files';
 import { REVIEW_STEP_LABELS, stepActivity, type ReviewActivity, type ReviewStepKey } from '@/components/health-safety/review-history';
 import type { PageHeaderStep } from '@/components/page/page-header-strip';
 import { PaneLink, type RecordProgressNext, type RecordProgressPane } from '@/components/signature/record-progress';
@@ -233,8 +234,44 @@ function actionLine(action: EventCorrectiveAction): string {
         .join(' · ');
 }
 
-/** The picked step's pane. */
+/** The picked step's pane, with the step's own files (board M5d) as its last row. */
 export function reviewStepPane(
+    d: EventDetail,
+    step: ReviewStepKey,
+    activity: ReviewActivity | null,
+    h: ReviewStepHandlers & { onBack?: () => void; onHistory: () => void; onAddFiles?: (step: ReviewStepKey) => void },
+): RecordProgressPane {
+    const pane = stepPaneBase(d, step, activity, h);
+    const files = (d.files ?? []).filter((file) => file.step === step);
+    const canAdd = !!d.can.add_files && !!h.onAddFiles && d.status !== 'closed';
+    if (!files.length && !canAdd) return pane;
+    return {
+        ...pane,
+        items: [
+            ...(pane.items ?? []),
+            {
+                key: 'files',
+                label: 'Files',
+                value: files.length ? (
+                    // eslint-disable-next-line no-restricted-syntax -- a quiet link from the step to its files on the Files tab.
+                    <button type="button" className="sg-pane-link" onClick={() => h.onSection('evidence')}>
+                        {filesSummary(files)}
+                    </button>
+                ) : (
+                    'None yet'
+                ),
+                meta: files.length ? `Added by ${[...new Set(files.map((file) => file.uploaded_by))].join(', ')}` : undefined,
+                action: canAdd ? (
+                    <PaneLink icon={Paperclip} onClick={() => h.onAddFiles?.(step)}>
+                        Add files
+                    </PaneLink>
+                ) : null,
+            },
+        ],
+    };
+}
+
+function stepPaneBase(
     d: EventDetail,
     step: ReviewStepKey,
     activity: ReviewActivity | null,

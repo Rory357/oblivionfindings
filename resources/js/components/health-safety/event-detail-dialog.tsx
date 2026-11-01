@@ -44,6 +44,7 @@ import {
     type InvestigationCorrection,
 } from '@/components/health-safety/review-correction';
 import {
+    REVIEW_STEP_LABELS,
     ReviewHistory,
     useReviewActivity,
     type ReviewStepKey,
@@ -67,6 +68,7 @@ import {
     reviewStepPane,
 } from '@/components/health-safety/review-progress';
 import { RecordProgress } from '@/components/signature/record-progress';
+import { AddFilesDialog, ReviewFilesSurface, type ReviewFile } from '@/components/health-safety/review-files';
 import {
     ShiftContextMenu,
     type ShiftCtxItem,
@@ -529,6 +531,8 @@ export type EventDetail = {
     corrective_actions: EventCorrectiveAction[];
     risk_assessments: EventRiskAssessment[];
     attachments: EventAttachment[];
+    /** G3 board M5d: photos, videos and documents on the review's steps. */
+    files?: ReviewFile[];
     handover: EventHandover;
     lifecycle: EventLifecycle;
     handover_summary: EventHandoverSummary;
@@ -571,6 +575,8 @@ export type EventDetail = {
         manage: boolean;
         /** Decision 3 + Q2 (G3): choose the first owner, or change it with a reason. */
         change_owner?: boolean;
+        /** G3 board M5d: add photos, videos and documents to a step. */
+        add_files?: boolean;
         request_procedure_review?: boolean;
         view_procedure_requests?: boolean;
         close: boolean;
@@ -1717,6 +1723,7 @@ function SafetyReviewPage({
         !pendingException &&
         !authorising;
     const [askOpen, setAskOpen] = useState(false);
+    const [filesStep, setFilesStep] = useState<ReviewStepKey | null>(null);
     const [deciding, setDeciding] = useState(false);
     const inlinePane = dialogPane ? null : pane;
     const replaced =
@@ -1794,6 +1801,7 @@ function SafetyReviewPage({
                     ...handlers,
                     onBack: picked !== current ? () => setPicked(current) : undefined,
                     onHistory: () => onSection('history'),
+                    onAddFiles: (step) => setFilesStep(step),
                 })}
             />
             <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
@@ -1889,7 +1897,16 @@ function SafetyReviewPage({
             <ReviewRisk d={d} />
         </>
     ) : tab === 'evidence' ? (
-        <ReviewEvidence d={d} />
+        <>
+            <ReviewFilesSurface
+                eventId={d.id}
+                files={d.files ?? []}
+                stepLabel={(step) => REVIEW_STEP_LABELS[step as ReviewStepKey] ?? step}
+                canAdd={!!d.can.add_files}
+                onAdd={() => setFilesStep(current)}
+            />
+            <ReviewEvidence d={d} />
+        </>
     ) : tab === 'history' ? (
         <ReviewHistory activity={activity} />
     ) : (
@@ -1995,6 +2012,17 @@ function SafetyReviewPage({
                 onDone={(notifiable) => (notifiable ? onPane({ kind: 'worksafe_notify' }) : onPaneDone())}
                 d={d}
             />
+            {filesStep ? (
+                <AddFilesDialog
+                    open
+                    onClose={() => setFilesStep(null)}
+                    eventId={d.id}
+                    step={filesStep}
+                    stepLabel={REVIEW_STEP_LABELS[filesStep]}
+                    context={[safetyReviewTitle(d), d.site?.name, d.reference_number].filter(Boolean).join(' · ')}
+                    viewerName={viewerName}
+                />
+            ) : null}
             <AskCloseAnywayDialog open={askOpen} onClose={() => setAskOpen(false)} onDone={() => setAskOpen(false)} d={d} />
             {pendingException?.can_decide ? (
                 <DecideCloseAnywayDialog

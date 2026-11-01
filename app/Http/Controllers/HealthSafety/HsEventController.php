@@ -1557,6 +1557,15 @@ class HsEventController extends Controller
             'corrective_actions' => $correctiveActions->all(),
             'risk_assessments' => $riskAssessments->all(),
             'attachments' => $handoverAttachments->all(),
+            // G3 board M5d: photos, videos and documents on the review's steps (hidden ones stay out; History keeps them).
+            'files' => \App\Models\HsEventFile::query()->where('hs_event_id', $hsEvent->id)->whereNull('hidden_at')->orderBy('created_at')
+                ->get()->map(fn (\App\Models\HsEventFile $file): array => [
+                    'id' => (int) $file->id, 'step' => $file->step, 'kind' => $file->kind, 'name' => $file->original_name,
+                    'size' => (int) $file->size_bytes, 'duration' => $file->duration_seconds, 'description' => $file->description,
+                    'uploaded_by' => $file->uploaded_by_name, 'created_at' => $file->created_at?->toIso8601String(),
+                    'url' => "/health-safety/events/{$hsEvent->id}/files/{$file->id}",
+                    'can_hide' => $canManage && $hsEvent->isOpen(),
+                ])->values()->all(),
             'close_gate' => $closureReadiness->toJourneyGate()->toArray(),
             'close_readiness' => $closureReadiness->toArray(),
             'closure_exceptions' => $closureExceptions,
@@ -1578,6 +1587,8 @@ class HsEventController extends Controller
                 'manage' => $canManage,
                 // Decision 3 + Q2 (G3): choose the first owner, or change the owner with a reason.
                 'change_owner' => $canChangeOwner,
+                // G3 board M5d: add photos, videos and documents to a step.
+                'add_files' => $canManage && $hsEvent->isOpen(),
                 // K1a (B1.5): the real answer (permission, Site, ownership, open), not the permission alone, so a team
                 // lead who doesn't own the review gets no Close the server would refuse.
                 'close' => $this->closures->closeAuthority($currentUser, $hsEvent)['allowed'],
