@@ -61,6 +61,7 @@ static class FixChecks
   Check(FixProtocol.ParseReply(Reply(4,new{type="key",keys=new[]{"ctrl","p"}}),4,800,600).Action.Keys!.SequenceEqual(new[]{"ctrl","p"}),"Ctrl+P was refused.");
   var done=FixProtocol.ParseReply(Reply(9,new{type="done",@fixed=true,summary="The printer works again.",steps=new[]{"Cancelled 3 stuck jobs","Printed a test page"},pictures=7,deleted_on="2026-11-09"}),9,800,600);
   Check(done.Action.Ends&&done.Action.Fixed&&done.Action.Done!.Count==2&&done.Action.Pictures==7&&done.Action.DeletedOn=="2026-11-09","The done answer lost what was kept.");
+  Check(FixWindow.DayWords("2026-11-05")=="Thu 5 Nov"&&FixWindow.DayWords("soon")=="","The pictures’ deletion day didn’t read as a day.");
   var handed=FixProtocol.ParseReply(Reply(9,new{type="handed_to_it",summary="IT will look at it.",ticket=new{id=42,reference="IT-0042"}}),9,800,600);
   Check(handed.Action.Ends&&handed.Action.Ticket!.Reference=="IT-0042","The hand-over lost its ticket.");
 

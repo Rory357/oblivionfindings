@@ -30,6 +30,8 @@ public sealed class FixWindow:Window,IFixView
  CancellationTokenSource? working;
  FixRunner? runner;
  TaskCompletionSource<bool>? password;
+ string asked="";
+ (int Step,int Of,string Narration) lastStep=(0,0,"");
  /// <summary>Raised when the person asks to sign in first.</summary>
  public event Action? SignInRequested;
 
@@ -89,6 +91,7 @@ public sealed class FixWindow:Window,IFixView
    DiagnosticSnapshot? checks=null;
    try{checks=await service.ReadDiagnosticsAsync(origin,CancellationToken.None);}catch(Exception error) when(error is not OutOfMemoryException){}
    var screen=System.Windows.Forms.Screen.PrimaryScreen?.Bounds??System.Drawing.Rectangle.Empty;
+   asked=problem.Trim();
    session=await api.StartFixAsync(Guid.NewGuid(),problem,siteId,checks,screen.Width,screen.Height,CancellationToken.None);
    if(session.State=="confirming"){
     // Prove which computer this is, as tickets do: the local Oblivion service confirms the challenge.
@@ -113,7 +116,8 @@ public sealed class FixWindow:Window,IFixView
    Present(Line(s.Refusal.Text),Buttons(offers.Length>0?offers:new[]{Primary("OK",Close)}));
    return;
   }
-  var parts=new List<UIElement>{Line(s.Title,strong:true)};
+  // H: the person's own words first, then what Obli found.
+  var parts=new List<UIElement>{Line(asked.Length>0?asked:s.Title,muted:asked.Length>0)};
   parts.AddRange(s.Checks.Select(Check));
   if(s.State=="needs_it"){
    parts.Add(Line("This needs IT. I can raise a ticket with what I checked, so nobody asks the same questions again."));
@@ -163,7 +167,7 @@ public sealed class FixWindow:Window,IFixView
   working.Cancel();
  }
 
- public void Working(int step,int of,string narration){if(session!=null){Hide();bar.Show(session.Title,step,of,narration);}}
+ public void Working(int step,int of,string narration){lastStep=(step,of,narration);if(session!=null){Hide();bar.Show(session.Title,step,of,narration);}}
  public void FixRunning(string label){if(session!=null)bar.Show(session.Title,0,0,label.Length>0?label:"IT’s fix is running through the Oblivion service");}
 
  /* ------------------------------------ J ------------------------------------ */
@@ -174,7 +178,7 @@ public sealed class FixWindow:Window,IFixView
   cancellation.Register(()=>password.TrySetResult(false));
   bar.Hide();
   Present(Line(text.Length>0?text:"This is asking for your password. Please type it yourself; I never type passwords.",strong:true),
-   Line("I’ll carry on when it’s done.",muted:true),
+   Line("I’ll carry on when it’s done."+(lastStep.Of>0?$" Paused at step {Math.Max(1,lastStep.Step)} of {lastStep.Of}"+(lastStep.Narration.Length>0?" · "+lastStep.Narration:""):""),muted:true),
    Buttons(Secondary("Stop",()=>password?.TrySetResult(false)),Primary("I’ve typed it",()=>password?.TrySetResult(true))));
   return password.Task;
  }
@@ -206,7 +210,7 @@ public sealed class FixWindow:Window,IFixView
    case "done":{
     var parts=new List<UIElement>{Line(final?.Summary??(final?.Fixed==true?"Fixed.":"It’s not fixed yet."),strong:true)};
     parts.AddRange((final?.Done??Array.Empty<string>()).Select(s=>Line("• "+s)));
-    if(final?.Pictures>0)parts.Add(Line($"{final.Pictures} screen pictures{(final.DeletedOn is {Length:>0} d?", deleted "+d:"")}.",muted:true));
+    if(final?.Pictures>0)parts.Add(Line($"{final.Pictures} screen {(final.Pictures==1?"picture":"pictures")}{(DayWords(final.DeletedOn) is {Length:>0} d?", deleted "+d:"")}.",muted:true));
     parts.Add(Buttons(Secondary("It’s still not working",()=>_=TicketAsync()),Primary("Thanks",Close)));
     Present(parts.ToArray());break;}
    case "handed_to_it":
@@ -220,6 +224,9 @@ public sealed class FixWindow:Window,IFixView
     break;
   }
  }
+
+ /// <summary>"2026-11-05" → "Thu 5 Nov" (K); anything else is left out.</summary>
+ internal static string DayWords(string? date)=>DateTime.TryParseExact(date,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out var day)?day.ToString("ddd d MMM",CultureInfo.GetCultureInfo("en-NZ")):"";
 
  async Task TicketAsync()
  {
@@ -236,7 +243,8 @@ public sealed class FixWindow:Window,IFixView
  {
   var advice=OfflineChecks.Advise(result);
   if(!advice.Online)OfflineChecks.Remember(result);
-  var parts=new List<UIElement>{Line(advice.Online?"Obli":"Obli · no internet",strong:true)};
+  Title=advice.Online?"Obli":"Obli · no internet";
+  var parts=new List<UIElement>();
   parts.AddRange(advice.Lines.Select(Check));
   parts.Add(Line(advice.Advice,strong:!advice.Online));
   parts.Add(Buttons(Secondary("Close",Close),Primary("Check again",()=>_=CheckAgainAsync())));
