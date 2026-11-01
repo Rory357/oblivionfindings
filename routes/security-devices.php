@@ -580,6 +580,10 @@ Route::middleware([
     Route::get('/setup/broker/sensors-certificate', [SetupController::class, 'sensorsCertificate'])
         ->middleware('throttle:30,1')
         ->name('security-devices.setup.broker.sensors-certificate');
+    // S&D Phase G (pg-sdr-15k): Setup › Computers & Obli › Remote support, the "Allow remote support" switch.
+    Route::put('/setup/computers/remote-support', [\App\Domain\SecurityDevices\Screens\Http\SetupRemoteSupportController::class, 'update'])
+        ->middleware('throttle:10,1')
+        ->name('security-devices.setup.computers.remote-support');
     // S&D Phase H (pg-sdr-15m, pop-up 91): Setup › Doors & access. The controller and AccessSetup check who may do what.
     Route::prefix('/setup/access')->middleware('throttle:30,1')->group(function (): void {
         $setup = \App\Domain\SecurityDevices\Access\Http\AccessSetupController::class;
@@ -599,7 +603,7 @@ Route::middleware([
         ->middleware(['permission:securityDevices.integrations.manage', 'throttle:30,1'])
         ->name('security-devices.setup.services.connect.run');
     Route::get('/setup/{section}', [SetupController::class, 'show'])
-        ->where('section', 'hubs|services|alerts|access|history')
+        ->where('section', 'hubs|services|alerts|access|computers|history')
         ->name('security-devices.setup.section');
 
     // S&D rebuild Phase D: Alerts, and what people do on one. The controller checks permissions.

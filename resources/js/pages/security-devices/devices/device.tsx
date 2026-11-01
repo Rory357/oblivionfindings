@@ -36,7 +36,9 @@ import {
 import { FirmwareUpdatePopup } from '@/components/security-devices/firmware-update-popup';
 import AppLayout from '@/layouts/app-layout';
 import { durationWords, timedText } from '@/lib/security-devices/device-time';
-import { Head, router } from '@inertiajs/react';
+import { RemoteConnectionDialog } from '@/pages/it/remote-support/_dialogs';
+import type { SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Activity, BellPlus, CircleArrowUp, Globe, HardDriveDownload, KeyRound, MonitorUp, Pencil } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BackupSettings } from './_device-backup';
@@ -128,8 +130,11 @@ export default function DevicePage(props: DevicePageProps) {
     const compare = (snapshotId: number) => open({ kind: 'compare', snapshotId });
 
     const watchable = can.watch && device.state === 'not_watched';
+    // S&D Phase G (pop-up 22): remote support starts here, in IT's own remote support dialog (request, Allow, screen).
+    const actorId = usePage<SharedData>().props.auth?.user?.id ?? null;
+    const [remoteOpen, setRemoteOpen] = useState(false);
     const primary = actions.remote_href ? (
-        <PageHeaderPrimaryButton icon={MonitorUp} onClick={() => router.visit(actions.remote_href as string)}>
+        <PageHeaderPrimaryButton icon={MonitorUp} onClick={() => (actorId ? setRemoteOpen(true) : router.visit(actions.remote_href as string))}>
             Start remote support
         </PageHeaderPrimaryButton>
     ) : watchable ? (
@@ -287,6 +292,17 @@ export default function DevicePage(props: DevicePageProps) {
                     login={actions.login}
                     onClose={close}
                     now={now}
+                />
+            ) : null}
+            {actions.remote_href && actorId ? (
+                <RemoteConnectionDialog
+                    open={remoteOpen}
+                    onClose={() => {
+                        setRemoteOpen(false);
+                        router.reload({ only: ['remote'] });
+                    }}
+                    actorId={actorId}
+                    device={{ id: device.id, name: device.name }}
                 />
             ) : null}
         </AppLayout>

@@ -1,7 +1,19 @@
 /** Setup (S&D rebuild pg-sdr-15 and its sections): the props SetupPresenter sends. */
 import type { StatusVariant } from '@/components/ui/status-badge';
 
-export type SetupSection = 'overview' | 'hubs' | 'services' | 'alerts' | 'access' | 'history';
+export type SetupSection = 'overview' | 'hubs' | 'services' | 'alerts' | 'access' | 'computers' | 'history';
+
+/** S&D Phase G (pg-sdr-15k): Computers & Obli › Remote support. */
+export type RemoteSetupData = {
+    allowed: boolean;
+    working: boolean;
+    computers_on: boolean;
+    relay_ready: boolean;
+    relays: number;
+    sessions_30_days: number;
+    can_change: boolean;
+    settings_href: string;
+};
 
 /** S&D Phase H (pg-sdr-15m): one Site's UniFi Access console, as Setup and pop-up 91 see it. */
 export type AccessConsoleState = {
@@ -176,4 +188,6 @@ export type SetupProps = {
     history: { rows: HistoryRow[]; page: number; pages: number; total: number; kept: [string, string][] } | null;
     /** S&D Phase H (pg-sdr-15m): Doors & access › UniFi Access. */
     access?: AccessSetupData | null;
+    /** S&D Phase G (pg-sdr-15k): Computers & Obli › Remote support. */
+    remote?: RemoteSetupData | null;
 };

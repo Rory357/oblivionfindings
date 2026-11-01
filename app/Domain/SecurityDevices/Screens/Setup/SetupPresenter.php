@@ -35,6 +35,8 @@ final class SetupPresenter
         'alerts' => ['label' => 'Alerts & checks', 'tabs' => ['rules' => 'Alert rules', 'checks' => 'Checks']],
         // S&D Phase H (pg-sdr-15m): each Site's UniFi Access console, through its hub.
         'access' => ['label' => 'Doors & access', 'tabs' => ['unifi' => 'UniFi Access']],
+        // S&D Phase G (pg-sdr-15k): Computers & Obli; only Remote support is built (Obli's tabs come with Phase I).
+        'computers' => ['label' => 'Computers & Obli', 'tabs' => ['remote' => 'Remote support']],
         'history' => ['label' => 'Change history', 'tabs' => []],
     ];
 
@@ -54,7 +56,7 @@ final class SetupPresenter
 
     public static function canOpen(User $viewer): bool
     {
-        return self::canSeeServices($viewer) || self::canSeeAlerts($viewer) || self::canSeeAccess($viewer);
+        return self::canSeeServices($viewer) || self::canSeeAlerts($viewer) || self::canSeeAccess($viewer) || SetupRemoteSupport::canSee($viewer);
     }
 
     public static function canSeeServices(User $viewer): bool
@@ -98,6 +100,9 @@ final class SetupPresenter
         }
         if (! self::canSeeAccess($viewer)) {
             unset($sections['access']);
+        }
+        if (! SetupRemoteSupport::canSee($viewer)) {
+            unset($sections['computers']);
         }
 
         return $sections;
@@ -161,6 +166,8 @@ final class SetupPresenter
             'history' => $section === 'history' ? $this->history->present($viewer, (int) ($query['page'] ?? 1)) : null,
             // S&D Phase H (pg-sdr-15m): the Sites' UniFi Access consoles and what Oblivion keeps in step.
             'access' => $section === 'access' && $tab === 'unifi' ? app(\App\Domain\SecurityDevices\Access\AccessSetup::class)->present($viewer) : null,
+            // S&D Phase G (pg-sdr-15k): remote support to staff computers.
+            'remote' => $section === 'computers' && $tab === 'remote' ? app(SetupRemoteSupport::class)->present($viewer) : null,
         ];
     }
 

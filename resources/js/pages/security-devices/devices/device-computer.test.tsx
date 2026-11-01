@@ -1,6 +1,12 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DevicePage from './device';
+
+// S&D Phase G (pop-up 22): IT's own remote support dialog, opened in place.
+vi.mock('@/pages/it/remote-support/_dialogs', () => ({
+    RemoteConnectionDialog: ({ open, device, actorId }: { open: boolean; device: { id: number; name: string }; actorId: number }) =>
+        open ? <div role="dialog" aria-label="Remote support">{`${device.name} · actor ${actorId}`}</div> : null,
+}));
 import type { ComputerHealth, DevicePageProps, RemoteSupport } from './_device-page-types';
 import { meter, minutesAgo, pageFixture } from './device-page-test-fixtures';
 
@@ -84,6 +90,8 @@ describe('Device page · computer (pg-sdr-9, 9b, 9c)', () => {
         expect(within(meterBlock('Disk used')).getByText('148 GB of 238 GB')).toBeInTheDocument();
         expect(within(meterBlock('Obli')).getByText('1.3.0')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Start remote support' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Start remote support' }));
+        expect(screen.getByRole('dialog', { name: 'Remote support' })).toHaveTextContent('Synthetic office PC · actor 7');
 
         const rail = screen.getByRole('tablist', { name: /views/ });
         expect(within(rail).getByText('Health')).toBeInTheDocument();
