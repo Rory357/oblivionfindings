@@ -20,6 +20,7 @@ use Oblivion\Collector\Runtime\RemoteDiscoveryRunner;
 use Oblivion\Collector\Runtime\UnifiAccessCommandRunner;
 use Oblivion\Collector\Security\CredentialLeaseDecryptor;
 use Oblivion\Collector\Security\EnvelopeVerifier;
+use Oblivion\Collector\Security\HubVault;
 use Oblivion\Collector\Security\ScopeGuard;
 use Oblivion\Collector\Spool\CheckpointFile;
 use Oblivion\Collector\Spool\EncryptedSpool;
@@ -86,7 +87,7 @@ final class CollectorApplication
 
     private function version(): int
     {
-        $this->write('Oblivion Collector '.self::VERSION.PHP_EOL);
+        $this->write('Oblivion Collector '.self::buildVersion().PHP_EOL);
 
         return 0;
     }
@@ -312,6 +313,20 @@ final class CollectorApplication
             $identity['client_certificate_file'],
             $identity['client_private_key_file'],
         );
+        // S&D Phase B: the login-store key. Handed out only to an approved hub that hasn't been
+        // removed; held in memory, never written down.
+        $vault = null;
+        $approval = 'approved';
+        try {
+            $vault = HubVault::fromSealed($this->hostSealedVaultKey($options) ?? $central->vaultKey($identity['collector_id']), $secretKey);
+        } catch (CentralApiFailure $exception) {
+            if ($exception->httpStatus() === 410) {
+                return $this->wipeRemovedHub($configPath, $stateDirectory, $secretKey);
+            }
+            if ($exception->httpStatus() === 409) {
+                $approval = 'waiting';
+            }
+        }
         $configurationError = null;
         $config = null;
         try {
@@ -320,12 +335,26 @@ final class CollectorApplication
                 $checkpoint->read()['config_sequence'],
             );
             $config = $loader->load($envelope);
-            $this->writePrivateFile($configPath, $envelope);
+            if ($vault !== null) {
+                $this->writePrivateFile($configPath, $vault->encrypt($envelope));
+            } elseif (is_file($configPath)) {
+                // Never keep saved logins on disk unless they're in the encrypted store.
+                @unlink($configPath);
+            }
         } catch (CentralApiFailure $exception) {
-            if (is_file($configPath)) {
+            if ($exception->httpStatus() === 410) {
+                return $this->wipeRemovedHub($configPath, $stateDirectory, $secretKey);
+            }
+            $stored = is_file($configPath) ? $this->readBounded($configPath) : null;
+            if ($stored !== null && ! HubVault::isSealed($stored)) {
+                // A work list from before the encrypted store: its logins go, a fresh one comes next.
+                @unlink($configPath);
+                $stored = null;
+            }
+            if ($stored !== null && $vault !== null && $exception->httpStatus() !== 409) {
                 $configurationError = $this->boundedMessage($exception);
-                $config = $loader->load($this->readBounded($configPath));
-            } elseif (! str_ends_with($exception->getMessage(), ': 409.')) {
+                $config = $loader->load($vault->decrypt($stored));
+            } elseif ($exception->httpStatus() !== 409 && $stored === null && $vault !== null) {
                 throw $exception;
             }
         }
@@ -412,20 +441,97 @@ final class CollectorApplication
         $uploadError ??= $this->flush($central, $identity['collector_id'], $spool);
         try {
             (new HeartbeatReporter($central, $identity['collector_id'], $spool))->report([
-                'version' => self::VERSION,
+                'version' => self::buildVersion(),
+                'platform' => PHP_OS_FAMILY === 'Windows' ? 'windows' : 'linux',
                 'checks_executed' => $checksExecuted,
                 'discovery_targets_executed' => $discoveryTargetsExecuted,
                 'commands_executed' => $commandsExecuted,
                 'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
+            $this->writeHostInstructions($stateDirectory, $central->lastHeartbeat());
         } catch (CentralApiFailure $exception) {
+            if ($exception->httpStatus() === 410) {
+                return $this->wipeRemovedHub($configPath, $stateDirectory, $secretKey);
+            }
             $uploadError ??= $this->boundedMessage($exception);
         }
         sodium_memzero($secretKey);
+        if ($approval === 'waiting') {
+            $this->write('collection: waiting for approval'.PHP_EOL);
+
+            return 4;
+        }
         $this->write('collection: '.($uploadError === null ? 'complete' : 'buffered').PHP_EOL);
 
         return $uploadError === null ? 0 : 2;
+    }
+
+    /**
+     * The hub has been removed in Oblivion: wipe the saved logins it held (the encrypted work
+     * list and anything the host keeps for it), leave a note, and stop.
+     */
+    private function wipeRemovedHub(string $configPath, string $stateDirectory, string &$secretKey): int
+    {
+        foreach ([$configPath, $stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json'] as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
+        $this->writePrivateFile($stateDirectory.DIRECTORY_SEPARATOR.'removed.json', json_encode([
+            'removed' => true,
+            'noticed_at' => (new DateTimeImmutable('now'))->format(DATE_ATOM),
+            'message' => 'This hub was removed in Oblivion. Its saved logins have been wiped. Uninstall Oblivion from this computer.',
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+        sodium_memzero($secretKey);
+        $this->write('collection: removed'.PHP_EOL);
+
+        return 3;
+    }
+
+    /**
+     * What the Windows service or Linux launcher should do next: approval state and the update
+     * it was told to install (window, ring, hold, roll-back time).
+     *
+     * @param  array<string, mixed>|null  $heartbeat
+     */
+    private function writeHostInstructions(string $stateDirectory, ?array $heartbeat): void
+    {
+        if ($heartbeat === null) {
+            return;
+        }
+        $this->writePrivateFile($stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json', json_encode([
+            'approval' => in_array($heartbeat['approval'] ?? null, ['waiting', 'approved'], true) ? $heartbeat['approval'] : 'approved',
+            'update' => is_array($heartbeat['update'] ?? null) ? $heartbeat['update'] : null,
+            'received_at' => (new DateTimeImmutable('now'))->format(DATE_ATOM),
+            'running_version' => self::buildVersion(),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+    }
+
+    /**
+     * The service hands over the sealed login-store key it fetched at start, on standard
+     * input, so a restart while offline doesn't need the server. --vault-stdin turns it on.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function hostSealedVaultKey(array $options): ?string
+    {
+        if (($options['vault-stdin'] ?? false) !== true) {
+            return null;
+        }
+        $line = fgets(STDIN, 1024);
+        $line = is_string($line) ? trim($line) : '';
+
+        return $line === '' ? null : $line;
+    }
+
+    /** The version stamped by the build (collector/VERSION), else the source default. */
+    public static function buildVersion(): string
+    {
+        $file = dirname(__DIR__).DIRECTORY_SEPARATOR.'VERSION';
+        $stamped = is_file($file) ? trim((string) file_get_contents($file, false, null, 0, 64)) : '';
+
+        return preg_match('/\A(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\z/', $stamped) === 1 ? $stamped : self::VERSION;
     }
 
     /** @param array<string, string|bool> $options */

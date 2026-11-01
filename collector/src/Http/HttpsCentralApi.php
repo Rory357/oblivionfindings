@@ -13,6 +13,9 @@ final readonly class HttpsCentralApi implements CentralApi
 
     private string $baseUrl;
 
+    /** Holds the last heartbeat reply (the class is readonly; this object isn't). */
+    private \stdClass $memo;
+
     public function __construct(
         string $baseUrl,
         private string $tlsPublicKeyPin,
@@ -23,6 +26,8 @@ final readonly class HttpsCentralApi implements CentralApi
         private ?Closure $testTransport = null,
         private ?string $caBundleFile = null,
     ) {
+        $this->memo = new \stdClass;
+        $this->memo->lastHeartbeat = null;
         $parts = parse_url($baseUrl);
         if (! is_array($parts)
             || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
@@ -129,10 +134,34 @@ final readonly class HttpsCentralApi implements CentralApi
 
     public function heartbeat(string $collectorId, array $status): void
     {
-        $this->request('POST', '/api/monitoring/collectors/heartbeat', [
+        $this->memo->lastHeartbeat = $this->request('POST', '/api/monitoring/collectors/heartbeat', [
             'collector_id' => $collectorId,
             'status' => $status,
         ]);
+    }
+
+    /** The last heartbeat reply: approval state and update instructions (S&D Phase B). */
+    public function lastHeartbeat(): ?array
+    {
+        return is_array($this->memo->lastHeartbeat) ? $this->memo->lastHeartbeat : null;
+    }
+
+    /** The login-store key, sealed to this hub's own key. 409 while waiting for approval; 410 once removed. */
+    public function vaultKey(string $collectorId): string
+    {
+        $response = $this->request('POST', '/api/monitoring/collectors/vault-key', ['collector_id' => $collectorId]);
+        $sealed = $response['sealed_key'] ?? null;
+        if (! is_string($sealed) || $sealed === '' || strlen($sealed) > 512) {
+            throw new CentralApiFailure('Central login-store key response is invalid.');
+        }
+
+        return $sealed;
+    }
+
+    /** @param array<string, mixed> $report */
+    public function updateReport(string $collectorId, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/update/report', ['collector_id' => $collectorId, 'report' => $report]);
     }
 
     /** @return array{schema: string, state: string, collector_reference_sha256: string, signing_key_reference_sha256: string, identity_generation_reference_sha256: string, expected_identity_state: string, pinned_https_contract: string, initial_response: string, replay_attempt: string, samples: int, observed_from_utc: string, observed_until_utc: string} */
@@ -237,7 +266,10 @@ final readonly class HttpsCentralApi implements CentralApi
             $result = $this->send($method, $path, $body, $headers, true);
         }
         if (! $result['transport_ok'] || $result['status'] < 200 || $result['status'] >= 300) {
-            throw new CentralApiFailure('Central HTTPS request failed with a bounded transport outcome: '.($result['status'] ?: 'unavailable').'.');
+            throw new CentralApiFailure(
+                'Central HTTPS request failed with a bounded transport outcome: '.($result['status'] ?: 'unavailable').'.',
+                $result['transport_ok'] ? (int) $result['status'] : 0,
+            );
         }
 
         try {
