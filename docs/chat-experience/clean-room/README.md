@@ -7,7 +7,7 @@ Stephan decided on 22 October 2026 (decision D1 in [../2026-10-22-rebuild-plan.h
 
 ## What stays outside Oblivion's code
 
-The platform every product runs on stays, with its notices: PHP, Laravel, Inertia, React, Radix, Tailwind, lucide, MySQL, Node.js, and the browser's built-in WebRTC, MediaRecorder, Web Audio and Push. Standard separate programs stay separate: ClamAV (virus scanning) and coturn (the firewall relay for calls, decision D4). Browser push still travels through the push services run by Google, Mozilla and Apple.
+The platform every product runs on stays, with its notices: PHP, Laravel, Inertia, React, Radix, Tailwind, lucide, MySQL, Node.js, and the browser's built-in WebRTC, MediaRecorder, Web Audio and Push. Standard separate programs stay separate: ClamAV (virus scanning). The firewall relay for calls is no longer one of them: on 1 November 2026 Rory changed decision D4 from coturn to Oblivion's own relay, Oblivion Relay, built through this clean room. Browser push still travels through the push services run by Google, Mozilla and Apple.
 
 Ownership of AI-written code is not settled law everywhere. A lawyer should confirm Oblivion's position before it is relied on commercially.
 
@@ -32,6 +32,7 @@ Ownership of AI-written code is not settled law everywhere. A lawyer should conf
 | Oblivion push sender | minishlink/web-push and its web-token, spomky-labs and brick/math parts | RFC 8030 (Web Push), RFC 8291 (message encryption), RFC 8292 (VAPID), RFC 8188 (aes128gcm), RFC 7515 and 7518 (JWS, ES256) |
 | Oblivion signer | Chat's direct use of firebase/php-jwt | RFC 7519 (JWT), RFC 7515 (JWS), RFC 2104 (HMAC-SHA256) |
 | Oblivion Calls | livekit-client, its bundled helpers, the LiveKit server | W3C WebRTC 1.0, RFC 8829 (JSEP), RFC 8445 (ICE), RFC 8656 (TURN, client side), RFC 4566 and 8866 (SDP) |
+| Oblivion Relay (firewall relay for calls: STUN and TURN) | coturn (planned under D4, never installed) and, once LiveKit goes, the LiveKit server's built-in TURN. Never open coturn, LiveKit's TURN, pion/turn or any other STUN or TURN implementation | RFC 8489 (STUN), RFC 8656 (TURN), RFC 5769 (STUN test vectors), RFC 7983 (first-byte demultiplexing), RFC 2104 (HMAC), RFC 8446 and 5246 (TLS), draft-uberti-behave-turn-rest-00 (TURN REST credentials), the Node.js documentation, and nginx's documentation for the PROXY protocol header it sends. RFC 6062 (TCP relaying) is out of scope |
 | Voice-note checker | ffprobe for chat voice notes | Matroska and WebM specification, RFC 7845 (Ogg Opus), RFC 3533 (Ogg), ISO base media file format as published, RFC 6716 (Opus) |
 | Emoji data | (new; never import emoji-mart, Twemoji or similar) | Unicode emoji data files (Unicode Licence v3, notice kept); Oblivion writes its own keywords, including te reo Māori |
 
@@ -69,5 +70,6 @@ Copy into `provenance/<engine>.md`.
 | Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Spec written 23 Oct 2026; ready for a builder session |
 | Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Spec written 23 Oct 2026; ready for a builder session |
 | Oblivion Calls | to write after Oblivion Live (stage 5) | — |
+| Oblivion Relay (firewall relay for calls) | [specs/oblivion-relay.md](specs/oblivion-relay.md) | Spec written 1 Nov 2026; ready for a builder session. Where it runs is for the user to decide before stage 5 network testing |
 
 The session that wrote these specs opened the built files of livekit-client and pusher-js to read their licence headers, so it does not build those replacements itself.
