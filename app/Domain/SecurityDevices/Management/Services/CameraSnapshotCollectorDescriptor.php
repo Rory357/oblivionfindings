@@ -7,6 +7,7 @@ use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\CollectorCredentialLeaseSealer;
 use App\Domain\SecurityDevices\Cctv\Services\CameraEndpointTrustService;
+use App\Domain\SecurityDevices\Cctv\Services\CameraPrivacy;
 use App\Domain\SecurityDevices\Cctv\Services\UniFiProtectLocalCameraClient;
 use App\Domain\SecurityDevices\Drivers\Cameras\UniFiProtectCameraDriver;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
@@ -96,6 +97,8 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
             $endpoint = $this->protect->authoriseConsoleEndpoint($device, checkCertificate: false);
 
             return $this->protectCamera($device)
+                // S&D Phase E: no hub picture while the camera is inside its privacy hours.
+                && ! app(CameraPrivacy::class)->active((int) $device->id)
                 // The hub needs the camera's Protect ID or its MAC to find it on the console.
                 && ($this->protectCameraId($device) !== null || $this->mac($device) !== null)
                 && $this->sites->resolve((int) $device->id) === $siteId
@@ -201,11 +204,14 @@ final class CameraSnapshotCollectorDescriptor implements CollectorCommandDescrip
 
         $capturedAt = CarbonImmutable::now('UTC');
         // Kept encrypted, for the person who asked, for two minutes; the status check takes it once.
-        Cache::put(self::pictureCacheKey((string) $request->command_uuid), Crypt::encryptString(json_encode([
-            'data_uri' => 'data:'.$mime.';base64,'.base64_encode($attachment),
-            'captured_at' => $capturedAt->toIso8601String(),
-            'hub' => CoveringHubResolver::label($collector),
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)), self::PICTURE_SECONDS);
+        // S&D Phase E: a picture that arrives inside the camera's privacy hours is never kept.
+        if (! app(CameraPrivacy::class)->active((int) $device->id)) {
+            Cache::put(self::pictureCacheKey((string) $request->command_uuid), Crypt::encryptString(json_encode([
+                'data_uri' => 'data:'.$mime.';base64,'.base64_encode($attachment),
+                'captured_at' => $capturedAt->toIso8601String(),
+                'hub' => CoveringHubResolver::label($collector),
+            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)), self::PICTURE_SECONDS);
+        }
 
         return new CollectorCommandOutcome(
             executionStatus: 'succeeded',

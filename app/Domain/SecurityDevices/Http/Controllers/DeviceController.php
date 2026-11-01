@@ -18,7 +18,9 @@ use App\Domain\SecurityDevices\Models\DeviceDocument;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Presenters\DeviceProfilePresenter;
 use App\Domain\SecurityDevices\Screens\DeviceKind;
+use App\Domain\SecurityDevices\Screens\Devices\Pages\CameraPagePresenter;
 use App\Domain\SecurityDevices\Screens\Devices\Pages\DevicePagePresenter;
+use App\Domain\SecurityDevices\Screens\Http\CameraPageController;
 use App\Domain\SecurityDevices\Screens\Http\DevicePageController;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
@@ -66,6 +68,10 @@ class DeviceController extends Controller
         // and the safety kit keep this profile until Phase E.
         if (DevicePagePresenter::serves(DeviceKind::of($device)) && ! $request->has('section')) {
             return app(DevicePageController::class)->show($request, $device);
+        }
+        // S&D rebuild Phase E: cameras get their own page (Live · Recordings · Checks & alerts · Settings).
+        if (CameraPagePresenter::serves($device) && ! $request->has('section')) {
+            return app(CameraPageController::class)->show($request, $device);
         }
 
         $canViewEvents = $user->canDo('securityDevices.events.view');

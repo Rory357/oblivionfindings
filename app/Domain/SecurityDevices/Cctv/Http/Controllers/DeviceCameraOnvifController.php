@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Cctv\Http\Controllers;
 
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Cctv\Services\CameraEndpointTrustService;
+use App\Domain\SecurityDevices\Cctv\Services\CameraPrivacy;
 use App\Domain\SecurityDevices\Cctv\Services\HubCameraPictureService;
 use App\Domain\SecurityDevices\Cctv\Services\OnvifCameraProfileClient;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
@@ -43,6 +44,18 @@ final class DeviceCameraOnvifController extends Controller
             && $device->status !== DeviceStatus::Decommissioned,
             404,
         );
+
+        // S&D Phase E: no picture at all while the camera is inside its privacy hours.
+        if (($private = $this->privacyRefusal($device)) !== null) {
+            AuditLogger::logOrFail('camera.onvif.snapshot', $device, [
+                'actor_id' => (int) $user->id,
+                'device_id' => (int) $device->id,
+                'ok' => false,
+                'reason_code' => CameraPrivacy::REFUSAL,
+            ]);
+
+            return $private;
+        }
 
         // S&D Phase B: a camera at a Site with a hub is checked through that hub, never from the server.
         $throughHub = $this->hubPictures->start($user, $device);
@@ -102,6 +115,13 @@ final class DeviceCameraOnvifController extends Controller
         );
         $this->access->assertCanViewDevice($user, $device);
         abort_unless($device->domain === 'security' && $device->category === 'cctv', 404);
+
+        // S&D Phase E: a picture that arrives once privacy hours have begun is thrown away unseen.
+        if (($private = $this->privacyRefusal($device)) !== null) {
+            $this->hubPictures->discard($user, $device, $command);
+
+            return $private;
+        }
 
         $status = $this->hubPictures->status($user, $device, $command);
         $payload = match ($status['state']) {
@@ -275,6 +295,19 @@ final class DeviceCameraOnvifController extends Controller
         ];
 
         return $result;
+    }
+
+    /** S&D Phase E: the refusal while a camera is inside its privacy hours, or null outside them. */
+    private function privacyRefusal(Device $device): ?JsonResponse
+    {
+        $until = app(CameraPrivacy::class)->until((int) $device->id);
+
+        return $until === null ? null : response()->json([
+            'ok' => false,
+            'reason_code' => CameraPrivacy::REFUSAL,
+            'message' => 'Privacy hours are on for this camera. No picture is shown until they end.',
+            'privacy_until' => $until->toIso8601String(),
+        ], 409)->header('Cache-Control', 'no-store');
     }
 
     /** S&D Phase B: refused at a Site with a hub, because the server never reaches into the house. */

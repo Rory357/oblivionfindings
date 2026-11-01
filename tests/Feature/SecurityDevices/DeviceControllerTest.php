@@ -363,8 +363,9 @@ class DeviceControllerTest extends TestCase
     {
         $device = Device::factory()->security()->create(['name' => 'Dome Camera 1']);
 
+        // A camera opens its own page (S&D Phase E); today's profile is still reached with ?section=.
         $response = $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}");
+            ->get("/security-devices/devices/{$device->id}?section=overview");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page

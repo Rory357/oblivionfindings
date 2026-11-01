@@ -86,16 +86,21 @@ final class HubCameraPictureService
     }
 
     /**
+     * S&D Phase E: throw away a hub picture unseen (the camera went into its privacy hours while the
+     * hub was taking it). Only the person who asked can reach it, as with status().
+     */
+    public function discard(User $user, Device $device, DeviceCommandRequest $request): void
+    {
+        $this->assertOwnPicture($user, $device, $request);
+        Cache::forget(CameraSnapshotCollectorDescriptor::pictureCacheKey((string) $request->command_uuid));
+    }
+
+    /**
      * @return array{state: 'pending'|'done'|'failed', message?: string, data_uri?: string, captured_at?: string, source?: string, tls_trust?: array<string, int|string>}
      */
     public function status(User $user, Device $device, DeviceCommandRequest $request): array
     {
-        abort_unless(
-            (int) $request->device_id === (int) $device->id
-            && $request->capability === CameraSnapshotCollectorDescriptor::CAPABILITY
-            && (int) $request->requested_by_user_id === (int) $user->id,
-            404,
-        );
+        $this->assertOwnPicture($user, $device, $request);
 
         if (in_array($request->status, [CommandStatus::Dispatching, CommandStatus::Accepted, CommandStatus::Running], true)) {
             if ($request->expires_at !== null && $request->expires_at->isPast()) {
@@ -131,5 +136,15 @@ final class HubCameraPictureService
         }
 
         return $result;
+    }
+
+    private function assertOwnPicture(User $user, Device $device, DeviceCommandRequest $request): void
+    {
+        abort_unless(
+            (int) $request->device_id === (int) $device->id
+            && $request->capability === CameraSnapshotCollectorDescriptor::CAPABILITY
+            && (int) $request->requested_by_user_id === (int) $user->id,
+            404,
+        );
     }
 }

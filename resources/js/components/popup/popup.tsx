@@ -817,6 +817,7 @@ export function PopupViewer({
     facts,
     children,
     action,
+    footerStart,
     closeLabel = 'Close',
     onCloseAutoFocus,
     testId,
@@ -833,6 +834,8 @@ export function PopupViewer({
     children?: ReactNode;
     /** One optional action after Close, e.g. "Open full record". */
     action?: ReactNode;
+    /** Left of Close, e.g. a ghost "Open recorder" (as PopupForm's footerStart). */
+    footerStart?: ReactNode;
     closeLabel?: string;
     onCloseAutoFocus?: AutoFocusHandler;
     testId?: string;
@@ -859,7 +862,7 @@ export function PopupViewer({
                 {facts?.length ? <PopupFacts rows={facts} /> : null}
                 {children}
             </div>
-            <PopupFooter>
+            <PopupFooter start={footerStart}>
                 <Button type="button" variant="outline" onClick={onClose}>
                     {closeLabel}
                 </Button>

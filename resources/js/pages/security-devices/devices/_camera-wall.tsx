@@ -1,8 +1,9 @@
 import { Note, QuietLine, Ring, type SgTone } from '@/components/signature/blocks';
+import { privacyUntilWords } from '@/lib/security-devices/camera-privacy';
 import { timedText } from '@/lib/security-devices/device-time';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
-import { CameraOff, Info } from 'lucide-react';
+import { CameraOff, EyeOff, Info } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { CameraTile } from './_types';
 
@@ -16,7 +17,8 @@ const RING: Record<string, SgTone> = {
 
 /**
  * The Cameras tab as a camera wall (drawing 2b). Oblivion doesn't keep camera pictures yet, so
- * each tile says so and opens the camera's page, where watching live asks for a reason (D6).
+ * each tile says so and opens the camera's page, where watching live asks for a reason (D6). A
+ * camera inside its privacy hours says "Privacy hours until …" instead (Phase E).
  */
 export function CameraWall({
     items,
@@ -54,10 +56,19 @@ export function CameraWall({
                                             'flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl border border-border bg-muted px-4 text-center text-[13px] text-muted-foreground transition-colors group-hover:border-primary/50',
                                         )}
                                     >
-                                        <CameraOff aria-hidden="true" className="size-6" />
-                                        {camera.state === 'online'
-                                            ? 'Picture not available · Oblivion doesn’t keep camera pictures yet'
-                                            : `No picture · ${timedText({ text: camera.line, at: camera.line_at }, now)}`}
+                                        {camera.privacy_until ? (
+                                            <>
+                                                <EyeOff aria-hidden="true" className="size-6" />
+                                                <span className="font-semibold text-foreground">{privacyUntilWords(camera.privacy_until, now)}</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CameraOff aria-hidden="true" className="size-6" />
+                                                {camera.state === 'online'
+                                                    ? 'Picture not available · Oblivion doesn’t keep camera pictures yet'
+                                                    : `No picture · ${timedText({ text: camera.line, at: camera.line_at }, now)}`}
+                                            </>
+                                        )}
                                     </span>
                                     <span className="mt-2 block text-sm font-semibold">{camera.name}</span>
                                     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

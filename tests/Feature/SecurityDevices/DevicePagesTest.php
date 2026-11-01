@@ -150,11 +150,12 @@ class DevicePagesTest extends TestCase
 
     public function test_safety_kit_kinds_and_management_links_keep_todays_page(): void
     {
+        // S&D rebuild Phase E: cameras have their own page now (CameraPrivacyHoursTest covers it).
         $camera = $this->device($this->home, ['name' => 'Synthetic camera'], 'security');
         $this->actingAs($this->viewer)
             ->get('/security-devices/devices/'.$camera->id)
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->component('security-devices/devices/show'));
+            ->assertInertia(fn ($page) => $page->component('security-devices/devices/camera'));
 
         // Today's governed actions still open on today's page until they have a new home.
         $switch = $this->device($this->home, ['name' => 'Synthetic switch', 'subcategory' => 'switch']);

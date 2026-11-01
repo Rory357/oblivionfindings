@@ -72,6 +72,8 @@ export type CameraTile = {
     state: DeviceState;
     line: string;
     line_at: string | null;
+    /** S&D Phase E: inside its privacy hours until then; the tile shows no picture. */
+    privacy_until?: string | null;
     href: string;
 };
 

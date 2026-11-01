@@ -48,6 +48,11 @@ final class CctvSessions
             } else {
                 $reason = 'authority_lost';
             }
+            // S&D Phase E: no live picture while the camera is inside its privacy hours.
+            if ($reason !== 'authority_lost' && app(CameraPrivacy::class)->active($cameraId)) {
+                $ready = false;
+                $reason = CameraPrivacy::REFUSAL;
+            }
             $manage = $viewer->canDo('securityDevices.integrations.manage') && $viewer->canDo('securityDevices.devices.update');
 
             return ['actor_id' => (int) $viewer->id, 'camera' => ['id' => $cameraId, 'name' => $device->name, 'site' => ['id' => $siteId, 'name' => $site->name]], 'live' => ['available' => $ready, 'reason_code' => $reason, 'can_start' => $ready, 'source_revision' => $ready ? (int) $source->revision : null, 'transport' => 'webrtc', 'video_codec' => 'H264', 'audio_enabled' => false, 'max_session_seconds' => $this->duration(), 'lease_seconds' => 15, 'start_href' => $ready ? '/security-devices/devices/'.$cameraId.'/live-sessions' : null, 'setup_href' => $manage ? '/security-devices/devices/'.$cameraId.'/live/source' : null, 'setup_ready' => $ready, 'streaming' => false], 'recording_references' => ['state' => 'not_requested', 'reference' => null], 'reference_href' => $viewer->canDo(CctvRecordingReferences::VIEW) && $device->status !== DeviceStatus::Decommissioned ? '/security-devices/devices/'.$cameraId.'/recording-references' : null];
@@ -68,7 +73,9 @@ final class CctvSessions
         $context = DB::transaction(function () use ($actorId, $cameraId, $input, $browser, $hash): array {
             $actor = app(CctvAuthority::class)->actor($actorId);
             app(CctvAuthority::class)->device($actor, $cameraId);
-            $hikvisionReplay = CctvLiveSession::query()->where('provider', 'hikvision')->where('actor_id', $actorId)->where('request_key', $input['request_key'])->lockForUpdate()->first();
+            // S&D Phase E: checked once the viewer is known to be allowed to see this camera.
+            app(CameraPrivacy::class)->refuse($cameraId);
+            $hikvisionReplay =CctvLiveSession::query()->where('provider', 'hikvision')->where('actor_id', $actorId)->where('request_key', $input['request_key'])->lockForUpdate()->first();
             abort_if($hikvisionReplay && ! hash_equals($hikvisionReplay->browser_fingerprint, $browser), 404, 'unavailable');
             $replay = $hikvisionReplay ?? CctvLiveSession::query()->where('actor_id', $actorId)->where('browser_fingerprint', $browser)->where('request_key', $input['request_key'])->lockForUpdate()->first();
             if ($replay) {
@@ -106,6 +113,7 @@ final class CctvSessions
             $this->authorize($actor, $source);
             $this->readiness((int) $source->collector_id, $source);
             abort_unless(hash_equals($context['source']->fingerprint, $source->fingerprint), 409, 'context_changed');
+            app(CameraPrivacy::class)->refuse($cameraId);
             $replay = CctvLiveSession::query()->where('actor_id', $actorId)->where('browser_fingerprint', $browser)->where('request_key', $input['request_key'])->lockForUpdate()->first();
             if ($replay) {
                 abort_unless(hash_equals($replay->request_hash, $hash) && (int) $replay->camera_id === $cameraId, 409, 'context_changed');
@@ -168,6 +176,10 @@ final class CctvSessions
                 }
 
                 return $this->dto($session);
+            }
+            // S&D Phase E: a live view still running when privacy hours begin is ended at once.
+            if (! in_array($session->status, CctvContract::TERMINAL, true) && app(CameraPrivacy::class)->active((int) $session->camera_id)) {
+                $this->end($session, 'revoked', CameraPrivacy::REFUSAL);
             }
             if (in_array($session->status, CctvContract::TERMINAL, true)) {
                 return $this->dto($session);
@@ -247,7 +259,8 @@ final class CctvSessions
             [, , , $current] = $this->authorize($actor, $source);
             $this->readiness((int) $source->collector_id, $source);
             abort_unless(hash_equals($context['source']->fingerprint, $source->fingerprint), 409, 'context_changed');
-            $known = CctvLiveSession::query()->where('provider', 'hikvision')->where('actor_id', $actorId)->where('request_key', $input['request_key'])->lockForUpdate()->first();
+            app(CameraPrivacy::class)->refuse($cameraId);
+            $known =CctvLiveSession::query()->where('provider', 'hikvision')->where('actor_id', $actorId)->where('request_key', $input['request_key'])->lockForUpdate()->first();
             if ($known) {
                 abort_unless(hash_equals($known->browser_fingerprint, $browser), 404, 'unavailable');
                 abort_unless((int) $known->camera_id === $cameraId && hash_equals($known->request_hash, $hash), 409, 'context_changed');

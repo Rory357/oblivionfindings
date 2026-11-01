@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\SecurityDevices\AccessControl\Http\Controllers\AccessControlController;
+use App\Domain\SecurityDevices\Cctv\Http\Controllers\CameraPrivacyHoursController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\CctvLiveController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\CctvRecordingReferenceController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\CctvSourceController;
@@ -294,6 +295,12 @@ Route::middleware([
             'throttle:90,1',
         ])
         ->name('security-devices.devices.camera.snapshot.status');
+
+    // S&D rebuild Phase E: a camera's privacy hours (pop-up 64). Audited; no picture is served inside them.
+    Route::put('/devices/{device}/camera/privacy-hours', [CameraPrivacyHoursController::class, 'update'])
+        ->whereNumber('device')
+        ->middleware(['permission:securityDevices.devices.update', 'throttle:20,1'])
+        ->name('security-devices.devices.camera.privacy-hours');
 
     // Phase A, item A5: trust (or, as an IT admin, replace) the certificate a camera or Protect console offered.
     Route::post('/devices/{device}/camera/certificate/trust', [DeviceCameraOnvifController::class, 'trustCertificate'])

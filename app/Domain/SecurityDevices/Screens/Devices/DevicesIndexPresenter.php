@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Screens\Devices;
 
+use App\Domain\SecurityDevices\Cctv\Services\CameraPrivacy;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Screens\DeviceState;
@@ -593,6 +594,8 @@ final class DevicesIndexPresenter
     private function cameraWall(Collection $entries): array
     {
         $cantCheck = $entries->filter(fn (DeviceEntry $entry): bool => $entry->state === DeviceState::CantCheck);
+        // S&D Phase E: a camera inside its privacy hours shows "Privacy hours until …", never a picture.
+        $private = app(CameraPrivacy::class)->untilMany($entries->map(fn (DeviceEntry $entry): int => $entry->id())->values()->all());
 
         return [
             'stills' => false,
@@ -603,6 +606,7 @@ final class DevicesIndexPresenter
                 'state' => $entry->state->value,
                 'line' => $this->cameraLine($entry),
                 'line_at' => $entry->state === DeviceState::Offline ? $entry->offlineSince?->toIso8601String() : null,
+                'privacy_until' => isset($private[$entry->id()]) ? $private[$entry->id()]->toIso8601String() : null,
                 'href' => '/security-devices/devices/'.$entry->id(),
             ])->all(),
             'cant_check' => $cantCheck
