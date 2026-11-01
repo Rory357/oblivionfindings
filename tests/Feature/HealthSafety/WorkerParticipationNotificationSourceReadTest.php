@@ -414,6 +414,27 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
         $this->assertGreaterThan(0, $queries); $this->assertLessThan(100, $queries);
     }
 
+    /**
+     * #14/#16 (MASTER, 2 Nov): a viewer with no private notice pays nothing for the private readers. The header opens no
+     * H&S read (no share-locked evidence, no meeting or exposure source) and asks "any private notice?" once, by id only.
+     */
+    public function test_a_viewer_without_private_notices_opens_no_hs_read_on_the_header(): void
+    {
+        $this->clearNotices();
+        $ordinary = $this->ordinary();
+        $log = []; DB::listen(function ($query) use (&$log): void { $log[] = strtolower($query->sql); });
+        $response = $this->get('/notifications', ['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'notifications/index', 'X-Inertia-Partial-Data' => 'inbox'])->assertOk();
+        $this->assertSame([$ordinary], array_column($response->json('props.inbox.notifications.items'), 'id'));
+        foreach ($log as $sql) {
+            foreach (['hs_committee_meetings', 'worker_participation_meeting_events', 'chemical_exposure_', 'substance_exposure_records'] as $source) {
+                $this->assertStringNotContainsString($source, $sql, 'No private source is read for a viewer without private notices.');
+            }
+        }
+        $checks = array_filter($log, fn ($sql) => str_starts_with($sql, 'select `notifications`.`id` from `notifications`')
+            && str_contains($sql, 'as `private_delivery`') && str_contains($sql, 'limit 1'));
+        $this->assertCount(1, $checks, 'One id-only "any private notice?" check for the whole header.');
+    }
+
     #[DataProvider('ordinaryFamilyEligibility')]
     public function test_production_board_pack_and_own_medication_notifications_preserve_existing_rules(bool $currentStaff): void
     {

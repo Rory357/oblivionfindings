@@ -244,12 +244,17 @@ final class BoardPackAccessService
         // Participation meeting notices: the reader's own evidence is prepared before any other family's metadata read.
         // A viewer with no participation notice skips the preparation (it opens an H&S read) and only hides the marker.
         $participation = app(WorkerParticipationNotificationReadService::class);
-        $participationPrepared = $healthSafetyContext !== null || HealthSafetyInboxReads::hasParticipationNotices($viewer);
+        // A viewer this request's doorway already found without any private notice skips the check (a notice written
+        // since is still hidden by the marker below).
+        $participationPrepared = $healthSafetyContext !== null
+            || (! HealthSafetyInboxReads::knownWithoutPrivate($viewer) && HealthSafetyInboxReads::hasParticipationNotices($viewer));
         if ($participationPrepared) {
             $participation->prepare($query, $viewer, $healthSafetyContext);
         }
 
         $visiblePacks = $this->visibleQuery($viewer);
+        // The same rule, with its EXISTS subqueries selecting 1 instead of * (notification SQL selects no unneeded columns).
+        self::existsSelectOne($visiblePacks->getQuery());
         $visiblePackIds = (clone $visiblePacks)
             ->select($visiblePacks->getModel()->qualifyColumn('id'));
         $visibleMeetingIds = (clone $visiblePacks)
@@ -285,6 +290,19 @@ final class BoardPackAccessService
 
         // The broadcast context intersects last, after every other family's filter.
         return $broadcastContext ? $broadcastContext->scope($query) : $query;
+    }
+
+    /** Make every (NOT) EXISTS subquery select 1 rather than *: identical results, no columns read. */
+    private static function existsSelectOne(\Illuminate\Database\Query\Builder $query): void
+    {
+        foreach ($query->wheres ?? [] as $where) {
+            $sub = $where['query'] ?? null;
+            if (! $sub instanceof \Illuminate\Database\Query\Builder) { continue; }
+            if (in_array($where['type'] ?? null, ['Exists', 'NotExists'], true) && ($sub->columns === null || $sub->columns === ['*'])) {
+                $sub->columns = [new \Illuminate\Database\Query\Expression('1')];
+            }
+            self::existsSelectOne($sub);
+        }
     }
 
     public function scopeAuditVisibility(Builder $query, ?User $viewer): Builder

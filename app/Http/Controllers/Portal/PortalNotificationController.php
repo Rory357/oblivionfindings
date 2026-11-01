@@ -26,23 +26,25 @@ class PortalNotificationController extends Controller
         return app(BroadcastRecipientReadService::class)->respond($user, $request, function (BroadcastRecipientReadContext $context) use ($request, $user) {
             $filter = $request->input('filter', 'all');
             // Private exposure follow-up notices are read inside their H&S context (#16); everyone else reads as before.
-            $props = $this->inbox->within($user, function (?HealthSafetyReadContext $hs) use ($context, $filter, $user): array {
+            $props = $this->inbox->within($user, function (?HealthSafetyReadContext $hs) use ($context, $filter, $user, $request): array {
                 $query = $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: $filter === 'unread',
                     healthSafetyContext: $hs, broadcastContext: $context);
+                // One statement counts the page total and the unread notices over the same visible set (each statement
+                // through this query is proved again, so two counts cost twice as much).
+                $counts = (clone $query->getQuery())->toBase()->reorder()
+                    ->selectRaw('count(*) as total, coalesce(sum(case when notifications.read_at is null then 1 else 0 end), 0) as unread')->first();
+                $total = (int) ($counts->total ?? 0);
+                $page = max(1, (int) $request->integer('page', 1));
+                $rows = $total === 0 ? collect() : $query->orderByDesc('created_at')->forPage($page, 30)->get();
+                $notifications = new \Illuminate\Pagination\LengthAwarePaginator($rows->map(fn ($notification) => $context->project($notification) ?? [
+                    'id' => $notification->id,
+                    'type' => class_basename($notification->type),
+                    'data' => $this->inbox->data($notification, $user, $hs),
+                    'read_at' => $notification->read_at?->toISOString(),
+                    'created_at' => $notification->created_at?->toISOString(),
+                ])->values(), $total, 30, $page, ['path' => $request->url(), 'pageName' => 'page', 'query' => $request->query()]);
 
-                return [
-                    'notifications' => $query->orderByDesc('created_at')
-                        ->paginate(30)
-                        ->through(fn ($notification) => $context->project($notification) ?? [
-                            'id' => $notification->id,
-                            'type' => class_basename($notification->type),
-                            'data' => $this->inbox->data($notification, $user, $hs),
-                            'read_at' => $notification->read_at?->toISOString(),
-                            'created_at' => $notification->created_at?->toISOString(),
-                        ])->toArray(),
-                    'unreadCount' => $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true,
-                        healthSafetyContext: $hs, broadcastContext: $context)->count(),
-                ];
+                return ['notifications' => $notifications->toArray(), 'unreadCount' => (int) ($counts->unread ?? 0)];
             });
 
             return inertia('portal/notifications', [

@@ -260,7 +260,10 @@ Route::middleware(['auth'])->group(function () {
             $type = $request->query('type', 'all');
             // Private exposure follow-up notices are read inside their H&S context (#16); everyone else reads as before.
             $inbox = app(\App\Services\HealthSafety\HealthSafetyInboxReads::class);
-            $read = $inbox->within($user, function (?\App\Services\HealthSafety\HealthSafetyReadContext $hs) use ($user, $boardPackAccess, $context, $filter, $type, $inbox): array {
+            // Read once, and only when this response includes the page's own list (a header-only partial reload skips it).
+            $read = null;
+            $page = function () use (&$read, $inbox, $user, $boardPackAccess, $context, $filter, $type): array {
+                return $read ??= $inbox->within($user, function (?\App\Services\HealthSafety\HealthSafetyReadContext $hs) use ($user, $boardPackAccess, $context, $filter, $type, $inbox): array {
                 $query = $boardPackAccess->visibleNotificationQuery($user, healthSafetyContext: $hs, broadcastContext: $context);
                 if ($filter === 'unread') {
                     $query->whereNull('read_at');
@@ -289,11 +292,12 @@ Route::middleware(['auth'])->group(function () {
                     ])->toArray(),
                     'unread_count' => $boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, healthSafetyContext: $hs, broadcastContext: $context)->count(),
                 ];
-            });
+                });
+            };
 
             return inertia('notifications/index', [
-                'notifications' => $read['notifications'],
-                'unread_count' => $read['unread_count'],
+                'notifications' => fn () => $page()['notifications'],
+                'unread_count' => fn () => $page()['unread_count'],
                 'broadcast_reader' => $context->envelope(),
                 'selected_broadcast_notification' => $selectedId === null ? null : $context->selected($selectedId),
                 'filters' => ['filter' => $filter, 'type' => $type],

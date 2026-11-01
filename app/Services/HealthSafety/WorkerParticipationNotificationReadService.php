@@ -26,6 +26,9 @@ final class WorkerParticipationNotificationReadService
     /** Presence-only original source-admission evidence, never a receiver grant/cache. */
     private static ?WeakMap $admittedRequests = null;
 
+    /** One prepared frame per H&S read context (keyed weakly, so it ends with the read). */
+    private static ?WeakMap $contextFrames = null;
+
     public function __construct(private readonly WorkerParticipationRecipientSourceService $recipients)
     {
         $this->frames = new WeakMap;
@@ -38,6 +41,16 @@ final class WorkerParticipationNotificationReadService
         if (isset($this->frames[$notifications])) { throw new LogicException('An inbox source frame cannot be prepared twice.'); }
         $context?->assertViewer($viewer);
         $connection = $notifications->getQuery()->getQuery()->getConnection();
+        // #14 speed: inside one H&S read (one transaction, its reads share-locked) the frame is the same for every
+        // notification query of this viewer, so a count and a list reuse it instead of proving every notice twice.
+        $reused = $context !== null ? (self::$contextFrames[$context] ?? null) : null;
+        if ($reused !== null && $reused['viewer_id'] === (int) $viewer->id && $reused['connection'] === $connection
+            && $reused['request']->get() === request()) {
+            $this->assertOriginal($reused);
+            $this->frames[$notifications] = $reused;
+
+            return;
+        }
         $frame = ['viewer_id' => (int) $viewer->id, 'morph' => $viewer->getMorphClass(), 'connection' => $connection,
             'request' => WeakReference::create(request()), 'context' => $context, 'private_ids' => [], 'copies' => [], 'delivery_schema' => false];
         $eligible = false;
@@ -78,7 +91,8 @@ final class WorkerParticipationNotificationReadService
                 if ($this->validCandidate($candidate)) { $sourceCandidates[(int) $candidate->meeting_id.':'.$candidate->audience] = ['meeting_id' => (int) $candidate->meeting_id, 'audience' => $candidate->audience]; }
             }
             $this->assertPhysicalConnection($frame);
-            $origins = $this->recipients->captureOrigins($viewer, array_values($sourceCandidates), $context);
+            // Each origin is checked below right before its notice is used, so the capture skips its own final check.
+            $origins = $this->recipients->captureOrigins($viewer, array_values($sourceCandidates), $context, assertEach: false);
             if ($origins !== []) {
                 // captureOrigins already replays the same earliest actor/source proof.
                 // A later transient inbox reader must not conceal that withdrawal.
@@ -97,7 +111,7 @@ final class WorkerParticipationNotificationReadService
                     'committee_id' => (int) $candidate->committee_id, 'site_id' => $candidate->site_id === null ? null : (int) $candidate->site_id,
                     'audience' => $candidate->audience, 'source_digest' => $candidate->source_digest,
                 ]))->toArray($viewer);
-                $originalCopyMatches = $this->copyQuery($frame, ['candidate' => $candidate, 'origin' => $origin, 'payload' => $payload, 'event' => null])->exists();
+                $originalCopyMatches = $this->copyQuery($frame, ['candidate' => $candidate, 'origin' => $origin, 'payload' => $payload, 'event' => null])->selectRaw('1')->exists();
                 // A malformed initial copy may be withheld; withdrawal of the source
                 // already admitted by captureOrigins must not become an empty inbox.
                 $origin->assertOriginal();
@@ -106,7 +120,8 @@ final class WorkerParticipationNotificationReadService
                     ->lock('for share nowait')
                     ->where('notice_event.id', $candidate->event_id)->whereExists($this->sourceBlock($candidate, $origin));
                 $event = $eventQuery->first(); // The copied private location/descriptor is behind its original source predicate.
-                $origin->assertOriginal();
+                // #14 speed: the origin was checked just above with a share-locked read in this same transaction, so it
+                // can't have changed since; the event-bound source and copy checks below still run.
                 abort_unless($event !== null, 404, 'Original meeting delivery evidence changed.');
                 try {
                     $descriptor = json_decode($event->source_descriptor, true, 512, JSON_THROW_ON_ERROR);
@@ -115,12 +130,16 @@ final class WorkerParticipationNotificationReadService
                 if (! $this->validEvent($event, $descriptor, $membership, $candidate)) { continue; }
                 $copy = ['candidate' => $candidate, 'event' => (array) $event, 'origin' => $origin, 'payload' => $payload];
                 abort_unless($this->sourceBlock($candidate, $origin, $copy['event'])->exists(), 404, 'Original meeting delivery evidence changed.');
-                abort_unless($this->copyQuery($frame, $copy)->exists(), 404, 'Original meeting notice evidence changed.');
+                abort_unless($this->copyQuery($frame, $copy)->selectRaw('1')->exists(), 404, 'Original meeting notice evidence changed.');
                 $frame['copies'][] = $copy;
             }
         }
         $this->assertOriginal($frame);
         $this->frames[$notifications] = $frame;
+        if ($context !== null) {
+            self::$contextFrames ??= new WeakMap;
+            self::$contextFrames[$context] = $frame;
+        }
     }
 
     /** Add an intersection; never replace the canonical own relation or other-family predicates. */

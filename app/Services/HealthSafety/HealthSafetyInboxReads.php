@@ -37,12 +37,53 @@ final class HealthSafetyInboxReads
      */
     public function within(User $viewer, callable $read): mixed
     {
-        if (! $this->hasExposureNotices($viewer) && ! self::hasParticipationNotices($viewer)) {
+        if (! $this->hasPrivateNotices($viewer)) {
             return $read(null);
         }
 
         return HealthSafetyReadContext::within($viewer, self::permissions(),
             fn (HealthSafetyReadContext $context) => HealthSafetyReadMaterialisationProof::within($context, fn () => $read($context)));
+    }
+
+    /** Per request: viewers the doorway found without any private notice (so the shared query need not ask again). */
+    private static ?\WeakMap $withoutPrivate = null;
+
+    /** Whether this request's doorway already found the viewer has no private notice at all. */
+    public static function knownWithoutPrivate(User $viewer): bool
+    {
+        return isset(self::$withoutPrivate[request()][(int) $viewer->id]);
+    }
+
+    /** Both private families in one id-only read: an exposure follow-up notice, or a meeting notice with its delivery row. */
+    public function hasPrivateNotices(User $viewer): bool
+    {
+        $found = $this->privateNoticeExists($viewer);
+        if (! $found) {
+            self::$withoutPrivate ??= new \WeakMap;
+            $known = self::$withoutPrivate[request()] ?? [];
+            $known[(int) $viewer->id] = true;
+            self::$withoutPrivate[request()] = $known;
+        }
+
+        return $found;
+    }
+
+    private function privateNoticeExists(User $viewer): bool
+    {
+        $deliveries = SchemaCache::hasTable('worker_participation_meeting_deliveries');
+
+        return $this->own($viewer)
+            ->where(function ($private) use ($deliveries): void {
+                $private->where('type', ChemicalExposureFollowupAssignedNotification::class)
+                    ->orWhere('data->kind', 'private_followup')
+                    ->orWhere('data->event_key', ChemicalExposureFollowupDestinationService::EVENT_KEY);
+                if ($deliveries) {
+                    $private->orWhereExists(fn (QueryBuilder $delivery) => $delivery->selectRaw('1')
+                        ->from('worker_participation_meeting_deliveries as private_delivery')
+                        ->whereColumn('private_delivery.id', 'notifications.id'));
+                }
+            })
+            ->limit(1)->value('notifications.id') !== null;
     }
 
     /** Whether any of the viewer's own notices is (or claims to be) a private exposure follow-up notice. */
