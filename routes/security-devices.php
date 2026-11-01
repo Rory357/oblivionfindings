@@ -24,7 +24,6 @@ use App\Domain\SecurityDevices\Http\Controllers\CategoryPageController;
 use App\Domain\SecurityDevices\Http\Controllers\CollectorInstallationController;
 use App\Domain\SecurityDevices\Http\Controllers\ConfigurationSnapshotComparisonController;
 use App\Domain\SecurityDevices\Http\Controllers\ConfigurationSnapshotController;
-use App\Domain\SecurityDevices\Http\Controllers\DashboardController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceAssignmentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceDocumentController;
@@ -75,6 +74,7 @@ use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandExecutio
 use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceCommandRequest;
 use App\Domain\SecurityDevices\Screens\Http\DevicesController;
 use App\Domain\SecurityDevices\Screens\Http\FoundDevicesController;
+use App\Domain\SecurityDevices\Screens\Http\OverviewController;
 use App\Domain\SecurityDevices\Screens\Http\SitesController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -96,7 +96,8 @@ Route::middleware([
     'auth',
     'permission:securityDevices.viewAny',
 ])->prefix('security-devices')->group(function () {
-    Route::get('/', DashboardController::class)
+    // S&D rebuild C4: the Security & devices home.
+    Route::get('/', OverviewController::class)
         ->name('security-devices.index');
 
     Route::middleware([EndpointTransport::class, 'permission:securityDevices.commands.admin', 'throttle:10,1'])->group(function (): void {
