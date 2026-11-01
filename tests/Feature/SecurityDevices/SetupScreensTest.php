@@ -283,6 +283,38 @@ class SetupScreensTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'security_devices.settings.changed']);
     }
 
+    public function test_a_sensor_gateway_gets_its_own_login_only_where_the_hub_relay_can_take_readings(): void
+    {
+        $keeper = $this->person(['securityDevices.viewAny', 'securityDevices.integrations.view', 'securityDevices.integrations.manage', 'securityDevices.savedLogins.manage']);
+        $make = fn (array $overrides = []) => $this->actingAs($keeper)->postJson('/security-devices/setup/broker/gateways', [
+            'site_id' => $this->home->id, 'model' => 'Milesight UG65', 'name' => 'Aurora House sensor gateway', ...$overrides,
+        ]);
+
+        // No hub yet, then unencrypted MQTT off: refused in plain words.
+        $make()->assertUnprocessable()->assertJsonPath('errors.site_id.0', 'This Site has no hub yet. Add a hub first: sensor readings never cross the public internet.');
+        $this->hub($this->home);
+        $make()->assertUnprocessable()->assertJsonValidationErrors('site_id');
+
+        app(SecurityDevicesSettings::class)->update($keeper, ['mqtt.allow_unencrypted' => true], 'Testing sensors through the hub at home');
+        $made = $make()->assertCreated()->assertJsonPath('port', 1883)->assertJsonPath('hub.label', 'Aurora House hub');
+        $login = \App\Domain\SecurityDevices\Iot\Relay\Models\SensorGatewayLogin::query()->sole();
+        expect($made->json('password'))->toBeString()
+            ->and($login->password_hash)->not->toContain($made->json('password'))
+            ->and(password_verify($made->json('password'), $login->password_hash))->toBeTrue()
+            ->and($made->json('topic'))->toBe($login->topic_prefix.'up');
+
+        $this->actingAs($keeper)->getJson("/security-devices/setup/broker/gateways/{$login->id}")->assertOk()->assertJsonPath('last_reading_at', null);
+        $this->actingAs($keeper)->get('/security-devices/setup/hubs?tab=broker')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('broker.rows.0.label', 'Aurora House sensor gateway (UG65)')
+            ->where('broker.rows.0.connection.text', 'Unencrypted, house network only'));
+
+        // Another Site's gateway: not found. Without the permission: forbidden.
+        $make(['site_id' => $this->other->id])->assertNotFound();
+        $this->actingAs($this->viewer)->deleteJson("/security-devices/setup/broker/gateways/{$login->id}")->assertForbidden();
+        $this->actingAs($keeper)->deleteJson("/security-devices/setup/broker/gateways/{$login->id}")->assertOk();
+        expect($login->fresh()->revoked_at)->not->toBeNull();
+    }
+
     public function test_supported_devices_splits_the_drivers_into_two_honest_tables(): void
     {
         $this->actingAs($this->viewer)->get('/security-devices/setup/services?tab=supported')

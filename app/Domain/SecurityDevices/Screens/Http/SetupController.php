@@ -99,6 +99,60 @@ final class SetupController extends Controller
         return response()->json(['run_id' => (int) $run->id], 202);
     }
 
+    /**
+     * Pop-up 98, step 2: make a gateway's own login on its Site's hub relay. The password is shown
+     * once, here, and never stored in a readable form. Refused in plain words when the relay can't
+     * take readings at that Site yet (no hub, unencrypted MQTT off, or an address range clash).
+     */
+    public function storeGateway(Request $request, SecurityDevicesAccessService $access, SecurityDevicesSettings $settings): JsonResponse
+    {
+        $user = $this->viewer($request);
+        abort_unless($user->canDo('securityDevices.savedLogins.manage'), 403);
+        $validated = $request->validate([
+            'site_id' => ['required', 'integer', 'min:1'],
+            'model' => ['required', 'string', \Illuminate\Validation\Rule::in(['Milesight UG65', 'Milesight UG67', 'Milesight UG56', 'Another MQTT gateway'])],
+            'name' => ['required', 'string', 'min:3', 'max:80'],
+        ]);
+        $access->assertCanViewSite($user, (int) $validated['site_id']);
+        $site = \App\Models\Site::query()->whereKey((int) $validated['site_id'])->where('is_active', true)->where('archived', false)->whereNull('archived_at')->firstOrFail();
+        $hub = app(\App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver::class)->forSite((int) $site->id);
+        $refusal = match (true) {
+            $hub === null => 'This Site has no hub yet. Add a hub first: sensor readings never cross the public internet.',
+            ! $settings->bool(SecurityDevicesSettings::MQTT_PLAIN) => 'Gateways send to the hub unencrypted on the house network, and that’s off. Turn on “Allow unencrypted MQTT through a Site’s hub” in Setup › Sensor broker first.',
+            in_array((int) $site->id, \App\Domain\SecurityDevices\Iot\Relay\Services\SensorRelaySites::clashing(), true) => 'Another Site uses the same address range, so unencrypted MQTT is refused here. Give one of them a different range first.',
+            default => null,
+        };
+        if ($refusal !== null) {
+            throw ValidationException::withMessages(['site_id' => $refusal]);
+        }
+        $label = trim($validated['name']).($validated['model'] !== 'Another MQTT gateway' ? ' ('.str_replace('Milesight ', '', $validated['model']).')' : '');
+        ['login' => $login, 'password' => $password] = app(\App\Domain\SecurityDevices\Iot\Relay\Services\SensorGatewayLoginService::class)->create($site, mb_substr($label, 0, 120), null, $user);
+        $hubAddress = $hub->collector_device_id ? \App\Domain\SecurityDevices\Models\Device::query()->whereKey($hub->collector_device_id)->value('ip_address') : null;
+
+        return response()->json([
+            'id' => (int) $login->id,
+            'username' => (string) $login->username,
+            'password' => $password,
+            'topic' => (string) $login->topic_prefix.'up',
+            'hub' => ['label' => \App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver::label($hub), 'address' => is_string($hubAddress) && $hubAddress !== '' ? $hubAddress : null],
+            'port' => 1883,
+        ], 201)->header('Cache-Control', 'no-store');
+    }
+
+    /** Pop-up 98, step 4: has the gateway's first reading arrived? */
+    public function showGateway(Request $request, int $login, SecurityDevicesAccessService $access): JsonResponse
+    {
+        $user = $this->viewer($request);
+        abort_unless($user->canDo('securityDevices.savedLogins.manage'), 403);
+        $record = \App\Domain\SecurityDevices\Iot\Relay\Models\SensorGatewayLogin::query()->findOrFail($login);
+        $access->assertCanViewSite($user, (int) $record->site_id);
+
+        return response()->json([
+            'last_reading_at' => $record->last_reading_at?->toIso8601String(),
+            'removed' => $record->revoked_at !== null,
+        ]);
+    }
+
     /** Setup › Sensor broker: remove one gateway's login; its hub stops accepting it at the next update. */
     public function revokeGateway(Request $request, int $login, SecurityDevicesAccessService $access): JsonResponse
     {

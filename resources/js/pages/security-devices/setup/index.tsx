@@ -17,6 +17,7 @@ import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { useDeviceFormOptions } from '@/components/security-devices/device-popups';
 import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
 import { AddNetwork } from '@/components/security-devices/scan-popups';
+import { AddSensorGateway } from '@/components/security-devices/sensor-gateway-popup';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
@@ -50,6 +51,7 @@ export default function SetupPage(props: SetupProps) {
     const draft = useSettingsDraft(props.settings);
     const [query, setQuery] = useState('');
     const [addingNetwork, setAddingNetwork] = useState(false);
+    const [addingGateway, setAddingGateway] = useState(false);
     const [leaving, setLeaving] = useState<string | null>(null);
     const allowLeave = useRef(false);
     // Times are read once per visit, so "6:00 am" and "3 min ago" agree across the page.
@@ -184,7 +186,18 @@ export default function SetupPage(props: SetupProps) {
                     <ChangeHistory data={props.history} canExport={can.export_history} query={query} now={now} onPage={(page) => go('history', null, page)} />
                 ) : null}
 
-                {props.broker ? <SetupBroker data={props.broker} draft={draft} query={query} now={now} /> : null}
+                {props.broker ? (
+                    <SetupBroker
+                        data={props.broker}
+                        draft={draft}
+                        query={query}
+                        now={now}
+                        onAdd={() => {
+                            load();
+                            setAddingGateway(true);
+                        }}
+                    />
+                ) : null}
                 {props.alerts ? <SetupAlertRules data={props.alerts} draft={draft} /> : null}
                 {props.checks ? <SetupChecks data={props.checks} draft={draft} query={query} canOpenDevices={can.open_devices} /> : null}
 
@@ -199,6 +212,7 @@ export default function SetupPage(props: SetupProps) {
                     router.reload({ except: ['deviceForm'] });
                 }}
             />
+            <AddSensorGateway open={addingGateway} form={form} onClose={() => setAddingGateway(false)} />
             <HubPopups state={hubs} form={form} canApprove={can.approve_hubs} canStopScan={can.manage} />
             <ConfirmDialog
                 open={leaving !== null}

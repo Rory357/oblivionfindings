@@ -508,6 +508,13 @@ Route::middleware([
         ->whereNumber('scope')
         ->middleware('throttle:20,1')
         ->name('security-devices.setup.networks.scan');
+    Route::post('/setup/broker/gateways', [SetupController::class, 'storeGateway'])
+        ->middleware('throttle:10,1')
+        ->name('security-devices.setup.broker.gateways.store');
+    Route::get('/setup/broker/gateways/{login}', [SetupController::class, 'showGateway'])
+        ->whereNumber('login')
+        ->middleware('throttle:60,1')
+        ->name('security-devices.setup.broker.gateways.show');
     Route::delete('/setup/broker/gateways/{login}', [SetupController::class, 'revokeGateway'])
         ->whereNumber('login')
         ->middleware('throttle:20,1')

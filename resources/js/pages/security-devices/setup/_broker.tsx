@@ -5,17 +5,18 @@ import { EntityTable } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
 import { AlwaysOn, SettingGroup, SettingRow } from '@/components/referrals/settings-ui';
 import { Note, QuietLine } from '@/components/signature/blocks';
+import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { seenTime } from '@/lib/security-devices/device-time';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
-import { Home, KeyRound, RadioTower, ShieldCheck, Trash2 } from 'lucide-react';
+import { Home, KeyRound, Plus, RadioTower, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { matches } from './_parts';
 import { SwitchGroup, type SettingsDraft } from './_settings';
 import type { BrokerRow, SetupProps } from './_types';
 
-export function SetupBroker({ data, draft, query, now }: { data: NonNullable<SetupProps['broker']>; draft: SettingsDraft; query: string; now: Date }) {
+export function SetupBroker({ data, draft, query, now, onAdd }: { data: NonNullable<SetupProps['broker']>; draft: SettingsDraft; query: string; now: Date; onAdd: () => void }) {
     const menu = useEntityContextMenu<BrokerRow>();
     const [removing, setRemoving] = useState<BrokerRow | null>(null);
     const [busy, setBusy] = useState(false);
@@ -59,14 +60,24 @@ export function SetupBroker({ data, draft, query, now }: { data: NonNullable<Set
                 <SettingRow label="Alert after 5 wrong logins in 10 minutes" hint="The hub ignores that address for 10 minutes and IT is told, as for a device that stops answering" control={<AlwaysOn />} />
             </SettingGroup>
 
-            <ListCaption title="Gateways and devices with a login" caption="Each has its own login and may send only its own readings" />
+            <ListCaption
+                title="Gateways and devices with a login"
+                caption="Each has its own login and may send only its own readings"
+                right={
+                    data.can_add ? (
+                        <Button size="sm" onClick={onAdd}>
+                            <Plus className="size-4" /> Add a sensor gateway
+                        </Button>
+                    ) : undefined
+                }
+            />
             {error ? (
                 <Note tone="critical">
                     <span role="alert">{error}</span>
                 </Note>
             ) : null}
             {data.rows.length === 0 ? (
-                <QuietLine text="No gateway logins yet." />
+                <QuietLine text="No gateway logins yet. Add a sensor gateway and Oblivion makes its own login on the Site’s hub." />
             ) : (
                 <EntityTable<BrokerRow>
                     rows={rows}
