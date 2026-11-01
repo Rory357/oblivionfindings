@@ -70,6 +70,6 @@ Copy into `provenance/<engine>.md`.
 | Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Spec written 23 Oct 2026; ready for a builder session |
 | Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Spec written 23 Oct 2026; ready for a builder session |
 | Oblivion Calls | to write after Oblivion Live (stage 5) | — |
-| Oblivion Relay (firewall relay for calls) | [specs/oblivion-relay.md](specs/oblivion-relay.md) | Spec written 1 Nov 2026; ready for a builder session. Where it runs is for the user to decide before stage 5 network testing |
+| Oblivion Relay (firewall relay for calls) | [specs/oblivion-relay.md](specs/oblivion-relay.md) | Spec written 1 Nov 2026, and updated the same day with the user's answers (instant cut-off over a control channel, fuller logs); ready for a builder session. Where it runs and the log retention default are still for the user |
 
 The session that wrote these specs opened the built files of livekit-client and pusher-js to read their licence headers, so it does not build those replacements itself.

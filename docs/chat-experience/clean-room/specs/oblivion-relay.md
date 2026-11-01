@@ -11,6 +11,15 @@ The Settings › Obli remote-support card shows a coturn configuration snippet. 
 
 **Spec provenance.** Written by the Oblivion Relay spec-writer session, a side session of the Chat rebuild session (`local_fae95f7b`), on 1 November 2026, on branch `claude/oblivion-relay-spec`. Sources read: RFC 8489, RFC 8656, RFC 5769 and RFC 7983 from rfc-editor.org, RFC 6062 (only to leave it out of scope), draft-uberti-behave-turn-rest-00, and the Oblivion code and documents named in section 1. This session opened, searched and fetched no code, examples or built files from any TURN or STUN implementation. It does not build the relay.
 
+**Updated the same day** with the user's answers to four open questions:
+
+- STUN Binding is on by default.
+- Five hours is the longest Chat call.
+- The app gets an instant cut-off, through the control channel in 3.7.
+- Fuller logs record the client IP of every allocation, with a retention limit and restricted access (section 9).
+
+The answers are listed in section 13.
+
 ## 1. What it is for
 
 Oblivion Calls (D3, stage 5) connects browsers directly with the browser's own WebRTC. Each person in a call has one peer connection to every other person: up to 7 in an 8-person voice call, and up to 3 in a 4-person video call. Most of these connections go direct. Some can't, for example:
@@ -28,7 +37,7 @@ Two other Oblivion features already issue TURN credentials and expect a TURN ser
 
 Both use the TURN REST format (section 3): the username is `expiry:opaque-id`, and the password is the Base64 HMAC-SHA1 of the username under a shared secret. Oblivion Relay accepts their credentials as they are today.
 
-**What it is:** one long-running Node.js program (Node 22 LTS or later) in `relay/` at the repository root, using Node's built-in modules only. It answers STUN Binding requests (optional) and serves TURN allocations that relay UDP. Clients reach it over UDP, TCP or TLS.
+**What it is:** one long-running Node.js program (Node 22 LTS or later) in `relay/` at the repository root, using Node's built-in modules only. It answers STUN Binding requests (optional) and serves TURN allocations that relay UDP. Clients reach it over UDP, TCP or TLS. It also has a health endpoint on localhost only, and a signed control channel on a private address, which the app uses to end a person's relay use at once (3.7).
 
 **What it is not:**
 
@@ -46,10 +55,11 @@ Both use the TURN REST format (section 3): the username is `expiry:opaque-id`, a
 4. It never opens a way into a private network. It refuses to relay to loopback, private, link-local, multicast, CGNAT, reserved or tunnel addresses, or to its own addresses, unless an explicit allowlist names them (section 6).
 5. It never amplifies or reflects attacks on others (section 7).
 6. No single person, credential or network can use it up. There are allocation quotas per credential and in total, bandwidth caps, and fixed lifetimes for allocations, permissions and channels.
-7. Logs never contain credentials, keys, nonces or message content (section 9). The health and metrics endpoint listens on localhost only.
+7. Logs never contain credentials, keys, nonces or message content. They record the client IP of every allocation, so abuse can be traced, and that log is deleted after a set number of days and readable only by named people (section 9). The health and metrics endpoint listens on localhost only.
 8. It runs on its own small server or beside nginx on the app server, from the same code and settings (section 10). **Where it runs is not decided. The user chooses before stage 5 network testing.**
 9. Rotating a secret or renewing the certificate never drops a call: both reload on SIGHUP.
 10. One node with 2 vCPUs and 2 GB of memory carries at least 1,000 allocations and 150 Mbit/s of relayed traffic in each direction (section 12).
+11. The app can end a person's relay use at once, for example when someone is offboarded during a call. It does this over a signed control channel that is never internet-facing (3.7). When the relay is reachable, the person's relayed media stops within 5 seconds of the app's decision.
 
 ## 3. Credentials
 
@@ -122,7 +132,7 @@ An allocation keeps the key it was made with, so steps 1 and 2 don't affect it. 
 
 ### 3.5 Deny list
 
-A TURN REST credential can't be withdrawn once it has been issued. `RELAY_DENY_FILE` is optional. It names a file with one opaque-id, or one `expiry:opaque-id`, per line, where `#` starts a comment. On SIGHUP the relay re-reads the file, ends matching allocations at once and refuses those ids from then on with 401. An operator adds ids by hand, for example when a credential is known to have leaked. The file never holds passwords. In version 1 the app can't write to it (open question 4).
+A TURN REST credential can't be withdrawn once it has been issued. The normal way to end someone's relay use is the app's control channel (3.7). The deny file is the operator's fallback when the app can't reach the relay. `RELAY_DENY_FILE` is optional. It names a file with one opaque-id, or one `expiry:opaque-id`, per line, where `#` starts a comment. On SIGHUP the relay re-reads the file, ends matching allocations at once and refuses those ids from then on with 401. An operator adds ids by hand, for example when a credential is known to have leaked. The file never holds passwords.
 
 ### 3.6 What the app issues for Chat
 
@@ -135,6 +145,94 @@ The CCTV and remote-support issuers stay as they are. Chat gets its own issuer i
 - The settings go in `config/chat.php` under `relay`: `urls`, `secret` and `credential_seconds`.
 - The HTTP route that hands credentials to a browser belongs to Oblivion Calls (C4.2). It checks that the person has been admitted to the call. The browser asks again before every ICE restart.
 - Credentials are computed on demand. They are never stored, logged or written to an audit row, as REMOTE-RELAY.md already requires for remote support.
+- It never issues an expiry at or before an `expires_up_to` it has sent in a revocation for the same id (3.7). It remembers each one in the cache until that time passes. The access checks normally refuse a revoked person first anyway.
+
+### 3.7 Ending relay use at once: the control channel
+
+On 1 November 2026 the user decided that the app must be able to end a person's relay use straight away, for example when someone is offboarded during a call. Version 1 therefore has a signed control channel from the app to the relay. Chat must use it: the relay refuses to start if the `chat` class is on and there is no control secret.
+
+**Transport.**
+
+- It is its own `node:http` listener, `RELAY_CONTROL_LISTEN` (default `127.0.0.1:9479`), separate from the health endpoint.
+- It may bind to a loopback address or a private one: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 (for a private overlay such as WireGuard) or fc00::/7. The relay refuses to start if it is set to a public address, `0.0.0.0` or `::`. It is never internet-facing.
+- It answers only sources in `RELAY_CONTROL_ALLOWED_SOURCES` (default `127.0.0.1/32,::1/128`), which may list loopback and private CIDRs only. Connections from anywhere else close without a reply. The host firewall also allows the control port only from the app server.
+- Where it listens:
+  - Beside nginx (shape B): on loopback.
+  - On its own server (shape A): on the relay's address on a private network it shares with the app server, such as a cloud private network or a WireGuard tunnel. Where there is no private network, use an SSH or WireGuard tunnel that ends on loopback. The port is never opened publicly.
+- It speaks plain HTTP/1.1. The HMAC gives authenticity and integrity. Bodies hold only opaque ids, times and a reason word, never names or user ids.
+
+**Authentication.**
+
+- The channel has its own secret, separate from every credential secret: `RELAY_CONTROL_SECRET`, with key id `RELAY_CONTROL_KEY_ID`. During rotation it also has `RELAY_CONTROL_PREVIOUS_SECRET` with `RELAY_CONTROL_PREVIOUS_KEY_ID`.
+  - Each secret is a value or a `_FILE` path, 32–512 bytes, and is re-read on SIGHUP.
+  - The relay refuses to start if the control secret equals any credential secret.
+- The app holds the same values in `CHAT_RELAY_CONTROL_SECRET` and `CHAT_RELAY_CONTROL_KEY_ID`, and always signs with the current key.
+- Rotation:
+  1. On the relay, make the new secret current and the old one previous, then send SIGHUP.
+  2. Switch the app to the new secret.
+  3. Once the app's queue holds no request signed with the old key, clear the previous one on the relay and send SIGHUP.
+- Every request carries four headers:
+  - `X-Relay-Key`: the key id;
+  - `X-Relay-Timestamp`: Unix seconds;
+  - `X-Relay-Nonce`: 32 lowercase hex characters (128 random bits);
+  - `X-Relay-Signature`: base64url, without padding, of HMAC-SHA256(secret, method "\n" path "\n" key id "\n" timestamp "\n" nonce "\n" raw body).
+
+  The method and path are signed, so a request can't be replayed on another endpoint. Compare with `crypto.timingSafeEqual`.
+- An unknown key id, a missing header or a wrong signature gets 401, with no detail. After 10 failures in a minute from one source, that source is ignored for 60 s.
+
+Known-answer vector, shared by the Node and PHP tests. Both were computed with `node:crypto` and PHP's `hash_hmac`, and they agree:
+
+| Input | Value |
+|---|---|
+| secret, key id | `oblivion-relay-control-test-0123456789`, `k1` |
+| method, path | `POST`, `/control/revoke` |
+| timestamp, nonce | `1798761600`, `00112233445566778899aabbccddeeff` |
+| body (150 bytes, no trailing newline) | `{"revocations":[{"id":"obli-chat-b0d51c58c8b9c1f458fadf16c7d375630ef51da4df81915893b05c0fa4ed8bc6","expires_up_to":1798765200}],"reason":"offboarded"}` |
+| `X-Relay-Signature` | `ORL-3hdG48NXinOxKS55SnorOgyU3fULooysZTgFcOw` |
+
+**Replay protection.**
+
+- The timestamp must be within 30 s of the relay's clock, either way, or the request gets 401.
+- The relay remembers every accepted nonce for 60 s and refuses a repeat with 401. It holds at most 10,000 nonces. When that is full, new requests get 503 until space frees.
+- A revocation is idempotent, so applying it twice changes nothing.
+
+**Endpoints.** Any other path gets 404 and any other method 405.
+
+| Method and path | Body | Answer |
+|---|---|---|
+| `POST /control/revoke` | `{"revocations":[{"id":"obli-<tag>-<64 hex>","expires_up_to":<Unix seconds>}],"reason":"offboarded"\|"left_call"\|"call_ended"\|"access_removed"\|"hand"}`. 1–500 entries, at most 64 KiB, `Content-Type: application/json` | 200 `{"ended": <allocations ended>, "held": <revocations now held>}`, sent once the work is done. 400 if any entry is invalid, and then nothing is applied. 413 if the body is too large |
+| `GET /control/status` | empty | 200 with the `/health` body, plus `revocations_held` and `control: {key_id, previous_key}` |
+
+**What a revoke names.** The opaque id from the username, `obli-<tag>-<64 hex>`. The tag tells the relay the class. `expires_up_to` is the latest credential expiry the app could have issued for that id so far: the app's clock now, plus its credential lifetime. If `expires_up_to` is further ahead of the relay's clock than the class's longest credential plus the clock allowance, the request gets 400.
+
+**What the relay does** before it answers, within 1 second:
+
+1. It ends every allocation whose opaque id matches and whose credential expiry is at or before `expires_up_to`, including allocations in their grace period. It closes their relayed sockets, drops their permissions and channels, and closes any TCP or TLS connection that carried them. Datagrams for those allocations are dropped from then on, and a later Refresh gets 437.
+2. It holds the revocation until `expires_up_to` plus the clock allowance. While it is held, an Allocate with a credential for that id whose expiry is at or before `expires_up_to` gets 401. Credentials issued after the revoke carry a later expiry and work, so someone re-admitted to a call can rejoin.
+3. A second revocation of the same id keeps the later `expires_up_to`.
+4. It writes the held revocations to `RELAY_STATE_DIR/revocations.json`, writing a temporary file and renaming it, so that a restart doesn't forget them. Expired entries are pruned. If the file exists but can't be read, the relay refuses to start and names the file. The operator moves it aside to start without it.
+5. It logs `revoked` in the allocation log (section 9) with the id hash, class, reason and the number of allocations ended.
+
+**The app side.**
+
+- `App\Services\Chat\OblivionRelay` provides `revoke(array $opaqueIds, string $reason)`, `revokePerson(User $user, string $reason)`, `revokeCallMember(ChatCall $call, User $user, string $reason)` and `status()`.
+- A person's ids are their Chat ids (3.6) for every call they were admitted to whose credentials could still be in use: calls that haven't ended, and calls that ended within the credential lifetime plus grace (five hours).
+- `CHAT_RELAY_CONTROL_URLS` lists one URL per relay node, one to four, such as `http://127.0.0.1:9479` or `http://10.0.0.5:9479`. Each must be `http`, a literal loopback or private IP with a port, and no path or query; anything else is refused when the configuration is read. The settings go in `config/chat.php` under `relay.control`: `urls`, `secret` and `key_id`.
+- Hooks:
+  - **Chat offboarding:** `ChatOffboarding::complete()` calls `revokePerson($person, 'offboarded')` after its transaction commits.
+  - **The leaver rule:** when `ChatMembershipGaps::sync()` opens a gap because someone is no longer current staff (hourly through `chat:sync-membership-gaps`, and at offboarding), it calls `revokePerson(…, 'offboarded')`.
+  - **Leaving or losing a call:** `ChatCallReconciler`, or its stage 5 successor in Oblivion Calls, calls `revokeCallMember(…)` when a participant becomes `left`, `removed`, `revoked` or `expired`, with `left_call` or `access_removed` as the reason. When a call ends, it revokes every participant's id for that call with `call_ended`, so nothing outlives the call.
+  - **Suspension or deactivation:** wherever the app suspends or deactivates an account (where Oblivion Live's revoke also hooks in), it calls `revokePerson(…, 'access_removed')`.
+  - **By hand:** `php artisan chat:relay-revoke {user} {--call=} {--reason=hand}` revokes one call or all of the person's live calls. A button for this in Settings › Chat needs a board first, so it isn't in version 1.
+- Every revoke, by hand or automatic, writes an audit row: `chat.relay.revoked`, with the actor (or `system`), the person's id, the call ids, the reason, and the nodes that confirmed.
+
+**When the app can't reach the relay.**
+
+- Each revoke is sent to every node straight after the database commit, after the browser has had its response, with a 3-second timeout. A failed node gets a queued retry job: at 5 s, 15 s and 30 s, then every minute. Retries stop once `expires_up_to` plus the class's grace has passed, because by then nothing the revoke covers can still be relaying.
+- The person's action never fails or waits because a relay is unreachable, as with Oblivion Live.
+- Settings › Chat › Service health shows "Relay: N revocations waiting" with the oldest one's age. The scheduler logs an error for each revocation that has waited more than 5 minutes.
+- Meanwhile, the app's access checks stop the person getting new credentials, and Oblivion Live's revoke ends their call signalling. Media through an allocation they already hold can continue until the revoke lands, or at worst until the credential's expiry plus grace (five hours for Chat). An operator who can reach the relay host can end it at once with the deny file (3.5).
+- After a relay restart, held revocations come back from the state file.
 
 ## 4. STUN (RFC 8489)
 
@@ -366,9 +464,38 @@ Requests from unspecified, multicast, broadcast, Teredo, 6to4 or IPv4-mapped add
 
 ## 9. Logs, health and metrics
 
-**Logs.** Each entry is one JSON object per line on stdout, which journald stores. The fields are `time`, `level` and `event`, and where they apply: `class`; `id` (the first 12 hex characters of SHA-256 of the opaque-id, so lines about one credential can be grouped without logging the id); `transport`; `relay_port`; `lifetime`; `duration_s`; `bytes_in`, `bytes_out`, `packets_in` and `packets_out`; and `reason`.
+**Logs.** Each entry is one JSON object per line, with the fields `time`, `level` and `event`, and where they apply:
 
-The following are never logged, at any level:
+- `class`;
+- `id`: the first 12 hex characters of SHA-256 of the opaque-id, so lines about one credential can be grouped without logging the id itself;
+- `client_ip` and `client_port`;
+- `transport` and `relay_port`;
+- `lifetime` and `duration_s`;
+- `bytes_in`, `bytes_out`, `packets_in` and `packets_out`;
+- `reason`.
+
+There are two streams:
+
+- **The operations log** goes to stdout, which journald stores. It holds `start`, `reload`, `listener_error`, `config_error`, `capacity`, the per-minute refusal summary and control-channel failures. It never carries an IP address, an id or an id hash, so it can follow the host's usual journald retention.
+- **The allocation log** goes to the relay's own files in `RELAY_LOG_DIR` (default `/var/log/oblivion-relay`), one file per UTC day, named `allocations-YYYY-MM-DD.jsonl`. RFC 8656 §21.3.2 suggests operators may log "the actual source IP and port of the client" so that abuse relayed through a TURN server can be traced back to its source. The user chose that on 1 November 2026. Every `allocation_start` and `allocation_end` line carries the client IP and port, taken from the PROXY header behind nginx. Security events (`auth_limit`, `rate_limit`, deny-list hits, connection limits, and control-channel authentication failures) and `revoked` lines go here too, with the client or source IP where there is one.
+
+**Retention.**
+
+- At start and every hour, the relay deletes allocation-log files older than `RELAY_LOG_RETENTION_DAYS`.
+- The proposed default is 14 days, and the allowed range is 1–90; any other value stops start-up. Open question 2 asks the user to confirm the default.
+- Exclude `RELAY_LOG_DIR` from host backups, or keep backups of it no longer than the same limit.
+- The files aren't forwarded to other systems unless the destination keeps the same retention and access limits.
+
+**Who can read the allocation log.**
+
+- The directory is owned by `oblivion-relay:oblivion-relay-logs` with mode 2750, so new files inherit the group. The relay writes files with mode 0640, under `UMask=0027`.
+- Only root, the relay itself and members of the `oblivion-relay-logs` group can read it. The group is limited to the people who investigate security incidents. They are named in `oblivion-relay.md`, and their membership is agreed with the organisation's privacy officer. The app's user (`www-data`) is not a member.
+- The log is read only to investigate abuse or a security incident.
+- Someone with access to the app can recompute a person's opaque id for a call and match it to the id hash. The log is therefore personal information, which is why access is kept this tight.
+
+**Peers aren't logged.** Peer addresses are only counted. RFC 8656 §21.3.2 also mentions logging every permission a client installs. Oblivion doesn't, because a list of peers records who called whom, and the client's own address is what the RFC says tracing needs.
+
+The following are never logged in either stream, at any level:
 
 - secrets, passwords and long-term keys;
 - MESSAGE-INTEGRITY and FINGERPRINT values, and nonces;
@@ -377,13 +504,7 @@ The following are never logged, at any level:
 - payloads, or any part of a relayed packet;
 - the raw bytes of a message that failed to parse (log its kind and length only).
 
-`RELAY_LOG_ADDRESSES` controls IP addresses in logs (open question 5):
-
-- `security` (the default) puts client IPs only on security events: the authentication failure limit reached, rate limits, deny-list hits and connection limits. Allocation start and end lines carry no IPs. Peer addresses are never logged, only counted.
-- `none` logs no IPs at all.
-- `all` also adds the client IP to allocation lines. It is for a limited time during an incident.
-
-The events are `start`, `reload`, `listener_error`, `allocation_start`, `allocation_end`, `auth_limit`, `rate_limit`, `capacity` and `config_error`. `allocation_end` gives a reason: `refresh_zero`, `lifetime`, `connection_closed`, `credential_grace`, `secret_removed`, `denied` or `shutdown`. Some refusals are normal ICE behaviour: 403 for private peers that browsers try, 438, and single 401s. They are counted in the metrics, with at most one summary line a minute in the log.
+The events are `start`, `reload`, `listener_error`, `allocation_start`, `allocation_end`, `auth_limit`, `rate_limit`, `capacity`, `config_error` and `revoked`. `allocation_end` gives a reason: `refresh_zero`, `lifetime`, `connection_closed`, `credential_grace`, `secret_removed`, `denied`, `revoked` or `shutdown`. Some refusals are normal ICE behaviour: 403 for private peers that browsers try, 438, and single 401s. They are counted in the metrics, with at most one summary line a minute in the log.
 
 **Health and metrics.** The endpoint listens on `RELAY_HEALTH_LISTEN` (default `127.0.0.1:9478`) using `node:http`. The relay refuses to start if that address isn't loopback. It has no authentication, because it shows nothing secret. It answers GET only, and 404 for any other path.
 
@@ -399,19 +520,24 @@ The events are `start`, `reload`, `listener_error`, `allocation_start`, `allocat
 
   It holds no addresses, ids or usernames.
 
-**In the app.** Settings › Chat › Service health (`ChatServiceHealth`) gains a relay row. When the relay runs on the app server, the app reads `/health` on localhost. When the relay has its own server, its health port stays on that server's localhost. The app then sends one unauthenticated Allocate over UDP to the first `turn:` URL and expects a 401, which works whether Binding is on or off. It also opens a TLS connection to the `turns:` URL and checks the certificate's expiry. Both probes are written in PHP with its built-in sockets.
+**In the app.** Settings › Chat › Service health (`ChatServiceHealth`) gains a relay row. When the relay runs on the app server, the app reads `/health` on localhost. When the relay has its own server, its health port stays on that server's localhost, and the app reads the signed `GET /control/status` over the control channel (3.7) instead. In both shapes the app also checks the public side:
+
+- it sends one unauthenticated Allocate over UDP to the first `turn:` URL and expects a 401, which works whether Binding is on or off;
+- it opens a TLS connection to the `turns:` URL and checks the certificate's expiry.
+
+Both probes are written in PHP with its built-in sockets. The same row shows how many revocations are waiting (3.7).
 
 ## 10. Runtime, settings and deployment
 
 ### 10.1 The program
 
 - `relay/server.mjs` is the entry point: it reads the settings, starts the listeners and handles signals. The modules are in `relay/lib/`, and the tests in `relay/test/`. Suggested module names: `stun.mjs`, `integrity.mjs`, `credentials.mjs`, `nonce.mjs`, `allocations.mjs`, `peers.mjs`, `limits.mjs`, `listeners.mjs`, `proxy.mjs`, `health.mjs`, `log.mjs` and `config.mjs`. The builder may change these.
-- Built-in modules only: `node:dgram`, `node:net`, `node:tls`, `node:crypto`, `node:http` (health only), `node:fs`, `node:zlib` (CRC-32 only), `node:os` (interface addresses), `node:timers` and `node:events`. No npm packages. No imports from outside `relay/`, so `relay/` can be copied on its own to a small server.
+- Built-in modules only: `node:dgram`, `node:net`, `node:tls`, `node:crypto`, `node:http` (health and the control channel only), `node:fs`, `node:zlib` (CRC-32 only), `node:os` (interface addresses), `node:timers` and `node:events`. No npm packages. No imports from outside `relay/`, so `relay/` can be copied on its own to a small server.
 - `package.json` gets `"test:relay": "node --test \"relay/test/*.test.mjs\""`, next to `test:live`.
 - At start the relay checks that MD5 and HMAC-SHA1 are available. A FIPS-only OpenSSL build lacks MD5, and the relay refuses to start on one.
 - Every setting is checked at start. A wrong value stops start-up with a message that names the setting. For secrets, the message never includes the value.
 - Signals:
-  - SIGHUP re-reads secret files, the certificate and the deny list without dropping allocations.
+  - SIGHUP re-reads secret files (including the control secrets), the certificate and the deny list without dropping allocations.
   - SIGTERM stops accepting connections, ends allocations and exits within 5 s.
 - Each secret can be given as a value (`RELAY_CHAT_SECRET`) or as a file path (`RELAY_CHAT_SECRET_FILE`). Files are preferred, owned `root:oblivion-relay` with mode 0640. Setting both forms is a start-up error. Only secrets given as files change on SIGHUP. Changing a value in the environment needs a restart, and a restart drops calls.
 
@@ -442,14 +568,21 @@ The events are `start`, `reload`, `listener_error`, `allocation_start`, `allocat
 | `RELAY_STUN_BINDING` | `on` | 4.4 |
 | `RELAY_HEALTH_LISTEN` | `127.0.0.1:9478` | Loopback only |
 | `RELAY_LOG_LEVEL` | `info` | `error`, `warn`, `info` or `debug`. Debug adds nothing secret |
-| `RELAY_LOG_ADDRESSES` | `security` | Section 9 |
+| `RELAY_LOG_DIR` | `/var/log/oblivion-relay` | The allocation log (section 9) |
+| `RELAY_LOG_RETENTION_DAYS` | 14 (proposed; open question 2) | Days the allocation log is kept, 1–90 |
 | `RELAY_DENY_FILE` | empty | 3.5 |
+| `RELAY_CONTROL_LISTEN` | `127.0.0.1:9479` | The control channel (3.7). Loopback or private address only |
+| `RELAY_CONTROL_ALLOWED_SOURCES` | `127.0.0.1/32,::1/128` | Who may call the control channel. Loopback and private CIDRs only |
+| `RELAY_CONTROL_SECRET[_FILE]`, `RELAY_CONTROL_KEY_ID` | required when `chat` is on | The control secret and its key id |
+| `RELAY_CONTROL_PREVIOUS_SECRET[_FILE]`, `RELAY_CONTROL_PREVIOUS_KEY_ID` | empty | Set only during rotation |
+| `RELAY_STATE_DIR` | `/var/lib/oblivion-relay` | Holds `revocations.json` (3.7) |
 
 ### 10.3 Shape A: its own small server
 
 - A small virtual machine with a public IPv4 address, and optionally IPv6. DNS points `turn.<domain>` at it. It runs no app code: copy only `relay/`.
 - The default listeners are UDP 3478, TCP 3478 and `tcp+tls` on 443. Port 443 carries both TURN over TLS and plain TURN over TCP (the first-byte check), so `turn:turn.<domain>:443?transport=tcp` also works on networks that allow port 443 without checking for TLS.
 - **Open inbound:** UDP 3478, TCP 3478, TCP 443 and UDP `RELAY_PORT_MIN`–`RELAY_PORT_MAX`. Open SSH from the admin addresses only, and nothing else. The health port stays on localhost.
+- **The control channel** listens on the relay's private address (a cloud private network or a WireGuard tunnel to the app server), and the firewall allows TCP 9479 from the app server's private address only. Where there's no private network, use an SSH or WireGuard tunnel to loopback.
 - **Outbound:** UDP from the relayed range to anywhere (the peers), plus DNS, NTP and package updates as usual.
 - To bind 443 as a non-root user, the service needs `CAP_NET_BIND_SERVICE`.
 - **Certificate:** Let's Encrypt, with an HTTP-01 challenge (TCP 80 open briefly) or a DNS-01 challenge. The renewal hook sends SIGHUP.
@@ -462,20 +595,27 @@ The events are `start`, `reload`, `listener_error`, `allocation_start`, `allocat
 - **Open inbound, in addition:** UDP 3478, TCP 3478 if used, and the relayed UDP range. Choose a narrower range here, for example 50000–53999, so that less of the app server is open. `RELAY_MAX_ALLOCATIONS` must fit inside it.
 - Plain TURN over TCP on 443 isn't possible in this shape, because nginx needs TLS's SNI name to route. TURN over TLS on 443 covers strict networks.
 - The peer rules refuse the app server's own addresses and private networks, so the relay can't reach MySQL, Redis or anything else on the host or its private network.
+- The control channel stays on the default `127.0.0.1:9479`, and the app uses `CHAT_RELAY_CONTROL_URLS=http://127.0.0.1:9479`.
 - **App URLs:** `turn:turn.<domain>:3478?transport=udp` and `turns:turn.<domain>:443?transport=tcp`, plus TCP 3478 if opened.
 - **While LiveKit still runs** (until C4.10), LiveKit's built-in TURN owns `turn.<domain>`, `127.0.0.1:5349` and UDP 3478. Until LiveKit is removed, give the relay its own name (for example `relay.<domain>`), loopback port (`127.0.0.1:5350`) and UDP port (3479), with its own SNI line in nginx. Move it over afterwards.
 
 ### 10.5 Files the builder writes in `deploy/chat-calling/`
 
-- **`oblivion-relay.env.example`**: every setting from 10.2 with a one-line comment. Secrets are left empty and the `_FILE` form is shown. It includes both shapes as commented blocks, and the matching app `.env` keys: the new `CHAT_RELAY_URLS`, `CHAT_RELAY_SECRET` and `CHAT_RELAY_CREDENTIAL_SECONDS`, and the existing `CCTV_TURN_*` and `ENDPOINT_REMOTE_RELAY_*`.
+- **`oblivion-relay.env.example`**: every setting from 10.2 with a one-line comment. Secrets are left empty and the `_FILE` form is shown. It includes both shapes as commented blocks, and the matching app `.env` keys: the new `CHAT_RELAY_URLS`, `CHAT_RELAY_SECRET`, `CHAT_RELAY_CREDENTIAL_SECONDS`, `CHAT_RELAY_CONTROL_URLS`, `CHAT_RELAY_CONTROL_SECRET` and `CHAT_RELAY_CONTROL_KEY_ID`, and the existing `CCTV_TURN_*` and `ENDPOINT_REMOTE_RELAY_*`.
 - **`oblivion-relay.service.example`**: shaped like `oblivion-live.service.example`, with these additions:
   - its own user, `oblivion-relay`, not `www-data`, because it may share the app server;
   - `EnvironmentFile=/etc/oblivion/relay.env` and `ExecStart=/usr/bin/node relay/server.mjs`;
   - `ExecReload=/bin/kill -HUP $MAINPID`;
   - `AmbientCapabilities=CAP_NET_BIND_SERVICE` and `CapabilityBoundingSet=CAP_NET_BIND_SERVICE`, needed only for 443 in shape A;
   - `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK` (`AF_NETLINK` is needed to read interface addresses);
-  - `PrivateDevices=true`, `MemoryMax=1G` and `LimitNOFILE=65536`, alongside Oblivion Live's hardening lines.
-- **`oblivion-relay.md`**: the two shapes, the ports, certificates, the rotation steps from 3.4, and the checks in section 12.
+  - `PrivateDevices=true`, `MemoryMax=1G` and `LimitNOFILE=65536`, alongside Oblivion Live's hardening lines;
+  - `StateDirectory=oblivion-relay` for the revocation state, `ReadWritePaths=/var/log/oblivion-relay` and `UMask=0027`. The install steps create the log directory as `oblivion-relay:oblivion-relay-logs` with mode 2750 (section 9).
+- **`oblivion-relay.md`** covers:
+  - the two shapes, the ports and certificates;
+  - the rotation steps for credential secrets (3.4) and the control secret (3.7);
+  - setting up the control channel's private network or tunnel;
+  - the allocation log's retention, who is in `oblivion-relay-logs` and how membership is agreed;
+  - the checks in section 12.
 
 ## 11. Tests the builder writes
 
@@ -569,7 +709,9 @@ The tests use `node --test` in `relay/test/`. They use a fake clock for lifetime
 15. **Health and logs.**
     - The health endpoint binds only to loopback, and a non-loopback setting stops start-up.
     - `/health` and `/metrics` hold the expected fields.
-    - A full flow runs with a marker secret, a password and a payload marker. The test then searches the captured logs, `/health` and `/metrics` and finds none of them, and no username or opaque-id. With `RELAY_LOG_ADDRESSES=none` it finds no test IP either.
+    - A full flow runs with a marker secret, a control secret, a password and a payload marker. The test then searches both log streams, `/health`, `/metrics` and `/control/status`, and finds none of them, and no username or opaque-id.
+    - Every `allocation_start` and `allocation_end` line in the allocation log carries the client IP and port (the PROXY address behind nginx).
+    - No peer address appears anywhere, and the operations log (stdout) carries no IP address or id hash.
 16. **Two peers through the relay on loopback.**
     - Client A (UDP) and client B (TCP, and in a second run TLS through a PROXY-sending test proxy) each allocate.
     - Each creates a permission for the other's relayed address, which is the own pool and so goes by internal delivery.
@@ -577,14 +719,47 @@ The tests use `node --test` in `relay/test/`. They use a fake clock for lifetime
     - 1,000 packets go each way, in order and with every byte intact.
     - When the permission expires the flow stops. When A refreshes with LIFETIME 0, B receives nothing more.
     - A second test covers the network path. It injects a peer policy that allows 127.0.0.1 for that test only, and checks that a plain UDP socket outside the relayed range gets and answers datagrams. `relay/server.mjs` never accepts an injected policy.
-17. **Settings.** Every invalid value in 10.2 stops start-up with the setting's name, and never the value of a secret. Some examples: a missing realm, a range smaller than the allocation total, two classes sharing a secret, both a secret and its `_FILE` set, a TLS listener without a certificate, and a non-loopback health address.
+17. **Settings.** Every invalid value in 10.2 stops start-up with the setting's name, and never the value of a secret. Some examples:
+    - a missing realm, or a range smaller than the allocation total;
+    - two classes sharing a secret, or both a secret and its `_FILE` set;
+    - a TLS listener without a certificate, or a non-loopback health address;
+    - `chat` switched on without a control secret, or a control secret equal to a credential secret;
+    - a control listener on a public address, `0.0.0.0` or `::`, or a public CIDR in the allowed sources;
+    - a log retention outside 1–90 days, or an unreadable `revocations.json`.
+18. **The control channel.**
+    - **Signing.** The known-answer vector in 3.7 gives the listed signature. A correct request gets 200, and so does one signed with the previous key. These get 401: a removed previous key, an unknown key id, a missing header, one flipped bit in the body, and a signature for `GET /control/status` replayed on `POST /control/revoke`. Ten failures in a minute silence that source for 60 s.
+    - **Replay.** A timestamp 31 s early or late gets 401. The same nonce within 60 s gets 401. The same body with a new nonce gets 200. A full nonce store gets 503.
+    - **Sources and limits.** A source outside `RELAY_CONTROL_ALLOWED_SOURCES` is closed without a reply. A body over 64 KiB gets 413. 501 entries get 400. One malformed id among valid ones gets 400 and nothing is applied. An `expires_up_to` too far ahead gets 400.
+    - **Effect.** A revoke ends the matching allocations within 1 s, before it answers:
+      - for UDP, relayed data stops at once and the next Refresh gets 437;
+      - for TCP and TLS, the connection closes;
+      - permissions and channels are gone;
+      - an allocation in its grace period is ended too;
+      - other ids, including the same person's id for another call, carry on.
+    - **Refusals while held.** Allocate with a credential whose expiry is at or before `expires_up_to` gets 401. A credential with a later expiry works. With the fake clock, the hold lapses at `expires_up_to` plus the clock allowance. A repeated revoke keeps the later time.
+    - **Restart.** Held revocations survive a restart through `revocations.json`.
+    - **Logging.** `revoked` is logged with the id hash and count.
+19. **The allocation log.**
+    - Lines go to one file per UTC day.
+    - With the fake clock, files older than `RELAY_LOG_RETENTION_DAYS` are deleted at start and on the hourly sweep, and newer ones are kept.
+    - Files are created with mode 0640 and the directory's group.
 
 **App tests (Pest):**
 
 - `ChatRelayCredentials`: the username format, the expiry bounds, one id per person per call, and the known-answer vector in 3.1.
 - Missing or invalid settings return no relay entry, and never an outside server.
 - The secret never appears in the output, the logs or audit rows.
-- The `ChatServiceHealth` relay row covers both the localhost and the remote probe.
+- The `ChatServiceHealth` relay row covers both the localhost and the control-channel status, the public probes, and the waiting-revocations count.
+- `OblivionRelay` signs the control vector in 3.7 exactly. Control URLs that are public, hostnames, `https` or have a path are refused.
+- **Hooks.** Each of these sends the person's ids for their live and recent calls, and no one else's:
+  - `ChatOffboarding::complete()` and the leaver rule's `ChatMembershipGaps::sync()`, after the commit;
+  - a participant becoming `left`, `removed`, `revoked` or `expired` in `ChatCallReconciler`;
+  - a call ending, which sends every participant's id;
+  - account suspension;
+  - `chat:relay-revoke` by hand.
+- Each revoke writes one `chat.relay.revoked` audit row.
+- **When the relay can't be reached.** The person's action still succeeds without waiting. The queued retry follows 5 s, 15 s, 30 s and then every minute, and stops after `expires_up_to` plus grace. Service health shows the waiting count, and an error is logged after 5 minutes.
+- After a revoke, `ChatRelayCredentials` never issues an expiry at or before the sent `expires_up_to`.
 
 **Load test** (`relay/tools/load.mjs`, run by hand, not in CI): many allocations and packet rates through one node, reporting packets a second, loss, added latency and memory, for checking against requirement 10.
 
@@ -605,15 +780,22 @@ These run during stage 5 network testing, on the server the user chooses.
    - Measured reply-to-request size stays at or under 4×, and the rate limits hold under a flood from one address.
 9. **CCTV and remote support**, when those features are switched on. Relay-only sessions work with their existing credentials, and the relayed addresses fall inside `CCTV_TURN_RELAY_CIDRS`.
 10. **Capacity.** On a 2 vCPU, 2 GB node: 1,000 allocations, 150 Mbit/s each way and 30,000 packets a second, with under 0.5% loss, under 5 ms added p99 latency and under 600 MB of memory.
+11. **Offboarded during a call.** A test staff member is in a relayed call (relay forced) and is offboarded through Chat offboarding. Their relayed media stops within 5 seconds, they can't rejoin, and the others' call carries on. The allocation log shows `revoked`, and the audit log shows `chat.relay.revoked`.
+12. **Control channel down.** Block the control port, then offboard a test person mid-call. Service health shows the waiting revocation and the call continues through the relay. Unblock the port, and the revoke lands within a minute and the media stops.
+13. **Log handling.** The allocation log holds the client IPs from checks 1–3, and no peer addresses or credentials. Only `oblivion-relay-logs` members and root can read it. Files older than the retention limit are gone after the hourly sweep.
 
 ## 13. Open questions for the user
 
 1. **Where does it run?** Shape A (its own small server) or shape B (beside nginx on the app server). Recommendation: shape A. It keeps an internet-facing UDP service with a wide port range off the host that holds care records, it allows plain TCP on 443, and it can grow on its own. The cost is one more small server. This is needed before stage 5 network testing.
-2. **STUN Binding on by default?** Recommendation: yes, with the limits in section 7, so that most calls go direct and the relay carries only the calls that need it.
-3. **Longest Chat call.** One-hour credentials plus four hours' grace keep calls alive for up to five hours. Is five hours enough for handovers and family calls, or should calls be capped in the app too?
-4. **Ending relay use at once.** Version 1 has only the deny file and short credentials. Should the app be able to cut off a person's relay use straight away, for example when someone is offboarded during a call? That needs a signed control channel from the app to the relay, which is more work.
-5. **IP addresses in logs.** The default keeps client IPs only on security events and never logs peers. RFC 8656 suggests that operators may keep fuller logs for tracing abuse. Keep the privacy-first default?
-6. **CCTV and remote support.** Should they move to Oblivion Relay at the same time as Chat, or later? Both features are off today and have no relay installed. Moving them also means rewording the Settings › Obli card, which shows a coturn snippet.
+2. **How long to keep the allocation log.** It now holds the client IP of every allocation (section 9). The proposal is 14 days (`RELAY_LOG_RETENTION_DAYS=14`; the relay allows 1–90). That is long enough for abuse reports, which usually arrive within days, and short enough to match the privacy principle of keeping personal information no longer than needed. Alternatives are 7 days (less personal data) or 30 days (more time for slow reports).
+3. **CCTV and remote support.** Should they move to Oblivion Relay at the same time as Chat, or later? Both features are off today and have no relay installed. Moving them also means rewording the Settings › Obli card, which shows a coturn snippet. If they move, their own stop flows (CCTV stop, the remote-support Stop that REMOTE-RELAY.md says "does not erase a previously issued bearer credential") could use the control channel's revoke too.
+
+**Answered by the user on 1 November 2026:**
+
+- **STUN Binding:** on by default, with the limits in section 7 (4.4).
+- **Longest Chat call:** five hours (one-hour credentials plus four hours' grace) is fine. There is no extra cap in the app (3.2).
+- **Ending relay use at once:** yes, an instant cut-off. Version 1 has the signed control channel and the app hooks (3.7).
+- **IP addresses in logs:** keep fuller logs, with the client IP of every allocation, as RFC 8656 suggests operators may. The log has a retention limit and restricted access, and still never holds credentials or content. Peers stay unlogged (section 9).
 
 ## 14. When it lands
 
