@@ -43,12 +43,24 @@ if [[ -f "/etc/ssl/certs/ca-certificates.crt" ]]; then
 fi
 cp "${LINUX_PKG_DIR}/oblivion-site-collector.service" "${DEST}/systemd/oblivion-site-collector.service"
 cp "${LINUX_PKG_DIR}/install.sh" "${DEST}/install.sh"
+# The hub's own runtime (S&D Phase B: nothing from apt): a static PHP with the hub's
+# extensions built in, placed in <binary-dir>/runtime/php by CI.
+if [[ -f "${BINARY_DIR}/runtime/php" ]]; then
+    mkdir -p "${DEST}/runtime"
+    cp "${BINARY_DIR}/runtime/php" "${DEST}/runtime/php"
+    if [[ -f "${DEST}/cacert.pem" ]]; then
+        cp "${DEST}/cacert.pem" "${DEST}/runtime/cacert.pem"
+    fi
+fi
 
 find "$DEST" -type d -exec chmod 0755 {} +
 find "$DEST" -type f -exec chmod 0644 {} +
 chmod 0755 "${DEST}/install.sh" "${DEST}/oblivion-site-collector" "${DEST}/bin/oblivion-collector"
 if [[ -f "${DEST}/oblivion-media" ]]; then
     chmod 0755 "${DEST}/oblivion-media"
+fi
+if [[ -f "${DEST}/runtime/php" ]]; then
+    chmod 0755 "${DEST}/runtime/php"
 fi
 
 mkdir -p "$(dirname "$OUTPUT_TARBALL")"

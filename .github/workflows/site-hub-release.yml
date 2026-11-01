@@ -37,8 +37,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # S&D Phase B: the Linux hub's own runtime, a static PHP with the hub's extensions built in,
+  # so a Raspberry Pi or NUC installs nothing from apt (plan v10, "Linux and Raspberry Pi").
+  linux-runtime:
+    name: Build hub runtime (static PHP, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            spc: spc-linux-x86_64.tar.gz
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            spc: spc-linux-aarch64.tar.gz
+    steps:
+      - name: Build static PHP 8.4 with the hub's extensions
+        env:
+          SPC_VERSION: "2.8.5"
+          SPC_ASSET: ${{ matrix.spc }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # static-php-cli, pinned, checked against the digest GitHub publishes for the asset.
+          WANT=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/crazywhalecc/static-php-cli/releases/tags/${SPC_VERSION}" \
+            | jq -r --arg n "$SPC_ASSET" '.assets[] | select(.name == $n) | .digest' | sed 's/^sha256://')
+          curl -fsSL -o spc.tar.gz "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/${SPC_ASSET}"
+          echo "${WANT}  spc.tar.gz" | sha256sum -c -
+          tar -xzf spc.tar.gz
+          chmod +x spc
+          ./spc doctor --auto-fix
+          EXT="curl,openssl,sodium,sockets,snmp,mbstring,ctype,filter,tokenizer,zlib"
+          ./spc download --with-php=8.4 --for-extensions="$EXT" --prefer-pre-built
+          ./spc build "$EXT" --build-cli
+          mkdir -p out
+          cp buildroot/bin/php out/php
+          ./out/php -r 'foreach (["curl", "openssl", "sodium", "sockets", "snmp", "mbstring"] as $e) { if (! extension_loaded($e)) { fwrite(STDERR, "missing $e\n"); exit(1); } } echo "runtime-ok\n";'
+
+      - name: Upload hub runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: hub-runtime-${{ matrix.arch }}
+          path: out/php
+          if-no-files-found: error
+
   linux-packages:
     name: Build Linux Site Hub (amd64 & arm64)
+    needs: linux-runtime
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -67,6 +114,12 @@ jobs:
           composer test
           composer install --no-dev --classmap-authoritative --no-interaction --prefer-dist
 
+      - name: Download hub runtimes
+        uses: actions/download-artifact@v4
+        with:
+          pattern: hub-runtime-*
+          path: ${{ runner.temp }}/hub-runtime
+
       - name: Cross-compile Linux binaries & package NUC/Pi tarballs
         run: |
           chmod +x scripts/package-linux-site-hub.sh endpoint-agent/packaging/linux/install.sh
@@ -75,7 +128,9 @@ jobs:
           printf '%s' "$VERSION" > collector/VERSION
           for ARCH in amd64 arm64; do
             OUT_BIN="${RUNNER_TEMP}/linux-bin-${ARCH}"
-            mkdir -p "$OUT_BIN"
+            mkdir -p "$OUT_BIN/runtime"
+            cp "${RUNNER_TEMP}/hub-runtime/hub-runtime-${ARCH}/php" "$OUT_BIN/runtime/php"
+            chmod 0755 "$OUT_BIN/runtime/php"
             (
               cd endpoint-agent
               CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o "${OUT_BIN}/oblivion-site-collector" ./cmd/oblivion-site-collector
