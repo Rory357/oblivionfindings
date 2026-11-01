@@ -320,6 +320,14 @@ final readonly class SetupCodeService
             ->get()->each(fn (SetupCode $code) => $this->markUsed($code));
     }
 
+    /** The setup code a person or installer typed, if it exists (any state). */
+    public function find(string $raw): ?SetupCode
+    {
+        $code = self::normalise($raw);
+
+        return $code === null ? null : SetupCode::query()->where('code_hash', self::hash($code))->first();
+    }
+
     /** XXXX-XXXX from the code alphabet; accepts lower case, spaces, and O/I/L typed for 0/1. */
     public static function normalise(string $raw): ?string
     {

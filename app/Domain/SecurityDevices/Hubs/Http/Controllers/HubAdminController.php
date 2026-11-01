@@ -248,7 +248,8 @@ final class HubAdminController extends Controller
             'expires_at' => $code->expires_at->toIso8601String(),
             'file_name' => $code->platform === 'windows' ? $this->codes->installerFileName($code, $plain) : null,
             'download_url' => $code->platform === 'windows' ? route('security-devices.hubs.setup-codes.download', $code) : null,
-            'linux_command' => $code->platform === 'linux' ? "curl -fsSL https://{$host}/hub/install.sh | sudo bash -s -- {$plain}" : null,
+            // windows tab, screen D: the code is in the address; nothing comes from apt.
+            'linux_command' => $code->platform === 'linux' ? "curl -fsSL https://{$host}/h/{$plain} | sudo sh" : null,
         ];
     }
 
