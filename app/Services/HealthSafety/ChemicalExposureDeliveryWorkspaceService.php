@@ -216,6 +216,8 @@ final class ChemicalExposureDeliveryWorkspaceService
             return $this->destination('restricted', 'destination_authority_unavailable');
         } catch (ModelNotFoundException) { return $this->destination('unavailable', 'destination_source_unavailable'); }
         catch (LogicException) { $context->assertActive(); return $this->destination('repair_required', 'destination_proof_unavailable'); }
+        // #16: a follow-up notice's own check refuses a changed source identity this way; it is withheld the same.
+        catch (\Illuminate\Validation\ValidationException) { $context->assertActive(); return $this->destination('repair_required', 'destination_proof_unavailable'); }
     }
 
     private function hasExpectedRoot(object $service, string $kind): bool

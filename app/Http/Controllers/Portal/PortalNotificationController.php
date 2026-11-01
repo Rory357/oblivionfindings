@@ -63,16 +63,13 @@ class PortalNotificationController extends Controller
             return $response;
         }
 
-        $this->inbox->within($user, function (?HealthSafetyReadContext $hs) use ($user, $notificationId): string {
-            $notification = $this->boardPackAccess
-                ->visibleNotificationQuery($user, healthSafetyContext: $hs)
-                ->where('notifications.id', $notificationId)
-                ->firstOrFail();
-            $notification->update(['read_at' => now()]);
-            $this->inbox->assertRead($notification, $user, $hs);
-
-            return (string) $notification->id;
-        });
+        // Prove the notice is visible to the viewer now, then mark only that row of their own.
+        $notification = $this->inbox->ownNotice($user, $this->inbox->within($user, fn (?HealthSafetyReadContext $hs): string => (string) $this->boardPackAccess
+            ->visibleNotificationQuery($user, healthSafetyContext: $hs)
+            ->where('notifications.id', (string) $notificationId)
+            ->firstOrFail(['notifications.id'])->id));
+        $notification->update(['read_at' => now()]);
+        $this->inbox->confirmRead($notification, $user);
 
         return redirect()->back();
     }
@@ -87,9 +84,9 @@ class PortalNotificationController extends Controller
         }
 
         // Only notices the viewer can see right now; a hidden private notice stays unread.
-        $this->inbox->within($user, fn (?HealthSafetyReadContext $hs): int => $this->boardPackAccess
+        $this->inbox->markOwnRead($user, $this->inbox->within($user, fn (?HealthSafetyReadContext $hs): array => $this->boardPackAccess
             ->visibleNotificationQuery($user, unreadOnly: true, healthSafetyContext: $hs)
-            ->update(['read_at' => now()]));
+            ->pluck('notifications.id')->map(fn ($id) => (string) $id)->all()));
 
         return redirect()->back();
     }

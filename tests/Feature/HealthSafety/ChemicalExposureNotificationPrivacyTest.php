@@ -346,7 +346,10 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
         [$root, $receiver, $notice, $delivery] = $this->notified(); $ordinary = $this->ordinary($receiver);
         [$foreignRoot, $foreignReceiver, $foreignNotice, $foreignDelivery] = $this->notified();
         $before = (array) DB::table('chemical_exposure_source_deliveries')->where('id', $delivery->id)->first();
-        foreach ([['exposure_id' => $foreignRoot->id], ['source_version_id' => $foreignDelivery->source_version_id],
+        // Re-pointing a delivery to the foreign delivery's version is refused by the database itself (one delivery per
+        // version and kind, ce_delivery_version_kind_uq), so that tamper can't happen and isn't simulated here.
+        $this->assertDatabaseHas('chemical_exposure_source_deliveries', ['source_version_id' => $foreignDelivery->source_version_id, 'kind' => 'followup']);
+        foreach ([['exposure_id' => $foreignRoot->id],
             ['recipient_id' => $foreignReceiver->id], ['actor_id' => $foreignReceiver->id], ['kind' => 'not_followup'],
             ['membership' => json_encode([...$delivery->membership, 'worker_id' => $foreignRoot->user_id], JSON_THROW_ON_ERROR)]] as $mutation) {
             $this->refuseAfterDiscovery($receiver, $notice, $ordinary,

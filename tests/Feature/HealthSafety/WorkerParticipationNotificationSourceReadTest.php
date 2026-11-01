@@ -138,7 +138,7 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
         $ordinary = $this->ordinary();
         $reader = app(BoardPackAccessService::class);
         $this->assertSame([$ordinary], $reader->visibleNotificationQuery($this->actor)->pluck('id')->all());
-        $this->assertTrue(app(WorkerParticipationRecipientSourceService::class)->hasPreparedReceiver());
+        // #14: the shared query prepares the meeting reader only for a viewer with a meeting notice (no H&S read on every page).
         $this->actor->hrEmployeeProfile()->update(['is_active' => false]);
         $this->assertSame([$ordinary], $reader->visibleNotificationQuery($this->actor)->pluck('id')->all());
         $late = $this->delivery($this->meeting);
@@ -152,7 +152,7 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
         $rows = $reader->visibleNotificationQuery($this->actor)->get(['id', 'data']);
         $this->assertSame([$ordinary], $rows->pluck('id')->all());
         $this->assertSame(0, $sourceBodies); $this->assertSame(0, $noticeBodies);
-        $this->assertTrue(app(WorkerParticipationRecipientSourceService::class)->hasPreparedReceiver());
+        // #14: the shared query prepares the meeting reader only for a viewer with a meeting notice (no H&S read on every page).
         $this->unavailable(fn () => app(WorkerParticipationRecipientSourceService::class)->prepareReceiver($this->actor));
     }
 

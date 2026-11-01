@@ -52,7 +52,8 @@ final class HealthSafetyInboxReads
             ->where(fn ($private) => $private->where('type', ChemicalExposureFollowupAssignedNotification::class)
                 ->orWhere('data->kind', 'private_followup')
                 ->orWhere('data->event_key', ChemicalExposureFollowupDestinationService::EVENT_KEY))
-            ->exists();
+            // Its id only (no select *: nothing of the notice itself is read here).
+            ->limit(1)->value('notifications.id') !== null;
     }
 
     /**
@@ -72,7 +73,7 @@ final class HealthSafetyInboxReads
             ->whereExists(fn (QueryBuilder $delivery) => $delivery->selectRaw('1')
                 ->from('worker_participation_meeting_deliveries as private_delivery')
                 ->whereColumn('private_delivery.id', 'notifications.id'))
-            ->exists();
+            ->limit(1)->value('notifications.id') !== null;
     }
 
     /**
@@ -94,12 +95,40 @@ final class HealthSafetyInboxReads
         return $this->exposures->dataForPresentation($row, $viewer, $context);
     }
 
-    /** After a read on a private exposure notice: confirm the read flag was kept (reading never completes the follow-up). */
-    public function assertRead(DatabaseNotification $row, User $viewer, ?HealthSafetyReadContext $context): void
+    /**
+     * Read and acknowledge writes. The H&S read proof re-checks every guarded read at its end, so a write inside it
+     * would fail its own check: callers prove inside within() which of the viewer's notices are visible (returning
+     * their ids), then write only those rows of the viewer's own after it.
+     */
+    public function ownNotice(User $viewer, string $id): DatabaseNotification
     {
-        if ($context !== null) {
-            $this->exposures->assertReadPersisted($row->fresh() ?? $row, $viewer, $context);
+        return DatabaseNotification::query()->whereKey($id)
+            ->where('notifiable_type', $viewer->getMorphClass())->where('notifiable_id', $viewer->id)->firstOrFail();
+    }
+
+    /** @param list<string> $ids */
+    public function markOwnRead(User $viewer, array $ids): int
+    {
+        $written = 0;
+        foreach (array_chunk(array_values(array_unique($ids)), 500) as $chunk) {
+            $written += DatabaseNotification::query()->whereIn('id', $chunk)->whereNull('read_at')
+                ->where('notifiable_type', $viewer->getMorphClass())->where('notifiable_id', $viewer->id)
+                ->update(['read_at' => now()]);
         }
+
+        return $written;
+    }
+
+    /** After reading a private exposure notice: confirm only its read flag was kept (the follow-up stays open). */
+    public function confirmRead(DatabaseNotification $row, User $viewer): void
+    {
+        if ($row->type !== ChemicalExposureFollowupAssignedNotification::class) { return; }
+        $this->within($viewer, function (?HealthSafetyReadContext $context) use ($row, $viewer): bool {
+            if ($context === null) { throw new LogicException('A private follow-up notice needs its H&S read context.'); }
+            $this->exposures->assertReadPersisted($row->fresh() ?? $row, $viewer, $context);
+
+            return true;
+        });
     }
 
     private function own(User $viewer): QueryBuilder
