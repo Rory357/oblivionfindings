@@ -174,7 +174,7 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
     ).filter((action) => firstAidCommandAllowed(d, action));
     const glass = GLASS.filter((action) => allowed.includes(action));
     const more = MORE.filter((action) => allowed.includes(action));
-    const primary = allowed.includes('add-followup') ? 'add-followup' : null;
+    const primary: FirstAidCommand | null = allowed.includes('add-followup') ? 'add-followup' : null;
 
     /* ---- facts ---- */
     const tone = outcomeTone(d.treatment_outcome);

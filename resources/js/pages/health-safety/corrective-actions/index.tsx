@@ -49,6 +49,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDateOnly, toDateInput } from '@/lib/datetime';
 import {
     correctiveActionHref,
+    type CorrectiveActionPane,
     safetyReviewHref,
 } from '@/lib/health-safety/navigation';
 import { cn } from '@/lib/utils';
@@ -397,7 +398,7 @@ export default function CorrectiveActionsIndex({
     };
     // Deep-link a row straight onto a lifecycle pane (Complete / Verify / Return)
     // of its parent event's Corrective actions section.
-    const openActionPane = (action: ActionRow, pane: ActionPane) => {
+    const openActionPane = (action: ActionRow, pane: CorrectiveActionPane) => {
         if (!action.event) return;
         router.visit(
             correctiveActionHref(action.id, {
