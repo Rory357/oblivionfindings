@@ -1307,3 +1307,18 @@ Route::middleware(['auth', 'throttle:30,1'])->group(function (): void {
     Route::post('/security-devices/setup/clockins/off', [$doorClockins, 'turnOff'])->middleware('throttle:10,1')->name('security-devices.setup.clockins.off');
     Route::patch('/security-devices/setup/clockins/settings', [$doorClockins, 'settings'])->name('security-devices.setup.clockins.settings');
 });
+
+// S&D Phase I: Obli fixes things, IT's side (9d, 15i, 15j, pop-ups 93-96). The services check the
+// Obli permission (fixes.manage or pictures.view) and the computer's Site on every call.
+Route::middleware(['auth', 'permission:securityDevices.viewAny', 'throttle:60,1'])->prefix('security-devices')->group(function (): void {
+    $obli = \App\Domain\Obli\Fixes\Http\ObliFixWebController::class;
+    Route::get('/obli/sessions/{uuid}', [$obli, 'session'])->whereUuid('uuid')->name('security-devices.obli.sessions.show');
+    Route::post('/obli/sessions/{uuid}/pictures', [$obli, 'openPictures'])->whereUuid('uuid')->middleware('throttle:20,1')->name('security-devices.obli.sessions.pictures');
+    Route::get('/obli/pictures/{picture}', [$obli, 'picture'])->whereNumber('picture')->withoutMiddleware('throttle:60,1')->middleware('throttle:240,1')->name('security-devices.obli.pictures.show');
+    Route::get('/obli/requests/{id}', [$obli, 'request'])->whereNumber('id')->name('security-devices.obli.requests.show');
+    Route::post('/obli/requests/{id}/decide', [$obli, 'decide'])->whereNumber('id')->middleware('throttle:20,1')->name('security-devices.obli.requests.decide');
+    Route::post('/setup/obli/fixes/on', [$obli, 'turnOn'])->middleware('throttle:10,1')->name('security-devices.setup.obli.fixes.on');
+    Route::post('/setup/obli/fixes/off', [$obli, 'turnOff'])->middleware('throttle:10,1')->name('security-devices.setup.obli.fixes.off');
+    Route::put('/setup/obli/fixes-switch', [$obli, 'fixesSwitch'])->middleware('throttle:10,1')->name('security-devices.setup.obli.fixes-switch');
+    Route::put('/setup/obli/helper', [$obli, 'helperSwitch'])->middleware('throttle:10,1')->name('security-devices.setup.obli.helper');
+});

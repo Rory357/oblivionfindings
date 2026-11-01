@@ -1034,6 +1034,8 @@ app(Schedule::class)->command('medications:chart-backups')->everyMinute()->witho
 
 // Native helper sign-in material has a bounded lifetime, including when Obli is disabled.
 app(Schedule::class)->command('obli:prune-sessions')->daily()->withoutOverlapping();
+// S&D Phase I (D17): Obli's screen pictures go after 7 days (file and row); fix sessions the tray left open end; old fix records are scrubbed.
+app(Schedule::class)->command('obli:fixes-prune')->dailyAt('03:40')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 
 Illuminate\Support\Facades\Schedule::command('endpoints:expire-remote-sessions')->everyMinute()->withoutOverlapping();
 

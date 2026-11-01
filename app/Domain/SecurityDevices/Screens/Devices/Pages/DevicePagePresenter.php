@@ -34,6 +34,8 @@ final class DevicePagePresenter
     public const array TAB_LABELS = [
         'overview' => 'Overview',
         'health' => 'Health',
+        // S&D Phase I (pg-sdr-9d): every time someone asked Obli for help on this PC.
+        'obli' => 'Obli help',
         'remote' => 'Remote support',
         'checks' => 'Checks & alerts',
         'terminal' => 'Terminal',
@@ -118,6 +120,7 @@ final class DevicePagePresenter
         $tabs = array_values(array_filter([
             'overview',
             $group === 'computer' && $posture !== null ? 'health' : null,
+            $group === 'computer' && \App\Domain\Obli\Fixes\Screens\ObliHelpTab::canSee($viewer) && app(\App\Domain\Obli\Fixes\ObliFixSettings::class)->schemaReady() ? 'obli' : null,
             $remote !== null ? 'remote' : null,
             $canSeeChecks ? 'checks' : null,
             $canTerminal ? 'terminal' : null,
@@ -182,6 +185,7 @@ final class DevicePagePresenter
                 ? $this->overview($viewer, $device, $kind, $group, $entry, $monitors, $latest, $custody, $range, $now, $posture, $backupHistory, $canSeeChecks)
                 : null,
             'health' => $tab === 'health' ? $this->health($device, $posture) : null,
+            'obli' => $tab === 'obli' ? app(\App\Domain\Obli\Fixes\Screens\ObliHelpTab::class)->present($viewer, $device) : null,
             'remote' => $tab === 'remote' ? $remote : null,
             'checks' => $tab === 'checks'
                 ? [

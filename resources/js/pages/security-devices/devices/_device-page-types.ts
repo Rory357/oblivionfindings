@@ -5,6 +5,7 @@ import type { DeviceKind, DeviceState } from '@/lib/security-devices/device-word
 import type { DeviceCardData, DeviceFormData, TimedText } from './_types';
 import type { FirmwareUpdate } from '@/components/security-devices/firmware-update-popup';
 import type { SavedLogin } from './_device-saved-login';
+import type { ObliHelpTabData } from '@/lib/security-devices/obli-fixes';
 
 /**
  * The device page (S&D rebuild C2): one page per kind for network gear, computers, printers,
@@ -12,7 +13,7 @@ import type { SavedLogin } from './_device-saved-login';
  * open tab's data is filled in. A null value means "Not available", never 0.
  */
 
-export type DevicePageTab = 'overview' | 'health' | 'remote' | 'checks' | 'terminal' | 'notes';
+export type DevicePageTab = 'overview' | 'health' | 'obli' | 'remote' | 'checks' | 'terminal' | 'notes';
 
 /** S&D Phase G (pg-sdr-3b): the Terminal tab, through the hub, for IT admins. */
 export type TerminalTabData = {
@@ -302,5 +303,7 @@ export type DevicePageProps = {
     checks: ChecksTab | null;
     terminal?: TerminalTabData | null;
     notes: NotesTab | null;
+    /** S&D Phase I (pg-sdr-9d): the Obli help tab. */
+    obli?: ObliHelpTabData | null;
     deviceForm?: DeviceFormData;
 };

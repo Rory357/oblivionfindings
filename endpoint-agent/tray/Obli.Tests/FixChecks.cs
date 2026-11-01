@@ -70,6 +70,15 @@ static class FixChecks
   Check(FixSafety.Blocked(new(false,"Windows Security","SecHealthUI"))!=null,"Windows Security wasn’t blocked.");
   Check(FixSafety.Blocked(new(false,"Administrator: Windows PowerShell","explorer"))!=null,"A PowerShell window wasn’t blocked by its title.");
   Check(FixSafety.Blocked(new(false,"Devices and Printers","explorer.exe"))==null,"An ordinary settings window was blocked.");
+  // Ways round the rules with clicks: Settings (Windows Update lives there), terminals, the Run box, unknown programs.
+  foreach(var (title,process) in new[]{("Settings","SystemSettings.exe"),("Settings","ApplicationFrameHost"),("Ubuntu","WindowsTerminal.exe"),("C:\\Windows\\system32","conhost"),("Run","explorer.exe"),("Anything","")})
+   Check(FixSafety.Blocked(new(false,title,process))!=null,"Obli would act on "+(process.Length>0?process:"an unnamed program")+".");
+  Check(FixSafety.Refuse(new FixAction("type",Text:"notepad"),new(false,"Search","SearchHost.exe"))!=null,"Obli would type into Start search.");
+  Check(FixSafety.Refuse(new FixAction("key",Keys:new[]{"enter"}),new(false,"Start","StartMenuExperienceHost.exe"))!=null,"Obli would press Enter in Start.");
+  foreach(string text in new[]{"powershell -w h -enc SQBFAFgA","cmd /c del x","ms-settings:windowsupdate","C:\\temp\\run.bat","%appdata%","\\\\server\\share\\x","notepad.exe"})
+   Check(FixSafety.Refuse(new FixAction("type",Text:text),new(false,"Documents","explorer.exe"))!=null,"Obli would type "+text+".");
+  foreach(string text in new[]{"HP LaserJet M404","Printer won’t print","https://intranet.example.test/printers","internet is slow"})
+   Check(FixSafety.Refuse(new FixAction("type",Text:text),new(false,"Untitled - Notepad","notepad.exe"))==null,"Obli refused to type "+text+".");
   var typing=new FixAction("type",Text:"hello");
   Check(FixSafety.Refuse(typing,new(true,"Sign in","chrome"))=="password","Obli would type into a password field.");
   Check(FixSafety.Refuse(new FixAction("key",Keys:new[]{"enter"}),new(true,"Sign in","chrome"))=="password","Obli would press keys in a password field.");

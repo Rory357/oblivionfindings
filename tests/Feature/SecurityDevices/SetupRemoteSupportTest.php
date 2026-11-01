@@ -28,7 +28,7 @@ beforeEach(function (): void {
 it('turns remote support on and off through today’s setting, audited', function (): void {
     $admin = ($this->person)(['securityDevices.viewAny', 'settings.access.manage', 'integrations.manage_secrets']);
 
-    $this->actingAs($admin)->get('/security-devices/setup/computers')->assertOk()
+    $this->actingAs($admin)->get('/security-devices/setup/computers?tab=remote')->assertOk()
         ->assertInertia(fn ($page) => $page->where('section', 'computers')->where('remote.allowed', false)->where('remote.can_change', true));
 
     $this->actingAs($admin)->putJson('/security-devices/setup/computers/remote-support', ['allowed' => true])->assertOk();
@@ -41,7 +41,7 @@ it('turns remote support on and off through today’s setting, audited', functio
 
 it('shows the tab to people who look after remote support, but only lets settings admins change it', function (): void {
     $policy = ($this->person)(['securityDevices.viewAny', 'securityDevices.remote.managePolicy']);
-    $this->actingAs($policy)->get('/security-devices/setup/computers')->assertOk()
+    $this->actingAs($policy)->get('/security-devices/setup/computers?tab=remote')->assertOk()
         ->assertInertia(fn ($page) => $page->where('remote.can_change', false));
     $this->actingAs($policy)->putJson('/security-devices/setup/computers/remote-support', ['allowed' => true])->assertForbidden();
     expect(app(EndpointRemoteSupportSettings::class)->current()['remote_support_enabled'])->toBeFalse();

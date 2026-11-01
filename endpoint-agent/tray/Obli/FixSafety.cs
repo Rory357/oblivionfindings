@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Oblivion.Obli;
 
@@ -9,9 +10,12 @@ namespace Oblivion.Obli;
 public sealed record FixFocus(bool IsPassword,string WindowTitle,string Process);
 
 /// <summary>
-/// S&D Phase I: the tray's own safety checks, on top of the server's. Obli never types into a password
-/// field, never acts on security or admin windows, and uses only ordinary keys (no Windows key, no
-/// Ctrl+Alt+Del, no Task Manager, no closing windows with Alt+F4). Pure and testable.
+/// S&D Phase I: the tray's own safety checks, on top of the server's (ObliFixSafety). Obli never types
+/// into a password field; never acts on security or admin windows, command windows, the Settings app
+/// (Windows Update and protection live there, and it is only ever titled "Settings"), the Run box, or a
+/// window whose program it can't name; never types or presses keys in Start or its search (they run
+/// what is typed); never types text that would start a program, a script or a settings page; and uses
+/// only ordinary keys (no Windows key, no Ctrl+Alt+Del, no Task Manager, no Alt+F4). Pure and testable.
 /// </summary>
 public static class FixSafety
 {
@@ -46,18 +50,40 @@ public static class FixSafety
   return keys;
  }
 
- static readonly string[] BlockedProcesses={"sechealthui","regedit","consent","credentialuibroker","logonui","netplwiz","lusrmgr","gpedit","mmc","taskmgr","msconfig","secpol","bitlockerwizard","bitlockerwizardelev","fvenotify","useraccountcontrolsettings","mrt","msmpeng","powershell","pwsh","cmd","wscript","cscript"};
+ static readonly string[] BlockedProcesses={"sechealthui","securityhealthhost","securityhealthsystray","regedit","regedt32","consent","credentialuibroker","logonui","lockapp","netplwiz","lusrmgr","gpedit","mmc","taskmgr","msconfig","secpol","bitlockerwizard","bitlockerwizardelev","fvenotify","manage-bde","useraccountcontrolsettings","wf","firewallcontrolpanel","credwiz","mrt","msmpeng","wscript","cscript",
+  // Settings holds Windows Update, protection and accounts.
+  "systemsettings","systemsettingsadminflows","control",
+  // Command windows and terminals: no action at all.
+  "powershell","pwsh","powershell_ise","cmd","windowsterminal","wt","conhost","openconsole","wsl","bash","mintty"};
+ static readonly string[] LauncherProcesses={"searchhost","searchapp","searchui","startmenuexperiencehost","shellexperiencehost"};
+ static readonly Regex LaunchText=new(@"\b(?:powershell|pwsh|cmd|command|conhost|wt|mshta|rundll32|regsvr32|wscript|cscript|certutil|bitsadmin|msiexec|wmic|schtasks|reg|sc|net|netsh|bcdedit|vssadmin|curl|wget|iwr|invoke-webrequest|start-process)(?:\.exe)?\b(?=\s|$|/|-)|-e(?:nc(?:odedcommand)?)?\s+[a-z0-9+/=]{8,}|\b(?:ms-settings|windowsdefender|shell|ms-msdt|search-ms|file|vbscript|javascript):|\.(?:ps1|psm1|bat|cmd|vbs|vbe|js|jse|wsf|hta|scr|msi|lnk|exe|com|reg)\b|\\\\[^\s\\]+\\|%[a-z_()]+%",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant,TimeSpan.FromMilliseconds(100));
  static readonly string[] BlockedTitles={"windows security","firewall","bitlocker","user accounts","local users and groups","group policy","registry editor","virus & threat","virus and threat","credential manager","windows defender","tamper protection","sign-in options","family options","user account control","command prompt","windows powershell"};
 
  /// <summary>Why Obli mustn't act on the window in front, or null when it may.</summary>
  public static string? Blocked(FixFocus focus)
  {
-  string process=focus.Process.Trim().ToLowerInvariant();
-  if(process.EndsWith(".exe",StringComparison.Ordinal))process=process[..^4];
-  string title=focus.WindowTitle.ToLowerInvariant();
-  if(BlockedProcesses.Contains(process)||BlockedTitles.Any(t=>title.Contains(t,StringComparison.Ordinal)))
+  string process=Process(focus);
+  string title=focus.WindowTitle.Trim().ToLowerInvariant();
+  // Fail safe: a window whose program can't be named (often one run as an administrator) is left alone.
+  if(process.Length==0||BlockedProcesses.Contains(process)||BlockedTitles.Any(t=>title.Contains(t,StringComparison.Ordinal))
+   ||(process=="applicationframehost"&&title.StartsWith("settings",StringComparison.Ordinal))||(process=="explorer"&&title=="run"))
    return "This window looks after the computer’s security or settings, so Obli doesn’t touch it.";
   return null;
+ }
+
+ static string Process(FixFocus focus)
+ {
+  string process=focus.Process.Trim().ToLowerInvariant();
+  int slash=Math.Max(process.LastIndexOf('\\'),process.LastIndexOf('/'));
+  if(slash>=0)process=process[(slash+1)..];
+  return process.EndsWith(".exe",StringComparison.Ordinal)?process[..^4]:process;
+ }
+
+ /// <summary>Text that would start a program, a script or a settings page if it reached an address bar or Start.</summary>
+ public static bool StartsSomething(string text)
+ {
+  try{return LaunchText.IsMatch(text);}
+  catch(RegexMatchTimeoutException){return true;}
  }
 
  /// <summary>
@@ -70,6 +96,8 @@ public static class FixSafety
   string? blocked=Blocked(focus);
   if(blocked!=null)return blocked;
   if(focus.IsPassword&&action.Type is "type" or "key")return "password";
+  if(action.Type is "type" or "key"&&LauncherProcesses.Contains(Process(focus)))return "Start and its search run what is typed, so Obli opens things by clicking instead.";
+  if(action.Type=="type"&&StartsSomething(action.Text??""))return "That text would start a program, a script or a settings page, so Obli doesn’t type it.";
   return null;
  }
 

@@ -39,7 +39,7 @@ final class DevicePageController extends Controller
             ]);
         };
         $props = [];
-        foreach (['device', 'tab', 'tabs', 'range', 'meters', 'can', 'actions', 'trouble', 'overview', 'health', 'remote', 'checks', 'notes'] as $key) {
+        foreach (['device', 'tab', 'tabs', 'range', 'meters', 'can', 'actions', 'trouble', 'overview', 'health', 'remote', 'checks', 'notes', 'obli', 'terminal'] as $key) {
             $props[$key] = fn () => $read()[$key];
         }
 

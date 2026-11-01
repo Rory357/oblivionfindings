@@ -184,3 +184,9 @@ it('refuses control characters in a typed line', function (): void {
     $this->actingAs($this->admin)->postJson("/security-devices/terminal/{$uuid}/input", ['interrupt' => true])->assertOk();
     expect(TerminalLine::query()->where('direction', 'in')->pluck('text')->all())->toBe(["\x03"]);
 });
+
+it('sends the Terminal tab its state on the device page', function (): void {
+    $this->actingAs($this->admin)->get("/security-devices/devices/{$this->router->id}?tab=terminal")
+        ->assertOk()
+        ->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page->where('tab', 'terminal')->has('terminal'));
+});

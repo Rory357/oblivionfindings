@@ -5,8 +5,8 @@
  * safety kit keep today's profile (show.tsx) until Phase E.
  *
  * Not offered here, on purpose: installing firmware (pop-up 62 shows an update a maker's source
- * reports and opens the maker's app), port on/off/restart (never), acknowledge and quiet time
- * (Phase D), and Obli help (Phase I).
+ * reports and opens the maker's app), port on/off/restart (never), and acknowledge and quiet time
+ * (Phase D). A computer's Obli help tab (Phase I, 9d) is _device-obli-help.tsx.
  */
 import {
     PageHeader,
@@ -50,6 +50,7 @@ import { GatewayOverviewTab } from './_gateway-overview';
 import { NetworkOverviewTab, TroubleOverview } from './_device-overview-network';
 import { OtherOverviewTab } from './_device-overview-other';
 import { NotesTabView } from './_device-notes';
+import { ObliHelpTab } from './_device-obli-help';
 import { TerminalTab } from './_device-terminal';
 import { WebPagePopup } from './_device-web-page';
 import type { DevicePageMeter, DevicePageProps, DevicePageTab } from './_device-page-types';
@@ -226,6 +227,8 @@ export default function DevicePage(props: DevicePageProps) {
         else body = <OtherOverviewTab props={props} now={now} onRange={(range) => go({ range })} menuFor={menuFor} />;
     } else if (tab === 'health' && props.health) {
         body = <ComputerHealthTab health={props.health} now={now} />;
+    } else if (tab === 'obli' && props.obli) {
+        body = <ObliHelpTab data={props.obli} now={now} />;
     } else if (tab === 'remote' && props.remote) {
         body = <RemoteSupportTab remote={props.remote} now={now} />;
     } else if (tab === 'checks' && props.checks) {

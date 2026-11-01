@@ -23,7 +23,7 @@ import { AddSensorGateway } from '@/components/security-devices/sensor-gateway-p
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Bell, Clock, DoorOpen, History, KeyRound, ListChecks, MonitorSmartphone, Network, Plug, RadioTower, Settings2 } from 'lucide-react';
+import { Bell, Bot, Clock, DoorOpen, History, KeyRound, ListChecks, MonitorSmartphone, Network, Plug, RadioTower, Settings2, Wrench } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SetupAccess } from './_access';
 import { SetupAlertRules } from './_alerts';
@@ -34,11 +34,13 @@ import { ChangeHistory } from './_history';
 import { SetupNetworks } from './_networks';
 import { SetupOverview } from './_overview';
 import { SetupRemote } from './_remote';
+import { SetupObli } from './_obli';
+import { SetupFixes } from './_fixes';
 import { ConnectedServices, SavedLogins, SupportedDevices } from './_services';
 import { SettingsSave, useSettingsDraft } from './_settings';
 import type { SetupMeter, SetupProps, SetupSection } from './_types';
 
-const TAB_ICONS = { networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks, rules: Bell, checks: ListChecks, broker: RadioTower, unifi: DoorOpen, clockins: Clock, remote: MonitorSmartphone } as const;
+const TAB_ICONS = { networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks, rules: Bell, checks: ListChecks, broker: RadioTower, unifi: DoorOpen, clockins: Clock, remote: MonitorSmartphone, obli: Bot, fixes: Wrench } as const;
 
 export function setupUrl(section: SetupSection, tab?: string | null, page?: number): string {
     const base = section === 'overview' ? '/security-devices/setup' : `/security-devices/setup/${section}`;
@@ -208,6 +210,8 @@ export default function SetupPage(props: SetupProps) {
                 ) : null}
                 {props.alerts ? <SetupAlertRules data={props.alerts} draft={draft} /> : null}
                 {props.remote ? <SetupRemote data={props.remote} /> : null}
+                {props.obli ? <SetupObli data={props.obli} /> : null}
+                {props.fixes ? <SetupFixes data={props.fixes} query={query} /> : null}
                 {props.access ? <SetupAccess data={props.access} draft={draft} query={query} now={now} onConnect={(siteId) => setConnectingAccess(siteId ?? 0)} /> : null}
                 {props.clockins ? <SetupClockins data={props.clockins} /> : null}
                 {props.checks ? <SetupChecks data={props.checks} draft={draft} query={query} canOpenDevices={can.open_devices} /> : null}

@@ -35,8 +35,8 @@ final class SetupPresenter
         'alerts' => ['label' => 'Alerts & checks', 'tabs' => ['rules' => 'Alert rules', 'checks' => 'Checks']],
         // S&D Phase H (pg-sdr-15m): each Site's UniFi Access console, through its hub.
         'access' => ['label' => 'Doors & access', 'tabs' => ['unifi' => 'UniFi Access', 'clockins' => 'Clock-ins from doors']],
-        // S&D Phase G (pg-sdr-15k): Computers & Obli; only Remote support is built (Obli's tabs come with Phase I).
-        'computers' => ['label' => 'Computers & Obli', 'tabs' => ['remote' => 'Remote support']],
+        // S&D Phase G (pg-sdr-15k): Computers & Obli › Remote support; S&D Phase I (15i, 15j): › Obli and › Fixes Obli can make.
+        'computers' => ['label' => 'Computers & Obli', 'tabs' => ['obli' => 'Obli', 'fixes' => 'Fixes Obli can make', 'remote' => 'Remote support']],
         'history' => ['label' => 'Change history', 'tabs' => []],
     ];
 
@@ -56,7 +56,8 @@ final class SetupPresenter
 
     public static function canOpen(User $viewer): bool
     {
-        return self::canSeeServices($viewer) || self::canSeeAlerts($viewer) || self::canSeeAccess($viewer) || SetupRemoteSupport::canSee($viewer);
+        return self::canSeeServices($viewer) || self::canSeeAlerts($viewer) || self::canSeeAccess($viewer) || SetupRemoteSupport::canSee($viewer)
+            || \App\Domain\Obli\Fixes\Screens\SetupObli::canSee($viewer);
     }
 
     public static function canSeeServices(User $viewer): bool
@@ -101,7 +102,17 @@ final class SetupPresenter
         if (! self::canSeeAccess($viewer)) {
             unset($sections['access']);
         }
+        // S&D Phase I: each Computers & Obli tab for the people who may see it; the section goes when none is left.
         if (! SetupRemoteSupport::canSee($viewer)) {
+            unset($sections['computers']['tabs']['remote']);
+        }
+        if (! \App\Domain\Obli\Fixes\Screens\SetupObli::canSee($viewer)) {
+            unset($sections['computers']['tabs']['obli']);
+        }
+        if (! \App\Domain\Obli\Fixes\Screens\SetupObli::canSeeFixes($viewer)) {
+            unset($sections['computers']['tabs']['fixes']);
+        }
+        if ($sections['computers']['tabs'] === []) {
             unset($sections['computers']);
         }
 
@@ -170,6 +181,9 @@ final class SetupPresenter
             'clockins' => $section === 'access' && $tab === 'clockins' ? app(\App\Domain\SecurityDevices\DoorClockins\Screens\SetupClockinsPresenter::class)->present($viewer) : null,
             // S&D Phase G (pg-sdr-15k): remote support to staff computers.
             'remote' => $section === 'computers' && $tab === 'remote' ? app(SetupRemoteSupport::class)->present($viewer) : null,
+            // S&D Phase I (pg-sdr-15i, 15j): Obli's switches and rules, and the fixes Obli can make (pop-up 93).
+            'obli' => $section === 'computers' && $tab === 'obli' ? app(\App\Domain\Obli\Fixes\Screens\SetupObli::class)->present($viewer) : null,
+            'fixes' => $section === 'computers' && $tab === 'fixes' ? app(\App\Domain\Obli\Fixes\ObliFixList::class)->presentSetup($viewer) : null,
         ];
     }
 

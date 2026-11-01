@@ -50,6 +50,10 @@ final class SetupHistory
         'monitoring.retention.created',
         'monitoring.retention.updated',
         'monitoring.retention.deactivated',
+        // S&D Phase I: Obli's fixes switch, and fixes turned on or off for a computer (15i, 15j, pop-up 93).
+        'obli.fixes.settings_changed',
+        'obli.fix.turned_on',
+        'obli.fix.turned_off',
     ];
 
     public function __construct(private readonly SecurityDevicesAccessService $access) {}
@@ -187,6 +191,9 @@ final class SetupHistory
             'monitoring.alert_route.deactivated' => 'Turned off an alert route',
             'monitoring.retention.created', 'monitoring.retention.updated' => 'Changed how long readings are kept',
             'monitoring.retention.deactivated' => 'Turned off a rule for how long readings are kept',
+            'obli.fixes.settings_changed' => ($meta['enabled'] ?? false) ? 'Let Obli use computers to fix things' : 'Stopped Obli using computers to fix things',
+            'obli.fix.turned_on' => 'Turned on an Obli fix for one computer'.(($meta['policy_changed'] ?? false) ? ' and its service actions' : ''),
+            'obli.fix.turned_off' => 'Turned off an Obli fix for one computer',
             default => 'Changed a setting',
         };
     }

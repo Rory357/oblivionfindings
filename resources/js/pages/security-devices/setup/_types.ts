@@ -1,6 +1,7 @@
 /** Setup (S&D rebuild pg-sdr-15 and its sections): the props SetupPresenter sends. */
 import type { StatusVariant } from '@/components/ui/status-badge';
 import type { SetupClockinsData } from '@/lib/security-devices/door-clockins';
+import type { ObliFixesSetupData, ObliSetupData } from '@/lib/security-devices/obli-fixes';
 
 export type SetupSection = 'overview' | 'hubs' | 'services' | 'alerts' | 'access' | 'computers' | 'history';
 
@@ -193,4 +194,8 @@ export type SetupProps = {
     remote?: RemoteSetupData | null;
     /** S&D Phase H (pg-sdr-15n, D15): Doors & access › Clock-ins from doors. */
     clockins?: SetupClockinsData | null;
+    /** S&D Phase I (pg-sdr-15i): Computers & Obli › Obli. */
+    obli?: ObliSetupData | null;
+    /** S&D Phase I (pg-sdr-15j): Computers & Obli › Fixes Obli can make. */
+    fixes?: ObliFixesSetupData | null;
 };
