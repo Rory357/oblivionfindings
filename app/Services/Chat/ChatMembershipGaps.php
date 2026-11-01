@@ -4,6 +4,7 @@ namespace App\Services\Chat;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -38,11 +39,13 @@ final class ChatMembershipGaps
     /**
      * Opens a gap on each private staff chat membership of someone who is no longer current
      * staff, and closes it once they're current again. Runs hourly (chat:sync-membership-gaps),
-     * and for one person when Chat offboarding completes. Returns how many gaps changed.
+     * and for one person when Chat offboarding completes. A leaver's relay use ends at once
+     * (Oblivion Relay, spec 3.7) unless the caller sends that revoke itself. Returns how many
+     * gaps changed.
      *
      * @param  array<int, int>|null  $userIds
      */
-    public function sync(?array $userIds = null): int
+    public function sync(?array $userIds = null, bool $revokeRelay = true): int
     {
         $memberships = DB::table('ops_conversation_participants')
             ->join('ops_conversations', 'ops_conversations.id', '=', 'ops_conversation_participants.conversation_id')
@@ -63,7 +66,11 @@ final class ChatMembershipGaps
         foreach ($memberships->groupBy('user_id') as $userId => $rows) {
             [$away, $present] = $rows->partition(fn ($row) => $open->has($row->id));
             if (! $current->has((int) $userId) && $present->isNotEmpty()) {
-                $changed += $this->open((int) $userId, $present->pluck('id'));
+                $opened = $this->open((int) $userId, $present->pluck('id'));
+                $changed += $opened;
+                if ($opened > 0 && $revokeRelay && ($leaver = User::find((int) $userId))) {
+                    app(OblivionRelay::class)->revokePerson($leaver, 'offboarded');
+                }
             }
             if ($current->has((int) $userId) && $away->isNotEmpty()) {
                 $changed += $this->close((int) $userId, $away->map(fn ($row) => $open->get($row->id)));

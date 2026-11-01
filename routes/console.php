@@ -85,6 +85,7 @@ use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\SyncWorkCalendarsJob;
 use App\Jobs\System\RecordDefaultWorkerHeartbeatJob;
 use App\Models\MedicationIdempotencyResult;
+use App\Services\Chat\OblivionRelay;
 use App\Services\Chat\SelfHostedCalling;
 use App\Services\Eligibility\WorkforceEligibilityRefresh;
 use App\Services\Fleet\FinanceReviewNotices;
@@ -1087,6 +1088,9 @@ app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->
 app(Schedule::class)->command('chat:prune')->dailyAt('02:40')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 // Hourly, so a re-hire's gap closes soon after they're current again; until then new messages stay hidden from them too.
 app(Schedule::class)->command('chat:sync-membership-gaps')->hourlyAt(7)->withoutOverlapping()->onOneServer();
+// Oblivion Relay (spec 3.7): an error for each revocation that has waited more than 5 minutes for a relay node.
+app(Schedule::class)->call(fn () => app(OblivionRelay::class)->reportStale())->name('chat:relay-revocations-waiting')->everyMinute()->onOneServer()
+    ->when(fn (): bool => app(OblivionRelay::class)->configured());
 
 // Procedure review assignment delivery is independent of reading or completing work.
 app(Schedule::class)->job(new RecoverProcedureReviewDeliveries)->everyMinute()->onOneServer()->withoutOverlapping();

@@ -31,7 +31,9 @@ final class ChatCallReconciler
             }
             $media = [];
         };
-        DB::transaction(function () use ($call, &$media, $flush): void {
+        // Oblivion Relay (spec 3.7): revokes queue for after the commit, so a rollback sends none.
+        $relay = app(OblivionRelay::class);
+        DB::transaction(function () use ($call, &$media, $flush, $relay): void {
             $call = ChatCall::whereKey($call->id)->lockForUpdate()->firstOrFail();
             if ($call->ended_at) {
                 return;
@@ -45,6 +47,7 @@ final class ChatCallReconciler
                 $media[] = ['end', $call, null];
                 $call->update(['status' => $expired ? 'missed' : 'ended', 'ended_at' => now()]);
                 $call->participants()->whereIn('status', ['accepted', 'connected', 'invited'])->update(['status' => 'left', 'left_at' => now()]);
+                $relay->revokeCall($call, 'call_ended');
                 $flush();
 
                 return;
@@ -53,6 +56,7 @@ final class ChatCallReconciler
                 if ($participant->status === 'removing') {
                     $media[] = ['remove', $call, $participant];
                     $participant->update(['status' => 'removed', 'left_at' => now()]);
+                    $relay->revokeCallMember($call, (int) $participant->user_id, 'access_removed');
 
                     continue;
                 }
@@ -64,17 +68,20 @@ final class ChatCallReconciler
                         $media[] = ['remove', $call, $participant];
                     }
                     $participant->update(['status' => $unauthorised ? 'revoked' : ($invitationExpired ? 'expired' : 'left'), 'left_at' => now()]);
+                    $relay->revokeCallMember($call, (int) $participant->user_id, $unauthorised ? 'access_removed' : 'left_call');
                 }
             }
             $remaining = $call->participants()->whereIn('status', ['accepted', 'connected'])->orderBy('id')->get();
             if ($remaining->isEmpty() || ($remaining->count() === 1 && ! $call->participants()->where('status', 'invited')->exists())) {
                 $media[] = ['end', $call, null];
                 $call->update(['status' => 'ended', 'ended_at' => now()]);
+                $relay->revokeCall($call, 'call_ended');
             } elseif (! $remaining->contains('user_id', $call->host_id)) {
                 $host = app(ChatCallHost::class)->successor($call, $remaining);
                 if ($host === null) {
                     $media[] = ['end', $call, null];
                     $call->update(['status' => 'ended', 'ended_at' => now()]);
+                    $relay->revokeCall($call, 'call_ended');
                 } else {
                     $call->update(['host_id' => $host]);
                 }
