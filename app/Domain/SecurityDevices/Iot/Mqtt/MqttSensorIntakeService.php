@@ -232,6 +232,12 @@ final class MqttSensorIntakeService
             return $createdCount;
         });
 
+        // S&D Phase E: readings over time, for the sensor page graphs and the battery forecast.
+        app(\App\Domain\SecurityDevices\Iot\Readings\SensorReadingHistory::class)->record(
+            (int) $device->id,
+            [...array_map(fn (array $reading): float => (float) $reading['value'], $newReadings), ...($battery !== null ? ['battery' => $battery] : [])],
+            $at,
+        );
         $alerts = app(DeviceAlertEngine::class);
         foreach ($readingChanges as $key => $reading) {
             $alerts->onReading($device, (string) $key, (string) $reading['label'], (string) $reading['state'], (float) $reading['value'], (string) $reading['unit'], $at);
