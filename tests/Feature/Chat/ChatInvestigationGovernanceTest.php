@@ -235,7 +235,11 @@ it('offboards a former staff member without deleting records and leaves current 
         ->assertJsonPath('summary.callbacks_returned', 1)->assertJsonPath('summary.family_work_returned', 1)
         ->assertJsonPath('preview.actionable', false);
 
-    expect($group->participants()->where('user_id', $leaver->id)->exists())->toBeFalse()
+    // Private staff chats keep the leaver's membership, marked as left, and never as the owner.
+    $kept = $group->participants()->where('user_id', $leaver->id)->first();
+    expect($kept?->role)->toBe('member')
+        ->and(DB::table('chat_membership_gaps')->where('participant_id', $kept->id)->whereNull('returned_at')->count())->toBe(1)
+        ->and(DB::table('chat_membership_gaps')->where('participant_id', $direct->participants()->where('user_id', $leaver->id)->value('id'))->count())->toBe(1)
         ->and($group->participants()->where('user_id', $stays->id)->value('role'))->toBe('admin')
         ->and($message->fresh())->not->toBeNull()
         ->and(DB::table('chat_callbacks')->where('id', $callback)->first())->assigned_to->toBeNull()->status->toBe('requested')
