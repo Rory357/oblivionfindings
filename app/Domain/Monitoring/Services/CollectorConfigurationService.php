@@ -9,6 +9,7 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
+use App\Domain\SecurityDevices\Hubs\Exceptions\HubAwaitingApproval;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
@@ -39,6 +40,10 @@ final readonly class CollectorConfigurationService
             if ($locked->revoked_at !== null || $locked->status === 'revoked'
                 || ! is_string($locked->public_key) || ! is_string($locked->client_certificate_fingerprint)) {
                 throw new DomainException('Collector is unavailable.');
+            }
+            if ($locked->approved_at === null) {
+                // No work and no sealed logins until an admin approves the hub.
+                throw new HubAwaitingApproval;
             }
             if ($afterSequence > (int) $locked->configuration_sequence) {
                 throw new DomainException('Collector configuration checkpoint is ahead of central state.');
@@ -159,7 +164,8 @@ final readonly class CollectorConfigurationService
                     $request = $attempt->request;
                     if ($request === null
                         || $request->expires_at?->isPast()
-                        || (int) $request->site_id !== (int) $locked->site_id
+                        // The hub that covers the Site runs it: its home Site or one it covers over SD-WAN.
+                        || ! in_array((int) $request->site_id, $locked->authorisedSiteIds(), true)
                         || (int) $request->collector_id !== (int) $locked->id) {
                         return;
                     }

@@ -2,6 +2,8 @@
 
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\CollectorMediaController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\HikvisionDiscoveryController;
+use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubRuntimeController;
+use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubSetupRedeemController;
 use App\Http\Controllers\Api\Monitoring\CollectorEnrollmentController;
 use App\Http\Controllers\Api\Monitoring\CollectorRecoverableEnrollmentController;
 use App\Http\Controllers\Api\Monitoring\CollectorSyncController;
@@ -20,5 +22,14 @@ Route::prefix('monitoring/collectors')->name('api.monitoring.collectors.')->grou
         Route::post('configuration', [CollectorSyncController::class, 'configuration'])->name('configuration');
         Route::post('observations', [CollectorSyncController::class, 'observations'])->name('observations');
         Route::post('heartbeat', [CollectorSyncController::class, 'heartbeat'])->name('heartbeat');
+        // S&D Phase B: the login-store key, update reports and update downloads.
+        Route::post('vault-key', [HubRuntimeController::class, 'vaultKey'])->name('vault-key');
+        Route::post('update/report', [HubRuntimeController::class, 'updateReport'])->name('update-report');
+        Route::post('update/download', [HubRuntimeController::class, 'updateDownload'])->name('update-download');
     });
+
+    // The installer redeems the 8-character code from its file name for its setup profile.
+    // No sign-in exists yet, so it's throttled hard; the hub still waits for approval after.
+    Route::post('setup/redeem', HubSetupRedeemController::class)
+        ->middleware('throttle:10,1')->name('setup.redeem');
 });

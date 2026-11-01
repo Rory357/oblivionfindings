@@ -125,6 +125,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\NetworkConfig\Contracts\NetworkCliSshTransport;
 use App\Domain\SecurityDevices\NetworkConfig\Services\PhpseclibNetworkCliTransport;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Events\FleetSignalEmitted;
 use App\Events\FleetWanderingAlertTriggered;
 use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
@@ -557,6 +558,8 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(DeliveryProviderManager::class);
         $this->app->scoped(UserSiteAccessService::class);
+        // Each viewer's S&D Sites are worked out once per request or queue job.
+        $this->app->scoped(SecurityDevicesAccessService::class);
 
         // Request-scoped so the Inertia middleware's badge pass and the
         // /my-day and /tasks controllers share one provider fan-out per

@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Data\CollectorEnrollmentResult;
 use App\Domain\Monitoring\Models\CollectorCheckpoint;
 use App\Domain\Monitoring\Models\CollectorEnrollment;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Hubs\Models\SetupCode;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Models\Site;
 use App\Models\User;
@@ -229,6 +230,9 @@ final readonly class CollectorEnrollmentService
                 'consumed_at' => now(),
                 'consumed_collector_id' => $collector->id,
             ])->save();
+            // The installer's setup code is spent too, and keeps no secrets (S&D Phase B).
+            SetupCode::query()->where('collector_enrollment_id', $enrollment->id)->whereNull('consumed_at')
+                ->update(['consumed_at' => now(), 'code_ciphertext' => null, 'profile_ciphertext' => null]);
             AuditLogger::logOrFail('monitoring.collector.enrolment.consumed', $collector, [
                 'actor_id' => (int) $enrollment->issued_by_user_id,
                 'site_id' => (int) $site->id,
@@ -261,7 +265,14 @@ final readonly class CollectorEnrollmentService
                 throw new DomainException('Collector revocation actor is unavailable.');
             }
             if ($locked->revoked_at === null) {
-                $locked->forceFill(['revoked_at' => now(), 'status' => 'revoked'])->save();
+                // Destroying the login-store key means the logins the hub kept can't be read
+                // again, even if it was offline when it was removed (S&D Phase B).
+                $locked->forceFill([
+                    'revoked_at' => now(),
+                    'status' => 'revoked',
+                    'vault_key_ciphertext' => null,
+                    'vault_key_rotated_at' => now(),
+                ])->save();
                 AuditLogger::logOrFail('monitoring.collector.revoked', $locked, [
                     'actor_id' => $actor->id,
                     'site_id' => (int) $locked->site_id,

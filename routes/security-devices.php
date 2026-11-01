@@ -61,6 +61,7 @@ use App\Domain\SecurityDevices\Http\Controllers\QueclinkUnitConsoleController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteHubWizardController;
+use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubAdminController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
 use App\Domain\SecurityDevices\Http\Controllers\SupportedDevicesController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandApprovalController;
@@ -708,6 +709,29 @@ Route::middleware([
                 ->middleware('throttle:20,1,security-device-collectors-update:')
                 ->name('security-devices.collectors.update');
         });
+
+    // ── Hubs (S&D Phase B): setup codes in the file name, approval, updates ──
+    // Each action checks its own permission in HubAdminController (integrations.manage to
+    // add and edit; hubs.approve to approve, replace, remove and hold updates).
+    Route::prefix('/hubs')->middleware('throttle:30,1,security-device-hubs:')->group(function () {
+        Route::post('/setup-codes', [HubAdminController::class, 'issue'])->name('security-devices.hubs.setup-codes.issue');
+        Route::get('/setup-codes/{setupCode}', [HubAdminController::class, 'status'])->whereNumber('setupCode')
+            ->withoutMiddleware('throttle:30,1,security-device-hubs:')->middleware('throttle:90,1,security-device-hubs-status:')
+            ->name('security-devices.hubs.setup-codes.status');
+        Route::get('/setup-codes/{setupCode}/download', [HubAdminController::class, 'download'])->whereNumber('setupCode')
+            ->name('security-devices.hubs.setup-codes.download');
+        Route::delete('/setup-codes/{setupCode}', [HubAdminController::class, 'cancel'])->whereNumber('setupCode')
+            ->name('security-devices.hubs.setup-codes.cancel');
+        Route::put('/updates/hold', [HubAdminController::class, 'hold'])->name('security-devices.hubs.updates.hold');
+        Route::post('/{collector}/approve', [HubAdminController::class, 'approve'])->whereNumber('collector')
+            ->name('security-devices.hubs.approve');
+        Route::post('/{collector}/remove', [HubAdminController::class, 'remove'])->whereNumber('collector')
+            ->name('security-devices.hubs.remove');
+        Route::post('/{collector}/replace', [HubAdminController::class, 'replace'])->whereNumber('collector')
+            ->name('security-devices.hubs.replace');
+        Route::patch('/{collector}', [HubAdminController::class, 'update'])->whereNumber('collector')
+            ->name('security-devices.hubs.update');
+    });
 
     Route::get('/settings', SettingsAuditController::class)
         ->name('security-devices.settings');

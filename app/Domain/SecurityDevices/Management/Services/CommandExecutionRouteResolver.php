@@ -68,7 +68,9 @@ final class CommandExecutionRouteResolver
 
         $collector = MonitoringCollector::query()->find($collectorIds->first());
         if (! $collector
-            || (int) $collector->site_id !== $siteId
+            // The hub that covers the Site: its home Site or one it covers over SD-WAN.
+            || ! in_array($siteId, $collector->authorisedSiteIds(), true)
+            || ! $collector->isApprovedForWork()
             || $collector->revoked_at !== null
             || ! is_string($collector->public_key)
             || ! is_string($collector->client_certificate_fingerprint)
