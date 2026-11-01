@@ -73,14 +73,16 @@ final class HsStoryReviewPresenter
         $done = count($readiness->requirements) - $left;
         $site = $event->site?->name;
         $owner = $event->owner?->name;
-        $incident = ClientIncident::query()->whereKey($story['incident_id'])->first(['id', 'type']);
+        $incident = ClientIncident::query()->whereKey($story['incident_id'])->first(['id', 'type', 'title']);
         $nearMiss = $incident?->type === 'near_miss';
+        $category = HsLabels::label('review_category', $event->event_category);
 
         return [
             'id' => (int) $event->id,
             'reference_number' => $event->reference_number,
-            // The category and Site only: the reader's own words are in the story below.
-            'title' => HsLabels::label('review_category', $event->event_category).($site ? ' — '.$site : ''),
+            // Decision 14 (Stephan, 1 Nov): the team lead's title uses the incident's own words (it reads them in the
+            // story anyway); with no incident title, the category and Site.
+            'title' => filled($incident?->title) ? (string) $incident->title : $category.($site ? ' — '.$site : ''),
             'status_label' => HsLabels::label('review_status', $event->status),
             'severity_label' => $event->severity ? ($nearMiss ? 'Potential: ' : '').HsLabels::label('severity', $event->severity) : null,
             'category_label' => $nearMiss ? 'Near miss · no one hurt' : HsLabels::label('review_category', $event->event_category),
