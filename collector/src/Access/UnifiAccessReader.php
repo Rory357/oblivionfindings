@@ -95,6 +95,9 @@ final class UnifiAccessReader
             [$visitors, $visitorsComplete] = $this->visitors($call);
             $policies = $this->policies($call('GET', '/api/v1/developer/access_policies'));
             [$windows, $eventsUntil] = $this->events($call, $eventsSince, $now);
+            // Optional: an older console without these still syncs the rest.
+            $readers = $this->optional(fn (): array => $this->readers($call('GET', '/api/v1/developer/devices'), $doors), []);
+            $emergency = $this->optional(fn (): ?string => $this->emergency($call('GET', '/api/v1/developer/doors/settings/emergency')), null);
         } catch (ConsoleUnreachable) {
             return $this->untrustedOrUnreachable($base, $address, $port, $pin);
         } catch (ConsoleRefused $refused) {
@@ -113,7 +116,73 @@ final class UnifiAccessReader
             'people' => $people,
             'visitors' => $visitors,
             'policies' => $policies,
+            'readers' => $readers,
+            'emergency' => $emergency,
         ], $windows, $eventsSince, $eventsUntil);
+    }
+
+    /** A read whose refusal isn't fatal (no answer at all still is). */
+    private function optional(callable $read, mixed $fallback): mixed
+    {
+        try {
+            return $read();
+        } catch (ConsoleRefused) {
+            return $fallback;
+        }
+    }
+
+    /**
+     * Card readers and other units placed at a door (for "tap a new card at a reader").
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  list<array<string, mixed>>  $doors
+     * @return list<array{id: string, name: string|null, type: string|null, door_id: string}>
+     */
+    private function readers(array $payload, array $doors): array
+    {
+        $doorIds = array_column($doors, 'id');
+        $devices = [];
+        foreach ($this->list($payload['data'] ?? null) as $row) {
+            // Some consoles group devices in lists; take one level down.
+            if (array_is_list($row)) {
+                foreach ($row as $inner) {
+                    if (is_array($inner)) {
+                        $devices[] = $inner;
+                    }
+                }
+            } else {
+                $devices[] = $row;
+            }
+        }
+        $rows = [];
+        foreach (array_slice($devices, 0, 500) as $device) {
+            $id = self::id($device['id'] ?? null);
+            $doorId = self::id($device['location_id'] ?? $device['door_id'] ?? null);
+            if ($id === null || $doorId === null || ! in_array($doorId, $doorIds, true)) {
+                continue;
+            }
+            $rows[] = [
+                'id' => $id,
+                'name' => self::text($device['alias'] ?? $device['name'] ?? null, 120),
+                'type' => self::text($device['type'] ?? $device['device_type'] ?? null, 40),
+                'door_id' => $doorId,
+            ];
+        }
+
+        return array_slice($rows, 0, 200);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function emergency(array $payload): ?string
+    {
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+
+        return match (true) {
+            ($data['evacuation'] ?? null) === true => 'evacuation',
+            ($data['lockdown'] ?? null) === true => 'lockdown',
+            ($data['evacuation'] ?? null) === false && ($data['lockdown'] ?? null) === false => 'normal',
+            default => null,
+        };
     }
 
     /**

@@ -21,7 +21,8 @@ final class NativeOnvifCameraNetwork implements OnvifCameraNetwork
     {
         $https = str_starts_with($url, 'https://');
         $handle = curl_init($url);
-        if ($handle === false || ! in_array($method, ['GET', 'POST'], true)) {
+        // PUT and DELETE are for UniFi Access changes (S&D Phase H); the camera jobs use GET and POST only.
+        if ($handle === false || ! in_array($method, ['GET', 'POST', 'PUT', 'DELETE'], true)) {
             return ['status' => 0, 'body' => '', 'truncated' => false, 'challenge' => ''];
         }
         $received = '';

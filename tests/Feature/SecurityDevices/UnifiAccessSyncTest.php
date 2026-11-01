@@ -196,6 +196,20 @@ it('ignores a snapshot for a console outside the hub’s Sites, and tolerates ju
         ->and(AccessDoor::query()->count())->toBe(0);
 });
 
+it('keeps each door’s readers and the console’s emergency state, and keeps them when an older console doesn’t say', function (): void {
+    app(UnifiAccessSync::class)->ingest($this->hub->fresh(), ($this->snapshot)([
+        'readers' => [['id' => 'reader-front', 'name' => 'Front reader', 'type' => 'UA-G2-PRO', 'door_id' => 'door-front'], ['id' => 'reader-x', 'name' => 'X', 'type' => 'UA', 'door_id' => 'door-missing']],
+        'emergency' => 'lockdown',
+    ]));
+    expect(AccessDoor::query()->where('external_id', 'door-front')->first()->readers)->toBe([['id' => 'reader-front', 'name' => 'Front reader', 'type' => 'UA-G2-PRO']])
+        ->and(AccessDoor::query()->where('external_id', 'door-office')->first()->readers)->toBe([])
+        ->and($this->console->fresh()->emergency_mode)->toBe('lockdown');
+
+    app(UnifiAccessSync::class)->ingest($this->hub->fresh(), ($this->snapshot)(['synced_at' => '2026-11-02T01:05:00+00:00']));
+    expect(AccessDoor::query()->where('external_id', 'door-front')->first()->readers)->toHaveCount(1)
+        ->and($this->console->fresh()->emergency_mode)->toBe('lockdown');
+});
+
 it('clears names on door events after 90 days', function (): void {
     app(UnifiAccessSync::class)->ingest($this->hub->fresh(), ($this->snapshot)());
     AccessEvent::query()->where('event_key', hash('sha256', 'evt-1'))->update(['occurred_at' => now()->subDays(91)]);

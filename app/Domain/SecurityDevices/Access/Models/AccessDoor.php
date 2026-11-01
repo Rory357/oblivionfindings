@@ -10,10 +10,11 @@ final class AccessDoor extends Model
 {
     protected $table = 'security_access_doors';
 
-    protected $fillable = ['console_id', 'external_id', 'name', 'lock_state', 'door_state', 'hub_bound', 'device_id', 'seen_at'];
+    protected $fillable = ['console_id', 'external_id', 'name', 'lock_state', 'door_state', 'hub_bound', 'readers', 'device_id', 'seen_at'];
 
     protected $casts = [
         'hub_bound' => 'boolean',
+        'readers' => 'array',
         'seen_at' => 'immutable_datetime',
     ];
 

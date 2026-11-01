@@ -288,6 +288,17 @@ final readonly class HttpsCentralApi implements CentralApi
         return $this->request('POST', '/api/monitoring/collectors/web/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
     }
 
+    /**
+     * S&D Phase H (H1): the UniFi Access changes poll. What the hub did goes in; signed changes come back.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    public function accessWork(string $collectorId, string $requestKey, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/access/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
+    }
+
     public function discoveryWork(string $collectorId, string $requestKey, array $capability): array
     {
         return $this->request('POST', '/api/monitoring/collectors/media/discovery/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'capability' => $capability]);

@@ -24,6 +24,8 @@ Route::prefix('monitoring/collectors')->name('api.monitoring.collectors.')->grou
         Route::post('terminal/work', [\App\Domain\SecurityDevices\Terminal\Http\TerminalCollectorController::class, 'work'])->name('terminal.work');
         // S&D Phase G (pop-up 61): the hub's device web page poll (page requests out, answers in).
         Route::post('web/work', [\App\Domain\SecurityDevices\WebPages\Http\WebPageController::class, 'hubWork'])->name('web.work');
+        // S&D Phase H (H1): the hub's UniFi Access changes poll (signed changes out, what it did in).
+        Route::post('access/work', [\App\Domain\SecurityDevices\Access\Http\AccessJobsCollectorController::class, 'work'])->name('access.work');
         Route::post('configuration', [CollectorSyncController::class, 'configuration'])->name('configuration');
         Route::post('observations', [CollectorSyncController::class, 'observations'])->name('observations');
         Route::post('heartbeat', [CollectorSyncController::class, 'heartbeat'])->name('heartbeat');

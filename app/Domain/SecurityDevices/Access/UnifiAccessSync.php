@@ -131,7 +131,7 @@ final class UnifiAccessSync
     {
         DB::transaction(function () use ($console, $payload, $syncedAt): void {
             $complete = ($payload['complete'] ?? false) === true;
-            $doors = $this->doors($console, $payload['doors'] ?? [], $syncedAt);
+            $doors = $this->doors($console, $payload['doors'] ?? [], $payload['readers'] ?? null, $syncedAt);
             $people = $this->people($console, $payload['people'] ?? [], $syncedAt);
             $this->visitors($console, $payload['visitors'] ?? [], $syncedAt);
             $this->policies($console, $payload['policies'] ?? [], $syncedAt);
@@ -151,6 +151,8 @@ final class UnifiAccessSync
             $console->forceFill([
                 'state' => 'ok', 'last_error' => null, 'last_synced_at' => $syncedAt,
                 'events_until' => $until !== null && ($console->events_until === null || $until->gt($console->events_until)) ? $until : $console->events_until,
+                // As UniFi last said; an older console that doesn't say keeps what was known.
+                'emergency_mode' => in_array($payload['emergency'] ?? null, ['normal', 'lockdown', 'evacuation'], true) ? $payload['emergency'] : $console->emergency_mode,
             ])->save();
         });
     }
@@ -176,8 +178,20 @@ final class UnifiAccessSync
     }
 
     /** @return array<string, int> external id => door id */
-    private function doors(AccessConsole $console, mixed $rows, CarbonImmutable $at): array
+    private function doors(AccessConsole $console, mixed $rows, mixed $readers, CarbonImmutable $at): array
     {
+        // Readers at each door, when the console says (null keeps what was known).
+        $byDoor = null;
+        if (is_array($readers)) {
+            $byDoor = [];
+            foreach (array_slice($readers, 0, 200) as $reader) {
+                $id = self::id($reader['id'] ?? null);
+                $door = self::id($reader['door_id'] ?? null);
+                if ($id !== null && $door !== null && count($byDoor[$door] ?? []) < 10) {
+                    $byDoor[$door][] = ['id' => $id, 'name' => self::text($reader['name'] ?? null, 120), 'type' => self::text($reader['type'] ?? null, 40)];
+                }
+            }
+        }
         $ids = [];
         foreach (array_slice(is_array($rows) ? $rows : [], 0, 500) as $row) {
             $external = self::id($row['id'] ?? null);
@@ -189,6 +203,7 @@ final class UnifiAccessSync
                 'lock_state' => in_array($row['lock'] ?? null, ['locked', 'unlocked'], true) ? $row['lock'] : null,
                 'door_state' => in_array($row['position'] ?? null, ['open', 'closed'], true) ? $row['position'] : null,
                 'hub_bound' => ($row['hub_bound'] ?? false) === true,
+                ...($byDoor !== null ? ['readers' => $byDoor[$external] ?? []] : []),
                 'seen_at' => $at,
             ]);
             $ids[$external] = (int) $door->id;

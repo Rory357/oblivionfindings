@@ -27,6 +27,9 @@ final class SecurityDeviceAlertsTick extends Command
         app(\App\Domain\SecurityDevices\WebPages\WebPages::class)->sweep();
         // S&D Phase H (D14): names on door events are cleared after 90 days.
         app(\App\Domain\SecurityDevices\Access\UnifiAccessSync::class)->forgetOldNames();
+        // S&D Phase H (D20): leavers are turned off in UniFi Access after their last day; stale changes close.
+        app(\App\Domain\SecurityDevices\Access\AccessLeavers::class)->tick();
+        app(\App\Domain\SecurityDevices\Access\AccessJobs::class)->expire();
         $this->info("Back from snooze: {$result['back']} · reminders sent: {$result['reminded']} · unlinked (consent ended): {$unlinked} · out of bed: {$outOfBed} · scald alerts closed: {$cool} · terminals closed: {$terminals}");
 
         return self::SUCCESS;

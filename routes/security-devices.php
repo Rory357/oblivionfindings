@@ -608,6 +608,20 @@ Route::middleware([
         ->middleware(['permission:securityDevices.webPage.open', 'throttle:20,1'])
         ->name('security-devices.devices.web.open');
 
+    // S&D Phase H (pop-ups 81–84, 90): people, cards and visitor passes in UniFi Access, through the Site's hub.
+    Route::prefix('/access')->middleware('throttle:30,1')->group(function (): void {
+        $people = \App\Domain\SecurityDevices\Access\Http\AccessPeopleController::class;
+        Route::post('/consoles/{console}/people', [$people, 'store'])->whereNumber('console')->name('security-devices.access.people.store');
+        Route::post('/consoles/{console}/visitors', [$people, 'storeVisitor'])->whereNumber('console')->name('security-devices.access.visitors.store');
+        Route::delete('/visitors/{visitor}', [$people, 'destroyVisitor'])->whereNumber('visitor')->name('security-devices.access.visitors.destroy');
+        Route::post('/people/{person}/status', [$people, 'status'])->whereNumber('person')->name('security-devices.access.people.status');
+        Route::put('/people/{person}/doors', [$people, 'doors'])->whereNumber('person')->name('security-devices.access.people.doors');
+        Route::post('/people/{person}/cards', [$people, 'enrol'])->whereNumber('person')->name('security-devices.access.people.cards.enrol');
+        Route::put('/people/{person}/match', [$people, 'match'])->whereNumber('person')->name('security-devices.access.people.match');
+        Route::delete('/cards/{card}', [$people, 'removeCard'])->whereNumber('card')->name('security-devices.access.cards.destroy');
+        Route::get('/jobs/{uuid}', [$people, 'job'])->whereUuid('uuid')->withoutMiddleware('throttle:30,1')->middleware('throttle:120,1')->name('security-devices.access.jobs.show');
+    });
+
     // S&D Phase G (D5): a device's Terminal tab, through the hub, for IT admins (terminal.use).
     Route::post('/devices/{device}/terminal', [\App\Domain\SecurityDevices\Terminal\Http\TerminalController::class, 'open'])
         ->whereNumber('device')

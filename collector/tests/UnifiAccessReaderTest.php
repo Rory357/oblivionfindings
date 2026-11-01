@@ -93,6 +93,11 @@ function accessRoutes(array $hits = []): array
             ['id' => 'policy-staff', 'name' => 'Staff', 'resources' => [['id' => 'door-front', 'type' => 'door'], ['id' => 'group-1', 'type' => 'door_group']], 'schedule_id' => 'sched-1'],
         ]),
         '/api/v1/developer/system/logs' => accessOk(['hits' => $hits], count($hits)),
+        '/api/v1/developer/devices' => accessOk([[
+            ['id' => 'reader-front', 'alias' => 'Front reader', 'type' => 'UA-G2-PRO', 'location_id' => 'door-front'],
+            ['id' => 'hub-1', 'name' => 'Hub', 'type' => 'UAH', 'location_id' => 'somewhere-else'],
+        ]]),
+        '/api/v1/developer/doors/settings/emergency' => accessOk(['lockdown' => false, 'evacuation' => false]),
     ];
 }
 
@@ -149,6 +154,8 @@ it('reads doors, people, cards, visitors, policies and door events with the trus
         ->and($snapshot['events'][2]['kind'])->toBe('unlocked')
         ->and($snapshot['events'][2]['method'])->toBe('remote')
         ->and($snapshot['events_until'])->toBe('2026-07-23T12:00:00+00:00')
+        ->and($snapshot['readers'])->toBe([['id' => 'reader-front', 'name' => 'Front reader', 'type' => 'UA-G2-PRO', 'door_id' => 'door-front']])
+        ->and($snapshot['emergency'])->toBe('normal')
         // The card's secret token and the API token never go up.
         ->and($encoded)->not->toContain(ACCESS_CARD_TOKEN)
         ->and($encoded)->not->toContain(ACCESS_HUB_TOKEN);
@@ -162,6 +169,17 @@ it('reads doors, people, cards, visitors, policies and door events with the trus
     $posts = array_values(array_filter($network->requests, static fn (array $request): bool => $request['method'] !== 'GET'));
     expect($posts)->toHaveCount(1)
         ->and(parse_url($posts[0]['url'], PHP_URL_PATH))->toBe('/api/v1/developer/system/logs');
+});
+
+it('still syncs an older console that has no device or emergency read', function () {
+    $routes = accessRoutes();
+    $routes['/api/v1/developer/devices'] = ['status' => 404, 'body' => '{}'];
+    $routes['/api/v1/developer/doors/settings/emergency'] = ['status' => 404, 'body' => '{}'];
+    $snapshot = accessReader(new AccessFixtureNetwork($routes))->read(accessConsoleFixture(), '2026-07-23T11:00:00+00:00', collectorNow());
+
+    expect($snapshot['state'])->toBe('ok')
+        ->and($snapshot['readers'])->toBe([])
+        ->and($snapshot['emergency'])->toBeNull();
 });
 
 it('says when UniFi Access refuses the token, and stops there', function () {

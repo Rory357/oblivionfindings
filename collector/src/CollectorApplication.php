@@ -4,6 +4,7 @@ namespace Oblivion\Collector;
 
 use DateTimeImmutable;
 use JsonException;
+use Oblivion\Collector\Access\AccessLane;
 use Oblivion\Collector\Access\UnifiAccessLane;
 use Oblivion\Collector\Access\UnifiAccessReader;
 use Oblivion\Collector\Config\SignedConfigLoader;
@@ -503,7 +504,7 @@ final class CollectorApplication
                 'commands_executed' => $commandsExecuted,
                 // The job types (and newer config sections) this hub can run: the server sends a new
                 // kind only to hubs that list it.
-                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE, self::WEB_PAGE_FEATURE, self::UNIFI_ACCESS_FEATURE]),
+                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE, self::WEB_PAGE_FEATURE, self::UNIFI_ACCESS_FEATURE, self::UNIFI_ACCESS_ADMIN_FEATURE]),
                 'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
@@ -561,6 +562,13 @@ final class CollectorApplication
         $web = new WebLane(
             fn (array $report): array => $central->webWork((string) $identity['collector_id'], bin2hex(random_bytes(16)), $report),
             new EnvelopeVerifier((string) $identity['central_signing_public_key']),
+        );
+        // S&D Phase H (H1): UniFi Access changes (people, cards, visitor passes), in the same process.
+        $access = new AccessLane(
+            fn (array $report): array => $central->accessWork((string) $identity['collector_id'], bin2hex(random_bytes(16)), $report),
+            new EnvelopeVerifier((string) $identity['central_signing_public_key']),
+            new CredentialLeaseDecryptor($secretKey),
+            $stateDirectory.DIRECTORY_SEPARATOR.'access-jobs.json',
         );
         sodium_memzero($secretKey);
         $loginsFile = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE;
@@ -627,6 +635,11 @@ final class CollectorApplication
             } catch (\Throwable $exception) {
                 $this->write('web page: '.$exception->getMessage().PHP_EOL, STDERR);
             }
+            try {
+                $access->tick();
+            } catch (\Throwable $exception) {
+                $this->write('access: '.$exception->getMessage().PHP_EOL, STDERR);
+            }
             $port = $logins()['listen_port'] ?? null;
             if ($port !== $listening) {
                 $server->close();
@@ -644,7 +657,7 @@ final class CollectorApplication
                 }
             }
             // A live terminal wants a quick round; otherwise the relay's usual pace.
-            $server->poll($terminal->active() || $web->active() ? 0.1 : ($listening === null ? ($tlsServer === null ? 2.0 : 0.0) : 0.8));
+            $server->poll($terminal->active() || $web->active() || $access->active() ? 0.1 : ($listening === null ? ($tlsServer === null ? 2.0 : 0.0) : 0.8));
         }
         $server->close();
         $tlsServer?->close();
@@ -668,6 +681,9 @@ final class CollectorApplication
 
     /** S&D Phase H (H0): this hub reads UniFi Access consoles (the `unifi_access` config section). */
     private const string UNIFI_ACCESS_FEATURE = 'unifi_access_v1';
+
+    /** S&D Phase H (H1): this hub makes UniFi Access changes for Oblivion (AccessLane, inside the relay process). */
+    private const string UNIFI_ACCESS_ADMIN_FEATURE = 'unifi_access_admin_v1';
 
     private function writeRelayTls(string $stateDirectory, CollectorConfig $config, RelayTlsIdentity $relayTls): void
     {
