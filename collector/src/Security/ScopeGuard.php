@@ -26,7 +26,17 @@ final readonly class ScopeGuard
         'camera_snapshot_v1' => [
             'capability' => 'camera.snapshot.capture', 'provider' => 'unifi_protect', 'protocol' => 'command.camera_snapshot',
         ],
+        // S&D Phase E (R6): arm or disarm one area of an Inner Range Inception or Gallagher panel.
+        'alarm_area_control_v1' => [
+            'capability' => ['alarm.arm', 'alarm.disarm'], 'provider' => ['inception', 'gallagher'], 'protocol' => 'command.alarm_rest',
+        ],
     ];
+
+    /** @return list<string> the job types this hub runs (reported in its heartbeat) */
+    public static function commandAdapters(): array
+    {
+        return array_keys(self::COMMAND_TYPES);
+    }
 
     private const array DISCOVERY_PROTOCOLS = [
         'icmp', 'arp', 'tcp', 'dns', 'http', 'tls', 'snmp', 'mdns', 'ssdp', 'onvif', 'syslog', 'flow', 'provider',
@@ -99,8 +109,8 @@ final readonly class ScopeGuard
             || ! is_int($command['site_id']) || ! in_array($command['site_id'], $this->config->allowedSiteIds(), true)
             || ! is_string($command['device_id']) || preg_match('/\A[1-9][0-9]{0,18}\z/', $command['device_id']) !== 1
             || ! is_string($command['adapter']) || ! isset(self::COMMAND_TYPES[$command['adapter']])
-            || $command['capability'] !== self::COMMAND_TYPES[$command['adapter']]['capability']
-            || $command['provider'] !== self::COMMAND_TYPES[$command['adapter']]['provider']
+            || ! in_array($command['capability'], (array) self::COMMAND_TYPES[$command['adapter']]['capability'], true)
+            || ! in_array($command['provider'], (array) self::COMMAND_TYPES[$command['adapter']]['provider'], true)
             || $command['protocol'] !== self::COMMAND_TYPES[$command['adapter']]['protocol']
             || ! is_string($command['target'])
             || ! is_string($command['idempotency_hash']) || preg_match('/\A[0-9a-f]{64}\z/', $command['idempotency_hash']) !== 1
@@ -119,6 +129,7 @@ final readonly class ScopeGuard
         match ($command['adapter']) {
             'ssh_config_backup_v1' => $this->assertSshConfigBackupCommand($command),
             'camera_snapshot_v1' => $this->assertCameraSnapshotCommand($command),
+            'alarm_area_control_v1' => $this->assertAlarmAreaCommand($command),
             default => $this->assertUnifiAccessCommand($command),
         };
 
@@ -187,6 +198,38 @@ final readonly class ScopeGuard
             || ! is_int($endpoint['connect_timeout_seconds']) || $endpoint['connect_timeout_seconds'] < 1 || $endpoint['connect_timeout_seconds'] > 10
             || ! is_int($endpoint['response_timeout_seconds']) || $endpoint['response_timeout_seconds'] < 1 || $endpoint['response_timeout_seconds'] > 30
             || ! is_int($endpoint['max_image_bytes']) || $endpoint['max_image_bytes'] < 1024 || $endpoint['max_image_bytes'] > 1_048_576) {
+            throw new ScopeViolation('Command endpoint is invalid or unbounded.');
+        }
+    }
+
+    /**
+     * S&D Phase E (R6): one area, one operation that matches the capability, to the panel at its
+     * scoped address over HTTPS. No other request is possible from this job.
+     *
+     * @param  array<string, mixed>  $command
+     */
+    private function assertAlarmAreaCommand(array $command): void
+    {
+        $operation = $command['capability'] === 'alarm.arm' ? 'arm' : 'disarm';
+        $parameters = $command['parameters'];
+        if (! is_array($parameters) || array_keys($parameters) !== ['area', 'operation']
+            || ! is_string($parameters['area']) || preg_match('/\A[A-Za-z0-9._:-]{1,80}\z/', $parameters['area']) !== 1
+            || $parameters['operation'] !== $operation
+            || $command['expected_state'] !== ['armed' => $operation === 'arm']) {
+            throw new ScopeViolation('Command parameters or expected state are invalid.');
+        }
+        $endpoint = $command['endpoint'];
+        $keys = ['driver', 'scheme', 'host', 'port', 'address', 'connect_timeout_seconds', 'response_timeout_seconds', 'max_response_bytes'];
+        if (! is_array($endpoint) || array_keys($endpoint) !== $keys
+            || $endpoint['driver'] !== $command['provider']
+            || $endpoint['scheme'] !== 'https'
+            || ! is_string($endpoint['host']) || $endpoint['host'] === '' || strlen($endpoint['host']) > 253
+            || preg_match('/[\x00-\x20\x7f\/@\\\\]/', $endpoint['host']) === 1
+            || ! in_array($endpoint['port'], $endpoint['driver'] === 'gallagher' ? [443, 8443, 8904] : [443, 8443], true)
+            || $endpoint['address'] !== $command['target']
+            || ! is_int($endpoint['connect_timeout_seconds']) || $endpoint['connect_timeout_seconds'] < 1 || $endpoint['connect_timeout_seconds'] > 10
+            || ! is_int($endpoint['response_timeout_seconds']) || $endpoint['response_timeout_seconds'] < 1 || $endpoint['response_timeout_seconds'] > 30
+            || ! is_int($endpoint['max_response_bytes']) || $endpoint['max_response_bytes'] < 1024 || $endpoint['max_response_bytes'] > 262_144) {
             throw new ScopeViolation('Command endpoint is invalid or unbounded.');
         }
     }

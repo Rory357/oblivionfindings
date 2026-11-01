@@ -18,10 +18,11 @@ final class CommandExecutionRouteResolver
 {
     /**
      * Actions whose server-side adapter connects straight into the house and that have no hub job
-     * yet (S&D Phase B). At a Site a hub covers they are unavailable rather than direct.
+     * yet (S&D Phase B). At a Site a hub covers they are unavailable rather than direct. Arm and
+     * disarm run through the hub since Phase E (R6).
      */
     private const array NOT_YET_THROUGH_A_HUB = [
-        'alarm.arm', 'alarm.disarm', 'alarm.bypass', 'alarm.reset', 'alarm.emergency_mode.set',
+        'alarm.bypass', 'alarm.reset', 'alarm.emergency_mode.set',
     ];
 
     public function __construct(
@@ -128,6 +129,11 @@ final class CommandExecutionRouteResolver
         if (! in_array((string) $hub->status, ['online', 'degraded'], true)) {
             return CommandExecutionRoute::unavailable(
                 "{$label} isn’t connected right now, so this can’t run until it’s back. Oblivion doesn’t reach into the house directly.",
+            );
+        }
+        if ($descriptor instanceof AlarmAreaCollectorDescriptor && ! AlarmAreaCollectorDescriptor::hubRunsIt($hub)) {
+            return CommandExecutionRoute::unavailable(
+                "{$label} needs its software update before it can arm or disarm the alarm. Oblivion doesn’t reach into the house directly.",
             );
         }
         if (! $descriptor->supports($device, $hub, $siteId)) {

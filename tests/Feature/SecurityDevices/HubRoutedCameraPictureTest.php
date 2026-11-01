@@ -203,7 +203,7 @@ it('sends the trusted pin to the hub once the console is trusted', function (): 
     expect(($this->hubJob)()['commands'][0]['endpoint']['trusted_pin'])->toBe(HUB_CAMERA_PIN);
 });
 
-it('says plainly that other camera actions and alarm commands do not run through a hub yet, and never goes direct', function (): void {
+it('says plainly that other camera actions don’t run through a hub yet and an older hub can’t arm alarms, and never goes direct', function (): void {
     $onvifCamera = Device::factory()->create([
         'name' => 'Kowhai Villa garage camera', 'domain' => 'security', 'category' => 'cctv', 'subcategory' => 'camera',
         'manufacturer' => 'Hikvision', 'model' => 'DS-2CD2143G2', 'provider' => 'onvif', 'ip_address' => '10.88.0.40', 'last_seen_at' => now(),
@@ -223,7 +223,7 @@ it('says plainly that other camera actions and alarm commands do not run through
     $route = app(\App\Domain\SecurityDevices\Management\Services\CommandExecutionRouteResolver::class)
         ->resolve($this->camera->fresh(), $this->site->id, 'alarm.disarm');
     expect($route->available)->toBeFalse()
-        ->and($route->reason)->toContain('alarm commands through a hub aren’t built yet');
+        ->and($route->reason)->toContain('needs its software update before it can arm or disarm the alarm');
 });
 
 it('never reaches the camera from the server when the covering hub is offline', function (): void {

@@ -16,8 +16,10 @@ final class CollectorCommandDescriptorRegistry
         UnifiAccessCollectorCommandDescriptor $unifiAccess,
         NetworkSshConfigBackupCollectorDescriptor $sshConfigBackup,
         CameraSnapshotCollectorDescriptor $cameraSnapshot,
+        AlarmArmCollectorDescriptor $alarmArm,
+        AlarmDisarmCollectorDescriptor $alarmDisarm,
     ) {
-        foreach ([$unifiAccess, $sshConfigBackup, $cameraSnapshot] as $descriptor) {
+        foreach ([$unifiAccess, $sshConfigBackup, $cameraSnapshot, $alarmArm, $alarmDisarm] as $descriptor) {
             $this->byCapability[$descriptor->capability()] = $descriptor;
         }
     }

@@ -13,6 +13,7 @@ final readonly class CollectorCommandExecutor
         private UnifiAccessCommandRunner $runner,
         private ?SshConfigBackupRunner $sshBackups = null,
         private ?CameraSnapshotRunner $cameraSnapshots = null,
+        private ?AlarmAreaCommandRunner $alarmAreas = null,
     ) {}
 
     /** @param array<string, mixed> $command */
@@ -47,12 +48,13 @@ final readonly class CollectorCommandExecutor
     }
 
     /** @param array<string, mixed> $command */
-    private function runnerFor(array $command): UnifiAccessCommandRunner|SshConfigBackupRunner|CameraSnapshotRunner
+    private function runnerFor(array $command): UnifiAccessCommandRunner|SshConfigBackupRunner|CameraSnapshotRunner|AlarmAreaCommandRunner
     {
         return match ($command['adapter'] ?? null) {
             'unifi_access_timed_unlock_v1' => $this->runner,
             'ssh_config_backup_v1' => $this->sshBackups ?? throw new ScopeViolation('This hub build cannot run settings backups.'),
             'camera_snapshot_v1' => $this->cameraSnapshots ?? throw new ScopeViolation('This hub build cannot take camera pictures.'),
+            'alarm_area_control_v1' => $this->alarmAreas ?? throw new ScopeViolation('This hub build cannot arm or disarm alarms.'),
             default => throw new ScopeViolation('Command adapter is not supported by this hub.'),
         };
     }

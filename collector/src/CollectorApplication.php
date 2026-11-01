@@ -23,6 +23,7 @@ use Oblivion\Collector\Runtime\NativeCollectorCommandTransport;
 use Oblivion\Collector\Runtime\ProbeRunner;
 use Oblivion\Collector\Runtime\RemoteDiscoveryRunner;
 use Oblivion\Collector\Runtime\SshConfigBackupRunner;
+use Oblivion\Collector\Runtime\AlarmAreaCommandRunner;
 use Oblivion\Collector\Runtime\UnifiAccessCommandRunner;
 use Oblivion\Collector\Security\CredentialLeaseDecryptor;
 use Oblivion\Collector\Security\EnvelopeVerifier;
@@ -406,6 +407,8 @@ final class CollectorApplication
                 // S&D Phase B: settings backups and camera pictures run here, through the hub, not from the server.
                 new SshConfigBackupRunner($scope, $credentialDecryptor),
                 new CameraSnapshotRunner($scope, $credentialDecryptor),
+                // S&D Phase E (R6): arming and disarming Inception / Gallagher areas.
+                new AlarmAreaCommandRunner($scope, $credentialDecryptor),
             );
             foreach ($config->commands as $command) {
                 if ($spool->status()['state'] === 'buffer_full') {
@@ -473,6 +476,8 @@ final class CollectorApplication
                 'checks_executed' => $checksExecuted,
                 'discovery_targets_executed' => $discoveryTargetsExecuted,
                 'commands_executed' => $commandsExecuted,
+                // The job types this hub can run: the server sends a new kind of job only to hubs that list it.
+                'command_adapters' => implode(',', ScopeGuard::commandAdapters()),
                 'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
