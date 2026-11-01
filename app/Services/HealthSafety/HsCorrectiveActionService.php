@@ -33,6 +33,9 @@ class HsCorrectiveActionService
 
     public const RESPONSIBILITY_NEW = 'new_responsibility';
 
+    /** D1: why a new start waits while the owner needs replacing (the page shows the same words). */
+    public const START_NEEDS_NEW_OWNER = 'Choose a new owner first';
+
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
     ) {}
@@ -389,10 +392,25 @@ class HsCorrectiveActionService
                 ->whereKey($action->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            // An exact retry of a start that was already accepted returns the first result, whatever has changed since.
+            if ($action->status === HsCorrectiveAction::STATUS_IN_PROGRESS
+                && $action->assigned_to_user_id
+                && (! $assigneeId || (int) $action->assigned_to_user_id === $assigneeId)) {
+                return $action;
+            }
+
             $this->assertTransition($action, HsCorrectiveAction::STATUS_IN_PROGRESS);
 
             if (! $action->assigned_to_user_id || ($assigneeId && (int) $action->assigned_to_user_id !== $assigneeId)) {
                 throw new InvalidArgumentException('Assign the accountable owner on the action page before starting work.');
+            }
+
+            // D1 (H&S UI/UX plan B1.6): a new start waits while the owner needs replacing (left, lost access or lost the site).
+            $owner = User::query()->find($action->assigned_to_user_id);
+            $event = $action->hsEvent()->first();
+            if (! $owner || ! $event || ! app(HsCorrectiveActionOwnershipService::class)->eligible($owner, $event)) {
+                throw new InvalidArgumentException(self::START_NEEDS_NEW_OWNER);
             }
 
             $updates = [

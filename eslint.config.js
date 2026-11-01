@@ -162,7 +162,14 @@ export default [
                     'no-accent-active-state': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-blanket-descendant-size': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
+                    'no-emoji-icon': builtinRules.get('no-restricted-syntax'),
                     'no-oblivion-fallback': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
+                    'no-edge-accent-line': builtinRules.get(
                         'no-restricted-syntax',
                     ),
                 },
@@ -191,6 +198,55 @@ export default [
                         "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/])",
                     message:
                         'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white / bg-primary-foreground, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. On a hero, use PageHeaderPrimaryButton (white primary) or PageHeaderGlassButton (glass secondary). See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                },
+            ],
+            // DESIGN.md non-negotiable 8 (Stephan, 31 Oct 2026: "never look like this it is obvious a AI thing"):
+            // no coloured line on any edge of a box. Matches one class string that pairs a thick edge width
+            // (border-t/l/r/b-2|3|4|8|[Npx]) with a coloured edge (border-t/l/r/b-primary|status-*|category-*|…).
+            'design/no-edge-accent-line': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/^(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:2|3|4|8|\\[\\d+px\\])(?=\\s|$))(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:primary|status-|category-|destructive|chart-|live|accent))/], TemplateElement[value.raw=/^(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:2|3|4|8|\\[\\d+px\\])(?=\\s|$))(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:primary|status-|category-|destructive|chart-|live|accent))/])',
+                    message:
+                        'No coloured line on any edge of a card, surface, strip, panel or pop-up (DESIGN.md non-negotiable 8 and the anti-pattern "Coloured edge lines"). Keep the neutral border; say what the box means with its title, a StatusBadge, a ring or an icon.',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "Chat — the Chat v3 boards" and its anti-patterns (corrected
+        // 2026-10-22). Chat is rebuilt to the approved boards; these guard the
+        // rebuild. The ignored files predate the rule and are rebuilt in stage 4.
+        files: [
+            'resources/js/components/chat/**/*.{ts,tsx}',
+            'resources/js/pages/chat/**/*.{ts,tsx}',
+        ],
+        ignores: [
+            '**/*.test.tsx',
+            '**/*.test.ts',
+            'resources/js/components/chat/chat-attachment-publication.tsx',
+            'resources/js/components/chat/chat-attachment-queue.tsx',
+            'resources/js/components/chat/chat-voice-recorder.tsx',
+            'resources/js/components/chat/chat-thread.tsx',
+        ],
+        rules: {
+            'design/no-blanket-descendant-size': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/\\[&_[^\\]]+\\]:min-[hw]-/], TemplateElement[value.raw=/\\[&_[^\\]]+\\]:min-[hw]-/])',
+                    message:
+                        'Blanket descendant min-height/min-width rules also catch switches and compact controls. Give a control that needs a larger target .frontline-hit. See DESIGN.md non-negotiable 5 and "Chat — the Chat v3 boards".',
+                },
+            ],
+            'design/no-emoji-icon': [
+                'error',
+                {
+                    selector:
+                        'JSXText[value=/[\\uD83C-\\uD83E][\\uDC00-\\uDFFF]|[\\u2600-\\u27BF]/]',
+                    message:
+                        'Emoji are message content (messages, reactions, the emoji picker, stickers), never icons or labels in chat chrome. Use a lucide icon. See DESIGN.md "Icons" and "Chat — the Chat v3 boards".',
                 },
             ],
         },
@@ -356,6 +412,15 @@ export default [
             'no-restricted-imports': [
                 'error',
                 {
+                    paths: [
+                        {
+                            // DESIGN.md "Skeleton vs loader" + anti-pattern "Bare <Deferred>".
+                            name: '@inertiajs/react',
+                            importNames: ['Deferred'],
+                            message:
+                                'Background-loaded panels use <DeferredPanel> (@/components/deferred-panel): it adds the error state with Try again and keeps data through a refresh. See DESIGN.md "Skeleton vs loader".',
+                        },
+                    ],
                     patterns: [
                         {
                             group: ['@fullcalendar/*'],
@@ -397,6 +462,13 @@ export default [
                             name: '@/components/finance/finance-hero',
                             message:
                                 'FinanceHero is deleted. Use <PageHeader> from @/components/page. See DESIGN.md "Page headers".',
+                        },
+                        {
+                            // Repeated from the calendar block (this block replaces it for finance).
+                            name: '@inertiajs/react',
+                            importNames: ['Deferred'],
+                            message:
+                                'Background-loaded panels use <DeferredPanel> (@/components/deferred-panel): it adds the error state with Try again and keeps data through a refresh. See DESIGN.md "Skeleton vs loader".',
                         },
                     ],
                     patterns: [

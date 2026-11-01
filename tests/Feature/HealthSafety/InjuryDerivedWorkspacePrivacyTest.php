@@ -32,6 +32,8 @@ use Tests\Support\NotInThisBuild;
 /** Actual accepted source facts and real HTTP/aggregate consumers; no invented medical authority. */
 class InjuryDerivedWorkspacePrivacyTest extends InjuryWorkspaceReadTestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -342,10 +344,10 @@ class InjuryDerivedWorkspacePrivacyTest extends InjuryWorkspaceReadTestCase
         $ordinary = $this->ordinary();
         $control = $this->action($ordinary);
         $this->investigation($ordinary, 'Healthy ordinary root cause');
-        $before = $this->get(route('health-safety.dashboard'))->assertOk()->inertiaProps();
+        $before = $this->getOverview(route('health-safety.dashboard'))->assertOk()->inertiaProps();
         $this->assertSame(2, $before['backbone']['events']['open_events']);
         DB::table('workplace_injuries')->where('id', $injury->id)->update(['source_revision' => 99]);
-        $after = $this->get(route('health-safety.dashboard'))->assertOk()->inertiaProps();
+        $after = $this->getOverview(route('health-safety.dashboard'))->assertOk()->inertiaProps();
         $this->assertSame(1, $after['backbone']['events']['open_events']);
         $this->assertSame([$control->id], array_column($after['worklists']['overdue_corrective_actions'], 'id'));
         $records = $this->getJson(route('health-safety.analytics.records', ['view' => 'root_cause', 'period' => '30d']))->assertOk();

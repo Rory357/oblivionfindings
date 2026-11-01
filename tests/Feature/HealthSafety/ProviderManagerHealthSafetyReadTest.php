@@ -23,6 +23,8 @@ use Tests\TestCase;
  */
 class ProviderManagerHealthSafetyReadTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -37,7 +39,7 @@ class ProviderManagerHealthSafetyReadTest extends TestCase
         $own = $this->event($site);
         $other = $this->event(Site::factory()->create(['is_active' => true]));
 
-        $this->actingAs($manager)->get('/health-safety')->assertOk()
+        $this->actingAs($manager)->getOverview('/health-safety')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->component('health-safety/dashboard')
                 // An empty near-miss tile says why instead of a bare dash: injury figures not shown to this role, or
                 // no recordable injuries yet.
@@ -48,7 +50,7 @@ class ProviderManagerHealthSafetyReadTest extends TestCase
         // Without wellbeing access the reason is "restricted".
         $wellbeing = Permission::where('key', 'hr.wellbeing.view')->sole();
         $manager->permissionOverrides()->syncWithoutDetaching([$wellbeing->id => ['allowed' => false]]);
-        $this->actingAs($manager->fresh())->get('/health-safety')->assertOk()
+        $this->actingAs($manager->fresh())->getOverview('/health-safety')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('leading_lagging.leading.near_miss_ratio_reason', 'restricted'));
         $manager->permissionOverrides()->detach($wellbeing->id);

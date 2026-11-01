@@ -10,7 +10,9 @@ use App\Models\FamilyVisitRequest;
 use App\Models\RespiteBooking;
 use App\Models\Shift;
 use App\Services\Portal\PortalClientSectionAccess;
+use App\Support\WorkerClock;
 use Carbon\Carbon;
+use DateTimeInterface;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -67,8 +69,9 @@ class PortalCalendarController extends Controller
             'start' => ['nullable', 'date'],
             'end' => ['nullable', 'date'],
         ]);
-        $start = $this->parseCalendarBoundary($boundaries['start'] ?? null, now()->startOfMonth());
-        $end = $this->parseCalendarBoundary($boundaries['end'] ?? null, now()->endOfMonth());
+        $workerNow = Carbon::now(WorkerClock::timezone());
+        $start = $this->parseCalendarBoundary($boundaries['start'] ?? null, $workerNow->copy()->startOfMonth());
+        $end = $this->parseCalendarBoundary($boundaries['end'] ?? null, $workerNow->copy()->endOfMonth());
         if ($end->lt($start)) {
             throw ValidationException::withMessages([
                 'end' => 'The calendar end must be on or after the start.',
@@ -80,13 +83,19 @@ class PortalCalendarController extends Controller
             ]);
         }
 
+        // The boundaries are NZ times. Date columns filter on their NZ dates;
+        // datetime columns on the UTC instants (a Carbon binds in its own
+        // timezone, so an NZ boundary would read 12-13 hours late).
+        $startUtc = $start->copy()->utc();
+        $endUtc = $end->copy()->utc();
+
         $events = collect();
 
         // 1. Shifts (staff visits)
         if ($showShiftSchedule) {
             $shifts = Shift::where('client_id', $client->id)
-                ->where('starts_at', '<', $end)
-                ->where('ends_at', '>', $start)
+                ->where('starts_at', '<', $endUtc)
+                ->where('ends_at', '>', $startUtc)
                 ->whereIn('status', ['scheduled', 'in_progress', 'completed'])
                 ->with(['staff:id,name', 'serviceContext:id,name'])
                 ->get();
@@ -122,8 +131,8 @@ class PortalCalendarController extends Controller
             $respiteBookings = RespiteBooking::query()
                 ->where('client_id', $client->id)
                 ->whereIn('status', ['confirmed', 'in_progress', 'completed'])
-                ->where('start_at', '<', $end)
-                ->where('end_at', '>', $start)
+                ->where('start_at', '<', $endUtc)
+                ->where('end_at', '>', $startUtc)
                 ->with(['stays' => fn ($query) => $query->latest('actual_start')])
                 ->get();
 
@@ -154,18 +163,11 @@ class PortalCalendarController extends Controller
             ->get();
 
         foreach ($visits as $v) {
-            $startTime = $v->requested_date->copy();
-            if ($v->preferred_time_start) {
-                [$h, $m] = explode(':', $v->preferred_time_start);
-                $startTime->setTime((int) $h, (int) $m);
-            }
-            $endTime = $v->requested_date->copy();
-            if ($v->preferred_time_end) {
-                [$h, $m] = explode(':', $v->preferred_time_end);
-                $endTime->setTime((int) $h, (int) $m);
-            } else {
-                $endTime = $startTime->copy()->addHour();
-            }
+            // The visit date and times are NZ wall-clock.
+            $startTime = $this->workerWallClock($v->requested_date, $v->preferred_time_start);
+            $endTime = $v->preferred_time_end
+                ? $this->workerWallClock($v->requested_date, $v->preferred_time_end)
+                : $startTime->copy()->addHour();
 
             $visitTypes = ['in_person' => 'In Person', 'video_call' => 'Video Call', 'outing' => 'Outing'];
             $events->push([
@@ -186,7 +188,7 @@ class PortalCalendarController extends Controller
         // 3. Appointments shared with family
         $appointments = $canViewSharedCare
             ? ClientAppointment::forClient($client->id)
-                ->inRange($start, $end)
+                ->inRange($startUtc, $endUtc)
                 ->sharedWithFamily()
                 ->where('status', '!=', 'cancelled')
                 ->get()
@@ -239,11 +241,7 @@ class PortalCalendarController extends Controller
             : collect();
 
         foreach ($familyNotes as $fn) {
-            $noteStart = $fn->due_date->copy();
-            if ($fn->due_time) {
-                [$h, $m] = explode(':', $fn->due_time);
-                $noteStart->setTime((int) $h, (int) $m);
-            }
+            $noteStart = $this->workerWallClock($fn->due_date, $fn->due_time);
             $events->push([
                 'id' => 'fnote-'.$fn->id,
                 'title' => '📝 '.$fn->title,
@@ -264,19 +262,36 @@ class PortalCalendarController extends Controller
         return response()->json($events->values());
     }
 
+    /**
+     * A calendar boundary in NZ time. A value with an offset keeps its
+     * instant; a bare date or time is NZ wall-clock, so "2026-10-05" starts
+     * at NZ midnight, not UTC midnight.
+     */
     private function parseCalendarBoundary(mixed $value, Carbon $fallback): Carbon
     {
         if ($value instanceof Carbon) {
-            return $value->copy();
+            return $value->copy()->setTimezone(WorkerClock::timezone());
         }
 
         if (! is_string($value) || trim($value) === '') {
-            return $fallback->copy();
+            return $fallback->copy()->setTimezone(WorkerClock::timezone());
         }
 
         $normalized = $this->normalizeCalendarBoundaryInput($value);
 
-        return Carbon::parse($normalized);
+        return Carbon::parse($normalized, WorkerClock::timezone())->setTimezone(WorkerClock::timezone());
+    }
+
+    /** An NZ wall-clock date (and optional "H:i[:s]" time) as an NZ Carbon. */
+    private function workerWallClock(DateTimeInterface $date, ?string $time): Carbon
+    {
+        $value = Carbon::parse($date->format('Y-m-d'), WorkerClock::timezone());
+        if ($time) {
+            [$h, $m] = explode(':', $time);
+            $value->setTime((int) $h, (int) $m);
+        }
+
+        return $value;
     }
 
     private function normalizeCalendarBoundaryInput(mixed $value): mixed

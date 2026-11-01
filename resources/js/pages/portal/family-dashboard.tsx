@@ -20,6 +20,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
+import { WORKER_TIMEZONE, addCalendarDays, toDateInput } from '@/lib/datetime';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlarmClock,
@@ -308,8 +309,11 @@ const EMOTION_INFO: Record<
     },
 };
 
+// Instants read in NZ time, matching the server's NZ shift days (a family
+// member's browser may be in another timezone).
 function formatTime(iso: string): string {
     return new Date(iso).toLocaleTimeString([], {
+        timeZone: WORKER_TIMEZONE,
         hour: '2-digit',
         minute: '2-digit',
     });
@@ -325,6 +329,7 @@ function formatDate(dateStr: string): string {
 
 function formatFullDate(iso: string): string {
     return new Date(iso).toLocaleDateString([], {
+        timeZone: WORKER_TIMEZONE,
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -423,7 +428,7 @@ export default function FamilyDashboard({
         // The calendar picker has no `min`; keep the old "today or later" rule.
         if (
             form.data.requested_date &&
-            form.data.requested_date < new Date().toISOString().split('T')[0]
+            form.data.requested_date < toDateInput(new Date())
         ) {
             form.setError('requested_date', 'Choose today or a later date.');
             return;
@@ -450,15 +455,15 @@ export default function FamilyDashboard({
         );
     };
 
-    // Build calendar grid for month view
+    // Build calendar grid for month view. Days are NZ calendar dates, matching
+    // the server's shift `date` (the UTC date is the previous day every NZ
+    // morning).
     const calendarDays = useMemo(() => {
-        const today = new Date();
+        const today = toDateInput(new Date());
         const days: { date: string; isToday: boolean; shifts: MonthShift[] }[] =
             [];
         for (let i = 0; i < 28; i++) {
-            const d = new Date(today);
-            d.setDate(d.getDate() + i);
-            const dateStr = d.toISOString().split('T')[0] ?? d.toISOString();
+            const dateStr = addCalendarDays(today, i);
             days.push({
                 date: dateStr,
                 isToday: i === 0,
@@ -977,6 +982,8 @@ export default function FamilyDashboard({
                                                                 ).toLocaleDateString(
                                                                     'en-NZ',
                                                                     {
+                                                                        timeZone:
+                                                                            WORKER_TIMEZONE,
                                                                         day: 'numeric',
                                                                         month: 'short',
                                                                     },
@@ -1023,6 +1030,7 @@ export default function FamilyDashboard({
                                 </CardTitle>
                                 <span className="text-sm text-muted-foreground">
                                     {new Date().toLocaleDateString([], {
+                                        timeZone: WORKER_TIMEZONE,
                                         weekday: 'long',
                                         month: 'long',
                                         day: 'numeric',
@@ -1175,6 +1183,8 @@ export default function FamilyDashboard({
                                                         dailySummary.lastEvent
                                                             .occurred_at,
                                                     ).toLocaleTimeString([], {
+                                                        timeZone:
+                                                            WORKER_TIMEZONE,
                                                         hour: '2-digit',
                                                         minute: '2-digit',
                                                     })}
@@ -1533,6 +1543,8 @@ export default function FamilyDashboard({
                                                                 ).toLocaleDateString(
                                                                     'en-NZ',
                                                                     {
+                                                                        timeZone:
+                                                                            WORKER_TIMEZONE,
                                                                         day: 'numeric',
                                                                         month: 'short',
                                                                     },
@@ -1979,6 +1991,8 @@ export default function FamilyDashboard({
                                                               ).toLocaleTimeString(
                                                                   'en-NZ',
                                                                   {
+                                                                      timeZone:
+                                                                          WORKER_TIMEZONE,
                                                                       hour: '2-digit',
                                                                       minute: '2-digit',
                                                                   },
@@ -2371,6 +2385,7 @@ function ShiftRow({
                     {showDate && (
                         <span className="mr-1.5">
                             {new Date(shift.starts_at).toLocaleDateString([], {
+                                timeZone: WORKER_TIMEZONE,
                                 weekday: 'short',
                                 month: 'short',
                                 day: 'numeric',

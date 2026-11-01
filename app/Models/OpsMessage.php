@@ -25,6 +25,8 @@ class OpsMessage extends Model
         'is_read',
         'read_at',
         'is_pinned',
+        'pinned_by',
+        'pinned_at',
         'meta',
         'client_id',
         'shift_id',
@@ -37,6 +39,7 @@ class OpsMessage extends Model
         'attachments' => 'array',
         'is_read' => 'boolean',
         'is_pinned' => 'boolean',
+        'pinned_at' => 'datetime',
         'read_at' => 'datetime',
         'meta' => 'array',
         'edited_at' => 'datetime',
@@ -50,6 +53,11 @@ class OpsMessage extends Model
     public function sender(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sender_id');
+    }
+
+    public function pinnedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pinned_by');
     }
 
     public function reactions(): HasMany

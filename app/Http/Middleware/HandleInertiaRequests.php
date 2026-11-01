@@ -95,6 +95,14 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $external = $request->user();
+        // Read the viewer's roles and permission overrides once, fresh, at the start of a
+        // page view: every later canDo() / hasRole() in this request (sidebar, page, per-row
+        // checks) then reads them from memory instead of querying each time. /clients made
+        // ~6,000 such queries. They live on this request's own User object only; writes
+        // (POST, PUT, PATCH, DELETE) keep querying per check, as before.
+        if ($external instanceof User && $request->isMethodSafe()) {
+            $external->load(['permissionOverrides:id,key', 'roles.permissions:id,key']);
+        }
         if ($external instanceof User && $external->isExternalClinicianAccount()) {
             return [
                 ...parent::share($request),
@@ -128,6 +136,7 @@ class HandleInertiaRequests extends Middleware
         // Build permissions for frontend (RBAC)
         // Optimized: Cache permissions during request to reduce DB queries
         $can = null;
+        $taskLinkShown = null;
 
         if ($user) {
             $can = $this->getUserPermissions($user);
@@ -159,12 +168,22 @@ class HandleInertiaRequests extends Middleware
             }
 
             // Company-wide /tasks entry: visible when the user can see at
-            // least one module feed; badge = my open + overdue items. One
-            // cache entry per user — the aggregator fans out across ~17
-            // modules, and users with no feeds never pay for the badge.
-            $can['tasks'] = $request->isMethod('GET') && $request->routeIs('health-safety.events.show')
-                ? fn () => $this->requestTaskNavigation($request, $user)
-                : $this->taskNavigation($user);
+            // least one module feed; badge = my open + overdue items. The
+            // badge reads every task module (seconds for a manager), so it
+            // loads after the page as the deferred `taskNav` prop below; the
+            // link itself is decided with the page in a few milliseconds, and
+            // only when a page is drawn (a save that redirects never asks).
+            // The H&S event page keeps its own in-request projection.
+            if ($this->usesRequestTaskNavigation($request)) {
+                $can['tasks'] = fn () => $this->requestTaskNavigation($request, $user);
+            } else {
+                // Asked at most once per request (the page and its count share it); nothing outlives the request.
+                $taskLinkVisible = null;
+                $taskLinkShown = function () use ($user, &$taskLinkVisible): bool {
+                    return $taskLinkVisible ??= $this->taskNavigationVisible($user);
+                };
+                $can['tasks'] = fn () => ['view' => $taskLinkShown()];
+            }
         }
 
         // Pull all app-settings we need for chrome (labels / theme / branding)
@@ -468,6 +487,16 @@ class HandleInertiaRequests extends Middleware
                 'flagged_alert_id' => session('flagged_alert_id'),
             ],
 
+            // Sidebar "All Tasks" count ({view, badge, badgeDegraded}), loaded after
+            // the page. It rides in the inbox's background request (same group),
+            // because a background request runs the page's controller again and a
+            // separate one would do that once more on every page. The sidebar
+            // shows no number until it arrives (never a "0"). Someone who does not
+            // see the link gets null.
+            'taskNav' => $taskLinkShown !== null
+                ? Inertia::defer(fn () => $taskLinkShown() ? $this->taskNavigation($user) : null)
+                : null,
+
             // Header inbox (notifications + announcements). Deferred so the
             // initial page render doesn't block on these queries — Inertia
             // fetches them in a follow-up request after mount.
@@ -600,6 +629,22 @@ class HandleInertiaRequests extends Middleware
             'badge' => $projection['view'] ? $projection['badge'] : 0,
             'badgeDegraded' => $projection['degraded'],
         ];
+    }
+
+    /** The H&S event page projects the task badge inside its own read (see requestTaskNavigation()). */
+    private function usesRequestTaskNavigation(Request $request): bool
+    {
+        return $request->isMethod('GET') && $request->routeIs('health-safety.events.show');
+    }
+
+    /**
+     * Whether the sidebar shows the All Tasks link, without building the badge:
+     * the task modules' own read checks, fresh on every request (a few
+     * milliseconds), so a removed role hides the link on the very next page.
+     */
+    private function taskNavigationVisible(User $user): bool
+    {
+        return app(TaskAggregator::class)->navigationVisibleFor($user);
     }
 
     /**

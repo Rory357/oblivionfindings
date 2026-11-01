@@ -12,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     HealthClinicalShell,
@@ -543,6 +544,7 @@ function RestraintLensView({ restraint }: { restraint: RestraintLensData }) {
     const fmt = (iso: string | null) =>
         iso
             ? new Date(iso).toLocaleDateString('en-NZ', {
+                  timeZone: WORKER_TIMEZONE,
                   day: 'numeric',
                   month: 'short',
                   year: 'numeric',

@@ -15,6 +15,7 @@ use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Services\Portal\PortalClientSectionAccess;
 use App\Services\Timeline\TimelineEmitter;
+use App\Support\WorkerClock;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,10 +33,13 @@ class FamilyDashboardController extends Controller
         $sectionAccessService = app(PortalClientSectionAccess::class);
         $sectionAccess = $sectionAccessService->for($user, $client);
 
-        $today = now()->startOfDay();
-        $tomorrow = (clone $today)->addDay();
-        $weekEnd = (clone $today)->addDays(7);
-        $monthEnd = (clone $today)->addDays(30);
+        // Days follow the NZ calendar. Queries get the UTC instants, because a
+        // Carbon binds in its own timezone.
+        $workerToday = WorkerClock::today();
+        $today = $workerToday->utc();
+        $tomorrow = $workerToday->addDay()->utc();
+        $weekEnd = $workerToday->addDays(7)->utc();
+        $monthEnd = $workerToday->addDays(30)->utc();
         $showShiftSchedule = $sectionAccess['show_shift_schedule'];
         $showRespite = $sectionAccess['show_respite'];
         $showCareNotes = $sectionAccess['show_care_notes'];
@@ -128,7 +132,7 @@ class FamilyDashboardController extends Controller
                 ->get()
                 ->map(fn ($s) => [
                     'id' => $s->id,
-                    'date' => $s->starts_at?->toDateString(),
+                    'date' => $s->starts_at ? WorkerClock::localDate($s->starts_at) : null,
                     'starts_at' => $s->starts_at?->toISOString(),
                     'ends_at' => $s->ends_at?->toISOString(),
                     'status' => $s->status,
@@ -185,7 +189,7 @@ class FamilyDashboardController extends Controller
                     'ends_at' => $booking->end_at?->toISOString(),
                     'status' => $booking->status,
                     'stay_status' => $booking->stays->first()?->status,
-                    'date' => $booking->start_at?->toDateString(),
+                    'date' => $booking->start_at ? WorkerClock::localDate($booking->start_at) : null,
                 ])
             : collect();
 
@@ -338,8 +342,8 @@ class FamilyDashboardController extends Controller
         $emotionSummary = $showCareNotes
             ? [
                 'today' => $getTopEmotions($today),
-                'week' => $getTopEmotions(now()->startOfWeek()),
-                'month' => $getTopEmotions(now()->startOfMonth()),
+                'week' => $getTopEmotions($workerToday->startOfWeek()->utc()),
+                'month' => $getTopEmotions($workerToday->startOfMonth()->utc()),
             ]
             : ['today' => [], 'week' => [], 'month' => []];
 
@@ -502,7 +506,8 @@ class FamilyDashboardController extends Controller
         abort_unless($user->canAccessClientPortal($client), 403);
 
         $validated = $request->validate([
-            'requested_date' => 'required|date|after_or_equal:today',
+            // "Today" is the NZ date; the UTC date is yesterday every NZ morning.
+            'requested_date' => 'required|date|after_or_equal:'.WorkerClock::today()->toDateString(),
             'preferred_time_start' => 'nullable|date_format:H:i',
             'preferred_time_end' => 'nullable|date_format:H:i|after:preferred_time_start',
             'visit_type' => 'required|in:in_person,video_call,outing',

@@ -139,13 +139,30 @@ const SIDEBAR_ICON_INACTIVE = 'text-sidebar-foreground/60';
 
 function CountPill({
     count,
+    pending = false,
     collapsed = false,
     testId,
 }: {
     count: number;
+    /** The count is not known yet (still loading, or its load failed): a dash, never "0". */
+    pending?: boolean;
     collapsed?: boolean;
     testId?: string;
 }) {
+    if (pending) {
+        return (
+            <span
+                data-test={testId}
+                title="Count not loaded yet"
+                className={cn(
+                    'flex h-5 min-w-5 items-center justify-center rounded-full bg-sidebar-accent px-1 text-[10px] leading-none font-bold text-sidebar-accent-foreground',
+                    collapsed ? 'absolute top-0.5 right-0.5' : 'ml-auto',
+                )}
+            >
+                –
+            </span>
+        );
+    }
     if (!count || count <= 0) return null;
     return (
         <span
@@ -270,6 +287,8 @@ interface IconNavItem {
     subPanel?: boolean;
     dividerAfter?: boolean;
     badge?: number;
+    /** The count is still loading (or failed to load): show a dash, never "0". */
+    badgePending?: boolean;
 }
 
 export interface SubPanelGroup {
@@ -615,16 +634,31 @@ function canAccessShiftHandovers(can?: any): boolean {
     );
 }
 
+/**
+ * The All Tasks count, or null while it is not known: still loading after the
+ * page (`taskNav`), its load failed, or a task module could not be read. Null
+ * shows a dash, never "0". The H&S event page still sends the count with
+ * `auth.can.tasks`.
+ */
+export function allTasksBadge(props: Record<string, any>): number | null {
+    const nav = props.taskNav ?? props.auth?.can?.tasks;
+    if (typeof nav?.badge !== 'number' || nav.badgeDegraded) return null;
+    return nav.badge;
+}
+
 function buildIconNavItems({
     role,
     can,
     portalClients,
     unreadMessageCount,
+    taskBadge,
 }: {
     role?: string | null;
     can?: any;
     portalClients?: PortalClient[] | null;
     unreadMessageCount?: number;
+    /** All Tasks count; null while it is not known (shown as a dash). */
+    taskBadge?: number | null;
 }): IconNavItem[] {
     // Portal users (family members / clients) get a dedicated sidebar
     if (role === 'next_of_kin' || role === 'client') {
@@ -690,7 +724,8 @@ function buildIconNavItems({
                       icon: ListChecks,
                       label: 'All Tasks',
                       href: '/tasks',
-                      badge: can?.tasks?.badge,
+                      badge: taskBadge ?? undefined,
+                      badgePending: taskBadge === null,
                       dividerAfter: true,
                   } as IconNavItem,
               ]
@@ -2334,6 +2369,7 @@ export function AppSidebar({
     const chatUnread = useChatCalling()?.unreadCount;
     const unreadMessageCount =
         chatUnread ?? (auth as any)?.unreadMessageCount ?? 0;
+    const taskBadge = allTasksBadge(page.props);
     const currentUrl = page.url;
     const { collapsed: fallbackCollapsed, setExpanded: setFallbackExpanded } =
         useAppSidebarState((page.props as any)?.sidebarOpen ?? true);
@@ -2357,8 +2393,14 @@ export function AppSidebar({
 
     const iconNavItems = useMemo(
         () =>
-            buildIconNavItems({ role, can, portalClients, unreadMessageCount }),
-        [role, can, portalClients, unreadMessageCount],
+            buildIconNavItems({
+                role,
+                can,
+                portalClients,
+                unreadMessageCount,
+                taskBadge,
+            }),
+        [role, can, portalClients, unreadMessageCount, taskBadge],
     );
 
     const subPanelMap = useMemo(
@@ -2631,6 +2673,7 @@ export function AppSidebar({
                                                 )}
                                                 <CountPill
                                                     count={item.badge ?? 0}
+                                                    pending={item.badgePending}
                                                     collapsed={isCollapsed}
                                                     testId={`sidebar-badge-${item.id}`}
                                                 />
@@ -2759,12 +2802,19 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
     const labels = useStableValue(labelsProp);
     const chatUnread = useChatCalling()?.unreadCount;
     const unreadMessageCount = chatUnread ?? auth?.unreadMessageCount ?? 0;
+    const taskBadge = allTasksBadge(page.props);
     const currentUrl = page.url;
 
     const iconNavItems = useMemo(
         () =>
-            buildIconNavItems({ role, can, portalClients, unreadMessageCount }),
-        [role, can, portalClients, unreadMessageCount],
+            buildIconNavItems({
+                role,
+                can,
+                portalClients,
+                unreadMessageCount,
+                taskBadge,
+            }),
+        [role, can, portalClients, unreadMessageCount, taskBadge],
     );
 
     const mobileSubPanelMap = useMemo(

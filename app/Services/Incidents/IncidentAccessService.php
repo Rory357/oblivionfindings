@@ -83,7 +83,13 @@ final class IncidentAccessService
             return $query;
         }
 
-        return $this->forSiteIds($query, $this->sites->accessibleSiteIds($viewer, [], $reads));
+        // Inside one read session the viewer's Sites are read once (speed, 31 Oct: the task count read the same
+        // profile and Site rows twice per incident, ~900 queries for a manager). The session holds those rows locked.
+        $siteIds = $reads === null
+            ? $this->sites->accessibleSiteIds($viewer)
+            : $reads->rememberFor($viewer, 'incident-site-boundary', fn (): array => $this->sites->accessibleSiteIds($viewer, [], $reads));
+
+        return $this->forSiteIds($query, $siteIds);
     }
 
     /** @param list<int> $siteIds */

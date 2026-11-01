@@ -52,7 +52,8 @@ final class ChatMessageChanges
     public function read(OpsConversation $conversation, User $viewer, string $cursor): array
     {
         return DB::transaction(function () use ($conversation, $viewer, $cursor): array {
-            $conversation = OpsConversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
+            // Shared: readers wait for writers still allocating change IDs, but not for each other.
+            $conversation = OpsConversation::whereKey($conversation->id)->sharedLock()->firstOrFail();
             $this->access->authorize($viewer, $conversation);
             // Disabling new messages must not revoke authorised history or its refresh stream.
             try {

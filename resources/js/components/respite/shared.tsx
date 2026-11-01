@@ -3,6 +3,7 @@
  * badges, an initials avatar, and small date helpers. Tones map onto the app's
  * --status-* design tokens so the workspace reads like the rest of the product.
  */
+import { WORKER_LOCALE, WORKER_TIMEZONE } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import type { Urgency } from './types';
 
@@ -159,11 +160,16 @@ export function Avatar({
 
 /* ---- dates -------------------------------------------------------------- */
 
+/** "5 Oct": the NZ date of a stored UTC instant, whatever the browser's timezone. */
 export function fmtDate(iso: string | null | undefined): string {
     if (!iso) return '—';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+    return d.toLocaleDateString(WORKER_LOCALE, {
+        timeZone: WORKER_TIMEZONE,
+        day: 'numeric',
+        month: 'short',
+    });
 }
 
 export function fmtRange(

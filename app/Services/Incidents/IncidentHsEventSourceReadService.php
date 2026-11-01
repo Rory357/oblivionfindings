@@ -43,7 +43,11 @@ final class IncidentHsEventSourceReadService
         });
     }
 
-    /** No callback means no source evidence, never an inferred permission or a detached ID admission list. */
+    /** No callback means no source evidence, never an inferred permission or a detached ID admission list.
+     * One approved exception (Stephan, 30 Oct 2026, speed option B): within ONE request's locked read, the ids that
+     * the full unchanged proof admits may be proven once and reused by that same request's later counts and lists.
+     * Never across requests, stored, or for another user. See HsEventAccessService::provenReadableEventIds() and
+     * IncidentRegisterReadService (proven register ids). */
     public function withoutIncidentSources(Builder $events): Builder
     {
         return $events->where(function (Builder $ordinary): void {
@@ -68,6 +72,8 @@ final class IncidentHsEventSourceReadService
                 ->whereIn('id', $sourceIds)->orWhereIn('hs_event_id', $eventIds)))->get(array_values(array_unique(self::ROOT_META)));
             // One batched evidence check for every root, instead of a full independence proof per root (speed, 30 Oct).
             app(IncidentIndependenceIntakeService::class)->prefetchEvidenceInReads($roots->pluck('id'), $reads);
+            // Every linked event's parent is the restricted root variant (see the loop below).
+            $this->prefetchRootIdentities($roots->pluck('id'), $current, $reads, true);
             $discovery = $this->discovery[$reads] ?? [];
             foreach ($identities as $event) {
                 $discovery[$event->id] ??= $roots->filter(fn ($root) => (int) $root->id === (int) $event->source_id || (int) $root->hs_event_id === (int) $event->id)->values();
@@ -163,8 +169,86 @@ final class IncidentHsEventSourceReadService
         return $query;
     }
 
-    /** Original incident scopes for admitted metrics/reports. No HSE association is invented for an independent incident. */
+    /** @var \WeakMap<CurrentAuthorizationReads, array<int, list<int>>>|null */
+    private static ?\WeakMap $provenIncidentIds = null;
+
+    /** @var \WeakMap<CurrentAuthorizationReads, true>|null reads a page-wide H&S read switched on (HealthSafetyReadContext::provePageWide) */
+    private static ?\WeakMap $pageWideReads = null;
+
+    /** Only a page-wide read uses the proven incident set; every other read keeps the embedded scope. */
+    public static function provePageWide(CurrentAuthorizationReads $reads): void
+    {
+        $reads->assertActive();
+        self::$pageWideReads ??= new \WeakMap;
+        self::$pageWideReads[$reads] = true;
+    }
+
+    public static function isPageWide(?CurrentAuthorizationReads $reads): bool
+    {
+        return $reads !== null && isset(self::$pageWideReads[$reads]);
+    }
+
+    /** @var \WeakMap<CurrentAuthorizationReads, array<int, User>>|null */
+    private static ?\WeakMap $provenIncidentViewers = null;
+
+    /** @return list<int> */
+    private function proveIncidentIds(User $current, CurrentAuthorizationReads $reads): array
+    {
+        return $reads->query($this->applyIncidentScopeInReadsEmbedded(ClientIncident::query(), $current, $reads))
+            ->reorder()->pluck('client_incidents.id')->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    /**
+     * Response barrier for the proven incident sets: the embedded scope runs once more before a page-wide read returns;
+     * a set that no longer matches (a moved incident, a withdrawn permission) withholds the whole response (404).
+     */
+    public function recheckProvenIncidentIds(CurrentAuthorizationReads $reads): void
+    {
+        foreach (self::$provenIncidentViewers[$reads] ?? [] as $id => $current) {
+            $proven = self::$provenIncidentIds[$reads][$id] ?? null;
+            if ($proven !== null && $this->proveIncidentIds($current, $reads) !== $proven) {
+                throw new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+            }
+        }
+    }
+
+    /**
+     * Original incident scopes for admitted metrics/reports. No HSE association is invented for an independent incident.
+     * Approved exception (Stephan, 30 Oct 2026, speed option B; see the rule note above withoutIncidentSources()): the
+     * incident ids the embedded scope admits are proven ONCE per locked read and viewer, over all incidents, and each
+     * metric in the same read is "its own filters AND id IN that set". The embedded scope decides each incident on its
+     * own facts, so the rows are the same; parity tests compare the two for every role.
+     */
     public function applyIncidentScopeInReads(Builder $incidents, User $current, CurrentAuthorizationReads $reads): Builder
+    {
+        $reads->assertActive();
+        if (! $incidents->getModel() instanceof ClientIncident || $incidents->getQuery()->from !== 'client_incidents') {
+            throw new LogicException('Incident source scope requires the canonical incident table.');
+        }
+        if (! isset(self::$pageWideReads[$reads])) {
+            return $this->applyIncidentScopeInReadsEmbedded($incidents, $current, $reads);
+        }
+        self::$provenIncidentIds ??= new \WeakMap;
+        $known = self::$provenIncidentIds[$reads] ?? [];
+        if (! array_key_exists((int) $current->id, $known)) {
+            $known[(int) $current->id] = $this->proveIncidentIds($current, $reads);
+            self::$provenIncidentIds[$reads] = $known;
+            self::$provenIncidentViewers ??= new \WeakMap;
+            self::$provenIncidentViewers[$reads] = [...(self::$provenIncidentViewers[$reads] ?? []), (int) $current->id => $current];
+        }
+
+        $original = \App\Support\HealthSafety\ProofParity::$enabled ? clone $incidents : null;
+        $scoped = $this->protect($incidents->whereIn('client_incidents.id', $known[(int) $current->id]), $reads);
+        if ($original !== null) {
+            \App\Support\HealthSafety\ProofParity::assertSameRows($scoped, $this->applyIncidentScopeInReadsEmbedded($original, $current, $reads),
+                'client_incidents.id', 'Incident source scope');
+        }
+
+        return $scoped;
+    }
+
+    /** The embedded scope: every admitted incident's full guard in the query (also what proves the per-read set). */
+    public function applyIncidentScopeInReadsEmbedded(Builder $incidents, User $current, CurrentAuthorizationReads $reads): Builder
     {
         $reads->assertActive();
         if (! $incidents->getModel() instanceof ClientIncident || $incidents->getQuery()->from !== 'client_incidents') {
@@ -173,6 +257,92 @@ final class IncidentHsEventSourceReadService
         $discover = app(IncidentAccessService::class)->apply((clone $incidents)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...)), $current, $reads);
         $roots = $reads->query($discover->select(array_values(array_unique(self::ROOT_META))))->get();
         app(IncidentIndependenceIntakeService::class)->prefetchEvidenceInReads($roots->pluck('id'), $reads);
+        $this->prefetchRootIdentities($roots->pluck('id'), $current, $reads, false);
+        if ($roots->isEmpty()) { return $this->protect($incidents->whereRaw('1 = 0'), $reads); }
+        $original = \App\Support\HealthSafety\ProofParity::$enabled ? clone $incidents : null;
+        $groups = $this->groupedRootGuards($roots, $current, $reads);
+        // Speed R3b. Per root, the old guard was G_i = "id = i AND S AND Admitted_i AND Exact_i AND Site/Client_i", where S
+        // (canonical access + Site scope) is the same row test for every root and Admitted_i (the independence block)
+        // also requires id = i. Each chunk's admitted query is "S AND (Admitted_i OR Admitted_j ...)" over its roots, so
+        // for a row with id = i it is exactly "S AND Admitted_i". Hence
+        //   OR_i (id IN G_i)  =  OR_chunk (id IN Chunk AND OR_{i in chunk} id IN (id = i AND Exact_i AND Site/Client_i))
+        // row by row: the same facts, with S and the evidence-free independence checks compiled once per chunk instead of
+        // once per root (the per-root form made a ~650 KB statement on the Overview). PROOF_PARITY compares both forms.
+        $incidents->where(function (Builder $allowed) use ($groups, $current, $reads): void {
+            $this->authorityCommon($allowed, $current, $reads);
+            $allowed->where(function (Builder $any) use ($groups): void {
+                foreach ($groups as [$chunk, $exacts]) {
+                    $any->orWhere(function (Builder $group) use ($chunk, $exacts): void {
+                        $group->whereIn('client_incidents.id', (clone $chunk)->reorder()->select('client_incidents.id'));
+                        $group->where(function (Builder $own) use ($exacts): void {
+                            foreach ($exacts as $exact) { $own->orWhereIn('client_incidents.id', (clone $exact)->reorder()->select('client_incidents.id')); }
+                        });
+                    });
+                }
+            });
+        });
+        $scoped = $this->protect($incidents, $reads);
+        if ($original !== null) {
+            \App\Support\HealthSafety\ProofParity::assertSameRows($scoped, $this->applyIncidentScopeInReadsPerRoot($original, $current, $reads),
+                'client_incidents.id', 'Incident embedded scope (grouped vs per root)');
+        }
+
+        return $scoped;
+    }
+
+    /** @var \WeakMap<CurrentAuthorizationReads, array<string, array{chunks: list<array{ids: list<int>, query: Builder}>, exact: array<int, Builder>}>>|null */
+    private ?\WeakMap $groupedGuards = null;
+
+    /**
+     * The grouped guards for these roots (see applyIncidentScopeInReadsEmbedded()), built once per reads and viewer like
+     * the per-root guards: a root's chunk and exact guard come from the first call that saw it, and a later call only adds
+     * a chunk for roots not seen yet. Each chunk's admitted query is the canonical access query for `id IN (chunk)` through
+     * the independence scope, from the rows read once by prefetchRootIdentities().
+     *
+     * @return list<array{0: Builder, 1: list<Builder>}> per chunk: its admitted query and the exact guards of these roots
+     */
+    private function groupedRootGuards(\Illuminate\Support\Collection $roots, User $current, CurrentAuthorizationReads $reads): array
+    {
+        $this->groupedGuards ??= new \WeakMap;
+        $known = $this->groupedGuards[$reads] ?? [];
+        $entry = $known[(string) $current->id] ?? ['chunks' => [], 'exact' => []];
+        $seen = [];
+        foreach ($entry['chunks'] as $index => $chunk) { foreach ($chunk['ids'] as $id) { $seen[$id] = $index; } }
+        $new = $roots->filter(fn (ClientIncident $root) => ! isset($seen[(int) $root->id]))->values();
+        foreach ($new->chunk(500) as $part) {
+            $ids = $part->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $query = $this->rootAccessQuery(ClientIncident::query()->whereIn('client_incidents.id', $ids), $current, $reads, false);
+            $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read',
+                prefetched: [$this->identityKey($current, false), $ids]);
+            $entry['chunks'][] = ['ids' => $ids, 'query' => $query];
+            foreach ($ids as $id) { $seen[$id] = array_key_last($entry['chunks']); }
+            foreach ($part as $root) {
+                // The facts the per-root guards pinned first (or pin now for them): a root changed since is never a new original.
+                $facts = $this->pinnedRootFacts($root, $current, $reads, false);
+                $exact = ClientIncident::query()->whereKey($root->id);
+                $this->exact($exact, $facts, 'client_incidents');
+                $exact = $this->authorityScoped($exact, $current, $reads,
+                    ($facts['site_id'] ?? null) === null ? null : (int) $facts['site_id'], ($facts['client_id'] ?? null) === null ? null : (int) $facts['client_id']);
+                $entry['exact'][(int) $root->id] = $this->protect($exact, $reads);
+            }
+        }
+        $known[(string) $current->id] = $entry;
+        $this->groupedGuards[$reads] = $known;
+        $groups = [];
+        foreach ($roots as $root) {
+            $index = $seen[(int) $root->id];
+            $groups[$index] ??= [$entry['chunks'][$index]['query'], []];
+            $groups[$index][1][] = $entry['exact'][(int) $root->id];
+        }
+
+        return array_values($groups);
+    }
+
+    /** The per-root form of the embedded scope (one full guard per root). Kept for PROOF_PARITY. */
+    private function applyIncidentScopeInReadsPerRoot(Builder $incidents, User $current, CurrentAuthorizationReads $reads): Builder
+    {
+        $discover = app(IncidentAccessService::class)->apply((clone $incidents)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...)), $current, $reads);
+        $roots = $reads->query($discover->select(array_values(array_unique(self::ROOT_META))))->get();
         $bindings = [];
         foreach ($roots as $root) { $bindings[] = $this->originalRootParent($root, $current, $reads, false); }
         if ($bindings === []) { return $this->protect($incidents->whereRaw('1 = 0'), $reads); }
@@ -212,21 +382,66 @@ final class IncidentHsEventSourceReadService
     {
         $baseKey = $current->id.'/base'.($restricted ? '/restricted' : '');
         if (isset(($this->rootParents[$reads] ?? [])[$baseKey][$root->id])) { return $this->rootParents[$reads][$baseKey][$root->id]; }
-        $access = app(IncidentAccessService::class);
-        // Restricted (H&S event visibility only): the incident's Site boundary, without the incident read permission or
-        // the HR-confidential content rule. As on main, H&S staff see the H&S event of a confidential incident (its
-        // WorkSafe work can't go unseen); the incident's content is the full variant, the canonical incident read.
-        $query = $restricted
-            ? $reads->query($access->applySiteBoundary(ClientIncident::query()->whereKey($root->id), $current, $reads))
-            : $access->apply(ClientIncident::query()->whereKey($root->id), $current, $reads);
-        $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read', siteBoundaryOnly: $restricted);
-        $this->exact($query, array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META)), 'client_incidents');
-        $base = ['query' => $query, 'site_id' => $root->site_id === null ? null : (int) $root->site_id,
-            'client_id' => $root->client_id === null ? null : (int) $root->client_id];
+        $query = $this->rootAccessQuery(ClientIncident::query()->whereKey($root->id), $current, $reads, $restricted);
+        $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read', siteBoundaryOnly: $restricted,
+            prefetched: [$this->identityKey($current, $restricted), (int) $root->id]);
+        $facts = $this->pinnedRootFacts($root, $current, $reads, $restricted);
+        $this->exact($query, $facts, 'client_incidents');
+        $base = ['query' => $query, 'site_id' => ($facts['site_id'] ?? null) === null ? null : (int) $facts['site_id'],
+            'client_id' => ($facts['client_id'] ?? null) === null ? null : (int) $facts['client_id']];
         $parents = $this->rootParents[$reads] ?? [];
         $parents[$baseKey][$root->id] = $base;
         $this->rootParents[$reads] = $parents;
         return $base;
+    }
+
+    /**
+     * A root's facts as first seen in this reads/actor lifetime, shared by rootBase() and the grouped guards so that
+     * whichever builds a guard first pins them for the other. Later reads of a changed row get the pinned facts.
+     *
+     * @return array<string, mixed>
+     */
+    private function pinnedRootFacts(ClientIncident $root, User $current, CurrentAuthorizationReads $reads, bool $restricted): array
+    {
+        $key = $current->id.'/facts'.($restricted ? '/restricted' : '');
+        $parents = $this->rootParents[$reads] ?? [];
+        if (! isset($parents[$key][$root->id])) {
+            $parents[$key][$root->id] = array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META));
+            $this->rootParents[$reads] = $parents;
+        }
+
+        return $parents[$key][$root->id];
+    }
+
+    /**
+     * The canonical access query rootBase() starts from, for one root (`whereKey`) or a batch (`whereIn`).
+     * Restricted (H&S event visibility only): the incident's Site boundary, without the incident read permission or
+     * the HR-confidential content rule. As on main, H&S staff see the H&S event of a confidential incident (its
+     * WorkSafe work can't go unseen); the incident's content is the full variant, the canonical incident read.
+     */
+    private function rootAccessQuery(Builder $incidents, User $current, CurrentAuthorizationReads $reads, bool $restricted): Builder
+    {
+        $access = app(IncidentAccessService::class);
+
+        return $restricted
+            ? $reads->query($access->applySiteBoundary($incidents, $current, $reads))
+            : $access->apply($incidents, $current, $reads);
+    }
+
+    private function identityKey(User $current, bool $restricted): string
+    {
+        return 'incident-root/'.$current->id.($restricted ? '/restricted' : '');
+    }
+
+    /** Speed R3b: read the identity rows of every root a list scope is about to bind in one query, not one per root
+     * (see IncidentIndependenceIntakeService::prefetchSourceIdentitiesInReads()). */
+    private function prefetchRootIdentities(iterable $rootIds, User $current, CurrentAuthorizationReads $reads, bool $restricted): void
+    {
+        $ids = collect($rootIds)->map(fn ($id) => (int) $id)->filter(fn (int $id) => $id > 0)->unique()->values()->all();
+        if ($ids === []) { return; }
+        app(IncidentIndependenceIntakeService::class)->prefetchSourceIdentitiesInReads(
+            $this->rootAccessQuery(ClientIncident::query(), $current, $reads, $restricted), $ids, $current, $reads,
+            $this->identityKey($current, $restricted), siteBoundaryOnly: $restricted);
     }
 
     /** Every child SELECT embeds the SAME original parent/HSE/independence/authority predicate. */

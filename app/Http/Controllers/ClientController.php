@@ -1329,21 +1329,8 @@ class ClientController extends Controller
             // care-risk list above — shown as a separate section in the same tab).
             // One H&S read for the whole list (Codex's port): only risks this viewer may read are listed, so a risk
             // copied from someone else's private treatment is left out instead of failing the whole profile.
-            'hs_risk_assessments' => $sectionAccess['first_aid']
-                ? RiskAssessmentPresenter::materialise($request->user(), null, function ($current, $reads, $context) use ($client): array {
-                    $query = HsRiskAssessment::forAssessable(Client::class, $client->id)
-                        ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])->withCount('attachments');
-
-                    $original = RiskAssessmentPresenter::guardEagerQuery($query, $current, $context);
-
-                    return (clone $original)
-                        ->orderByDesc('created_at')->orderByDesc('id')->limit(100)->get()
-                        ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra, $current, $context, $original))->values()->all();
-                })
-                : [],
-            'ra_pickers' => $sectionAccess['first_aid_manage']
-                ? RiskAssessmentPresenter::pickers()
-                : ['sites' => [], 'clients' => [], 'events' => []],
+            'hs_risk_assessments' => ($hsRiskPanel = $this->clientHsRiskPanel($request->user(), $client, $sectionAccess))['rows'],
+            'ra_pickers' => $hsRiskPanel['pickers'],
 
             // Recent incidents (last 5)
             // Recent incidents (last 5) the viewer may read through the incident source rules: their Sites,
@@ -3735,6 +3722,43 @@ class ClientController extends Controller
         }
 
         return back()->with('success', 'Panic acknowledged.');
+    }
+
+    /**
+     * The risk-management tab's H&S risk panel and its pickers, read in ONE H&S read. Its final check then replays
+     * the panel's rows after the picker read, so a permission withdrawn part-way through the request withholds the
+     * page instead of returning the panel as first read (Stephan, 31 Oct: fix the logged race limits).
+     *
+     * @param  array<string, bool>  $sectionAccess
+     * @return array{rows: array<int, array<string, mixed>>, pickers: array<string, mixed>}
+     */
+    private function clientHsRiskPanel(User $viewer, Client $client, array $sectionAccess): array
+    {
+        $noPickers = ['sites' => [], 'clients' => [], 'events' => []];
+        if (! $sectionAccess['first_aid'] && ! $sectionAccess['first_aid_manage']) {
+            return ['rows' => [], 'pickers' => $noPickers];
+        }
+
+        return RiskAssessmentPresenter::materialise($viewer, null, function ($current, $reads, $context) use ($client, $sectionAccess, $noPickers): array {
+            $rows = [];
+            if ($sectionAccess['first_aid']) {
+                // Only risks this viewer may read are listed, so a risk copied from someone else's private treatment
+                // is left out instead of failing the whole profile.
+                $query = HsRiskAssessment::forAssessable(Client::class, $client->id)
+                    ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])->withCount('attachments');
+                $original = RiskAssessmentPresenter::guardEagerQuery($query, $current, $context);
+                $rows = (clone $original)
+                    ->orderByDesc('created_at')->orderByDesc('id')->limit(100)->get()
+                    ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra, $current, $context, $original))->values()->all();
+            }
+            // Plain arrays (the read refuses to hand out collections); the page receives the same JSON as before.
+            $pickers = $sectionAccess['first_aid_manage']
+                ? RiskAssessmentPresenter::pickerRowsInContext($current,
+                    app(UserSiteAccessService::class)->accessibleSiteIds($current, ['healthSafety.viewAllSites'], $reads), $context)
+                : $noPickers;
+
+            return ['rows' => $rows, 'pickers' => $pickers];
+        });
     }
 
     /** The profile's recent incidents, read through the incident source rules (Codex's narrowing). */

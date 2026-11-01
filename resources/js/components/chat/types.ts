@@ -52,6 +52,9 @@ export type ChatMessage = {
     content: string;
     deleted: boolean;
     pinned: boolean;
+    // Who pinned it ("You" for the viewer) and when; null for unpinned messages.
+    pinned_by_name?: string | null;
+    pinned_at?: string | null;
     saved?: boolean;
     mentions?: ChatMention[];
     created_at: string;
@@ -84,7 +87,8 @@ export type ChatMessage = {
         name: string;
         url: string | null;
     }[];
-    reactions: { emoji: string; count: number; mine: boolean }[];
+    // people: who reacted ("You" for the viewer), first 20, in the order they reacted.
+    reactions: { emoji: string; count: number; mine: boolean; people?: string[] }[];
 };
 export type ChatPolicy = {
     enabled: boolean;

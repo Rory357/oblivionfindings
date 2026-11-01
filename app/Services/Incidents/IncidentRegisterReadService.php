@@ -94,12 +94,30 @@ final class IncidentRegisterReadService
             } finally { $working->setUserResolver($resolver); }
         }));
     }
+    /**
+     * The register's query checks (owner lens, record kind, period). The header inbox's follow-up request runs
+     * them too, so it is refused exactly when the page is.
+     *
+     * @return array{0: string, 1: array<string, mixed>}
+     */
+    public function validatedQuery(Request $request): array
+    {
+        $owner = $request->validate(['owner' => ['nullable', 'in:all,me,needs_owner']])['owner'] ?? 'all';
+        $period = $request->validate([
+            'kind' => ['nullable', 'in:all,incidents,near_misses'],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
+        ]);
+
+        return [$owner, $period];
+    }
+
     private function compose(Request $request, User $user, CurrentAuthorizationReads $reads, ?callable $detailConsumer): array
     {
 
         abort_unless($user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned'), 403);
 
-        $owner = $request->validate(['owner' => ['nullable', 'in:all,me,needs_owner']])['owner'] ?? 'all';
+        [$owner, $period] = $this->validatedQuery($request);
         $q = trim((string) $request->get('q', ''));
         $tab = $request->get('tab', 'all'); // all|open|investigation|followups|worksafe|near_misses|review|closed
         // Back-compat: the legacy ?type=near_miss lens now lands on the tab.
@@ -110,11 +128,6 @@ final class IncidentRegisterReadService
         $clientId = $request->get('client_id');
         $siteId = $request->get('site_id');
         $source = $request->get('source');
-        $period = $request->validate([
-            'kind' => ['nullable', 'in:all,incidents,near_misses'],
-            'from' => ['nullable', 'date_format:Y-m-d'],
-            'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
-        ]);
         $from = $period['from'] ?? null;
         $to = $period['to'] ?? null;
         $kind = $period['kind'] ?? 'all';

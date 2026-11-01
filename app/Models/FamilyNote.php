@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -85,7 +86,7 @@ class FamilyNote extends Model
     public function scopeOverdue($query)
     {
         return $query->whereNotNull('due_date')
-            ->where('due_date', '<', now()->toDateString())
+            ->where('due_date', '<', WorkerClock::today()->toDateString())
             ->whereIn('status', ['open', 'in_progress']);
     }
 

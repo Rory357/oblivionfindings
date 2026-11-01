@@ -147,8 +147,8 @@ class RespiteReadinessTest extends TestCase
 
         $this->actingAs($this->admin)
             ->put(route('respite.bookings.update', $booking), [
-                'start_at' => $booking->start_at->format('Y-m-d H:i:s'),
-                'end_at' => $booking->end_at->format('Y-m-d H:i:s'),
+                'start_at' => $this->nzWallClock($booking->start_at),
+                'end_at' => $this->nzWallClock($booking->end_at),
                 'status' => 'cancelled',
                 'cancellation_reason' => 'Family requested cancellation',
             ])
@@ -172,8 +172,8 @@ class RespiteReadinessTest extends TestCase
 
         $this->actingAs($this->admin)
             ->put(route('respite.bookings.update', $completedBooking), [
-                'start_at' => $completedBooking->start_at->format('Y-m-d H:i:s'),
-                'end_at' => $completedBooking->end_at->format('Y-m-d H:i:s'),
+                'start_at' => $this->nzWallClock($completedBooking->start_at),
+                'end_at' => $this->nzWallClock($completedBooking->end_at),
                 'status' => 'cancelled',
                 'cancellation_reason' => 'Late cancellation',
             ])
@@ -249,11 +249,12 @@ class RespiteReadinessTest extends TestCase
         $this->assertSame('in_progress', $shift->status);
         $this->assertNotNull($shift->actual_starts_at);
 
-        $newEnd = Carbon::parse('2026-05-05 18:00:00');
+        // The extend dialog posts NZ wall-clock; storage is UTC (06:00Z).
+        $newEnd = Carbon::parse('2026-05-05 18:00:00', 'Pacific/Auckland')->utc();
 
         $this->actingAs($this->admin)
             ->post(route('respite.stays.extend', $stay), [
-                'new_end' => $newEnd->format('Y-m-d H:i:s'),
+                'new_end' => '2026-05-05 18:00:00',
             ])
             ->assertRedirect()
             ->assertSessionHasNoErrors();
@@ -327,5 +328,11 @@ class RespiteReadinessTest extends TestCase
         $this->assertNotNull($clientShift);
         $this->assertTrue($clientShift['extendedProps']['is_respite']);
         $this->assertSame($booking->id, $clientShift['extendedProps']['respite_booking_id']);
+    }
+
+    /** What the booking form posts for a stored UTC time: NZ wall-clock, no offset. */
+    private function nzWallClock(Carbon $utc): string
+    {
+        return $utc->copy()->setTimezone('Pacific/Auckland')->format('Y-m-d H:i:s');
     }
 }

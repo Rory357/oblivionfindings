@@ -7,6 +7,8 @@ use App\Models\RespiteCommunicationLog;
 use App\Models\RespiteStay;
 use App\Models\RespiteAuditLog;
 use App\Events\Respite\RespiteEvent;
+use App\Support\Respite\RespiteWallClock;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -20,8 +22,9 @@ class RespiteCommunicationLogController extends Controller
             ->with(['stay.client'])
             ->when($request->stay_id, fn ($q, $stayId) => $q->where('stay_id', $stayId))
             ->when($request->channel, fn ($q, $channel) => $q->where('channel', $channel))
-            ->when($request->date_from, fn ($q, $date) => $q->whereDate('occurred_at', '>=', $date))
-            ->when($request->date_to, fn ($q, $date) => $q->whereDate('occurred_at', '<=', $date))
+            // The filters are NZ calendar dates; occurred_at is UTC.
+            ->when($this->filterDate($request->date_from), fn ($q, $date) => $q->where('occurred_at', '>=', WorkerClock::dayStartUtc($date)))
+            ->when($this->filterDate($request->date_to), fn ($q, $date) => $q->where('occurred_at', '<=', WorkerClock::dayEndUtc($date)))
             ->orderByDesc('occurred_at')
             ->paginate(20);
 
@@ -67,6 +70,7 @@ class RespiteCommunicationLogController extends Controller
             'occurred_at' => 'required|date',
             'evidence' => 'nullable|array',
         ]);
+        $validated = RespiteWallClock::inputsToUtc($validated, ['occurred_at']);
 
         $validated['created_by'] = auth()->id();
 
@@ -125,6 +129,7 @@ class RespiteCommunicationLogController extends Controller
             'occurred_at' => 'sometimes|date',
             'evidence' => 'nullable|array',
         ]);
+        $validated = RespiteWallClock::inputsToUtc($validated, ['occurred_at']);
 
         $validated['updated_by'] = auth()->id();
         $communicationLog->update($validated);
@@ -197,5 +202,14 @@ class RespiteCommunicationLogController extends Controller
             'portal' => 'Portal Message',
             'other' => 'Other',
         ];
+    }
+
+    /** A filter value that is a real Y-m-d date, else null (the filter is skipped). */
+    private function filterDate(mixed $value): ?string
+    {
+        return is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1
+            && checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4))
+            ? $value
+            : null;
     }
 }

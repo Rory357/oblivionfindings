@@ -40,6 +40,7 @@ class LoneWorkerSessionWorkspaceTest extends TestCase
         $this->owner = $this->worker();
         $this->manager = $this->worker(true);
         $tasks = Mockery::mock(TaskAggregator::class);
+        $tasks->shouldReceive('navigationVisibleFor')->andReturn(true);
         $tasks->shouldReceive('navigationBadgeFor')->andReturn(['view' => true, 'badge' => 0, 'degraded' => false]);
         $tasks->shouldReceive('navigationBadgeInContext')->andReturn(['view' => true, 'badge' => 0, 'degraded' => false]);
         $tasks->shouldReceive('findItemFor')->andReturnNull();

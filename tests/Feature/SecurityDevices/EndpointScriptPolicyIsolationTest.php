@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\OwnedTestDatabase;
 
 it('binds script policy to current assignment even with an older repeatable read snapshot', function () {
     $manager = DB::getFacadeRoot();
@@ -13,7 +14,8 @@ it('binds script policy to current assignment even with an older repeatable read
     $configuration = config('database.connections.'.$default);
     expect($configuration['driver'])->toBe('mysql')
         ->and(app()->environment())->toBe('testing')
-        ->and(str_ends_with($configuration['database'], '_'.getmypid()))->toBeTrue();
+        ->and(str_ends_with($configuration['database'], '_'.getmypid())
+            || OwnedTestDatabase::isOwnedBy($configuration['database'], getmypid()))->toBeTrue();
     $prefix = 'script_policy_rr_'.strtolower(Str::random(8)).'_';
     $configuration['prefix'] = $prefix;
     $configuration['isolation_level'] = 'REPEATABLE READ';

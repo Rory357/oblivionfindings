@@ -55,8 +55,20 @@ final class ChatInvitations
     {
         return $conversation->conversation_type === 'family'
             ? (bool) $conversation->client && $person->canAccessClientPortal($conversation->client) && $this->family->canAppearAsParticipant($person, $conversation->client)
+            // Only someone the adder can see, and who sees (and is seen by) the adder and every member the
+            // adder can still see. Members who have since moved out of the adder's Sites don't block an
+            // addition (Stephan, 23 Oct 2026); a brand-new group needs everyone to see everyone.
             : $this->staff->visibleCurrentStaffQuery($actor)->where('users.id', $person->id)->exists()
-                && $this->access->staffAudienceAllows([...$conversation->participants()->pluck('user_id')->all(), $person->id], $conversation);
+                && $this->access->staffAudienceAllows([...$this->membersSeenBy($actor, $conversation), $actor->id, $person->id], $conversation);
+    }
+
+    /** Current members the adder can still see; members who moved out of the adder's Sites are left out. */
+    private function membersSeenBy(User $actor, OpsConversation $conversation): array
+    {
+        $members = $conversation->members()->pluck('user_id')->map(fn ($id) => (int) $id)->all();
+
+        return $members === [] ? [] : $this->staff->visibleCurrentStaffQuery($actor)->whereIn('users.id', $members)
+            ->pluck('users.id')->map(fn ($id) => (int) $id)->all();
     }
 
     public function invite(User $actor, OpsConversation $conversation, array $data): array
@@ -79,8 +91,10 @@ final class ChatInvitations
             }
             abort_unless($conversation->chat_version === $data['version'], 409, 'The conversation changed. Reopen the invitation to review its current audience.');
             abort_unless($people->count() === count($ids) && $people->every(fn ($person) => $this->eligible($actor, $person, $conversation)), 403);
+            // The adder, everyone being added and every member the adder can still see must all see each
+            // other; members who have since moved out of the adder's Sites don't block it (Stephan, 23 Oct 2026).
             abort_unless($conversation->conversation_type === 'family'
-                || $this->access->staffAudienceAllows([...$conversation->participants()->pluck('user_id')->all(), ...$ids], $conversation),
+                || $this->access->staffAudienceAllows([...$this->membersSeenBy($actor, $conversation), $actor->id, ...$ids], $conversation),
                 403, 'These people cannot all access the same conversation. Review your selection.');
             abort_if($conversation->participants()->whereIn('user_id', $ids)->exists(), 422, 'A selected person is already a member. Review your selection.');
             abort_if($conversation->conversation_type === 'group' && ! $conversation->is_managed_channel

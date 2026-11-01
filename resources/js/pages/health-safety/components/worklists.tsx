@@ -43,11 +43,18 @@ export type CorrectiveActionRow = {
     status: string | null;
     due_date: string | null;
     days_overdue: number | null;
+    /** Set while the owner has marked it completed and it waits for verification. */
+    completed_days_ago?: number | null;
     owner: string | null;
     client_id: number | null;
     staff_id: number | null;
     event_reference: string | null;
 };
+
+/** "completed today", "completed 1 day ago", "completed 4 days ago". */
+export function completedAgo(days: number): string {
+    return days === 0 ? 'completed today' : days === 1 ? 'completed 1 day ago' : `completed ${days} days ago`;
+}
 
 export type InvestigationRow = {
     id: number;
@@ -170,9 +177,11 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
         actionLabel: `Open corrective action: ${r.title ?? r.reference ?? r.id}`,
         pill: {
             label:
-                r.days_overdue != null
-                    ? `${r.days_overdue}d overdue`
-                    : 'Overdue',
+                r.status === 'completed'
+                    ? hsLabel('action_status', 'completed')
+                    : r.days_overdue != null
+                      ? `${r.days_overdue}d overdue`
+                      : 'Overdue',
             tone: ['high', 'critical', 'urgent'].includes(
                 (r.priority ?? '').toLowerCase(),
             )
@@ -508,7 +517,7 @@ export function HsWorklists({
             key: 'acceptance',
             icon: ShieldAlert,
             iconTone: 'warning',
-            title: 'Waiting for Health & safety to accept',
+            title: hsLabel('handover_status', 'awaiting_acceptance'),
             subtitle:
                 worklists.attention[0]?.help ??
                 'A named Health & safety owner must accept responsibility for each one',

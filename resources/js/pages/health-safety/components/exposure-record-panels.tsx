@@ -60,8 +60,10 @@ function LogRow({ time, tone, title, sub, children, actions, menu, menuTitle, se
         <span className="inline-flex items-center gap-3">{actions}{menu?.length ? <EntityKebab actions={menu} label={`Actions for ${menuTitle ?? 'this entry'}`} /> : null}</span>
     </li>;
 }
-// eslint-disable-next-line no-restricted-syntax -- the kit's quiet text action (.sg-act) beside a log row, not a form button.
-const act = (labelText: string, onClick: () => void) => <button type="button" className="sg-act ml-0" onClick={onClick}>{labelText}</button>;
+const act = (labelText: string, onClick: () => void) => (
+    // eslint-disable-next-line no-restricted-syntax -- the kit's quiet text action (.sg-act) beside a log row, not a form button.
+    <button type="button" className="sg-act ml-0" onClick={onClick}>{labelText}</button>
+);
 
 const FACT_LABELS: Record<keyof ExposureHistoryFacts, string> = {
     user_id: 'Worker reference', site_id: 'Site reference', exposed_at: 'Exposure time', exposure_type: 'Exposure route',

@@ -69,6 +69,47 @@ function collect(name, from) {
 }
 collect('livekit-client', root);
 collect('pusher-js', root);
+
+// Code copied inside a package's built file rather than installed as its own package, so it
+// ships no licence file. The marker must still appear in the built file, or the entry needs review.
+const MIT_BODY = `Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+const embedded = [
+    { name: 'ts-debounce', host: 'livekit-client', file: 'dist/livekit-client.esm.mjs', marker: 'Originally from ts-debounce', holder: '2017 Jakub Chodorowicz' },
+    { name: '@stablelib/base64', host: 'pusher-js', file: 'dist/web/pusher.js', marker: 'Copyright (C) 2016 Dmitry Chestnykh', holder: '2016 Dmitry Chestnykh' },
+    { name: '@stablelib/utf8', host: 'pusher-js', file: 'dist/web/pusher.js', marker: 'Package utf8 implements UTF-8 encoding', holder: '2016 Dmitry Chestnykh' },
+];
+for (const part of embedded) {
+    const hostPackage = locate(part.host, root);
+    const built = path.join(path.dirname(hostPackage), part.file);
+    if (!fs.existsSync(built) || !fs.readFileSync(built, 'utf8').includes(part.marker))
+        throw new Error(
+            `Review required: ${part.name} is no longer found inside ${part.host}/${part.file}`,
+        );
+    const host = JSON.parse(fs.readFileSync(hostPackage, 'utf8'));
+    entries.push({
+        name: part.name,
+        version: `bundled inside ${host.name}@${host.version}`,
+        licence: 'MIT',
+        files: [{ name: 'LICENSE (from the built file header)', content: `MIT License\n\nCopyright (c) ${part.holder}\n\n${MIT_BODY}` }],
+    });
+}
+
 entries.sort(
     (a, b) =>
         a.name.localeCompare(b.name) || a.version.localeCompare(b.version),

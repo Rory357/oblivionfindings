@@ -1135,7 +1135,10 @@ it('applies site revocation reassignment and explicit application wide permissio
             ->where('pagination.total', count($globalIds))
             ->where('items', fn ($items) => collect($items)->pluck('id')->sort()->values()->all() === $globalIds)
             ->where('auth.can.tasks.view', $revokedNavigation['view'])
-            ->where('auth.can.tasks.badge', $revokedNavigation['badge']));
+            // The count loads after the page, with the inbox.
+            ->loadDeferredProps('default', fn ($fill) => $fill
+                ->where('taskNav.view', $revokedNavigation['view'])
+                ->where('taskNav.badge', $revokedNavigation['badge'])));
 
     $profile->update([
         'primary_site_id' => $fixture['siteB']->id,

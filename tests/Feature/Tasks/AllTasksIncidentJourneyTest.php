@@ -272,9 +272,9 @@ it('keeps completed corrective actions active with truthful independent verifica
 
     expect($item)->not->toBeNull()
         ->and($item->status)->toBe(HsCorrectiveAction::STATUS_COMPLETED)
-        ->and($item->displayState)->toBe('Awaiting independent verification')
+        ->and($item->displayState)->toBe('Done — waiting to be checked')
         ->and($item->bucket)->toBe(TaskItem::BUCKET_IN_PROGRESS)
-        ->and($verifiedItem?->displayState)->toBe('Verified — ready to close')
+        ->and($verifiedItem?->displayState)->toBe('Checked — it worked')
         ->and($verifiedItem?->bucket)->toBe(TaskItem::BUCKET_IN_PROGRESS);
 });
 
@@ -390,7 +390,7 @@ it('finds the incident journey by people place source work narrative references 
 
     $verificationResults = collect((new TaskAggregator)->arrayFor(
         $viewer,
-        ['q' => 'awaiting independent verification'],
+        ['q' => 'waiting to be checked'],
     ));
     expect($verificationResults->pluck('id'))
         ->toContain('corrective_action-'.$journey['action']->id)
@@ -449,9 +449,11 @@ it('searches incident journey responsibilities beyond each providers normal 300 
             ->where('items', fn ($items) => collect($items)
                 ->contains(fn ($item) => $item['id'] === 'corrective_action-'.$targetAction->id)));
 
+    // One read each for the page's items. The sidebar's All Tasks count no longer runs
+    // with the page (it loads after it, with the inbox), so the second read is gone.
     expect(TaskSearch::hasQuery(['q' => '0']))->toBeTrue()
-        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_work_orders')))->toHaveCount(2)
-        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_service_schedules')))->toHaveCount(2)
+        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_work_orders')))->toHaveCount(1)
+        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_service_schedules')))->toHaveCount(1)
         ->and(collect($queries)->contains(
             fn (string $sql) => str_contains($sql, 'hs_corrective_actions')
                 && str_contains($sql, ' like '),

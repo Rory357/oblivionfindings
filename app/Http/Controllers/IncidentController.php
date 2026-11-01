@@ -40,6 +40,7 @@ use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
 use App\Support\Incidents\IncidentOccurrencePeriod;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
+use App\Support\Inertia\SharedDeferredReload;
 use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -71,11 +72,29 @@ class IncidentController extends Controller
      */
     public function index(Request $request)
     {
+        // The header inbox's follow-up request (just after the page loaded) gets only the inbox. Every register prop
+        // is Inertia::always, so this request used to rebuild the whole register and send it again; the page now keeps
+        // the register it loaded a moment before (Stephan, 31 Oct: "Change it"). The route guard has already re-checked
+        // the viewer's current register access, and the query checks below refuse it exactly when the page is refused.
+        if (SharedDeferredReload::only($request, 'incidents/index')) {
+            abort_unless($request->user() instanceof User, 403);
+            $this->register->validatedQuery($request);
+
+            return $this->privateRegisterResponse($request, []);
+        }
+
         $props = $this->register->index($request,
             fn (Request $current, int $id, CurrentAuthorizationReads $reads): ?array => $this->buildIncidentDetail($current, $id, $reads));
         // Existing eager fanout is preserved; sensitive props replace stale partial values.
         $fresh = array_map(fn ($value) => Inertia::always($value), $props);
-        $response = Inertia::render('incidents/index', $fresh)->toResponse($request);
+
+        return $this->privateRegisterResponse($request, $fresh);
+    }
+
+    /** @param  array<string, mixed>  $props */
+    private function privateRegisterResponse(Request $request, array $props)
+    {
+        $response = Inertia::render('incidents/index', $props)->toResponse($request);
         $response->headers->set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         return $response;

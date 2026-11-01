@@ -40,6 +40,8 @@ use Tests\TestCase;
 
 class HealthSafetyDashboardSiteIsolationTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -143,7 +145,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.site', $visibleSite->id)
@@ -252,7 +254,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('worklists.overdue_corrective_actions', 1)
@@ -300,7 +302,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $this->makeOpenHazard($foreignSite, $viewer, 'Foreign hazard');
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('site_league', 1)
@@ -336,7 +338,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $expectedStaffIds = collect([$viewer->id, $visibleWorker->id])->sort()->values()->all();
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('clients', 1)
@@ -448,7 +450,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('backbone.risk_assessments.active_assessments', 1)
@@ -545,7 +547,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $viewer = $this->userWithPermissions(['hazards.view', 'healthSafety.viewAllSites'], 'Global H&S Viewer');
 
         $this->actingAs($viewer)
-            ->get('/health-safety?site='.$secondSite->id)
+            ->getOverview('/health-safety?site='.$secondSite->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('sites', 2)
@@ -662,7 +664,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.site', null)
@@ -721,7 +723,7 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $this->assertStringContainsString('Remote Site', $exportContent);
 
         $this->actingAs($viewer)
-            ->get('/health-safety?site='.$remoteSite->id)
+            ->getOverview('/health-safety?site='.$remoteSite->id)
             ->assertOk();
         $this->actingAs($viewer)
             ->get('/health-safety/analytics?site_id='.$remoteSite->id)

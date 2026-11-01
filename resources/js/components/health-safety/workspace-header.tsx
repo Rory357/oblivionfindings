@@ -14,11 +14,40 @@ import {
     SAFETY_HUBS,
     visibleSafetyViews,
     type SafetyHubKey,
+    type SafetyNavigationPermissions,
 } from '@/lib/health-safety/workspace-navigation';
 import { type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import { CalendarDays } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+/**
+ * G2 (B5.2/K9): the Incidents and safety reviews rail shows each tab's attention count (incidents needing an owner,
+ * reviews needing an owner, overdue actions, WorkSafe to decide or tell), read on the server like the Overview's boxes.
+ * A count the person can't read comes back null and the tab shows none. Pages that pass their own counts keep them.
+ */
+function useConcernsRailCounts(enabled: boolean): Partial<Record<string, number>> | undefined {
+    const [counts, setCounts] = useState<Partial<Record<string, number>>>();
+    useEffect(() => {
+        if (!enabled) return;
+        let live = true;
+        axios
+            .get<Record<string, number | null>>('/health-safety/rail-counts')
+            .then(({ data }) => {
+                if (!live) return;
+                setCounts(Object.fromEntries(Object.entries(data).filter((entry): entry is [string, number] => typeof entry[1] === 'number')));
+            })
+            .catch(() => undefined); // No counts is a quiet state: the tabs still work.
+        return () => {
+            live = false;
+        };
+    }, [enabled]);
+    return counts;
+}
+
+/** B5.4: Site inspections stay a Sites page; Risks and prevention links there (↗, folded under More) for people who can open them. */
+const INSPECTIONS_LINK = 'inspections-link';
 
 /** Sibling destinations live on the header rail, status lenses in its filters. */
 export function SafetyWorkspaceRail({
@@ -38,20 +67,48 @@ export function SafetyWorkspaceRail({
     onSelect?: (key: string) => boolean;
 }) {
     const can = usePage<SharedData>().props.auth.can;
+    const fetched = useConcernsRailCounts(hub === 'concerns' && counts === undefined);
+    // Fetched counts are attention counts (work waiting), so they take the alert pair; a page's own counts stay neutral.
+    const attention = counts === undefined && fetched !== undefined;
+    counts = counts ?? fetched;
     const group = SAFETY_HUBS.find((item) => item.key === hub)!;
     const views = visibleSafetyViews(group, can).filter(
         (view) => !view.shortcut,
     );
+    const inspections =
+        hub === 'prevention' &&
+        !!(can as SafetyNavigationPermissions | undefined)?.checklists?.view &&
+        !!(can as SafetyNavigationPermissions | undefined)?.sites?.viewAny;
     return (
         <PageHeaderRail
-            items={views.map((view) => ({
-                ...view,
-                count: counts?.[view.key] || undefined,
-            }))}
+            items={[
+                ...views.map((view) => ({
+                    ...view,
+                    count: counts?.[view.key] || undefined,
+                    alert: attention && !!counts?.[view.key],
+                })),
+                ...(inspections
+                    ? [
+                          {
+                              key: INSPECTIONS_LINK,
+                              label: 'Inspections ↗',
+                              overflow: {
+                                  description:
+                                      'Opens Sites: each site keeps its own inspections',
+                              },
+                          },
+                      ]
+                    : []),
+            ]}
             value={current}
             ariaLabel={`${group.label} views`}
             showFind={views.length > 2}
+            maxVisible={inspections ? views.length : undefined}
             onSelect={(key) => {
+                if (key === INSPECTIONS_LINK) {
+                    router.visit('/sites');
+                    return;
+                }
                 if (onSelect?.(key)) return;
                 const view = views.find((view) => view.key === key);
                 if (view) router.visit(view.href);

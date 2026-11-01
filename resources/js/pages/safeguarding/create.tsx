@@ -30,7 +30,7 @@ export default function SafeguardingCreate({
         { title: 'Home', href: '/dashboard' },
         ...(canSeeRegister
             ? [
-                  { title: 'Health & safety', href: '/health-safety' },
+                  { title: 'Health and safety', href: '/health-safety' },
                   { title: 'Safeguarding', href: '/safeguarding' },
               ]
             : []),

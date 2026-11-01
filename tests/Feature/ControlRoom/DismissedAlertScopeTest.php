@@ -38,6 +38,7 @@ use Tests\TestCase;
 class DismissedAlertScopeTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Support\LoadsHealthSafetyOverview;
 
     private User $admin;
 
@@ -71,7 +72,7 @@ class DismissedAlertScopeTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-safety/dashboard')
@@ -349,7 +350,7 @@ class DismissedAlertScopeTest extends TestCase
         ]);
 
         $this->actingAs($officer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('kpis.active_alerts', 1));
 
@@ -784,7 +785,7 @@ class DismissedAlertScopeTest extends TestCase
             'healthSafety.viewAllSites',
         ]);
         $this->actingAs($globalHsOfficer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('kpis.active_alerts', 2));
 

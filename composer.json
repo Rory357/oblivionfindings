@@ -1,13 +1,13 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/react-starter-kit",
+    "name": "oblivion/care",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Oblivion Care: the supported-living care platform.",
     "keywords": [
-        "laravel",
-        "framework"
+        "oblivion",
+        "care"
     ],
-    "license": "MIT",
+    "license": "proprietary",
     "require": {
         "php": "^8.4.27",
         "ext-sodium": "*",
@@ -83,7 +83,17 @@
             "@php artisan test"
         ],
         "test:prepare": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv DB_DATABASE=oblivion_findings_codex_test_snapshot",
             "@php artisan testing:prepare-schema --env=testing"
+        ],
+        "test:fast": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php scripts/test/fast.php"
+        ],
+        "test:changed": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php scripts/test/changed.php"
         ],
         "test:unit": [
             "@php artisan test --testsuite=Unit"
