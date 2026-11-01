@@ -499,6 +499,10 @@ class IncidentController extends Controller
             'notes' => $reportNotes,
             'can' => [
                 'add_note' => $canAddNote,
+                // Board M5c note + answer 21: a closed incident's PDF is for whole-record viewers only (the incident
+                // register's managers and the incident's owner), never someone who sees only their own reports.
+                'download_pdf' => $incident->status === 'closed'
+                    && ($user->canDo('incidents.viewAny') || (int) $incident->incident_owner_user_id === (int) $user->id),
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),
                 'review' => $user->can('review', $incident),
@@ -1292,6 +1296,21 @@ class IncidentController extends Controller
         $response->headers->set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         return $response;
+    }
+
+    /**
+     * Board M5c note: a closed incident's final record as a PDF, built from the same admitted page payload as show().
+     */
+    public function pdf(Request $request, string $incident)
+    {
+        $id = $this->incidentRecordIdentity($incident);
+        $props = app(\App\Services\Incidents\IncidentEvidenceWindowPolicySettings::class)->withLockedPolicy(fn () =>
+            $this->register->show($request, $id,
+                fn (Request $current, int $id, CurrentAuthorizationReads $reads): ?array => $this->buildIncidentDetail($current, $id, $reads)));
+        $detail = $props['detail'];
+        abort_unless(($detail['can']['download_pdf'] ?? false) === true, 403);
+
+        return app(\App\Services\Incidents\IncidentPdfService::class)->download($id, $detail, $request->user());
     }
 
     /** Bound raw route identities before integer conversion or private model hydration. */

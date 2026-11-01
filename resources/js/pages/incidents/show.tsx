@@ -112,6 +112,7 @@ import {
     LinkIcon,
     ListTodo,
     Paperclip,
+    FileDown,
     Pencil,
     RadioTower,
     RotateCw,
@@ -455,6 +456,12 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
             {canEditDraft ? (
                 <PageHeaderGlassButton icon={Pencil} onClick={() => setAction('edit')}>
                     Edit draft
+                </PageHeaderGlassButton>
+            ) : null}
+            {d.can.download_pdf ? (
+                // Board M5c note: the closed incident's final record, for whole-record viewers (answer 21).
+                <PageHeaderGlassButton icon={FileDown} onClick={() => window.location.assign(`/incidents/${d.id}/pdf`)}>
+                    Download PDF
                 </PageHeaderGlassButton>
             ) : null}
             {d.can.requestResponse ? (
