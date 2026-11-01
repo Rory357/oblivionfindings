@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"oblivion.local/endpoint-agent/internal/hubupdate"
 )
 
 var errInstallation = errors.New("collector installation is not trusted; administrator review is required")
@@ -30,9 +32,15 @@ type timings struct{ startup, cycle, interval, maximumBackoff time.Duration }
 
 var productionTimings = timings{20 * time.Second, 10 * time.Minute, time.Minute, 5 * time.Minute}
 
+// updateHook is the hub's self-update (hubupdate.Updater, D3). It may be nil.
+type updateHook interface {
+	AfterCycle(context.Context, uint32, error) hubupdate.Action
+	StartupFailed(context.Context) hubupdate.Action
+}
+
 // Local readiness means the protected runtime can start. Only the collector's
 // accepted heartbeat establishes central monitoring health.
-func runCycles(ctx context.Context, executor cycleExecutor, ready func(), report func(string), timing timings) error {
+func runCycles(ctx context.Context, executor cycleExecutor, ready func(), report func(string), timing timings, updates updateHook) error {
 	if executor == nil || ready == nil || report == nil || timing.startup <= 0 || timing.cycle <= 0 || timing.interval <= 0 || timing.maximumBackoff < timing.interval {
 		return errors.New("collector service configuration is invalid")
 	}
@@ -41,6 +49,10 @@ func runCycles(ctx context.Context, executor cycleExecutor, ready func(), report
 	startupErr := startup.Err()
 	cancel()
 	if err != nil || startupErr != nil {
+		if updates != nil && ctx.Err() == nil {
+			// A new release on trial that can't start goes straight back to the old one.
+			updates.StartupFailed(ctx)
+		}
 		return errors.New("collector runtime or identity requires administrator review")
 	}
 	if ctx.Err() != nil {
@@ -85,6 +97,15 @@ func runCycles(ctx context.Context, executor cycleExecutor, ready func(), report
 		if state != last {
 			report(state)
 			last = state
+		}
+		if updates != nil {
+			// Restart needs nothing here: the update helper stops this service and starts
+			// it again from the new release. Until then cycles carry on as normal.
+			if updates.AfterCycle(ctx, code, cycleErr) == hubupdate.Wait {
+				// A release is on trial: check again at the normal pace, without backing off.
+				waiting = true
+				delay = timing.interval
+			}
 		}
 		timer := time.NewTimer(delay)
 		select {

@@ -32,6 +32,17 @@ final class EndpointReleaseCatalogue
     /** Publisher metadata only: no profile, machine credential, API key or arbitrary URL. */
     public function catalogue(?DateTimeImmutable $now = null): array
     {
+        return $this->signedCatalogue($now)['catalogue'];
+    }
+
+    /**
+     * The verified release list and the exact signed bytes it was read from, so a Linux hub
+     * can check the publisher's signature itself before it installs an update (S&D Phase B, D3).
+     *
+     * @return array{catalogue: array<string, mixed>, signed: string}
+     */
+    public function signedCatalogue(?DateTimeImmutable $now = null): array
+    {
         $now ??= new DateTimeImmutable;
         $key = base64_decode($this->publicKey, true);
         $this->require(is_string($key) && strlen($key) === SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES && base64_encode($key) === $this->publicKey);
@@ -84,7 +95,7 @@ final class EndpointReleaseCatalogue
                 $names[strtolower($artifact['filename'])] = true;
             }
 
-            return $catalogue;
+            return ['catalogue' => $catalogue, 'signed' => $bytes];
         } catch (Throwable) {
             throw new EndpointReleaseUnavailable('Agent releases are unavailable.');
         }

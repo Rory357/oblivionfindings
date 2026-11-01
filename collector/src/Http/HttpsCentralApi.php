@@ -164,6 +164,25 @@ final readonly class HttpsCentralApi implements CentralApi
         return $this->request('POST', '/api/monitoring/collectors/update/report', ['collector_id' => $collectorId, 'report' => $report]);
     }
 
+    /**
+     * Streams the release file this hub was told to install (S&D Phase B, D3), signed and over
+     * mTLS like every other hub call. Each chunk goes to $sink, which returns false to stop.
+     *
+     * @param  Closure(string): bool  $sink
+     */
+    public function downloadUpdate(string $collectorId, string $artifactId, string $sha256, Closure $sink): void
+    {
+        $path = '/api/monitoring/collectors/update/download';
+        $body = json_encode(['collector_id' => $collectorId, 'artifact_id' => $artifactId, 'sha256' => $sha256], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $result = $this->send('POST', $path, $body, $this->requestHeaders('POST', $path, $body), true, $sink);
+        if (! $result['transport_ok'] || $result['status'] !== 200) {
+            throw new CentralApiFailure(
+                'Central HTTPS download failed with a bounded transport outcome: '.($result['status'] ?: 'unavailable').'.',
+                $result['transport_ok'] ? (int) $result['status'] : 0,
+            );
+        }
+    }
+
     /** @return array{schema: string, state: string, collector_reference_sha256: string, signing_key_reference_sha256: string, identity_generation_reference_sha256: string, expected_identity_state: string, pinned_https_contract: string, initial_response: string, replay_attempt: string, samples: int, observed_from_utc: string, observed_until_utc: string} */
     public function verifyTransport(
         string $collectorId,
@@ -313,8 +332,15 @@ final readonly class HttpsCentralApi implements CentralApi
         return $headers;
     }
 
-    /** @param list<string> $headers @return array{transport_ok: bool, status: int, body: string, transient_failure?: bool} */
-    private function send(string $method, string $path, string $body, array $headers, bool $useMtls): array
+    /**
+     * With a $sink (update downloads), a 200 reply's body goes to the sink instead of memory,
+     * with longer time limits; any other reply is kept as a small error body.
+     *
+     * @param  list<string>  $headers
+     * @param  null|Closure(string): bool  $sink
+     * @return array{transport_ok: bool, status: int, body: string, transient_failure?: bool}
+     */
+    private function send(string $method, string $path, string $body, array $headers, bool $useMtls, ?Closure $sink = null): array
     {
         if ($this->testTransport !== null) {
             $result = ($this->testTransport)($method, $path, $body, $headers, $useMtls);
@@ -323,6 +349,14 @@ final readonly class HttpsCentralApi implements CentralApi
                 || ! is_string($result['body'] ?? null)
                 || (array_key_exists('transient_failure', $result) && ! is_bool($result['transient_failure']))) {
                 throw new CentralApiFailure('Collector test transport returned an invalid bounded outcome.');
+            }
+            if ($sink !== null && $result['transport_ok'] && $result['status'] === 200) {
+                foreach (str_split($result['body'], 65536) as $chunk) {
+                    if (! $sink($chunk)) {
+                        return ['transport_ok' => false, 'status' => 200, 'body' => ''];
+                    }
+                }
+                $result['body'] = '';
             }
 
             return $result;
@@ -341,13 +375,16 @@ final readonly class HttpsCentralApi implements CentralApi
             CURLOPT_HEADER => false,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_MAXREDIRS => 0,
-            CURLOPT_CONNECTTIMEOUT => str_contains($path, '/collectors/media/') ? 3 : 5,
-            CURLOPT_TIMEOUT => str_contains($path, '/collectors/media/') ? 3 : 15,
+            CURLOPT_CONNECTTIMEOUT => str_contains($path, '/collectors/media/') ? 3 : ($sink !== null ? 10 : 5),
+            CURLOPT_TIMEOUT => str_contains($path, '/collectors/media/') ? 3 : ($sink !== null ? 2400 : 15),
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_PINNEDPUBLICKEY => $this->tlsPublicKeyPin,
             CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
-            CURLOPT_WRITEFUNCTION => function ($curl, string $chunk) use (&$response): int {
+            CURLOPT_WRITEFUNCTION => function ($curl, string $chunk) use (&$response, $sink): int {
+                if ($sink !== null && curl_getinfo($curl, CURLINFO_RESPONSE_CODE) === 200) {
+                    return $sink($chunk) ? strlen($chunk) : 0;
+                }
                 if (strlen($response) + strlen($chunk) > self::MAX_RESPONSE_BYTES) {
                     return 0;
                 }
@@ -358,6 +395,11 @@ final readonly class HttpsCentralApi implements CentralApi
         ];
         if ($this->caBundleFile !== null) {
             $options[CURLOPT_CAINFO] = $this->caBundleFile;
+        }
+        if ($sink !== null) {
+            // A stalled download gives up rather than holding the hub for the whole time limit.
+            $options[CURLOPT_LOW_SPEED_LIMIT] = 1024;
+            $options[CURLOPT_LOW_SPEED_TIME] = 120;
         }
         if ($useMtls) {
             $options[CURLOPT_SSLCERT] = $this->clientCertificateFile;

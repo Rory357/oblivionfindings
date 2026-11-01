@@ -41,7 +41,8 @@ func Run() error {
 		} else {
 			close(mediaDone)
 		}
-		err = runCycles(ctx, state, ready, report, productionTimings)
+		// D3: after each cycle the hub may update itself overnight, and rolls back if it fails.
+		err = runCycles(ctx, state, ready, report, productionTimings, newUpdater(state, report))
 		if err != nil && ctx.Err() == nil && log != nil {
 			_ = log.Error(11, "Collector service stopped; approved runtime and private state require review.")
 		}

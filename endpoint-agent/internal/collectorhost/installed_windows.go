@@ -18,6 +18,8 @@ var stagePattern = regexp.MustCompile("^r-[1-9][0-9]{0,15}-[a-f0-9]{32}$")
 
 type installed struct {
 	code, state *securefs.Directory
+	releases    *securefs.Directory // Program Files\Oblivion\Agent\releases, for self-updates
+	stage       string              // the release folder this service runs from
 	opened      []*securefs.Directory
 	locks       []*os.File
 	environment []string
@@ -72,8 +74,12 @@ func openInstalled() (*installed, error) {
 		if err != nil {
 			return nil, errInstallation
 		}
+		if name == "releases" {
+			i.releases = parent
+		}
 	}
 	i.code = parent
+	i.stage = stage
 	// Hold every package directory, so no path can be redirected while in use.
 	if err = i.holdCodeTree(i.code, 0, new(int)); err != nil {
 		return nil, err
@@ -184,9 +190,9 @@ func (i *installed) validatePrivateState() error {
 	// PHP runtime-check performs the complete identity/certificate validation.
 	return checkPrivateTree(i.state, 0, new(int))
 }
-func (i *installed) call(command string) invocation {
+func (i *installed) call(command string, extra ...string) invocation {
 	runtime := filepath.Join(i.code.Path(), "runtime")
-	args := phpArguments(runtime, filepath.Join(i.code.Path(), "bin", "oblivion-collector"), i.state.Path(), command)
+	args := append(phpArguments(runtime, filepath.Join(i.code.Path(), "bin", "oblivion-collector"), i.state.Path(), command), extra...)
 	return invocation{executable: filepath.Join(runtime, "php.exe"), directory: runtime, arguments: args, environment: i.environment}
 }
 func (i *installed) Check(ctx context.Context) error {

@@ -121,6 +121,11 @@ jobs:
           path: ${{ runner.temp }}/hub-runtime
 
       - name: Cross-compile Linux binaries & package NUC/Pi tarballs
+        env:
+          # D3 self-updates: Linux hubs check each update against the signed release list, so the
+          # launcher carries that list's public key. Only main has it; other builds get none and
+          # their hubs refuse to self-update (nothing installs without a key).
+          RELEASE_LIST_PUBKEY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_RELEASE_PUBLIC_KEY || '' }}
         run: |
           chmod +x scripts/package-linux-site-hub.sh endpoint-agent/packaging/linux/install.sh
           VERSION="${{ inputs.version }}"
@@ -133,7 +138,7 @@ jobs:
             chmod 0755 "$OUT_BIN/runtime/php"
             (
               cd endpoint-agent
-              CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o "${OUT_BIN}/oblivion-site-collector" ./cmd/oblivion-site-collector
+              CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath -ldflags="-s -w -X main.version=${VERSION} -X oblivion.local/endpoint-agent/internal/hubupdate.ReleaseListPublicKey=${RELEASE_LIST_PUBKEY}" -o "${OUT_BIN}/oblivion-site-collector" ./cmd/oblivion-site-collector
               CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath -ldflags="-s -w" -o "${OUT_BIN}/oblivion-media" ./cmd/oblivion-media
             )
             ./scripts/package-linux-site-hub.sh "$ARCH" "$OUT_BIN" "${RUNNER_TEMP}/dist/oblivion-site-hub-linux-${ARCH}.tar.gz"
@@ -263,7 +268,8 @@ jobs:
               $binDir = Join-Path $workRoot "go-win-$arch"
               New-Item -ItemType Directory -Force -Path $binDir | Out-Null
               go build -trimpath -ldflags="-s -w -X main.version=$version $releaseFlags" -o (Join-Path $binDir 'oblivion-agent.exe') ./cmd/oblivion-agent
-              go build -trimpath -ldflags="-s -w -X main.version=$version $releaseFlags" -o (Join-Path $binDir 'oblivion-collector.exe') ./cmd/oblivion-collector
+              # D3 self-updates: the hub checks each update package with the publisher's package key.
+              go build -trimpath -ldflags="-s -w -X main.version=$version -X oblivion.local/endpoint-agent/internal/hubupdate.PackagePublicKey=$pkgPub $releaseFlags" -o (Join-Path $binDir 'oblivion-collector.exe') ./cmd/oblivion-collector
               go build -trimpath -ldflags="-s -w $releaseFlags" -o (Join-Path $binDir 'oblivion-media.exe') ./cmd/oblivion-media
               go build -trimpath -ldflags="-s -w -X main.version=$version -X main.publisherPublicKey=$pkgPub $releaseFlags" -o (Join-Path $binDir 'oblivion-setup-core.exe') ./cmd/oblivion-setup
             }

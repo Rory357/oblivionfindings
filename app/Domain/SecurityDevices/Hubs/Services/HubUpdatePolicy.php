@@ -83,21 +83,23 @@ final class HubUpdatePolicy
             'window' => [
                 'start' => $this->clock($collector->update_window_start, '02:00'),
                 'end' => $this->clock($collector->update_window_end, '05:00'),
-                'timezone' => (string) config('app.timezone', 'Pacific/Auckland'),
+                // The hubs' local night: app.timezone is UTC (storage), so it can't be used here.
+                'timezone' => (string) config('app.worker_timezone', 'Pacific/Auckland'),
             ],
             'rollback_after_minutes' => self::ROLLBACK_AFTER_MINUTES,
             'target' => ($hold['held'] || $collector->approved_at === null) ? null : $this->target($collector, $ring, $now),
         ];
     }
 
-    /** @return array{version: string, release_revision: int, artifacts: list<array<string, mixed>>}|null */
+    /** @return array{version: string, release_revision: int, artifacts: list<array<string, mixed>>, release_list?: string}|null */
     private function target(MonitoringCollector $collector, string $ring, CarbonImmutable $now): ?array
     {
         try {
-            $catalogue = ($this->catalogue ?? EndpointReleaseCatalogue::configured())->catalogue($now->toDateTimeImmutable());
+            $signed = ($this->catalogue ?? EndpointReleaseCatalogue::configured())->signedCatalogue($now->toDateTimeImmutable());
         } catch (EndpointReleaseUnavailable) {
             return null;
         }
+        $catalogue = $signed['catalogue'];
         $issuedAt = CarbonImmutable::parse((string) $catalogue['issued_at'])->utc();
         if ($ring === 'everyone' && $issuedAt->gt($now->subHours(self::EVERYONE_DELAY_HOURS))) {
             // Test-first hubs have had it for less than a day: everyone else waits.
@@ -115,7 +117,7 @@ final class HubUpdatePolicy
         usort($artifacts, fn (array $a, array $b): int => $b['release_revision'] <=> $a['release_revision']);
         $latest = $artifacts[0];
 
-        return [
+        $target = [
             'version' => (string) $latest['version'],
             'release_revision' => (int) $latest['release_revision'],
             'artifacts' => array_values(array_map(fn (array $artifact): array => [
@@ -126,6 +128,14 @@ final class HubUpdatePolicy
                 'sha256' => $artifact['sha256'],
             ], array_filter($artifacts, fn (array $artifact): bool => $artifact['release_revision'] === $latest['release_revision']))),
         ];
+        if ($platform === 'linux') {
+            // Linux packages aren't signed themselves; the signed release list pins their exact
+            // bytes, so the hub checks the list's signature before it installs. Windows packages
+            // carry their own signature, so Windows hubs don't need it.
+            $target['release_list'] = base64_encode($signed['signed']);
+        }
+
+        return $target;
     }
 
     /**

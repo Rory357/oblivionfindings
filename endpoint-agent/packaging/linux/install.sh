@@ -116,46 +116,74 @@ ensure_php() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_ROOT="/opt/oblivion-collector"
 STATE_ROOT="/etc/oblivion-collector"
+# Self-updates (D3): each release has its own folder under releases/, and systemd starts the
+# one the "current" link points at. The hub swaps that link to update or roll back. This
+# installer doesn't know the build's revision, so its folder says r-0 ("not known").
+STAGE="r-0-$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+RELEASE_DIR="${INSTALL_ROOT}/releases/${STAGE}"
+CURRENT="${INSTALL_ROOT}/current"
 
 PHP_BIN=""
 if [[ -x "${SCRIPT_DIR}/runtime/php" ]]; then
-    PHP_BIN="${INSTALL_ROOT}/runtime/php"
+    PHP_BIN="${CURRENT}/runtime/php"
 else
     PHP_BIN="$(ensure_php)"
 fi
 
-install -d -o root -g root -m 0755 "$INSTALL_ROOT"
+WAS_ACTIVE=0
+if systemctl is-active --quiet oblivion-site-collector.service 2>/dev/null; then
+    WAS_ACTIVE=1
+    systemctl stop oblivion-site-collector.service
+fi
+
+install -d -o root -g root -m 0755 "$INSTALL_ROOT" "${INSTALL_ROOT}/releases" "$RELEASE_DIR"
 install -d -o root -g root -m 0700 "$STATE_ROOT"
 
-rm -rf "${INSTALL_ROOT}/bin" "${INSTALL_ROOT}/src" "${INSTALL_ROOT}/vendor" "${INSTALL_ROOT}/runtime"
-cp -R "${SCRIPT_DIR}/bin" "${SCRIPT_DIR}/src" "${SCRIPT_DIR}/vendor" "$INSTALL_ROOT/"
+cp -R "${SCRIPT_DIR}/bin" "${SCRIPT_DIR}/src" "${SCRIPT_DIR}/vendor" "$RELEASE_DIR/"
 if [[ -d "${SCRIPT_DIR}/runtime" ]]; then
-    cp -R "${SCRIPT_DIR}/runtime" "$INSTALL_ROOT/"
+    cp -R "${SCRIPT_DIR}/runtime" "$RELEASE_DIR/"
 fi
-install -o root -g root -m 0644 "${SCRIPT_DIR}/composer.json" "${INSTALL_ROOT}/composer.json"
+install -o root -g root -m 0644 "${SCRIPT_DIR}/composer.json" "${RELEASE_DIR}/composer.json"
+if [[ -f "${SCRIPT_DIR}/VERSION" ]]; then
+    install -o root -g root -m 0644 "${SCRIPT_DIR}/VERSION" "${RELEASE_DIR}/VERSION"
+fi
 if [[ -f "${SCRIPT_DIR}/cacert.pem" ]]; then
-    install -o root -g root -m 0644 "${SCRIPT_DIR}/cacert.pem" "${INSTALL_ROOT}/cacert.pem"
+    install -o root -g root -m 0644 "${SCRIPT_DIR}/cacert.pem" "${RELEASE_DIR}/cacert.pem"
 fi
-install -o root -g root -m 0755 "${SCRIPT_DIR}/oblivion-site-collector" "${INSTALL_ROOT}/oblivion-site-collector"
+install -o root -g root -m 0755 "${SCRIPT_DIR}/oblivion-site-collector" "${RELEASE_DIR}/oblivion-site-collector"
 if [[ -f "${SCRIPT_DIR}/oblivion-media" ]]; then
-    install -o root -g root -m 0755 "${SCRIPT_DIR}/oblivion-media" "${INSTALL_ROOT}/oblivion-media"
+    install -o root -g root -m 0755 "${SCRIPT_DIR}/oblivion-media" "${RELEASE_DIR}/oblivion-media"
 fi
 
-chown -R root:root "$INSTALL_ROOT"
-find "$INSTALL_ROOT" -type d -exec chmod 0755 {} +
-find "$INSTALL_ROOT" -type f -exec chmod 0644 {} +
-chmod 0755 "${INSTALL_ROOT}/oblivion-site-collector" "${INSTALL_ROOT}/bin/oblivion-collector"
-if [[ -f "${INSTALL_ROOT}/oblivion-media" ]]; then
-    chmod 0755 "${INSTALL_ROOT}/oblivion-media"
+chown -R root:root "$RELEASE_DIR"
+find "$RELEASE_DIR" -type d -exec chmod 0755 {} +
+find "$RELEASE_DIR" -type f -exec chmod 0644 {} +
+chmod 0755 "${RELEASE_DIR}/oblivion-site-collector" "${RELEASE_DIR}/bin/oblivion-collector"
+if [[ -f "${RELEASE_DIR}/oblivion-media" ]]; then
+    chmod 0755 "${RELEASE_DIR}/oblivion-media"
 fi
-if [[ -f "${INSTALL_ROOT}/runtime/php" ]]; then
-    chmod 0755 "${INSTALL_ROOT}/runtime/php"
+if [[ -f "${RELEASE_DIR}/runtime/php" ]]; then
+    chmod 0755 "${RELEASE_DIR}/runtime/php"
 fi
+
+# Point "current" at the new release in one step (rename a new link over the old one).
+ln -s "releases/${STAGE}" "${INSTALL_ROOT}/.current-new"
+mv -T -f "${INSTALL_ROOT}/.current-new" "$CURRENT"
+# Tidy up: the files of an install from before self-updates, and older release folders.
+rm -rf "${INSTALL_ROOT}/bin" "${INSTALL_ROOT}/src" "${INSTALL_ROOT}/vendor" "${INSTALL_ROOT}/runtime" \
+    "${INSTALL_ROOT}/composer.json" "${INSTALL_ROOT}/cacert.pem" "${INSTALL_ROOT}/VERSION" \
+    "${INSTALL_ROOT}/oblivion-site-collector" "${INSTALL_ROOT}/oblivion-media"
+find "${INSTALL_ROOT}/releases" -mindepth 1 -maxdepth 1 ! -name "$STAGE" -exec rm -rf {} +
+# The update record names release folders that are gone now: a fresh install starts it again.
+rm -f "${STATE_ROOT}/hub-update.json"
 
 install -o root -g root -m 0644 "${SCRIPT_DIR}/systemd/oblivion-site-collector.service" /etc/systemd/system/oblivion-site-collector.service
 systemctl daemon-reload
 
 if [[ "$INSTALL_ONLY" -eq 1 ]]; then
+    if [[ "$WAS_ACTIVE" -eq 1 ]]; then
+        systemctl start oblivion-site-collector.service
+    fi
     echo "Site hub files installed to ${INSTALL_ROOT}."
     exit 0
 fi
@@ -239,7 +267,7 @@ if [[ -z "$DEPLOYMENT_URL" || -z "$COLLECTOR_URL" ]]; then
 fi
 
 ENROL_ARGS=(
-    "${INSTALL_ROOT}/bin/oblivion-collector"
+    "${CURRENT}/bin/oblivion-collector"
     "enrol-profile"
     "--profile=${PROFILE_PATH}"
     "--state-directory=${STATE_ROOT}"
@@ -252,7 +280,7 @@ fi
 "$PHP_BIN" "${ENROL_ARGS[@]}"
 cleanup
 
-"$PHP_BIN" "${INSTALL_ROOT}/bin/oblivion-collector" run \
+"$PHP_BIN" "${CURRENT}/bin/oblivion-collector" run \
     "--identity=${STATE_ROOT}/collector.identity.json" \
     "--config=${STATE_ROOT}/collector.json" || true
 

@@ -30,16 +30,21 @@ final class CollectorApplication
 {
     public const string VERSION = '0.2.0';
 
+    /** Largest release file a hub will download (matches the signed release list's limit). */
+    private const int MAX_UPDATE_BYTES = 536_870_912;
+
     /**
      * @param  null|\Closure(string, string, string, string, string): array<string, mixed>  $enrolmentTransport
      * @param  null|\Closure(string, string, int, string, string): array<string, mixed>  $transportEvidenceTransport
      * @param  null|\Closure(string, mixed): void  $output
+     * @param  null|\Closure(string, string, string, list<string>, bool): array{transport_ok: bool, status: int, body: string}  $updateTransport  test transport for update-fetch and update-report
      */
     public function __construct(
         private readonly ?\Closure $enrolmentTransport = null,
         private readonly ?\Closure $transportEvidenceTransport = null,
         private readonly ?\Closure $output = null,
         private readonly ?\Closure $recoverableEnrollmentTransport = null,
+        private readonly ?\Closure $updateTransport = null,
     ) {}
 
     /** @param list<string> $arguments */
@@ -58,6 +63,8 @@ final class CollectorApplication
                 'runtime-check' => $this->runtimeCheck($options),
                 'media-run' => $this->mediaRun($options),
                 'run' => $this->collect($options),
+                'update-fetch' => $this->updateFetch($options),
+                'update-report' => $this->updateReport($options),
                 'verify-transport' => $this->verifyTransport($options),
                 default => $this->usage(),
             };
@@ -534,6 +541,205 @@ final class CollectorApplication
         return preg_match('/\A(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\z/', $stamped) === 1 ? $stamped : self::VERSION;
     }
 
+    /**
+     * update-fetch (S&D Phase B, D3): downloads the release file this hub was told to install,
+     * on the signed mTLS path, into a file inside the state folder. It refuses any file not
+     * named in hub-instructions.json's current target, checks size and SHA-256 while it
+     * streams, and renames the file into place only once both match. The Go host then checks
+     * the package's own signature before it installs anything.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function updateFetch(array $options): int
+    {
+        if (array_diff(array_keys($options), ['identity', 'artifact', 'output']) !== []) {
+            throw new RuntimeException('Update download contains an unknown option.');
+        }
+        $identityPath = $this->requiredPath($options, 'identity');
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $stateDirectory = $this->stateDirectory($identity, $identityPath);
+        $artifact = $this->instructedArtifact($stateDirectory, $this->requiredString($options, 'artifact'));
+        $output = $this->updateOutputPath($stateDirectory, $this->requiredString($options, 'output'));
+        $secretKey = $this->requestSigningKey($identity);
+        $temporary = $output.'.part-'.bin2hex(random_bytes(8));
+        $handle = @fopen($temporary, 'xb');
+        try {
+            if ($handle === false) {
+                throw new RuntimeException('The update file could not be created.');
+            }
+            $hash = hash_init('sha256');
+            $size = 0;
+            $this->central($identity, $secretKey)->downloadUpdate(
+                $identity['collector_id'],
+                $artifact['id'],
+                $artifact['sha256'],
+                function (string $chunk) use ($handle, $hash, &$size, $artifact): bool {
+                    $size += strlen($chunk);
+                    if ($size > $artifact['size']) {
+                        return false;
+                    }
+                    hash_update($hash, $chunk);
+
+                    return $this->writeAll($handle, $chunk);
+                },
+            );
+            if ($size !== $artifact['size'] || ! hash_equals($artifact['sha256'], hash_final($hash))) {
+                throw new RuntimeException('The downloaded update does not match its size and SHA-256.');
+            }
+            $synced = fflush($handle) && fsync($handle);
+            $closed = fclose($handle);
+            $handle = null;
+            if (! $synced || ! $closed || ! rename($temporary, $output)) {
+                throw new RuntimeException('The update file could not be saved.');
+            }
+        } finally {
+            sodium_memzero($secretKey);
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            if (is_file($temporary)) {
+                @unlink($temporary);
+            }
+        }
+        $this->write("update-fetch: downloaded and checked\n");
+
+        return 0;
+    }
+
+    /**
+     * update-report (S&D Phase B, D3): tells Oblivion how an update went, so the Go host needs
+     * no signing code of its own. A roll-back or failure raises an alert for IT.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function updateReport(array $options): int
+    {
+        if (array_diff(array_keys($options), ['identity', 'outcome', 'from', 'to', 'detail']) !== []) {
+            throw new RuntimeException('Update report contains an unknown option.');
+        }
+        $version = '/\A(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\z/';
+        $outcome = $this->requiredString($options, 'outcome');
+        $to = $this->requiredString($options, 'to');
+        $from = $options['from'] ?? null;
+        $detail = $options['detail'] ?? null;
+        if (! in_array($outcome, ['installed', 'rolled_back', 'failed'], true) || preg_match($version, $to) !== 1
+            || ($from !== null && (! is_string($from) || preg_match($version, $from) !== 1))
+            || ($detail !== null && ! is_string($detail))) {
+            throw new RuntimeException('Update report options are invalid.');
+        }
+        if (is_string($detail)) {
+            // Plain text only, at most 500 characters (the server's limit).
+            $detail = substr(trim((string) preg_replace('/[^\x20-\x7e]+/', ' ', $detail)), 0, 500);
+        }
+        $identityPath = $this->requiredPath($options, 'identity');
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $secretKey = $this->requestSigningKey($identity);
+        try {
+            $this->central($identity, $secretKey)->updateReport($identity['collector_id'], [
+                'outcome' => $outcome,
+                'from_version' => $from,
+                'to_version' => $to,
+                'detail' => $detail === '' ? null : $detail,
+            ]);
+        } finally {
+            sodium_memzero($secretKey);
+        }
+        $this->write("update-report: recorded\n");
+
+        return 0;
+    }
+
+    /**
+     * The file named --artifact in the current update target of hub-instructions.json.
+     *
+     * @return array{id: string, size: int, sha256: string}
+     */
+    private function instructedArtifact(string $stateDirectory, string $artifactId): array
+    {
+        try {
+            $instructions = json_decode($this->readBounded($stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json'), true, 16, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException('The hub update instructions are unreadable.', previous: $exception);
+        }
+        $update = is_array($instructions) ? ($instructions['update'] ?? null) : null;
+        $target = is_array($update) ? ($update['target'] ?? null) : null;
+        if (! is_array($update) || ($update['held'] ?? null) !== false || ! is_array($target) || ! is_array($target['artifacts'] ?? null)) {
+            throw new RuntimeException('No update is waiting for this hub.');
+        }
+        foreach ($target['artifacts'] as $artifact) {
+            if (! is_array($artifact) || ($artifact['id'] ?? null) !== $artifactId) {
+                continue;
+            }
+            if (preg_match('/\A[a-z0-9][a-z0-9-]{1,63}\z/', $artifactId) !== 1
+                || ! is_int($artifact['size'] ?? null) || $artifact['size'] < 1 || $artifact['size'] > self::MAX_UPDATE_BYTES
+                || ! is_string($artifact['sha256'] ?? null) || preg_match('/\A[a-f0-9]{64}\z/', $artifact['sha256']) !== 1) {
+                throw new RuntimeException('The update instructions for that file are invalid.');
+            }
+
+            return ['id' => $artifactId, 'size' => $artifact['size'], 'sha256' => $artifact['sha256']];
+        }
+        throw new RuntimeException('That file is not in this hub\'s update instructions.');
+    }
+
+    /** The update file goes straight into an existing folder inside the state folder. */
+    private function updateOutputPath(string $stateDirectory, string $output): string
+    {
+        $fold = fn (string $path): string => PHP_OS_FAMILY === 'Windows' ? strtolower($path) : $path;
+        $state = realpath($stateDirectory);
+        $folder = realpath(dirname($output));
+        $name = basename($output);
+        if ($state === false || $folder === false || ! is_dir($folder)
+            || ($fold($folder) !== $fold($state) && ! str_starts_with($fold($folder), $fold(rtrim($state, '\\/').DIRECTORY_SEPARATOR)))
+            || preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,100}\z/', $name) !== 1) {
+            throw new RuntimeException('The update file must be saved inside the hub\'s state folder.');
+        }
+        $target = $folder.DIRECTORY_SEPARATOR.$name;
+        if (is_link($target) || is_dir($target)) {
+            throw new RuntimeException('The update file must be saved inside the hub\'s state folder.');
+        }
+
+        return $target;
+    }
+
+    /** @param resource $handle */
+    private function writeAll($handle, string $chunk): bool
+    {
+        $offset = 0;
+        while ($offset < strlen($chunk)) {
+            $written = fwrite($handle, substr($chunk, $offset));
+            if (! is_int($written) || $written < 1) {
+                return false;
+            }
+            $offset += $written;
+        }
+
+        return true;
+    }
+
+    /** @param array<string, mixed> $identity */
+    private function requestSigningKey(array $identity): string
+    {
+        $secretKey = base64_decode($identity['request_signing_secret_key'], true);
+        if (! is_string($secretKey) || strlen($secretKey) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
+            throw new RuntimeException('Collector request signing key is invalid.');
+        }
+
+        return $secretKey;
+    }
+
+    /** @param array<string, mixed> $identity */
+    private function central(array $identity, string $secretKey): HttpsCentralApi
+    {
+        return new HttpsCentralApi(
+            $identity['central_url'],
+            $identity['tls_public_key_pin'],
+            $secretKey,
+            $identity['client_certificate_file'],
+            $identity['client_private_key_file'],
+            $this->updateTransport,
+        );
+    }
+
     /** @param array<string, string|bool> $options */
     private function verifyTransport(array $options): int
     {
@@ -780,7 +986,7 @@ final class CollectorApplication
 
     private function usage(): int
     {
-        $this->write("Usage: oblivion-collector enrol|enrol-profile|enrol-recoverable|runtime-check|run|doctor|verify-transport|version [--name=value]\n", STDERR);
+        $this->write("Usage: oblivion-collector enrol|enrol-profile|enrol-recoverable|runtime-check|run|update-fetch|update-report|doctor|verify-transport|version [--name=value]\n", STDERR);
 
         return 64;
     }

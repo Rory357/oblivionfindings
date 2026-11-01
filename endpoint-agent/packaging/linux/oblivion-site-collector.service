@@ -8,7 +8,9 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=/opt/oblivion-collector
-ExecStart=/opt/oblivion-collector/oblivion-site-collector --identity=/etc/oblivion-collector/collector.identity.json
+# "current" points at the release to run (releases/<stage>). The hub swaps it to update itself
+# overnight or roll back (D3), then exits; Restart=always starts the release it now points at.
+ExecStart=/opt/oblivion-collector/current/oblivion-site-collector --identity=/etc/oblivion-collector/collector.identity.json
 Restart=always
 RestartSec=10
 # Exit 3: the hub was removed in Oblivion and wiped its saved logins. Stay stopped (S&D Phase B).
