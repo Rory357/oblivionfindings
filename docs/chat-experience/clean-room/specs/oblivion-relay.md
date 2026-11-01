@@ -11,12 +11,13 @@ The Settings › Obli remote-support card shows a coturn configuration snippet. 
 
 **Spec provenance.** Written by the Oblivion Relay spec-writer session, a side session of the Chat rebuild session (`local_fae95f7b`), on 1 November 2026, on branch `claude/oblivion-relay-spec`. Sources read: RFC 8489, RFC 8656, RFC 5769 and RFC 7983 from rfc-editor.org, RFC 6062 (only to leave it out of scope), draft-uberti-behave-turn-rest-00, and the Oblivion code and documents named in section 1. This session opened, searched and fetched no code, examples or built files from any TURN or STUN implementation. It does not build the relay.
 
-**Updated the same day** with the user's answers to four open questions:
+**Updated the same day** with the user's answers to five open questions:
 
 - STUN Binding is on by default.
 - Five hours is the longest Chat call.
 - The app gets an instant cut-off, through the control channel in 3.7.
-- Fuller logs record the client IP of every allocation, with a retention limit and restricted access (section 9).
+- Fuller logs record the client IP of every allocation, with restricted access (section 9).
+- That log is kept for 14 days.
 
 The answers are listed in section 13.
 
@@ -482,7 +483,7 @@ There are two streams:
 **Retention.**
 
 - At start and every hour, the relay deletes allocation-log files older than `RELAY_LOG_RETENTION_DAYS`.
-- The proposed default is 14 days, and the allowed range is 1–90; any other value stops start-up. Open question 2 asks the user to confirm the default.
+- The default is 14 days, which the user chose on 1 November 2026. The allowed range is 1–90; any other value stops start-up.
 - Exclude `RELAY_LOG_DIR` from host backups, or keep backups of it no longer than the same limit.
 - The files aren't forwarded to other systems unless the destination keeps the same retention and access limits.
 
@@ -569,7 +570,7 @@ Both probes are written in PHP with its built-in sockets. The same row shows how
 | `RELAY_HEALTH_LISTEN` | `127.0.0.1:9478` | Loopback only |
 | `RELAY_LOG_LEVEL` | `info` | `error`, `warn`, `info` or `debug`. Debug adds nothing secret |
 | `RELAY_LOG_DIR` | `/var/log/oblivion-relay` | The allocation log (section 9) |
-| `RELAY_LOG_RETENTION_DAYS` | 14 (proposed; open question 2) | Days the allocation log is kept, 1–90 |
+| `RELAY_LOG_RETENTION_DAYS` | 14 | Days the allocation log is kept, 1–90 |
 | `RELAY_DENY_FILE` | empty | 3.5 |
 | `RELAY_CONTROL_LISTEN` | `127.0.0.1:9479` | The control channel (3.7). Loopback or private address only |
 | `RELAY_CONTROL_ALLOWED_SOURCES` | `127.0.0.1/32,::1/128` | Who may call the control channel. Loopback and private CIDRs only |
@@ -787,15 +788,15 @@ These run during stage 5 network testing, on the server the user chooses.
 ## 13. Open questions for the user
 
 1. **Where does it run?** Shape A (its own small server) or shape B (beside nginx on the app server). Recommendation: shape A. It keeps an internet-facing UDP service with a wide port range off the host that holds care records, it allows plain TCP on 443, and it can grow on its own. The cost is one more small server. This is needed before stage 5 network testing.
-2. **How long to keep the allocation log.** It now holds the client IP of every allocation (section 9). The proposal is 14 days (`RELAY_LOG_RETENTION_DAYS=14`; the relay allows 1–90). That is long enough for abuse reports, which usually arrive within days, and short enough to match the privacy principle of keeping personal information no longer than needed. Alternatives are 7 days (less personal data) or 30 days (more time for slow reports).
-3. **CCTV and remote support.** Should they move to Oblivion Relay at the same time as Chat, or later? Both features are off today and have no relay installed. Moving them also means rewording the Settings › Obli card, which shows a coturn snippet. If they move, their own stop flows (CCTV stop, the remote-support Stop that REMOTE-RELAY.md says "does not erase a previously issued bearer credential") could use the control channel's revoke too.
+2. **CCTV and remote support.** Should they move to Oblivion Relay at the same time as Chat, or later? Both features are off today and have no relay installed. Moving them also means rewording the Settings › Obli card, which shows a coturn snippet. If they move, their own stop flows (CCTV stop, the remote-support Stop that REMOTE-RELAY.md says "does not erase a previously issued bearer credential") could use the control channel's revoke too.
 
 **Answered by the user on 1 November 2026:**
 
 - **STUN Binding:** on by default, with the limits in section 7 (4.4).
 - **Longest Chat call:** five hours (one-hour credentials plus four hours' grace) is fine. There is no extra cap in the app (3.2).
 - **Ending relay use at once:** yes, an instant cut-off. Version 1 has the signed control channel and the app hooks (3.7).
-- **IP addresses in logs:** keep fuller logs, with the client IP of every allocation, as RFC 8656 suggests operators may. The log has a retention limit and restricted access, and still never holds credentials or content. Peers stay unlogged (section 9).
+- **IP addresses in logs:** keep fuller logs, with the client IP of every allocation, as RFC 8656 suggests operators may. The log has restricted access, and still never holds credentials or content. Peers stay unlogged (section 9).
+- **How long to keep the allocation log:** 14 days (`RELAY_LOG_RETENTION_DAYS=14`; the relay allows 1–90). That is long enough for abuse reports, which usually arrive within days, and no longer than needed for the client IPs the log holds (section 9).
 
 ## 14. When it lands
 
