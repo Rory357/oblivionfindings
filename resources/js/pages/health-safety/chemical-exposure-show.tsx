@@ -27,6 +27,7 @@ import { CheckCircle2, ClipboardCheck, FileText, History, Link2, ListChecks, Loc
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ExposureCommandForm } from './components/exposure-command-form';
 import { ExposureDeliveryPanel } from './components/exposure-delivery-panel';
+import { earlierLinkChip, ExposureEarlierLink, type EarlierLink } from './components/exposure-earlier-link';
 import { ExposureRecordSide } from './components/exposure-overview';
 import { ExposureRecordPanel } from './components/exposure-record-panels';
 import type { ExposureReceipt } from './components/use-exposure-command';
@@ -36,7 +37,9 @@ const SECTIONS = [{ key: 'overview', label: 'Recorded facts', icon: LockKeyhole 
     { key: 'history', label: 'History', icon: History }, { key: 'connections', label: 'Connections', icon: Link2 }] as const;
 /** Exposure managers only (job 3): this exposure hasn't reached the H&S register yet. */
 type DeliveryAlert = { state: 'needs_manager' | 'failed' | 'overdue'; since: string | null };
-type Props = { detail: ExposureWorkspaceDetail; return_to: string | null; chemical_exposure_confirmation: ExposureReceipt | null; delivery_alert?: DeliveryAlert | null };
+type Props = { detail: ExposureWorkspaceDetail; return_to: string | null; chemical_exposure_confirmation: ExposureReceipt | null; delivery_alert?: DeliveryAlert | null;
+    /** #15: an earlier, unconfirmed link to an incident and its later reviews (null when the record has none). */
+    earlier_link?: EarlierLink | null };
 const DELIVERY_ALERT: Record<DeliveryAlert['state'], string> = {
     needs_manager: 'The automatic delivery stopped because the record needs checking. Check it and retry from Connections.',
     failed: 'The automatic delivery failed and is trying again. If it keeps failing, retry it from Connections.',
@@ -141,7 +144,7 @@ export default function ChemicalExposureShow(props: Props) {
     const { props: shared } = usePage<SharedData>();
     return <ExposureWorkspace key={`${shared.auth.user.id}:${props.detail.id}`} {...props} />;
 }
-function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, delivery_alert = null }: Props) {
+function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, delivery_alert = null, earlier_link = null }: Props) {
     const { url, props: shared } = usePage<SharedData>(); const location = exposureLocation(url); const drafts = useSafetyWorkspaceDrafts();
     const [picked, setPicked] = useState<ExposureStepKey | null>(null);
     const [withdrawn, setWithdrawn] = useState(false); const onWithdraw = useCallback(() => setWithdrawn(true), []);
@@ -231,8 +234,8 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
             <PageLayout hero={<PageHeader variant="profile" wrapTitle title={title} icon={LockKeyhole} backHref={returnTo}
                 subline={admitted ? `${detail.record!.substance.name} · ${detail.record!.site.name}` : 'Current access or source history could not be confirmed'}
                 actions={actions}
-                titleChip={<PageHeaderStatusChip variant={admitted && detail.source_integrity === 'recorded' ? 'neutral' : 'warning'}>
-                    {admitted ? detail.source_integrity === 'legacy_unknown' ? 'Earlier provenance unconfirmed' : 'Private recorded source' : 'Details withheld'}</PageHeaderStatusChip>}
+                titleChip={<PageHeaderStatusChip variant={admitted && (detail.source_integrity === 'recorded' || earlier_link?.state === 'reviewed') ? 'neutral' : 'warning'}>
+                    {admitted ? detail.source_integrity === 'legacy_unknown' ? earlierLinkChip(earlier_link) ?? 'Earlier provenance unconfirmed' : 'Private recorded source' : 'Details withheld'}</PageHeaderStatusChip>}
                 strip={stages ? <PageHeaderSteps steps={stages.steps} selected={progressShown ? shownStep : null} onSelect={(key) => { setPicked(key === stages.current ? null : key as ExposureStepKey); if (section !== 'overview' || action) drafts.request(() => move('overview')); }} ariaLabel="Exposure steps" /> : undefined}
                 rail={<PageHeaderRail items={rail} value={section} onSelect={(next) => move(next)} ariaLabel="Private exposure sections" />} />}>
                 <div className="grid min-w-0 gap-5">
@@ -260,6 +263,10 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
                                 {progressShown && stages && shownStep ? <ExposureProgress next={next} detail={detail} stages={stages} shown={shownStep} onGo={(target) => drafts.request(() => move(target))} onBack={shownStep !== stages.current ? () => setPicked(null) : undefined} /> : null}
                                 <ExposureRecordPanel detail={current} section={section} open={open} onPage={onPage} focusedFollowupId={focusedFollowupId} /></>
                                 : <div role="status"><Note tone="warning">Saved private details and changes are withheld. Retained entries stay in memory until you leave or discard them.</Note></div>}
+                            {admitted && section === 'connections' && earlier_link ? (
+                                <ExposureEarlierLink key={`${shared.auth.user.id}:${earlier_link.expected_version ?? 'r'}`} link={earlier_link}
+                                    exposureId={detail.id} siteId={detail.record!.site.id} actorId={shared.auth.user.id} />
+                            ) : null}
                             <ExposureDeliveryPanel key={shared.auth.user.id} actorId={shared.auth.user.id} detail={current} active={admitted && section === 'connections'} autoCheck={!!delivery_alert} onWithdraw={onWithdraw} />
                         </div>
                         {admitted ? <aside className="min-w-0" aria-label="Care answers and record"><SideColumn><ExposureRecordSide detail={current} /></SideColumn></aside> : null}

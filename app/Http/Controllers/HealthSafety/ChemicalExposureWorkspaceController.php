@@ -23,7 +23,8 @@ final class ChemicalExposureWorkspaceController extends Controller
     public function __construct(private readonly ChemicalExposureWorkspaceService $workspace,
         private readonly ChemicalExposureSourceService $source, private readonly ChemicalExposureEvidenceService $evidence,
         private readonly ChemicalExposureDownloadService $downloads,
-        private readonly ChemicalExposureDeliveryWorkspaceService $deliveryWorkspace) {}
+        private readonly ChemicalExposureDeliveryWorkspaceService $deliveryWorkspace,
+        private readonly \App\Services\HealthSafety\ChemicalExposureAssociationRecoveryService $recovery) {}
 
     public function index(Request $r)
     {
@@ -46,7 +47,75 @@ final class ChemicalExposureWorkspaceController extends Controller
             'return_to' => ChemicalExposureReturn::sanitize($r->input('return_to')),
             'chemical_exposure_confirmation' => $this->confirmation($r, $exposure),
             // Exposure managers only: this exposure hasn't reached the H&S register yet (job 3).
-            'delivery_alert' => app(\App\Services\HealthSafety\ChemicalExposureDeliveryProblems::class)->forExposure($r->user(), $exposure)]);
+            'delivery_alert' => app(\App\Services\HealthSafety\ChemicalExposureDeliveryProblems::class)->forExposure($r->user(), $exposure),
+            'earlier_link' => $this->earlierLink($r, $exposure, $detail)]);
+    }
+
+    /**
+     * #15 (boards 15-1 to 15-3, approved 2 Nov): an exposure saved with a link to an incident before links were checked.
+     * An exposure manager gets every later review and can record one; anyone else who can open the record sees only
+     * whether it was reviewed (and the incident's reference and title when they can open that incident). Null when the
+     * record has no such link.
+     */
+    private function earlierLink(Request $r, int $exposure, array $detail): ?array
+    {
+        if (($detail['exposure_access'] ?? null) !== 'readable' || ($detail['source_integrity'] ?? null) !== 'legacy_unknown') { return null; }
+        $user = $r->user();
+        if ($user->canDo('hazards.manage')) {
+            try {
+                $card = $this->recovery->card($user, $exposure);
+                return [...$card, 'state' => $card['reviews'] === [] ? 'unreviewed' : 'reviewed', 'manager' => true];
+            } catch (\Illuminate\Validation\ValidationException) {
+                return null; // Not a linked-unknown origin: no card.
+            } catch (HttpExceptionInterface $denial) {
+                if (! in_array($denial->getStatusCode(), [403, 404], true)) { throw $denial; }
+            } catch (ModelNotFoundException) {
+                // Falls through to the reader's summary.
+            } catch (LogicException $broken) {
+                // A review history that doesn't prove itself is never shown; the page still opens with the summary.
+                report($broken);
+            }
+        }
+        $root = \App\Models\SubstanceExposureRecord::query()->whereKey($exposure)->first(['id', 'related_incident_id', 'original_context', 'source_schema_version']);
+        if ($root === null || $root->related_incident_id === null || $root->original_context !== null) { return null; }
+        $incident = app(\App\Services\Incidents\IncidentAccessService::class)->apply(\App\Models\ClientIncident::query(), $user)
+            ->whereKey($root->related_incident_id)->first(['id', 'reference_number', 'title', 'occurred_at']);
+        $reviewed = \App\Models\ChemicalExposureRecoveryCase::query()->where('exposure_id', $exposure)->where('revision', '>', 0)->exists();
+
+        return ['state' => $reviewed ? 'reviewed' : 'unreviewed', 'manager' => false, 'expected_version' => null,
+            'linked_incident' => $incident === null ? ['id' => null, 'reference' => null, 'title' => null, 'occurred_at' => null, 'readable' => false]
+                : ['id' => (int) $incident->id, 'reference' => (string) $incident->reference_number, 'title' => $incident->title,
+                    'occurred_at' => $incident->occurred_at?->toISOString(), 'readable' => true],
+            'reviews' => [], 'files' => [], 'can' => ['record_review' => false, 'add_file' => false]];
+    }
+
+    /** #15: record a later review of the earlier link (exposure managers; the service proves access and the version). */
+    public function reviewEarlierLink(Request $r, string|int $exposure)
+    {
+        $exposure = $this->id($exposure);
+        $this->recovery->recordReview($r->user(), $exposure, $this->input($r));
+
+        return redirect()->to('/health-safety/chemical-exposures/'.$exposure.'?section=connections')
+            ->with('success', 'Review saved. The old record is unchanged; your review sits beside it.');
+    }
+
+    /** #15: one file kept with the latest review (photos, PDFs or Word files, up to 10 MB). */
+    public function addEarlierLinkFile(Request $r, string|int $exposure)
+    {
+        $exposure = $this->id($exposure);
+        $r->validate(['file' => ['required', 'file']]);
+        app(\App\Services\HealthSafety\ChemicalExposureRecoveryEvidenceService::class)->upload($r->user(), $exposure, $r->file('file'), $this->input($r, ['file']));
+
+        return redirect()->to('/health-safety/chemical-exposures/'.$exposure.'?section=connections')->with('success', 'File added to the review.');
+    }
+
+    public function downloadEarlierLinkFile(Request $r, string|int $exposure, string|int $file)
+    {
+        $exposure = $this->id($exposure); $file = $this->id($file);
+        $descriptor = app(\App\Services\HealthSafety\ChemicalExposureRecoveryEvidenceService::class)->evidence($r->user(), $exposure, $file);
+
+        return $this->headers(\Illuminate\Support\Facades\Storage::disk($descriptor['disk'])->download($descriptor['path'], $descriptor['original_name'],
+            ['Content-Type' => $descriptor['mime'] ?: 'application/octet-stream', 'X-Content-Type-Options' => 'nosniff']));
     }
     public function capture(Request $r)
     {
