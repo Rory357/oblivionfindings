@@ -39,7 +39,16 @@ final class HsStoryReviewPresenter
     /** @return array<string, mixed>|null */
     public function present(User $viewer, int $eventId): ?array
     {
-        $event = HsEvent::query()->with(['site:id,name', 'owner:id,name'])->find($eventId);
+        // A refused read touches no review body: check the key first, then load only what the story view shows.
+        if (! $viewer->canDo(HsIncidentStoryReadService::PERMISSION) || ! $viewer->canDo('hazards.view')) {
+            return null;
+        }
+        $event = HsEvent::query()->with(['site:id,name', 'owner:id,name'])->whereKey($eventId)->first([
+            'id', 'reference_number', 'event_category', 'severity', 'status', 'site_id', 'owner_user_id', 'source_type',
+            'source_id', 'worksafe_notifiable', 'worksafe_decided_at', 'worksafe_decided_by_user_id', 'worksafe_decision_source',
+            'worksafe_decision_reason', 'worksafe_decision_tree_version', 'worksafe_source_effective_date',
+            'investigation_required', 'accepted_at', 'reported_at', 'closed_at',
+        ]);
         if ($event === null || $this->access->canReadEvent($viewer, $event)) {
             return null;
         }

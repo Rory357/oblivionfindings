@@ -102,9 +102,11 @@ export default function SafetyReviewStory({ review }: { review: StoryReview }) {
                         facts={
                             <PageHeaderFacts
                                 items={[
-                                    review.severity_label ? { value: review.severity_label, label: 'severity', tone: 'warning' } : null,
+                                    ...(review.severity_label
+                                        ? [{ value: review.severity_label, label: 'severity', tone: 'warning' as const }]
+                                        : []),
                                     { value: review.category_label },
-                                ].filter((item): item is NonNullable<typeof item> => item !== null)}
+                                ]}
                             />
                         }
                         strip={

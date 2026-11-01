@@ -36,16 +36,19 @@ final class HsIncidentStoryReadService
     /** @return array{incident_id: int, what_happened: ?string, did_straight_away: ?string, reported_by: ?string}|null */
     public function storyFor(User $viewer, HsEvent $event): ?array
     {
-        $incident = $this->readableIncident($viewer, $event);
-        if ($incident === null) {
+        $eligible = $this->readableIncident($viewer, $event);
+        if ($eligible === null) {
             return null;
         }
+        // The report's words are read only once the story read is allowed (a refused read touches no incident body).
+        $incident = ClientIncident::query()->whereKey($eligible->id)
+            ->first(['id', 'description', 'immediate_action_taken', 'immediate_action', 'reported_by']);
 
         return [
-            'incident_id' => (int) $incident->id,
-            'what_happened' => $incident->description !== null ? (string) $incident->description : null,
-            'did_straight_away' => $incident->immediate_action_taken ?? $incident->immediate_action,
-            'reported_by' => $incident->reporter?->name,
+            'incident_id' => (int) $eligible->id,
+            'what_happened' => $incident?->description !== null ? (string) $incident->description : null,
+            'did_straight_away' => $incident?->immediate_action_taken ?? $incident?->immediate_action,
+            'reported_by' => $incident?->reporter?->name,
         ];
     }
 
@@ -100,14 +103,15 @@ final class HsIncidentStoryReadService
         return $incident;
     }
 
-    /** The incident behind the review: its canonical source, else the incident that links to it. */
+    /** The incident behind the review: its canonical source, else the incident that links to it. Eligibility columns only. */
     private function sourceIncident(HsEvent $event): ?ClientIncident
     {
+        $columns = ['id', 'status', 'type', 'is_hr_confidential', 'independent_handling_requested', 'site_id', 'client_id', 'hs_event_id'];
         $source = ltrim((string) $event->getRawOriginal('source_type'), '\\');
         if ($source === ClientIncident::class && $event->source_id !== null) {
-            return ClientIncident::query()->whereKey((int) $event->source_id)->first();
+            return ClientIncident::query()->whereKey((int) $event->source_id)->first($columns);
         }
 
-        return ClientIncident::query()->where('hs_event_id', $event->id)->orderBy('id')->first();
+        return ClientIncident::query()->where('hs_event_id', $event->id)->orderBy('id')->first($columns);
     }
 }
