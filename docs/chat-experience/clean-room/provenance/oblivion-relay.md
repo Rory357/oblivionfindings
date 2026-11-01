@@ -10,7 +10,7 @@
   - Oblivion's own code: Oblivion Live's gateway on branch `claude/eloquent-shamir-b83b60` (`live/`, `deploy/chat-calling/oblivion-live.*`, `CloseChatLiveConnections`) as the model for layout, test style, deploy examples and the suspension hook; `CctvSessions::turn()`, `EndpointRemoteRelay::grant()` and `isValidRelayUrl()` for the credential formats (their formulas were run once, in PHP, to make the deferred-class fixtures); `ChatServiceHealth`, `ChatOffboarding`, `ChatMembershipGaps`, `ChatCallReconciler`, `ChatCallController`, `SelfHostedCalling` and the existing Chat tests; `deploy/chat-calling/gateway.nginx.conf.example` for the stream map the relay's line joins.
 - Outside code consulted: none. No STUN or TURN implementation's source, examples, documentation examples or built files were opened, searched or fetched. The coturn link in `docs/native-endpoint-management/REMOTE-RELAY.md` was not followed, the endpoint agent's pion/turn test fixture was not opened, and `deploy/chat-calling/livekit.yaml.example` was not opened. No answer site or AI suggestion quoting a library was used.
 - New outside packages: none. `relay/` imports only `node:` built-in modules and its own files; `relay/test/allocation-log.test.mjs` enforces that. The app side uses only what the app already had.
-- Similarity check: not yet run. That is the checker session's job (README "Checking").
+- Similarity check: the checker's own Node.js token-similarity script (four token modes plus a shared-identifier check), thresholds 12 tokens (structure), 8 tokens (literal, and names and values) and 8 words (comments and strings). Result: clean, no copied code ([details](#similarity-check)). By the Oblivion Relay checker session (a side session of `local_fae95f7b`), 1 November 2026.
 
 ## What was built
 
@@ -48,6 +48,62 @@ The spec left these to the builder, or they needed a reading of the spec:
 23. **App: URLs.** Sorted UDP, then TCP, then TLS. Any invalid URL, or more than four, means no relay entry.
 24. **Service health.** The new row needed its label in `chat-service-health.tsx`, because the screen accepts only the known set of rows. `ChatServiceHealth` takes its three new collaborators as optional constructor arguments so existing direct constructions keep working.
 25. **Control key ids reload too (the user's answer, 1 November 2026).** The spec had an inconsistency. Requirement 9 says rotating a secret never drops a call, and 3.7's rotation step 1 ends with SIGHUP. But `RELAY_CONTROL_KEY_ID` and `RELAY_CONTROL_PREVIOUS_KEY_ID` are plain settings, and 10.1 says environment values need a restart. Asked in a pop-up, the user chose "Reload key ids too". Each key id may now also be given as `RELAY_CONTROL_KEY_ID_FILE` and `RELAY_CONTROL_PREVIOUS_KEY_ID_FILE`: value or file, never both. They are re-read on SIGHUP with the secrets, and an empty file means not set. The env example and `oblivion-relay.md` use the file form, so rotating the control key is file writes and a reload. These are the only two settings beyond the spec's table.
+
+## Similarity check
+
+**Clean: no copied code.** Checked on 1 November 2026 by the Oblivion Relay checker session, a side session of `local_fae95f7b` that did not build the relay. The checker was the only session to read outside STUN and TURN source. That source stayed in the checker's own scratchpad, never in a worktree, the repository or the main checkout, and none of its build tools or scripts were run.
+
+- **New code compared:** every file in `relay/`: the 14 `lib/` modules, `server.mjs`, `tools/load.mjs` and the 15 files in `test/`. Also `app/Services/Chat/OblivionRelay.php` and `ChatRelayProbe.php`, plus `ChatRelayCredentials.php`, `SendChatRelayRevocation`, `RevokeChatRelayUse`, `ChatRelayRevoke` and `tests/Feature/Chat/OblivionRelayTest.php`. The three `deploy/chat-calling/oblivion-relay.*` files were compared as prose. This is the code at `1fb6dc1b5`: 68,437 tokens.
+- **Outside source compared:**
+  - coturn 4.18.0;
+  - pion/turn v5.1.3 and pion/stun v4.0.1;
+  - the LiveKit server's TURN set-up, `pkg/service/turn.go` at v1.13.10, the version the register lists;
+  - processone/stun 1.2.23, the STUN and TURN library inside eturnal;
+  - two Node.js implementations: node-turn (Atlantis-Software, commit `fc1951cce`) and nodertc/stun v2.1.0.
+
+  Each was fetched from GitHub with its tests and documentation: 786 files and about 553,000 code tokens in total. The texts of RFC 8489, 8656, 5769, 6062 and 7983 and draft-uberti-behave-turn-rest-00 were used to tell protocol wording apart from copied wording.
+- **Tool:** a Node.js script written by the checker. Its tokenizer handles JavaScript, Go, C, Erlang and PHP. It drops comments and whitespace and treats `;` as noise. It reads names in a way that works across languages: `XOR_PEER_ADDRESS`, `xorPeerAddress` and `XorPeerAddress` all compare equal, and numbers compare by value, so `0x0012` equals `18`. It then finds every maximal run of tokens that a new file shares with any outside file, in four modes:
+  - **structure:** names, strings and numbers each become one placeholder, and a few cross-language keywords are merged. Threshold: 12 tokens.
+  - **literal:** names, numbers and strings are kept. Threshold: 8 tokens.
+  - **names and values:** only names, numbers and strings, so that a translation from Go or C still lines up. Threshold: 8 tokens.
+  - **comment and string words:** threshold 8 words. This mode also covers the outside projects' documentation and example configuration, such as coturn's `turnserver.conf`.
+  - A fifth check lists every **shared identifier** longer than 3 characters that is neither RFC vocabulary nor used in Oblivion's own unrelated files.
+- **Controls:**
+  - A node-turn file with every name renamed and every string blanked scored 100 % in structure mode.
+  - A line-by-line JavaScript port of one pion/stun Go function, written in the scratchpad as a control and deleted after scoring, reached only 17 % coverage in the literal and names modes. The shared-identifier check caught it, flagging 13 pion-specific names. That check is why it was added.
+  - Unrelated Oblivion code (the 20 files of Oblivion Live's `live/` gateway and 6 Chat services) scored up to 32.2 % structure coverage with runs up to 45 tokens, and up to 3.2 % literal coverage with runs up to 17 tokens.
+- **Results.** Every match above the threshold was reviewed by hand. Each one is protocol shape or a common idiom:
+  - **Structure:** coverage per file is 0–25.8 %, inside the unrelated-code range. The matches merge into 929 regions. All 84 regions with a run of 20 tokens or more were read on both sides:
+    - lists of setting names, method and attribute tables, import lists and object literals (the longest is 106 tokens of `string ,` repeated, in `config.mjs` 57–111);
+    - constructor assignments and nested `test(...)` blocks;
+    - the message-type bit layout (below).
+
+    The 845 regions of 12–19 tokens follow the same patterns: declarations, `assert.equal` rows, argument lists and loops.
+  - **Literal:** 100 runs. The longest is 30 tokens. The matches are:
+    - The method, class and attribute tables in `stun.mjs` 13–67, which match the constants files of nodertc/stun and node-turn: RFC registry names and numbers. The relay lists the attributes in one numeric list. That list includes RFC 8489's SHA-256 and password-algorithm attributes and RFC 8656's address-family attributes. Neither Node.js project has any of those, and both group their tables by RFC.
+    - The message-type packing in `stun.mjs` 114–127, which matches coturn `src/client/ns_turn_msg.c` 549–559: the masks of RFC 8489 figure 3. The relay moves bits M7–M11 with one mask and adds the class bits, where coturn splits those bits over two masks.
+    - The PROXY protocol version 2 signature in `transports.test.mjs` 166–169, which matches coturn `src/apps/relay/ns_ioalib_engine_impl.c` 3015. These are the 12 fixed bytes of the PROXY protocol's binary form, sent in the test that checks version 2 is refused (spec 8).
+    - The IPv6 `::` expansion in `addresses.mjs` 28–31, which matches node-turn `lib/address.js` 23–30 for 9 tokens: splitting on `::` and computing 8 minus both halves' group counts. The code around it differs. The relay handles an embedded IPv4 tail and empty halves and writes bytes; node-turn builds text in a loop.
+    - Runs of 11 tokens or fewer: Node API idioms (`Buffer.alloc` with two `writeUInt16BE` calls for a 4-byte header, `socket.once('close', …)`, `rinfo.port` and `rinfo.address` from the `node:dgram` documentation), `node:test` and `assert` idioms, small byte arrays, and `return true … return false`.
+  - **Names and values:** 8 runs, the longest 14 tokens: the same method and attribute tables and the PROXY version 2 signature.
+  - **Comment and string words:** 44 runs.
+    - The longest is 22 words: the RFC 8489 and RFC 8656 reason phrases in `stun.mjs` 99–106, matching processone/stun `src/stun_codec.erl` 152–159 and coturn `ns_turn_msg.c` 843–861.
+    - The other runs are address and port literals (127.0.0.1, 3478, and the first addresses of the private ranges) and the IPv6 address of the RFC 5769 test vector, which matches RFC 5769 itself as well as pion/stun's and coturn's copies of the vectors.
+    - No comment prose matches any source. The env example, the install guide and the service file share no run of 8 words with any source.
+  - **Shared identifiers:** 13 to 36 per source, all reviewed. They are:
+    - Node.js, PHP and TLS names (`createSocket`, `TLSSocket`, `rinfo`, `removeAllListeners`, `SSL_OP_NO_RENEGOTIATION`, `minVersion`, `notBefore`, `notAfter`, `inet_pton`);
+    - plain words (`listener`, `metrics`, `bucket`, `slot`);
+    - names the spec gives (`maxPermissions`, `parseUsername`);
+    - `FINGERPRINT_XOR`, which coturn also uses. It names the RFC 8489 14.7 value.
+    - `usernameAttr`, `realmAttr` and `nonceAttr` (`turn.mjs` 404–406), which pion-turn's `internal/server/util.go` also uses. Both authentication flows were read side by side. The relay follows spec 3.3 step by step: it refuses USERHASH and the password algorithms, checks the class and the deny list, then tries the current secret and then the previous one. pion checks the nonce before the realm and username, has no USERHASH step and hands the decision to a callback.
+  - **Overall structure:** the TURN core is one `RelayCore` class whose methods follow the spec's sections. pion-turn splits the same work between allocation `Manager` and `Allocation` objects and adds RFC 6062 TCP relaying. coturn is built around its own C I/O engine. Neither matches the relay's layout.
+- **Removal, notices and guard:**
+  - No package is removed: coturn was never installed. `deploy/chat-calling/licenses/` never held a coturn file, and `scripts/chat-license-notices.mjs` never listed one, so neither needs changing. Against `main`, the branch changes `package.json` only to add `test:relay`.
+  - The guard in `relay/test/allocation-log.test.mjs` was checked with a temporary file in `relay/lib/`, deleted after each run. It fails, naming the file, on a static import of `stun`, a multi-line named import from `node-turn`, a side-effect import, a dynamic `import()`, `require()`, `export * from`, and a relative path that leaves `relay/`.
+  - A `package.json` guard isn't needed. coturn is a separate program, so it can't come back through a package file. The relay runs as `node relay/server.mjs` with no npm install, so a package added to `package.json` reaches it only through an import in `relay/`, which the guard catches. Browser-side STUN and TURN packages belong to the Oblivion Calls check.
+  - One gap remains, and it doesn't block sign-off. Loading a package through `createRequire` from `node:module` passes the guard. Nothing in `relay/` imports `node:module`. Refusing `node:module` in the guard would close the gap; that change is for the builder.
+- **Tests re-run by the checker** at `1fb6dc1b5`: `node --test "relay/test/*.test.mjs"` gave 111 tests: 110 passed, none failed, and 1 was skipped (the log file mode and group test, which runs only on Linux). Pest was not re-run, since this worktree has no `vendor/`.
+- **Source list:** the PROXY version 2 signature used in the test comes from the PROXY protocol specification. That document is not in the builder's list of sources read. It is a protocol constant, not outside code, but the builder may want to add it to the list.
 
 ## Open questions
 
