@@ -69,6 +69,23 @@ final class HubCameraPictureService
     }
 
     /**
+     * A camera action the server would run by connecting straight to the camera. At a Site a hub
+     * covers it never does; this says so in words, or returns null where no hub covers the Site.
+     */
+    public function notThroughHubYet(Device $device, string $what): ?string
+    {
+        try {
+            $hub = $this->hubs->forSite($this->sites->resolve((int) $device->id));
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $hub instanceof MonitoringCollector
+            ? CoveringHubResolver::label($hub)." covers this Site, and {$what} through a hub isn’t built yet. Oblivion doesn’t reach into the house directly."
+            : null;
+    }
+
+    /**
      * @return array{state: 'pending'|'done'|'failed', message?: string, data_uri?: string, captured_at?: string, source?: string, tls_trust?: array<string, int|string>}
      */
     public function status(User $user, Device $device, DeviceCommandRequest $request): array

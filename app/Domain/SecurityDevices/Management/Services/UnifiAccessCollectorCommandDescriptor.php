@@ -57,15 +57,23 @@ final class UnifiAccessCollectorCommandDescriptor implements CollectorCommandDes
         return self::CAPABILITY;
     }
 
-    /** UniFi Access keeps its existing route: the one hub that already watches the door. */
+    /**
+     * At a Site a hub covers, a door unlock goes through that hub or not at all: the server never
+     * opens a house's door controller directly (S&D Phase B). Sites without a hub keep the server's
+     * own UniFi Access adapter.
+     */
     public function routesThroughCoveringHub(): bool
     {
-        return false;
+        return true;
     }
 
     public function supports(Device $device, MonitoringCollector $collector, int $siteId): bool
     {
         try {
+            // Its endpoint, saved login and network scope are the hub's own Site's.
+            if ((int) $collector->site_id !== $siteId || ! $collector->isApprovedForWork()) {
+                return false;
+            }
             $this->baseDescriptor($device, $collector, self::CAPABILITY);
 
             return $this->credentials->available($device, (int) $collector->site_id, self::CAPABILITY);

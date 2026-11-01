@@ -203,6 +203,29 @@ it('sends the trusted pin to the hub once the console is trusted', function (): 
     expect(($this->hubJob)()['commands'][0]['endpoint']['trusted_pin'])->toBe(HUB_CAMERA_PIN);
 });
 
+it('says plainly that other camera actions and alarm commands do not run through a hub yet, and never goes direct', function (): void {
+    $onvifCamera = Device::factory()->create([
+        'name' => 'Kowhai Villa garage camera', 'domain' => 'security', 'category' => 'cctv', 'subcategory' => 'camera',
+        'manufacturer' => 'Hikvision', 'model' => 'DS-2CD2143G2', 'provider' => 'onvif', 'ip_address' => '10.88.0.40', 'last_seen_at' => now(),
+    ]);
+    DeviceAssignment::query()->create([
+        'device_id' => $onvifCamera->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $this->site->id,
+        'assignment_type' => 'permanent', 'assigned_at' => now()->subHour(),
+    ]);
+
+    $this->actingAs($this->it)->postJson("/security-devices/devices/{$onvifCamera->id}/camera/snapshot")
+        ->assertStatus(409)
+        ->assertJsonPath('reason_code', 'hub_route_not_built');
+    $this->actingAs($this->it)->getJson("/security-devices/devices/{$this->camera->id}/camera/streams")
+        ->assertStatus(409)
+        ->assertJsonPath('reason_code', 'hub_route_not_built');
+
+    $route = app(\App\Domain\SecurityDevices\Management\Services\CommandExecutionRouteResolver::class)
+        ->resolve($this->camera->fresh(), $this->site->id, 'alarm.disarm');
+    expect($route->available)->toBeFalse()
+        ->and($route->reason)->toContain('alarm commands through a hub aren’t built yet');
+});
+
 it('never reaches the camera from the server when the covering hub is offline', function (): void {
     $this->hub->forceFill(['status' => 'offline'])->save();
 

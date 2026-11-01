@@ -70,6 +70,9 @@ final class DeviceCameraOnvifController extends Controller
                     'message' => $throughHub['message'],
                 ], 409)->header('Cache-Control', 'no-store');
         }
+        if (($notYet = $this->hubPictures->notThroughHubYet($device, 'a picture from this kind of camera')) !== null) {
+            return $this->notThroughHubYet($notYet);
+        }
 
         $driver = $this->drivers->resolveCameraDriver($device);
         $result = $driver !== null
@@ -137,6 +140,9 @@ final class DeviceCameraOnvifController extends Controller
             && $device->status !== DeviceStatus::Decommissioned,
             404,
         );
+        if (($notYet = $this->hubPictures->notThroughHubYet($device, 'checking camera streams')) !== null) {
+            return $this->notThroughHubYet($notYet);
+        }
 
         $driver = $this->drivers->resolveCameraDriver($device);
         $result = $driver !== null
@@ -195,6 +201,9 @@ final class DeviceCameraOnvifController extends Controller
         ]);
 
         $action = (string) $validated['action'];
+        if (($notYet = $this->hubPictures->notThroughHubYet($device, 'moving the camera')) !== null) {
+            return $this->notThroughHubYet($notYet);
+        }
         $driver = $this->drivers->resolveCameraDriver($device);
         $result = $driver !== null
             ? $driver->performPtz($device, $action)
@@ -266,6 +275,16 @@ final class DeviceCameraOnvifController extends Controller
         ];
 
         return $result;
+    }
+
+    /** S&D Phase B: refused at a Site with a hub, because the server never reaches into the house. */
+    private function notThroughHubYet(string $message): JsonResponse
+    {
+        return response()->json([
+            'ok' => false,
+            'reason_code' => 'hub_route_not_built',
+            'message' => $message,
+        ], 409)->header('Cache-Control', 'no-store');
     }
 
     private function siteOf(Device $device): ?int

@@ -16,6 +16,14 @@ use Throwable;
 
 final class CommandExecutionRouteResolver
 {
+    /**
+     * Actions whose server-side adapter connects straight into the house and that have no hub job
+     * yet (S&D Phase B). At a Site a hub covers they are unavailable rather than direct.
+     */
+    private const array NOT_YET_THROUGH_A_HUB = [
+        'alarm.arm', 'alarm.disarm', 'alarm.bypass', 'alarm.reset', 'alarm.emergency_mode.set',
+    ];
+
     public function __construct(
         private readonly CommandExecutionAdapterRegistry $centralAdapters,
         private readonly CollectorCommandDescriptorRegistry $collectorCommands,
@@ -47,6 +55,12 @@ final class CommandExecutionRouteResolver
             if ($hubRoute instanceof CommandExecutionRoute) {
                 return $hubRoute;
             }
+        } elseif (in_array($capability, self::NOT_YET_THROUGH_A_HUB, true)
+            && ($hub = $this->coveringHubs->forSite($siteId)) instanceof MonitoringCollector) {
+            // The server would connect straight into the house; at a Site with a hub it never does.
+            return CommandExecutionRoute::unavailable(
+                CoveringHubResolver::label($hub).' covers this Site, and alarm commands through a hub aren’t built yet. Oblivion doesn’t reach into the house directly.',
+            );
         }
         try {
             if ($this->centralAdapters->supports($device, $capability)) {
