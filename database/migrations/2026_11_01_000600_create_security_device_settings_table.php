@@ -16,7 +16,8 @@ return new class extends Migration
         Schema::create('security_device_settings', function (Blueprint $table): void {
             $table->id();
             $table->string('key', 64)->unique();
-            $table->json('value');
+            // Null is a value too: "IT for that Site" instead of a named role.
+            $table->json('value')->nullable();
             $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });

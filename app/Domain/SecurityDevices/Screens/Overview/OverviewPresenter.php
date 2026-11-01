@@ -5,9 +5,11 @@ namespace App\Domain\SecurityDevices\Screens\Overview;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryRun;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Hubs\Services\HubActionRules;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Domain\SecurityDevices\Screens\Alerts\AlertsPresenter;
 use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Screens\DeviceState;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceDirectory;
@@ -489,10 +491,47 @@ final class OverviewPresenter
      */
     private function alerts(User $viewer, Collection $entries): array
     {
-        if ($entries->isEmpty() || (! $viewer->canDo('controlRoom.viewAny') && ! $viewer->canDo('controlRoom.alerts.view'))) {
+        if ($entries->isEmpty()) {
             return [];
         }
         $byId = $entries->keyBy(fn (DeviceEntry $entry): int => $entry->id());
+        // S&D Phase D: the device alerts people work in Alerts, worst first.
+        $deviceAlerts = ! AlertsPresenter::canOpen($viewer) ? [] : DeviceAlert::query()
+            ->active()
+            ->whereIn('device_id', $byId->keys()->all())
+            ->orderByRaw("CASE WHEN severity = 'critical' THEN 0 ELSE 1 END")
+            ->orderByDesc('opened_at')
+            ->limit(200)
+            ->get(['id', 'device_id', 'title', 'severity', 'opened_at'])
+            ->map(function (DeviceAlert $alert) use ($byId): array {
+                $entry = $byId->get((int) $alert->device_id);
+
+                return [
+                    'id' => 'sd-'.$alert->id,
+                    'title' => $alert->title,
+                    'at' => $alert->opened_at->toIso8601String(),
+                    'device' => (string) ($entry?->name() ?? ''),
+                    'site' => (string) ($entry?->siteName ?? ''),
+                    'href' => '/security-devices/alerts?alert='.$alert->id,
+                ];
+            })
+            ->values()
+            ->all();
+        if (! $viewer->canDo('controlRoom.viewAny') && ! $viewer->canDo('controlRoom.alerts.view')) {
+            return $deviceAlerts;
+        }
+
+        return [...$deviceAlerts, ...$this->controlRoomAlerts($viewer, $byId)];
+    }
+
+    /**
+     * Control Room's own alerts about these devices (trackers and fleet signals), opened there.
+     *
+     * @param  Collection<int, DeviceEntry>  $byId
+     * @return list<array<string, mixed>>
+     */
+    private function controlRoomAlerts(User $viewer, Collection $byId): array
+    {
         $alerts = ControlRoomAlert::query()
             ->whereIn('status', ControlRoomAlert::ACTIVE_STATUSES)
             ->whereHas('device', fn ($device) => $device->whereIn('canonical_device_id', $byId->keys()->all()))

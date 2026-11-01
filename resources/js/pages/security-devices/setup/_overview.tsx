@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ReviewCard } from '@/components/wizard/shell';
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight, History, KeyRound, ListChecks, Plug, Router, Users, type LucideIcon } from 'lucide-react';
+import { ArrowUpRight, Bell, History, KeyRound, ListChecks, Plug, Router, Users, type LucideIcon } from 'lucide-react';
 import { LineText, ToneLine, matches } from './_parts';
 import type { ReviewCardData, SetupProps, SetupSection, TodoItem } from './_types';
 
@@ -16,6 +16,7 @@ const ICONS: Record<ReviewCardData['icon'], LucideIcon> = {
     'list-checks': ListChecks,
     users: Users,
     history: History,
+    bell: Bell,
 };
 
 const RING = { success: 'success', warning: 'warning', critical: 'critical', info: 'info', neutral: 'none' } as const;

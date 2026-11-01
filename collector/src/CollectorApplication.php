@@ -379,6 +379,10 @@ final class CollectorApplication
         }
         $spool = new EncryptedSpool($stateDirectory, $checkpoint);
         $this->moveRelayedReadings($stateDirectory, $spool, $secretKey);
+        if ($config !== null) {
+            // S&D Phase E (D21): once a day, check Oblivion's public address refuses MQTT.
+            $this->checkBrokerExposure($stateDirectory, $spool, (string) $identity['central_url']);
+        }
         $uploadError = $this->flush($central, $identity['collector_id'], $spool);
         $uploadError ??= $configurationError;
 
@@ -612,6 +616,45 @@ final class CollectorApplication
                 $inbox->remove($held['file']);
             }
         }
+    }
+
+    /**
+     * S&D Phase E (D21): sensor readings must never cross the public internet, so once a day the
+     * hub tries Oblivion's public address on ports 1883 and 8883. Both must refuse. The result goes
+     * up with the next batch; Setup › Sensor broker shows it and an answer alerts IT.
+     */
+    private function checkBrokerExposure(string $stateDirectory, EncryptedSpool $spool, string $centralUrl): void
+    {
+        $stamp = $stateDirectory.DIRECTORY_SEPARATOR.'broker-exposure-check.json';
+        $last = is_file($stamp) ? json_decode((string) file_get_contents($stamp), true) : null;
+        $now = new DateTimeImmutable('now');
+        if (is_array($last) && is_int($last['checked_at'] ?? null) && $last['checked_at'] > $now->getTimestamp() - 86_400) {
+            return;
+        }
+        $host = parse_url($centralUrl, PHP_URL_HOST);
+        if (! is_string($host) || $host === '' || $spool->status()['state'] === 'buffer_full') {
+            return;
+        }
+        $ports = [];
+        foreach ([1883, 8883] as $port) {
+            $target = 'tcp://'.(str_contains($host, ':') ? "[{$host}]" : $host).':'.$port;
+            $socket = @stream_socket_client($target, $errorNumber, $errorText, 3);
+            $ports[(string) $port] = is_resource($socket) ? 'answered' : 'refused';
+            if (is_resource($socket)) {
+                fclose($socket);
+            }
+        }
+        try {
+            $spool->append('broker-exposure:'.$now->format('Ymd'), $spool->nextSourceSequence(), [
+                'item_type' => 'broker_exposure_check',
+                'host' => substr($host, 0, 253),
+                'ports' => $ports,
+                'checked_at' => $now->format(DATE_ATOM),
+            ], $now);
+        } catch (SpoolFull) {
+            return;
+        }
+        $this->writePrivateFile($stamp, json_encode(['checked_at' => $now->getTimestamp()], JSON_THROW_ON_ERROR));
     }
 
     private function wipeRemovedHub(string $configPath, string $stateDirectory, string &$secretKey): int

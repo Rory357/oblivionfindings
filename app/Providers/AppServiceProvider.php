@@ -645,9 +645,11 @@ class AppServiceProvider extends ServiceProvider
         Site::observe(SiteObserver::class);
         SiteHazard::observe(SiteHazardObserver::class);
         SiteChecklistRun::observe(SiteChecklistRunObserver::class);
-        DeviceEvent::observe(
+        DeviceEvent::observe([
             DeviceEventObserver::class,
-        );
+            // S&D Phase E: safety events also open an alert in Security & devices › Alerts.
+            \App\Domain\SecurityDevices\Alerts\SafetyEventObserver::class,
+        ]);
 
         // H&S → Control Room bridge observers
         ClientIncident::observe(ClientIncidentObserver::class);

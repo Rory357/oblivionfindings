@@ -124,7 +124,7 @@ export function SetupNetworks({
                 icon={ScanSearch}
                 title="Scans"
                 caption="Applies to every network unless a Site changes it"
-                keys={['scans.daily', 'scans.server_direct']}
+                keys={['scans.daily', 'notify.new_devices.app', 'scans.server_direct']}
                 draft={draft}
             />
         </div>

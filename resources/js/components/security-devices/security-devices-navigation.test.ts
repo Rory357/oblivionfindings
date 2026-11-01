@@ -66,7 +66,7 @@ describe('Security & Devices navigation contract', () => {
                 ['Overview', '/security-devices'],
                 ['Devices', '/security-devices/devices'],
                 ['Sites', '/security-devices/sites'],
-                ['Alerts & upkeep', '/security-devices/monitoring'],
+                ['Alerts', '/security-devices/alerts'],
                 ['Setup', '/security-devices/setup'],
             ],
         );
@@ -90,7 +90,7 @@ describe('Security & Devices navigation contract', () => {
         });
         expect(
             maintenanceOnly[0]?.items.map((item) => [item.title, item.href]),
-        ).toEqual([['Alerts & upkeep', '/security-devices/maintenance']]);
+        ).toEqual([['Alerts', '/security-devices/maintenance']]);
 
         const collectorManager = buildSecurityDevicesNavigationGroups({
             integrationsManage: true,
@@ -107,7 +107,7 @@ describe('Security & Devices navigation contract', () => {
                 item.title,
                 item.href,
             ]),
-        ).toEqual([['Setup', '/security-devices/settings']]);
+        ).toEqual([['Setup', '/security-devices/setup']]);
     });
 
     it('matches hub pages and preserved legacy routes without making Overview greedy', () => {

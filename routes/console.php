@@ -1044,6 +1044,9 @@ app(Schedule::class)->command('monitoring:prune-enrolment-recovery')
 // S&D Phase B: start each hub's daily network scan once its time has come (off until someone sets a time).
 app(Schedule::class)->command('monitoring:run-daily-discovery')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
 
+// S&D Phase D: snoozed device alerts come back on time; open ones nobody has acknowledged remind people after an hour.
+app(Schedule::class)->command('security-devices:alerts-tick')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+
 // Native attempt expiry is bookkeeping only; it never retries a computer action.
 app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
 

@@ -67,6 +67,9 @@ function fixture(overrides: Partial<SetupProps> = {}): SetupProps {
             ],
         },
         settings: null,
+        alerts: null,
+        checks: null,
+        broker: null,
         networks: null,
         connected: null,
         logins: null,
@@ -104,8 +107,8 @@ describe('Setup', () => {
                     tab: 'networks',
                     overview: null,
                     settings: {
-                        'scans.daily': { on: true, default: true, changed: false, loosens_when_on: false, can_change: true },
-                        'scans.server_direct': { on: false, default: false, changed: false, loosens_when_on: true, can_change: true },
+                        'scans.daily': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'scans.server_direct': { type: 'bool', on: false, default: false, changed: false, loosens_when_on: true, loosens_when_off: false, can_change: true },
                     },
                     networks: {
                         rows: [
@@ -137,8 +140,9 @@ describe('Setup', () => {
         fireEvent.click(screen.getByRole('switch', { name: 'Let the Oblivion server scan networks it can reach directly' }));
         expect(screen.getByText('1 change not saved')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
-        expect(screen.getByText('Loosens a safety check')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+        expect(screen.getByText('This loosens a safety check.')).toBeInTheDocument();
+        expect(screen.getByLabelText('Why loosen it?')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Save, including the loosened check' })).toBeInTheDocument();
     });
 
     it('shows saved logins with their state and never anything secret, and a switch the viewer cannot change is locked', () => {
@@ -175,6 +179,37 @@ describe('Setup', () => {
         expect(screen.getByRole('tab', { name: /Saved logins/ })).toBeInTheDocument();
         // No save bar for someone who can't change anything.
         expect(screen.queryByText('No unsaved changes')).not.toBeInTheDocument();
+    });
+
+    it('sets who is told when a device stops answering, and how', () => {
+        render(
+            <SetupPage
+                {...fixture({
+                    section: 'alerts',
+                    tab: 'rules',
+                    overview: null,
+                    sections: [...sections.slice(0, 3), { key: 'alerts', label: 'Alerts & checks', tabs: [{ key: 'rules', label: 'Alert rules' }] }, sections[3]],
+                    alerts: { rules: 0 },
+                    settings: {
+                        'alerts.devices.role': { type: 'role', value: null, default: null, changed: false, can_change: true, options: [{ value: null, label: 'IT for that Site' }, { value: 'it_admin', label: 'IT admin' }] },
+                        'alerts.devices.app': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: true, can_change: true },
+                        'alerts.devices.email': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'alerts.devices.push': { type: 'bool', on: false, default: false, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'notify.new_devices.app': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'notify.new_devices.email': { type: 'bool', on: false, default: false, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'notify.new_devices.push': { type: 'bool', on: false, default: false, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                    },
+                })}
+            />,
+        );
+
+        expect(screen.getByText('Who is told when a rule doesn’t say')).toBeInTheDocument();
+        expect(screen.getByText('No rules of your own yet, so these defaults apply everywhere.')).toBeInTheDocument();
+        // Turning off the app notice for devices not answering loosens a safety check.
+        fireEvent.click(screen.getByRole('switch', { name: 'Devices and hubs not answering: In-app' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
+        expect(screen.getByText('Save 1 change to alert rules?')).toBeInTheDocument();
+        expect(screen.getByText('This loosens a safety check.')).toBeInTheDocument();
     });
 
     it('lists the change history with export and a pager', () => {

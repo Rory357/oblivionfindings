@@ -48,10 +48,12 @@ final class SetupController extends Controller
         $user = $this->viewer($request);
         $validated = $request->validate([
             'changes' => ['required', 'array', 'min:1', 'max:20'],
+            // Required by the settings store when a change loosens a safety check (pop-up 80).
+            'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         try {
-            $changed = $settings->update($user, $validated['changes']);
+            $changed = $settings->update($user, $validated['changes'], $validated['reason'] ?? null);
         } catch (AuthorizationException) {
             abort(403, 'You can’t change this setting.');
         }
@@ -95,6 +97,18 @@ final class SetupController extends Controller
         }
 
         return response()->json(['run_id' => (int) $run->id], 202);
+    }
+
+    /** Setup › Sensor broker: remove one gateway's login; its hub stops accepting it at the next update. */
+    public function revokeGateway(Request $request, int $login, SecurityDevicesAccessService $access): JsonResponse
+    {
+        $user = $this->viewer($request);
+        abort_unless($user->canDo('securityDevices.savedLogins.manage'), 403);
+        $record = \App\Domain\SecurityDevices\Iot\Relay\Models\SensorGatewayLogin::query()->active()->findOrFail($login);
+        $access->assertCanViewSite($user, (int) $record->site_id);
+        app(\App\Domain\SecurityDevices\Iot\Relay\Services\SensorGatewayLoginService::class)->revoke($record, $user);
+
+        return response()->json(['message' => 'Login removed.']);
     }
 
     /** Change history as a CSV file (newest first, up to 5,000 rows). */

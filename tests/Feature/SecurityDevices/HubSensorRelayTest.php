@@ -31,6 +31,8 @@ beforeEach(function (): void {
         'status' => 'online', 'last_seen_at' => now(), 'approved_at' => now()->subDay(), 'revoked_at' => null,
     ]);
     ['login' => $this->login, 'password' => $this->password] = app(SensorGatewayLoginService::class)->create($this->site, 'Office UG65');
+    // Phase E (D22): the hub relay is unencrypted MQTT, so it runs only once Setup allows that.
+    \App\Domain\SecurityDevices\Setup\Models\SecurityDeviceSetting::query()->create(['key' => 'mqtt.allow_unencrypted', 'value' => true]);
 
     $this->sensor = Device::factory()->create([
         'name' => 'Rata House medication fridge', 'domain' => 'iot_healthcare', 'category' => 'environmental',
@@ -78,6 +80,19 @@ it('sends the hub only a hash of each gateway login, and a relay-only hub still 
         ->and($envelope)->not->toContain($this->password);
 });
 
+it('sends no relay while unencrypted MQTT is off, or for a Site whose range another Site uses (D22)', function (): void {
+    $config = fn (): array => json_decode(base64_decode(json_decode(app(CollectorConfigurationService::class)->signedEnvelope($this->hub->fresh(), 0), true)['payload'], true), true);
+
+    \App\Domain\SecurityDevices\Setup\Models\SecurityDeviceSetting::query()->where('key', 'mqtt.allow_unencrypted')->update(['value' => json_encode(false)]);
+    expect(fn () => $config())->toThrow(DomainException::class); // a relay-only hub then has no work at all
+
+    \App\Domain\SecurityDevices\Setup\Models\SecurityDeviceSetting::query()->where('key', 'mqtt.allow_unencrypted')->update(['value' => json_encode(true)]);
+    $other = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+    \App\Domain\Monitoring\Discovery\Models\DiscoveryScope::factory()->create(['site_id' => $this->site->id, 'cidrs' => ['172.16.0.0/24']]);
+    \App\Domain\Monitoring\Discovery\Models\DiscoveryScope::factory()->create(['site_id' => $other->id, 'cidrs' => ['172.16.0.0/24']]);
+    expect(fn () => $config())->toThrow(DomainException::class);
+});
+
 it('puts a relayed reading into the sensor intake with the time the hub received it', function (): void {
     $receivedAt = CarbonImmutable::now('UTC')->subMinutes(8)->startOfSecond();
 
@@ -114,4 +129,40 @@ it('stops sending a revoked login to the hub', function (): void {
 
     expect(fn () => app(CollectorConfigurationService::class)->signedEnvelope($this->hub->fresh(), 0))
         ->toThrow(DomainException::class, 'Collector has no executable work');
+});
+
+it('records the daily public-port check and alerts when Oblivion answers MQTT from the internet (D21)', function (): void {
+    $hubDevice = Device::factory()->create(['name' => 'Rata House hub PC']);
+    $this->hub->forceFill(['collector_device_id' => $hubDevice->id])->save();
+    $send = fn (array $ports): array => app(CollectorIngestService::class)->ingest($this->hub->fresh(), [[
+        'id' => 'broker-exposure:'.Str::random(8),
+        'source_sequence' => 1,
+        'created_at' => now()->toIso8601String(),
+        'payload' => ['item_type' => 'broker_exposure_check', 'host' => 'oblivion.example', 'ports' => $ports, 'checked_at' => now()->toIso8601String()],
+    ]]);
+
+    $send(['1883' => 'answered', '8883' => 'refused']);
+    expect(\App\Domain\SecurityDevices\Iot\Relay\Models\BrokerExposureCheck::query()->sole()->passed)->toBeFalse();
+    $alert = \App\Domain\SecurityDevices\Alerts\Models\DeviceAlert::query()->sole();
+    expect($alert->kind)->toBe('mqtt_exposed')->and($alert->severity)->toBe('critical')
+        ->and($alert->title)->toBe('Oblivion’s public address answers on port 1883');
+
+    $send(['1883' => 'refused', '8883' => 'refused']);
+    expect($alert->fresh()->state)->toBe('done');
+});
+
+it('turns 5 wrong logins at the relay into an alert on the hub for IT', function (): void {
+    $hubDevice = Device::factory()->create(['name' => 'Rata House hub PC']);
+    $this->hub->forceFill(['collector_device_id' => $hubDevice->id])->save();
+
+    app(CollectorIngestService::class)->ingest($this->hub->fresh(), [[
+        'id' => 'sensor-reading:'.Str::random(8),
+        'source_sequence' => 1,
+        'created_at' => now()->toIso8601String(),
+        'payload' => ['item_type' => 'relay_login_failures', 'address' => '10.20.0.36', 'count' => 5, 'received_at' => now()->toIso8601String()],
+    ]]);
+
+    $alert = \App\Domain\SecurityDevices\Alerts\Models\DeviceAlert::query()->sole();
+    expect($alert->kind)->toBe('mqtt_logins')
+        ->and($alert->title)->toBe('Rata House hub: 5 wrong sensor logins from 10.20.0.36');
 });

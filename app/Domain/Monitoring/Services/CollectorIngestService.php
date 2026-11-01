@@ -172,6 +172,42 @@ final readonly class CollectorIngestService
 
             return;
         }
+        if ($itemType === 'broker_exposure_check') {
+            // S&D Phase E (D21): the hub's daily check that Oblivion's public address refuses MQTT.
+            $ports = [];
+            foreach (['1883', '8883'] as $port) {
+                $value = is_array($payload['ports'] ?? null) ? ($payload['ports'][$port] ?? null) : null;
+                $ports[$port] = $value === 'answered' ? 'answered' : 'refused';
+            }
+            try {
+                $at = CarbonImmutable::parse((string) ($payload['checked_at'] ?? 'now'))->utc();
+            } catch (\Throwable) {
+                $at = CarbonImmutable::now('UTC');
+            }
+            $passed = ! in_array('answered', $ports, true);
+            \App\Domain\SecurityDevices\Iot\Relay\Models\BrokerExposureCheck::query()->create([
+                'collector_id' => $collector->id,
+                'host' => is_string($payload['host'] ?? null) ? mb_substr($payload['host'], 0, 253) : '',
+                'ports' => $ports,
+                'passed' => $passed,
+                'checked_at' => $at,
+            ]);
+            app(\App\Domain\SecurityDevices\Alerts\DeviceAlertEngine::class)->onBrokerExposure($collector, array_keys(array_filter($ports, fn (string $result): bool => $result === 'answered')), $at);
+
+            return;
+        }
+        if ($itemType === 'relay_login_failures') {
+            // S&D Phase E: 5 wrong sensor logins in 10 minutes at the hub's relay alert IT.
+            $address = is_string($payload['address'] ?? null) ? mb_substr($payload['address'], 0, 64) : 'an unknown address';
+            try {
+                $at = CarbonImmutable::parse((string) ($payload['received_at'] ?? 'now'))->utc();
+            } catch (\Throwable) {
+                $at = CarbonImmutable::now('UTC');
+            }
+            app(\App\Domain\SecurityDevices\Alerts\DeviceAlertEngine::class)->onRelayLoginFailures($collector, $address, max(1, (int) ($payload['count'] ?? 5)), $at);
+
+            return;
+        }
         if ($itemType === 'syslog_event') {
             $siteId = $this->positiveSiteId($payload['site_id'] ?? null);
             $senderIp = $this->nonEmptyString($payload['sender_ip'] ?? null, 'Collector Syslog sender IP is invalid.');

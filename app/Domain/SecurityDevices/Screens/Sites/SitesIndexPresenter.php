@@ -9,6 +9,8 @@ use App\Domain\SecurityDevices\Screens\Devices\DeviceDirectory;
 use App\Domain\SecurityDevices\Screens\Hubs\HubPanelPresenter;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceEntry;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
+use App\Domain\SecurityDevices\Screens\Alerts\AlertsPresenter;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
 use App\Models\User;
@@ -166,7 +168,9 @@ final class SitesIndexPresenter
      */
     private function deviceAlerts(User $viewer, Collection $entriesBySite): array
     {
-        if (! $viewer->canDo('controlRoom.viewAny') && ! $viewer->canDo('controlRoom.alerts.view')) {
+        $canReadDeviceAlerts = AlertsPresenter::canOpen($viewer);
+        $canReadControlRoom = $viewer->canDo('controlRoom.viewAny') || $viewer->canDo('controlRoom.alerts.view');
+        if (! $canReadDeviceAlerts && ! $canReadControlRoom) {
             return [];
         }
         $siteByDevice = [];
@@ -178,6 +182,19 @@ final class SitesIndexPresenter
         if ($siteByDevice === []) {
             return [];
         }
+        $bySite = [];
+        // S&D Phase D: the device alerts people work in Alerts come first.
+        if ($canReadDeviceAlerts) {
+            DeviceAlert::query()->active()->whereIn('device_id', array_keys($siteByDevice))
+                ->orderByRaw("CASE WHEN severity = 'critical' THEN 0 ELSE 1 END")->orderByDesc('opened_at')->limit(500)
+                ->get(['id', 'device_id', 'title'])
+                ->each(function (DeviceAlert $alert) use ($siteByDevice, &$bySite): void {
+                    $bySite[$siteByDevice[(int) $alert->device_id]][] = $alert->title;
+                });
+        }
+        if (! $canReadControlRoom) {
+            return array_map(fn (array $titles): array => array_values(array_unique($titles)), $bySite);
+        }
         $alerts = ControlRoomAlert::query()
             ->whereIn('status', ControlRoomAlert::ACTIVE_STATUSES)
             ->whereHas('device', fn ($device) => $device->whereIn('canonical_device_id', array_keys($siteByDevice)))
@@ -187,7 +204,6 @@ final class SitesIndexPresenter
             ->get(['id', 'alert_type', 'device_id', 'site_id', 'status']);
         $readable = $this->alertAccess->readableIds($alerts, $viewer)->flip();
 
-        $bySite = [];
         foreach ($alerts as $alert) {
             $siteId = $siteByDevice[(int) $alert->device?->canonical_device_id] ?? null;
             if ($siteId !== null && $readable->has((int) $alert->id)) {

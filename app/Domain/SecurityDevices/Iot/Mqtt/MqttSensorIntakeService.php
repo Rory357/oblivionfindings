@@ -5,6 +5,8 @@ namespace App\Domain\SecurityDevices\Iot\Mqtt;
 use App\Domain\Monitoring\Enums\RuntimeMessageType;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\MonitoringOutboxPublisher;
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
+use App\Domain\SecurityDevices\Alerts\SafetyEventObserver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
@@ -133,7 +135,9 @@ final class MqttSensorIntakeService
 
         $eventsToCreate = $this->extractDiscreteEvents($data);
 
+        $readingChanges = [];
         $eventsCreated = DB::transaction(function () use (
+            &$readingChanges,
             $device,
             $siteId,
             $sourceProtocol,
@@ -149,6 +153,13 @@ final class MqttSensorIntakeService
             $observed = is_array($meta['observed'] ?? null) ? $meta['observed'] : [];
             $existingReadings = is_array($observed['sensor_readings'] ?? null) ? $observed['sensor_readings'] : [];
 
+            // S&D Phase E: a reading that changes state opens or closes its alert (after this commit).
+            foreach ($newReadings as $key => $reading) {
+                $before = is_array($existingReadings[$key] ?? null) ? (string) ($existingReadings[$key]['state'] ?? 'healthy') : 'healthy';
+                if ($before !== $reading['state']) {
+                    $readingChanges[$key] = $reading;
+                }
+            }
             $mergedReadings = array_replace($existingReadings, $newReadings);
             $observed['sensor_readings'] = $mergedReadings;
             $observed['last_telemetry_protocol'] = $sourceProtocol;
@@ -185,6 +196,10 @@ final class MqttSensorIntakeService
                 $deviceEvent = $hasSignalSource
                     ? DeviceEvent::query()->create($eventAttributes)
                     : DeviceEvent::withoutEvents(fn () => DeviceEvent::query()->create($eventAttributes));
+                if (! $hasSignalSource) {
+                    // Model events were off for Control Room's bridge; the S&D safety alert still opens.
+                    app(SafetyEventObserver::class)->created($deviceEvent);
+                }
 
                 try {
                     $this->outbox->stage(
@@ -216,6 +231,14 @@ final class MqttSensorIntakeService
 
             return $createdCount;
         });
+
+        $alerts = app(DeviceAlertEngine::class);
+        foreach ($readingChanges as $key => $reading) {
+            $alerts->onReading($device, (string) $key, (string) $reading['label'], (string) $reading['state'], (float) $reading['value'], (string) $reading['unit'], $at);
+        }
+        if ($battery !== null) {
+            $alerts->onBattery($device, $battery, $at);
+        }
 
         return [
             'accepted' => true,

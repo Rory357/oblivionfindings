@@ -71,6 +71,7 @@ use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandControll
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandEvidenceController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandExecutionController;
 use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceCommandRequest;
+use App\Domain\SecurityDevices\Screens\Http\AlertsController;
 use App\Domain\SecurityDevices\Screens\Http\DevicesController;
 use App\Domain\SecurityDevices\Screens\Http\FoundDevicesController;
 use App\Domain\SecurityDevices\Screens\Http\HubPanelController;
@@ -507,9 +508,25 @@ Route::middleware([
         ->whereNumber('scope')
         ->middleware('throttle:20,1')
         ->name('security-devices.setup.networks.scan');
+    Route::delete('/setup/broker/gateways/{login}', [SetupController::class, 'revokeGateway'])
+        ->whereNumber('login')
+        ->middleware('throttle:20,1')
+        ->name('security-devices.setup.broker.gateways.revoke');
     Route::get('/setup/{section}', [SetupController::class, 'show'])
-        ->where('section', 'hubs|services|history')
+        ->where('section', 'hubs|services|alerts|history')
         ->name('security-devices.setup.section');
+
+    // S&D rebuild Phase D: Alerts, and what people do on one. The controller checks permissions.
+    Route::get('/alerts', [AlertsController::class, 'index'])
+        ->name('security-devices.alerts.index');
+    Route::prefix('/alerts/{alert}')->whereNumber('alert')->middleware('throttle:30,1')->group(function (): void {
+        Route::post('/acknowledge', [AlertsController::class, 'acknowledge'])->name('security-devices.alerts.acknowledge');
+        Route::post('/assign', [AlertsController::class, 'assign'])->name('security-devices.alerts.assign');
+        Route::get('/assignees', [AlertsController::class, 'assignees'])->name('security-devices.alerts.assignees');
+        Route::post('/snooze', [AlertsController::class, 'snooze'])->name('security-devices.alerts.snooze');
+        Route::post('/incident', [AlertsController::class, 'reportIncident'])->name('security-devices.alerts.incident');
+        Route::post('/done', [AlertsController::class, 'done'])->name('security-devices.alerts.done');
+    });
 
     Route::get('/network-it', [CategoryPageController::class, 'networkIt'])
         ->middleware('permission:securityDevices.devices.view')

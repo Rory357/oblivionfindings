@@ -15,6 +15,8 @@ use App\Domain\SecurityDevices\Screens\Devices\DeviceEntry;
 use App\Domain\SecurityDevices\Screens\Hubs\HubPanelPresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
+use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
+use App\Domain\SecurityDevices\Screens\Alerts\AlertsPresenter;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
 use App\Models\User;
@@ -230,10 +232,25 @@ final class SitePagePresenter
      */
     private function alerts(User $viewer, Collection $entries): array
     {
-        if ($entries->isEmpty() || (! $viewer->canDo('controlRoom.viewAny') && ! $viewer->canDo('controlRoom.alerts.view'))) {
+        if ($entries->isEmpty()) {
             return [];
         }
         $names = $entries->mapWithKeys(fn (DeviceEntry $entry): array => [$entry->id() => $entry->name()]);
+        // S&D Phase D: the device alerts people work in Alerts come first.
+        $deviceAlerts = ! AlertsPresenter::canOpen($viewer) ? [] : DeviceAlert::query()->active()
+            ->whereIn('device_id', $names->keys()->all())
+            ->orderByRaw("CASE WHEN severity = 'critical' THEN 0 ELSE 1 END")->orderByDesc('opened_at')->limit(100)
+            ->get(['id', 'device_id', 'title', 'opened_at'])
+            ->map(fn (DeviceAlert $alert): array => [
+                'id' => (int) $alert->id,
+                'title' => $alert->title,
+                'at' => $alert->opened_at->toIso8601String(),
+                'device' => (string) ($names[(int) $alert->device_id] ?? ''),
+                'href' => '/security-devices/alerts?alert='.$alert->id,
+            ])->values()->all();
+        if (! $viewer->canDo('controlRoom.viewAny') && ! $viewer->canDo('controlRoom.alerts.view')) {
+            return $deviceAlerts;
+        }
         $alerts = ControlRoomAlert::query()
             ->whereIn('status', ControlRoomAlert::ACTIVE_STATUSES)
             ->whereHas('device', fn ($device) => $device->whereIn('canonical_device_id', $names->keys()->all()))
@@ -243,7 +260,7 @@ final class SitePagePresenter
             ->get(['id', 'alert_type', 'device_id', 'status', 'created_at']);
         $readable = $this->alertAccess->readableIds($alerts, $viewer)->flip();
 
-        return $alerts
+        return [...$deviceAlerts, ...$alerts
             ->filter(fn (ControlRoomAlert $alert): bool => $readable->has((int) $alert->id))
             ->map(fn (ControlRoomAlert $alert): array => [
                 'id' => (int) $alert->id,
@@ -253,7 +270,7 @@ final class SitePagePresenter
                 'href' => '/control-room/alerts/'.$alert->id,
             ])
             ->values()
-            ->all();
+            ->all()];
     }
 
     /** @return array<string, mixed> */

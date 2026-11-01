@@ -81,6 +81,30 @@ final class DeviceOfflineAlertController extends Controller
             return back()->with('success', 'Offline alerts turned off for this device.');
         }
 
+        ['monitor' => $monitor, 'checked_by' => $checkedBy] = $this->enable($user, $device);
+        $message = "Offline alerts turned on for this device. {$checkedBy['label']}.";
+
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return response()->json([
+                'enabled' => true,
+                'monitor_id' => $monitor->id,
+                'checked_by' => $checkedBy,
+                'message' => $message,
+            ]);
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Turn on offline alerts for one device: check its Site and address, put the check on the hub
+     * that covers the Site (or the server when none does) and save the ping check. Also used when
+     * found devices are added (S&D Phase D, "Watch devices as soon as they're added").
+     *
+     * @return array{monitor: Monitor, checked_by: array{mode: string, hub_id: int|null, label: string}}
+     */
+    public function enable(User $user, Device $device): array
+    {
         try {
             $siteId = $this->siteResolver->resolve((int) $device->id);
         } catch (UnexpectedValueException) {
@@ -130,18 +154,8 @@ final class DeviceOfflineAlertController extends Controller
         }
 
         $monitor = $this->saveMonitor($user, $device, $rawTarget, $siteId, $hub);
-        $message = "Offline alerts turned on for this device. {$checkedBy['label']}.";
 
-        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
-            return response()->json([
-                'enabled' => true,
-                'monitor_id' => $monitor->id,
-                'checked_by' => $checkedBy,
-                'message' => $message,
-            ]);
-        }
-
-        return back()->with('success', $message);
+        return ['monitor' => $monitor, 'checked_by' => $checkedBy];
     }
 
     /** The server pings the device itself: the address must pass the server's egress rules. */

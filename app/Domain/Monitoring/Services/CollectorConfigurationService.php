@@ -188,9 +188,16 @@ final readonly class CollectorConfigurationService
                 });
 
             // S&D Phase B (D21): the sensor gateways whose readings this hub relays. Hashes only.
-            $relayLogins = SensorGatewayLogin::query()
+            // Phase E (D22): the relay is unencrypted MQTT on the house network, so it runs only when
+            // Setup allows unencrypted MQTT (off by default, flagged when on), and never for a Site
+            // whose address range another Site also uses.
+            $relaySettings = app(\App\Domain\SecurityDevices\Setup\SecurityDevicesSettings::class);
+            $relaySites = $relaySettings->bool(\App\Domain\SecurityDevices\Setup\SecurityDevicesSettings::MQTT_PLAIN)
+                ? array_values(array_diff($locked->authorisedSiteIds(), \App\Domain\SecurityDevices\Iot\Relay\Services\SensorRelaySites::clashing()))
+                : [];
+            $relayLogins = $relaySites === [] ? [] : SensorGatewayLogin::query()
                 ->active()
-                ->whereIn('site_id', $locked->authorisedSiteIds())
+                ->whereIn('site_id', $relaySites)
                 ->orderBy('id')
                 ->limit(256)
                 ->get(['username', 'password_hash', 'site_id', 'topic_prefix'])

@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Screens\Setup;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Presenters\SupportedDevicesPresenter;
+use App\Domain\SecurityDevices\Screens\Alerts\AlertRulesPresenter;
 use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceDirectory;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceEntry;
@@ -29,8 +30,9 @@ final class SetupPresenter
     /** @var array<string, array{label: string, tabs: array<string, string>}> */
     public const array SECTIONS = [
         'overview' => ['label' => 'Overview', 'tabs' => []],
-        'hubs' => ['label' => 'Hubs & networks', 'tabs' => ['networks' => 'Networks & scans']],
+        'hubs' => ['label' => 'Hubs & networks', 'tabs' => ['networks' => 'Networks & scans', 'broker' => 'Sensor broker']],
         'services' => ['label' => 'Services & logins', 'tabs' => ['connected' => 'Connected services', 'logins' => 'Saved logins', 'supported' => 'Supported devices']],
+        'alerts' => ['label' => 'Alerts & checks', 'tabs' => ['rules' => 'Alert rules', 'checks' => 'Checks']],
         'history' => ['label' => 'Change history', 'tabs' => []],
     ];
 
@@ -44,24 +46,44 @@ final class SetupPresenter
         private readonly SetupLogins $logins,
         private readonly SetupHistory $history,
         private readonly SupportedDevicesPresenter $supported,
+        private readonly AlertRulesPresenter $rules,
+        private readonly SetupBroker $broker,
     ) {}
 
     public static function canOpen(User $viewer): bool
+    {
+        return self::canSeeServices($viewer) || self::canSeeAlerts($viewer);
+    }
+
+    public static function canSeeServices(User $viewer): bool
     {
         return $viewer->canDo('securityDevices.integrations.view')
             || $viewer->canDo('securityDevices.integrations.manage');
     }
 
+    public static function canSeeAlerts(User $viewer): bool
+    {
+        return $viewer->canDo('securityDevices.automations.manage')
+            || $viewer->canDo('securityDevices.monitoring.manage');
+    }
+
     public static function canSeeHistory(User $viewer): bool
     {
         return $viewer->canDo('securityDevices.reports.view')
-            || $viewer->canDo('securityDevices.integrations.manage');
+            || $viewer->canDo('securityDevices.integrations.manage')
+            || $viewer->canDo('securityDevices.automations.manage');
     }
 
     /** @return array<string, array{label: string, tabs: array<string, string>}> */
     public static function sectionsFor(User $viewer): array
     {
         $sections = self::SECTIONS;
+        if (! self::canSeeServices($viewer)) {
+            unset($sections['hubs'], $sections['services']);
+        }
+        if (! self::canSeeAlerts($viewer)) {
+            unset($sections['alerts']);
+        }
         if (! self::canSeeHistory($viewer)) {
             unset($sections['history']);
         }
@@ -81,13 +103,19 @@ final class SetupPresenter
         $tab = $tabs === [] ? null : (array_key_exists((string) $tab, $tabs) ? (string) $tab : array_key_first($tabs));
 
         $entries = $this->directory->entries($viewer);
-        $hubs = $this->hubsFor($viewer);
-        $noHub = $this->sitesWithoutHub($viewer, $entries);
-        $services = $this->services->present($viewer, $entries);
-        $logins = $this->logins->present($viewer);
-        $failedScans = $this->networks->failedScans($viewer);
+        $seesServices = array_key_exists('services', $sections);
+        // Someone who only manages alerts sees nothing about hubs, services or saved logins.
+        $hubs = $seesServices ? $this->hubsFor($viewer) : collect();
+        $noHub = $seesServices ? $this->sitesWithoutHub($viewer, $entries) : [];
+        $services = $seesServices ? $this->services->present($viewer, $entries) : ['cards' => [], 'connected' => 0, 'total' => 0, 'attention' => []];
+        $logins = $seesServices ? $this->logins->present($viewer) : ['rows' => [], 'kept' => [], 'failed' => [], 'due' => 0];
+        $failedScans = $seesServices ? $this->networks->failedScans($viewer) : [];
         $todo = $this->todo($viewer, $hubs, $noHub, $services, $logins, $failedScans);
         $canManage = $viewer->canDo('securityDevices.integrations.manage');
+        $meters = array_values(array_filter(
+            $this->meters($hubs, $todo, $services, $logins, $entries, $viewer->canDo('securityDevices.devices.view')),
+            fn (array $meter): bool => $seesServices || ! in_array($meter['key'], ['hubs', 'services', 'logins'], true),
+        ));
 
         return [
             'section' => $section,
@@ -97,7 +125,7 @@ final class SetupPresenter
                 'label' => $definition['label'],
                 'tabs' => collect($definition['tabs'])->map(fn (string $label, string $tabKey): array => ['key' => $tabKey, 'label' => $label])->values()->all(),
             ])->values()->all(),
-            'meters' => $this->meters($hubs, $todo, $services, $logins, $entries, $viewer->canDo('securityDevices.devices.view')),
+            'meters' => $meters,
             'can' => [
                 'manage' => $canManage,
                 'add_network' => $canManage,
@@ -110,8 +138,11 @@ final class SetupPresenter
                 'todo' => $todo,
                 'cards' => $this->cards($viewer, $hubs, $noHub, $services, $logins, $failedScans, $sections),
             ] : null,
-            'settings' => $section === 'hubs' ? $this->settings->forViewer($viewer) : null,
+            'settings' => in_array($section, ['hubs', 'alerts'], true) ? $this->settings->forViewer($viewer) : null,
+            'alerts' => $section === 'alerts' && $tab === 'rules' ? ['rules' => $this->rules->count($viewer)] : null,
+            'checks' => $section === 'alerts' && $tab === 'checks' ? $this->checks($entries) : null,
             'networks' => $section === 'hubs' && $tab === 'networks' ? $this->networks->present($viewer) : null,
+            'broker' => $section === 'hubs' && $tab === 'broker' ? $this->broker->present($viewer) : null,
             'connected' => $section === 'services' && $tab === 'connected' ? ['cards' => $services['cards']] : null,
             'logins' => $section === 'services' && $tab === 'logins' ? ['rows' => $logins['rows'], 'kept' => $logins['kept']] : null,
             'supported' => $section === 'services' && $tab === 'supported' ? $this->supportedTables($viewer) : null,
@@ -406,12 +437,21 @@ final class SetupPresenter
                 ],
                 'link' => ['label' => 'Review supported devices', 'section' => 'services', 'tab' => 'supported'],
             ],
-            [
-                'key' => 'roles', 'icon' => 'users', 'title' => 'Who can do what', 'lines' => $this->roleLines(),
-                'link' => $viewer->canDo('settings.access.manage')
-                    ? ['label' => 'Open Settings › Roles', 'href' => '/settings/roles']
-                    : null,
-            ],
+        ];
+        if (! array_key_exists('services', $sections)) {
+            $cards = [];
+        }
+        if (array_key_exists('alerts', $sections)) {
+            $cards[] = [
+                'key' => 'alerts', 'icon' => 'bell', 'title' => 'Alerts & checks', 'lines' => $this->alertLines($viewer),
+                'link' => ['label' => 'Review alerts & checks', 'section' => 'alerts', 'tab' => 'rules'],
+            ];
+        }
+        $cards[] = [
+            'key' => 'roles', 'icon' => 'users', 'title' => 'Who can do what', 'lines' => $this->roleLines(),
+            'link' => $viewer->canDo('settings.access.manage')
+                ? ['label' => 'Open Settings › Roles', 'href' => '/settings/roles']
+                : null,
         ];
         if (array_key_exists('history', $sections)) {
             $latest = $this->history->latest($viewer);
@@ -434,6 +474,66 @@ final class SetupPresenter
         unset($card);
 
         return $cards;
+    }
+
+    /**
+     * Setup › Alerts & checks › Checks (pg-sdr-15h): what each kind of device gets today, from
+     * the default offline check (the same one "Watch devices as soon as they're added" uses).
+     *
+     * @param  Collection<int, DeviceEntry>  $entries
+     * @return array{rows: list<array<string, mixed>>}
+     */
+    private function checks(Collection $entries): array
+    {
+        $profile = AppDomainMonitoringModelsMonitoringProfile::query()
+            ->where('name', AppDomainMonitoringModelsMonitoringProfile::DEFAULT_AVAILABILITY_NAME)->where('is_active', true)->first();
+        $interval = (int) ($profile?->interval_seconds ?? 60);
+        $misses = max(1, (int) ($profile?->failure_confirmations ?? 3));
+        $often = $interval % 60 === 0 ? ($interval === 60 ? 'Every minute' : 'Every '.intdiv($interval, 60).' minutes') : "Every {$interval} seconds";
+
+        $rows = $entries
+            ->reject(fn (DeviceEntry $entry): bool => $entry->state === DeviceState::Retired)
+            ->groupBy(fn (DeviceEntry $entry): string => $entry->kind->label())
+            ->map(function (Collection $group, string $label) use ($often, $misses): array {
+                $watched = $group->filter(fn (DeviceEntry $entry): bool => $entry->watching !== [])->count();
+                $words = $group->flatMap(fn (DeviceEntry $entry): array => $entry->watching)->unique()->values()->all();
+
+                return [
+                    'key' => IlluminateSupportStr::slug($label),
+                    'kind' => $label,
+                    'check' => $words === [] ? 'Not watched yet' : ucfirst(SetupNetworks::andList(array_slice($words, 0, 3))),
+                    'often' => $watched === 0 ? null : $often,
+                    'after' => $watched === 0 ? null : ($misses === 1 ? '1 missed check' : "{$misses} missed checks in a row"),
+                    'devices' => $group->count(),
+                    'watched' => $watched,
+                ];
+            })
+            ->sortBy('kind')
+            ->values()
+            ->all();
+
+        return ['rows' => $rows];
+    }
+
+    /** The Alerts & checks card: who is told by default, how, and how many rules there are. @return list<array{tone: string, text: string, at: null}> */
+    private function alertLines(User $viewer): array
+    {
+        $how = fn (array $channels): string => $channels === []
+            ? 'nobody is told'
+            : SetupNetworks::andList(array_map(fn (string $channel): string => match ($channel) {
+                'database' => 'app', 'mail' => 'email', default => 'push',
+            }, $channels));
+        $role = $this->settings->role(SecurityDevicesSettings::DEVICES_ROLE);
+        $who = $role === null ? 'IT for that Site' : (string) (Role::query()->where('name', $role)->value('label') ?: $role);
+        $devices = $this->settings->channels(SecurityDevicesSettings::DEVICES_APP, SecurityDevicesSettings::DEVICES_EMAIL, SecurityDevicesSettings::DEVICES_PUSH);
+        $found = $this->settings->channels(SecurityDevicesSettings::NEW_DEVICES_APP, SecurityDevicesSettings::NEW_DEVICES_EMAIL, SecurityDevicesSettings::NEW_DEVICES_PUSH);
+        $rules = $this->rules->count($viewer);
+
+        return [
+            ['tone' => $devices === [] ? 'warning' : 'success', 'text' => $devices === [] ? 'Nobody is told when a device stops answering' : "Device or hub stops answering: {$who} ({$how($devices)})", 'at' => null],
+            ['tone' => 'info', 'text' => 'New device found by a scan: '.($found === [] ? 'no notice' : $how($found)), 'at' => null],
+            ['tone' => 'info', 'text' => $rules === 0 ? 'No rules of your own yet: these defaults apply' : ($rules === 1 ? '**1 rule** of your own' : "**{$rules} rules** of your own"), 'at' => null],
+        ];
     }
 
     /** @return list<array{tone: string, text: string, at: null}> */

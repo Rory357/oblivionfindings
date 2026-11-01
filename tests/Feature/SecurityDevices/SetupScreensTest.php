@@ -163,6 +163,10 @@ class SetupScreensTest extends TestCase
         $manager = $this->person(['securityDevices.viewAny', 'securityDevices.integrations.view', 'securityDevices.integrations.manage']);
         $this->actingAs($manager)
             ->patchJson('/security-devices/setup/settings', ['changes' => ['scans.server_direct' => true, 'scans.daily' => true]])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('reason');
+        $this->actingAs($manager)
+            ->patchJson('/security-devices/setup/settings', ['changes' => ['scans.server_direct' => true, 'scans.daily' => true], 'reason' => 'The server sits on the head office network'])
             ->assertOk()
             ->assertJsonPath('changed', ['scans.server_direct'])
             ->assertJsonPath('settings.scans\.server_direct.on', true)
@@ -196,7 +200,7 @@ class SetupScreensTest extends TestCase
             expect($exception->errors()['hub_id'][0])->toContain('Setup › Networks & scans');
         }
 
-        app(SecurityDevicesSettings::class)->update($manager, ['scans.server_direct' => true]);
+        app(SecurityDevicesSettings::class)->update($manager, ['scans.server_direct' => true], 'The server sits on the head office network');
         $scope = app(NetworkScans::class)->add($manager, $this->home->id, '10.20.0.0/24', null, ['everything'], null);
         expect($scope->collector_id)->toBeNull();
     }
@@ -241,6 +245,42 @@ class SetupScreensTest extends TestCase
             ->where('logins.kept.0.1', 'Encrypted in the Oblivion database'));
         $this->assertStringNotContainsString('very-secret-path', $response->getContent());
         $this->assertStringNotContainsString('other-router', $response->getContent());
+    }
+
+    public function test_an_alerts_manager_sees_only_alerts_and_checks_and_the_defaults_decide_who_is_told(): void
+    {
+        $alerts = $this->person(['securityDevices.viewAny', 'securityDevices.automations.manage']);
+
+        $this->actingAs($alerts)->get('/security-devices/setup/alerts')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('section', 'alerts')
+                ->where('tab', 'rules')
+                ->where('sections', fn ($sections): bool => collect($sections)->pluck('key')->all() === ['overview', 'alerts', 'history'])
+                ->where('settings.alerts\.devices\.app.on', true)
+                ->where('settings.alerts\.devices\.app.loosens_when_off', true)
+                ->where('alerts.rules', 0));
+        // Hubs, services and saved logins stay out of reach.
+        $this->actingAs($alerts)->get('/security-devices/setup/services?tab=logins')->assertNotFound();
+
+        // Turning the app notice off loosens a safety check: it needs a reason.
+        $this->actingAs($alerts)->patchJson('/security-devices/setup/settings', ['changes' => ['alerts.devices.app' => false]])
+            ->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $this->actingAs($alerts)->patchJson('/security-devices/setup/settings', [
+            'changes' => ['alerts.devices.role' => 'admin', 'alerts.devices.push' => true, 'alerts.devices.app' => false],
+            'reason' => 'IT reads email only this month',
+        ])->assertOk();
+        $this->actingAs($alerts)->patchJson('/security-devices/setup/settings', ['changes' => ['alerts.devices.role' => 'no_such_role']])
+            ->assertUnprocessable();
+
+        $device = \App\Domain\SecurityDevices\Models\Device::factory()->itInfrastructure()->create();
+        $route = app(\App\Domain\Monitoring\Services\EffectiveMonitoringPolicyResolver::class)->resolveAlertRoute($device, null, $this->home->id);
+        expect($route['source'])->toBe('default')
+            ->and($route['recipient_role'])->toBe('admin')
+            ->and($route['critical_notify_in_app'])->toBeFalse()
+            ->and($route['critical_notify_email'])->toBeTrue()
+            ->and($route['critical_notify_push'])->toBeTrue();
+        $this->assertDatabaseHas('audit_logs', ['action' => 'security_devices.settings.changed']);
     }
 
     public function test_supported_devices_splits_the_drivers_into_two_honest_tables(): void

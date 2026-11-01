@@ -20,8 +20,11 @@ import { AddNetwork } from '@/components/security-devices/scan-popups';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { History, KeyRound, ListChecks, Network, Plug, Settings2 } from 'lucide-react';
+import { Bell, History, KeyRound, ListChecks, Network, Plug, RadioTower, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { SetupAlertRules } from './_alerts';
+import { SetupBroker } from './_broker';
+import { SetupChecks } from './_checks';
 import { ChangeHistory } from './_history';
 import { SetupNetworks } from './_networks';
 import { SetupOverview } from './_overview';
@@ -29,7 +32,7 @@ import { ConnectedServices, SavedLogins, SupportedDevices } from './_services';
 import { SettingsSave, useSettingsDraft } from './_settings';
 import type { SetupMeter, SetupProps, SetupSection } from './_types';
 
-const TAB_ICONS = { networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks } as const;
+const TAB_ICONS = { networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks, rules: Bell, checks: ListChecks, broker: RadioTower } as const;
 
 export function setupUrl(section: SetupSection, tab?: string | null, page?: number): string {
     const base = section === 'overview' ? '/security-devices/setup' : `/security-devices/setup/${section}`;
@@ -99,7 +102,7 @@ export default function SetupPage(props: SetupProps) {
                 <PageHeader
                     icon={Settings2}
                     title="Setup"
-                    subline="Organisation · hubs, networks, connected services and saved logins"
+                    subline="Organisation · hubs, networks, connected services, saved logins and alerts"
                     actions={
                         <>
                             <PageHeaderSearch value={query} onChange={setQuery} placeholder="Search setup" />
@@ -181,7 +184,11 @@ export default function SetupPage(props: SetupProps) {
                     <ChangeHistory data={props.history} canExport={can.export_history} query={query} now={now} onPage={(page) => go('history', null, page)} />
                 ) : null}
 
-                {props.settings ? <SettingsSave draft={draft} /> : null}
+                {props.broker ? <SetupBroker data={props.broker} draft={draft} query={query} now={now} /> : null}
+                {props.alerts ? <SetupAlertRules data={props.alerts} draft={draft} /> : null}
+                {props.checks ? <SetupChecks data={props.checks} draft={draft} query={query} canOpenDevices={can.open_devices} /> : null}
+
+                {props.settings ? <SettingsSave draft={draft} what={section === 'alerts' ? (tab === 'checks' ? 'checks' : 'alert rules') : tab === 'broker' ? 'the sensor broker' : 'scans'} /> : null}
             </div>
 
             <AddNetwork

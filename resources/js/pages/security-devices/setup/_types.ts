@@ -1,7 +1,7 @@
 /** Setup (S&D rebuild pg-sdr-15 and its sections): the props SetupPresenter sends. */
 import type { StatusVariant } from '@/components/ui/status-badge';
 
-export type SetupSection = 'overview' | 'hubs' | 'services' | 'history';
+export type SetupSection = 'overview' | 'hubs' | 'services' | 'alerts' | 'history';
 export type Tone = 'success' | 'warning' | 'critical' | 'info' | 'neutral';
 
 /** A line from the server: "**bold**" is the figure; "{time}" / "{ago}" are filled from `at` in NZ time. */
@@ -27,7 +27,7 @@ export type TodoItem = { key: string; tone: Tone; text: string; at?: string | nu
 
 export type ReviewCardData = {
     key: string;
-    icon: 'router' | 'plug' | 'key' | 'list-checks' | 'users' | 'history';
+    icon: 'router' | 'plug' | 'key' | 'list-checks' | 'users' | 'history' | 'bell';
     title: string;
     tone: 'critical' | 'warning' | 'info';
     lines: SetupLine[];
@@ -35,12 +35,25 @@ export type ReviewCardData = {
 };
 
 export type SettingSwitch = {
+    type: 'bool';
     on: boolean;
     default: boolean;
     changed: boolean;
     loosens_when_on: boolean;
+    loosens_when_off: boolean;
     can_change: boolean;
 };
+
+export type SettingRole = {
+    type: 'role';
+    value: string | null;
+    default: string | null;
+    changed: boolean;
+    can_change: boolean;
+    options: { value: string | null; label: string }[];
+};
+
+export type SettingRow = SettingSwitch | SettingRole;
 
 export type NetworkRow = {
     id: number;
@@ -88,6 +101,18 @@ export type SupportedRow = {
 
 export type SupportedTable = { key: string; title: string; sub: string; rows: SupportedRow[] };
 
+export type BrokerRow = {
+    id: number;
+    label: string;
+    sub: string;
+    site: { id: number; name: string };
+    reaches: string;
+    connection: { tone: StatusVariant; text: string };
+    last: string | null;
+};
+
+export type CheckRow = { key: string; kind: string; check: string; often: string | null; after: string | null; devices: number; watched: number };
+
 export type HistoryRow = { id: number; at: string | null; who: string; what: string; where: string; site_id: number | null };
 
 export type SetupProps = {
@@ -97,7 +122,15 @@ export type SetupProps = {
     meters: SetupMeter[];
     can: { manage: boolean; add_network: boolean; add_hub: boolean; approve_hubs: boolean; export_history: boolean; open_devices: boolean };
     overview: { todo: TodoItem[]; cards: ReviewCardData[] } | null;
-    settings: Record<string, SettingSwitch> | null;
+    settings: Record<string, SettingRow> | null;
+    alerts: { rules: number } | null;
+    checks: { rows: CheckRow[] } | null;
+    broker: {
+        rows: BrokerRow[];
+        check: { passed: boolean; at: string; by: string; answered: string[] } | null;
+        clashes: string[];
+        can_add: boolean;
+    } | null;
     networks: { rows: NetworkRow[]; notes: { tone: 'warning' | 'critical'; text: string }[] } | null;
     connected: { cards: ServiceCard[] } | null;
     logins: { rows: LoginRow[]; kept: [string, string][] } | null;

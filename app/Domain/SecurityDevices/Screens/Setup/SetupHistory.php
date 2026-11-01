@@ -195,10 +195,25 @@ final class SetupHistory
     private function settingSentence(array $meta): string
     {
         $state = ($meta['to'] ?? false) === true ? 'on' : 'off';
+        $role = is_string($meta['to'] ?? null) && $meta['to'] !== ''
+            ? (string) (\App\Models\Role::query()->where('name', $meta['to'])->value('label') ?: ucfirst(str_replace('_', ' ', (string) $meta['to'])))
+            : 'IT for that Site';
 
         return match ($meta['key'] ?? null) {
             SecurityDevicesSettings::DAILY_SCANS => "Turned daily network scans {$state}",
             SecurityDevicesSettings::SERVER_SCANS => "Turned {$state} scans by the Oblivion server itself",
+            SecurityDevicesSettings::DEVICES_ROLE => "When a device or hub stops answering, {$role} is now told",
+            SecurityDevicesSettings::DEVICES_APP => "Turned {$state} app notices when a device or hub stops answering",
+            SecurityDevicesSettings::DEVICES_EMAIL => "Turned {$state} emails when a device or hub stops answering",
+            SecurityDevicesSettings::DEVICES_PUSH => "Turned {$state} push notices when a device or hub stops answering",
+            SecurityDevicesSettings::NEW_DEVICES_APP => "Turned {$state} app notices when a scan finds a new device",
+            SecurityDevicesSettings::NEW_DEVICES_EMAIL => "Turned {$state} emails when a scan finds a new device",
+            SecurityDevicesSettings::NEW_DEVICES_PUSH => "Turned {$state} push notices when a scan finds a new device",
+            SecurityDevicesSettings::SAFETY_EMAIL => "Turned {$state} safety alerts by email",
+            SecurityDevicesSettings::SAFETY_PUSH => "Turned {$state} safety alerts by push",
+            SecurityDevicesSettings::SAFETY_ROSTER => "Turned {$state} using the roster for safety alerts",
+            SecurityDevicesSettings::WATCH_ON_ADD => "Turned {$state} watching devices as soon as they’re added",
+            SecurityDevicesSettings::WATCH_PHONES => "Turned {$state} watching phones and tablets",
             default => "Turned a setting {$state}",
         };
     }

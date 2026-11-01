@@ -301,6 +301,29 @@ final class DeviceChecksTab
      */
     private function alerts(User $viewer, Device $device, CarbonImmutable $now): array
     {
+        // S&D Phase D: the device's alerts (each opens in Alerts); older history from its events.
+        $alerts = \App\Domain\SecurityDevices\Alerts\Models\DeviceAlert::query()
+            ->where('device_id', $device->id)
+            ->where('opened_at', '>=', $now->subDays(90))
+            ->latest('opened_at')
+            ->limit(8)
+            ->get(['id', 'title', 'severity', 'state', 'opened_at', 'closed_at'])
+            ->map(fn (\App\Domain\SecurityDevices\Alerts\Models\DeviceAlert $alert): array => [
+                'key' => 'alert-'.$alert->id,
+                'at' => $alert->opened_at->toIso8601String(),
+                'tone' => $alert->isActive() ? ($alert->severity === 'critical' ? 'critical' : 'warning') : 'success',
+                'title' => $alert->title,
+                'sub' => $alert->isActive()
+                    ? 'Still open'
+                    : 'Lasted '.\App\Domain\SecurityDevices\Alerts\DeviceAlertEngine::duration($alert->opened_at, $alert->closed_at ?? $now),
+                'href' => '/security-devices/alerts?alert='.$alert->id,
+            ])
+            ->values()
+            ->all();
+        if ($alerts !== []) {
+            return $alerts;
+        }
+
         return $this->access
             ->applyTemporalEventCustodyScope(DeviceEvent::query()->where('device_id', $device->id), $viewer)
             ->where('occurred_at', '>=', $now->subDays(90))

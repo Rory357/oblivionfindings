@@ -362,10 +362,45 @@ final class DiscoveryRunner
                     app(SiteTopologyMapService::class)->reconcileSite($siteId, $actorId);
                 } catch (Throwable) {
                 }
+                // S&D Phase D: one notice per scan that found something new (Setup › Alerts & checks).
+                try {
+                    $this->tellAboutNewDevices($completed, $siteId);
+                } catch (Throwable) {
+                }
             }
         }
 
         return $completed;
+    }
+
+    /** People who manage connected services at the Site hear once that a scan found new devices. */
+    private function tellAboutNewDevices(DiscoveryRun $run, int $siteId): void
+    {
+        $found = (int) $run->proposed_count;
+        $channels = $this->settings->channels(SecurityDevicesSettings::NEW_DEVICES_APP, SecurityDevicesSettings::NEW_DEVICES_EMAIL, SecurityDevicesSettings::NEW_DEVICES_PUSH);
+        if ($found < 1 || $channels === []) {
+            return;
+        }
+        $access = app(\App\Domain\SecurityDevices\Services\SecurityDevicesAccessService::class);
+        $people = \App\Models\User::query()
+            ->whereNotNull('approved_at')
+            ->with(['roles.permissions', 'permissionOverrides'])
+            ->limit(200)
+            ->get()
+            ->filter(fn (\App\Models\User $person): bool => $person->canDo('securityDevices.integrations.manage')
+                && ($access->canViewAllSites($person) || in_array($siteId, $access->accessibleSiteIds($person), true)))
+            ->values();
+        if ($people->isEmpty()) {
+            return;
+        }
+        $site = (string) (\App\Models\Site::query()->whereKey($siteId)->value('name') ?? 'a Site');
+        $range = implode(', ', array_filter((array) data_get($run->scope_snapshot, 'cidrs', []), 'is_string'));
+        \Illuminate\Support\Facades\Notification::send($people, new \App\Notifications\SecurityDevicesFoundNotification(
+            runId: (int) $run->id,
+            found: $found,
+            where: trim($site.($range !== '' ? ' · '.$range : '')),
+            channels: $channels,
+        ));
     }
 
     public function cancel(int $runId, string $reason): DiscoveryRun

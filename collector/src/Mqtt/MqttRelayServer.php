@@ -260,8 +260,18 @@ final class MqttRelayServer
         $this->failures[$address][] = ($this->now)();
         $this->send($id, $connack);
         $this->drop($id);
-        if ($this->log !== null && count($this->failures[$address]) >= self::FAILURES_BEFORE_PAUSE) {
-            ($this->log)("Sensor relay: {$address} gave ".count($this->failures[$address]).' wrong logins in 10 minutes; ignoring it for 10 minutes.');
+        $count = count($this->failures[$address]);
+        if ($count === self::FAILURES_BEFORE_PAUSE) {
+            // S&D Phase E: Oblivion hears about it once per pause and alerts IT ("5 failed logins in 10 minutes").
+            $this->inbox->put([
+                'item_type' => 'relay_login_failures',
+                'address' => $address,
+                'count' => $count,
+                'received_at' => (new DateTimeImmutable('@'.($this->now)()))->format(DATE_ATOM),
+            ]);
+        }
+        if ($this->log !== null && $count >= self::FAILURES_BEFORE_PAUSE) {
+            ($this->log)("Sensor relay: {$address} gave {$count} wrong logins in 10 minutes; ignoring it for 10 minutes.");
         }
     }
 

@@ -873,6 +873,9 @@ class HandleInertiaRequests extends Middleware
                 'reportsView' => $user->canDo('securityDevices.reports.view'),
                 'commandsAdmin' => $user->canDo('securityDevices.commands.admin'),
                 'commandsApprove' => $user->canDo('securityDevices.commands.approve'),
+                // S&D rebuild Phase D: the Alerts menu entry and Setup › Alerts & checks.
+                'alertsAcknowledge' => $user->canDo('securityDevices.alerts.acknowledge'),
+                'automationsManage' => $user->canDo('securityDevices.automations.manage'),
             ],
 
             'calendar' => [

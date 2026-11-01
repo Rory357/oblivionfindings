@@ -19,6 +19,8 @@ export interface SecurityDevicesPermissions {
     monitoringManage?: boolean;
     reportsView?: boolean;
     commandsAdmin?: boolean;
+    alertsAcknowledge?: boolean;
+    automationsManage?: boolean;
 }
 
 export interface SecurityDevicesNavigationItem extends NavItem {
@@ -107,17 +109,20 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                 visible: (can) => Boolean(can.devicesView),
             },
             {
-                title: 'Alerts & upkeep',
-                href: '/security-devices/monitoring',
+                title: 'Alerts',
+                href: '/security-devices/alerts',
                 hubHrefs: [
+                    '/security-devices/alerts',
                     '/security-devices/monitoring',
                     '/security-devices/maintenance',
                 ],
+                // S&D rebuild Phase D: the new Alerts; upkeep stays for people who only see that.
                 resolveHref: (can) =>
-                    can.eventsView
-                        ? '/security-devices/monitoring'
+                    can.eventsView || can.alertsAcknowledge
+                        ? '/security-devices/alerts'
                         : '/security-devices/maintenance',
                 aliases: [
+                    '/security-devices/alerts',
                     '/security-devices/monitoring',
                     '/security-devices/alerts-events',
                     '/security-devices/maintenance',
@@ -128,6 +133,7 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                 visible: (can) =>
                     Boolean(
                         can.eventsView ||
+                        can.alertsAcknowledge ||
                         can.maintenanceView ||
                         can.maintenanceManage,
                     ),
@@ -144,7 +150,7 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                 // S&D rebuild C5: the new Setup for whoever can open it; the old pages stay for
                 // people who reach only them until their sections are rebuilt.
                 resolveHref: (can) => {
-                    if (can.integrationsView || can.integrationsManage) {
+                    if (can.integrationsView || can.integrationsManage || can.automationsManage || can.monitoringManage) {
                         return '/security-devices/setup';
                     }
 
@@ -171,7 +177,8 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                         can.commandsAdmin ||
                         can.groupsManage ||
                         can.reportsView ||
-                        can.monitoringManage,
+                        can.monitoringManage ||
+                        can.automationsManage,
                     ),
             },
         ],
