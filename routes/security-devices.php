@@ -77,6 +77,7 @@ use App\Domain\SecurityDevices\Screens\Http\DevicesController;
 use App\Domain\SecurityDevices\Screens\Http\FoundDevicesController;
 use App\Domain\SecurityDevices\Screens\Http\HubPanelController;
 use App\Domain\SecurityDevices\Screens\Http\OverviewController;
+use App\Domain\SecurityDevices\Screens\Http\SafetyKitCommandController;
 use App\Domain\SecurityDevices\Screens\Http\SetupController;
 use App\Domain\SecurityDevices\Screens\Http\SitesController;
 use Illuminate\Support\Facades\Route;
@@ -359,6 +360,18 @@ Route::middleware([
             'permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin',
         ])
         ->name('security-devices.devices.commands.store');
+
+    // S&D rebuild Phase E: arm, disarm and unlock from the alarm and door pages. Today's governed
+    // commands, plus the rebuild keys; the controller checks both. A person only, never an automation (D12).
+    Route::prefix('/devices/{device}/safety')->whereNumber('device')->group(function (): void {
+        Route::get('/confirm-identity', [SafetyKitCommandController::class, 'confirmIdentity'])->name('security-devices.devices.safety.confirm-identity');
+        Route::middleware([AuditDeniedDeviceCommandRequest::class, 'throttle:20,1'])->group(function (): void {
+            Route::post('/arm', [SafetyKitCommandController::class, 'arm'])->name('security-devices.devices.safety.arm');
+            Route::post('/disarm', [SafetyKitCommandController::class, 'disarm'])->name('security-devices.devices.safety.disarm');
+            Route::post('/unlock', [SafetyKitCommandController::class, 'unlock'])->name('security-devices.devices.safety.unlock');
+            Route::post('/commands/{command}/run', [SafetyKitCommandController::class, 'run'])->whereNumber('command')->name('security-devices.devices.safety.run');
+        });
+    });
 
     $restartPolicy = EndpointRestartPolicyController::class;
     Route::get('/devices/{device}/endpoint/restart-policy', [$restartPolicy, 'show'])->name('security-devices.devices.endpoint.restart-policy.show');
