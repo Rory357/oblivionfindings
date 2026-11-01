@@ -876,6 +876,8 @@ class HandleInertiaRequests extends Middleware
                 // S&D rebuild Phase D: the Alerts menu entry and Setup › Alerts & checks.
                 'alertsAcknowledge' => $user->canDo('securityDevices.alerts.acknowledge'),
                 'automationsManage' => $user->canDo('securityDevices.automations.manage'),
+                // S&D Phase H: the Access menu entry (pg-sdr-19).
+                'accessControlView' => $user->canDo('securityDevices.accessControl.view'),
             ],
 
             'calendar' => [

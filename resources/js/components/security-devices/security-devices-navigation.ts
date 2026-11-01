@@ -2,6 +2,7 @@ import type { NavItem } from '@/types';
 import {
     Activity,
     Cpu,
+    KeyRound,
     LayoutDashboard,
     MapPinned,
     Settings,
@@ -21,6 +22,8 @@ export interface SecurityDevicesPermissions {
     commandsAdmin?: boolean;
     alertsAcknowledge?: boolean;
     automationsManage?: boolean;
+    /** S&D Phase H: the Access menu entry (pg-sdr-19). */
+    accessControlView?: boolean;
 }
 
 export interface SecurityDevicesNavigationItem extends NavItem {
@@ -107,6 +110,14 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                 hubHrefs: ['/security-devices/sites'],
                 icon: MapPinned,
                 visible: (can) => Boolean(can.devicesView),
+            },
+            {
+                // S&D Phase H (pg-sdr-19): doors, people, visitors, schedules and the door log.
+                title: 'Access',
+                href: '/security-devices/access',
+                hubHrefs: ['/security-devices/access'],
+                icon: KeyRound,
+                visible: (can) => Boolean(can.viewAny && can.accessControlView),
             },
             {
                 title: 'Alerts',

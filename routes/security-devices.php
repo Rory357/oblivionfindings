@@ -637,6 +637,18 @@ Route::middleware([
         ->middleware(['permission:securityDevices.webPage.open', 'throttle:20,1'])
         ->name('security-devices.devices.web.open');
 
+    // S&D Phase H (pg-sdr-19, 19b–19d, 19f): the Access page, and the fire roll call (pop-up 87). The controller checks accessControl.view and the Site.
+    Route::get('/access', [\App\Domain\SecurityDevices\Screens\Http\AccessPageController::class, 'index'])
+        ->name('security-devices.access.index');
+    Route::get('/access/sites/{site}/roll-call', [\App\Domain\SecurityDevices\Screens\Http\AccessPageController::class, 'rollCall'])
+        ->whereNumber('site')
+        ->middleware('throttle:30,1')
+        ->name('security-devices.access.roll-call');
+    Route::get('/access/jobs/{uuid}/person', [\App\Domain\SecurityDevices\Screens\Http\AccessPageController::class, 'addedPerson'])
+        ->whereUuid('uuid')
+        ->middleware('throttle:60,1')
+        ->name('security-devices.access.jobs.person');
+
     // S&D Phase H (pop-ups 81–84, 90): people, cards and visitor passes in UniFi Access, through the Site's hub.
     Route::prefix('/access')->middleware('throttle:30,1')->group(function (): void {
         $people = \App\Domain\SecurityDevices\Access\Http\AccessPeopleController::class;
