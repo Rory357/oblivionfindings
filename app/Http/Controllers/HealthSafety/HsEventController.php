@@ -16,6 +16,7 @@ use App\Models\HsClosureException;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
+use App\Models\HsInvestigationCorrection;
 use App\Models\HsRiskAssessment;
 use App\Models\RestraintEvent;
 use App\Models\SafeguardingConcern;
@@ -34,6 +35,7 @@ use App\Services\HealthSafety\HsEventAccessService;
 use App\Services\HealthSafety\HsEventClosureService;
 use App\Services\HealthSafety\HsEventReviewFlagService;
 use App\Services\HealthSafety\HsEventService;
+use App\Services\HealthSafety\HsInvestigationCorrectionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\HealthSafety\RestraintAccessService;
 use App\Services\HealthSafety\SafeWorkProcedureAccessService;
@@ -54,6 +56,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use App\Support\HealthSafety\HsStoryReviewPresenter;
 use App\Support\HealthSafety\QueryPaging;
 use App\Support\HealthSafety\CurrentRecords;
 
@@ -392,7 +396,19 @@ class HsEventController extends Controller
      */
     public function show(Request $request, int $hsEvent): Response
     {
-        return DB::transaction(fn () => $this->showWithinSourceAuthority($request, $hsEvent));
+        try {
+            return DB::transaction(fn () => $this->showWithinSourceAuthority($request, $hsEvent));
+        } catch (NotFoundHttpException|\Illuminate\Database\Eloquent\ModelNotFoundException $notReadable) {
+            // Q1 + answer 23 (G3 board M5b): someone who can't read the review but reads the incident's story (a team
+            // lead at the incident's Site) gets the story view. The presenter checks both again; everyone else keeps
+            // the 404. A 403 (not current staff) never reaches here.
+            $story = DB::transaction(fn () => app(HsStoryReviewPresenter::class)->present($request->user(), $hsEvent));
+            if ($story === null) {
+                throw $notReadable;
+            }
+
+            return Inertia::render('health-safety/events/story', ['review' => $story]);
+        }
     }
 
     private function showWithinSourceAuthority(Request $request, int $hsEvent): Response
@@ -571,7 +587,7 @@ class HsEventController extends Controller
     public function activity(Request $request, int $hsEvent): \Illuminate\Http\JsonResponse
     {
         $entries = DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent,
-            fn (HsEvent $event): array => app(\App\Services\HealthSafety\HsEventActivityService::class)->forEvent($event), false));
+            fn (HsEvent $event): array => app(\App\Services\HealthSafety\HsEventActivityService::class)->forEvent($event, $request->user()), false));
 
         return response()->json(['entries' => $entries]);
     }
@@ -951,6 +967,7 @@ class HsEventController extends Controller
             'worksafeSitePreservationReleasedBy:id,name',
         ]);
 
+        $correctionsService = app(HsInvestigationCorrectionService::class);
         $investigations = $hsEvent->investigations()
             ->with([
                 'leadInvestigator:id,name',
@@ -959,6 +976,11 @@ class HsEventController extends Controller
                 'approvedBy:id,name',
                 'recommendationDispositions.correctiveAction:id,reference_number,status',
                 'recommendationDispositions.decidedBy:id,name',
+                // Answer 20 (G3): a correction still waiting for review or approval.
+                'corrections' => fn ($query) => $query
+                    ->whereIn('status', [HsInvestigationCorrection::STATUS_PROPOSED, HsInvestigationCorrection::STATUS_REVIEWED])
+                    ->with('reviewedBy:id,name')
+                    ->orderByDesc('id'),
             ])
             ->orderByDesc('created_at')
             ->get()
@@ -979,12 +1001,28 @@ class HsEventController extends Controller
                 'immediate_causes' => $inv->immediate_causes,
                 'root_causes' => $inv->root_causes,
                 'contributing_factors' => $inv->contributing_factors,
-                'findings_summary' => $inv->findings_summary,
+                // Answer 20 (G3): the findings people see are the latest approved correction, else as agreed.
+                'findings_summary' => $inv->isCompleted() ? $inv->effectiveFindingsSummary() : $inv->findings_summary,
                 'recommendations' => $this->presentInvestigationRecommendations($inv),
                 'lessons_learned' => $inv->lessons_learned,
                 'submitted_by_name' => $inv->submittedBy?->name,
                 'reviewed_by_name' => $inv->reviewedBy?->name,
                 'approved_by_name' => $inv->approvedBy?->name,
+                'correction' => ($pending = $inv->corrections->first()) ? [
+                    'id' => (int) $pending->id,
+                    'status' => $pending->status,
+                    'before_value' => $pending->before_value,
+                    'after_value' => $pending->after_value,
+                    'reason' => $pending->reason,
+                    'proposed_by_name' => $pending->proposed_by_name,
+                    'proposed_at' => $pending->proposed_at?->toIso8601String(),
+                    'reviewed_by_name' => $pending->reviewedBy?->name,
+                    'can_review' => $correctionsService->canDecide($hsEvent, $pending, $currentUser, 'review', $currentUser->canDo('hazards.manage')),
+                    'can_approve' => $correctionsService->canDecide($hsEvent, $pending, $currentUser, 'approval', $currentUser->canDo('hazards.manage')),
+                    'can_reject' => $correctionsService->canDecide($hsEvent, $pending, $currentUser, 'rejection', $currentUser->canDo('hazards.manage')),
+                ] : null,
+                'can_propose_correction' => $currentUser->canDo('hazards.manage') && $hsEvent->isOpen()
+                    && $inv->isCompleted() && $inv->corrections->isEmpty(),
             ]);
 
         $canManage = $currentUser->canDo('hazards.manage');
@@ -1037,14 +1075,25 @@ class HsEventController extends Controller
                 $evidenceLoadState = HsCorrectiveActionPresenter::EVIDENCE_UNAVAILABLE;
             }
         }
+        // Q11 (G3): which checked-and-failed actions still need a revised action, and what each revision replaces.
+        $revisedIds = $correctiveActions->pluck('replaces_action_id')->filter()->map(fn ($id): int => (int) $id)->all();
+        $actionsById = $correctiveActions->keyBy('id');
         $correctiveActions = $correctiveActions->map(
-            fn (HsCorrectiveAction $action) => $this->correctiveActionPresenter->present(
-                $action,
-                $currentUser,
-                $canManage,
-                $canAccessActionEvidence,
-                $evidenceLoadState,
-            ),
+            fn (HsCorrectiveAction $action) => [
+                ...$this->correctiveActionPresenter->present(
+                    $action,
+                    $currentUser,
+                    $canManage,
+                    $canAccessActionEvidence,
+                    $evidenceLoadState,
+                ),
+                'needs_revision' => $action->checkedIneffective() && ! in_array((int) $action->id, $revisedIds, true),
+                'replaces' => ($replaced = $actionsById->get((int) $action->replaces_action_id)) !== null ? [
+                    'id' => (int) $replaced->id,
+                    'reference_number' => $replaced->reference_number,
+                    'title' => $replaced->title,
+                ] : null,
+            ],
         );
 
         $riskAssessmentQuery = $hsEvent->riskAssessments();
@@ -1215,6 +1264,22 @@ class HsEventController extends Controller
         $ownerName = $hsEvent->owner?->name;
         $managers = "anyone who manages health and safety at {$siteName}";
         $who = $ownerName ? "{$ownerName}, the owner, or {$managers}" : ucfirst($managers);
+        // Decision 3 (G3): an ownerless review that isn't waiting on its handover gets its first owner through
+        // events.owner.change; Q2: one with an owner can have it changed (with a reason). Route: hazards.manage.
+        $canChangeOwner = $canManage && $hsEvent->isOpen()
+            && ($hsEvent->owner_user_id !== null || in_array($hsEvent->handover_status, [
+                HsEvent::HANDOVER_ACCEPTED,
+                HsEvent::HANDOVER_NOT_REQUIRED,
+            ], true));
+        // Q11 (G3): the oldest action whose check said it didn't work and that has no revised action yet.
+        $needsRevision = HsCorrectiveAction::query()
+            ->where('hs_event_id', $hsEvent->id)
+            ->whereIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+            ->where('effectiveness_confirmed', false)
+            ->whereDoesntHave('revisions')
+            ->orderBy('id')
+            ->get(['id', 'title', 'reference_number']);
+        $firstFailed = $needsRevision->first();
         $nextStep = $hsEvent->status === HsEvent::STATUS_CLOSED ? null : match (true) {
             $hsEvent->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE => ['key' => 'take_on', 'label' => 'Take it on',
                 'can' => $canAccept, 'who' => "Someone who manages health and safety at {$siteName} takes it on."],
@@ -1224,8 +1289,15 @@ class HsEventController extends Controller
                 'label' => 'Record that WorkSafe was told', 'can' => $canNotifyWorksafe, 'who' => "{$who} records it."],
             $hsEvent->worksafe_status === HsEvent::WORKSAFE_NOTIFIED => ['key' => 'worksafe_acknowledge',
                 'label' => 'Record the WorkSafe acknowledgement', 'can' => $canAcknowledgeWorksafe, 'who' => "{$who} records it."],
+            // Decision 3 (G3): closing needs an owner, so choosing one is the way through.
+            $hsEvent->owner_user_id === null => ['key' => 'choose_owner', 'label' => 'Choose the owner',
+                'can' => $canChangeOwner, 'who' => "Someone who manages health and safety at {$siteName} chooses the owner."],
             $hsEvent->investigation_required && ! $hsEvent->hasCompletedInvestigation() => ['key' => 'investigation',
                 'label' => 'Finish the investigation', 'can' => $canManage, 'who' => "{$who} does it."],
+            // Q11 (G3): a check that said it didn't work needs a revised action before closing.
+            $firstFailed !== null => ['key' => 'revised_action',
+                'label' => 'Add a revised action for “'.($firstFailed->title ?: $firstFailed->reference_number).'”',
+                'can' => $canManage, 'who' => "{$who} adds it.", 'action_id' => (int) $firstFailed->id],
             $hsEvent->hasOpenCorrectiveActions() => ['key' => 'actions', 'label' => 'Finish the actions',
                 'can' => $canManage, 'who' => 'Each action\'s owner does their part.'],
             default => ['key' => 'close', 'label' => 'Close the safety review',
@@ -1410,6 +1482,8 @@ class HsEventController extends Controller
             'review_flags' => app(HsEventReviewFlagService::class)->present($hsEvent, $canManage),
             'can' => [
                 'manage' => $canManage,
+                // Decision 3 + Q2 (G3): choose the first owner, or change the owner with a reason.
+                'change_owner' => $canChangeOwner,
                 // K1a (B1.5): the real answer (permission, Site, ownership, open), not the permission alone, so a team
                 // lead who doesn't own the review gets no Close the server would refuse.
                 'close' => $this->closures->closeAuthority($currentUser, $hsEvent)['allowed'],

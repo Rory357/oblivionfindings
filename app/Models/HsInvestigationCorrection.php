@@ -58,6 +58,11 @@ class HsInvestigationCorrection extends Model
         return $this->belongsTo(HsInvestigation::class, 'hs_investigation_id');
     }
 
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_id');
+    }
+
     public function isOpen(): bool
     {
         return in_array($this->status, [self::STATUS_PROPOSED, self::STATUS_REVIEWED], true);

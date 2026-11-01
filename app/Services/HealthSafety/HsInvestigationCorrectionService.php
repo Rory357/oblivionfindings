@@ -124,8 +124,39 @@ final class HsInvestigationCorrectionService
         }, 3);
     }
 
+    /**
+     * The page's answer for one viewer (G3 board M5x): may they take this decision now? The same status and
+     * independence rules as decide(); the route still needs hazards.manage and the event read.
+     */
+    public function canDecide(HsEvent $event, HsInvestigationCorrection $correction, User $actor, string $decision, bool $canManage): bool
+    {
+        if (! $canManage || ! $event->isOpen()) {
+            return false;
+        }
+        $expected = match ($decision) {
+            'review' => [HsInvestigationCorrection::STATUS_PROPOSED],
+            'approval' => [HsInvestigationCorrection::STATUS_REVIEWED],
+            default => [HsInvestigationCorrection::STATUS_PROPOSED, HsInvestigationCorrection::STATUS_REVIEWED],
+        };
+        if (! in_array($correction->status, $expected, true)) {
+            return false;
+        }
+        $investigation = $correction->relationLoaded('investigation') ? $correction->investigation : $correction->investigation()->first();
+
+        return $investigation !== null && ! $this->excluded($investigation, $correction, $decision)->contains((int) $actor->id);
+    }
+
     /** Independent assurance, as for the original findings (HsInvestigationService::assertIndependentAssuranceActor). */
     private function assertIndependent(HsInvestigation $investigation, HsInvestigationCorrection $correction, User $actor, string $decision): void
+    {
+        if ($this->excluded($investigation, $correction, $decision)->contains((int) $actor->id)) {
+            throw ValidationException::withMessages(['correction' => 'Someone who didn\'t propose this correction, investigate or submit the work'
+                .($decision === 'approval' ? ', or review the correction,' : '').' must do this.']);
+        }
+    }
+
+    /** @return \Illuminate\Support\Collection<int, int> */
+    private function excluded(HsInvestigation $investigation, HsInvestigationCorrection $correction, string $decision): \Illuminate\Support\Collection
     {
         $excluded = collect([
             $investigation->lead_investigator_id,
@@ -136,10 +167,8 @@ final class HsInvestigationCorrectionService
         if ($decision === 'approval' && $correction->reviewed_by_id) {
             $excluded->push((int) $correction->reviewed_by_id);
         }
-        if ($excluded->contains((int) $actor->id)) {
-            throw ValidationException::withMessages(['correction' => 'Someone who didn\'t propose this correction, investigate or submit the work'
-                .($decision === 'approval' ? ', or review the correction,' : '').' must do this.']);
-        }
+
+        return $excluded;
     }
 
     private function lockedInvestigation(HsEvent $event, HsInvestigation $investigation): HsInvestigation

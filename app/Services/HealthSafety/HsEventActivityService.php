@@ -23,8 +23,47 @@ final class HsEventActivityService
 {
     public const LIMIT = 300;
 
-    /** @return list<array{at: string, who: ?string, what: string, step: string, kind: string, detail: ?array}> */
-    public function forEvent(HsEvent $event): array
+    /**
+     * Story view (G3 board M5b): only what happened to the viewer's own actions on the review — never anyone else's
+     * actions, the investigation or the review itself.
+     *
+     * @return list<array{at: string, who: ?string, you: bool, what: string}>
+     */
+    public function forOwnActions(HsEvent $event, User $viewer): array
+    {
+        $actions = HsCorrectiveAction::query()->where('hs_event_id', $event->id)->where('assigned_to_user_id', $viewer->id)
+            ->get(['id', 'title', 'reference_number']);
+        if ($actions->isEmpty()) {
+            return [];
+        }
+        $titles = $actions->mapWithKeys(fn (HsCorrectiveAction $a): array => [$a->id => $a->title ?: $a->reference_number])->all();
+        $rows = AuditLog::query()
+            ->whereIn('auditable_type', [(new HsCorrectiveAction)->getMorphClass(), HsCorrectiveAction::class])
+            ->whereIn('auditable_id', $actions->pluck('id'))
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->limit(50)
+            ->get(['id', 'user_id', 'action', 'auditable_type', 'auditable_id', 'meta', 'created_at']);
+        $names = User::query()->whereIn('id', $rows->pluck('user_id')->filter()->unique())->pluck('name', 'id');
+
+        $entries = [];
+        foreach ($rows as $row) {
+            $entry = $this->describe($row, $titles, [], true);
+            if ($entry === null) {
+                continue;
+            }
+            $entries[] = [
+                'at' => Carbon::parse($row->created_at)->toIso8601String(),
+                'who' => $row->user_id ? ($names[$row->user_id] ?? null) : 'The app',
+                'you' => (int) $row->user_id === (int) $viewer->id,
+                'what' => $entry['what'],
+            ];
+        }
+
+        return $entries;
+    }
+
+    /** @return list<array{at: string, who: ?string, you: bool, what: string, step: string, kind: string, detail: ?array}> */
+    public function forEvent(HsEvent $event, ?User $viewer = null): array
     {
         $actions = HsCorrectiveAction::query()->where('hs_event_id', $event->id)->get(['id', 'title', 'reference_number']);
         $investigationIds = HsInvestigation::query()->where('hs_event_id', $event->id)->pluck('id')->all();
@@ -61,6 +100,7 @@ final class HsEventActivityService
             $entries->push([
                 'at' => Carbon::parse($row->created_at)->toIso8601String(),
                 'who' => $row->user_id ? ($names[$row->user_id] ?? null) : 'The app',
+                'you' => $viewer !== null && (int) $row->user_id === (int) $viewer->id,
                 ...$entry,
             ]);
         }
@@ -70,6 +110,7 @@ final class HsEventActivityService
             $entries = $entries->reject(fn (array $e): bool => ($e['change_id'] ?? null) === $change->id)->values();
             $entries->push([
                 'at' => $change->created_at->toIso8601String(), 'who' => $change->actor_name,
+                'you' => $viewer !== null && (int) $change->actor_user_id === (int) $viewer->id,
                 'what' => $change->previous_owner_user_id === null && $change->previous_owner_name === null
                     ? 'chose '.$change->owner_name.' as the owner'
                     : 'changed the owner from '.($change->previous_owner_name ?: 'someone no longer listed').' to '.$change->owner_name,
@@ -128,7 +169,7 @@ final class HsEventActivityService
                     default => 'didn\'t accept the correction to the findings',
                 };
                 $detail = $c && $row->action === 'healthSafety.investigation.correctionProposed'
-                    ? ['why' => $c->reason, 'before' => $c->before_value, 'after' => $c->after_value]
+                    ? ['why' => $c->reason, 'before' => $c->before_value, 'after' => $c->after_value, 'status' => $c->status]
                     : ($row->action === 'healthSafety.investigation.correctionRejected' && $c ? ['why' => $c->rejection_reason] : null);
 
                 return $plain($verb, 'investigated', 'edit', $detail);
