@@ -243,7 +243,10 @@ final readonly class CollectorConfigurationService
                 }
             }
 
-            if ($checks === [] && $discoveryRuns === [] && $commands === [] && $relayLogins === [] && $tlsRelay === null) {
+            // S&D Phase H: UniFi Access consoles this hub keeps in step (read only; hubs that run it only).
+            $unifiAccess = app(\App\Domain\SecurityDevices\Access\UnifiAccessSync::class)->hubSection($locked);
+
+            if ($checks === [] && $discoveryRuns === [] && $commands === [] && $relayLogins === [] && $tlsRelay === null && $unifiAccess === null) {
                 throw new DomainException('Collector has no executable work in its approved Site scope.');
             }
             if ($relayLogins !== []) {
@@ -252,6 +255,9 @@ final readonly class CollectorConfigurationService
             }
             if ($tlsRelay !== null) {
                 $protocols[] = 'sensor_relay_tls';
+            }
+            if ($unifiAccess !== null) {
+                $protocols[] = 'unifi_access';
             }
             $maximumChecks = max(1, min(10_000, (int) config(
                 'monitoring.collector.max_checks_per_configuration',
@@ -302,6 +308,10 @@ final readonly class CollectorConfigurationService
             if ($tlsRelay !== null) {
                 // A new section: older hubs ignore it, and only hubs that run it are sent it.
                 $payload['sensor_relay_tls'] = $tlsRelay;
+            }
+            if ($unifiAccess !== null) {
+                // A new section: older hubs ignore it, and only hubs that run it are sent it.
+                $payload['unifi_access'] = $unifiAccess;
             }
             $json = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
             $secret = $this->signingSecretKey();

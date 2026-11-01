@@ -4,6 +4,8 @@ namespace Oblivion\Collector;
 
 use DateTimeImmutable;
 use JsonException;
+use Oblivion\Collector\Access\UnifiAccessLane;
+use Oblivion\Collector\Access\UnifiAccessReader;
 use Oblivion\Collector\Config\SignedConfigLoader;
 use Oblivion\Collector\Data\CollectorConfig;
 use Oblivion\Collector\Discovery\LanDiscoveryScanner;
@@ -476,6 +478,19 @@ final class CollectorApplication
                 }
             }
 
+            // S&D Phase H (H0): each UniFi Access console, read when due. Read only.
+            (new UnifiAccessLane(
+                new UnifiAccessReader($credentialDecryptor),
+                $stateDirectory.DIRECTORY_SEPARATOR.'unifi-access.json',
+                static function (string $id, array $item, DateTimeImmutable $at) use ($spool): bool {
+                    try {
+                        return $spool->status()['state'] !== 'buffer_full'
+                            && $spool->append($id, $spool->nextSourceSequence(), $item, $at);
+                    } catch (SpoolFull) {
+                        return false;
+                    }
+                },
+            ))->run($config->unifiAccess, new DateTimeImmutable('now'));
         }
 
         $uploadError ??= $this->flush($central, $identity['collector_id'], $spool);
@@ -488,7 +503,7 @@ final class CollectorApplication
                 'commands_executed' => $commandsExecuted,
                 // The job types (and newer config sections) this hub can run: the server sends a new
                 // kind only to hubs that list it.
-                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE, self::WEB_PAGE_FEATURE]),
+                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE, self::WEB_PAGE_FEATURE, self::UNIFI_ACCESS_FEATURE]),
                 'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
@@ -650,6 +665,9 @@ final class CollectorApplication
 
     /** S&D Phase G (pop-up 61): this hub opens device web pages (WebLane, inside the relay process). */
     private const string WEB_PAGE_FEATURE = 'web_page_v1';
+
+    /** S&D Phase H (H0): this hub reads UniFi Access consoles (the `unifi_access` config section). */
+    private const string UNIFI_ACCESS_FEATURE = 'unifi_access_v1';
 
     private function writeRelayTls(string $stateDirectory, CollectorConfig $config, RelayTlsIdentity $relayTls): void
     {

@@ -29,6 +29,8 @@ final readonly class CollectorConfig
         public ?array $sensorRelay = null,
         /** S&D Phase E (E5): the encrypted relay (TLS on 8883): the same logins, plus this hub's certificate. */
         public ?array $sensorRelayTls = null,
+        /** S&D Phase H: UniFi Access consoles this hub reads (doors, people, cards, events). */
+        public ?array $unifiAccess = null,
     ) {}
 
     /** @return list<int> */
@@ -57,7 +59,8 @@ final readonly class CollectorConfig
             $allowedSiteIds = array_values(array_unique([$siteId, ...$coveredSiteIds]));
             $sensorRelay = self::sensorRelay($payload['sensor_relay'] ?? null, $allowedSiteIds);
             $sensorRelayTls = self::sensorRelayTls($payload['sensor_relay_tls'] ?? null, $allowedSiteIds);
-            $relays = $sensorRelay !== null || $sensorRelayTls !== null;
+            $unifiAccess = self::unifiAccess($payload['unifi_access'] ?? null, $allowedSiteIds);
+            $relays = $sensorRelay !== null || $sensorRelayTls !== null || $unifiAccess !== null;
             // A hub that only relays sensor readings has no network targets of its own.
             $relayOnly = $relays && ($scope['cidrs'] ?? null) === [];
             $cidrs = $relayOnly ? [] : self::stringList($scope['cidrs'] ?? null, 'network scope');
@@ -67,6 +70,9 @@ final readonly class CollectorConfig
             }
             if ($sensorRelayTls !== null && ! in_array('sensor_relay_tls', $protocols, true)) {
                 throw new ConfigurationRejected('Configuration encrypted sensor relay is outside the signed protocol scope.');
+            }
+            if ($unifiAccess !== null && ! in_array('unifi_access', $protocols, true)) {
+                throw new ConfigurationRejected('Configuration UniFi Access is outside the signed protocol scope.');
             }
             $discoveryRuns = self::discoveryRuns($payload['discovery_runs'] ?? [], $version, $allowedSiteIds);
             $commands = self::commands($payload['commands'] ?? [], $version);
@@ -135,6 +141,7 @@ final readonly class CollectorConfig
                 commands: $commands,
                 sensorRelay: $sensorRelay,
                 sensorRelayTls: $sensorRelayTls,
+                unifiAccess: $unifiAccess,
             );
         } catch (ConfigurationRejected $exception) {
             throw $exception;
@@ -198,6 +205,44 @@ final readonly class CollectorConfig
             'max_payload_bytes' => $value['max_payload_bytes'],
             'logins' => $value['logins'],
         ], $allowedSiteIds);
+
+        return $value;
+    }
+
+    /**
+     * S&D Phase H: the UniFi Access consoles to read. Private addresses only, the console's own
+     * ports, a trusted key or none (then the hub only reads the certificate and sends no token),
+     * and a token sealed to this hub for exactly that console and address.
+     *
+     * @param  list<int>  $allowedSiteIds
+     * @return array{consoles: list<array<string, mixed>>}|null
+     */
+    public static function unifiAccess(mixed $value, array $allowedSiteIds): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+        $keys = ['console_id', 'site_id', 'address', 'port', 'trusted_pin', 'interval_seconds', 'events_since', 'credential_lease'];
+        if (! is_array($value) || array_keys($value) !== ['consoles'] || ! is_array($value['consoles']) || ! array_is_list($value['consoles'])
+            || $value['consoles'] === [] || count($value['consoles']) > 20) {
+            throw new ConfigurationRejected('Configuration UniFi Access is invalid.');
+        }
+        foreach ($value['consoles'] as $console) {
+            $lease = is_array($console) ? ($console['credential_lease'] ?? null) : null;
+            if (! is_array($console) || array_keys($console) !== $keys
+                || ! is_string($console['console_id']) || preg_match('/\A[1-9][0-9]{0,18}\z/', $console['console_id']) !== 1
+                || ! is_int($console['site_id']) || ! in_array($console['site_id'], $allowedSiteIds, true)
+                || ! is_string($console['address']) || filter_var($console['address'], FILTER_VALIDATE_IP) === false
+                || filter_var($console['address'], FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false
+                || ! in_array($console['port'], [443, 12445], true)
+                || ($console['trusted_pin'] !== null && (! is_string($console['trusted_pin']) || preg_match('/\Asha256\/\/[A-Za-z0-9+\/]{43}=\z/', $console['trusted_pin']) !== 1))
+                || ! is_int($console['interval_seconds']) || $console['interval_seconds'] < 60 || $console['interval_seconds'] > 3600
+                || ! is_string($console['events_since']) || strlen($console['events_since']) > 40
+                || ! is_array($lease) || ($lease['protocol'] ?? null) !== 'access.unifi' || ($lease['target'] ?? null) !== $console['address']
+                || ($lease['device_id'] ?? null) !== 'access-console-'.$console['console_id'] || ($lease['site_id'] ?? null) !== $console['site_id']) {
+                throw new ConfigurationRejected('Configuration UniFi Access console is invalid.');
+            }
+        }
 
         return $value;
     }

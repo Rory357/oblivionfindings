@@ -196,6 +196,12 @@ final readonly class CollectorIngestService
 
             return;
         }
+        if ($itemType === 'unifi_access_snapshot') {
+            // S&D Phase H: what a Site's UniFi Access console holds, read by its hub.
+            app(\App\Domain\SecurityDevices\Access\UnifiAccessSync::class)->ingest($collector, $payload);
+
+            return;
+        }
         if ($itemType === 'relay_certificate_request') {
             // S&D Phase E (E5): the hub's own relay key, sent as a certificate request only. A request
             // that isn't the hub's or names an address outside its Sites is ignored; the hub asks again.
