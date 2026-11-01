@@ -112,13 +112,18 @@ func resolvePhpRuntime(root string) (php string, workDir string, envPath string,
 			return "", "", "", nil, false, unavailable
 		}
 		args := []string{"-n", "-d", "date.timezone=UTC", "-d", "log_errors=0", "-d", "display_errors=stderr"}
+		// The release's own runtime is a static PHP with the hub's extensions built in (S&D Phase B,
+		// CI builds it with static-php-cli and proves each one loads). An older runtime with shared
+		// extensions keeps them in runtime/ext, and then every one must be there and protected.
 		// snmp: Phase A, item A7 — hubs read switches over SNMP v2c/v3 (docs/security-devices/GOAL.md).
-		for _, ext := range []string{"curl", "openssl", "sodium", "sockets", "snmp"} {
-			extPath := filepath.Join(runtimeDir, "ext", ext+".so")
-			if protected(extPath, false) != nil {
-				return "", "", "", nil, false, unavailable
+		if info, statErr := os.Lstat(filepath.Join(runtimeDir, "ext")); statErr == nil && info.IsDir() {
+			for _, ext := range []string{"curl", "openssl", "sodium", "sockets", "snmp"} {
+				extPath := filepath.Join(runtimeDir, "ext", ext+".so")
+				if protected(extPath, false) != nil {
+					return "", "", "", nil, false, unavailable
+				}
+				args = append(args, "-d", "extension="+extPath)
 			}
-			args = append(args, "-d", "extension="+extPath)
 		}
 		args = append(args, "-d", "curl.cainfo="+caFile, "-d", "openssl.cafile="+caFile)
 		return bundledPhp, runtimeDir, runtimeDir, args, true, nil
