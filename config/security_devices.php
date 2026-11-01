@@ -184,6 +184,11 @@ $capabilities = [
         'area' => ['type' => 'string', 'max_length' => 80],
         'mode' => ['type' => 'string', 'enum' => ['enabled', 'disabled']],
     ], ['area', 'mode']),
+    // S&D Phase B: one still picture through the Site hub. Read only; nothing on the camera changes.
+    'camera.snapshot.capture' => array_replace(
+        $definition('Check camera picture', 'security', 'observe', 'low', false, false, false, false, 120, 'fresh_camera_picture'),
+        ['requires_fresh_observation' => false, 'allowed_current_states' => ['active', 'degraded', 'offline', 'maintenance']],
+    ),
     'camera.privacy.enable' => $high('Enable camera privacy mode', 'security', 'camera_privacy_state'),
     'camera.privacy.disable' => $critical('Disable camera privacy mode', 'security', 'camera_privacy_state', [], [], false),
     'camera.recording.update' => $high('Update camera recording', 'security', 'camera_recording_state', [
@@ -308,6 +313,7 @@ $authorise(
 );
 $authorise(
     [
+        'camera.snapshot.capture',
         'camera.privacy.enable',
         'camera.privacy.disable',
         'camera.recording.update',
@@ -383,6 +389,7 @@ $guidance = [
     'alarm.bypass' => ['Temporarily bypasses one alarm zone and reduces protection for the bounded period.', 'A fresh provider observation confirms the exact bounded bypass.'],
     'alarm.reset' => ['Resets the alarm fault state and may clear an active operational condition.', 'A fresh provider observation confirms the resulting alarm fault state.'],
     'alarm.emergency_mode.set' => ['Changes emergency alarm behaviour for the selected area.', 'A fresh provider observation confirms the requested emergency mode.'],
+    'camera.snapshot.capture' => ['Takes one still picture from the camera through the Site hub. Nothing on the camera changes.', 'The picture is shown once to the person who asked and kept for two minutes at most; it is never stored.'],
     'camera.privacy.enable' => ['Enables privacy mode and stops normal camera observation.', 'A fresh provider observation confirms privacy mode is enabled.'],
     'camera.privacy.disable' => ['Disables privacy mode and resumes camera observation of the protected area.', 'A fresh provider observation confirms privacy mode is disabled.'],
     'camera.recording.update' => ['Changes how this camera records and may alter storage or privacy impact.', 'A fresh provider observation confirms the approved recording mode.'],

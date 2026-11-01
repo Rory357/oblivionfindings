@@ -23,6 +23,9 @@ final readonly class ScopeGuard
         'ssh_config_backup_v1' => [
             'capability' => 'network.config.backup', 'provider' => 'ssh', 'protocol' => 'command.ssh_config_backup',
         ],
+        'camera_snapshot_v1' => [
+            'capability' => 'camera.snapshot.capture', 'provider' => 'unifi_protect', 'protocol' => 'command.camera_snapshot',
+        ],
     ];
 
     private const array DISCOVERY_PROTOCOLS = [
@@ -115,6 +118,7 @@ final readonly class ScopeGuard
         }
         match ($command['adapter']) {
             'ssh_config_backup_v1' => $this->assertSshConfigBackupCommand($command),
+            'camera_snapshot_v1' => $this->assertCameraSnapshotCommand($command),
             default => $this->assertUnifiAccessCommand($command),
         };
 
@@ -154,6 +158,35 @@ final readonly class ScopeGuard
             || ! is_int($endpoint['connect_timeout_seconds']) || $endpoint['connect_timeout_seconds'] < 1 || $endpoint['connect_timeout_seconds'] > 10
             || ! is_int($endpoint['command_timeout_seconds']) || $endpoint['command_timeout_seconds'] < 1 || $endpoint['command_timeout_seconds'] > 25
             || ! is_int($endpoint['max_output_bytes']) || $endpoint['max_output_bytes'] < 1024 || $endpoint['max_output_bytes'] > 1_048_576) {
+            throw new ScopeViolation('Command endpoint is invalid or unbounded.');
+        }
+    }
+
+    /**
+     * S&D Phase B: one picture from a UniFi Protect console, sent to the trusted key only.
+     *
+     * @param  array<string, mixed>  $command
+     */
+    private function assertCameraSnapshotCommand(array $command): void
+    {
+        if ($command['parameters'] !== ['method' => 'protect_integration_v1']
+            || $command['expected_state'] !== ['picture_captured' => true]) {
+            throw new ScopeViolation('Command parameters or expected state are invalid.');
+        }
+        $endpoint = $command['endpoint'];
+        $keys = ['address', 'port', 'trusted_pin', 'camera_id', 'mac', 'connect_timeout_seconds', 'response_timeout_seconds', 'max_image_bytes'];
+        if (! is_array($endpoint) || array_keys($endpoint) !== $keys
+            || $endpoint['address'] !== $command['target']
+            || ! in_array($endpoint['port'], [443, 8443], true)
+            || ($endpoint['trusted_pin'] !== null && (! is_string($endpoint['trusted_pin'])
+                || preg_match('/\Asha256\/\/[A-Za-z0-9+\/]{43}=\z/', $endpoint['trusted_pin']) !== 1))
+            || ($endpoint['camera_id'] !== null && (! is_string($endpoint['camera_id'])
+                || preg_match('/\A[A-Za-z0-9_-]{4,64}\z/', $endpoint['camera_id']) !== 1))
+            || ($endpoint['mac'] !== null && (! is_string($endpoint['mac']) || preg_match('/\A[0-9A-F]{12}\z/', $endpoint['mac']) !== 1))
+            || ($endpoint['camera_id'] === null && $endpoint['mac'] === null)
+            || ! is_int($endpoint['connect_timeout_seconds']) || $endpoint['connect_timeout_seconds'] < 1 || $endpoint['connect_timeout_seconds'] > 10
+            || ! is_int($endpoint['response_timeout_seconds']) || $endpoint['response_timeout_seconds'] < 1 || $endpoint['response_timeout_seconds'] > 30
+            || ! is_int($endpoint['max_image_bytes']) || $endpoint['max_image_bytes'] < 1024 || $endpoint['max_image_bytes'] > 1_048_576) {
             throw new ScopeViolation('Command endpoint is invalid or unbounded.');
         }
     }

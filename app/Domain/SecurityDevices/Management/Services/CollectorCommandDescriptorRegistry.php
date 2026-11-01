@@ -15,8 +15,9 @@ final class CollectorCommandDescriptorRegistry
     public function __construct(
         UnifiAccessCollectorCommandDescriptor $unifiAccess,
         NetworkSshConfigBackupCollectorDescriptor $sshConfigBackup,
+        CameraSnapshotCollectorDescriptor $cameraSnapshot,
     ) {
-        foreach ([$unifiAccess, $sshConfigBackup] as $descriptor) {
+        foreach ([$unifiAccess, $sshConfigBackup, $cameraSnapshot] as $descriptor) {
             $this->byCapability[$descriptor->capability()] = $descriptor;
         }
     }

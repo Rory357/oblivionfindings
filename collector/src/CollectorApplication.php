@@ -11,12 +11,14 @@ use Oblivion\Collector\Enrollment\RecoverableEnrollment;
 use Oblivion\Collector\Exceptions\CentralApiFailure;
 use Oblivion\Collector\Http\HttpsCentralApi;
 use Oblivion\Collector\Media\MediaLane;
+use Oblivion\Collector\Runtime\CameraSnapshotRunner;
 use Oblivion\Collector\Runtime\CollectorCommandExecutor;
 use Oblivion\Collector\Runtime\CommandJournal;
 use Oblivion\Collector\Runtime\HeartbeatReporter;
 use Oblivion\Collector\Runtime\NativeCollectorCommandTransport;
 use Oblivion\Collector\Runtime\ProbeRunner;
 use Oblivion\Collector\Runtime\RemoteDiscoveryRunner;
+use Oblivion\Collector\Runtime\SshConfigBackupRunner;
 use Oblivion\Collector\Runtime\UnifiAccessCommandRunner;
 use Oblivion\Collector\Security\CredentialLeaseDecryptor;
 use Oblivion\Collector\Security\EnvelopeVerifier;
@@ -387,6 +389,9 @@ final class CollectorApplication
                     new NativeCollectorCommandTransport,
                 ),
             );
+                // S&D Phase B: settings backups and camera pictures run here, through the hub, not from the server.
+                new SshConfigBackupRunner($scope, $credentialDecryptor),
+                new CameraSnapshotRunner($scope, $credentialDecryptor),
             foreach ($config->commands as $command) {
                 if ($spool->status()['state'] === 'buffer_full') {
                     break;

@@ -55,6 +55,9 @@ final class DeclaredDeviceCommandCapabilities
         // from the record; each is added back below only when real code can carry it out.
         $declared = $declared->reject(fn (string $key): bool => in_array($key, [
             'network.config.backup',
+            // The camera picture check runs only from the camera's own card, through the Site hub
+            // (see supports()); it is never a listed action.
+            CameraSnapshotCollectorDescriptor::CAPABILITY,
             'endpoint.service.manage',
             'endpoint.computer.restart',
             'endpoint.software.install',
@@ -98,6 +101,11 @@ final class DeclaredDeviceCommandCapabilities
 
     public function supports(Device $device, string $capability): bool
     {
+        if ($capability === CameraSnapshotCollectorDescriptor::CAPABILITY) {
+            // S&D Phase B: a UniFi Protect camera at a Site a hub covers. Not listed with the other actions.
+            return app(CameraSnapshotCollectorDescriptor::class)->eligible($device);
+        }
+
         return $this->forDevice($device)->containsStrict($capability);
     }
 

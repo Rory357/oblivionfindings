@@ -279,6 +279,17 @@ Route::middleware([
             'permission:securityDevices.integrations.view|securityDevices.integrations.manage',
             'throttle:30,1',
         ])
+    // S&D Phase B: the picture a Site hub took, fetched once by the person who asked for it.
+    Route::get('/devices/{device}/camera/snapshot/{command}', [DeviceCameraOnvifController::class, 'snapshotStatus'])
+        ->whereNumber('device')
+        ->whereNumber('command')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.cctv.media.view',
+            'throttle:90,1',
+        ])
+        ->name('security-devices.devices.camera.snapshot.status');
+
         ->name('security-devices.devices.queclink-console.show');
 
     Route::post('/devices/{device}/queclink-console/commands', [QueclinkUnitConsoleController::class, 'sendCommand'])

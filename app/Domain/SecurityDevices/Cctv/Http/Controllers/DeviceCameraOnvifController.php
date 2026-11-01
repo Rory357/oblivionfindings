@@ -4,9 +4,11 @@ namespace App\Domain\SecurityDevices\Cctv\Http\Controllers;
 
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Cctv\Services\CameraEndpointTrustService;
+use App\Domain\SecurityDevices\Cctv\Services\HubCameraPictureService;
 use App\Domain\SecurityDevices\Cctv\Services\OnvifCameraProfileClient;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
+use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Services\AuditLogger;
@@ -22,6 +24,7 @@ final class DeviceCameraOnvifController extends Controller
         private readonly SecurityDevicesAccessService $access,
         private readonly OnvifCameraProfileClient $onvif,
         private readonly DeviceDriverRegistry $drivers,
+        private readonly HubCameraPictureService $hubPictures,
     ) {}
 
     public function snapshot(Request $request, Device $device): JsonResponse
@@ -41,6 +44,33 @@ final class DeviceCameraOnvifController extends Controller
             404,
         );
 
+        // S&D Phase B: a camera at a Site with a hub is checked through that hub, never from the server.
+        $throughHub = $this->hubPictures->start($user, $device);
+        if ($throughHub !== null) {
+            $pending = $throughHub['state'] === 'pending';
+            AuditLogger::logOrFail('camera.onvif.snapshot', $device, [
+                'actor_id' => (int) $user->id,
+                'device_id' => (int) $device->id,
+                'driver_key' => 'unifi-protect-through-hub',
+                'ok' => $pending,
+                'reason_code' => $pending ? 'checking_through_hub' : 'hub_unavailable',
+            ]);
+
+            return $pending
+                ? response()->json([
+                    'ok' => false,
+                    'pending' => true,
+                    'reason_code' => 'checking_through_hub',
+                    'message' => $throughHub['message'],
+                    'status_url' => route('security-devices.devices.camera.snapshot.status', ['device' => $device->id, 'command' => $throughHub['command_id']], false),
+                ], 202)->header('Cache-Control', 'no-store')
+                : response()->json([
+                    'ok' => false,
+                    'reason_code' => 'hub_unavailable',
+                    'message' => $throughHub['message'],
+                ], 409)->header('Cache-Control', 'no-store');
+        }
+
         $driver = $this->drivers->resolveCameraDriver($device);
         $result = $driver !== null
             ? $driver->captureSnapshot($device)
@@ -55,6 +85,40 @@ final class DeviceCameraOnvifController extends Controller
         ]);
 
         return response()->json($this->withTrustPrompt($request, $device, $result))->header('Cache-Control', 'no-store');
+    }
+
+    /** S&D Phase B: the camera card checks back here until the Site hub's picture arrives. */
+    public function snapshotStatus(Request $request, Device $device, DeviceCommandRequest $command): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless(
+            $user
+            && $user->canDo('securityDevices.devices.view')
+            && $user->canDo('securityDevices.cctv.media.view'),
+            403,
+        );
+        $this->access->assertCanViewDevice($user, $device);
+        abort_unless($device->domain === 'security' && $device->category === 'cctv', 404);
+
+        $status = $this->hubPictures->status($user, $device, $command);
+        $payload = match ($status['state']) {
+            'pending' => ['ok' => false, 'pending' => true, 'reason_code' => 'checking_through_hub', 'message' => $status['message'] ?? ''],
+            'done' => [
+                'ok' => true,
+                'reason_code' => 'captured',
+                'data_uri' => $status['data_uri'] ?? null,
+                'captured_at' => $status['captured_at'] ?? null,
+                'source' => $status['source'] ?? null,
+            ],
+            default => [
+                'ok' => false,
+                'reason_code' => 'hub_snapshot_failed',
+                'message' => $status['message'] ?? '',
+                'tls_trust' => $status['tls_trust'] ?? null,
+            ],
+        };
+
+        return response()->json($this->withTrustPrompt($request, $device, $payload))->header('Cache-Control', 'no-store');
     }
 
     public function streams(Request $request, Device $device): JsonResponse

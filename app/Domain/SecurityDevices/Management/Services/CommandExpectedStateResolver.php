@@ -21,6 +21,7 @@ final class CommandExpectedStateResolver
             'alarm.bypass' => ['zone_bypassed' => true, 'zone' => $parameters['zone'] ?? null, 'duration_minutes' => $parameters['duration_minutes'] ?? null],
             'alarm.reset' => ['fault_reset' => true],
             'alarm.emergency_mode.set' => ['emergency_mode' => $parameters['mode'] ?? null, 'area' => $parameters['area'] ?? null],
+            'camera.snapshot.capture' => ['picture_captured' => true],
             'camera.privacy.enable' => ['privacy_mode' => true],
             'camera.privacy.disable' => ['privacy_mode' => false],
             'camera.recording.update' => ['recording_mode' => $parameters['recording_mode'] ?? null],

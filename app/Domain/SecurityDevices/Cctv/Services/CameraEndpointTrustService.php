@@ -162,6 +162,32 @@ class CameraEndpointTrustService
     }
 
     /**
+     * S&D Phase B: the certificate a camera or Protect console offered to the Site hub, which read it
+     * because the server can't reach the house. Recorded exactly as if the server had read it, so the
+     * same "Trust this camera" check follows.
+     *
+     * @param  array{pin: mixed, fingerprint: mixed, subject: mixed, valid_to: mixed}  $certificate
+     */
+    public function recordOfferedFromHub(int $siteId, string $host, int $port, array $certificate): ?CameraEndpointTrust
+    {
+        $subject = $certificate['subject'];
+        $validTo = $certificate['valid_to'];
+        if (! is_string($certificate['pin']) || preg_match(self::PIN_PATTERN, $certificate['pin']) !== 1
+            || ! is_string($certificate['fingerprint']) || preg_match('/\A(?:[0-9A-F]{2}:){31}[0-9A-F]{2}\z/', $certificate['fingerprint']) !== 1
+            || ($subject !== null && (! is_string($subject) || mb_strlen($subject) > 255))
+            || ($validTo !== null && ! is_int($validTo))) {
+            return null;
+        }
+
+        return $this->recordOffered($siteId, $host, $port, [
+            'pin' => $certificate['pin'],
+            'fingerprint' => $certificate['fingerprint'],
+            'subject' => $subject,
+            'valid_to' => $validTo,
+        ]);
+    }
+
+    /**
      * Read the certificate an address presents, without trusting it and without sending anything else.
      *
      * @return array{pin: string, fingerprint: string, subject: string|null, valid_to: int|null, publicly_trusted: bool}|null

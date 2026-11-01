@@ -98,6 +98,12 @@ final class NetworkSshConfigBackupCollectorDescriptor implements CollectorComman
         $this->assertWorkingHub($collector, $siteId);
         $target = $this->target($device, $siteId);
         $address = $target->addresses[0];
+        $trustedKey = $this->hostKeys->trusted($device);
+        // Never build a job the hub's scope guard would refuse: one bad job makes it refuse the whole config.
+        if (($trustedKey !== null && preg_match(SshHostKeyTrust::FINGERPRINT_PATTERN, $trustedKey) !== 1)
+            || $target->port < 1 || $target->port > 65535) {
+            throw new RuntimeException('The backup job would not pass the hub’s checks.');
+        }
         $lease = $this->credentials->acquireFor($device, $siteId, self::CAPABILITY);
 
         return [
@@ -119,7 +125,7 @@ final class NetworkSshConfigBackupCollectorDescriptor implements CollectorComman
             'endpoint' => [
                 'address' => $address,
                 'port' => $target->port,
-                'expected_host_key' => $this->hostKeys->trusted($device),
+                'expected_host_key' => $trustedKey,
                 'connect_timeout_seconds' => max(2, min(10, $target->connectTimeoutSeconds)),
                 'command_timeout_seconds' => 20,
                 'max_output_bytes' => self::MAX_OUTPUT_BYTES,
