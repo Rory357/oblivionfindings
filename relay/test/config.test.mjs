@@ -3,14 +3,17 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { ConfigError, readConfig } from '../lib/config.mjs';
 import { startRelay } from '../lib/relay.mjs';
 import { selfSignedCertificate } from './certs.mjs';
 import { baseEnv, CONTROL_SECRET, SECRET, tempDir } from './helpers.mjs';
 
-const ENV_EXAMPLE = join(dirname(fileURLToPath(import.meta.url)), '../../deploy/chat-calling/oblivion-relay.env.example');
+const ENV_EXAMPLE = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../deploy/chat-calling/oblivion-relay.env.example',
+);
 
 describe('the committed env example', () => {
     test(
@@ -18,21 +21,32 @@ describe('the committed env example', () => {
         { skip: !existsSync(ENV_EXAMPLE) && 'relay/ copied on its own' },
         () => {
             const env = {};
-            for (const line of readFileSync(ENV_EXAMPLE, 'utf8').split(/\r?\n/)) {
+            for (const line of readFileSync(ENV_EXAMPLE, 'utf8').split(
+                /\r?\n/,
+            )) {
                 const match = /^(RELAY_[A-Z0-9_]+)=(.*)$/.exec(line);
                 if (match) env[match[1]] = match[2];
             }
             assert.ok(Object.keys(env).length > 40);
             // Swap the host paths and the one value the operator supplies for local ones.
             const dir = tempDir('relay-example-');
-            const { cert, key } = selfSignedCertificate('relay.oblivionfindings.com');
-            const files = { cert: 'fullchain.pem', key: 'privkey.pem', chat: 'chat.secret', control: 'control.secret', deny: 'deny' };
+            const { cert, key } = selfSignedCertificate(
+                'relay.oblivionfindings.com',
+            );
+            const files = {
+                cert: 'fullchain.pem',
+                key: 'privkey.pem',
+                chat: 'chat.secret',
+                control: 'control.secret',
+                deny: 'deny',
+            };
             writeFileSync(join(dir, files.cert), cert);
             writeFileSync(join(dir, files.key), key);
             writeFileSync(join(dir, files.chat), SECRET);
             writeFileSync(join(dir, files.control), CONTROL_SECRET);
             writeFileSync(join(dir, files.deny), '');
             writeFileSync(join(dir, 'empty'), '');
+            writeFileSync(join(dir, 'control.key-id'), 'k2026a\n');
             const config = readConfig({
                 ...env,
                 RELAY_EXTERNAL_IP: '203.0.113.10',
@@ -42,11 +56,26 @@ describe('the committed env example', () => {
                 RELAY_CHAT_PREVIOUS_SECRET_FILE: join(dir, 'empty'),
                 RELAY_CONTROL_SECRET_FILE: join(dir, files.control),
                 RELAY_CONTROL_PREVIOUS_SECRET_FILE: join(dir, 'empty'),
+                RELAY_CONTROL_KEY_ID_FILE: join(dir, 'control.key-id'),
+                RELAY_CONTROL_PREVIOUS_KEY_ID_FILE: join(dir, 'empty'),
                 RELAY_DENY_FILE: join(dir, files.deny),
             });
+            assert.equal(config.secrets.control.keyId, 'k2026a');
             assert.equal(config.realm, 'relay.oblivionfindings.com');
-            assert.deepEqual([config.portMin, config.portMax, config.maxAllocations, config.logRetentionDays], [61_000, 64_999, 3000, 14]);
-            assert.equal(config.secrets.chat.previous, null, 'an empty previous-secret file means none');
+            assert.deepEqual(
+                [
+                    config.portMin,
+                    config.portMax,
+                    config.maxAllocations,
+                    config.logRetentionDays,
+                ],
+                [61_000, 64_999, 3000, 14],
+            );
+            assert.equal(
+                config.secrets.chat.previous,
+                null,
+                'an empty previous-secret file means none',
+            );
             assert.equal(config.controlListen.host, '127.0.0.1');
         },
     );
@@ -267,6 +296,30 @@ describe('17. Settings', () => {
         );
         refuses({ RELAY_CONTROL_KEY_ID: '' }, 'RELAY_CONTROL_KEY_ID');
         refuses({ RELAY_CONTROL_KEY_ID: 'has spaces' }, 'RELAY_CONTROL_KEY_ID');
+        // Key ids, like secrets, may come from a file that reloads on SIGHUP, but not both ways.
+        const ids = tempDir();
+        writeFileSync(join(ids, 'bad.key-id'), 'not a key id!');
+        refuses(
+            { RELAY_CONTROL_KEY_ID_FILE: join(ids, 'k.key-id') },
+            'RELAY_CONTROL_KEY_ID',
+            'both a key id and its _FILE',
+        );
+        refuses(
+            {
+                RELAY_CONTROL_KEY_ID: '',
+                RELAY_CONTROL_KEY_ID_FILE: join(ids, 'missing'),
+            },
+            'RELAY_CONTROL_KEY_ID_FILE',
+            'an unreadable key id file',
+        );
+        refuses(
+            {
+                RELAY_CONTROL_KEY_ID: '',
+                RELAY_CONTROL_KEY_ID_FILE: join(ids, 'bad.key-id'),
+            },
+            'RELAY_CONTROL_KEY_ID_FILE',
+            'a bad key id in a file',
+        );
         refuses(
             {
                 RELAY_CONTROL_PREVIOUS_SECRET:

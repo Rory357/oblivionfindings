@@ -102,9 +102,11 @@ const SETTINGS = new Set([
     'RELAY_CONTROL_SECRET',
     'RELAY_CONTROL_SECRET_FILE',
     'RELAY_CONTROL_KEY_ID',
+    'RELAY_CONTROL_KEY_ID_FILE',
     'RELAY_CONTROL_PREVIOUS_SECRET',
     'RELAY_CONTROL_PREVIOUS_SECRET_FILE',
     'RELAY_CONTROL_PREVIOUS_KEY_ID',
+    'RELAY_CONTROL_PREVIOUS_KEY_ID_FILE',
     'RELAY_STATE_DIR',
 ]);
 
@@ -275,8 +277,36 @@ function readSecret(source) {
 }
 
 /**
- * Read every secret (values and files). Runs at start and on SIGHUP; only file-based secrets can
- * change on reload. Throws ConfigError, never with a secret's value.
+ * A control key id, given as a value or as a file (the user's choice of 1 November 2026, so that
+ * rotating the control key reloads on SIGHUP like the secrets and never drops a call). An empty
+ * file means not set.
+ */
+function readKeyId(source) {
+    if (!source) return '';
+    let value = source.value ?? '';
+    if (source.file) {
+        try {
+            value = readFileSync(source.file, 'utf8');
+        } catch {
+            throw new ConfigError(
+                source.name,
+                'names a file that cannot be read',
+            );
+        }
+    }
+    value = value.trim();
+    if (value && !/^[A-Za-z0-9._-]{1,64}$/.test(value)) {
+        throw new ConfigError(
+            source.name,
+            'must be 1 to 64 letters, digits, dots, dashes or underscores',
+        );
+    }
+    return value;
+}
+
+/**
+ * Read every secret and control key id (values and files). Runs at start and on SIGHUP; only
+ * file-based ones can change on reload. Throws ConfigError, never with a secret's value.
  */
 export function loadSecrets(config) {
     const sources = config.secretSources;
@@ -287,6 +317,8 @@ export function loadSecrets(config) {
     const control = {
         current: readSecret(sources.control.current),
         previous: readSecret(sources.control.previous),
+        keyId: readKeyId(sources.control.keyId),
+        previousKeyId: readKeyId(sources.control.previousKeyId),
     };
     if (chat.previous && !chat.current) {
         throw new ConfigError(
@@ -330,7 +362,7 @@ export function loadSecrets(config) {
             );
         }
     }
-    if (control.current && !config.controlKeyId) {
+    if (control.current && !control.keyId) {
         throw new ConfigError(
             'RELAY_CONTROL_KEY_ID',
             'is required with RELAY_CONTROL_SECRET',
@@ -338,8 +370,7 @@ export function loadSecrets(config) {
     }
     if (
         control.previous &&
-        (!config.controlPreviousKeyId ||
-            config.controlPreviousKeyId === config.controlKeyId)
+        (!control.previousKeyId || control.previousKeyId === control.keyId)
     ) {
         throw new ConfigError(
             'RELAY_CONTROL_PREVIOUS_KEY_ID',
@@ -639,20 +670,6 @@ export function readConfig(env = process.env, overrides = {}) {
         };
     }
 
-    const controlKeyId = text(env, 'RELAY_CONTROL_KEY_ID');
-    const controlPreviousKeyId = text(env, 'RELAY_CONTROL_PREVIOUS_KEY_ID');
-    for (const [name, value] of [
-        ['RELAY_CONTROL_KEY_ID', controlKeyId],
-        ['RELAY_CONTROL_PREVIOUS_KEY_ID', controlPreviousKeyId],
-    ]) {
-        if (value && !/^[A-Za-z0-9._-]{1,64}$/.test(value)) {
-            throw new ConfigError(
-                name,
-                'must be 1 to 64 letters, digits, dots, dashes or underscores',
-            );
-        }
-    }
-
     const logLevel = text(env, 'RELAY_LOG_LEVEL', 'info');
     if (!['error', 'warn', 'info', 'debug'].includes(logLevel)) {
         throw new ConfigError(
@@ -746,8 +763,6 @@ export function readConfig(env = process.env, overrides = {}) {
         denyFile: text(env, 'RELAY_DENY_FILE'),
         controlListen: control,
         controlAllowedSources,
-        controlKeyId,
-        controlPreviousKeyId,
         stateDir: text(env, 'RELAY_STATE_DIR', '/var/lib/oblivion-relay'),
         secretSources: {
             chat: {
@@ -757,6 +772,11 @@ export function readConfig(env = process.env, overrides = {}) {
             control: {
                 current: secretSource(env, 'RELAY_CONTROL_SECRET'),
                 previous: secretSource(env, 'RELAY_CONTROL_PREVIOUS_SECRET'),
+                keyId: secretSource(env, 'RELAY_CONTROL_KEY_ID'),
+                previousKeyId: secretSource(
+                    env,
+                    'RELAY_CONTROL_PREVIOUS_KEY_ID',
+                ),
             },
         },
         interfaceAddresses: Object.values(networkInterfaces())

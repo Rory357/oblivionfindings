@@ -198,11 +198,12 @@ export function createControlServer({
         const timestamp = request.headers['x-relay-timestamp'];
         const nonce = request.headers['x-relay-nonce'];
         const signature = request.headers['x-relay-signature'];
+        // Secrets and key ids as of the last reload.
         const secrets = relay.secrets().control;
         const secret =
-            keyId && keyId === config.controlKeyId
+            keyId && keyId === secrets.keyId
                 ? secrets.current
-                : keyId && keyId === config.controlPreviousKeyId
+                : keyId && keyId === secrets.previousKeyId
                   ? secrets.previous
                   : null;
         if (
@@ -247,9 +248,9 @@ export function createControlServer({
                 ...relay.healthBody(),
                 revocations_held: relay.core.held.size,
                 control: {
-                    key_id: config.controlKeyId,
+                    key_id: secrets.keyId,
                     previous_key: secrets.previous
-                        ? config.controlPreviousKeyId
+                        ? secrets.previousKeyId
                         : null,
                 },
             });

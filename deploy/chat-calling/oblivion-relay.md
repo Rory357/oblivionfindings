@@ -95,10 +95,18 @@ chown root:oblivion-relay /etc/oblivion/relay/chat.secret /etc/oblivion/relay/co
 ```
 
 ```bash
-for f in deny chat-previous.secret control-previous.secret; do install -o root -g oblivion-relay -m 0640 /dev/null /etc/oblivion/relay/$f; done
+printf 'k2026a' > /etc/oblivion/relay/control.key-id
 ```
 
-The deny file (3.5) and the two previous-secret files start empty. The previous files are filled only during a rotation; an empty file means "no previous secret", so rotating the chat secret never needs a restart. Secrets never go in the repository, a ticket or a chat message; copy them to the app's `.env` directly on the server.
+```bash
+for f in deny chat-previous.secret control-previous.secret control-previous.key-id; do install -o root -g oblivion-relay -m 0640 /dev/null /etc/oblivion/relay/$f; done
+```
+
+```bash
+chown root:oblivion-relay /etc/oblivion/relay/control.key-id && chmod 0640 /etc/oblivion/relay/control.key-id
+```
+
+The control key id is a short name (letters, digits, dots, dashes or underscores) in a file of its own; the app's `CHAT_RELAY_CONTROL_KEY_ID` holds the same name. The deny file (3.5) and the three "previous" files start empty and are filled only during a rotation. An empty file means "not set", and every one of these files is re-read on reload, so no rotation needs a restart. Secrets never go in the repository, a ticket or a chat message; copy them to the app's `.env` directly on the server.
 
 ### 4. The relay's settings
 
@@ -193,7 +201,7 @@ CHAT_RELAY_CREDENTIAL_SECONDS=3600
 CHAT_RELAY_HEALTH_URL=http://127.0.0.1:9478
 CHAT_RELAY_CONTROL_URLS=http://127.0.0.1:9479
 CHAT_RELAY_CONTROL_SECRET=<contents of /etc/oblivion/relay/control.secret>
-CHAT_RELAY_CONTROL_KEY_ID=k2026a
+CHAT_RELAY_CONTROL_KEY_ID=<contents of /etc/oblivion/relay/control.key-id>
 ```
 
 Then refresh the app's cached configuration the usual way (`php artisan config:cache`). Settings › Chat › Service health now has a "Calling relay" row.
@@ -214,9 +222,9 @@ Run the acceptance checks in spec section 12 during stage 5 network testing. Che
 
 **The control secret (3.7).**
 
-1. Copy the current secret into `/etc/oblivion/relay/control-previous.secret` and write a new one to `control.secret`. In `relay.env`, set `RELAY_CONTROL_PREVIOUS_KEY_ID` to the old key id and `RELAY_CONTROL_KEY_ID` to a new one, then `systemctl restart oblivion-relay`. Key ids are plain settings, so this one step needs a restart, which makes relayed calls reconnect: do it at a quiet time.
+1. Copy `control.secret` into `control-previous.secret` and `control.key-id` into `control-previous.key-id`. Write a new secret to `control.secret` and a new key id (for example `k2027a`) to `control.key-id`, then `systemctl reload oblivion-relay`. The relay now accepts both keys; no call drops.
 2. Switch the app's `CHAT_RELAY_CONTROL_SECRET` and `CHAT_RELAY_CONTROL_KEY_ID` to the new values.
-3. The app signs every request, including queued retries, at the moment it sends, so nothing in its queue uses the old key. Empty `control-previous.secret` and reload.
+3. The app signs every request, including queued retries, at the moment it sends, so nothing in its queue uses the old key. Empty `control-previous.secret` and `control-previous.key-id`, and reload.
 
 ## The control channel
 
@@ -257,6 +265,6 @@ The operations log goes to the journal (`journalctl -u oblivion-relay`). It neve
 
 ## Signals and exit codes
 
-- `systemctl reload oblivion-relay` (SIGHUP): re-reads secret files, the certificate and the deny list. Allocations stay, except those whose secret was removed or whose id is now denied. A file that can't be read is reported as `config_error` and the old value is kept.
+- `systemctl reload oblivion-relay` (SIGHUP): re-reads secret and key id files, the certificate and the deny list. Allocations stay, except those whose secret was removed or whose id is now denied. A file that can't be read is reported as `config_error` and the old value is kept.
 - `systemctl stop` (SIGTERM): ends every allocation and exits within 5 seconds.
 - Exit 78: a setting is wrong (the journal names it). Exit 70: an unexpected error (systemd restarts it).

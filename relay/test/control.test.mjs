@@ -46,6 +46,80 @@ const revoke = (t, entries, options = {}) =>
     );
 
 describe('18. The control channel', () => {
+    test('rotating the control key through files and a reload, without a restart', async () => {
+        // The user's choice of 1 November 2026: the key ids reload on SIGHUP like the secrets.
+        const dir = tempDir('relay-control-');
+        const files = {
+            secret: join(dir, 'control.secret'),
+            previous: join(dir, 'control-previous.secret'),
+            keyId: join(dir, 'control.key-id'),
+            previousKeyId: join(dir, 'control-previous.key-id'),
+        };
+        const older = CONTROL_KAV.secret;
+        const newer = 'oblivion-relay-control-newer-secret-012345';
+        writeFileSync(files.secret, older);
+        writeFileSync(files.previous, '');
+        writeFileSync(files.keyId, 'k1\n');
+        writeFileSync(files.previousKeyId, '');
+        await withRelay(
+            {
+                env: {
+                    RELAY_CONTROL_SECRET: '',
+                    RELAY_CONTROL_KEY_ID: '',
+                    RELAY_CONTROL_SECRET_FILE: files.secret,
+                    RELAY_CONTROL_PREVIOUS_SECRET_FILE: files.previous,
+                    RELAY_CONTROL_KEY_ID_FILE: files.keyId,
+                    RELAY_CONTROL_PREVIOUS_KEY_ID_FILE: files.previousKeyId,
+                },
+            },
+            async (t) => {
+                const status = (secret, keyId) =>
+                    controlRequest(
+                        t.relay.controlPort,
+                        'GET',
+                        '/control/status',
+                        '',
+                        { timestamp: t.clock.seconds(), secret, keyId },
+                    );
+                const client = await allocated(t, t.relay.port('udp'), {
+                    lifetime: 3600,
+                });
+                assert.equal((await status(older, 'k1')).status, 200);
+                // Step 1: the new key current, the old one previous, then a reload.
+                writeFileSync(files.previous, older);
+                writeFileSync(files.previousKeyId, 'k1');
+                writeFileSync(files.secret, newer);
+                writeFileSync(files.keyId, 'k2');
+                assert.equal(t.relay.reload().secrets, 'ok');
+                assert.equal(
+                    (await status(older, 'k1')).status,
+                    200,
+                    'the old key still works',
+                );
+                const both = await status(newer, 'k2');
+                assert.equal(both.status, 200, 'the new key works');
+                assert.deepEqual(both.body.control, {
+                    key_id: 'k2',
+                    previous_key: 'k1',
+                });
+                // Step 3: the previous key is cleared.
+                writeFileSync(files.previous, '');
+                writeFileSync(files.previousKeyId, '');
+                t.relay.reload();
+                assert.equal((await status(older, 'k1')).status, 401);
+                assert.equal((await status(newer, 'k2')).status, 200);
+                // No call dropped along the way.
+                assert.equal(t.relay.core.allocations.size, 1);
+                assert.equal(errorCode(await client.refresh(600)), 200);
+                // A reload that would leave a previous secret without its own key id keeps the old values.
+                writeFileSync(files.previous, older);
+                assert.equal(t.relay.reload().secrets, 'kept');
+                assert.equal((await status(newer, 'k2')).status, 200);
+                client.close();
+            },
+        );
+    });
+
     test('signing: the known-answer vector, the current and previous keys', async () => {
         assert.equal(
             controlSignature(
