@@ -683,6 +683,8 @@ export type PopupConfirmProps = {
     error?: string;
     /** Extra fields, e.g. a reason. */
     children?: ReactNode;
+    /** A second way out between Cancel and the main button, e.g. "Retire instead". */
+    secondary?: ReactNode;
     onCloseAutoFocus?: AutoFocusHandler;
     testId?: string;
 };
@@ -711,6 +713,7 @@ export function PopupConfirm({
     confirmDisabled,
     error,
     children,
+    secondary,
     onCloseAutoFocus,
     testId,
 }: PopupConfirmProps) {
@@ -776,6 +779,7 @@ export function PopupConfirm({
                             {cancelLabel}
                         </Button>
                     )}
+                    {secondary}
                     <Button
                         type="submit"
                         variant={danger ? 'destructive' : 'default'}

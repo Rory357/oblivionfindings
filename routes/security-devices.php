@@ -74,6 +74,8 @@ use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandControll
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandEvidenceController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandExecutionController;
 use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceCommandRequest;
+use App\Domain\SecurityDevices\Screens\Http\DevicesController;
+use App\Domain\SecurityDevices\Screens\Http\FoundDevicesController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -175,9 +177,45 @@ Route::middleware([
     Route::post('/devices/{device}/live/source/disable', [$source, 'disable'])->whereNumber('device')->middleware('throttle:10,1')->name('security-devices.cctv.source.disable');
     // ── Device CRUD ───────────────────────────────────────────────
 
-    Route::get('/devices', [DeviceController::class, 'index'])
+    // S&D rebuild C1: the Devices menu, Found devices and the scan pop-ups.
+    Route::get('/devices', [DevicesController::class, 'index'])
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.devices.index');
+
+    Route::post('/devices/add-one', [DevicesController::class, 'store'])
+        ->middleware(['permission:securityDevices.devices.create', 'throttle:20,1'])
+        ->name('security-devices.devices.add-one');
+
+    Route::post('/devices/move', [DevicesController::class, 'move'])
+        ->middleware(['permission:securityDevices.devices.assign', 'throttle:20,1'])
+        ->name('security-devices.devices.move');
+
+    Route::get('/scans/{run}', [FoundDevicesController::class, 'show'])
+        ->whereNumber('run')
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.scans.show');
+
+    Route::get('/scans/{run}/progress', [FoundDevicesController::class, 'progress'])
+        ->whereNumber('run')
+        ->middleware(['permission:securityDevices.devices.view', 'throttle:120,1'])
+        ->name('security-devices.scans.progress');
+
+    Route::post('/scans', [FoundDevicesController::class, 'start'])
+        ->middleware(['permission:securityDevices.integrations.manage', 'throttle:10,1'])
+        ->name('security-devices.scans.start');
+
+    Route::post('/scans/{run}/stop', [FoundDevicesController::class, 'stop'])
+        ->whereNumber('run')
+        ->middleware(['permission:securityDevices.integrations.manage', 'throttle:20,1'])
+        ->name('security-devices.scans.stop');
+
+    Route::post('/networks', [FoundDevicesController::class, 'addNetwork'])
+        ->middleware(['permission:securityDevices.integrations.manage', 'throttle:20,1'])
+        ->name('security-devices.networks.store');
+
+    Route::get('/networks/range-check', [FoundDevicesController::class, 'rangeCheck'])
+        ->middleware(['permission:securityDevices.integrations.manage', 'throttle:60,1'])
+        ->name('security-devices.networks.range-check');
 
     Route::get('/devices/create', [DeviceController::class, 'create'])
         ->middleware('permission:securityDevices.devices.create')
@@ -243,6 +281,17 @@ Route::middleware([
         ])
         ->name('security-devices.devices.camera.snapshot');
 
+    // S&D Phase B: the picture a Site hub took, fetched once by the person who asked for it.
+    Route::get('/devices/{device}/camera/snapshot/{command}', [DeviceCameraOnvifController::class, 'snapshotStatus'])
+        ->whereNumber('device')
+        ->whereNumber('command')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.cctv.media.view',
+            'throttle:90,1',
+        ])
+        ->name('security-devices.devices.camera.snapshot.status');
+
     // Phase A, item A5: trust (or, as an IT admin, replace) the certificate a camera or Protect console offered.
     Route::post('/devices/{device}/camera/certificate/trust', [DeviceCameraOnvifController::class, 'trustCertificate'])
         ->whereNumber('device')
@@ -279,17 +328,6 @@ Route::middleware([
             'permission:securityDevices.integrations.view|securityDevices.integrations.manage',
             'throttle:30,1',
         ])
-    // S&D Phase B: the picture a Site hub took, fetched once by the person who asked for it.
-    Route::get('/devices/{device}/camera/snapshot/{command}', [DeviceCameraOnvifController::class, 'snapshotStatus'])
-        ->whereNumber('device')
-        ->whereNumber('command')
-        ->middleware([
-            'permission:securityDevices.devices.view',
-            'permission:securityDevices.cctv.media.view',
-            'throttle:90,1',
-        ])
-        ->name('security-devices.devices.camera.snapshot.status');
-
         ->name('security-devices.devices.queclink-console.show');
 
     Route::post('/devices/{device}/queclink-console/commands', [QueclinkUnitConsoleController::class, 'sendCommand'])
