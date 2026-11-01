@@ -17,6 +17,7 @@ import {
 import { AddDeviceChooser, DeviceFormPopup, useDeviceFormOptions } from '@/components/security-devices/device-popups';
 import { EditHouseMode, modeIcon, SwitchHouseMode } from '@/components/security-devices/house-mode-popups';
 import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
+import { NetworkCheckPopup } from '@/components/security-devices/network-check-popup';
 import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { SiteTopologyTreeCard } from '@/components/security-devices/site-topology-tree';
 import type { SiteTopologyTree } from '@/components/security-devices/topology-types';
@@ -72,7 +73,15 @@ type Popup =
     | { kind: 'scanning'; runId: number }
     | { kind: 'switch_mode' }
     | { kind: 'edit_mode' }
+    | { kind: 'ask_obli'; session: string | null }
     | null;
+
+/** An IT job's link back to Obli's record: ?tab=network&obli=<session>. */
+function obliSessionFromUrl(): string | null {
+    if (typeof window === 'undefined') return null;
+    const value = new URLSearchParams(window.location.search).get('obli');
+    return value && /^[0-9a-f-]{36}$/i.test(value) ? value : null;
+}
 
 export default function SiteShow(props: SitePageProps) {
     const { site, tab, flag, hub, meters, can } = props;
@@ -81,7 +90,10 @@ export default function SiteShow(props: SitePageProps) {
     const switchable = can.switch_mode ? house.modes.filter((mode) => mode.id !== house.current?.id) : [];
     const now = useNow();
     const base = `/security-devices/sites/${site.id}`;
-    const [popup, setPopup] = useState<Popup>(null);
+    const [popup, setPopup] = useState<Popup>(() => {
+        const session = can.ask_obli ? obliSessionFromUrl() : null;
+        return session ? { kind: 'ask_obli', session } : null;
+    });
     // The mode a house mode pop-up is about; kept while it closes so its words don't change.
     const [modeTarget, setModeTarget] = useState<number | null>(null);
     const switchMode = (modeId: number) => {
@@ -231,7 +243,15 @@ export default function SiteShow(props: SitePageProps) {
 
     let body: ReactNode = null;
     if (tab === 'overview' && props.overview) body = <OverviewTab overview={props.overview} siteName={site.name} now={now} onDevices={() => router.visit(`/security-devices/devices?site=${site.id}`)} />;
-    if (tab === 'network' && props.network) body = <NetworkTab tree={props.network.tree as SiteTopologyTree | undefined} siteName={site.name} />;
+    if (tab === 'network' && props.network)
+        body = (
+            <NetworkTab
+                tree={props.network.tree as SiteTopologyTree | undefined}
+                siteName={site.name}
+                hubLabel={hub?.label ?? null}
+                onAskObli={can.ask_obli ? () => setPopup({ kind: 'ask_obli', session: null }) : null}
+            />
+        );
     if (tab === 'internet' && props.internet) body = <InternetTab internet={props.internet} now={now} />;
     if (tab === 'rooms' && props.rooms) body = <RoomsTab rooms={props.rooms} siteName={site.name} />;
     if (tab === 'modes' && props.modes)
@@ -273,6 +293,15 @@ export default function SiteShow(props: SitePageProps) {
             />
             <ScanningViewer open={popup?.kind === 'scanning'} runId={popup?.kind === 'scanning' ? popup.runId : null} canStop={can.scan} onClose={() => setPopup(null)} />
             <HubPopups state={hubs} form={form} canApprove={!!can.approve_hub} canStopScan={can.scan} />
+            {can.ask_obli ? (
+                <NetworkCheckPopup
+                    open={popup?.kind === 'ask_obli'}
+                    siteId={site.id}
+                    siteName={site.name}
+                    sessionId={popup?.kind === 'ask_obli' ? popup.session : null}
+                    onClose={() => setPopup(null)}
+                />
+            ) : null}
             {can.switch_mode ? (
                 <SwitchHouseMode
                     open={popup?.kind === 'switch_mode'}
@@ -379,13 +408,35 @@ function OverviewTab({ overview, siteName, now, onDevices }: { overview: NonNull
     );
 }
 
-function NetworkTab({ tree, siteName }: { tree: SiteTopologyTree | undefined; siteName: string }) {
+function NetworkTab({
+    tree,
+    siteName,
+    hubLabel,
+    onAskObli,
+}: {
+    tree: SiteTopologyTree | undefined;
+    siteName: string;
+    hubLabel: string | null;
+    onAskObli: (() => void) | null;
+}) {
     const empty = !tree || (tree.roots.length === 0 && tree.unplaced.length === 0);
 
-    return empty ? (
-        <QuietLine title="Network map" text="Oblivion hasn’t mapped this Site’s network yet. A scan through its hub fills it in." />
-    ) : (
-        <SiteTopologyTreeCard tree={tree} siteName={siteName} />
+    return (
+        <div className="flex flex-col gap-5">
+            {empty ? (
+                <QuietLine title="Network map" text="Oblivion hasn’t mapped this Site’s network yet. A scan through its hub fills it in." />
+            ) : (
+                <SiteTopologyTreeCard tree={tree} siteName={siteName} />
+            )}
+            {/* S&D Phase I (pop-up 97): read-only network checks through the hub, for IT. */}
+            {onAskObli ? (
+                <QuietLine
+                    title="Something not working?"
+                    text={`Obli checks the internet, switch ports and Wi-Fi through ${hubLabel ?? 'the Site’s hub'} and tells you what it found. It only looks; it changes nothing.`}
+                    action={{ label: 'Ask Obli', onClick: onAskObli }}
+                />
+            ) : null}
+        </div>
     );
 }
 

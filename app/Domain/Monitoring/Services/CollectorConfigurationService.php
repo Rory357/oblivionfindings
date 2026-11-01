@@ -259,6 +259,10 @@ final readonly class CollectorConfigurationService
             if ($unifiAccess !== null) {
                 $protocols[] = 'unifi_access';
             }
+            // S&D Phase I (pop-up 97): read-only network checks, only for hubs that run them.
+            if (\App\Domain\SecurityDevices\Management\Services\HubJobTypes::runs($locked, \App\Domain\SecurityDevices\NetworkChecks\NetworkChecks::HUB_FEATURE)) {
+                $protocols[] = 'network_checks';
+            }
             $maximumChecks = max(1, min(10_000, (int) config(
                 'monitoring.collector.max_checks_per_configuration',
                 10_000,

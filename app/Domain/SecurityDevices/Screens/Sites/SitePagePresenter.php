@@ -104,6 +104,8 @@ final class SitePagePresenter
                 // S&D Phase F: switch a house mode by hand (pop-up 42), and add or edit one (pop-up 43).
                 'switch_mode' => $viewer->canDo('securityDevices.modes.switch'),
                 'edit_modes' => $viewer->canDo('securityDevices.automations.manage'),
+                // S&D Phase I (pop-up 97): ask Obli to check the network through the hub (IT, as Scan now).
+                'ask_obli' => \App\Domain\SecurityDevices\NetworkChecks\NetworkChecks::mayAsk($viewer),
             ],
         ];
     }

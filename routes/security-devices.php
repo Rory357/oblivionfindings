@@ -1322,3 +1322,14 @@ Route::middleware(['auth', 'permission:securityDevices.viewAny', 'throttle:60,1'
     Route::put('/setup/obli/fixes-switch', [$obli, 'fixesSwitch'])->middleware('throttle:10,1')->name('security-devices.setup.obli.fixes-switch');
     Route::put('/setup/obli/helper', [$obli, 'helperSwitch'])->middleware('throttle:10,1')->name('security-devices.setup.obli.helper');
 });
+
+// S&D Phase I (pop-up 97): "Obli checks <Site>'s network", read-only checks through the Site's hub.
+// IT only (devices.view + integrations.manage, as "Scan now"); the service checks the Site every call.
+// Each route counts on its own (a named prefix), so the 2-second poll never uses up asking or raising an IT job.
+Route::middleware(['auth', 'permission:securityDevices.viewAny', 'permission:securityDevices.integrations.manage'])->prefix('security-devices')->group(function (): void {
+    $network = \App\Domain\SecurityDevices\NetworkChecks\Http\NetworkCheckController::class;
+    Route::get('/sites/{site}/network-checks', [$network, 'panel'])->whereNumber('site')->middleware('throttle:30,1,netcheck-panel')->name('security-devices.network-checks.panel');
+    Route::post('/sites/{site}/network-checks', [$network, 'ask'])->whereNumber('site')->middleware('throttle:6,1,netcheck-ask')->name('security-devices.network-checks.ask');
+    Route::get('/network-checks/{uuid}', [$network, 'show'])->whereUuid('uuid')->middleware('throttle:120,1,netcheck-show')->name('security-devices.network-checks.show');
+    Route::post('/network-checks/{uuid}/ticket', [$network, 'ticket'])->whereUuid('uuid')->middleware('throttle:10,1,netcheck-ticket')->name('security-devices.network-checks.ticket');
+});

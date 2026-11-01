@@ -179,6 +179,9 @@ final class DevicePagePresenter
                 'update' => $group !== 'computer' ? app(\App\Domain\SecurityDevices\Screens\Devices\DeviceUpdates::class)->forPage($device, $entry, $now) : null,
                 // S&D Phase G (pop-up 63): the saved login the hub uses to reach it, for people who may replace it.
                 'login' => $group !== 'computer' ? app(\App\Domain\SecurityDevices\Credentials\Services\DeviceSavedLogin::class)->present($viewer, $device, $siteId) : null,
+                // S&D Phase I (pop-up 97): a Wi-Fi point's "Ask Obli", read-only checks through its Site's hub (IT).
+                'ask_obli' => $kind === DeviceKind::WifiPoint && $siteId !== null && \App\Domain\SecurityDevices\NetworkChecks\NetworkChecks::mayAsk($viewer)
+                    ? ['site_id' => (int) $siteId, 'site' => (string) $siteName] : null,
             ],
             'trouble' => $trouble,
             'overview' => $tab === 'overview'

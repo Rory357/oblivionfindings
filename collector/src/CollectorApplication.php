@@ -16,6 +16,7 @@ use Oblivion\Collector\Exceptions\CentralApiFailure;
 use Oblivion\Collector\Http\HttpsCentralApi;
 use Oblivion\Collector\Exceptions\SpoolFull;
 use Oblivion\Collector\Media\MediaLane;
+use Oblivion\Collector\NetworkChecks\NetworkCheckLane;
 use Oblivion\Collector\Mqtt\MqttRelayServer;
 use Oblivion\Collector\Mqtt\RelayInbox;
 use Oblivion\Collector\Mqtt\RelayTlsIdentity;
@@ -388,6 +389,8 @@ final class CollectorApplication
             $this->writeRelayLogins($stateDirectory, $config);
             // S&D Phase E (E5): and the encrypted relay from this one, with this hub's certificate.
             $this->writeRelayTls($stateDirectory, $config, $relayTls);
+            // S&D Phase I (pop-up 97): the network checks lane checks its targets against this.
+            $this->writeNetworkCheckScope($stateDirectory, $config);
         }
         $spool = new EncryptedSpool($stateDirectory, $checkpoint);
         $this->moveRelayedReadings($stateDirectory, $spool, $secretKey);
@@ -507,7 +510,7 @@ final class CollectorApplication
                 'commands_executed' => $commandsExecuted,
                 // The job types (and newer config sections) this hub can run: the server sends a new
                 // kind only to hubs that list it.
-                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE, self::WEB_PAGE_FEATURE, self::UNIFI_ACCESS_FEATURE, self::UNIFI_ACCESS_ADMIN_FEATURE]),
+                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE, self::WEB_PAGE_FEATURE, self::UNIFI_ACCESS_FEATURE, self::UNIFI_ACCESS_ADMIN_FEATURE, self::NETWORK_CHECKS_FEATURE]),
                 'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
@@ -572,6 +575,13 @@ final class CollectorApplication
             new EnvelopeVerifier((string) $identity['central_signing_public_key']),
             new CredentialLeaseDecryptor($secretKey),
             $stateDirectory.DIRECTORY_SEPARATOR.'access-jobs.json',
+        );
+        // S&D Phase I (pop-up 97): Obli's read-only network checks, in the same process.
+        $network = new NetworkCheckLane(
+            fn (array $report): array => $central->networkCheckWork((string) $identity['collector_id'], bin2hex(random_bytes(16)), $report),
+            new EnvelopeVerifier((string) $identity['central_signing_public_key']),
+            new CredentialLeaseDecryptor($secretKey),
+            $stateDirectory.DIRECTORY_SEPARATOR.self::NETWORK_CHECK_SCOPE_FILE,
         );
         sodium_memzero($secretKey);
         $loginsFile = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE;
@@ -643,6 +653,11 @@ final class CollectorApplication
             } catch (\Throwable $exception) {
                 $this->write('access: '.$exception->getMessage().PHP_EOL, STDERR);
             }
+            try {
+                $network->tick();
+            } catch (\Throwable $exception) {
+                $this->write('network checks: '.$exception->getMessage().PHP_EOL, STDERR);
+            }
             $port = $logins()['listen_port'] ?? null;
             if ($port !== $listening) {
                 $server->close();
@@ -660,7 +675,7 @@ final class CollectorApplication
                 }
             }
             // A live terminal wants a quick round; otherwise the relay's usual pace.
-            $server->poll($terminal->active() || $web->active() || $access->active() ? 0.1 : ($listening === null ? ($tlsServer === null ? 2.0 : 0.0) : 0.8));
+            $server->poll($terminal->active() || $web->active() || $access->active() || $network->active() ? 0.1 : ($listening === null ? ($tlsServer === null ? 2.0 : 0.0) : 0.8));
         }
         $server->close();
         $tlsServer?->close();
@@ -687,6 +702,26 @@ final class CollectorApplication
 
     /** S&D Phase H (H1): this hub makes UniFi Access changes for Oblivion (AccessLane, inside the relay process). */
     private const string UNIFI_ACCESS_ADMIN_FEATURE = 'unifi_access_admin_v1';
+
+    /** S&D Phase I (pop-up 97): this hub runs Obli's read-only network checks (NetworkCheckLane, inside the relay process). */
+    private const string NETWORK_CHECKS_FEATURE = 'network_checks_v1';
+
+    /** The Sites, networks and device addresses from the verified work list, for NetworkCheckLane. */
+    private const string NETWORK_CHECK_SCOPE_FILE = 'network-checks-scope.json';
+
+    private function writeNetworkCheckScope(string $stateDirectory, CollectorConfig $config): void
+    {
+        $this->writePrivateFile($stateDirectory.DIRECTORY_SEPARATOR.self::NETWORK_CHECK_SCOPE_FILE, json_encode([
+            'version' => 1,
+            'written_at' => time(),
+            // The signed work's own end: past it (or revoked) the lane does nothing.
+            'expires_at' => $config->expiresAt->getTimestamp(),
+            'protocols' => array_values($config->scope['protocols'] ?? []),
+            'allowed_site_ids' => $config->allowedSiteIds(),
+            'cidrs' => array_values($config->scope['cidrs'] ?? []),
+            'devices' => (object) ($config->scope['devices'] ?? []),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+    }
 
     private function writeRelayTls(string $stateDirectory, CollectorConfig $config, RelayTlsIdentity $relayTls): void
     {

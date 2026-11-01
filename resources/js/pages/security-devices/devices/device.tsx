@@ -34,12 +34,13 @@ import {
     type PopupDevice,
 } from '@/components/security-devices/device-popups';
 import { FirmwareUpdatePopup } from '@/components/security-devices/firmware-update-popup';
+import { NetworkCheckPopup } from '@/components/security-devices/network-check-popup';
 import AppLayout from '@/layouts/app-layout';
 import { durationWords, timedText } from '@/lib/security-devices/device-time';
 import { RemoteConnectionDialog } from '@/pages/it/remote-support/_dialogs';
 import type { SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Activity, BellPlus, CircleArrowUp, Globe, HardDriveDownload, KeyRound, MonitorUp, Pencil } from 'lucide-react';
+import { Activity, BellPlus, Bot, CircleArrowUp, Globe, HardDriveDownload, KeyRound, MonitorUp, Pencil } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BackupSettings } from './_device-backup';
 import { SavedLoginPopup } from './_device-saved-login';
@@ -90,6 +91,8 @@ export default function DevicePage(props: DevicePageProps) {
     const now = useNow();
     const [popup, setPopup] = useState<Popup>(null);
     const [webOpen, setWebOpen] = useState(false);
+    // S&D Phase I (pop-up 97): a Wi-Fi point's "Ask Obli".
+    const [obliOpen, setObliOpen] = useState(false);
     const { form, load } = useDeviceFormOptions();
     const base = `/security-devices/devices/${device.id}`;
 
@@ -168,6 +171,11 @@ export default function DevicePage(props: DevicePageProps) {
                     {actions.web?.ok ? (
                         <PageHeaderGlassButton icon={Globe} onClick={() => setWebOpen(true)}>
                             Open web page
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {actions.ask_obli ? (
+                        <PageHeaderGlassButton icon={Bot} onClick={() => setObliOpen(true)}>
+                            Ask Obli
                         </PageHeaderGlassButton>
                     ) : null}
                     {actions.update ? (
@@ -263,6 +271,15 @@ export default function DevicePage(props: DevicePageProps) {
 
             <PingViewer open={popup?.kind === 'ping'} device={popup?.kind === 'ping' ? popup.device : null} onClose={close} />
             {actions.web?.ok ? <WebPagePopup open={webOpen} device={{ id: device.id, name: device.name, address: device.address }} hub={actions.web.hub} onClose={() => setWebOpen(false)} /> : null}
+            {actions.ask_obli ? (
+                <NetworkCheckPopup
+                    open={obliOpen}
+                    siteId={actions.ask_obli.site_id}
+                    siteName={actions.ask_obli.site}
+                    device={{ id: device.id, name: device.name }}
+                    onClose={() => setObliOpen(false)}
+                />
+            ) : null}
             <DeviceFormPopup
                 open={popup?.kind === 'edit'}
                 mode="edit"

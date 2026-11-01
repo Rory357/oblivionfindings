@@ -299,6 +299,17 @@ final readonly class HttpsCentralApi implements CentralApi
         return $this->request('POST', '/api/monitoring/collectors/access/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
     }
 
+    /**
+     * S&D Phase I (pop-up 97): Obli's network checks poll. What the hub found goes in; signed read-only checks come back.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    public function networkCheckWork(string $collectorId, string $requestKey, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/network-checks/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
+    }
+
     public function discoveryWork(string $collectorId, string $requestKey, array $capability): array
     {
         return $this->request('POST', '/api/monitoring/collectors/media/discovery/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'capability' => $capability]);

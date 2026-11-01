@@ -1068,6 +1068,10 @@ app(Schedule::class)->command('security-devices:nightly-settings-backups')->ever
     ->between(...App\Domain\SecurityDevices\NetworkConfig\Services\NightlySettingsBackups::window())
     ->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 
+// S&D Phase I (pop-up 97): Obli's network checks move on (hub checks that ran out of time, answers still to write); sessions go after a year.
+app(Schedule::class)->command('security-devices:network-checks-tick')->everyMinute()->withoutOverlapping()->onOneServer();
+app(Schedule::class)->command('security-devices:network-checks-tick --prune')->dailyAt('03:55')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+
 // Native attempt expiry is bookkeeping only; it never retries a computer action.
 app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
 

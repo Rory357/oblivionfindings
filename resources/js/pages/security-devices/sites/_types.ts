@@ -169,5 +169,6 @@ export type SitePageProps = {
     rooms?: SiteRooms | null;
     modes?: SiteModes | null;
     house?: HouseSummary;
-    can: { add_device: boolean; assign: boolean; scan: boolean; switch_mode?: boolean; edit_modes?: boolean } & HubCan;
+    /** ask_obli: S&D Phase I (pop-up 97), Obli's read-only network checks through the hub (IT). */
+    can: { add_device: boolean; assign: boolean; scan: boolean; switch_mode?: boolean; edit_modes?: boolean; ask_obli?: boolean } & HubCan;
 };

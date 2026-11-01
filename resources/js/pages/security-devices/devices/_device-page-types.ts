@@ -295,6 +295,8 @@ export type DevicePageProps = {
         update?: FirmwareUpdate | null;
         /** S&D Phase G (pop-up 63): the saved login the hub uses, for people who may replace it. */
         login?: SavedLogin | null;
+        /** S&D Phase I (pop-up 97): a Wi-Fi point's "Ask Obli" (IT), with the Site its hub checks. */
+        ask_obli?: { site_id: number; site: string } | null;
     };
     trouble: TroubleState | null;
     overview: DeviceOverview | null;
