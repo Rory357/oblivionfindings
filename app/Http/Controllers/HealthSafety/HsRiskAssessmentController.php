@@ -317,7 +317,7 @@ class HsRiskAssessmentController extends Controller
 
         $storedPath = null;
         try {
-            $this->service->command($assessment, $request->user(), function (HsRiskAssessment $locked, User $actor) use ($request, $data, &$storedPath): void {
+            $this->service->command($assessment, $request->user(), function (HsRiskAssessment $locked, User $actor, $reads, HealthSafetyReadContext $context) use ($request, $data, &$storedPath): void {
                 $this->service->requireMutable($locked);
                 $file = $request->file('file');
                 $storedPath = $file->store('hs_risk_assessment_attachments', 'private');
@@ -330,7 +330,7 @@ class HsRiskAssessmentController extends Controller
                     'kind' => $data['kind'] ?? null, 'notes' => $data['notes'] ?? null, 'alt_text' => $data['alt_text'] ?? null,
                 ]);
                 if (! $attachment->exists) { throw new \LogicException('Risk evidence creation was not persisted.'); }
-                $this->service->audit('risk_assessment.evidence_added', $locked, $actor, null, ['names' => [$attachment->original_name], 'attachment_id' => $attachment->id]);
+                $this->service->audit('risk_assessment.evidence_added', $locked, $actor, null, ['names' => [$attachment->original_name], 'attachment_id' => $attachment->id], $context, HsRiskAssessmentService::attachmentTuple($locked));
             });
         } catch (Throwable $error) {
             if (is_string($storedPath) && $storedPath !== '') {
@@ -380,7 +380,7 @@ class HsRiskAssessmentController extends Controller
                 $current = RiskAssessmentPresenter::guardChildQuery(HsRiskAssessmentAttachment::query()->whereKey($attachment->id), 'hs_risk_assessment_attachments.hs_risk_assessment_id', $parent, $context)->lockForUpdate()->firstOrFail();
                 $disk = $current->disk ?: 'private';
                 $path = $current->path;
-                $this->service->audit('risk_assessment.evidence_removed', $locked, $actor, null, ['names' => [$current->original_name], 'attachment_id' => $current->id]);
+                $this->service->audit('risk_assessment.evidence_removed', $locked, $actor, null, ['names' => [$current->original_name], 'attachment_id' => $current->id], $context, HsRiskAssessmentService::attachmentTuple($locked));
                 $this->service->deleteAttachment($current, $parent, $context);
                 DB::afterCommit(function () use ($disk, $path): void {
                     try {

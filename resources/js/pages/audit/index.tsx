@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { Lock } from 'lucide-react';
 import { useMemo } from 'react';
 
 type AuditLog = {
@@ -15,6 +16,10 @@ type AuditLog = {
     client?: { id: number; name: string } | null;
     subject_type: string | null;
     subject_id: number | null;
+    /** #13: a risk assessment's reference (and title, unless it is linked to a person). */
+    subject_label?: string | null;
+    /** #13: 'linked_person' — only who changed what and when shows, for every viewer. */
+    values_hidden?: 'linked_person' | null;
     properties: {
         fields: string[];
         before: Record<string, unknown>;
@@ -312,7 +317,11 @@ export default function AuditIndex({ logs, filters, filter_options }: Props) {
                                         <div className="font-medium">
                                             {l.action}
                                         </div>
-                                        {l.subject_type ? (
+                                        {l.subject_label ? (
+                                            <div className="text-xs text-muted-foreground">
+                                                {l.subject_label}
+                                            </div>
+                                        ) : l.subject_type ? (
                                             <div className="text-xs text-muted-foreground">
                                                 {l.subject_type}
                                                 {l.subject_id
@@ -347,16 +356,35 @@ export default function AuditIndex({ logs, filters, filter_options }: Props) {
                                         )}
                                     </td>
                                     <td className="p-3">
+                                        {l.subject_label && !l.values_hidden && Object.keys(l.properties.after).length > 0 ? (
+                                            <div className="text-xs">
+                                                {Object.keys(l.properties.after).map((field) => (
+                                                    <div key={field}>
+                                                        {field.replaceAll('_', ' ')}:{' '}
+                                                        <span className="text-muted-foreground">{String(l.properties.before[field] ?? '—')}</span>
+                                                        {' → '}
+                                                        {String(l.properties.after[field] ?? '—')}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : null}
                                         {l.properties.fields.length > 0 ? (
                                             <div className="text-xs text-muted-foreground">
-                                                Fields:{' '}
-                                                {l.properties.fields.join(', ')}
+                                                {l.values_hidden ? 'Changed' : 'Fields'}:{' '}
+                                                {l.properties.fields.map((field) => field.replaceAll('_', ' ')).join(', ')}
                                             </div>
-                                        ) : (
+                                        ) : null}
+                                        {l.values_hidden === 'linked_person' ? (
+                                            <div className="flex items-center gap-1 text-xs italic text-muted-foreground">
+                                                <Lock className="size-3" aria-hidden="true" />
+                                                Values hidden: this assessment is linked to a person
+                                            </div>
+                                        ) : null}
+                                        {l.properties.fields.length === 0 && !l.values_hidden ? (
                                             <span className="text-muted-foreground">
                                                 —
                                             </span>
-                                        )}
+                                        ) : null}
                                     </td>
                                 </tr>
                             ))}
