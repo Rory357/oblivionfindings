@@ -52,6 +52,16 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
         return [$root->fresh(), $receiver, $notice, $healthy, $incident, $original];
     }
 
+    /** Each simulated tamper must really change the row (a no-op "tamper" proves nothing). */
+    private function assertRealTamper(array $before, array $mutation): void
+    {
+        foreach ($mutation as $column => $value) {
+            $old = $before[$column] ?? null; $old = is_string($old) && json_decode($old, true) !== null && str_starts_with(ltrim($old), '{') ? json_decode($old, true) : $old;
+            $new = is_string($value) && str_starts_with(ltrim($value), '{') ? json_decode($value, true) : $value;
+            $this->assertNotEquals($old, $new, "The {$column} tamper must change the stored row.");
+        }
+    }
+
     private function refuseAfterDiscovery($receiver, DatabaseNotification $notice, DatabaseNotification $ordinary, callable $mutation): void
     {
         $this->inbox()->materialize($receiver, function ($current, $context) use ($notice, $ordinary, $mutation): null {
@@ -329,11 +339,12 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
         $before = (array) DB::table('substance_exposure_records')->where('id', $root->id)->first();
         $mutations = [
             ['site_id' => $this->foreignSite->id], ['user_id' => $this->manager->id],
-            ['source_revision' => $root->source_revision + 1], ['source_schema_version' => 0],
+            ['source_revision' => $root->fresh()->source_revision + 1], ['source_schema_version' => 0],
             ['deleted_at' => now()], ['symptoms' => 'FOREIGN-UNVERSIONED-MEDICAL-FACT'],
             ['original_context' => json_encode([...$root->original_context, 'site_id' => $this->foreignSite->id], JSON_THROW_ON_ERROR)],
         ];
         foreach ($mutations as $mutation) {
+            $this->assertRealTamper($before, $mutation);
             $this->refuseAfterDiscovery($receiver, $notice, $ordinary,
                 fn () => DB::table('substance_exposure_records')->where('id', $root->id)->update($mutation));
             DB::table('substance_exposure_records')->where('id', $root->id)->update($before);
@@ -351,7 +362,8 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
         $this->assertDatabaseHas('chemical_exposure_source_deliveries', ['source_version_id' => $foreignDelivery->source_version_id, 'kind' => 'followup']);
         foreach ([['exposure_id' => $foreignRoot->id],
             ['recipient_id' => $foreignReceiver->id], ['actor_id' => $foreignReceiver->id], ['kind' => 'not_followup'],
-            ['membership' => json_encode([...$delivery->membership, 'worker_id' => $foreignRoot->user_id], JSON_THROW_ON_ERROR)]] as $mutation) {
+            ['membership' => json_encode([...$delivery->membership, 'worker_id' => $this->manager->id], JSON_THROW_ON_ERROR)]] as $mutation) {
+            $this->assertRealTamper($before, $mutation);
             $this->refuseAfterDiscovery($receiver, $notice, $ordinary,
                 fn () => DB::table('chemical_exposure_source_deliveries')->where('id', $delivery->id)->update($mutation));
             DB::table('chemical_exposure_source_deliveries')->where('id', $delivery->id)->update($before);
@@ -366,8 +378,9 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
         $foreignRoot = $this->exposure();
         $before = (array) DB::table('chemical_exposure_followups')->where('id', $accepted['source_id'])->first();
         foreach ([['exposure_id' => $foreignRoot->id], ['assigned_to' => $this->manager->id], ['completed_at' => now()],
-            ['source_schema_version' => 0], ['source_revision' => $root->source_revision + 1],
+            ['source_schema_version' => 0], ['source_revision' => $root->fresh()->source_revision + 1],
             ['instruction' => 'FOREIGN-UNVERSIONED-PRIVATE-INSTRUCTION']] as $mutation) {
+            $this->assertRealTamper($before, $mutation);
             $this->refuseAfterDiscovery($receiver, $notice, $ordinary,
                 fn () => DB::table('chemical_exposure_followups')->where('id', $accepted['source_id'])->update($mutation));
             DB::table('chemical_exposure_followups')->where('id', $accepted['source_id'])->update($before);

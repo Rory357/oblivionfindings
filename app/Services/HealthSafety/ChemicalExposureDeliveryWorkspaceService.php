@@ -140,6 +140,13 @@ final class ChemicalExposureDeliveryWorkspaceService
         } catch (LogicException) { $reads->assertActive(); return false; }
         catch (ModelNotFoundException) { return false; }
         catch (HttpExceptionInterface $denial) { if (! in_array($denial->getStatusCode(), [403,404], true)) { throw $denial; } return false; }
+        // The identity check refuses a changed identity as a source validation error: not stable, so "needs checking".
+        catch (\Illuminate\Validation\ValidationException $changed) {
+            if (array_keys($changed->errors()) !== ['source']) { throw $changed; }
+            $reads->assertActive();
+
+            return false;
+        }
     }
 
     private function unchangedRawRoot(SubstanceExposureRecord $root, CurrentAuthorizationReads $reads): bool
