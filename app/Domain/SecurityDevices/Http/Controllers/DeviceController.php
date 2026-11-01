@@ -848,13 +848,13 @@ class DeviceController extends Controller
 
         $this->registry->decommission($device, $user);
 
-        // Retire keeps its history (S&D rebuild pop-up 11); the Devices page stays where it was.
+        // Removing keeps its history (Stephan, 1 Nov; pop-up 11); the Devices page stays where it was.
         if ($request->boolean('_modal')) {
-            return redirect()->back()->with('success', "Retired {$device->name}. Its history is kept.");
+            return redirect()->back()->with('success', "Removed {$device->name}. Its history is kept.");
         }
 
         return redirect()->route('security-devices.devices.index')
-            ->with('success', "Retired {$device->name}. Its history is kept.");
+            ->with('success', "Removed {$device->name}. Its history is kept.");
     }
 
     // ── Mapping helpers ───────────────────────────────────────────

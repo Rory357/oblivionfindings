@@ -17,6 +17,17 @@ This file says what "done" means, how each phase is proved, and what Stephan sti
 
 This file replaces `PROGRESS.md` as the record of where S&D stands. `PROGRESS.md` holds Gemini's claims, and the audit shows many of them are untrue.
 
+### Stephan's answers, 1 Nov 2026
+
+Also recorded in the plan (`sdr-plan/pack/decisions.md`).
+
+1. **The 13 new views:** approved ("Approve them"). Built as drawn, in their phases.
+2. **Leftover workspaces:** "Yes, as proposed".
+   - Health kit becomes a Devices › Sensors filter; readings stay in Health & clinical.
+   - Vehicle and asset trackers are owned by Fleet and read-only in S&D.
+   - Groups and command batches follow D8 and the plan's data moves.
+3. **Remove vs Retire:** "Keep its history". Removing takes the device off the lists, but its readings, alerts and settings backups stay on record. Approved pop-up 11 is corrected to match: one action, "Remove device", and no separate "Retire instead".
+
 ## 1. Done means
 
 All of these are true:
@@ -456,7 +467,7 @@ Each item is ticked with the commit that fixed it and how it was proved.
 | Phase | State | Commit | Gate | Stephan's walk | On main / .com |
 | --- | --- | --- | --- | --- | --- |
 | Finish line (this file) | Approved by MASTER, 30 Oct | 8b2cc254d | — | — | — |
-| A · Honest and safe | Built (A1–A8); local gate passed 31 Oct; walked 1 Nov by the build session (Stephan short on time) | `61f5e2c22` … `4b0568a13`, merged with main as `3e5675e39`; walk fix `6ddfc1451` | Pest 100 of 101 (the 1 is main's hub syslog test, same on main; its stale dates are fixed in `da6ff873d`); vitest 14/14; lint 0/0; build OK; tsc: 1 H&S test error that main has too | 1, 2, 3, 5, 8, 10 passed; 6 and 7 passed on test stand-ins, not on Stephan's kit; the walk found and fixed real SSH backups (`6ddfc1451`); 4 and 10b after the merge (`END-REVIEW-WALKS.md`) | — |
+| A · Honest and safe | Built (A1–A8); local gate passed 31 Oct; walked 1 Nov by the build session (Stephan short on time) | `61f5e2c22` … `4b0568a13`, merged with main as `3e5675e39`; walk fix `6ddfc1451` | Pest 100 of 101 (the 1 is main's hub syslog test, same on main; its stale dates are fixed in `da6ff873d`); vitest 14/14; lint 0/0; build OK; tsc: 1 H&S test error that main has too | 1, 2, 3, 5, 8, 10 passed; 6 and 7 passed on test stand-ins, not on Stephan's kit; the walk found and fixed real SSH backups (`6ddfc1451`); 4 passed on the .com 1 Nov (MASTER, with Stephan's OK); 10b still needs an outside connection (`END-REVIEW-WALKS.md`) | — |
 | B · Windows app and hubs | Not started | | | | |
 | C · Core screens | Not started | | | | |
 | D · Alerts | Not started | | | | |

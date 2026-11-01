@@ -996,9 +996,13 @@ export function WatchDevice({
 }
 
 /* ------------------------------------------------------------------ */
-/*  11 · Remove or retire                                              */
+/*  11 · Remove a device                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Stephan, 1 Nov: "Keep its history". Removing takes the device off the lists, but its readings,
+ * alerts and settings backups stay on record, so there's one action, not Remove and Retire.
+ */
 export function RetireDevice({
     open,
     device,
@@ -1025,10 +1029,10 @@ export function RetireDevice({
                 const message = String(Object.values(errors)[0] ?? '');
                 setError(
                     /monitor/i.test(message)
-                        ? 'Stop watching it first: its checks are still on. Then retire it.'
+                        ? 'Stop watching it first: its checks are still on. Then remove it.'
                         : /provider integration/i.test(message)
-                          ? 'It comes from a connected service. Release it there first, then retire it.'
-                          : message || 'It couldn’t be retired. Try again.',
+                          ? 'It comes from a connected service. Release it there first, then remove it.'
+                          : message || 'It couldn’t be removed. Try again.',
                 );
             },
             onFinish: () => setProcessing(false),
@@ -1045,23 +1049,18 @@ export function RetireDevice({
             title={`Remove ${device?.name ?? 'this device'}?`}
             description={
                 <>
-                    <b className="font-semibold text-foreground">{device?.name}</b> and its
-                    history would be removed from Oblivion. The device itself isn’t changed.
+                    <b className="font-semibold text-foreground">{device?.name}</b> comes off the
+                    lists. The device itself isn’t changed.
                 </>
             }
             error={error ?? undefined}
             confirmLabel="Remove device"
-            confirmDisabled
-            secondary={
-                <Button type="button" variant="outline" onClick={retire} disabled={processing}>
-                    {processing ? 'Retiring…' : 'Retire instead'}
-                </Button>
-            }
+            processing={processing}
+            processingLabel="Removing…"
             testId="sd-retire-device"
         >
             <PopupCallout tone="info">
-                Removing isn’t available yet. Retire it instead: it leaves the lists and keeps
-                its history.
+                Its history stays on record: its readings, alerts and settings backups are kept.
             </PopupCallout>
         </PopupConfirm>
     );

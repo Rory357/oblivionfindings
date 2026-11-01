@@ -159,17 +159,17 @@ describe('Devices page', () => {
         expect(inertia.get).toHaveBeenLastCalledWith('/security-devices/devices', { status: 'offline' }, expect.anything());
     });
 
-    it('offers Retire, which keeps history, and shows Remove as not available yet', () => {
+    it('removes a device and keeps its history (Stephan, 1 Nov)', () => {
         render(<DevicesIndex {...fixture()} />);
 
         fireEvent.contextMenu(screen.getByRole('article', { name: 'Synthetic switch' }));
         fireEvent.click(screen.getByRole('menuitem', { name: 'Remove device' }));
 
         const confirm = screen.getByRole('alertdialog');
-        expect(within(confirm).getByText(/Removing isn’t available yet/)).toBeTruthy();
-        expect((within(confirm).getByRole('button', { name: 'Remove device' }) as HTMLButtonElement).disabled).toBe(true);
+        expect(within(confirm).getByText(/readings, alerts and settings backups are kept/)).toBeTruthy();
+        expect(within(confirm).queryByRole('button', { name: 'Retire instead' })).toBeNull();
 
-        fireEvent.click(within(confirm).getByRole('button', { name: 'Retire instead' }));
+        fireEvent.click(within(confirm).getByRole('button', { name: 'Remove device' }));
         expect(inertia.delete).toHaveBeenCalledWith('/security-devices/devices/1', expect.objectContaining({ data: { _modal: true } }));
     });
 
