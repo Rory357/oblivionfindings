@@ -164,8 +164,14 @@ func run(ctx context.Context, args []string) error {
 		command.Stdout = io.Discard
 		command.Stderr = io.Discard
 		command.WaitDelay = 2 * time.Second
-		_ = command.Run()
+		runErr := command.Run()
 		cancel()
+		var exit *exec.ExitError
+		if errors.As(runErr, &exit) && exit.ExitCode() == 3 {
+			// Removed in Oblivion: the hub wiped its saved logins and leaves removed.json.
+			// Stop for good; systemd's unit treats exit 3 as final (RestartPreventExitStatus=3).
+			return errRemoved
+		}
 		select {
 		case <-ctx.Done():
 			return nil

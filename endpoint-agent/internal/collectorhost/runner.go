@@ -10,6 +10,18 @@ import (
 
 var errInstallation = errors.New("collector installation is not trusted; administrator review is required")
 
+// errRemoved: the hub was removed in Oblivion and has wiped its saved logins (S&D Phase B).
+// The service stops for good; uninstalling Oblivion is the next step on this computer.
+var errRemoved = errors.New("this hub was removed in Oblivion; its saved logins have been wiped")
+
+// Exit codes from the PHP hub's collect cycle (collector/src/CollectorApplication.php).
+const (
+	cycleComplete       = 0
+	cycleDeferred       = 2
+	cycleRemoved        = 3
+	cycleWaitingApprove = 4
+)
+
 type cycleExecutor interface {
 	Check(context.Context) error
 	Cycle(context.Context) (uint32, error)
@@ -54,12 +66,21 @@ func runCycles(ctx context.Context, executor cycleExecutor, ready func(), report
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		if cycleErr == nil && code == cycleRemoved {
+			report("This hub was removed in Oblivion. Its saved logins have been wiped. Uninstall Oblivion from this computer.")
+			return errRemoved
+		}
 		state := "Collector cycle failed; retained state will be retried."
-		if cycleErr == nil && code == 0 {
+		waiting := cycleErr == nil && code == cycleWaitingApprove
+		if cycleErr == nil && code == cycleComplete {
 			state = "Collector cycle completed."
 			delay = timing.interval
-		} else if cycleErr == nil && code == 2 {
+		} else if cycleErr == nil && code == cycleDeferred {
 			state = "Collector upload deferred; buffered observations are retained."
+		} else if waiting {
+			// Connected and waiting: check again each interval, without backing off.
+			state = "Connected. Waiting for an admin to approve this hub in Oblivion."
+			delay = timing.interval
 		}
 		if state != last {
 			report(state)
@@ -72,7 +93,7 @@ func runCycles(ctx context.Context, executor cycleExecutor, ready func(), report
 			return ctx.Err()
 		case <-timer.C:
 		}
-		if cycleErr != nil || code != 0 {
+		if !waiting && (cycleErr != nil || code != cycleComplete) {
 			delay *= 2
 			if delay > timing.maximumBackoff {
 				delay = timing.maximumBackoff

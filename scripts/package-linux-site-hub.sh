@@ -30,6 +30,10 @@ mkdir -p "${DEST}/systemd"
 
 cp -R "${COLLECTOR_DIR}/bin" "${COLLECTOR_DIR}/src" "${COLLECTOR_DIR}/vendor" "${DEST}/"
 cp "${COLLECTOR_DIR}/composer.json" "${DEST}/composer.json"
+# The version stamped by the build (S&D Phase B: real version numbers).
+if [[ -f "${COLLECTOR_DIR}/VERSION" ]]; then
+  cp "${COLLECTOR_DIR}/VERSION" "${DEST}/VERSION"
+fi
 cp "${BINARY_DIR}/oblivion-site-collector" "${DEST}/oblivion-site-collector"
 if [[ -f "${BINARY_DIR}/oblivion-media" ]]; then
     cp "${BINARY_DIR}/oblivion-media" "${DEST}/oblivion-media"
