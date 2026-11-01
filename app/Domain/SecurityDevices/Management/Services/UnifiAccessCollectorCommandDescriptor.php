@@ -7,8 +7,11 @@ use App\Domain\Monitoring\Data\ProbeTarget;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\CollectorCredentialLeaseSealer;
+use App\Domain\Monitoring\Exceptions\RuntimePayloadInvalid;
 use App\Domain\Monitoring\Services\EgressPolicy;
 use App\Domain\SecurityDevices\Credentials\Services\CommandCredentialLeaseService;
+use App\Domain\SecurityDevices\Management\Contracts\CollectorCommandDescriptor;
+use App\Domain\SecurityDevices\Management\Data\CollectorCommandOutcome;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
 use App\Domain\SecurityDevices\Models\Device;
@@ -16,11 +19,31 @@ use App\Models\Integration\IntegrationSiteSecret;
 use RuntimeException;
 use Throwable;
 
-final class UnifiAccessCollectorCommandDescriptor
+final class UnifiAccessCollectorCommandDescriptor implements CollectorCommandDescriptor
 {
     private const string CAPABILITY = 'access.door.unlock_timed';
 
     private const string PROTOCOL = 'command.unifi_access';
+
+    private const array RECONCILIATION_SUMMARIES = [
+        'The remote Site collector freshly confirmed that the door relay returned to locked.',
+        'The remote Site collector freshly reported that the door relay remains unlocked.',
+        'The remote Site collector could not freshly confirm the final door state. Do not retry until actual state is known.',
+        'Fresh state is required before any new attempt.',
+    ];
+
+    private const array FAILURES = [
+        'UniFi Access reports that the mapped door is not bound to an access hub.',
+        'The door was not in the approved locked state immediately before execution.',
+        'UniFi Access rejected the credential or required API permission.',
+        'The mapped UniFi Access door is unavailable.',
+        'UniFi Access rejected the door action in its current state.',
+        'UniFi Access rate-limited the door action.',
+        'UniFi Access did not accept the remote door action.',
+        'The collector did not receive a confirmed final provider response. Actual state was checked before any retry.',
+        'The collector could not complete the approved pre-execution state and credential checks.',
+        'The collector restarted after persisting execution intent without a durable final result. The action was not repeated.',
+    ];
 
     public function __construct(
         private readonly EgressPolicy $egress,
@@ -29,15 +52,80 @@ final class UnifiAccessCollectorCommandDescriptor
         private readonly CollectorCommandContract $contracts,
     ) {}
 
-    public function supports(Device $device, MonitoringCollector $collector, string $capability): bool
+    public function capability(): string
+    {
+        return self::CAPABILITY;
+    }
+
+    /** UniFi Access keeps its existing route: the one hub that already watches the door. */
+    public function routesThroughCoveringHub(): bool
+    {
+        return false;
+    }
+
+    public function supports(Device $device, MonitoringCollector $collector, int $siteId): bool
     {
         try {
-            $this->baseDescriptor($device, $collector, $capability);
+            $this->baseDescriptor($device, $collector, self::CAPABILITY);
 
-            return $this->credentials->available($device, (int) $collector->site_id, $capability);
+            return $this->credentials->available($device, (int) $collector->site_id, self::CAPABILITY);
         } catch (Throwable) {
             return false;
         }
+    }
+
+    public function maxAttachmentBytes(): int
+    {
+        return 0;
+    }
+
+    public function interpret(
+        DeviceCommandRequest $request,
+        MonitoringCollector $collector,
+        string $executionStatus,
+        array $safeResult,
+        ?string $providerReference,
+        ?string $failure,
+        ?array $reconciliation,
+        ?string $attachment,
+    ): CollectorCommandOutcome {
+        if ($executionStatus === 'succeeded') {
+            if (array_keys($safeResult) !== ['provider_state', 'previous_lock_state', 'unlock_duration_seconds']
+                || $safeResult['provider_state'] !== 'accepted'
+                || $safeResult['previous_lock_state'] !== 'locked'
+                || ! is_int($safeResult['unlock_duration_seconds'])
+                || $safeResult['unlock_duration_seconds'] < 5
+                || $safeResult['unlock_duration_seconds'] > 60
+                || $providerReference !== 'unifi-access:'.$request->command_uuid
+                || $failure !== null) {
+                throw new RuntimePayloadInvalid('Collector UniFi success evidence is invalid.');
+            }
+        } elseif ($safeResult !== [] || $providerReference !== null
+            || ! is_string($failure) || ! in_array($failure, self::FAILURES, true)) {
+            throw new RuntimePayloadInvalid('Collector UniFi failure evidence is invalid.');
+        }
+        if ($executionStatus !== 'failed' && $reconciliation === null) {
+            // A door action that may have happened always comes back with the hub's fresh look at the door.
+            throw new RuntimePayloadInvalid('Collector command reconciliation is invalid.');
+        }
+        if ($reconciliation !== null) {
+            $observed = $reconciliation['observed_state'];
+            if (($observed !== null && (array_keys($observed) !== ['locked'] || ! is_bool($observed['locked'])))
+                || ! in_array($reconciliation['safe_evidence_summary'], self::RECONCILIATION_SUMMARIES, true)
+                || ($reconciliation['outcome'] === 'matched' && $observed !== ['locked' => true])
+                || ($reconciliation['outcome'] === 'mismatch' && $observed !== ['locked' => false])) {
+                throw new RuntimePayloadInvalid('Collector command reconciliation evidence is not a declared typed outcome.');
+            }
+        }
+
+        return new CollectorCommandOutcome($executionStatus, $safeResult, $providerReference, $failure, $reconciliation);
+    }
+
+    public function sameEvidence(DeviceCommandAttempt $attempt, string $executionStatus, array $safeResult, ?string $failure): bool
+    {
+        return $attempt->status->value === $executionStatus
+            && ($attempt->safe_result_summary ?? []) === $safeResult
+            && $attempt->safe_failure_reason === $failure;
     }
 
     /** @return array<string, mixed> */

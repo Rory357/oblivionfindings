@@ -5,6 +5,7 @@ namespace Oblivion\Collector\Security;
 use DateTimeImmutable;
 use Oblivion\Collector\Data\CollectorConfig;
 use Oblivion\Collector\Exceptions\ScopeViolation;
+use Oblivion\Collector\Runtime\SshExportProfiles;
 
 final readonly class ScopeGuard
 {
@@ -13,6 +14,16 @@ final readonly class ScopeGuard
     ];
 
     private const array CREDENTIALED_PROTOCOLS = ['snmp', 'ssh', 'winrm'];
+
+    /** The jobs a hub runs for governed commands, each with its one capability, provider and protocol. */
+    private const array COMMAND_TYPES = [
+        'unifi_access_timed_unlock_v1' => [
+            'capability' => 'access.door.unlock_timed', 'provider' => 'unifi', 'protocol' => 'command.unifi_access',
+        ],
+        'ssh_config_backup_v1' => [
+            'capability' => 'network.config.backup', 'provider' => 'ssh', 'protocol' => 'command.ssh_config_backup',
+        ],
+    ];
 
     private const array DISCOVERY_PROTOCOLS = [
         'icmp', 'arp', 'tcp', 'dns', 'http', 'tls', 'snmp', 'mdns', 'ssdp', 'onvif', 'syslog', 'flow', 'provider',
@@ -84,10 +95,10 @@ final readonly class ScopeGuard
             || ! is_int($command['attempt_number']) || $command['attempt_number'] < 1
             || ! is_int($command['site_id']) || ! in_array($command['site_id'], $this->config->allowedSiteIds(), true)
             || ! is_string($command['device_id']) || preg_match('/\A[1-9][0-9]{0,18}\z/', $command['device_id']) !== 1
-            || $command['capability'] !== 'access.door.unlock_timed'
-            || $command['provider'] !== 'unifi'
-            || $command['adapter'] !== 'unifi_access_timed_unlock_v1'
-            || $command['protocol'] !== 'command.unifi_access'
+            || ! is_string($command['adapter']) || ! isset(self::COMMAND_TYPES[$command['adapter']])
+            || $command['capability'] !== self::COMMAND_TYPES[$command['adapter']]['capability']
+            || $command['provider'] !== self::COMMAND_TYPES[$command['adapter']]['provider']
+            || $command['protocol'] !== self::COMMAND_TYPES[$command['adapter']]['protocol']
             || ! is_string($command['target'])
             || ! is_string($command['idempotency_hash']) || preg_match('/\A[0-9a-f]{64}\z/', $command['idempotency_hash']) !== 1
             || ! is_string($command['contract_hash']) || preg_match('/\A[0-9a-f]{64}\z/', $command['contract_hash']) !== 1) {
@@ -102,6 +113,55 @@ final readonly class ScopeGuard
             || $expiresAt === null || $expiresAt <= $at) {
             throw new ScopeViolation('Signed collector command is expired or revoked.');
         }
+        match ($command['adapter']) {
+            'ssh_config_backup_v1' => $this->assertSshConfigBackupCommand($command),
+            default => $this->assertUnifiAccessCommand($command),
+        };
+
+        $this->rejectExecutableFields($command);
+        if (! in_array($command['protocol'], $this->config->scope['protocols'], true)) {
+            throw new ScopeViolation('Command protocol is outside the signed scope.');
+        }
+        $this->assertScopedTarget($command['device_id'], $command['target']);
+        if (! is_array($command['credential_lease'])) {
+            throw new ScopeViolation('Credential lease is required for this command.');
+        }
+        $this->assertCredentialLease($command['credential_lease'], $command, $at);
+    }
+
+    /**
+     * S&D Phase B: the settings backup job. It names an export profile and carries no command text;
+     * the hub runs only that profile's fixed read-only commands.
+     *
+     * @param  array<string, mixed>  $command
+     */
+    private function assertSshConfigBackupCommand(array $command): void
+    {
+        $parameters = $command['parameters'];
+        if (! is_array($parameters) || array_keys($parameters) !== ['export_profile']
+            || ! is_string($parameters['export_profile'])
+            || SshExportProfiles::for($parameters['export_profile']) === null
+            || $command['expected_state'] !== ['snapshot_available' => true]) {
+            throw new ScopeViolation('Command parameters or expected state are invalid.');
+        }
+        $endpoint = $command['endpoint'];
+        $keys = ['address', 'port', 'expected_host_key', 'connect_timeout_seconds', 'command_timeout_seconds', 'max_output_bytes'];
+        if (! is_array($endpoint) || array_keys($endpoint) !== $keys
+            || $endpoint['address'] !== $command['target']
+            || ! is_int($endpoint['port']) || $endpoint['port'] < 1 || $endpoint['port'] > 65535
+            || ($endpoint['expected_host_key'] !== null && (! is_string($endpoint['expected_host_key'])
+                || preg_match('/\ASHA256:[A-Za-z0-9+\/]{43}\z/', $endpoint['expected_host_key']) !== 1))
+            || ! is_int($endpoint['connect_timeout_seconds']) || $endpoint['connect_timeout_seconds'] < 1 || $endpoint['connect_timeout_seconds'] > 10
+            || ! is_int($endpoint['command_timeout_seconds']) || $endpoint['command_timeout_seconds'] < 1 || $endpoint['command_timeout_seconds'] > 25
+            || ! is_int($endpoint['max_output_bytes']) || $endpoint['max_output_bytes'] < 1024 || $endpoint['max_output_bytes'] > 1_048_576) {
+            throw new ScopeViolation('Command endpoint is invalid or unbounded.');
+        }
+    }
+
+    /** @param array<string, mixed> $command */
+    private function assertUnifiAccessCommand(array $command): void
+    {
+        $uuid = '/\A[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/i';
         $parameters = $command['parameters'];
         if (! is_array($parameters) || array_keys($parameters) !== ['duration_seconds']
             || ! is_int($parameters['duration_seconds'])
@@ -127,16 +187,6 @@ final readonly class ScopeGuard
             || ! is_int($endpoint['max_response_bytes']) || $endpoint['max_response_bytes'] < 1024 || $endpoint['max_response_bytes'] > 65_536) {
             throw new ScopeViolation('Command endpoint is invalid or unbounded.');
         }
-
-        $this->rejectExecutableFields($command);
-        if (! in_array($command['protocol'], $this->config->scope['protocols'], true)) {
-            throw new ScopeViolation('Command protocol is outside the signed scope.');
-        }
-        $this->assertScopedTarget($command['device_id'], $command['target']);
-        if (! is_array($command['credential_lease'])) {
-            throw new ScopeViolation('Credential lease is required for this command.');
-        }
-        $this->assertCredentialLease($command['credential_lease'], $command, $at);
     }
 
     /** @param array<string, mixed> $run */

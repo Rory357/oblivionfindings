@@ -127,7 +127,7 @@ final class NetworkSshConfigBackupCommandAdapter implements CommandExecutionAdap
 
                 return new CommandExecutionResult(
                     status: CommandAttemptStatus::Failed,
-                    safeFailureReason: $this->humanFailureReason($lastReason, $hostKeyFingerprint),
+                    safeFailureReason: self::humanFailureReason($lastReason, $hostKeyFingerprint),
                 );
             }
 
@@ -254,7 +254,8 @@ final class NetworkSshConfigBackupCommandAdapter implements CommandExecutionAdap
         return false;
     }
 
-    private function humanFailureReason(string $reasonCode, ?string $offeredFingerprint = null): string
+    /** The same words whether the backup ran from the server or through the Site hub. */
+    public static function humanFailureReason(string $reasonCode, ?string $offeredFingerprint = null): string
     {
         return match ($reasonCode) {
             'auth_failed' => 'The network device rejected the SSH username, password, or key.',
@@ -269,7 +270,11 @@ final class NetworkSshConfigBackupCommandAdapter implements CommandExecutionAdap
             'host_key_unavailable' => 'The network device did not present a valid SSH host key.',
             'cli_rejected_command' => 'The network device CLI rejected the read-only export command (check user privilege level).',
             'output_exceeded_limit' => 'Running configuration output exceeded the 2 MB safety limit.',
+            'hub_output_exceeded_limit' => 'Running configuration output exceeded the hub’s 1 MB safety limit.',
             'command_timed_out' => 'SSH configuration export timed out before completion.',
+            'ssh_transport_error' => 'The Site hub couldn’t open an SSH connection to the device.',
+            'precheck_failed' => 'The Site hub couldn’t complete its safety and login checks, so nothing was sent to the device.',
+            'interrupted' => 'The Site hub restarted during the backup. Nothing was changed on the device; run the backup again.',
             default => 'Could not capture a non-empty running configuration over SSH.',
         };
     }

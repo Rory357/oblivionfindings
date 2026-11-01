@@ -13,7 +13,7 @@ use App\Domain\SecurityDevices\Hubs\Exceptions\HubAwaitingApproval;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
-use App\Domain\SecurityDevices\Management\Services\UnifiAccessCollectorCommandDescriptor;
+use App\Domain\SecurityDevices\Management\Services\CollectorCommandDescriptorRegistry;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +26,7 @@ final readonly class CollectorConfigurationService
         private CredentialLeaseProvider $credentials,
         private CollectorCredentialLeaseSealer $credentialSealer,
         private DiscoveryRunner $discovery,
-        private UnifiAccessCollectorCommandDescriptor $collectorCommands,
+        private CollectorCommandDescriptorRegistry $collectorCommands,
     ) {}
 
     public function signedEnvelope(MonitoringCollector $collector, int $afterSequence): string
@@ -170,7 +170,9 @@ final readonly class CollectorConfigurationService
                         return;
                     }
                     try {
-                        $command = $this->collectorCommands->build($request, $attempt, $locked);
+                        $descriptor = $this->collectorCommands->for((string) $request->capability)
+                            ?? throw new RuntimeException('No hub job is declared for this capability.');
+                        $command = $descriptor->build($request, $attempt, $locked);
                     } catch (\Throwable) {
                         return;
                     }

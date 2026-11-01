@@ -8,6 +8,8 @@ use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceAuthority;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareAuthority;
+use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
+use App\Domain\SecurityDevices\Management\Contracts\CollectorCommandDescriptor;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionRoute;
 use App\Domain\SecurityDevices\Models\Device;
 use Throwable;
@@ -16,7 +18,8 @@ final class CommandExecutionRouteResolver
 {
     public function __construct(
         private readonly CommandExecutionAdapterRegistry $centralAdapters,
-        private readonly UnifiAccessCollectorCommandDescriptor $collectorCommands,
+        private readonly CollectorCommandDescriptorRegistry $collectorCommands,
+        private readonly CoveringHubResolver $coveringHubs,
     ) {}
 
     public function resolve(Device $device, int $siteId, string $capability): CommandExecutionRoute
@@ -36,6 +39,14 @@ final class CommandExecutionRouteResolver
         if ($capability === 'endpoint.service.manage') {
             return app(EndpointServiceAuthority::class)->supports($device)
                 ? CommandExecutionRoute::endpoint() : CommandExecutionRoute::unavailable('The governed native service-action release or installed agent is unavailable.');
+        }
+        // S&D Phase B: a job the hub that covers the Site can run goes through that hub, and only there.
+        $descriptor = $this->collectorCommands->for($capability);
+        if ($descriptor instanceof CollectorCommandDescriptor && $descriptor->routesThroughCoveringHub()) {
+            $hubRoute = $this->throughCoveringHub($descriptor, $device, $siteId);
+            if ($hubRoute instanceof CommandExecutionRoute) {
+                return $hubRoute;
+            }
         }
         try {
             if ($this->centralAdapters->supports($device, $capability)) {
@@ -79,13 +90,39 @@ final class CommandExecutionRouteResolver
                 'The Device remote collector is not currently enrolled, Site-matched, and available.',
             );
         }
-        if (! $this->collectorCommands->supports($device, $collector, $capability)) {
+        if (! $this->collectorCommands->for($capability)?->supports($device, $collector, $siteId)) {
             return CommandExecutionRoute::unavailable(
                 'The remote collector does not have an approved endpoint, scope, credential reference, and typed adapter for this action.',
             );
         }
 
         return CommandExecutionRoute::collector($collector);
+    }
+
+    /**
+     * The covering hub's route, or null when no hub covers the Site (then the server's own adapter
+     * may run it). A covering hub that is offline or can't run the job makes the action unavailable:
+     * the server never reaches into a house that has a hub.
+     */
+    private function throughCoveringHub(CollectorCommandDescriptor $descriptor, Device $device, int $siteId): ?CommandExecutionRoute
+    {
+        $hub = $this->coveringHubs->forSite($siteId);
+        if (! $hub instanceof MonitoringCollector) {
+            return null;
+        }
+        $label = CoveringHubResolver::label($hub);
+        if (! in_array((string) $hub->status, ['online', 'degraded'], true)) {
+            return CommandExecutionRoute::unavailable(
+                "{$label} isn’t connected right now, so this can’t run until it’s back. Oblivion doesn’t reach into the house directly.",
+            );
+        }
+        if (! $descriptor->supports($device, $hub, $siteId)) {
+            return CommandExecutionRoute::unavailable(
+                "{$label} can’t run this for the device yet: it needs an approved address, a saved login and a supported device type.",
+            );
+        }
+
+        return CommandExecutionRoute::collector($hub);
     }
 
     public function matches(Device $device, int $siteId, string $capability, ?int $collectorId): bool
