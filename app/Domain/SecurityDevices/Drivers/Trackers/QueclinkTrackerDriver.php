@@ -12,7 +12,9 @@ use App\Domain\SecurityDevices\Models\Device;
 /**
  * Queclink Wireless `@Track` personal & vehicle GPS tracker driver.
  *
- * Verified live against the `oblivion-queclink.service` TCP listener.
+ * Not proven on real hardware: the only live tracker has been offline since 20 May 2026, and the
+ * console added in Gemini's phase 1 has never talked to a real unit. The earlier "tested live"
+ * claim was removed in Phase A (docs/security-devices/GOAL.md, review item R13).
  */
 final class QueclinkTrackerDriver implements DeviceDriver
 {
@@ -30,7 +32,7 @@ final class QueclinkTrackerDriver implements DeviceDriver
             brand: 'Queclink Wireless',
             name: 'Queclink @Track GPS & SOS Telemetry',
             deviceClass: DriverDeviceClass::Tracker,
-            supportLevel: DriverSupportLevel::TestedOnHardware,
+            supportLevel: DriverSupportLevel::BuiltFromDocs,
             transportSummary: 'Queclink @Track ASCII / HEX over persistent TCP daemon',
             models: ['GL300 / GL320MG', 'GL520MG / GL521MG', 'GV58LAU / GV350MG'],
             capabilities: [
@@ -39,11 +41,10 @@ final class QueclinkTrackerDriver implements DeviceDriver
                 DriverCapability::TrackerBattery,
                 DriverCapability::TrackerGeofence,
             ],
-            summary: 'Receives live GPS position fixes, SOS / panic button alerts, battery percentage, geofence events, and over-the-air configuration readbacks from paired Queclink personal and fleet trackers.',
+            summary: 'Receives GPS positions, SOS and panic alerts, battery level, safe-zone events and settings read back from paired Queclink trackers. Not tested on real hardware yet.',
             officialDocs: [
                 ['label' => 'Queclink Wireless Telematics', 'url' => 'https://www.queclink.com/'],
             ],
-            hardwareEvidence: 'Tested live against the production `oblivion-queclink.service` TCP socket daemon.',
             setupHref: '/security-devices/devices',
         );
     }

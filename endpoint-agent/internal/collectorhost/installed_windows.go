@@ -213,7 +213,8 @@ func (i *installed) Cycle(ctx context.Context) (uint32, error) {
 
 func phpArguments(runtime, script, state, command string) []string {
 	args := []string{"-n", "-d", "extension_dir=" + filepath.Join(runtime, "ext")}
-	for _, extension := range []string{"curl", "openssl", "sodium", "sockets"} {
+	// snmp: Phase A, item A7 — hubs read switches over SNMP v2c/v3 (docs/security-devices/GOAL.md).
+	for _, extension := range []string{"curl", "openssl", "sodium", "sockets", "snmp"} {
 		args = append(args, "-d", "extension=php_"+extension+".dll")
 	}
 	args = append(args, "-d", "curl.cainfo="+filepath.Join(runtime, "cacert.pem"), "-d", "openssl.cafile="+filepath.Join(runtime, "cacert.pem"),

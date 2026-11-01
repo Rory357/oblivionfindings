@@ -1,10 +1,18 @@
 # Supported Security & Devices Hardware and Protocols
 
+> **Corrected 30 Oct 2026 (Phase A, `docs/security-devices/GOAL.md`).** Earlier versions of this page said
+> "Tested on real hardware" for UniFi, Queclink and several discovery protocols with no recorded walk.
+> Those marks now read "Not proven on hardware". Report-only alarm brands (Ajax, Arrowhead, Bosch, DSC,
+> ICT Protege, Inner Range Integriti, Paradox) are **view only**: Oblivion can't arm, disarm or unlock
+> them. UniFi PoE power-cycle and restart are not built. The alarm receiver (SIA DC-09) is being fixed in
+> Phase A; until then it rejects real panels. The live list is Setup › Supported devices; walks are
+> recorded in `docs/security-devices/HARDWARE-WALKS.md`.
+
 This document records the exact protocol specifications, supported capabilities, and honest verification levels for hardware integrated into Oblivion Findings' Security & Devices workspace.
 
 ## Support levels
 
-- **Tested on real hardware** — Verified end-to-end against physical units connected to Oblivion Findings.
+- **Tested on real hardware** — Walked end-to-end on physical units, with the walk recorded in `HARDWARE-WALKS.md`. Nothing has this level yet.
 - **Built from vendor docs** — Implemented directly from official vendor protocol specifications and verified against automated protocol/unit suites.
 - **Planned** — Scheduled for upcoming phases; not yet active in production.
 
@@ -16,7 +24,7 @@ This document records the exact protocol specifications, supported capabilities,
 
 | Series / Model | Category | Transport | Support level |
 | --- | --- | --- | --- |
-| **Queclink GL30M / GL30MEU / GL300** (`gl30m`) | Personal safety & care tracker | Direct TCP `@Track` ASCII frames (`+RESP:`, `+BUFF:`, `+ACK:`, `AT+GT...$`) | **Tested on real hardware** (`Care tracker 867963069916998`) |
+| **Queclink GL30M / GL30MEU / GL300** (`gl30m`) | Personal safety & care tracker | Direct TCP `@Track` ASCII frames (`+RESP:`, `+BUFF:`, `+ACK:`, `AT+GT...$`) | **Not proven on hardware** (claimed before 30 Oct with no recorded walk) (`Care tracker 867963069916998`) |
 | **Queclink GV500CG** (`gv500cg`) | OBD-II vehicle telematics tracker | Direct TCP `@Track` ASCII frames (`+RESP:`, `+BUFF:`, `+ACK:`, `AT+GT...$`) | **Built from vendor docs** |
 
 ### Official vendor protocol specifications cited
@@ -51,11 +59,11 @@ This document records the exact protocol specifications, supported capabilities,
 
 | Protocol / Source | Transport & Port | Purpose | Support level |
 | --- | --- | --- | --- |
-| **ICMP Echo + ARP / Neighbour Table** | ICMP + OS ARP (`arp -a`, `/proc/net/arp`, `ip neigh`) | Verifies genuine echo replies (rejecting Windows `Destination host unreachable` exit-code-0 false positives) and resolves Layer-2 MAC addresses on local subnets | **Tested on real hardware** (`172.16.0.0/24` LAN + Ubiquiti `UX7`) |
-| **IEEE OUI & MA-M MAC Vendor Lookup** | Offline binary-searched dataset (`46,453` prefixes) | Resolves hardware manufacturers from 24-bit OUI and 28-bit MA-M prefixes while skipping locally-administered randomised MACs | **Tested on real hardware** |
-| **Async TCP + HTTP Banners + TLS Certificates** | Bounded non-blocking TCP + HTTP `HEAD`/`GET` + TLS peer certificate Subject/SAN | Identifies management interfaces, RTSP cameras (`554`), JetDirect/IPP printers (`9100`/`631`), NAS appliances (`5000`/`5001`), and Windows/SSH endpoints | **Tested on real hardware** |
-| **mDNS & DNS-SD** | Multicast UDP `224.0.0.251:5353` | Discovers `.local` hostnames and advertised services (`_rtsp._tcp`, `_onvif._tcp`, `_ipp._tcp`, `_pdl-datastream._tcp`, `_airplay._tcp`, `_googlecast._tcp`, `_smb._tcp`, `_ssh._tcp`) | **Tested on real hardware** |
-| **SSDP & UPnP Device Description** | Multicast UDP `239.255.255.250:1900` + SSRF-guarded XML `GET` | Extracts UPnP `friendlyName`, `manufacturer`, `modelName`, and `deviceType` strictly within the approved scope CIDR | **Tested on real hardware** |
+| **ICMP Echo + ARP / Neighbour Table** | ICMP + OS ARP (`arp -a`, `/proc/net/arp`, `ip neigh`) | Verifies genuine echo replies (rejecting Windows `Destination host unreachable` exit-code-0 false positives) and resolves Layer-2 MAC addresses on local subnets | **Not proven on hardware** (claimed before 30 Oct with no recorded walk) (`172.16.0.0/24` LAN + Ubiquiti `UX7`) |
+| **IEEE OUI & MA-M MAC Vendor Lookup** | Offline binary-searched dataset (`46,453` prefixes) | Resolves hardware manufacturers from 24-bit OUI and 28-bit MA-M prefixes while skipping locally-administered randomised MACs | **Not proven on hardware** (claimed before 30 Oct with no recorded walk) |
+| **Async TCP + HTTP Banners + TLS Certificates** | Bounded non-blocking TCP + HTTP `HEAD`/`GET` + TLS peer certificate Subject/SAN | Identifies management interfaces, RTSP cameras (`554`), JetDirect/IPP printers (`9100`/`631`), NAS appliances (`5000`/`5001`), and Windows/SSH endpoints | **Not proven on hardware** (claimed before 30 Oct with no recorded walk) |
+| **mDNS & DNS-SD** | Multicast UDP `224.0.0.251:5353` | Discovers `.local` hostnames and advertised services (`_rtsp._tcp`, `_onvif._tcp`, `_ipp._tcp`, `_pdl-datastream._tcp`, `_airplay._tcp`, `_googlecast._tcp`, `_smb._tcp`, `_ssh._tcp`) | **Not proven on hardware** (claimed before 30 Oct with no recorded walk) |
+| **SSDP & UPnP Device Description** | Multicast UDP `239.255.255.250:1900` + SSRF-guarded XML `GET` | Extracts UPnP `friendlyName`, `manufacturer`, `modelName`, and `deviceType` strictly within the approved scope CIDR | **Not proven on hardware** (claimed before 30 Oct with no recorded walk) |
 | **ONVIF WS-Discovery** | Multicast UDP `239.255.255.250:3702` SOAP `Probe` / `ProbeMatches` | Identifies `NetworkVideoTransmitter` IP cameras and NVRs (`onvif://www.onvif.org/hardware/...`, `name/...`) without credentials | **Built from vendor docs** |
 | **SNMP v2c & SNMPv3 USM System MIB** | Pure-PHP ASN.1 BER over UDP `161` | Queries `sysDescr.0` (`1.3.6.1.2.1.1.1.0`), `sysObjectID.0` (`1.3.6.1.2.1.1.2.0`), and `sysName.0` (`1.3.6.1.2.1.1.5.0`) via read-only v2c or leased SNMPv3 `authPriv` | **Built from vendor docs** (verified against live UDP BER responder) |
 
@@ -121,16 +129,16 @@ Every integration in Security & Devices implements the Home-Assistant-style `Dev
 
 | Brand / Driver | Key | Transport | Capabilities & Governance | Support level |
 | --- | --- | --- | --- | --- |
-| **ANSI/SIA DC-09 & Ademco Contact ID (DC-05) IP Receiver** | `alarm.sia_dc09_contact_id` | TCP/UDP IP receiver (`SiaDc09FrameDecoder` CRC-16/ARC `0x8005`, optional AES-128/256-CBC decryption, `ADM-CID`, `SIA-DCS`, `NULL` heartbeat, `ACK` reply; `php artisan security-devices:sia-dc09-listen`) | Real-time arm (`Q=3` `400`–`409`) / disarm (`Q=1` `400`–`409`), burglary (`130`–`139`), panic/duress (`120`–`125`), fire (`110`–`118`), tamper (`137`/`383`), AC/battery trouble (`301`/`302`); works today with Arrowhead Elite/ESL-2, ICT Protege, Bosch Solution, Paradox, DSC Neo, Texecom, & Honeywell IP communicators | **Built from vendor docs** |
+| **ANSI/SIA DC-09 & Ademco Contact ID (DC-05) IP Receiver** | `alarm.sia_dc09_contact_id` | TCP/UDP IP receiver (`SiaDc09FrameDecoder` CRC-16/ARC `0x8005`, optional AES-128/256-CBC decryption, `ADM-CID`, `SIA-DCS`, `NULL` heartbeat, `ACK` reply; `php artisan security-devices:sia-dc09-listen`) | Real-time arm (`Q=3` `400`–`409`) / disarm (`Q=1` `400`–`409`), burglary (`130`–`139`), panic/duress (`120`–`125`), fire (`110`–`118`), tamper (`137`/`383`), AC/battery trouble (`301`/`302`); intended for Arrowhead Elite/ESL-2, ICT Protege, Bosch Solution, Paradox, DSC Neo, Texecom, & Honeywell IP communicators | **Built from vendor docs** |
 | **Gallagher Command Centre** | `alarm.gallagher_command_centre` | Local HTTPS REST API (`GGL-API-KEY` + mutual TLS client cert, `/api/alarm_zones/{id}/arm` & `/disarm`) | Alarm zone status, arm (`alarm.arm` — confirmation + approval), disarm (`alarm.disarm` — MFA + type-device-name confirmation + approval + audit log) | **Built from vendor docs** |
 | **Inner Range Inception** | `alarm.innerrange_inception` | Local HTTPS REST API v1 (`/api/v1/authentication/login`, `/api/v1/control/area/{id}/activity` `ArmArea` / `DisarmArea`) | Area arm/disarm state, arm (`alarm.arm`), disarm (`alarm.disarm` — MFA + type-device-name confirmation + approval + audit log) | **Built from vendor docs** |
-| **Arrowhead Alarm Products (AAP) Elite S / ESL-2** | `alarm.arrowhead_elite` | Native IP module control requires AAP installer/integrator protocol documentation (events supported today via SIA DC-09 / Contact ID IP reporting) | Native arm/disarm planned; SIA DC-09 event intake active today | **Planned** |
-| **ICT Protege GX / WX** | `alarm.ict_protege` | SOAP/REST SDK gated behind ICT Technology Partner programme & licensing (events supported today via SIA DC-09) | Native area/door control planned; SIA DC-09 event intake active today | **Planned** |
+| **Arrowhead Alarm Products (AAP) Elite S / ESL-2** | `alarm.arrowhead_elite` | Native IP module control requires AAP installer/integrator protocol documentation (events supported today via SIA DC-09 / Contact ID IP reporting) | Native arm/disarm planned; SIA DC-09 reports, view only | **Planned** |
+| **ICT Protege GX / WX** | `alarm.ict_protege` | SOAP/REST SDK gated behind ICT Technology Partner programme & licensing (events supported today via SIA DC-09) | Native area/door control planned; SIA DC-09 reports, view only | **Planned** |
 | **Inner Range Integriti** | `alarm.innerrange_integriti` | Licensed Integriti XML/REST Integration Server port (events supported today via SIA DC-09) | Native Integriti XML/REST integration planned | **Planned** |
-| **Bosch Solution 2000 / 3000 / 6000** | `alarm.bosch_solution` | Proprietary RSC+ / Bosch installer SDK under NDA (events supported today via SIA DC-09 / Contact ID over B426-M) | Native RSC+ control planned; SIA DC-09 event intake active today | **Planned** |
-| **Ajax Systems Hub 2 / Hub Hybrid** | `alarm.ajax_hub` | Direct control requires Ajax Enterprise API agreement; local SIA DC-09 Event Translator works today | Native Enterprise API planned; SIA DC-09 event intake active today | **Planned** |
-| **Paradox EVO / Magellan / Spectra (IP150+)** | `alarm.paradox_ip` | Proprietary encrypted bus protocol without public third-party API (events supported today via SIA DC-09 / IPR512 compatible reporting) | Native IP150+ integration planned; SIA DC-09 event intake active today | **Planned** |
-| **DSC PowerSeries Neo (TL280E)** | `alarm.dsc_powerseries_neo` | Johnson Controls integrator programme required for ITV2 encrypted bus (events supported today via SIA DC-09) | Native ITV2 integration planned; SIA DC-09 event intake active today | **Planned** |
+| **Bosch Solution 2000 / 3000 / 6000** | `alarm.bosch_solution` | Proprietary RSC+ / Bosch installer SDK under NDA (events supported today via SIA DC-09 / Contact ID over B426-M) | Native RSC+ control planned; SIA DC-09 reports, view only | **Planned** |
+| **Ajax Systems Hub 2 / Hub Hybrid** | `alarm.ajax_hub` | Direct control requires Ajax Enterprise API agreement; SIA DC-09 reports only (view only) | Native Enterprise API planned; SIA DC-09 reports, view only | **Planned** |
+| **Paradox EVO / Magellan / Spectra (IP150+)** | `alarm.paradox_ip` | Proprietary encrypted bus protocol without public third-party API (events supported today via SIA DC-09 / IPR512 compatible reporting) | Native IP150+ integration planned; SIA DC-09 reports, view only | **Planned** |
+| **DSC PowerSeries Neo (TL280E)** | `alarm.dsc_powerseries_neo` | Johnson Controls integrator programme required for ITV2 encrypted bus (events supported today via SIA DC-09) | Native ITV2 integration planned; SIA DC-09 reports, view only | **Planned** |
 
 **Official alarm specifications cited:**
 - **Security Industry Association (SIA)** — *ANSI/SIA DC-09 Internet Protocol Event Reporting*, *ANSI/SIA DC-05 (Ademco Contact ID)*, and *ANSI/SIA DC-03 (SIA-DCS)* (<https://www.securityindustry.org/industry-standards/>).
@@ -145,7 +153,7 @@ Every integration in Security & Devices implements the Home-Assistant-style `Dev
 | Brand / Driver | Key | Transport & Codec | Capabilities | Support level |
 | --- | --- | --- | --- | --- |
 | **OASIS MQTT v3.1.1 Environmental & Care Sensors** | `sensor.mqtt_generic` | Pure-PHP OASIS MQTT v3.1.1 TCP/TLS client (`MqttV311Client`, `CONNECT`/`SUBSCRIBE`/`PUBLISH`/`PINGREQ` + `security-devices:mqtt-listen`), JSON sensor payload intake (`MqttSensorIntakeService`) | Temperature, humidity, CO2, battery %, door/window contact alerts, leak alerts, panic/call button alerts, PIR occupancy | **Built from vendor docs** |
-| **Milesight LoRaWAN Gateway (UG56 / UG65 / UG67) & Sensors** | `sensor.milesight_lorawan_gateway` | Authenticated HTTPS Webhook (`POST /webhooks/milesight-gateway/{site}` with HMAC-SHA256 `X-Milesight-Signature` or Bearer secret) + MQTT uplink JSON + **clean-room** binary TLV payload decoder (`MilesightLorawanPayloadDecoder`, zero GPL code) | Decodes AM103/AM307/AM319 (`temp`, `humidity`, `co2`, `tvoc`, `pm2_5`, `pressure`), EM300-TH/SLD/MCS (`leak`, `door`), WS101 (`button`), WS202 (`pir`), WS301 (`magnet`, `tamper`), VS121 (`people_count_all`) | **Built from vendor docs** |
+| **Milesight LoRaWAN Gateway (UG56 / UG65 / UG67) & Sensors** | `sensor.milesight_lorawan_gateway` | Authenticated HTTPS Webhook (`POST /webhooks/milesight-gateway/{site}` with the Site’s secret as a Bearer token, an `X-Oblivion-Webhook-Token` header or a Basic-auth password; Milesight gateways don’t sign requests, and the earlier `X-Milesight-Signature` check was removed in Phase A) + MQTT uplink JSON + **clean-room** binary TLV payload decoder (`MilesightLorawanPayloadDecoder`, zero GPL code) | Decodes AM103/AM307/AM319 (`temp`, `humidity`, `co2`, `tvoc`, `pm2_5`, `pressure`), EM300-TH/SLD/MCS (`leak`, `door`), WS101 (`button`), WS202 (`pir`), WS301 (`magnet`, `tamper`), VS121 (`people_count_all`) | **Built from vendor docs** |
 | **Milesight Development Platform Cloud** | `sensor.milesight_cloud` | OAuth2 + Webhook API via `/security-devices/integrations/milesight` | Cloud application & sensor sync, webhook telemetry | **Built from vendor docs** |
 
 **Official IoT specifications cited & clean-room licence compliance:**
@@ -162,7 +170,7 @@ Every integration in Security & Devices implements the Home-Assistant-style `Dev
 | **Cisco IOS / IOS-XE** | `network.cisco_ios` | `show running-config` | Strips `! Last configuration change`, `NVRAM config last updated`, and `Current configuration : N bytes` volatile lines; redacts Type 5/7/8/9 secrets, SNMP communities, TACACS/RADIUS keys, and WPA PSKs | **Built from vendor docs** |
 | **HPE Aruba Networking (AOS-CX & ArubaOS-Switch)** | `network.aruba_aos` | `show running-config` | Strips volatile timestamp banners; redacts `ciphertext`, SNMP communities, RADIUS/TACACS keys, and user hashes | **Built from vendor docs** |
 | **Fortinet FortiGate (FortiOS)** | `network.fortinet_fortios` | `show full-configuration` (configurable to `show`) | Strips volatile `#conf_file_ver=` headers; redacts `set password ENC ...`, `set psksecret ENC ...`, `set private-key`, and SNMP/RADIUS secrets | **Built from vendor docs** |
-| **Ubiquiti UniFi Network** | `network.ubiquiti_unifi` | HTTPS Local Controller & Cloud Site Manager API | Device inventory, port state, topology, and configuration snapshot tracking | **Tested on real hardware** (`UX7` gateway on `172.16.0.0/24`) |
+| **Ubiquiti UniFi Network** | `network.ubiquiti_unifi` | HTTPS Local Controller & Cloud Site Manager API | Device inventory, port state, topology, and configuration snapshot tracking | **Not proven on hardware** (claimed before 30 Oct with no recorded walk) (`UX7` gateway on `172.16.0.0/24`) |
 
 All SSH configuration backups run through the audited `network.config.backup` command adapter (`NetworkSshConfigBackupCommandAdapter`) with operator impact confirmation, leased SSH credentials (`GovernedCredentialLeaseBroker`), SSRF/scope checks (`EgressPolicy`), SHA-256 drift detection (`ConfigurationSnapshotService::captureFromCommand()`), and side-by-side redacted line diffs (`ConfigurationDiffDialog`).
 

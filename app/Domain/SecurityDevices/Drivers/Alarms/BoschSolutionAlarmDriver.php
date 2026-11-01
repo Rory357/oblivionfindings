@@ -32,19 +32,18 @@ final class BoschSolutionAlarmDriver implements DeviceDriver
             name: 'Solution 2000 / 3000 / 6000 & B-Series',
             deviceClass: DriverDeviceClass::AlarmPanel,
             supportLevel: DriverSupportLevel::Planned,
-            transportSummary: 'SIA DC-09 / Contact ID IP (available now) · Bosch Mode 2 Automation (planned)',
+            transportSummary: 'Alarm reports (SIA DC-09) to Oblivion’s alarm receiver · no direct control',
             models: ['Bosch Solution 2000', 'Bosch Solution 3000', 'Bosch Solution 6000', 'Bosch B5512 / B8512G'],
             capabilities: [
                 DriverCapability::AlarmEventsSiaDc09,
                 DriverCapability::AlarmZoneStatus,
-                DriverCapability::AlarmArm,
-                DriverCapability::AlarmDisarm,
             ],
-            summary: 'Live IP alarm & Contact ID reporting works today via Bosch B426-M Ethernet module into the SIA DC-09 IP Receiver. Direct Mode 2 / RSC+ remote arming is planned pending Bosch Integration Partner Program credentials.',
+            summary: 'A Bosch panel with an Ethernet module can send its alarm reports to Oblivion’s alarm receiver. View only: Oblivion can’t arm or disarm it. Not tested on real hardware.',
             officialDocs: [
                 ['label' => 'Bosch Security Intrusion Alarm Systems', 'url' => 'https://www.boschsecurity.com/'],
             ],
             limitationsNote: 'Bosch Solution Mode 2 / RSC+ automation specifications require Bosch Integration Partner NDA access.',
+            viewOnly: true,
         );
     }
 

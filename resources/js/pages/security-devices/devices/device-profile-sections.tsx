@@ -18,6 +18,7 @@ import {
     ItChangeDestination,
     ItWorkspaceAccessRequired,
 } from '@/components/security-devices/permission-destinations';
+import { SshHostKeyNotice } from '@/components/security-devices/ssh-host-key-notice';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -2932,6 +2933,7 @@ export function DeviceConfigurationSection({
         latestSnapshot,
         snapshotHistory,
         snapshotHistoryTruncated,
+        sshHostKey,
     } = profile.configuration;
     const [diffTarget, setDiffTarget] =
         useState<ConfigurationDiffTarget | null>(null);
@@ -2941,7 +2943,9 @@ export function DeviceConfigurationSection({
     const showBackupsCard =
         Boolean(backupActionHref) ||
         Boolean(latestSnapshot) ||
-        (snapshotHistory?.length ?? 0) > 0;
+        (snapshotHistory?.length ?? 0) > 0 ||
+        Boolean(sshHostKey?.offered) ||
+        Boolean(sshHostKey?.trusted);
 
     return (
         <div className="space-y-4">
@@ -3130,6 +3134,7 @@ export function DeviceConfigurationSection({
                         ) : null}
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        <SshHostKeyNotice state={sshHostKey} />
                         {canViewSnapshots === false ? (
                             <p className="text-sm text-muted-foreground">
                                 Configuration snapshot downloads and version
