@@ -63,7 +63,6 @@ use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteHubWizardController;
 use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubAdminController;
 use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubLinuxSetupController;
-use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
 use App\Domain\SecurityDevices\Http\Controllers\SupportedDevicesController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandApprovalController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBatchController;
@@ -76,6 +75,7 @@ use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandExecutio
 use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceCommandRequest;
 use App\Domain\SecurityDevices\Screens\Http\DevicesController;
 use App\Domain\SecurityDevices\Screens\Http\FoundDevicesController;
+use App\Domain\SecurityDevices\Screens\Http\SitesController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -482,11 +482,13 @@ Route::middleware([
     // These canonical routes reuse today's production-backed controllers.
     // Later workspace tasks expand their local tabs without changing URLs.
 
-    Route::get('/sites', [SiteTechnologyController::class, 'index'])
+    // S&D rebuild C3: Sites and the Site page.
+    Route::get('/sites', [SitesController::class, 'index'])
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.sites.index');
 
-    Route::get('/sites/{site}', [SiteTechnologyController::class, 'show'])
+    Route::get('/sites/{site}', [SitesController::class, 'show'])
+        ->whereNumber('site')
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.sites.show');
 

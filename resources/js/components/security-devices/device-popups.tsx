@@ -353,6 +353,7 @@ export function DeviceFormPopup({
     context,
     form,
     canAssign,
+    initialSiteId,
     onClose,
 }: {
     open: boolean;
@@ -362,6 +363,8 @@ export function DeviceFormPopup({
     context?: PopupDevice | null;
     form: DeviceFormData | undefined;
     canAssign: boolean;
+    /** Add: start with this Site chosen (a Site page's own "Add device"). */
+    initialSiteId?: number | null;
     onClose: () => void;
 }) {
     const [state, setState] = useState<FormState>(EMPTY_FORM);
@@ -381,9 +384,11 @@ export function DeviceFormPopup({
         setNotice(null);
         setNotListed(false);
         if (mode === 'add') {
+            // Opened from a Site's page: that Site is already chosen.
+            const start = initialSiteId && canAssign ? { ...EMPTY_FORM, siteId: String(initialSiteId) } : EMPTY_FORM;
             setDevice(null);
-            setState(EMPTY_FORM);
-            setOriginal(EMPTY_FORM);
+            setState(start);
+            setOriginal(start);
             return;
         }
         if (!deviceId) return;
@@ -416,7 +421,7 @@ export function DeviceFormPopup({
             .catch(() =>
                 setLoadError('This device couldn’t be loaded. Close and try again.'),
             );
-    }, [open, mode, deviceId]);
+    }, [open, mode, deviceId, canAssign, initialSiteId]);
 
     const models = useMemo(
         () =>
