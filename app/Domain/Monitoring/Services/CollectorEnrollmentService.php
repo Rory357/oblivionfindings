@@ -248,9 +248,13 @@ final readonly class CollectorEnrollmentService
         }, 3);
     }
 
+    /**
+     * A null actor means the hub asked for this itself, because it is being uninstalled
+     * (S&D Phase B, "Removing it tells Oblivion"). Only the hub's own authenticated call does that.
+     */
     public function revoke(
         MonitoringCollector $collector,
-        int $actorId,
+        ?int $actorId,
         ?string $reason = null,
     ): MonitoringCollector {
         $reason = $reason === null ? null : trim($reason);
@@ -259,9 +263,9 @@ final readonly class CollectorEnrollmentService
         }
 
         return DB::transaction(function () use ($collector, $actorId, $reason): MonitoringCollector {
-            $actor = User::query()->whereKey($actorId)->whereNotNull('approved_at')->lockForUpdate()->first();
+            $actor = $actorId === null ? null : User::query()->whereKey($actorId)->whereNotNull('approved_at')->lockForUpdate()->first();
             $locked = MonitoringCollector::query()->whereKey($collector->id)->lockForUpdate()->firstOrFail();
-            if ($actor === null) {
+            if ($actorId !== null && $actor === null) {
                 throw new DomainException('Collector revocation actor is unavailable.');
             }
             if ($locked->revoked_at === null) {
@@ -274,7 +278,7 @@ final readonly class CollectorEnrollmentService
                     'vault_key_rotated_at' => now(),
                 ])->save();
                 AuditLogger::logOrFail('monitoring.collector.revoked', $locked, [
-                    'actor_id' => $actor->id,
+                    ...($actor === null ? ['removed_by' => 'hub_uninstalled'] : ['actor_id' => $actor->id]),
                     'site_id' => (int) $locked->site_id,
                     ...($reason === null ? [] : ['reason' => $reason]),
                 ]);

@@ -171,10 +171,32 @@ jobs:
           go-version-file: endpoint-agent/go.mod
           cache-dependency-path: endpoint-agent/go.sum
 
-      - name: Setup .NET 10
+      - name: Setup .NET 10 (Obli tray)
         uses: actions/setup-dotnet@v4
         with:
-          global-json-file: endpoint-agent/installer/global.json
+          global-json-file: endpoint-agent/tray/global.json
+
+      # The one-file Windows installer is built with Inno Setup (plan v10, "How it's built": One
+      # file). Installed per-user into the runner's temp folder from Inno Setup's own GitHub
+      # release, pinned by version and SHA-256, and its publisher signature checked first.
+      - name: Install Inno Setup 6.7.4 (pinned and checked)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe'
+          $want = 'a549929319f9120716677c685535ca4671e4b937b5fdc87e2585f32d8eb30e8c'
+          $setup = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.4.exe'
+          Invoke-WebRequest -Uri $url -OutFile $setup
+          $got = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($got -ne $want) { throw "The Inno Setup download doesn't match its pinned SHA-256 ($got)" }
+          $signature = Get-AuthenticodeSignature -LiteralPath $setup
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*O=Pyrsys B.V.*') { throw 'The Inno Setup download is not signed by its publisher' }
+          $dir = Join-Path $env:RUNNER_TEMP 'inno'
+          $run = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/CURRENTUSER', '/PORTABLE=1', '/NOICONS', '/NORESTART', "/DIR=$dir") -Wait -PassThru
+          if ($run.ExitCode -ne 0) { throw "Inno Setup did not install ($($run.ExitCode))" }
+          $iscc = Join-Path $dir 'ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) { throw 'ISCC.exe is missing after installing Inno Setup' }
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Setup PHP 8.4 (for collector vendor & Windows x64 runtime)
         uses: shivammathur/setup-php@v2
@@ -196,7 +218,7 @@ jobs:
         run: |
           go test ./...
 
-      - name: Build Windows binaries, unsigned Obli.Setup installer, and signed release manifests
+      - name: Build Windows binaries, the one-file installer, and signed release manifests
         shell: pwsh
         # Only a push to main (or a manual run on main) may sign with the real publisher keys. Every
         # other branch, tag and pull request builds with throwaway keys and uploads no signed catalogue,
@@ -213,6 +235,9 @@ jobs:
           PUBLISHER_CATALOGUE_SEED: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_CATALOGUE_SIGNING_SEED || '' }}
           PUBLISHER_PACKAGE_PUBKEY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_PACKAGE_PUBLIC_KEY || '' }}
           PUBLISHER_CATALOGUE_PUBKEY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_RELEASE_PUBLIC_KEY || '' }}
+          # Optional: the server a renamed installer falls back to when neither its name nor the
+          # download record says (a plain host name, e.g. oblivionfindings.com). Empty is fine.
+          SETUP_DEFAULT_SERVER: ${{ vars.OBLIVION_SETUP_DEFAULT_SERVER || '' }}
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content -Raw endpoint-agent/VERSION).Trim()
@@ -260,7 +285,9 @@ jobs:
           # 2. Build Go binaries for windows/amd64 and windows/arm64 + oblivion-release tool
           Push-Location endpoint-agent
           try {
-            go build -trimpath -o (Join-Path $workRoot 'oblivion-release.exe') ./cmd/oblivion-release
+            # The catalogue tool checks the installer .exe like every Windows program, so it takes the
+            # same D1 switch: unsigned accepted only while no code-signing certificate exists.
+            go build -trimpath -ldflags="$releaseFlags" -o (Join-Path $workRoot 'oblivion-release.exe') ./cmd/oblivion-release
             foreach ($arch in @('amd64', 'arm64')) {
               $env:GOOS = 'windows'
               $env:GOARCH = $arch
@@ -278,15 +305,7 @@ jobs:
             Pop-Location
           }
 
-          # 3. Build unsigned Obli.Setup graphical Windows installers (x64 & arm64) with pinned BackendSha256
-          & ./endpoint-agent/installer/build.ps1 `
-            -OutputRoot $toolsOut `
-            -BackendX64 (Join-Path $workRoot 'go-win-amd64\oblivion-setup-core.exe') `
-            -BackendArm64 (Join-Path $workRoot 'go-win-arm64\oblivion-setup-core.exe')
-
-          Copy-Item (Join-Path $toolsOut 'obli-setup-windows-x64\oblivion-setup.exe') (Join-Path $stageCatalogue 'oblivion-setup-windows-amd64.exe')
-          Copy-Item (Join-Path $toolsOut 'obli-setup-windows-x64\oblivion-setup.exe') (Join-Path $stageCatalogue 'oblivion-site-setup-windows-amd64.exe')
-          Copy-Item (Join-Path $toolsOut 'obli-setup-windows-arm64\oblivion-setup.exe') (Join-Path $stageCatalogue 'oblivion-setup-windows-arm64.exe')
+          # 3. (The one-file installer is built in step 4b, once the signed packages it carries exist.)
 
           # 4. Assemble & sign Windows release archives (OBLIVION-RELEASE-V1)
           $phpExe = (Get-Command php).Source
@@ -372,6 +391,20 @@ jobs:
           Copy-Item (Join-Path $workRoot 'go-win-arm64\oblivion-agent.exe') (Join-Path $arm64Stage 'computer\oblivion-agent.exe')
           Invoke-BuildWindowsZip $arm64Stage 'arm64' @('computer') (Join-Path $stageCatalogue 'oblivion-windows-arm64.zip')
 
+          # 4b. The one-file Windows installer (endpoint-agent/installer/inno): the setup engine and the
+          # signed packages above in one .exe, for hubs, IT's full installs and staff installs alike.
+          # Oblivion names each download for its Site with the server and setup code, so this file is
+          # the same for everyone and stays valid once signed (D1, D2).
+          $innoPayload = Join-Path $workRoot 'inno-payload'
+          New-Item -ItemType Directory -Force -Path $innoPayload | Out-Null
+          Copy-Item (Join-Path $workRoot 'go-win-amd64\oblivion-setup-core.exe') (Join-Path $innoPayload 'oblivion-setup-core-amd64.exe')
+          Copy-Item (Join-Path $stageCatalogue 'oblivion-windows-amd64.zip') (Join-Path $innoPayload 'oblivion-windows-amd64.zip')
+          Copy-Item (Join-Path $workRoot 'go-win-arm64\oblivion-setup-core.exe') (Join-Path $innoPayload 'oblivion-setup-core-arm64.exe')
+          Copy-Item (Join-Path $stageCatalogue 'oblivion-windows-arm64.zip') (Join-Path $innoPayload 'oblivion-windows-arm64.zip')
+          & ./endpoint-agent/installer/inno/build.ps1 -Iscc $env:ISCC -PayloadDir $innoPayload -Version $version `
+            -OutputDir (Join-Path $workRoot 'inno-out') -DefaultServer $env:SETUP_DEFAULT_SERVER
+          Copy-Item (Join-Path $workRoot 'inno-out\oblivion-setup-windows.exe') (Join-Path $stageCatalogue 'oblivion-setup-windows-amd64.exe')
+
           # 5. Assemble & sign OBLIVION-DOWNLOADS-V1 catalogue
           function New-ArtifactEntry([string]$id, [string]$platform, [string]$arch, [string[]]$roles, [string]$filename) {
             $item = Get-Item -LiteralPath (Join-Path $stageCatalogue $filename)
@@ -388,16 +421,15 @@ jobs:
             }
           }
 
+          # One Windows installer (.exe) for every role; the zips stay for hub self-updates (D3).
           $artifacts = @(
             (New-ArtifactEntry 'windows-setup-amd64' 'windows' 'amd64' $combinedAmd64Roles 'oblivion-setup-windows-amd64.exe'),
             (New-ArtifactEntry 'windows-package-amd64' 'windows' 'amd64' $combinedAmd64Roles 'oblivion-windows-amd64.zip'),
-            (New-ArtifactEntry 'windows-setup-arm64' 'windows' 'arm64' @('computer') 'oblivion-setup-windows-arm64.exe'),
             (New-ArtifactEntry 'windows-package-arm64' 'windows' 'arm64' @('computer') 'oblivion-windows-arm64.zip'),
             (New-ArtifactEntry 'linux-site-hub-amd64' 'linux' 'amd64' @('site') 'oblivion-site-hub-linux-amd64.tar.gz'),
             (New-ArtifactEntry 'linux-site-hub-arm64' 'linux' 'arm64' @('site') 'oblivion-site-hub-linux-arm64.tar.gz')
           )
           if ($hasWinPhpRuntime) {
-            $artifacts += (New-ArtifactEntry 'windows-site-setup-amd64' 'windows' 'amd64' @('site') 'oblivion-site-setup-windows-amd64.exe')
             $artifacts += (New-ArtifactEntry 'windows-site-package-amd64' 'windows' 'amd64' @('site') 'oblivion-site-windows-amd64.zip')
           }
 

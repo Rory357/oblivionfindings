@@ -145,6 +145,37 @@ func TestDecideWaitsTwentyHoursAfterAFailedVersion(t *testing.T) {
 	}
 }
 
+func TestDecideCheckNowSkipsOnlyTheNightWindow(t *testing.T) {
+	midday := nightInAuckland.Add(10 * time.Hour) // 12:30 pm in Auckland
+	in := instructionsFixture(midday)
+	if d := Decide(in, runningFixture, nil, "windows", "amd64", midday); d.Update {
+		t.Fatal("updated in the middle of the day without Check now")
+	}
+	in.Update.CheckNow = true
+	if d := Decide(in, runningFixture, nil, "windows", "amd64", midday); !d.Update {
+		t.Fatal("Check now did not update outside the window:", d.Reason)
+	}
+	held := instructionsFixture(midday)
+	held.Update.CheckNow, held.Update.Held = true, true
+	waiting := instructionsFixture(midday)
+	waiting.Update.CheckNow, waiting.Approval = true, "waiting"
+	noTarget := instructionsFixture(midday)
+	noTarget.Update.CheckNow, noTarget.Update.Target = true, nil
+	for name, blocked := range map[string]Instructions{"held": held, "waiting": waiting, "no target for this ring": noTarget} {
+		if d := Decide(blocked, runningFixture, nil, "windows", "amd64", midday); d.Update {
+			t.Errorf("Check now bypassed %s", name)
+		}
+	}
+	recent := &Failure{Version: "1.3.1", Revision: 41, At: midday.Add(-time.Hour)}
+	if d := Decide(in, runningFixture, recent, "windows", "amd64", midday); d.Update {
+		t.Fatal("Check now retried a version that just failed")
+	}
+	parsed, err := ParseInstructions([]byte(`{"approval":"approved","received_at":"2026-11-01T00:00:00Z","running_version":"1.3.0","update":{"check_now":true}}`))
+	if err != nil || parsed.Update == nil || !parsed.Update.CheckNow {
+		t.Fatal("check_now was not read from the instructions", err)
+	}
+}
+
 func TestDecideNeedsAValidFileForThisMachine(t *testing.T) {
 	in := instructionsFixture(nightInAuckland)
 	if d := Decide(in, runningFixture, nil, "windows", "arm64", nightInAuckland); d.Update {

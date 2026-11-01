@@ -19,6 +19,9 @@ use DomainException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * One-time setup codes (D2): one computer, 24 hours, can be cancelled.
@@ -150,8 +153,10 @@ final readonly class SetupCodeService
      * The installer swaps its code for its setup profile. Refused once used, cancelled or
      * expired; the message says which, so "This installer was already used" shows on a second PC.
      * A computer code also needs the computer's name: its device record is made at that moment.
+     * A Windows hub code given the computer's name also returns a computer profile, so the hub
+     * PC gets Obli too (D4).
      *
-     * @return array{role: string, install_mode: string|null, profile: array<string, mixed>}
+     * @return array{role: string, install_mode: string|null, profile: array<string, mixed>, computer_profile?: array<string, mixed>|null}
      */
     public function redeem(string $rawCode, ?string $computerName = null): array
     {
@@ -191,7 +196,62 @@ final readonly class SetupCodeService
             throw new SetupCodeRefused($outcome['refused']);
         }
 
-        return ['role' => 'hub', 'install_mode' => null, 'profile' => $outcome['profile']];
+        return [
+            'role' => 'hub',
+            'install_mode' => null,
+            'profile' => $outcome['profile'],
+            'computer_profile' => $record === null ? null : $this->hubComputerProfile($record, $computerName),
+        ];
+    }
+
+    /**
+     * D4: a Windows hub PC also gets Obli, so the installer needs a computer profile for this
+     * PC as well. Issued as the person who made the download, for this PC's device at the hub's
+     * Site. A hub code can be redeemed again until the hub enrols, so an unfinished profile from
+     * an earlier redeem of this code is replaced. Anything that blocks it (computer agents
+     * switched off, settings missing, another enrolment on that computer) gives null: the hub
+     * still installs, without Obli.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function hubComputerProfile(SetupCode $record, ?string $computerName): ?array
+    {
+        $name = is_string($computerName) ? strtoupper(trim($computerName)) : '';
+        if ($record->platform !== 'windows' || preg_match('/\A[A-Z0-9][A-Z0-9-]{0,62}\z/', $name) !== 1) {
+            return null;
+        }
+        try {
+            return DB::transaction(function () use ($record, $name): ?array {
+                // One computer per hub code: the file name carries the code, so a copied download
+                // must not be able to give Obli to any number of other computers.
+                $locked = SetupCode::query()->whereKey($record->id)->lockForUpdate()->first();
+                if ($locked === null || ($locked->computer_name !== null && ! hash_equals($locked->computer_name, $name))) {
+                    return null;
+                }
+                $issuer = User::query()->whereKey($record->issued_by_user_id)->whereNotNull('approved_at')->first();
+                if ($issuer === null) {
+                    return null;
+                }
+                $locked->forceFill(['computer_name' => $name])->save();
+                $device = $this->computerDevice((int) $record->site_id, $name, $issuer);
+                // Only this code's own earlier, unfinished profile is replaced.
+                EndpointAgent::query()->where('device_id', $device->id)
+                    ->whereNull('enrolled_at')->whereNull('revoked_at')
+                    ->where('created_by_user_id', $issuer->id)
+                    ->where('updated_at', '>=', $record->created_at)
+                    ->update(['revoked_at' => now()]);
+                $profile = app(EndpointBootstrap::class)->issue($issuer, $device);
+                AuditLogger::logOrFail('security_devices.setup_code.hub_computer_profile', $record, [
+                    'site_id' => (int) $record->site_id,
+                    'role' => 'hub',
+                    'device_id' => (int) $device->id,
+                ]);
+
+                return $profile;
+            }, 3);
+        } catch (HttpExceptionInterface|ValidationException|RuntimeException|DomainException) {
+            return null;
+        }
     }
 
     /**

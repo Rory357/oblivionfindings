@@ -15,11 +15,13 @@ final readonly class AuthenticateMonitoringCollector
     /**
      * What a hub may do before an admin approves it: say it's alive and report its version,
      * so Oblivion can show "Connected, waiting for approval". Nothing else: no work, no
-     * uploads, no saved logins (S&D Phase B, hub approval).
+     * uploads, no saved logins (S&D Phase B, hub approval). A hub being uninstalled may also
+     * remove itself, which only takes trust away.
      */
     private const BEFORE_APPROVAL = [
         'api.monitoring.collectors.heartbeat',
         'api.monitoring.collectors.update-report',
+        'api.monitoring.collectors.deregister',
     ];
 
     public function __construct(private CollectorTransportAuthenticator $authenticator) {}

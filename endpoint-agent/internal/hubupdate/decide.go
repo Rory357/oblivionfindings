@@ -37,8 +37,8 @@ type Decision struct {
 func wait(reason string) Decision { return Decision{Reason: reason} }
 
 // Decide applies D3. An update starts only when the hub is approved, updates aren't held,
-// the target is newer than what's running, the local time is inside the update window, and
-// this version didn't fail in the last 20 hours.
+// the target is newer than what's running, the local time is inside the update window (or an
+// admin pressed "Check now"), and this version didn't fail in the last 20 hours.
 func Decide(in Instructions, running Running, last *Failure, platform, arch string, now time.Time) Decision {
 	if in.Approval != "approved" {
 		return wait("waiting for an admin to approve this hub")
@@ -64,7 +64,9 @@ func Decide(in Instructions, running Running, last *Failure, platform, arch stri
 	if err != nil {
 		return wait("the update window is invalid")
 	}
-	if !inside {
+	// "Check now" skips only the night window. Approval, hold, the ring's target and the
+	// 20-hour wait after a failure still apply.
+	if !inside && !in.Update.CheckNow {
 		return wait("outside the update window")
 	}
 	if last != nil && last.Version == target.Version && last.Revision == target.ReleaseRevision && now.Sub(last.At) < RetryAfterFailure {

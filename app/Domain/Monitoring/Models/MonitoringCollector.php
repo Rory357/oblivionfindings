@@ -69,6 +69,7 @@ class MonitoringCollector extends Model
         'approved_at' => 'immutable_datetime',
         'vault_key_rotated_at' => 'immutable_datetime',
         'update_state' => 'array',
+        'update_check_requested_at' => 'immutable_datetime',
     ];
 
     /** The login-store key never leaves the model by accident. */

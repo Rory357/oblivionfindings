@@ -142,6 +142,25 @@ final class HubAdminController extends Controller
         return response()->json(['hub' => $this->hubPayload($hub)]);
     }
 
+    /**
+     * D3 "Check now": this hub looks for its update on its next heartbeat instead of waiting
+     * for its night window. It still needs approval, updates not on hold, and the release its
+     * ring allows; the hub decides and reports back, which clears the request.
+     */
+    public function checkUpdate(Request $request, MonitoringCollector $collector, HubApprovalService $approvals): JsonResponse
+    {
+        $actor = $this->actor($request, 'securityDevices.hubs.approve');
+        $approvals->assertMayManage($actor, $collector);
+        abort_if($collector->revoked_at !== null, 409, 'This hub has already been removed.');
+        $collector->forceFill(['update_check_requested_at' => now()])->save();
+        AuditLogger::logOrFail('security_devices.hub.update_check_requested', $collector, [
+            'actor_id' => (int) $actor->id,
+            'site_id' => (int) $collector->site_id,
+        ]);
+
+        return response()->json(['hub' => $this->hubPayload($collector->fresh())]);
+    }
+
     /** Pop-up 74: name, covered Sites, update ring and night window. */
     public function update(Request $request, MonitoringCollector $collector, CollectorEnrollmentService $enrollments): JsonResponse
     {
@@ -247,6 +266,7 @@ final class HubAdminController extends Controller
             'update_window_start' => (string) $hub->update_window_start,
             'update_window_end' => (string) $hub->update_window_end,
             'update_state' => $hub->update_state,
+            'update_check_requested_at' => $hub->update_check_requested_at?->toIso8601String(),
         ];
     }
 

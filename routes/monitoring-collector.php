@@ -27,6 +27,8 @@ Route::prefix('monitoring/collectors')->name('api.monitoring.collectors.')->grou
         Route::post('vault-key', [HubRuntimeController::class, 'vaultKey'])->name('vault-key');
         Route::post('update/report', [HubRuntimeController::class, 'updateReport'])->name('update-report');
         Route::post('update/download', [HubRuntimeController::class, 'updateDownload'])->name('update-download');
+        // Uninstalling a hub tells Oblivion, which stops trusting it (windows tab, E).
+        Route::post('deregister', [HubRuntimeController::class, 'deregister'])->name('deregister');
     });
 
     // The installer redeems the 8-character code from its file name for its setup profile.

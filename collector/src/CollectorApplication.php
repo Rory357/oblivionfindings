@@ -71,6 +71,7 @@ final class CollectorApplication
                 'run' => $this->collect($options),
                 'update-fetch' => $this->updateFetch($options),
                 'update-report' => $this->updateReport($options),
+                'deregister' => $this->deregister($options),
                 'relay' => $this->relay($options),
                 'verify-transport' => $this->verifyTransport($options),
                 default => $this->usage(),
@@ -789,6 +790,37 @@ final class CollectorApplication
     }
 
     /**
+     * Uninstalling the hub tells Oblivion, which removes it and stops trusting it (windows tab,
+     * E). Exit 0 when Oblivion confirms, or says the hub was already removed (410); 1 otherwise,
+     * so the uninstaller can say it couldn't tell Oblivion.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function deregister(array $options): int
+    {
+        if (array_keys($options) !== ['identity']) {
+            throw new RuntimeException('Deregister takes only --identity.');
+        }
+        $identityPath = $this->requiredPath($options, 'identity');
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $secretKey = $this->requestSigningKey($identity);
+        try {
+            $this->central($identity, $secretKey)->deregister($identity['collector_id']);
+        } catch (CentralApiFailure $failure) {
+            if ($failure->httpStatus() !== 410) {
+                $this->write("deregister: not confirmed\n");
+
+                return 1;
+            }
+        } finally {
+            sodium_memzero($secretKey);
+        }
+        $this->write("deregister: removed\n");
+
+        return 0;
+    }
+
+    /**
      * The file named --artifact in the current update target of hub-instructions.json.
      *
      * @return array{id: string, size: int, sha256: string}
@@ -1125,7 +1157,7 @@ final class CollectorApplication
 
     private function usage(): int
     {
-        $this->write("Usage: oblivion-collector enrol|enrol-profile|enrol-recoverable|runtime-check|run|update-fetch|update-report|doctor|verify-transport|version [--name=value]\n", STDERR);
+        $this->write("Usage: oblivion-collector enrol|enrol-profile|enrol-recoverable|runtime-check|run|update-fetch|update-report|deregister|doctor|verify-transport|version [--name=value]\n", STDERR);
 
         return 64;
     }

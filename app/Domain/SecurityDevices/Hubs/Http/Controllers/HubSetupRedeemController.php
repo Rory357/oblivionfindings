@@ -32,9 +32,17 @@ final class HubSetupRedeemController extends Controller
         }
 
         // role: hub | computer. install_mode (computers): staff = Obli for this person, no admin;
-        // full = IT's install with the service. display: what the Welcome screen shows (windows
-        // tab screen 3): the Site, who made the download, until when, and the brand.
-        return response()->json(['state' => 'ok', ...$result, 'display' => $this->display($codes->find($code))], 200, $this->noStore());
+        // full = IT's install with the service. computer_profile (Windows hubs given the
+        // computer's name): Obli for the hub PC too (D4), null when it can't be issued; always
+        // null for computer codes, whose profile is the computer profile. display: what the
+        // Welcome screen shows (windows tab screen 3): the Site, who made the download, until
+        // when, and the brand.
+        return response()->json([
+            'state' => 'ok',
+            ...$result,
+            'computer_profile' => $result['computer_profile'] ?? null,
+            'display' => $this->display($codes->find($code)),
+        ], 200, $this->noStore());
     }
 
     /** @return array<string, string|null> */

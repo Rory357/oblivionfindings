@@ -28,11 +28,14 @@ type Instructions struct {
 
 // Update is the server's update block (app/Domain/SecurityDevices/Hubs/Services/HubUpdatePolicy.php).
 type Update struct {
-	Held                 bool    `json:"held"`
-	Ring                 string  `json:"ring"`
-	Window               Window  `json:"window"`
-	RollbackAfterMinutes int     `json:"rollback_after_minutes"`
-	Target               *Target `json:"target"`
+	Held                 bool   `json:"held"`
+	Ring                 string `json:"ring"`
+	Window               Window `json:"window"`
+	RollbackAfterMinutes int    `json:"rollback_after_minutes"`
+	// CheckNow: an admin pressed "Check now" for this hub, so it may update outside the night
+	// window. The server sends it until the hub reports how that update went.
+	CheckNow bool    `json:"check_now"`
+	Target   *Target `json:"target"`
 }
 
 type Window struct {
@@ -88,6 +91,13 @@ var versionPattern = regexp.MustCompile(`^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8
 
 // ValidVersion reports whether v is a plain x.y.z version.
 func ValidVersion(v string) bool { return versionPattern.MatchString(v) }
+
+// CompareVersions orders two x.y.z versions: -1, 0 or 1 (0 also when either is invalid).
+// Setup uses it to offer "Update to 1.3.1".
+func CompareVersions(a, b string) int {
+	result, _ := compareVersions(a, b)
+	return result
+}
 
 // compareVersions compares two x.y.z versions: -1, 0 or 1. ok is false if either is invalid.
 func compareVersions(a, b string) (result int, ok bool) {

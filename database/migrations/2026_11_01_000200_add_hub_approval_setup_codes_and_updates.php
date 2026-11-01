@@ -48,6 +48,8 @@ return new class extends Migration
             $table->foreignId('collector_enrollment_id')->nullable()->constrained('monitoring_collector_enrollments')->nullOnDelete();
             $table->foreignId('replaces_collector_id')->nullable()->constrained('monitoring_collectors')->nullOnDelete();
             $table->string('intended_name', 120)->nullable();
+            // D4: the one computer a Windows hub code may also give Obli to (its first redeem's name).
+            $table->string('computer_name', 64)->nullable();
             // The 8-character code, hashed for lookup and encrypted so the download can name the file.
             $table->char('code_hash', 64)->unique();
             $table->text('code_ciphertext')->nullable();

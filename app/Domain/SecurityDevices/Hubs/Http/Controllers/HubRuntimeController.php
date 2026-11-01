@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Hubs\Http\Controllers;
 
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\Monitoring\Services\CollectorEnrollmentService;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointReleaseCatalogue;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointReleaseUnavailable;
 use App\Domain\SecurityDevices\Hubs\Exceptions\HubAwaitingApproval;
@@ -10,6 +11,7 @@ use App\Domain\SecurityDevices\Hubs\Exceptions\HubRemoved;
 use App\Domain\SecurityDevices\Hubs\Services\HubUpdatePolicy;
 use App\Domain\SecurityDevices\Hubs\Services\HubVaultKeyService;
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Hub-facing calls added in S&D Phase B. Every call is authenticated by the hub's certificate
  * and signature (the monitoring.collector middleware), and only an approved hub gets past it,
- * except for the update report.
+ * except for the update report and deregister.
  */
 final class HubRuntimeController extends Controller
 {
@@ -48,6 +50,22 @@ final class HubRuntimeController extends Controller
         }
 
         return response()->json(['recorded' => true, 'update' => $updates->instructionFor($collector)]);
+    }
+
+    /**
+     * The hub is being uninstalled (Windows Settings › Apps, or the installer's Remove): it
+     * asks to be removed, so Oblivion shows "hub removed" and stops trusting it. Same removal
+     * as an admin's, including destroying the login-store key.
+     */
+    public function deregister(Request $request, CollectorEnrollmentService $enrollments): JsonResponse
+    {
+        $collector = $this->collector($request);
+        $enrollments->revoke($collector, null);
+        AuditLogger::logOrFail('security_devices.hub.uninstalled', $collector, [
+            'site_id' => (int) $collector->site_id,
+        ]);
+
+        return response()->json(['state' => 'removed'], 200, $this->noStore());
     }
 
     /**

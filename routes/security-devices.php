@@ -778,7 +778,7 @@ Route::middleware([
 
     // ── Hubs (S&D Phase B): setup codes in the file name, approval, updates ──
     // Each action checks its own permission in HubAdminController (integrations.manage to
-    // add and edit; hubs.approve to approve, replace, remove and hold updates).
+    // add and edit; hubs.approve to approve, replace, remove, hold updates and "Check now").
     Route::prefix('/hubs')->middleware('throttle:30,1,security-device-hubs:')->group(function () {
         Route::post('/setup-codes', [HubAdminController::class, 'issue'])->name('security-devices.hubs.setup-codes.issue');
         Route::post('/computer-setup-codes', [HubAdminController::class, 'issueComputer'])->name('security-devices.computers.setup-codes.issue');
@@ -796,6 +796,8 @@ Route::middleware([
             ->name('security-devices.hubs.remove');
         Route::post('/{collector}/replace', [HubAdminController::class, 'replace'])->whereNumber('collector')
             ->name('security-devices.hubs.replace');
+        Route::post('/{collector}/check-update', [HubAdminController::class, 'checkUpdate'])->whereNumber('collector')
+            ->name('security-devices.hubs.check-update');
         Route::patch('/{collector}', [HubAdminController::class, 'update'])->whereNumber('collector')
             ->name('security-devices.hubs.update');
     });

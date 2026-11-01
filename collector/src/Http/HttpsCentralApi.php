@@ -165,6 +165,17 @@ final readonly class HttpsCentralApi implements CentralApi
     }
 
     /**
+     * The hub is being uninstalled: ask Oblivion to remove it, so it stops trusting this hub
+     * (S&D Phase B, windows tab E). Signed and over mTLS like every other hub call.
+     *
+     * @return array<string, mixed>
+     */
+    public function deregister(string $collectorId): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/deregister', ['collector_id' => $collectorId]);
+    }
+
+    /**
      * Streams the release file this hub was told to install (S&D Phase B, D3), signed and over
      * mTLS like every other hub call. Each chunk goes to $sink, which returns false to stop.
      *

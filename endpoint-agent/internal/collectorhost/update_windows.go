@@ -134,7 +134,13 @@ func (r *updateRecords) Switch(_ context.Context, stage string) error {
 		return nil
 	}
 	config.BinaryPathName = serviceCommand(program, stage)
-	return service.UpdateConfig(config)
+	if err := service.UpdateConfig(config); err != nil {
+		return err
+	}
+	// The sensor relay's firewall rule names the runtime in the release folder, so it follows
+	// the switch. A firewall problem never blocks an update or a roll-back.
+	_ = EnsureRelayFirewallRule(RelayRuntime(filepath.Join(r.releases.Path(), stage)))
+	return nil
 }
 
 // serviceCommand matches what setup registers (internal/setup/service_windows.go).

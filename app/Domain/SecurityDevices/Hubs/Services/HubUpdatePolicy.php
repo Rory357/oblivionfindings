@@ -30,6 +30,9 @@ final class HubUpdatePolicy
 
     private const EVERYONE_DELAY_HOURS = 24;
 
+    /** A "Check now" that the hub never answered stops counting after a day. */
+    private const CHECK_NOW_HOURS = 24;
+
     public function __construct(private ?EndpointReleaseCatalogue $catalogue = null) {}
 
     /** @return array{held: bool, held_at: string|null, held_by: string|null} */
@@ -68,6 +71,7 @@ final class HubUpdatePolicy
      *     ring: string,
      *     window: array{start: string, end: string, timezone: string},
      *     rollback_after_minutes: int,
+     *     check_now: bool,
      *     target: array{version: string, release_revision: int, artifacts: list<array<string, mixed>>}|null
      * }
      */
@@ -87,6 +91,9 @@ final class HubUpdatePolicy
                 'timezone' => (string) config('app.worker_timezone', 'Pacific/Auckland'),
             ],
             'rollback_after_minutes' => self::ROLLBACK_AFTER_MINUTES,
+            // "Check now": the hub may start this update outside its night window, once. Still
+            // only when approved, not held, and for the release its ring allows.
+            'check_now' => $this->checkNow($collector, $now),
             'target' => ($hold['held'] || $collector->approved_at === null) ? null : $this->target($collector, $ring, $now),
         ];
     }
@@ -163,7 +170,8 @@ final class HubUpdatePolicy
             'detail' => $detail === null ? null : trim(preg_replace('/[\p{Cc}\p{Cf}]+/u', ' ', $detail) ?? ''),
             'reported_at' => now()->toIso8601String(),
         ];
-        $collector->forceFill(['update_state' => $state])->save();
+        // Any report answers a "Check now".
+        $collector->forceFill(['update_state' => $state, 'update_check_requested_at' => null])->save();
         AuditLogger::logOrFail('security_devices.hub.update_'.$outcome, $collector, [
             'site_id' => (int) $collector->site_id,
             'from_version' => $from,
@@ -189,6 +197,14 @@ final class HubUpdatePolicy
         }
 
         return $collector->fresh();
+    }
+
+    /** An admin asked this hub to check now (in the last day) and it hasn't reported since. */
+    private function checkNow(MonitoringCollector $collector, CarbonImmutable $now): bool
+    {
+        $requested = $collector->update_check_requested_at;
+
+        return $requested !== null && $requested->gt($now->subHours(self::CHECK_NOW_HOURS));
     }
 
     private function platform(MonitoringCollector $collector): string
