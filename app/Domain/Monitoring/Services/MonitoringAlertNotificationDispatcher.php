@@ -64,7 +64,8 @@ final class MonitoringAlertNotificationDispatcher
             return null;
         }
 
-        $recipients = $this->policies->resolveItRecipients($siteId, $route['recipient_role']);
+        // S&D 13d: the IT person on call (Rostering) is told first; the rest hear at the one-hour reminder.
+        $recipients = app(\App\Domain\SecurityDevices\Alerts\ItOnCall::class)->first($this->policies->resolveItRecipients($siteId, $route['recipient_role']));
         if ($recipients->isEmpty()) {
             return null;
         }

@@ -9,9 +9,12 @@
  * a confirm, by people who manage connected services, as on the old page.
  */
 import { DeferredPanel } from '@/components/deferred-panel';
+import { EntityContextMenu, useEntityContextMenu, type MenuItem } from '@/components/lists';
+import { EntityTable } from '@/components/lists/entity-table';
+import { ListCaption } from '@/components/lists/list-caption';
 import { confirmedRecovery, type RecoveryAttempt } from '@/components/monitoring/delivery-recovery-data';
 import { PopupConfirm, PopupField } from '@/components/popup';
-import { FactRows } from '@/components/signature/blocks';
+import { FactRows, KnowList, QuietLine, type SgTone } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
@@ -20,7 +23,7 @@ import { formatDateTime } from '@/lib/datetime';
 import type { ServerReadinessPayload } from '@/pages/settings/server-readiness';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
-import { ArchiveX, RefreshCw } from 'lucide-react';
+import { ArchiveX, Home, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -40,6 +43,13 @@ export function ServerCheck() {
                 fallback={<Skeleton className="h-40 w-full rounded-xl" aria-label="Checking the monitoring service" />}
             >
                 {({ server_health }) => <MonitoringHealthCard data={server_health} />}
+            </DeferredPanel>
+            <DeferredPanel<{ server_readiness: ServerChecksSites }>
+                data="server_readiness"
+                label="Sites the server checks itself"
+                fallback={<Skeleton className="h-40 w-full rounded-xl" aria-label="Checking which Sites the server checks itself" />}
+            >
+                {({ server_readiness }) => <SitesServerChecks data={server_readiness} />}
             </DeferredPanel>
         </div>
     );
@@ -333,5 +343,86 @@ export function DeliveryDecision({
                 />
             </PopupField>
         </PopupConfirm>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sites the server checks itself (pg-sdr-15q)                         */
+/* ------------------------------------------------------------------ */
+
+type ReadinessTone = 'success' | 'warning' | 'critical' | 'info' | 'neutral';
+
+export type ServerChecksSites = {
+    rows: {
+        site: { id: number; name: string; href: string };
+        checked_by: string;
+        state: { label: string; tone: ReadinessTone; note: string };
+        devices: number;
+        next: string;
+    }[];
+    meanings: { tone: ReadinessTone; text: string }[];
+};
+
+type ReadinessRow = ServerChecksSites['rows'][number];
+
+const READINESS_RING: Record<ReadinessTone, SgTone> = { success: 'success', warning: 'warning', critical: 'critical', info: 'info', neutral: 'none' };
+
+/** The retired Monitoring page's Central Site readiness, in plain words: whether the server checks each Site itself. */
+export function SitesServerChecks({ data }: { data: ServerChecksSites }) {
+    const menu = useEntityContextMenu<ReadinessRow>();
+    const [checking, setChecking] = useState(false);
+    const again = () => {
+        if (checking) return;
+        setChecking(true);
+        router.reload({ only: ['server_readiness'], onFinish: () => setChecking(false) });
+    };
+    const open = (row: ReadinessRow) => router.visit(row.site.href);
+    const actionsFor = (row: ReadinessRow): MenuItem[] => [{ label: 'Open the Site', onClick: () => open(row) }];
+    const bold = (text: string) => text.split(/\*\*(.+?)\*\*/g).map((part, index) => (index % 2 === 1 ? <b key={index}>{part}</b> : part));
+
+    return (
+        <div className="space-y-5" aria-label="Sites the server checks itself">
+            <ListCaption
+                title="Sites the server checks itself"
+                caption="Admins only, like the server check · a Site with a hub is always checked by its hub"
+                right={
+                    <Button size="sm" variant="outline" onClick={again} disabled={checking}>
+                        {checking ? 'Checking…' : 'Check again'}
+                    </Button>
+                }
+            />
+            {data.rows.length === 0 ? (
+                <QuietLine text="No Sites to show. Sites appear here once you can see them in Security & devices." />
+            ) : (
+                <EntityTable<ReadinessRow>
+                    rows={data.rows}
+                    rowKey={(row) => row.site.id}
+                    identityLabel="Site"
+                    identity={(row) => ({ icon: Home, name: row.site.name, linkLabel: `Open ${row.site.name}` })}
+                    columns={[
+                        { key: 'by', label: 'Checked by', width: '1.1fr', cell: (row) => row.checked_by },
+                        {
+                            key: 'state',
+                            label: 'State',
+                            width: '1.6fr',
+                            cell: (row) => (
+                                <span className="flex flex-col items-start gap-1">
+                                    <StatusBadge variant={row.state.tone}>{row.state.label}</StatusBadge>
+                                    <span className="text-caption">{row.state.note}</span>
+                                </span>
+                            ),
+                        },
+                        { key: 'devices', label: 'Devices', width: '0.6fr', cell: (row) => (row.devices > 0 ? row.devices : <span className="text-muted-foreground">—</span>) },
+                        { key: 'next', label: 'Next step', width: '1.8fr', cell: (row) => row.next },
+                    ]}
+                    actionsFor={actionsFor}
+                    onOpen={open}
+                    onRowContextMenu={(event, row) => menu.open(event, row)}
+                    minWidth={900}
+                />
+            )}
+            {menu.ctx ? <EntityContextMenu x={menu.ctx.x} y={menu.ctx.y} icon={Home} title={menu.ctx.record.site.name} items={actionsFor(menu.ctx.record)} onClose={menu.close} /> : null}
+            <KnowList title="What each state means" items={data.meanings.map((line) => ({ tone: READINESS_RING[line.tone], text: bold(line.text) }))} />
+        </div>
     );
 }

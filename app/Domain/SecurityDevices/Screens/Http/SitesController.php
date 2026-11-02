@@ -39,7 +39,8 @@ final class SitesController extends Controller
         $model = $this->sitePage->site($user, $site);
 
         return Inertia::render('security-devices/sites/show', [
-            ...$this->sitePage->present($user, $model, $request->only(['tab'])),
+            // what / day: the Logbook's "What" choice and "Go to" date (12i).
+            ...$this->sitePage->present($user, $model, $request->only(['tab', 'what', 'day'])),
             'deviceForm' => Inertia::optional(fn (): array => $this->formOptions->present($user)),
         ]);
     }

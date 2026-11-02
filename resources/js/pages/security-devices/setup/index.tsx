@@ -23,7 +23,7 @@ import { AddSensorGateway } from '@/components/security-devices/sensor-gateway-p
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Bell, Bot, Clock, DoorOpen, History, KeyRound, ListChecks, MonitorSmartphone, Network, Plug, RadioTower, Settings2, Wrench } from 'lucide-react';
+import { Bell, Bot, Clock, DoorOpen, History, KeyRound, ListChecks, MonitorSmartphone, Network, Plug, RadioTower, Router, Settings2, Wrench } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SetupAccess } from './_access';
 import { SetupAlertRules } from './_alerts';
@@ -31,6 +31,7 @@ import { SetupBroker } from './_broker';
 import { SetupChecks } from './_checks';
 import { SetupClockins } from './_clockins';
 import { ChangeHistory } from './_history';
+import { SetupHubs } from './_hubs';
 import { SetupNetworks } from './_networks';
 import { SetupOverview } from './_overview';
 import { SetupRemote } from './_remote';
@@ -41,7 +42,7 @@ import { ConnectedServices, SavedLogins, SupportedDevices } from './_services';
 import { SettingsSave, useSettingsDraft } from './_settings';
 import type { SetupMeter, SetupProps, SetupSection } from './_types';
 
-const TAB_ICONS = { networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks, rules: Bell, checks: ListChecks, broker: RadioTower, unifi: DoorOpen, clockins: Clock, remote: MonitorSmartphone, obli: Bot, fixes: Wrench } as const;
+const TAB_ICONS = { hubs: Router, networks: Network, connected: Plug, logins: KeyRound, supported: ListChecks, rules: Bell, checks: ListChecks, broker: RadioTower, unifi: DoorOpen, clockins: Clock, remote: MonitorSmartphone, obli: Bot, fixes: Wrench } as const;
 
 export function setupUrl(section: SetupSection, tab?: string | null, page?: number): string {
     const base = section === 'overview' ? '/security-devices/setup' : `/security-devices/setup/${section}`;
@@ -177,6 +178,7 @@ export default function SetupPage(props: SetupProps) {
                         onOpenHub={(hubId) => hubs.openPanel(hubId)}
                     />
                 ) : null}
+                {props.hubs ? <SetupHubs data={props.hubs} query={query} now={now} onOpenHub={(hubId) => hubs.openPanel(hubId)} onAddHub={() => hubs.openAdd()} /> : null}
                 {props.networks ? (
                     <SetupNetworks
                         data={props.networks}

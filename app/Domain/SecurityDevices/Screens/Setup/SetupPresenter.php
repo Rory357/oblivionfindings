@@ -30,7 +30,8 @@ final class SetupPresenter
     /** @var array<string, array{label: string, tabs: array<string, string>}> */
     public const array SECTIONS = [
         'overview' => ['label' => 'Overview', 'tabs' => []],
-        'hubs' => ['label' => 'Hubs & networks', 'tabs' => ['networks' => 'Networks & scans', 'broker' => 'Sensor broker']],
+        // S&D round 3 (pg-sdr-15p): Hubs first, as drawn on 15b.
+        'hubs' => ['label' => 'Hubs & networks', 'tabs' => ['hubs' => 'Hubs', 'networks' => 'Networks & scans', 'broker' => 'Sensor broker']],
         'services' => ['label' => 'Services & logins', 'tabs' => ['connected' => 'Connected services', 'logins' => 'Saved logins', 'supported' => 'Supported devices']],
         'alerts' => ['label' => 'Alerts & checks', 'tabs' => ['rules' => 'Alert rules', 'checks' => 'Checks']],
         // S&D Phase H (pg-sdr-15m): each Site's UniFi Access console, through its hub.
@@ -171,6 +172,8 @@ final class SetupPresenter
             'settings' => in_array($section, ['hubs', 'alerts', 'access'], true) && $tab !== 'clockins' ? $this->settings->forViewer($viewer) : null,
             'alerts' => $section === 'alerts' && $tab === 'rules' ? ['rules' => $this->rules->count($viewer)] : null,
             'checks' => $section === 'alerts' && $tab === 'checks' ? $this->checks($entries) : null,
+            // S&D round 3 (pg-sdr-15p): a card for each hub, a banner when an update failed, and how updates work.
+            'hubs' => $section === 'hubs' && $tab === 'hubs' ? app(SetupHubs::class)->present($viewer) : null,
             'networks' => $section === 'hubs' && $tab === 'networks' ? $this->networks->present($viewer) : null,
             'broker' => $section === 'hubs' && $tab === 'broker' ? $this->broker->present($viewer) : null,
             'connected' => $section === 'services' && $tab === 'connected' ? ['cards' => $services['cards']] : null,
@@ -524,8 +527,8 @@ final class SetupPresenter
      */
     private function checks(Collection $entries): array
     {
-        $profile = AppDomainMonitoringModelsMonitoringProfile::query()
-            ->where('name', AppDomainMonitoringModelsMonitoringProfile::DEFAULT_AVAILABILITY_NAME)->where('is_active', true)->first();
+        $profile = \App\Domain\Monitoring\Models\MonitoringProfile::query()
+            ->where('name', \App\Domain\Monitoring\Models\MonitoringProfile::DEFAULT_AVAILABILITY_NAME)->where('is_active', true)->first();
         $interval = (int) ($profile?->interval_seconds ?? 60);
         $misses = max(1, (int) ($profile?->failure_confirmations ?? 3));
         $often = $interval % 60 === 0 ? ($interval === 60 ? 'Every minute' : 'Every '.intdiv($interval, 60).' minutes') : "Every {$interval} seconds";
@@ -538,7 +541,7 @@ final class SetupPresenter
                 $words = $group->flatMap(fn (DeviceEntry $entry): array => $entry->watching)->unique()->values()->all();
 
                 return [
-                    'key' => IlluminateSupportStr::slug($label),
+                    'key' => \Illuminate\Support\Str::slug($label),
                     'kind' => $label,
                     'check' => $words === [] ? 'Not watched yet' : ucfirst(SetupNetworks::andList(array_slice($words, 0, 3))),
                     'often' => $watched === 0 ? null : $often,

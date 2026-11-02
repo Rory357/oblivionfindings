@@ -2,7 +2,8 @@
  * A device's page (S&D rebuild C2, drawings pg-sdr-3, 3c, 9, 9b, 9c, 10, 16, 17, 20, 21, 22 and
  * the shared Notes & documents tab 5d) for network gear, computers, printers, UPSs, recorders,
  * sensor gateways and other devices. The kind decides the tabs and the overview. Cameras and the
- * safety kit keep today's profile (show.tsx) until Phase E.
+ * safety kit keep today's profile (show.tsx) until Phase E. S&D v13 adds a switch's Ports tab
+ * (pg-sdr-3d) and network gear's History and Settings tabs (3e, 3f).
  *
  * Not offered here, on purpose: installing firmware (pop-up 62 shows an update a maker's source
  * reports and opens the maker's app), port on/off/restart (never), and acknowledge and quiet time
@@ -52,6 +53,9 @@ import { NetworkOverviewTab, TroubleOverview } from './_device-overview-network'
 import { OtherOverviewTab } from './_device-overview-other';
 import { NotesTabView } from './_device-notes';
 import { ObliHelpTab } from './_device-obli-help';
+import { HistoryTabView, type HistoryFilter } from './_device-history';
+import { PortsTabView } from './_device-ports';
+import { SettingsTabView } from './_device-settings';
 import { TerminalTab } from './_device-terminal';
 import { WebPagePopup } from './_device-web-page';
 import type { DevicePageMeter, DevicePageProps, DevicePageTab } from './_device-page-types';
@@ -113,6 +117,17 @@ export default function DevicePage(props: DevicePageProps) {
         router.get(
             base,
             Object.fromEntries(Object.entries({ tab: next.tab === 'overview' ? undefined : next.tab, range: next.range === '24h' ? undefined : next.range }).filter(([, value]) => value !== undefined)),
+            { preserveState: true, preserveScroll: true },
+        );
+    };
+
+    // S&D v13 (pg-sdr-3e): History's "What" and "From" stay in the address, so a filtered view can be shared.
+    const filterHistory = (filter: HistoryFilter) => {
+        const what = filter.what ?? props.history?.what ?? 'all';
+        const from = filter.from !== undefined ? filter.from : (props.history?.from ?? null);
+        router.get(
+            base,
+            Object.fromEntries(Object.entries({ tab: 'history', what: what === 'all' ? undefined : what, from: from ?? undefined }).filter(([, value]) => value !== undefined)),
             { preserveState: true, preserveScroll: true },
         );
     };
@@ -253,6 +268,28 @@ export default function DevicePage(props: DevicePageProps) {
         );
     } else if (tab === 'notes' && props.notes) {
         body = <NotesTabView props={props} notes={props.notes} now={now} />;
+    } else if (tab === 'ports' && props.ports) {
+        body = <PortsTabView ports={props.ports} noun="switch" now={now} />;
+    } else if (tab === 'history' && props.history) {
+        body = (
+            <HistoryTabView
+                history={props.history}
+                now={now}
+                onFilter={filterHistory}
+                onCompare={compare}
+                onTerminal={props.tabs.some((item) => item.key === 'terminal') ? () => go({ tab: 'terminal' }) : null}
+            />
+        );
+    } else if (tab === 'settings' && props.settings) {
+        body = (
+            <SettingsTabView
+                props={props}
+                settings={props.settings}
+                onMove={can.move ? () => open({ kind: 'move', device: self }) : null}
+                onLogin={actions.login ? () => open({ kind: 'login' }) : null}
+                onRemove={can.retire ? () => open({ kind: 'remove', device: self }) : null}
+            />
+        );
     } else if (tab === 'terminal' && props.terminal) {
         body = <TerminalTab deviceId={device.id} deviceName={device.name} terminal={props.terminal} now={now} />;
     }

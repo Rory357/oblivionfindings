@@ -89,6 +89,94 @@ describe('Security & devices home', () => {
         expect(screen.queryByText('Offline')).not.toBeInTheDocument();
     });
 
+    it('has no Activity tab for someone who may not see device events', () => {
+        render(<Overview {...fixture()} />);
+
+        expect(screen.queryByRole('tab', { name: 'Activity' })).not.toBeInTheDocument();
+    });
+
+    it('shows the day’s stream newest first, with the night as its own block (18c)', () => {
+        const at = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+        const line = {
+            site_id: 4,
+            site: 'Synthetic House',
+            device_id: null,
+            device_kind: null,
+            by: null,
+            action: null,
+            sub: null,
+            next: null,
+        };
+        render(
+            <Overview
+                {...fixture({
+                    tab: 'activity',
+                    overview: null,
+                    can: { add: true, scan: true, connect: true, assign: true, activity: true, export: true },
+                    activity: {
+                        day: '2026-10-29',
+                        today: true,
+                        kind: 'all',
+                        kinds: [
+                            { value: 'all', label: 'Every kind' },
+                            { value: 'alerts', label: 'Alerts' },
+                        ],
+                        rows: [
+                            {
+                                ...line,
+                                key: 'alert-1',
+                                at: at(10),
+                                tone: 'critical',
+                                kind: 'alert',
+                                group: 'alerts',
+                                title: 'Synthetic router is offline',
+                                device_id: 11,
+                                device_kind: 'router',
+                                href: '/security-devices/alerts?alert=1',
+                                next: 'Nobody was told · still open, not acknowledged',
+                                action: { label: 'Open alert', href: '/security-devices/alerts?alert=1' },
+                            },
+                            { ...line, key: 'mode-2', at: at(40), tone: 'info', kind: 'mode', group: 'alarm', title: 'House mode Night → Day', sub: 'By schedule', href: '/security-devices/sites/4?tab=modes' },
+                        ],
+                        total: 2,
+                        overnight: {
+                            from: at(900),
+                            to: at(300),
+                            sites: [],
+                            rows: [{ ...line, key: 'scan-3', at: at(400), tone: 'success', kind: 'device', title: 'Scan of Synthetic House finished', sub: '12 found', href: '/security-devices/scans/3' }],
+                        },
+                        by_kind: [
+                            { key: 'devices', label: 'Devices and scans', count: 1 },
+                            { key: 'alarm', label: 'Alarm and modes', count: 1 },
+                            { key: 'alerts', label: 'Alerts', count: 1 },
+                            { key: 'doors', label: 'Doors worth a look', count: 0 },
+                            { key: 'planned', label: 'Planned work', count: 0 },
+                            { key: 'hs', label: 'H&S', count: 0 },
+                        ],
+                        doors: false,
+                    },
+                })}
+            />,
+        );
+
+        expect(screen.getByRole('tab', { name: 'Activity' })).toBeInTheDocument();
+        expect(screen.getByText('Synthetic router is offline')).toBeInTheDocument();
+        expect(screen.getByText('Nobody was told · still open, not acknowledged')).toBeInTheDocument();
+        const rows = screen.getAllByRole('row');
+        expect(rows.findIndex((row) => row.textContent?.includes('Synthetic router is offline'))).toBeLessThan(
+            rows.findIndex((row) => row.textContent?.includes('House mode Night → Day')),
+        );
+        expect(screen.getByText('Overnight')).toBeInTheDocument();
+        expect(screen.getByText('Scan of Synthetic House finished')).toBeInTheDocument();
+        expect(screen.getByText('What’s in this stream')).toBeInTheDocument();
+        expect(screen.getByText(/residents are never named/)).toBeInTheDocument();
+        // Filters: Site, kind and day; Export… is the events CSV.
+        expect(screen.getByText('Every kind')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Day: Today' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /Export/ })).toHaveAttribute('href', '/security-devices/exports/events.csv');
+        expect(screen.queryByText(/doors worth a look,/)).not.toBeInTheDocument();
+    });
+
     it('says plainly when there is no history yet on Trends', () => {
         render(
             <Overview

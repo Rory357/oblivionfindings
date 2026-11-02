@@ -1,8 +1,24 @@
-/** Props for the Security & devices home (S&D rebuild drawings pg-sdr-1, 1b, 18 and 18b). */
+/** Props for the Security & devices home (S&D rebuild drawings pg-sdr-1, 1b, 18, 18b and 18c). */
 import type { DeviceState, DevicesTab } from '@/lib/security-devices/device-words';
-import type { FactTone, SiteCard } from '../sites/_types';
+import type { FactTone, SiteCard, StreamLine } from '../sites/_types';
 
-export type OverviewTab = 'overview' | 'trends' | 'reports';
+export type OverviewTab = 'overview' | 'trends' | 'reports' | 'activity';
+
+/** pg-sdr-18c: Activity's "Every kind" groups. */
+export type ActivityGroup = 'devices' | 'alarm' | 'alerts' | 'doors' | 'planned' | 'hs';
+
+export type ActivityData = {
+    day: string;
+    today: boolean;
+    kind: ActivityGroup | 'all';
+    kinds: { value: string; label: string }[];
+    rows: (StreamLine & { group: ActivityGroup })[];
+    total: number;
+    overnight: { from: string; to: string; sites: string[]; rows: StreamLine[] };
+    by_kind: { key: ActivityGroup; label: string; count: number }[];
+    /** Doors worth a look are only in the stream for people who can see Access. */
+    doors: boolean;
+};
 
 /** A person who gets, or may get, the monthly email. */
 export type ReportPerson = { id: number; name: string };
@@ -77,8 +93,23 @@ export type OverviewProps = {
     } | null;
     /** pg-sdr-18b: only on the Reports tab, for people who may see reports. */
     reports?: ReportsData | null;
-    /** add_hub / approve_hub: Add a hub (sdr-12) and approving it (sdr-79). reports: the Reports tab (18b). */
-    can: { add: boolean; scan: boolean; connect: boolean; assign: boolean; add_hub?: boolean; approve_hub?: boolean; reports?: boolean };
+    /** pg-sdr-18c: only on the Activity tab, for people who may see device events. */
+    activity?: ActivityData | null;
+    /**
+     * add_hub / approve_hub: Add a hub (sdr-12) and approving it (sdr-79). reports: the Reports tab (18b).
+     * activity: the Activity tab (18c); export: its Export…, the events CSV.
+     */
+    can: {
+        add: boolean;
+        scan: boolean;
+        connect: boolean;
+        assign: boolean;
+        add_hub?: boolean;
+        approve_hub?: boolean;
+        reports?: boolean;
+        activity?: boolean;
+        export?: boolean;
+    };
     view?: 'it';
 };
 

@@ -25,7 +25,8 @@ final class OverviewController extends Controller
         }
 
         return Inertia::render('security-devices/overview/index', [
-            ...$overview->present($user, $request->only(['tab', 'site', 'month'])),
+            // kind / day: the Activity tab's own filters (pg-sdr-18c).
+            ...$overview->present($user, $request->only(['tab', 'site', 'month', 'kind', 'day'])),
             // Add a device and Scan a network load their choices only when one opens.
             'deviceForm' => Inertia::optional(fn (): array => $formOptions->present($user)),
         ]);

@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Screens\Devices;
 
+use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
@@ -142,7 +143,11 @@ final class DeviceDirectory
 
         $suppressed = $monitors->first(fn (Monitor $monitor): bool => in_array($monitor->suppression_reason, ['dependency', 'collector_path'], true));
         $availability = $monitors->filter(fn (Monitor $monitor): bool => (bool) $monitor->affects_availability);
-        $availabilityFailed = $availability->first(fn (Monitor $monitor): bool => $monitor->current_state?->value === 'failed'
+        // S&D round 3: a device that still answers (ping, a port or its hub) isn't Offline when only another
+        // check fails, such as a camera that answers without a picture: that's "Needs attention", as its
+        // alert already says. Without a reachability check, any availability check decides, as before.
+        $reachability = $availability->filter(fn (Monitor $monitor): bool => in_array($monitor->kind, [MonitorKind::Icmp, MonitorKind::Tcp, MonitorKind::Collector], true));
+        $availabilityFailed = ($reachability->isNotEmpty() ? $reachability : $availability)->first(fn (Monitor $monitor): bool => $monitor->current_state?->value === 'failed'
             && $monitor->suppression_reason === null);
         $failing = $monitors->first(fn (Monitor $monitor): bool => (bool) $monitor->current_state?->isFailure()
             && $monitor->suppression_reason === null);

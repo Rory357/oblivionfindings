@@ -30,7 +30,10 @@ final class DevicesIndexPresenter
     public const int PER_PAGE = 25;
 
     /** Every prop present() returns, so the controller can hand each one over lazily. */
-    public const array PROPS = ['tab', 'layout', 'upkeep', 'filters', 'tabs', 'meters', 'sites', 'statuses', 'groups', 'can', 'cards', 'cameras', 'list', 'batteries', 'updates'];
+    public const array PROPS = ['tab', 'layout', 'upkeep', 'filters', 'tabs', 'meters', 'sites', 'statuses', 'groups', 'can', 'cards', 'cameras', 'list', 'batteries', 'updates', 'not_watched', 'retired'];
+
+    /** Upkeep's views (S&D v13: Not watched, pg-sdr-2e, and Retired, pg-sdr-2f, join Batteries and Updates). */
+    public const array UPKEEP_VIEWS = ['batteries', 'updates', 'not_watched', 'retired'];
 
     /** Cards drawn per group before "Show all"; the rest stay one click away in the list. */
     public const int CARD_LIMIT = 200;
@@ -44,13 +47,13 @@ final class DevicesIndexPresenter
     ) {}
 
     /**
-     * @param  array{tab?: mixed, layout?: mixed, upkeep?: mixed, site?: mixed, status?: mixed, group?: mixed, q?: mixed, page?: mixed}  $input
+     * @param  array{tab?: mixed, layout?: mixed, upkeep?: mixed, site?: mixed, status?: mixed, group?: mixed, q?: mixed, page?: mixed, retired?: mixed}  $input
      * @return array<string, mixed>
      */
     public function present(User $viewer, array $input, string $layout): array
     {
         $tab = in_array($input['tab'] ?? null, self::TABS, true) ? $input['tab'] : 'all';
-        $upkeep = ($input['upkeep'] ?? null) === 'updates' ? 'updates' : 'batteries';
+        $upkeep = in_array($input['upkeep'] ?? null, self::UPKEEP_VIEWS, true) ? (string) $input['upkeep'] : 'batteries';
         $status = in_array($input['status'] ?? null, self::STATUS_FILTERS, true) ? $input['status'] : 'all';
         $search = Str::limit(trim((string) ($input['q'] ?? '')), 120, '');
         $siteId = $this->siteFilter($viewer, $input['site'] ?? null);
@@ -103,11 +106,17 @@ final class DevicesIndexPresenter
             'list' => null,
             'batteries' => null,
             'updates' => null,
+            'not_watched' => null,
+            'retired' => null,
         ];
 
         if ($tab === 'upkeep') {
             if ($upkeep === 'updates') {
                 $props['updates'] = $this->updates($viewer, $scoped);
+            } elseif ($upkeep === 'not_watched') {
+                $props['not_watched'] = app(NotWatchedDevices::class)->present($viewer, $filtered, $scoped, $pageNumber);
+            } elseif ($upkeep === 'retired') {
+                $props['retired'] = app(RetiredDevices::class)->present($viewer, $siteId, $search, $pageNumber, $input['retired'] ?? null);
             } else {
                 $props['batteries'] = $this->batteries($inTab, $pageNumber);
             }

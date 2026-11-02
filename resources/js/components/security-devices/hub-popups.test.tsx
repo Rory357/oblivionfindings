@@ -74,7 +74,7 @@ const panel: HubPanelData = {
         replaces: null,
         removed_at: null,
     },
-    updates: { ring: 'everyone', window_start: '02:00', window_end: '05:00', last: null, check_requested_at: null, held: false, held_at: null },
+    updates: { ring: 'everyone', window_start: '02:00', window_end: '05:00', last: null, check_requested_at: null, held: false, held_at: null, waiting: null },
     watching: { devices: 12, sites: 1, cant_check: 0 },
     sites: [{ id: 4, name: 'Synthetic House', own: true }],
     networks: [{ key: 'scope-3', site: 'Synthetic House', own: true, range: '10.40.0.0/24', daily_at: '06:00' }],

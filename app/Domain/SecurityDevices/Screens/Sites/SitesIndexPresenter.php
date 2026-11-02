@@ -183,14 +183,17 @@ final class SitesIndexPresenter
             return [];
         }
         $bySite = [];
-        // S&D Phase D: the device alerts people work in Alerts come first.
+        // S&D Phase D: the device alerts people work in Alerts come first. Snoozed alerts aren't open:
+        // they wait in Alerts › Snoozed until their time is up.
         if ($canReadDeviceAlerts) {
-            DeviceAlert::query()->active()->whereIn('device_id', array_keys($siteByDevice))
+            $open = DeviceAlert::query()->where('state', DeviceAlert::STATE_OPEN)->whereIn('device_id', array_keys($siteByDevice))
                 ->orderByRaw("CASE WHEN severity = 'critical' THEN 0 ELSE 1 END")->orderByDesc('opened_at')->limit(500)
-                ->get(['id', 'device_id', 'title'])
-                ->each(function (DeviceAlert $alert) use ($siteByDevice, &$bySite): void {
-                    $bySite[$siteByDevice[(int) $alert->device_id]][] = $alert->title;
-                });
+                ->get(['id', 'device_id', 'kind', 'title', 'opened_at']);
+            // A care rule's alert names its resident only to someone who may open their record.
+            $people = SiteStream::carePeople($viewer, $open);
+            $open->each(function (DeviceAlert $alert) use ($siteByDevice, $people, &$bySite): void {
+                $bySite[$siteByDevice[(int) $alert->device_id]][] = (new AlertWords($alert, $people[(int) $alert->id] ?? false))->title();
+            });
         }
         if (! $canReadControlRoom) {
             return array_map(fn (array $titles): array => array_values(array_unique($titles)), $bySite);

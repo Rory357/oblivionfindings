@@ -36,10 +36,13 @@ final class DevicePageController extends Controller
             return $page ??= $this->presenter->present($user, $device, [
                 'tab' => $request->query('tab'),
                 'range' => $request->query('range'),
+                // S&D v13 (pg-sdr-3e): the History tab's "What" and "From".
+                'what' => $request->query('what'),
+                'from' => $request->query('from'),
             ]);
         };
         $props = [];
-        foreach (['device', 'tab', 'tabs', 'range', 'meters', 'can', 'actions', 'trouble', 'overview', 'health', 'remote', 'checks', 'notes', 'obli', 'terminal'] as $key) {
+        foreach (['device', 'tab', 'tabs', 'range', 'meters', 'can', 'actions', 'trouble', 'overview', 'health', 'remote', 'checks', 'notes', 'obli', 'terminal', 'ports', 'history', 'settings'] as $key) {
             $props[$key] = fn () => $read()[$key];
         }
 

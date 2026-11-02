@@ -2,8 +2,8 @@
  * Alerts (S&D rebuild drawing pg-sdr-13, Workspace template, split layout): a work queue of what needs
  * someone, with the chosen alert's next step, story and timeline beside it. Done is a table, and
  * Rules & automations (13b) lists who is told when a check fails and (S&D Phase F) the house
- * automations, with Add automation (pop-up 40) and Test it (41). The Quiet times tab (13c) waits for
- * its drawing's approval.
+ * automations, with Add automation (pop-up 40) and Test it (41). S&D round 3: Quiet times (13c) lists
+ * every quiet time and what it held back; On call (13d) shows who covers IT from Rostering.
  */
 import {
     EntityContextMenu,
@@ -64,6 +64,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BlockHead, ListPager } from '../devices/_parts';
+import { OnCallTab } from './_on-call';
+import { QuietTimesTab } from './_quiet';
 import {
     AlertNextBox,
     AlertStory,
@@ -91,6 +93,8 @@ const TAB_LABEL: Record<AlertsTab, string> = {
     snoozed: 'Snoozed',
     done: 'Done',
     rules: 'Rules & automations',
+    quiet: 'Quiet times',
+    oncall: 'On call',
 };
 
 function useNow(): Date {
@@ -466,7 +470,10 @@ export default function AlertsIndex(props: AlertsProps) {
                         (key) => ({
                             key,
                             label: TAB_LABEL[key],
-                            count: key === 'done' ? undefined : counts[key],
+                            count:
+                                key === 'done' || key === 'oncall'
+                                    ? undefined
+                                    : counts[key],
                         }),
                     )}
                     value={tab}
@@ -711,6 +718,42 @@ export default function AlertsIndex(props: AlertsProps) {
                         <AlertsPerWeek weeks={props.per_week} />
                     </div>
                 ) : null}
+            </div>
+        );
+    } else if (tab === 'quiet') {
+        body = (
+            <div className="flex flex-col gap-5">
+                {tally}
+                {props.quiet_times ? (
+                    <QuietTimesTab
+                        data={props.quiet_times}
+                        now={now}
+                        search={props.q ?? ''}
+                        actorId={actorId}
+                        onAdd={openQuiet}
+                    />
+                ) : (
+                    <BlockFailed
+                        title="Quiet times"
+                        text="The quiet times couldn’t load."
+                        onRetry={() => router.reload({ only: ['quiet_times'] })}
+                    />
+                )}
+            </div>
+        );
+    } else if (tab === 'oncall') {
+        body = (
+            <div className="flex flex-col gap-5">
+                {tally}
+                {props.on_call ? (
+                    <OnCallTab data={props.on_call} now={now} />
+                ) : (
+                    <BlockFailed
+                        title="On call"
+                        text="Who is on call couldn’t load."
+                        onRetry={() => router.reload({ only: ['on_call'] })}
+                    />
+                )}
             </div>
         );
     }
