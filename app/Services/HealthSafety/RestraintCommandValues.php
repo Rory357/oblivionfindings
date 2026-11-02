@@ -9,6 +9,24 @@ use Illuminate\Validation\ValidationException;
 /** Typed factual command values. Elapsed whole minutes are rounded down, never wall-clock subtraction. */
 final class RestraintCommandValues
 {
+    /**
+     * E2E (2 Nov): the form showed "The client id field must be at least 1." / "The started at field is required."
+     * Plain words for the fields people fill in; anything else keeps Laravel's message.
+     */
+    private const PLAIN_MESSAGES = [
+        'client_id.required' => 'Choose the person.',
+        'client_id.min' => 'Choose the person.',
+        'started_at.required' => 'Add the date and time it started.',
+        'restraint_type.required' => 'Choose the type of restraint.',
+        'restraint_type.in' => 'Choose the type of restraint.',
+        'severity.required' => 'Choose the severity.',
+        'severity.in' => 'Choose the severity.',
+        'trigger_description.required' => 'Say what led to the restraint.',
+        'de_escalation_attempted.required' => 'Say what was tried before the restraint.',
+        'restraint_description.required' => 'Say what happened.',
+        'summary.max' => 'Keep the summary to 120 characters.',
+    ];
+
     public static function validate(array $input, array $rules, bool $create = false): array
     {
         $envelope = ['idempotency_key' => ['required', 'string', 'uuid']];
@@ -23,7 +41,7 @@ final class RestraintCommandValues
                 throw ValidationException::withMessages([$field => 'Use an integer, not a boolean.']);
             }
         }
-        $values = Validator::make($input, [...$envelope, ...$rules])->validate();
+        $values = Validator::make($input, [...$envelope, ...$rules], self::PLAIN_MESSAGES)->validate();
         foreach ([...$envelope, ...$rules] as $field => $fieldRules) {
             if (! in_array('integer', $fieldRules, true)) {
                 continue;
