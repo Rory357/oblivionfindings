@@ -706,6 +706,10 @@ class RbacSeeder extends Seeder
 
         // Provider Manager
         $syncPermissions($providerManager, [
+            // Q21 (Stephan, 2 Nov 2026: "Yes, their Sites"): read restraints at the Sites they manage (RestraintAccessService
+            // keeps reads to their Sites). Review and approval stay on restraints.review/approve/manage, not granted here.
+            // Grant migration 2026_11_02_130000.
+            'restraints.view',
             'medications.errors.manage',
             'sites.viewAny', 'sites.viewAll', 'sites.create', 'sites.update',
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
@@ -980,8 +984,11 @@ class RbacSeeder extends Seeder
             // Raise a safeguarding concern (create only; MASTER for Stephan, 30 Oct).
             'safeguarding.create',
             // Report incidents (Stephan, 30 Oct): read the clients at their sites, report from /incidents/report.
-            // No incident register. Grant migration: 2026_10_30_110000_grant_team_lead_incident_reporting.
+            // Grant migration: 2026_10_30_110000_grant_team_lead_incident_reporting.
             'incidents.create', 'clients.viewAny',
+            // Q21 (Stephan, 2 Nov 2026: "Own Site only"): the incident list and incident pages at their own Sites,
+            // read-only (no incidents.update / owner / review / close key). Grant migration 2026_11_02_130000.
+            'incidents.viewAny',
             'healthSafety.events.close', 'healthSafety.closureExceptions.request',
             // G3 (Stephan, 1 Nov 2026): read an incident's story on its safety review (Q1), and own/finish actions there
             // (answer 23). Never the incident itself. Grant migrations 2026_11_01_110000 and 2026_11_01_120000.
@@ -1046,6 +1053,9 @@ class RbacSeeder extends Seeder
                     ->whereIn('key', [
                         'hazards.view',
                         'healthSafety.viewAllSites',
+                        // Q21 (Stephan, 2 Nov 2026: "Read + report"): a read-only incident register for audits, and
+                        // reporting like any staff member. No owner/edit/close/approve key. Grant migration 2026_11_02_130000.
+                        'incidents.viewAny', 'incidents.create',
                         'healthSafety.closureExceptions.approve',
                         'safeguarding.viewAny',
                         'safeguarding.viewSensitive',
@@ -1127,8 +1137,8 @@ class RbacSeeder extends Seeder
             'hazards.create' => ['restraints.view', 'restraints.create'],
             'hazards.manage' => ['restraints.view', 'restraints.create', 'restraints.manage', 'restraints.review'],
         ];
-        // Provider managers act on H&S items at their sites with no restraint access (Stephan, Q4, 31 Oct 2026), so
-        // their hazards keys never copy restraint keys. This matches live, where they hold none.
+        // Provider managers act on H&S items at their sites (Stephan, Q4, 31 Oct 2026), so their hazards keys never copy
+        // restraint keys; their only restraint key is restraints.view, granted explicitly above (Q21, 2 Nov 2026).
         $noRestraintCopy = Role::whereIn('name', ['provider_manager'])->pluck('id')->all();
         foreach ($restraintGrantMap as $hazardKey => $grantKeys) {
             $hazard = Permission::where('key', $hazardKey)->first();
