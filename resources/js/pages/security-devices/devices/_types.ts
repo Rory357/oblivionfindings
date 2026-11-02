@@ -93,6 +93,62 @@ export type BatteryRow = {
     href: string;
 };
 
+/**
+ * One logbook line (S&D v13, pg-sdr-3e and 2f), newest first. `kind` is the "What" it files
+ * under; `span` is a quiet time's start and end; `tab` opens another tab of the device page.
+ */
+export type LogbookLine = {
+    key: string;
+    kind: 'alerts' | 'settings' | 'quiet' | 'logins' | 'moves' | 'terminal';
+    at: string;
+    tone: 'info' | 'warning' | 'success' | 'critical' | 'brand' | 'none';
+    title: string;
+    sub: string | null;
+    /** The person, or "Oblivion" for its own checks and backups; null when nobody is recorded. */
+    who: string | null;
+    compare_id: number | null;
+    span: { from: string | null; to: string | null } | null;
+    href: string | null;
+    tab: 'terminal' | null;
+};
+
+/** Upkeep › Not watched (S&D v13, pg-sdr-2e). */
+export type NotWatchedRow = {
+    id: number;
+    name: string;
+    model: string;
+    kind: DeviceKind;
+    state: DeviceState;
+    sub: string;
+    where: string | null;
+    /** The stored stop-watching reason in words, or how it was added without checks. */
+    why: string;
+    /** The device's own note. */
+    note: string | null;
+    since: string | null;
+    seen_at: string | null;
+    site: string | null;
+    site_id: number | null;
+    address: string | null;
+    watching: string;
+    href: string;
+};
+
+/** Upkeep › Retired (S&D v13, pg-sdr-2f): removed devices, read-only. */
+export type RetiredRow = {
+    id: number;
+    name: string;
+    kind: DeviceKind;
+    model: string;
+    sub: string;
+    was_at: string | null;
+    removed_at: string | null;
+    by: string | null;
+    kept: string;
+};
+
+export type UpkeepView = 'batteries' | 'updates' | 'not_watched' | 'retired';
+
 export type SiteOption = {
     id: number;
     name: string;
@@ -138,7 +194,7 @@ export type DevicesCan = {
 export type DevicesIndexProps = {
     tab: DevicesTab;
     layout: 'cards' | 'list';
-    upkeep: 'batteries' | 'updates';
+    upkeep: UpkeepView;
     /** `group`: "all", "health" (Health kit) or a device group's id (S&D rebuild C6). Optional for older fixtures. */
     filters: { site: string; status: string; group?: string; q: string };
     tabs: { key: DevicesTab; count: number | null }[];
@@ -179,6 +235,18 @@ export type DevicesIndexProps = {
             versions: string | null;
             at: string | null;
         }[];
+    } | null;
+    /** S&D v13 (pg-sdr-2e): devices known but not checked, with why and since when. */
+    not_watched?: {
+        rows: NotWatchedRow[];
+        meta: PageMeta;
+        recent: { key: string; at: string; tone: 'success' | 'none'; title: string; sub: string | null }[];
+    } | null;
+    /** S&D v13 (pg-sdr-2f): removed devices from the viewer's Sites, and the chosen one's last lines. */
+    retired?: {
+        rows: RetiredRow[];
+        meta: PageMeta;
+        selected: { id: number; name: string; removed_at: string | null; by: string | null; lines: LogbookLine[] } | null;
     } | null;
     openDialog: 'add' | null;
     deviceForm?: DeviceFormData;

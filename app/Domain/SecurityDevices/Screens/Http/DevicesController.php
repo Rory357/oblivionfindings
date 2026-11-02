@@ -69,6 +69,8 @@ final class DevicesController extends Controller
             'group' => $request->query('group') ?? ($request->query('domain') === 'iot_healthcare' ? 'health' : null),
             'q' => $request->query('q') ?? $request->query('search'),
             'page' => $request->query('page'),
+            // S&D v13 (pg-sdr-2f): the removed device whose last logbook lines are open.
+            'retired' => $request->query('retired'),
         ];
 
         $layout = $request->query('layout');

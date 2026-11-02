@@ -220,9 +220,16 @@ function TopologyBranch({
 export function SiteTopologyTreeCard({
     tree,
     siteName,
+    title,
+    description,
+    unplacedNote,
 }: {
     tree?: SiteTopologyTree;
     siteName?: string;
+    /** The S&D Site page's own words for the map (pg-sdr-12j); others keep the defaults. */
+    title?: string;
+    description?: string;
+    unplacedNote?: string;
 }) {
     const branchIds = useMemo(
         () => (tree ? collectBranchIds(tree.roots) : []),
@@ -260,15 +267,19 @@ export function SiteTopologyTreeCard({
                     <div className="space-y-1">
                         <CardTitle className="flex items-center gap-2">
                             <GitBranch className="h-4 w-4" />
-                            Automatic Site network map
+                            {title ?? 'Automatic Site network map'}
                         </CardTitle>
                         <CardDescription>
-                            Hierarchy built from hub discovery (LLDP, CDP,
-                            switch MAC tables, ARP, and UniFi)
-                            {siteName ? ` at ${siteName}` : ''}.
-                            {tree.last_captured_at
-                                ? ` Last updated ${formatDateTime(tree.last_captured_at)}.`
-                                : ''}
+                            {description ?? (
+                                <>
+                                    Hierarchy built from hub discovery (LLDP,
+                                    CDP, switch MAC tables, ARP, and UniFi)
+                                    {siteName ? ` at ${siteName}` : ''}.
+                                    {tree.last_captured_at
+                                        ? ` Last updated ${formatDateTime(tree.last_captured_at)}.`
+                                        : ''}
+                                </>
+                            )}
                         </CardDescription>
                     </div>
                     {branchIds.length > 0 && (
@@ -374,10 +385,8 @@ export function SiteTopologyTreeCard({
                                     </Button>
                                 </div>
                                 <p className="text-caption">
-                                    These devices are assigned to this Site,
-                                    but no switch port, access point, or LAN
-                                    gateway uplink has been reported for them
-                                    yet.
+                                    {unplacedNote ??
+                                        'These devices are assigned to this Site, but no switch port, access point, or LAN gateway uplink has been reported for them yet.'}
                                 </p>
                                 {showUnplaced && (
                                     <div className="grid gap-2 sm:grid-cols-2">

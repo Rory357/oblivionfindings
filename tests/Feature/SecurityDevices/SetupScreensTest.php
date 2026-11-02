@@ -108,7 +108,9 @@ class SetupScreensTest extends TestCase
             ->where('section', 'overview')
             ->where('sections.0.key', 'overview')
             ->where('sections.1.key', 'hubs')
-            ->where('sections.1.tabs.0.key', 'networks')
+            // S&D round 3 (pg-sdr-15p): Hubs is the first tab, then Networks & scans.
+            ->where('sections.1.tabs.0.key', 'hubs')
+            ->where('sections.1.tabs.1.key', 'networks')
             ->where('sections.2.key', 'services')
             // Phase H: Doors & access, for people who look after services. Computers & Obli needs its own keys.
             ->where('sections.3.key', 'access')

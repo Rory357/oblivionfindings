@@ -1,6 +1,30 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SiteShow, { type SitePageProps } from './show';
+import type { SiteDeviceListRow } from './_types';
+
+function deviceRow(id: number, name: string, kind: SiteDeviceListRow['kind']): SiteDeviceListRow {
+    return {
+        id,
+        name,
+        sub: 'Synthetic model · 10.0.0.' + id,
+        kind,
+        kind_label: 'Device',
+        state: 'online',
+        site: 'Synthetic House',
+        site_id: 4,
+        address: '10.0.0.' + id,
+        model: 'Synthetic model',
+        battery: null,
+        watching: 'Online',
+        href: `/security-devices/devices/${id}`,
+        badge: { label: 'Online', tone: 'success' },
+        note: { text: 'Checked {ago}', at: new Date(Date.now() - 60_000).toISOString() },
+        seen_at: new Date(Date.now() - 60_000).toISOString(),
+        room: null,
+        tab: 'network',
+    };
+}
 
 vi.mock('@inertiajs/react', async () => {
     const actual = await vi.importActual<typeof import('@inertiajs/react')>('@inertiajs/react');
@@ -55,8 +79,9 @@ describe('Site page', () => {
         expect(screen.getByText('Lowest on Wed, when 99.2% of checks answered.')).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Rooms' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Modes' })).toBeInTheDocument();
-        // The Devices, Alerts and Logbook tabs wait for their drawings' approval.
-        expect(screen.queryByRole('tab', { name: /devices|alerts|logbook/i })).not.toBeInTheDocument();
+        // Devices for everyone here; Alerts and Logbook only with their keys (12h, 12i).
+        expect(screen.getByRole('tab', { name: /^devices/i })).toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: /alerts|logbook/i })).not.toBeInTheDocument();
         // No modes and no switch permission: no Change mode.
         expect(screen.queryByText(/change mode/i)).not.toBeInTheDocument();
         expect(screen.getByText('No house modes yet')).toBeInTheDocument();
@@ -81,6 +106,249 @@ describe('Site page', () => {
         expect(screen.getByText('Synthetic House hub has stopped answering')).toBeInTheDocument();
         expect(screen.getByText(/2 devices it watches can’t be checked until it’s back/)).toBeInTheDocument();
         expect(screen.getByText('No cameras at this Site.')).toBeInTheDocument();
+    });
+
+    it('lists the Site’s devices with their room, problems first, not-watched ones in grey (12g)', () => {
+        render(
+            <SiteShow
+                {...fixture({
+                    tab: 'devices',
+                    overview: null,
+                    tabs: { devices: 2, alerts: true, logbook: true },
+                    devices: {
+                        rows: [
+                            {
+                                ...deviceRow(21, 'Synthetic yard camera', 'camera'),
+                                state: 'offline',
+                                badge: { label: 'Offline', tone: 'critical' },
+                                note: { text: 'Since {time}', at: new Date(Date.now() - 600_000).toISOString() },
+                                room: 'Back yard',
+                                tab: 'cameras',
+                            },
+                            { ...deviceRow(22, 'Synthetic phone base', 'other'), state: 'not_watched', watching: 'Nothing', room: null, tab: 'other' },
+                        ],
+                        by_kind: { cameras: 1, other: 1 },
+                        checked: [
+                            { tone: 'info', text: '**Synthetic House hub** checks **1** of them from here' },
+                            { tone: 'none', text: 'A device behind one that’s offline shows **Can’t check** in grey, not red' },
+                        ],
+                        not_watched: ['Synthetic phone base'],
+                        not_watched_count: 1,
+                        retired: [],
+                        retired_count: 0,
+                        can: { edit: true, watch: true, move: false, retire: false, export: false, commands: false },
+                    },
+                })}
+            />,
+        );
+
+        expect(screen.getByRole('tab', { name: /alerts/i })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: /logbook/i })).toBeInTheDocument();
+        expect(screen.getByText('Devices at Synthetic House')).toBeInTheDocument();
+        expect(screen.getByText('Back yard')).toBeInTheDocument();
+        expect(screen.getByRole('columnheader', { name: 'Room' })).toBeInTheDocument();
+        expect(screen.queryByRole('columnheader', { name: 'Site' })).not.toBeInTheDocument();
+        const rows = screen.getAllByRole('row');
+        expect(rows.findIndex((row) => row.textContent?.includes('Synthetic yard camera'))).toBeLessThan(
+            rows.findIndex((row) => row.textContent?.includes('Synthetic phone base')),
+        );
+        expect(screen.getByRole('button', { name: 'Select' })).toBeInTheDocument();
+        expect(screen.getByText(/Synthetic phone base isn’t watched, so it’s last in this list, in grey/)).toBeInTheDocument();
+        expect(screen.getByText('How they’re checked')).toBeInTheDocument();
+        expect(screen.getByText('Synthetic House hub', { selector: 'b' })).toBeInTheDocument();
+    });
+
+    it('shows the Site’s alerts, who was told and how each ended, and that safety never pauses (12h)', () => {
+        render(
+            <SiteShow
+                {...fixture({
+                    tab: 'alerts',
+                    overview: null,
+                    tabs: { devices: 3, alerts: true, logbook: true },
+                    alerts: {
+                        rows: [
+                            {
+                                id: 5,
+                                title: 'Synthetic yard camera has no picture',
+                                sub: 'Check · Started failing',
+                                device_id: 21,
+                                device_kind: 'camera',
+                                device: 'Synthetic yard camera',
+                                state: 'snoozed',
+                                at: new Date(Date.now() - 3_600_000).toISOString(),
+                                told: 'Nobody was told',
+                                ended: { badge: 'Snoozed', tone: 'neutral', note: 'Until 11:00 am · Synthetic Person: checking the port' },
+                                href: '/security-devices/alerts?alert=5',
+                            },
+                        ],
+                        days: 30,
+                        told: [{ when: 'Safety alerts: panic button, alarm, water leak, door forced', then: 'Staff on shift here, in the app · Control Room has them too' }],
+                        quiet: [],
+                    },
+                })}
+            />,
+        );
+
+        expect(screen.getByText('Alerts at Synthetic House')).toBeInTheDocument();
+        expect(screen.getByText('Synthetic yard camera has no picture')).toBeInTheDocument();
+        expect(screen.getByText('Nobody was told')).toBeInTheDocument();
+        expect(screen.getByText('Snoozed')).toBeInTheDocument();
+        expect(screen.getByText('Until 11:00 am · Synthetic Person: checking the port')).toBeInTheDocument();
+        expect(screen.getByText('Who’s told here')).toBeInTheDocument();
+        expect(screen.getByText('Safety alerts never pause.')).toBeInTheDocument();
+        expect(screen.getByText('No quiet time is planned.')).toBeInTheDocument();
+        // Nothing is said about a 6:00 am summary: it isn't built.
+        expect(screen.queryByText(/6:00 am summary/)).not.toBeInTheDocument();
+    });
+
+    it('keeps a plain logbook filtered by one What dropdown, not pill chips (12i)', () => {
+        const at = new Date(Date.now() - 600_000).toISOString();
+        render(
+            <SiteShow
+                {...fixture({
+                    tab: 'logbook',
+                    overview: null,
+                    tabs: { devices: 3, alerts: true, logbook: true },
+                    logbook: {
+                        day: '2026-10-29',
+                        today: true,
+                        what: 'everything',
+                        sections: [
+                            {
+                                key: 'day',
+                                title: 'This morning',
+                                items: [
+                                    {
+                                        key: 'mode-1',
+                                        at,
+                                        tone: 'info',
+                                        kind: 'mode',
+                                        title: 'House mode Night → Day',
+                                        sub: 'By schedule',
+                                        site_id: 4,
+                                        site: 'Synthetic House',
+                                        device_id: null,
+                                        device_kind: null,
+                                        href: '/security-devices/sites/4?tab=modes',
+                                        next: null,
+                                        by: null,
+                                        action: null,
+                                    },
+                                ],
+                            },
+                            { key: 'night', title: 'Overnight and early morning', items: [] },
+                            { key: 'before', title: 'Yesterday · Wed 28 Oct', items: [] },
+                        ],
+                    },
+                })}
+            />,
+        );
+
+        expect(screen.getByText('This morning')).toBeInTheDocument();
+        expect(screen.getByText('House mode Night → Day')).toBeInTheDocument();
+        expect(screen.getByLabelText('What')).toBeInTheDocument();
+        expect(screen.getByText('What the logbook keeps')).toBeInTheDocument();
+        expect(screen.queryByRole('tablist', { name: /what/i })).not.toBeInTheDocument();
+        // Empty sections aren't drawn; there's no export to stub.
+        expect(screen.queryByText('Overnight and early morning')).not.toBeInTheDocument();
+        expect(screen.queryByText(/export/i)).not.toBeInTheDocument();
+    });
+
+    it('lists the links found beside the map, with the configured Can’t check line (12j)', () => {
+        render(
+            <SiteShow
+                {...fixture({
+                    tab: 'network',
+                    overview: null,
+                    network: {
+                        tree: {
+                            tier_counts: { gateways: 1, switches: 0, access_points: 0, devices: 0 },
+                            sources: [],
+                            last_captured_at: null,
+                            mapped_count: 1,
+                            roots: [
+                                {
+                                    id: 1,
+                                    device_uid: 'synthetic-gw',
+                                    name: 'Synthetic gateway',
+                                    tier: 'gateway',
+                                    domain: 'it_infrastructure',
+                                    category: 'network',
+                                    subcategory: 'router',
+                                    manufacturer: null,
+                                    model: null,
+                                    ip_address: '10.0.0.1',
+                                    mac_address: null,
+                                    status: 'online',
+                                    health: 'online',
+                                    href: '/security-devices/devices/1',
+                                    uplink: null,
+                                    children: [],
+                                },
+                            ],
+                            unplaced: [],
+                        },
+                        links: {
+                            nothing: false,
+                            sources: [{ key: 'hub', who: 'Synthetic House hub', text: 'asks the gateway and switch what’s plugged into each port', at: new Date(Date.now() - 600_000).toISOString() }],
+                            threshold: 80,
+                            rows: [
+                                {
+                                    key: '1-2',
+                                    name: 'Synthetic gateway → Synthetic switch',
+                                    sub: 'Cable',
+                                    parent_id: 1,
+                                    child_id: 2,
+                                    child_kind: 'switch',
+                                    child_href: '/security-devices/devices/2',
+                                    by: 'Synthetic House hub',
+                                    ports: 'LAN 1 → Port 1',
+                                    sure: 98,
+                                    seen_at: new Date(Date.now() - 600_000).toISOString(),
+                                    map: { state: 'new', tone: 'info', label: 'Not on the map yet', note: 'First found {time}', at: new Date(Date.now() - 600_000).toISOString() },
+                                    relationship: null,
+                                },
+                            ],
+                            changes: [],
+                            unplaced: { count: 1, names: ['Synthetic leak sensor'], more: 0 },
+                            can: { change: true },
+                        },
+                    },
+                })}
+            />,
+        );
+
+        expect(screen.getByText('Where the links come from')).toBeInTheDocument();
+        expect(screen.getByText('Links that Oblivion is at least 80% sure of also decide which devices show Can’t check when the one before them goes offline.')).toBeInTheDocument();
+        expect(screen.getByText('Links found')).toBeInTheDocument();
+        expect(screen.getByText('Not on the map yet')).toBeInTheDocument();
+        expect(screen.getByText('98%')).toBeInTheDocument();
+        expect(screen.getByText(/Nothing reports a link for Synthetic leak sensor/)).toBeInTheDocument();
+        expect(screen.getByText('The links people have added or confirmed')).toBeInTheDocument();
+
+        fireEvent.contextMenu(screen.getByText('LAN 1 → Port 1'));
+        expect(screen.getByRole('menuitem', { name: 'Add to the map' })).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: 'Take off the map' })).not.toBeInTheDocument();
+    });
+
+    it('says when nothing reports links yet, with Add a hub', () => {
+        render(
+            <SiteShow
+                {...fixture({
+                    tab: 'network',
+                    overview: null,
+                    hub: null,
+                    can: { add_device: true, assign: true, scan: true, add_hub: true },
+                    network: {
+                        tree: { tier_counts: { gateways: 0, switches: 0, access_points: 0, devices: 1 }, sources: [], last_captured_at: null, mapped_count: 0, roots: [], unplaced: [] },
+                        links: { nothing: true, sources: [], threshold: 85, rows: [], changes: [], unplaced: { count: 0, names: [], more: 0 }, can: { change: false } },
+                    },
+                })}
+            />,
+        );
+
+        expect(screen.getByText('Nothing reports links here yet.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Add a hub' })).toBeInTheDocument();
     });
 
     it('is honest about what it doesn’t know about the internet line', () => {

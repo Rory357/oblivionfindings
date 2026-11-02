@@ -37,8 +37,13 @@ final class DevicePagePresenter
         // S&D Phase I (pg-sdr-9d): every time someone asked Obli for help on this PC.
         'obli' => 'Obli help',
         'remote' => 'Remote support',
+        // S&D v13 (pg-sdr-3d): a switch's ports, read-only.
+        'ports' => 'Ports',
         'checks' => 'Checks & alerts',
         'terminal' => 'Terminal',
+        // S&D v13 (pg-sdr-3e, 3f): network gear's logbook and settings.
+        'history' => 'History',
+        'settings' => 'Settings',
         'notes' => 'Notes & documents',
     ];
 
@@ -80,7 +85,7 @@ final class DevicePagePresenter
     }
 
     /**
-     * @param  array{tab?: mixed, range?: mixed}  $input
+     * @param  array{tab?: mixed, range?: mixed, what?: mixed, from?: mixed}  $input
      * @return array<string, mixed>
      */
     public function present(User $viewer, Device $device, array $input): array
@@ -122,8 +127,12 @@ final class DevicePagePresenter
             $group === 'computer' && $posture !== null ? 'health' : null,
             $group === 'computer' && \App\Domain\Obli\Fixes\Screens\ObliHelpTab::canSee($viewer) && app(\App\Domain\Obli\Fixes\ObliFixSettings::class)->schemaReady() ? 'obli' : null,
             $remote !== null ? 'remote' : null,
+            // Per-port detail comes from the same checks the Checks tab shows, so it needs the same key.
+            $kind === DeviceKind::Switch && $canSeeChecks ? 'ports' : null,
             $canSeeChecks ? 'checks' : null,
             $canTerminal ? 'terminal' : null,
+            $group === 'network' ? 'history' : null,
+            $group === 'network' ? 'settings' : null,
             'notes',
         ]));
         $tab = in_array($input['tab'] ?? null, $tabs, true) ? (string) $input['tab'] : 'overview';
@@ -198,6 +207,58 @@ final class DevicePagePresenter
                 : null,
             'notes' => $tab === 'notes' ? $this->notes->present($viewer, $device, $now) : null,
             'terminal' => $tab === 'terminal' ? $this->terminal($viewer, $device) : null,
+            // S&D v13 (pg-sdr-3d, 3e, 3f).
+            'ports' => $tab === 'ports' ? app(SwitchPorts::class)->present($viewer, $device, $monitors, $latest, $custody, $now) : null,
+            'history' => $tab === 'history' ? $this->history($viewer, $device, $siteId, $kind, $input) : null,
+            'settings' => $tab === 'settings'
+                ? app(DeviceSettingsTab::class)->present($viewer, $device, $kind, $entry, $monitors, $siteId, $siteName, self::noun($kind))
+                : null,
+        ];
+    }
+
+    /** "switch", "router", "Wi-Fi point": what the tabs call this device. */
+    public static function noun(DeviceKind $kind): string
+    {
+        return match ($kind) {
+            DeviceKind::Switch => 'switch',
+            DeviceKind::Router => 'router',
+            DeviceKind::WifiPoint => 'Wi-Fi point',
+            DeviceKind::Computer => 'computer',
+            DeviceKind::Printer => 'printer',
+            DeviceKind::Ups => 'UPS',
+            DeviceKind::Recorder => 'recorder',
+            DeviceKind::SensorGateway => 'gateway',
+            default => 'device',
+        };
+    }
+
+    /**
+     * S&D v13 (pg-sdr-3e): the logbook, filtered by kind ("What") and from a date and time.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function history(User $viewer, Device $device, ?int $siteId, DeviceKind $kind, array $input): array
+    {
+        $options = DeviceLogbook::kindOptions($viewer, true);
+        $what = is_string($input['what'] ?? null) && in_array($input['what'], array_column($options, 'value'), true) ? $input['what'] : 'all';
+        $from = null;
+        if (is_string($input['from'] ?? null) && trim($input['from']) !== '') {
+            try {
+                // The picker sends NZ wall-clock time ("2026-10-28T15:00"); stored times are UTC.
+                $from = CarbonImmutable::parse(trim($input['from']), (string) config('app.worker_timezone', 'Pacific/Auckland'))->utc();
+            } catch (\Throwable) {
+                $from = null;
+            }
+        }
+
+        return [
+            'noun' => self::noun($kind),
+            'what' => $what,
+            // Handed back as the NZ wall-clock time it was picked in, for the pickers.
+            'from' => $from === null ? null : $from->setTimezone((string) config('app.worker_timezone', 'Pacific/Auckland'))->format('Y-m-d\TH:i'),
+            'kinds' => $options,
+            'lines' => app(DeviceLogbook::class)->lines($viewer, $device, $siteId, $what, $from),
         ];
     }
 
@@ -362,7 +423,8 @@ final class DevicePagePresenter
             default => array_values(array_filter([
                 $reply(),
                 $uptime(),
-                $this->portsMeter($monitors, $latest),
+                // A switch's "Ports in use" opens its Ports tab (S&D v13, pg-sdr-3d).
+                $this->portsMeter($monitors, $latest, $kind === DeviceKind::Switch && $viewer->canDo('securityDevices.events.view') ? 'ports' : 'checks'),
                 $this->settingsMeter($backup, $backupHistory),
             ])),
         };
@@ -392,13 +454,13 @@ final class DevicePagePresenter
     }
 
     /** @param Collection<int, Monitor> $monitors */
-    private function portsMeter(Collection $monitors, Collection $latest): ?array
+    private function portsMeter(Collection $monitors, Collection $latest, string $tab = 'checks'): ?array
     {
         $ports = $this->observations->ports($monitors, $latest);
 
         return self::meter('ports', 'Ports in use', $ports ? $ports['up'].' of '.$ports['total'] : null, $ports
             ? ['text' => 'Read {ago}', 'at' => $ports['read_at']]
-            : ['text' => 'Ports aren’t read from it', 'at' => null], 'brand', 'checks');
+            : ['text' => 'Ports aren’t read from it', 'at' => null], 'brand', $tab);
     }
 
     /**

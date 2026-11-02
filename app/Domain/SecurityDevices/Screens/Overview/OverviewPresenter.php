@@ -16,7 +16,9 @@ use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Screens\DeviceState;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceDirectory;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceEntry;
+use App\Domain\SecurityDevices\Screens\Sites\AlertWords;
 use App\Domain\SecurityDevices\Screens\Sites\SitesIndexPresenter;
+use App\Domain\SecurityDevices\Screens\Sites\SiteStream;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
@@ -30,11 +32,22 @@ use Illuminate\Support\Str;
  * Security & devices home (S&D rebuild drawings pg-sdr-1 with its first-time view 1b, the Trends
  * tab pg-sdr-18 and the Reports tab 18b). Scoped by SecurityDevicesAccessService. The support
  * worker's view (1c) is WorkerOverviewPresenter (see showsWorkerView); Reports is for people who
- * may see reports (MonthlyReport); the Activity tab (18c) waits for its drawing's approval.
+ * may see reports (MonthlyReport); the Activity tab (18c) is for people who may see device events
+ * (SiteStream). The support worker's Overview has no Activity tab.
  */
 final class OverviewPresenter
 {
-    public const array TABS = ['overview', 'trends', 'reports'];
+    public const array TABS = ['overview', 'trends', 'reports', 'activity'];
+
+    /** Activity's "Every kind" choices (18c), each with the stream kinds it holds. */
+    public const array ACTIVITY_KINDS = [
+        'devices' => ['label' => 'Devices and scans', 'kinds' => ['device']],
+        'alarm' => ['label' => 'Alarm and modes', 'kinds' => ['alarm', 'mode']],
+        'alerts' => ['label' => 'Alerts', 'kinds' => ['alert']],
+        'doors' => ['label' => 'Doors worth a look', 'kinds' => ['door']],
+        'planned' => ['label' => 'Planned work', 'kinds' => ['planned']],
+        'hs' => ['label' => 'H&S', 'kinds' => ['hs']],
+    ];
 
     /**
      * The keys of people who look after devices (IT, managers, facilities, H&S, auditors). Someone with
@@ -74,16 +87,17 @@ final class OverviewPresenter
         private readonly SitesIndexPresenter $sites,
         private readonly MonthlyReport $reports,
         private readonly MonthlyReportEmail $reportEmail,
+        private readonly SiteStream $stream,
     ) {}
 
     /**
-     * @param  array{tab?: mixed, site?: mixed, month?: mixed}  $input
+     * @param  array{tab?: mixed, site?: mixed, month?: mixed, kind?: mixed, day?: mixed}  $input
      * @return array<string, mixed>
      */
     public function present(User $viewer, array $input): array
     {
         $tab = in_array($input['tab'] ?? null, self::TABS, true) ? $input['tab'] : 'overview';
-        if ($tab === 'reports' && ! MonthlyReport::canView($viewer)) {
+        if (($tab === 'reports' && ! MonthlyReport::canView($viewer)) || ($tab === 'activity' && ! SiteStream::mayView($viewer))) {
             $tab = 'overview';
         }
         $siteId = is_scalar($input['site'] ?? null) && ctype_digit((string) $input['site']) ? (int) $input['site'] : null;
@@ -119,8 +133,13 @@ final class OverviewPresenter
                 ...$this->reports->present($viewer, $siteId, $input['month'] ?? null, $entries),
                 'email' => $this->reportEmail->forViewer($viewer, CarbonImmutable::now('UTC')),
             ] : null,
+            // pg-sdr-18c: today's stream across the Sites in view, with the night beside it.
+            'activity' => $tab === 'activity' ? $this->activityTab($viewer, $entries, $siteOptions, $siteId, $input) : null,
             'can' => [
                 'reports' => MonthlyReport::canView($viewer),
+                'activity' => SiteStream::mayView($viewer),
+                // Activity's Export… is the events CSV Reports had (pg-sdr-18b), same key.
+                'export' => $viewer->canDo('securityDevices.reports.view'),
                 'add' => $viewer->canDo('securityDevices.devices.create'),
                 'scan' => $viewer->canDo('securityDevices.integrations.manage'),
                 'connect' => $viewer->canDo('securityDevices.integrations.manage'),
@@ -533,6 +552,79 @@ final class OverviewPresenter
     }
 
     /**
+     * pg-sdr-18c: a day's stream across the Sites in view, newest first, in plain sentences, each with
+     * what happened next. The night before it is its own block for whoever starts in the morning.
+     * Filtered by Site (the header's), kind and day.
+     *
+     * @param  Collection<int, DeviceEntry>  $entries
+     * @param  Collection<int, Site>  $siteOptions  the viewer's open Sites
+     * @param  array{kind?: mixed, day?: mixed}  $input
+     * @return array<string, mixed>
+     */
+    private function activityTab(User $viewer, Collection $entries, Collection $siteOptions, ?int $siteId, array $input): array
+    {
+        $zone = SiteStream::zone();
+        $now = CarbonImmutable::now('UTC');
+        $today = $now->setTimezone($zone)->startOfDay();
+        $day = $today;
+        if (is_string($input['day'] ?? null) && preg_match('/\A\d{4}-\d{2}-\d{2}\z/', $input['day']) === 1) {
+            try {
+                $picked = CarbonImmutable::createFromFormat('!Y-m-d', $input['day'], $zone);
+                if ($picked !== false && $picked->lte($today) && $picked->gte($today->subYear())) {
+                    $day = $picked;
+                }
+            } catch (\Throwable) {
+                // Not a real date: today.
+            }
+        }
+        $kind = array_key_exists((string) ($input['kind'] ?? ''), self::ACTIVITY_KINDS) ? (string) $input['kind'] : 'all';
+        $sites = $siteOptions
+            ->filter(fn (Site $site): bool => $siteId === null || (int) $site->id === $siteId)
+            ->mapWithKeys(fn (Site $site): array => [(int) $site->id => (string) $site->name])
+            ->all();
+        $isToday = $day->isSameDay($today);
+        $night = $this->stream->night($sites, $day);
+        $end = $isToday ? $now : $day->addDay()->utc();
+        $midnight = $day->utc();
+        $lines = collect($this->stream->between($viewer, $entries, $sites, $night['from']->min($midnight), $end, false, 800));
+        $groupOf = [];
+        foreach (self::ACTIVITY_KINDS as $key => $group) {
+            foreach ($group['kinds'] as $streamKind) {
+                $groupOf[$streamKind] = $key;
+            }
+        }
+        $at = fn (array $line): CarbonImmutable => CarbonImmutable::parse((string) $line['at']);
+        $shown = $lines->filter(fn (array $line): bool => $kind === 'all' || ($groupOf[$line['kind']] ?? null) === $kind)->values();
+        $rows = $shown->filter(fn (array $line): bool => $at($line)->gte($night['to']))->values();
+        $byKind = $lines->filter(fn (array $line): bool => $at($line)->gte($midnight))->countBy(fn (array $line): string => $groupOf[$line['kind']] ?? 'devices');
+
+        return [
+            'day' => $day->format('Y-m-d'),
+            'today' => $isToday,
+            'kind' => $kind,
+            'kinds' => [
+                ['value' => 'all', 'label' => 'Every kind'],
+                // Doors are offered only to people who can see them; the stream leaves them out otherwise.
+                ...array_values(array_filter(array_map(fn (string $key, array $group): ?array => $key === 'doors' && ! \App\Domain\SecurityDevices\Screens\Access\AccessPagePresenter::canSeeDoors($viewer) ? null : ['value' => $key, 'label' => $group['label']], array_keys(self::ACTIVITY_KINDS), self::ACTIVITY_KINDS))),
+            ],
+            'rows' => $rows->take(200)->map(fn (array $line): array => [...$line, 'group' => $groupOf[$line['kind']] ?? 'devices'])->all(),
+            'total' => $rows->count(),
+            'overnight' => [
+                'from' => $night['from']->toIso8601String(),
+                'to' => $night['to']->toIso8601String(),
+                'sites' => $night['sites'],
+                'rows' => $shown->filter(fn (array $line): bool => $at($line)->gte($night['from']) && $at($line)->lt($night['to']))
+                    ->take(40)->values()->all(),
+            ],
+            'by_kind' => collect(self::ACTIVITY_KINDS)
+                ->map(fn (array $group, string $key): array => ['key' => $key, 'label' => $group['label'], 'count' => (int) ($byKind[$key] ?? 0)])
+                ->values()
+                ->all(),
+            'doors' => \App\Domain\SecurityDevices\Screens\Access\AccessPagePresenter::canSeeDoors($viewer),
+        ];
+    }
+
+    /**
      * Open alerts about the viewer's devices that they may read, newest first.
      *
      * @param  Collection<int, DeviceEntry>  $entries
@@ -544,20 +636,24 @@ final class OverviewPresenter
             return [];
         }
         $byId = $entries->keyBy(fn (DeviceEntry $entry): int => $entry->id());
-        // S&D Phase D: the device alerts people work in Alerts, worst first.
-        $deviceAlerts = ! AlertsPresenter::canOpen($viewer) ? [] : DeviceAlert::query()
-            ->active()
+        // S&D Phase D: the device alerts people work in Alerts, worst first. Snoozed alerts aren't
+        // open: they wait in Alerts › Snoozed until their time is up.
+        $open = ! AlertsPresenter::canOpen($viewer) ? collect() : DeviceAlert::query()
+            ->where('state', DeviceAlert::STATE_OPEN)
             ->whereIn('device_id', $byId->keys()->all())
             ->orderByRaw("CASE WHEN severity = 'critical' THEN 0 ELSE 1 END")
             ->orderByDesc('opened_at')
             ->limit(200)
-            ->get(['id', 'device_id', 'title', 'severity', 'opened_at'])
-            ->map(function (DeviceAlert $alert) use ($byId): array {
+            ->get(['id', 'device_id', 'kind', 'title', 'severity', 'opened_at']);
+        // A care rule's alert names its resident only to someone who may open their record.
+        $people = SiteStream::carePeople($viewer, $open);
+        $deviceAlerts = $open
+            ->map(function (DeviceAlert $alert) use ($byId, $people): array {
                 $entry = $byId->get((int) $alert->device_id);
 
                 return [
                     'id' => 'sd-'.$alert->id,
-                    'title' => $alert->title,
+                    'title' => (new AlertWords($alert, $people[(int) $alert->id] ?? false))->title(),
                     'at' => $alert->opened_at->toIso8601String(),
                     'device' => (string) ($entry?->name() ?? ''),
                     'site' => (string) ($entry?->siteName ?? ''),

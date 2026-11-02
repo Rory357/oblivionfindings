@@ -5,8 +5,10 @@
  * _worker.tsx); the server decides.
  */
 import { DonutChart } from '@/components/dashboard/donut-chart';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -23,13 +25,15 @@ import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-
 import { Journey, Log, PlaceCards, PointBars, QuietLine, SideBySide, SideColumn, Story, Surface, Tally } from '@/components/signature/blocks';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
 import { seenTime, timedText } from '@/lib/security-devices/device-time';
 import { deviceStateLabel, deviceStateTone, devicesTabLabel } from '@/lib/security-devices/device-words';
 import { Head, Link, router } from '@inertiajs/react';
-import { Monitor, Network, Plus, Radar, RefreshCw, ShieldCheck } from 'lucide-react';
+import { CalendarDays, Monitor, Network, Plus, Radar, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { FactText, SiteFlagBadge } from '../sites/_parts';
+import { ActivityBody } from './_activity';
 import { ReportsBody } from './_reports';
 import type { ActivityRow, OverviewProps, OverviewTab, SecurityDevicesHomeProps } from './_types';
 import { WorkerOverview } from './_worker';
@@ -38,8 +42,8 @@ export type { OverviewProps, WorkerOverviewProps } from './_types';
 
 const BASE = '/security-devices';
 
-// Reports (18b) is for people who may see reports; Activity (18c) waits for its drawing's approval.
-const TAB_LABEL: Record<OverviewTab, string> = { overview: 'Overview', trends: 'Trends', reports: 'Reports' };
+// Reports (18b) is for people who may see reports; Activity (18c) for people who may see device events.
+const TAB_LABEL: Record<OverviewTab, string> = { overview: 'Overview', trends: 'Trends', reports: 'Reports', activity: 'Activity' };
 
 const KIND_COLOURS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
@@ -74,13 +78,25 @@ function ItOverview(props: OverviewProps) {
     const addHubFirst = !!props.first_time && tab === 'overview' && !!can.add_hub;
     const addHub = () => hubs.openAdd(site !== 'all' ? Number(site) : null);
     const reports = props.reports ?? null;
-    const go = (changes: { tab?: OverviewTab; site?: string; month?: string }) => {
+    const activity = props.activity ?? null;
+    const go = (changes: { tab?: OverviewTab; site?: string; month?: string; kind?: string; day?: string }) => {
         const next = { tab: changes.tab ?? tab, site: changes.site ?? site, month: changes.month ?? reports?.month.key };
         // The month is the Reports tab's own filter; this month is the default.
         const month = next.tab === 'reports' && next.month && next.month !== reports?.months[0]?.value ? next.month : undefined;
+        // Kind and day are the Activity tab's own filters; every kind and today are the defaults.
+        const kind = next.tab === 'activity' ? (changes.kind ?? activity?.kind) : undefined;
+        const day = next.tab === 'activity' ? (changes.day !== undefined ? changes.day : activity && !activity.today ? activity.day : '') : undefined;
         router.get(
             BASE,
-            Object.fromEntries(Object.entries({ tab: next.tab === 'overview' ? undefined : next.tab, site: next.site === 'all' ? undefined : next.site, month }).filter(([, v]) => v !== undefined)),
+            Object.fromEntries(
+                Object.entries({
+                    tab: next.tab === 'overview' ? undefined : next.tab,
+                    site: next.site === 'all' ? undefined : next.site,
+                    month,
+                    kind: kind && kind !== 'all' ? kind : undefined,
+                    day: day || undefined,
+                }).filter(([, v]) => v !== undefined),
+            ),
             { preserveState: true, preserveScroll: true },
         );
     };
@@ -141,9 +157,27 @@ function ItOverview(props: OverviewProps) {
                 </>
             }
             filters={
-                sites.length > 1 || (tab === 'reports' && reports) ? (
+                sites.length > 1 || (tab === 'reports' && reports) || (tab === 'activity' && activity) ? (
                     <>
                         {sites.length > 1 ? <PageHeaderFilterSelect label="All Sites" value={site} options={sites} onChange={(value) => go({ site: value })} /> : null}
+                        {tab === 'activity' && activity ? (
+                            <>
+                                <PageHeaderFilterSelect label="Every kind" value={activity.kind} options={activity.kinds} onChange={(value) => go({ kind: value })} />
+                                {/* The Today filter picks another day with the approved date picker. */}
+                                <DatePicker
+                                    id="activity-day"
+                                    label="Day"
+                                    value={activity.today ? '' : activity.day}
+                                    allowClear
+                                    onChange={(value) => go({ day: value })}
+                                    trigger={
+                                        <PageHeaderFilterButton icon={CalendarDays} active={!activity.today} aria-label={`Day: ${activity.today ? 'Today' : formatDateOnly(activity.day)}`}>
+                                            {activity.today ? 'Today' : formatDateOnly(activity.day)}
+                                        </PageHeaderFilterButton>
+                                    }
+                                />
+                            </>
+                        ) : null}
                         {tab === 'reports' && reports && reports.months.length > 0 ? (
                             <PageHeaderFilterSelect
                                 label={reports.months[0].label}
@@ -159,7 +193,9 @@ function ItOverview(props: OverviewProps) {
             rail={
                 <PageHeaderRail<OverviewTab>
                     ariaLabel="Security & devices views"
-                    items={(Object.keys(TAB_LABEL) as OverviewTab[]).filter((key) => key !== 'reports' || can.reports).map((key) => ({ key, label: TAB_LABEL[key] }))}
+                    items={(Object.keys(TAB_LABEL) as OverviewTab[])
+                        .filter((key) => (key !== 'reports' || can.reports) && (key !== 'activity' || can.activity))
+                        .map((key) => ({ key, label: TAB_LABEL[key] }))}
                     value={tab}
                     onSelect={(key) => go({ tab: key })}
                 />
@@ -170,9 +206,10 @@ function ItOverview(props: OverviewProps) {
     let body: ReactNode = null;
     if (tab === 'overview' && props.first_time)
         body = <FirstTime firstTime={props.first_time} onConnect={can.connect ? () => setPopup({ kind: 'connect' }) : null} onAddHub={can.add_hub ? addHub : null} />;
-    else if (tab === 'overview' && props.overview) body = <OverviewBody overview={props.overview} now={now} />;
+    else if (tab === 'overview' && props.overview) body = <OverviewBody overview={props.overview} now={now} canActivity={!!can.activity} />;
     else if (tab === 'trends' && props.trends) body = <Trends trends={props.trends} />;
     else if (tab === 'reports' && reports) body = <ReportsBody reports={reports} now={now} />;
+    else if (tab === 'activity' && activity) body = <ActivityBody activity={activity} now={now} canExport={!!can.export} />;
 
     return (
         <AppLayout
@@ -254,7 +291,7 @@ function FirstTime({ firstTime, onConnect, onAddHub }: { firstTime: NonNullable<
     );
 }
 
-function OverviewBody({ overview, now }: { overview: NonNullable<OverviewProps['overview']>; now: Date }) {
+function OverviewBody({ overview, now, canActivity }: { overview: NonNullable<OverviewProps['overview']>; now: Date; canActivity: boolean }) {
     return (
         <SideBySide cols="minmax(0, 1fr) 360px">
             <div className="flex flex-col gap-5">
@@ -322,7 +359,13 @@ function OverviewBody({ overview, now }: { overview: NonNullable<OverviewProps['
                         calm={overview.hubs.calm ?? undefined}
                     />
                 ) : null}
-                <Activity rows={overview.activity} now={now} limit={6} title="Recent activity" />
+                <Activity
+                    rows={overview.activity}
+                    now={now}
+                    limit={6}
+                    title="Recent activity"
+                    action={canActivity ? { label: 'All activity', href: '/security-devices?tab=activity' } : undefined}
+                />
             </SideColumn>
         </SideBySide>
     );

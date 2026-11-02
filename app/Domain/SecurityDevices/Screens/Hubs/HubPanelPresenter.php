@@ -181,6 +181,27 @@ final class HubPanelPresenter
             'check_requested_at' => $hub->update_check_requested_at?->toIso8601String(),
             'held' => $hold['held'],
             'held_at' => $hold['held_at'],
+            // Stephan, 3 Nov: "Wait for the test hub". A hub that isn't test-first says what its next version waits for.
+            'waiting' => $this->waiting($hub),
+        ];
+    }
+
+    /** @return array{version: string, state: string, ready_at: string, test_hub: string|null}|null */
+    private function waiting(MonitoringCollector $hub): ?array
+    {
+        if ($hub->update_ring === 'early' || $hub->approved_at === null) {
+            return null;
+        }
+        $waiting = $this->updates->waitingFor($hub);
+        if ($waiting === null) {
+            return null;
+        }
+
+        return [
+            'version' => $waiting['version'],
+            'state' => $waiting['state'],
+            'ready_at' => $waiting['ready_at'],
+            'test_hub' => $waiting['test_hub'] instanceof MonitoringCollector ? CoveringHubResolver::label($waiting['test_hub']) : null,
         ];
     }
 

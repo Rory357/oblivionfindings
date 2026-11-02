@@ -93,7 +93,7 @@ final class DeviceAlertEngine
             }
             $settings = app(SecurityDevicesSettings::class);
             $people = (int) $hub->site_id > 0
-                ? $this->policies->resolveItRecipients((int) $hub->site_id, $settings->role(SecurityDevicesSettings::DEVICES_ROLE))
+                ? app(ItOnCall::class)->first($this->policies->resolveItRecipients((int) $hub->site_id, $settings->role(SecurityDevicesSettings::DEVICES_ROLE)))
                 : collect();
             $channels = $settings->channels(SecurityDevicesSettings::DEVICES_APP, SecurityDevicesSettings::DEVICES_EMAIL, SecurityDevicesSettings::DEVICES_PUSH);
             $told = $people->isNotEmpty() && $channels !== []
@@ -385,7 +385,7 @@ final class DeviceAlertEngine
                 // Told as Setup › Alerts & checks says for "a device or hub stops answering".
                 $settings = app(SecurityDevicesSettings::class);
                 $people = (int) $hub->site_id > 0
-                    ? $this->policies->resolveItRecipients((int) $hub->site_id, $settings->role(SecurityDevicesSettings::DEVICES_ROLE))
+                    ? app(ItOnCall::class)->first($this->policies->resolveItRecipients((int) $hub->site_id, $settings->role(SecurityDevicesSettings::DEVICES_ROLE)))
                     : collect();
                 $channels = $settings->channels(SecurityDevicesSettings::DEVICES_APP, SecurityDevicesSettings::DEVICES_EMAIL, SecurityDevicesSettings::DEVICES_PUSH);
                 $told = $people->isNotEmpty() && $channels !== []

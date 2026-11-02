@@ -2,7 +2,7 @@ import type { StatusVariant } from '@/components/ui/status-badge';
 import type { SshHostKeyState } from '@/components/security-devices/ssh-host-key-notice';
 import type { SgTone } from '@/components/signature/blocks';
 import type { DeviceKind, DeviceState } from '@/lib/security-devices/device-words';
-import type { DeviceCardData, DeviceFormData, TimedText } from './_types';
+import type { DeviceCardData, DeviceFormData, LogbookLine, TimedText } from './_types';
 import type { FirmwareUpdate } from '@/components/security-devices/firmware-update-popup';
 import type { SavedLogin } from './_device-saved-login';
 import type { ObliHelpTabData } from '@/lib/security-devices/obli-fixes';
@@ -13,7 +13,89 @@ import type { ObliHelpTabData } from '@/lib/security-devices/obli-fixes';
  * open tab's data is filled in. A null value means "Not available", never 0.
  */
 
-export type DevicePageTab = 'overview' | 'health' | 'obli' | 'remote' | 'checks' | 'terminal' | 'notes';
+export type DevicePageTab = 'overview' | 'health' | 'obli' | 'remote' | 'ports' | 'checks' | 'terminal' | 'history' | 'settings' | 'notes';
+
+export type { LogbookLine } from './_types';
+
+/** S&D v13 (pg-sdr-3d): one port of a switch. null = not read ("Not available"), never 0. */
+export type SwitchPort = {
+    port: number;
+    device: { id: number; name: string; kind: DeviceKind; model: string; state: DeviceState; href: string } | null;
+    /** The port's own label (its alias in the switch, or UniFi's name) when no device is linked. */
+    label: string | null;
+    up: boolean | null;
+    speed: string | null;
+    poe_w: number | null;
+    /** Errors counted by its port check over the last `error_hours`. */
+    errors: number | null;
+    /** UniFi's own counters since the switch last started, when no port check counts them. */
+    errors_total: number | null;
+    changed_at: string | null;
+    change: string | null;
+    problem: boolean;
+    free: boolean;
+};
+
+export type PortsTab = {
+    rows: SwitchPort[];
+    total: number;
+    tally: {
+        free: number | null;
+        poe_w: number | null;
+        powering: number;
+        errors: number | null;
+        errors_first: string | null;
+        changed: number;
+        changed_ports: number[];
+    };
+    source: {
+        checks: number;
+        every: string | null;
+        by: string | null;
+        read_at: string | null;
+        unifi_at: string | null;
+        unifi_hub: string | null;
+        error_hours: number;
+    };
+};
+
+/** S&D v13 (pg-sdr-3e): the device's logbook. */
+export type HistoryTab = {
+    noun: string;
+    what: string;
+    /** NZ wall-clock "YYYY-MM-DDTHH:mm", or null for any date. */
+    from: string | null;
+    kinds: { value: string; label: string }[];
+    lines: LogbookLine[];
+};
+
+/** S&D v13 (pg-sdr-3f): the device's Settings tab. */
+export type SettingsTab = {
+    noun: string;
+    name: string;
+    site: string | null;
+    site_id: number | null;
+    room: string | null;
+    checked_by: string | null;
+    address: string | null;
+    read_through: string | null;
+    watching: {
+        on: boolean;
+        by_service: boolean;
+        every: string | null;
+        checked_by: string;
+        offline_alert: boolean;
+        offline_ids: number[];
+        stop_ids: number[];
+        other_checks: number;
+        backup: { every: string | null } | null;
+        relied_on: boolean;
+        dependents: number;
+    };
+    about: { model: string; added_at: string | null; added_by: string | null; from_scan: boolean };
+    it: [string, string][];
+    edit: { domain: string; category: string; subcategory: string | null } | null;
+};
 
 /** S&D Phase G (pg-sdr-3b): the Terminal tab, through the hub, for IT admins. */
 export type TerminalTabData = {
@@ -304,6 +386,10 @@ export type DevicePageProps = {
     remote: RemoteSupport | null;
     checks: ChecksTab | null;
     terminal?: TerminalTabData | null;
+    /** S&D v13 (pg-sdr-3d, 3e, 3f): a switch's Ports, and network gear's History and Settings. */
+    ports?: PortsTab | null;
+    history?: HistoryTab | null;
+    settings?: SettingsTab | null;
     notes: NotesTab | null;
     /** S&D Phase I (pg-sdr-9d): the Obli help tab. */
     obli?: ObliHelpTabData | null;

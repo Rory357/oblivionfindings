@@ -18,7 +18,11 @@ use DomainException;
  * Each hub is told on its heartbeat which release it should run and when it may update. The
  * hub downloads it, checks its signature, swaps it in, restarts, and rolls back by itself if
  * no heartbeat gets through within ROLLBACK_AFTER_MINUTES. "Test first" hubs get a release
- * as soon as it's published; everyone else a day later.
+ * as soon as it's published. Everyone else waits for the test hub (Stephan, 3 Nov: "Wait for
+ * the test hub"): a release goes to them only once a test-first hub has installed it and a day
+ * has passed since it was published. A test-first hub whose update failed or rolled back holds
+ * the others on their version until a test hub has it working. With no test-first hub, the
+ * others simply wait the day.
  */
 final class HubUpdatePolicy
 {
@@ -123,6 +127,10 @@ final class HubUpdatePolicy
         }
         usort($artifacts, fn (array $a, array $b): int => $b['release_revision'] <=> $a['release_revision']);
         $latest = $artifacts[0];
+        if ($ring === 'everyone' && $this->testHubs((string) $latest['version'])['state'] !== 'clear') {
+            // Waiting for a test-first hub to have it working, or held because its update failed.
+            return null;
+        }
 
         $target = [
             'version' => (string) $latest['version'],
@@ -197,6 +205,80 @@ final class HubUpdatePolicy
         }
 
         return $collector->fresh();
+    }
+
+    /**
+     * Where the test-first hubs are with a version, which decides whether everyone else may take it.
+     *
+     * - `clear`: no test-first hub failed it and at least one has it working, or there is no
+     *   test-first hub at all (then only the day's wait applies);
+     * - `waiting`: test-first hubs exist but none has reported it working yet;
+     * - `held`: a test-first hub's latest report on it is a failure or a roll-back. Everyone else
+     *   keeps their version until a test hub reports it working.
+     *
+     * @return array{state: 'clear'|'waiting'|'held', test_hubs: int, hub: MonitoringCollector|null}
+     */
+    public function testHubs(string $version): array
+    {
+        $tests = MonitoringCollector::query()
+            ->where('update_ring', 'early')
+            ->whereNotNull('approved_at')
+            ->whereNull('revoked_at')
+            ->orderBy('id')
+            ->get();
+        if ($tests->isEmpty()) {
+            return ['state' => 'clear', 'test_hubs' => 0, 'hub' => null];
+        }
+        $outcome = fn (MonitoringCollector $hub): ?string => is_array($hub->update_state)
+            && ($hub->update_state['to_version'] ?? null) === $version
+            ? (is_string($hub->update_state['outcome'] ?? null) ? $hub->update_state['outcome'] : null)
+            : null;
+        $failed = $tests->first(fn (MonitoringCollector $hub): bool => in_array($outcome($hub), ['failed', 'rolled_back'], true));
+        if ($failed !== null) {
+            return ['state' => 'held', 'test_hubs' => $tests->count(), 'hub' => $failed];
+        }
+        // Working: it reported installing it, or it already runs it (a fresh install on the new version).
+        $working = $tests->first(fn (MonitoringCollector $hub): bool => $outcome($hub) === 'installed' || $hub->softwareVersion() === $version);
+
+        return $working !== null
+            ? ['state' => 'clear', 'test_hubs' => $tests->count(), 'hub' => $working]
+            : ['state' => 'waiting', 'test_hubs' => $tests->count(), 'hub' => null];
+    }
+
+    /**
+     * For Setup: the newest release, and what a hub that isn't test-first is waiting for, if anything.
+     * Null when the release list can't be read or the hub already runs it.
+     *
+     * @return array{version: string, state: 'day'|'waiting'|'held'|'ready', ready_at: string, test_hub: MonitoringCollector|null}|null
+     */
+    public function waitingFor(MonitoringCollector $collector, ?CarbonImmutable $now = null): ?array
+    {
+        $now ??= CarbonImmutable::now('UTC');
+        try {
+            $catalogue = ($this->catalogue ?? EndpointReleaseCatalogue::configured())->signedCatalogue($now->toDateTimeImmutable())['catalogue'];
+        } catch (EndpointReleaseUnavailable) {
+            return null;
+        }
+        $platform = $this->platform($collector);
+        $versions = array_values(array_filter($catalogue['artifacts'], fn (array $artifact): bool => $artifact['platform'] === $platform && in_array('site', $artifact['roles'], true)));
+        if ($versions === []) {
+            return null;
+        }
+        usort($versions, fn (array $a, array $b): int => $b['release_revision'] <=> $a['release_revision']);
+        $version = (string) $versions[0]['version'];
+        if ($collector->softwareVersion() === $version) {
+            return null;
+        }
+        $readyAt = CarbonImmutable::parse((string) $catalogue['issued_at'])->utc()->addHours(self::EVERYONE_DELAY_HOURS);
+        $tests = $this->testHubs($version);
+        $state = match (true) {
+            $tests['state'] === 'held' => 'held',
+            $tests['state'] === 'waiting' => 'waiting',
+            $readyAt->gt($now) => 'day',
+            default => 'ready',
+        };
+
+        return ['version' => $version, 'state' => $state, 'ready_at' => $readyAt->toIso8601String(), 'test_hub' => $tests['hub']];
     }
 
     /** An admin asked this hub to check now (in the last day) and it hasn't reported since. */

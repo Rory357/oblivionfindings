@@ -16,6 +16,17 @@ export function FactText({ fact, now }: { fact: SiteFact; now: Date }): ReactNod
     );
 }
 
+/** A server line where "**…**" marks the figure or name to make bold (no times in it). */
+export function BoldText({ text }: { text: string }): ReactNode {
+    const parts = text.split(/\*\*(.+?)\*\*/g);
+
+    return (
+        <>
+            {parts.map((part, index) => (index % 2 === 1 ? <b key={index}>{part}</b> : <Fragment key={index}>{part}</Fragment>))}
+        </>
+    );
+}
+
 export function SiteFlagBadge({ flag }: { flag: SiteFlag }) {
     return <StatusBadge variant={flag.tone}>{flag.text}</StatusBadge>;
 }

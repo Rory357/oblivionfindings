@@ -169,6 +169,21 @@ export type CheckRow = { key: string; kind: string; check: string; often: string
 
 export type HistoryRow = { id: number; at: string | null; who: string; what: string; where: string; site_id: number | null };
 
+/** S&D round 3 (pg-sdr-15p): Setup › Hubs & networks › Hubs. */
+export type SetupHubCard = { id: number; name: string; sub: string; flag: { tone: Tone; text: string }; lines: SetupLine[] };
+
+export type SetupHubs = {
+    cards: SetupHubCard[];
+    /** The newest failed or rolled-back update in the last week, if any. */
+    banner: { hub_id: number; label: string; title: string; text: string; at: string | null; then: string; can: { try_again: boolean } } | null;
+    for_it: [string, string][] | null;
+    how: SetupLine[];
+    can: { add: boolean; hold: boolean };
+    held: boolean;
+    /** The viewer may open Setup but not hub panels: the tab says so instead of listing hubs. */
+    locked: boolean;
+};
+
 export type SetupProps = {
     section: SetupSection;
     tab: string | null;
@@ -181,6 +196,7 @@ export type SetupProps = {
     /** Deferred, same people: the monitoring service's heartbeat, work waiting, failed deliveries and outage watchdog. */
     server_health?: ServerHealthPayload | null;
     overview: { todo: TodoItem[]; cards: ReviewCardData[] } | null;
+    hubs?: SetupHubs | null;
     settings: Record<string, SettingRow> | null;
     alerts: { rules: number } | null;
     checks: { rows: CheckRow[] } | null;

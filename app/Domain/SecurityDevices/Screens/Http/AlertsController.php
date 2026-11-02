@@ -3,13 +3,16 @@
 namespace App\Domain\SecurityDevices\Screens\Http;
 
 use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
+use App\Domain\SecurityDevices\Alerts\ItOnCall;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
+use App\Domain\SecurityDevices\Alerts\Models\OnCallHandover;
 use App\Domain\SecurityDevices\Screens\Alerts\AlertRulesPresenter;
 use App\Domain\SecurityDevices\Screens\Alerts\AlertsPresenter;
 use App\Domain\SecurityDevices\Screens\Alerts\AutomationsPresenter;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceFormOptions;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -136,6 +139,40 @@ final class AlertsController extends Controller
         $hazard = app(\App\Domain\SecurityDevices\Care\ScaldWatch::class)->raiseHazard($user, $record);
 
         return response()->json(['hazard_id' => (int) $hazard->id, 'url' => '/hazards/'.$hazard->id], 201);
+    }
+
+    /**
+     * S&D round 3 (pg-sdr-13d): a handover note for whoever is on IT on call next. It goes to the next
+     * person on the on-call roster (or nobody yet, when the roster is empty), from the person writing it.
+     */
+    public function handover(Request $request, ItOnCall $onCall): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User && $user->canDo('securityDevices.alerts.acknowledge'), 403);
+        $validated = $request->validate([
+            'still_open' => ['nullable', 'string', 'max:2000'],
+            'coming_up' => ['nullable', 'string', 'max:2000'],
+            'good_to_know' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $words = array_map(fn (mixed $text): ?string => is_string($text) && trim($text) !== '' ? trim($text) : null, $validated);
+        if (array_filter($words) === []) {
+            throw ValidationException::withMessages(['still_open' => 'Write at least one part of the handover.']);
+        }
+        $now = CarbonImmutable::now('UTC');
+        $next = $onCall->shifts($now, $now->addDays(14))
+            ->first(fn ($shift): bool => (int) $shift->user_id !== (int) $user->id);
+        $note = OnCallHandover::query()->create([
+            'from_user_id' => (int) $user->id,
+            'to_user_id' => $next?->user_id === null ? null : (int) $next->user_id,
+            'still_open' => $words['still_open'] ?? null,
+            'coming_up' => $words['coming_up'] ?? null,
+            'good_to_know' => $words['good_to_know'] ?? null,
+        ]);
+        AuditLogger::logOrFail('security_devices.on_call.handover_written', $note, ['actor_id' => (int) $user->id, 'to_user_id' => $note->to_user_id]);
+
+        return response()->json([
+            'message' => $next?->staff?->name ? 'Handover saved for '.$next->staff->name.'.' : 'Handover saved.',
+        ], 201);
     }
 
     /** @return array{0: User, 1: DeviceAlert} */

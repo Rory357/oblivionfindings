@@ -334,6 +334,8 @@ export type HubPanelData = {
         check_requested_at: string | null;
         held: boolean;
         held_at: string | null;
+        /** A hub that isn't test-first: what the newest release waits for (Stephan, 3 Nov: "Wait for the test hub"). */
+        waiting: { version: string; state: 'day' | 'waiting' | 'held' | 'ready'; ready_at: string; test_hub: string | null } | null;
     };
     watching: { devices: number; sites: number; cant_check: number };
     sites: { id: number; name: string; own: boolean }[];
@@ -770,7 +772,7 @@ export function EditHub({
                         onChange={setRing}
                         options={[
                             { value: 'everyone', label: 'With everyone' },
-                            { value: 'early', label: 'Test first: gets updates a day early' },
+                            { value: 'early', label: 'Test first: gets updates first; the others wait for it' },
                         ]}
                     />
                 </PopupField>
@@ -838,6 +840,21 @@ function updateOutcome(last: HubPanelData['updates']['last']): string | null {
     if (last.outcome === 'installed') return last.to ? `Updated to ${last.to}` : 'Updated';
     if (last.outcome === 'rolled_back') return `Update${last.to ? ` to ${last.to}` : ''} didn’t work, so it went back${last.from ? ` to ${last.from}` : ''}`;
     return `Update${last.to ? ` to ${last.to}` : ''} didn’t install${last.from ? `, still on ${last.from}` : ''}`;
+}
+
+/** What the newest release waits for, for a hub that isn't test-first. */
+function waitingWords(waiting: NonNullable<HubPanelData['updates']['waiting']>): string {
+    const test = waiting.test_hub ?? 'the test hub';
+    switch (waiting.state) {
+        case 'held':
+            return `Stays on its version: ${waiting.version} failed on ${test}. It goes once a test hub has ${waiting.version} working.`;
+        case 'waiting':
+            return `Waits for ${test} to have ${waiting.version} working first`;
+        case 'day':
+            return `${waiting.version} from ${formatDateTime(waiting.ready_at)}, a day after it came out`;
+        default:
+            return `${waiting.version} in its next update window`;
+    }
 }
 
 export function HubPanel({
@@ -1008,13 +1025,14 @@ export function HubPanel({
                     rows={[
                         ['Version', hub.version ?? 'Not available'],
                         ['Last update', lastUpdate ? `${lastUpdate}${data.updates.last?.at ? ` · ${formatDateTime(data.updates.last.at)}` : ''}` : 'None reported yet'],
-                        ['Gets updates', data.updates.ring === 'early' ? 'Test first: a day before everyone' : 'With everyone'],
+                        ['Gets updates', data.updates.ring === 'early' ? 'Test first: before the other hubs' : 'With everyone'],
+                        ...(data.updates.waiting ? [['Next update', waitingWords(data.updates.waiting)] as const] : []),
                         ['Updates between', `${clockWords(data.updates.window_start)} – ${clockWords(data.updates.window_end)}, New Zealand time`],
                         ['Every hub', data.updates.held ? `On hold${data.updates.held_at ? ` since ${formatDateTime(data.updates.held_at)}` : ''}` : 'Updating as usual'],
                         ...(data.updates.check_requested_at ? [['Check now', `Asked ${seenTime(data.updates.check_requested_at, now)} · it looks the next time it checks in`] as const] : []),
                     ]}
                 />
-                <PopupCallout tone="info">Updates install themselves in this window. If one fails, the hub goes back to the version before.</PopupCallout>
+                <PopupCallout tone="info">Updates install themselves in this window. If one fails, the hub goes back to the version before. Test-first hubs get a new version first; the others take it a day after it comes out, and only once a test-first hub has it working. If the test hub’s update fails, they keep their version.</PopupCallout>
             </div>
         );
     } else {

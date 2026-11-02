@@ -1,6 +1,7 @@
 /**
- * One Site (S&D rebuild drawing pg-sdr-12, with Network map 12b, Internet 12e, Rooms 12d, Modes 12c
- * and "hub stopped answering" 12f). House modes switch by hand with pop-up 42 and are edited with 43.
+ * One Site (S&D rebuild drawing pg-sdr-12, with Network map 12b and its links found 12j, Internet
+ * 12e, Rooms 12d, Modes 12c, Devices 12g, Alerts 12h, Logbook 12i and "hub stopped answering" 12f).
+ * House modes switch by hand with pop-up 42 and are edited with 43.
  */
 import { DonutChart } from '@/components/dashboard/donut-chart';
 import {
@@ -30,19 +31,26 @@ import { deviceStateLabel, deviceStateTone, type DeviceState } from '@/lib/secur
 import { Head, Link, router } from '@inertiajs/react';
 import { House, Plus, Radar, SunMoon } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import { AlertsTab } from './_alerts';
+import { DevicesTab } from './_devices';
+import { LinkChanges, LinksFoundTable, NotPlaced, WhereLinksComeFrom } from './_links';
+import { LogbookTab } from './_logbook';
 import { ModesTab } from './_modes';
 import { RoomsTab } from './_rooms';
-import type { HouseSummary, SitePageProps, SitePageTab } from './_types';
+import type { HouseSummary, LinksFound, SitePageProps, SitePageTab } from './_types';
 
 export type { SitePageProps } from './_types';
 
-// The Devices, Alerts and Logbook tabs (12g–12i) wait for their drawings' approval.
+// Alerts (12h) is for people who may see alerts, Logbook (12i) for people who may see device events.
 const TAB_LABEL: Record<SitePageTab, string> = {
     overview: 'Overview',
     network: 'Network map',
     internet: 'Internet',
     rooms: 'Rooms',
     modes: 'Modes',
+    devices: 'Devices',
+    alerts: 'Alerts',
+    logbook: 'Logbook',
 };
 
 const NO_HOUSE: HouseSummary = { current: null, next: null, modes: [] };
@@ -85,6 +93,7 @@ function obliSessionFromUrl(): string | null {
 
 export default function SiteShow(props: SitePageProps) {
     const { site, tab, flag, hub, meters, can } = props;
+    const tabs = props.tabs ?? { devices: 0, alerts: false, logbook: false };
     const house = props.house ?? NO_HOUSE;
     // Change mode offers every mode but the one the house is in.
     const switchable = can.switch_mode ? house.modes.filter((mode) => mode.id !== house.current?.id) : [];
@@ -187,7 +196,7 @@ export default function SiteShow(props: SitePageProps) {
                     <PageHeaderMeterBlock
                         label="Devices online"
                         tone={meters.online.of > 0 && meters.online.count === meters.online.of ? 'success' : meters.online.of > 0 ? 'warning' : 'brand'}
-                        onClick={() => router.visit(`/security-devices/devices?site=${site.id}`)}
+                        onClick={() => go('devices')}
                         ariaLabel="Show this Site’s devices"
                     >
                         <PageHeaderMeterBig>{meters.online.of > 0 ? `${meters.online.count} of ${meters.online.of}` : 'Not available'}</PageHeaderMeterBig>
@@ -207,7 +216,12 @@ export default function SiteShow(props: SitePageProps) {
                                       : 'No house modes yet'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock label="Alerts open" tone={meters.alerts.count > 0 ? 'warning' : 'success'} onClick={() => router.visit(`/security-devices?site=${site.id}`)} ariaLabel="Show what needs attention at this Site">
+                    <PageHeaderMeterBlock
+                        label="Alerts open"
+                        tone={meters.alerts.count > 0 ? 'warning' : 'success'}
+                        onClick={() => (tabs.alerts ? go('alerts') : router.visit(`/security-devices?site=${site.id}`))}
+                        ariaLabel={tabs.alerts ? 'Show this Site’s alerts' : 'Show what needs attention at this Site'}
+                    >
                         <PageHeaderMeterBig>{meters.alerts.count}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>{meters.alerts.caption}</PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
@@ -233,7 +247,9 @@ export default function SiteShow(props: SitePageProps) {
             rail={
                 <PageHeaderRail<SitePageTab>
                     ariaLabel="About this Site"
-                    items={(Object.keys(TAB_LABEL) as SitePageTab[]).map((key) => ({ key, label: TAB_LABEL[key] }))}
+                    items={(Object.keys(TAB_LABEL) as SitePageTab[])
+                        .filter((key) => (key !== 'alerts' || tabs.alerts) && (key !== 'logbook' || tabs.logbook))
+                        .map((key) => ({ key, label: TAB_LABEL[key], count: key === 'devices' ? tabs.devices : undefined }))}
                     value={tab}
                     onSelect={go}
                 />
@@ -247,11 +263,18 @@ export default function SiteShow(props: SitePageProps) {
         body = (
             <NetworkTab
                 tree={props.network.tree as SiteTopologyTree | undefined}
+                links={props.network.links ?? null}
                 siteName={site.name}
                 hubLabel={hub?.label ?? null}
+                now={now}
+                onAddHub={hub === null && can.add_hub ? () => hubs.openAdd(site.id) : null}
                 onAskObli={can.ask_obli ? () => setPopup({ kind: 'ask_obli', session: null }) : null}
             />
         );
+    if (tab === 'devices' && props.devices)
+        body = <DevicesTab devices={props.devices} siteId={site.id} siteName={site.name} now={now} form={form} load={load} canAssign={can.assign} />;
+    if (tab === 'alerts' && props.alerts) body = <AlertsTab alerts={props.alerts} siteId={site.id} siteName={site.name} now={now} />;
+    if (tab === 'logbook' && props.logbook) body = <LogbookTab logbook={props.logbook} base={base} siteName={site.name} />;
     if (tab === 'internet' && props.internet) body = <InternetTab internet={props.internet} now={now} />;
     if (tab === 'rooms' && props.rooms) body = <RoomsTab rooms={props.rooms} siteName={site.name} />;
     if (tab === 'modes' && props.modes)
@@ -410,23 +433,56 @@ function OverviewTab({ overview, siteName, now, onDevices }: { overview: NonNull
 
 function NetworkTab({
     tree,
+    links,
     siteName,
     hubLabel,
+    now,
+    onAddHub,
     onAskObli,
 }: {
     tree: SiteTopologyTree | undefined;
+    links: LinksFound | null;
     siteName: string;
     hubLabel: string | null;
+    now: Date;
+    onAddHub: (() => void) | null;
     onAskObli: (() => void) | null;
 }) {
     const empty = !tree || (tree.roots.length === 0 && tree.unplaced.length === 0);
+    // pg-sdr-12j: the map shows only the links people added or confirmed.
+    const map = empty ? (
+        <QuietLine title="Network map" text="No devices at this Site yet." />
+    ) : (
+        <SiteTopologyTreeCard
+            tree={tree}
+            siteName={siteName}
+            title="Network map"
+            description="The links people have added or confirmed"
+            unplacedNote="No link is on the map for these yet. Add one from Links found below."
+        />
+    );
 
     return (
         <div className="flex flex-col gap-5">
-            {empty ? (
-                <QuietLine title="Network map" text="Oblivion hasn’t mapped this Site’s network yet. A scan through its hub fills it in." />
+            {links === null ? (
+                map
+            ) : links.nothing ? (
+                <>
+                    {map}
+                    <QuietLine title="Links found" text="Nothing reports links here yet." action={onAddHub ? { label: 'Add a hub', onClick: onAddHub } : null} />
+                </>
             ) : (
-                <SiteTopologyTreeCard tree={tree} siteName={siteName} />
+                <>
+                    <SideBySide cols="minmax(0, 2.3fr) minmax(0, 1fr)">
+                        {map}
+                        <WhereLinksComeFrom links={links} now={now} />
+                    </SideBySide>
+                    <LinksFoundTable links={links} siteName={siteName} now={now} />
+                    <SideBySide cols="minmax(0, 1.15fr) minmax(0, 1fr)">
+                        <LinkChanges links={links} now={now} />
+                        <NotPlaced links={links} />
+                    </SideBySide>
+                </>
             )}
             {/* S&D Phase I (pop-up 97): read-only network checks through the hub, for IT. */}
             {onAskObli ? (

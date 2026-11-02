@@ -52,6 +52,10 @@ final class SetupController extends Controller
             'server_health' => $serverCheck
                 ? Inertia::defer(fn (): array => app(\App\Domain\SecurityDevices\Screens\Setup\ServerHealth::class)->present($user), 'server-health')
                 : null,
+            // S&D round 3 (pg-sdr-15q): which Sites the server checks itself, same admins, own load.
+            'server_readiness' => $serverCheck
+                ? Inertia::defer(fn (): array => app(\App\Domain\SecurityDevices\Screens\Setup\SetupServerReadiness::class)->present($user), 'server-readiness')
+                : null,
             // Add a network loads its Site and hub choices only when it opens.
             'deviceForm' => Inertia::optional(fn (): array => $this->formOptions->present($user)),
         ]);

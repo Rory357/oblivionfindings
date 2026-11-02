@@ -38,7 +38,7 @@ const ago = (minutes: number) =>
 function fixture(overrides: Partial<AlertsProps> = {}): AlertsProps {
     return {
         tab: 'open',
-        counts: { open: 2, snoozed: 1, done: 4, rules: 1 },
+        counts: { open: 2, snoozed: 1, done: 4, rules: 1, quiet: 0 },
         site: 'all',
         sites: [
             { value: '1', label: 'Synthetic House' },

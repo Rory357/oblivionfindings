@@ -633,6 +633,10 @@ Route::middleware([
     // S&D rebuild Phase D: Alerts, and what people do on one. The controller checks permissions.
     Route::get('/alerts', [AlertsController::class, 'index'])
         ->name('security-devices.alerts.index');
+    // S&D round 3 (pg-sdr-13d): a handover note for the next person on IT on call.
+    Route::post('/alerts/on-call/handover', [AlertsController::class, 'handover'])
+        ->middleware('throttle:10,1')
+        ->name('security-devices.alerts.on-call.handover');
     Route::prefix('/alerts/{alert}')->whereNumber('alert')->middleware('throttle:30,1')->group(function (): void {
         Route::post('/acknowledge', [AlertsController::class, 'acknowledge'])->name('security-devices.alerts.acknowledge');
         Route::post('/assign', [AlertsController::class, 'assign'])->name('security-devices.alerts.assign');

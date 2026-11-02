@@ -1,6 +1,12 @@
 /** Props for Alerts (S&D rebuild drawing pg-sdr-13, with Rules & automations 13b), from AlertsPresenter. */
 
-export type AlertsTab = 'open' | 'snoozed' | 'done' | 'rules';
+export type AlertsTab =
+    | 'open'
+    | 'snoozed'
+    | 'done'
+    | 'rules'
+    | 'quiet'
+    | 'oncall';
 
 export type AlertTone = 'critical' | 'warning' | 'success';
 
@@ -228,7 +234,8 @@ export type PickableDevice = {
 
 export type AlertsProps = {
     tab: AlertsTab;
-    counts: Record<AlertsTab, number>;
+    /** On call has no count. */
+    counts: Record<Exclude<AlertsTab, 'oncall'>, number>;
     site: string;
     sites: { value: string; label: string }[];
     q?: string | null;
@@ -249,6 +256,10 @@ export type AlertsProps = {
     /** S&D Phase F: the house automations, in the same list as the rules (Rules & automations tab). */
     automations?: AutomationRow[] | null;
     per_week?: { labels: string[]; values: number[] } | null;
+    /** S&D round 3: Quiet times (13c), on its tab only. */
+    quiet_times?: QuietTimes | null;
+    /** S&D round 3: On call (13d), on its tab only. */
+    on_call?: OnCall | null;
     can: {
         acknowledge: boolean;
         quiet_time: boolean;
@@ -265,4 +276,93 @@ export type AlertsProps = {
     ruleForm?: RuleForm | null;
     /** Optional, loaded when Add automation opens; null without automations.manage. */
     automationForm?: AutomationForm | null;
+};
+
+/** A note with a time in it ("Set {time}", "Until {time}"), or plain words. */
+export type NoteLine = string | TimedLine;
+
+/** Alerts › Quiet times (13c): one quiet time, from QuietTimesPresenter. */
+export type QuietTimeRow = {
+    id: number;
+    version: number;
+    scope: {
+        site_id: number;
+        device_id: number | null;
+        monitor_id: number | null;
+        monitor_device_id: number | null;
+    };
+    paused: {
+        name: string;
+        sub: string;
+        icon: 'site' | 'building' | 'network';
+        href: string | null;
+    };
+    /** The current or next occurrence, or the last one once it has ended. */
+    when: {
+        starts_at: string;
+        ends_at: string;
+        repeats: 'daily' | 'weekly' | null;
+        until: string | null;
+    };
+    why: string;
+    set_by: string | null;
+    state: {
+        label: string;
+        tone: 'success' | 'warning' | 'info' | 'neutral';
+        note: NoteLine;
+    };
+    can_end: boolean;
+    ends_now: boolean;
+};
+
+export type QuietTimes = {
+    rows: QuietTimeRow[];
+    held: {
+        at: string;
+        tone: 'success' | 'warning';
+        title: string;
+        sub: NoteLine;
+    }[];
+    know: { tone: 'info' | 'warning'; text: string }[];
+    can: { add: boolean; end: boolean };
+};
+
+/** Alerts › On call (13d), from OnCallPresenter. */
+export type OnCall = {
+    now: { name: string; first_name: string; until: string } | null;
+    people: {
+        id: number;
+        name: string;
+        role: string | null;
+        when: 'now' | 'next' | 'before';
+        from: string;
+        to: string;
+    }[];
+    /** The IT role chosen in Setup › Alerts & checks; null = IT for each Site. */
+    role: string | null;
+    handover: {
+        from: string;
+        to: string | null;
+        at: string;
+        still_open: string | null;
+        coming_up: string | null;
+        good_to_know: string | null;
+    } | null;
+    waiting: {
+        id: number;
+        at: string;
+        tone: 'critical' | 'warning';
+        title: string;
+        told_at: string | null;
+        reminded_at: string | null;
+    }[];
+    delivery: {
+        key: string;
+        when: string;
+        sub: string;
+        app: boolean;
+        email: boolean;
+        push: boolean;
+    }[];
+    can: { rostering: boolean; handover: boolean; setup: boolean };
 };

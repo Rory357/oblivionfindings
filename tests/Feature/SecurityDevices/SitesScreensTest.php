@@ -154,19 +154,25 @@ class SitesScreensTest extends TestCase
                 ->where('overview.hub_down.hub', 'Aurora House hub'));
     }
 
-    public function test_tabs_still_waiting_for_their_drawings_fall_back_to_the_overview(): void
+    public function test_the_devices_tab_lists_only_this_sites_devices_and_alerts_and_logbook_need_their_keys(): void
     {
         $this->device($this->home, ['name' => 'Aurora House switch', 'subcategory' => 'switch']);
         $this->device($this->other, ['name' => 'Kōwhai Lodge router']);
 
-        foreach (['devices', 'alerts', 'logbook'] as $tab) {
-            $response = $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab='.$tab);
+        $response = $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab=devices');
+        $response->assertOk()->assertInertia(fn ($page) => $page
+            ->where('tab', 'devices')
+            ->where('tabs.devices', 1)
+            ->has('devices.rows', 1)
+            ->where('devices.rows.0.name', 'Aurora House switch')
+            ->where('overview', null));
+        $this->assertStringNotContainsString('Kōwhai Lodge router', $response->getContent());
 
-            $response->assertOk()->assertInertia(fn ($page) => $page
-                ->where('tab', 'overview')
-                ->missing('devices')
-                ->missing('logbook'));
-            $this->assertStringNotContainsString('Kōwhai Lodge router', $response->getContent());
+        // Without securityDevices.events.view there's no Alerts or Logbook tab: the Overview opens.
+        foreach (['alerts', 'logbook'] as $tab) {
+            $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab='.$tab)
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page->where('tab', 'overview')->where('alerts', null)->where('logbook', null));
         }
     }
 }

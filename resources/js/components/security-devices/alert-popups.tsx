@@ -971,7 +971,8 @@ export function QuietTime({
                     : `Alerts paused for ${chosen.length} devices.`,
             );
             onClose();
-            router.reload({ only: ['meters'] });
+            // S&D round 3: the Quiet times tab and its count update too.
+            router.reload({ only: ['meters', 'quiet_times', 'counts'] });
         }
     };
 

@@ -12,6 +12,8 @@ use App\Domain\SecurityDevices\Alerts\Models\DeviceAlertEvent;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceDirectory;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceEntry;
+use App\Domain\SecurityDevices\Screens\Sites\AlertWords;
+use App\Domain\SecurityDevices\Screens\Sites\SiteStream;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Site;
 use App\Models\User;
@@ -25,7 +27,8 @@ use Illuminate\Support\Collection;
  */
 final class AlertsPresenter
 {
-    public const array TABS = ['open', 'snoozed', 'done', 'rules'];
+    /** S&D round 3: Quiet times (13c) and On call (13d) join the rail. */
+    public const array TABS = ['open', 'snoozed', 'done', 'rules', 'quiet', 'oncall'];
 
     public const int DONE_PER_PAGE = 25;
 
@@ -45,6 +48,8 @@ final class AlertsPresenter
         private readonly CoveringHubResolver $hubs,
         private readonly AlertRulesPresenter $rules,
         private readonly AutomationsPresenter $automations,
+        private readonly QuietTimesPresenter $quietTimes,
+        private readonly OnCallPresenter $onCall,
     ) {}
 
     public static function canOpen(User $viewer): bool
@@ -65,8 +70,6 @@ final class AlertsPresenter
         $base = $this->scoped($viewer, $siteFilter);
         // The header search narrows the lists (queue, Done); the numbers and tab counts stay whole.
         $search = is_string($query['q'] ?? null) ? trim(mb_substr($query['q'], 0, 100)) : '';
-        $matches = fn (DeviceAlert $alert): bool => $search === ''
-            || str_contains(mb_strtolower($alert->title.' '.($alert->device?->name ?? '').' '.($alert->site?->name ?? '')), mb_strtolower($search));
 
         $open = (clone $base)->with(['device:id,name', 'site:id,name', 'acknowledgedBy:id,name', 'assignedTo:id,name'])
             ->where('state', DeviceAlert::STATE_OPEN)->get()
@@ -77,6 +80,10 @@ final class AlertsPresenter
             ->orderByDesc('closed_at')->limit(10)->get();
         $snoozed = (clone $base)->with(['device:id,name', 'site:id,name', 'acknowledgedBy:id,name', 'assignedTo:id,name'])
             ->where('state', DeviceAlert::STATE_SNOOZED)->orderBy('snoozed_until')->get();
+        // A care rule's alert names its resident only to someone who may see them (as the Site page does).
+        $this->hide = SiteStream::carePeople($viewer, $open->concat($resolved)->concat($snoozed));
+        $matches = fn (DeviceAlert $alert): bool => $search === ''
+            || str_contains(mb_strtolower($this->title($alert).' '.($alert->device?->name ?? '').' '.($alert->site?->name ?? '')), mb_strtolower($search));
         $doneCount = (clone $base)->where('state', DeviceAlert::STATE_DONE)->where('closed_at', '>=', $now->subDays(30))->count();
         // S&D Phase F: the tab counts the house automations beside the alert rules.
         $rules = $this->rules->count($viewer, $siteFilter) + $this->automations->count($viewer, $siteFilter);
@@ -86,7 +93,7 @@ final class AlertsPresenter
             'snoozed' => $snoozed->filter($matches)->map(fn (DeviceAlert $alert): array => $this->row($alert))->values()->all(),
             default => [],
         };
-        $done = $tab === 'done' ? $this->done($base, max(1, (int) ($query['page'] ?? 1)), $now, $search) : null;
+        $done = $tab === 'done' ? $this->done($viewer, $base, max(1, (int) ($query['page'] ?? 1)), $now, $search) : null;
 
         $selectedId = is_numeric($query['alert'] ?? null) ? (int) $query['alert'] : ($queue[0]['id'] ?? ($done['rows'][0]['id'] ?? null));
         $selected = $selectedId !== null && in_array($tab, ['open', 'snoozed', 'done'], true) ? $this->selected($viewer, (int) $selectedId, $siteFilter) : null;
@@ -97,7 +104,7 @@ final class AlertsPresenter
 
         return [
             'tab' => $tab,
-            'counts' => ['open' => $open->count(), 'snoozed' => $snoozed->count(), 'done' => $doneCount, 'rules' => $rules],
+            'counts' => ['open' => $open->count(), 'snoozed' => $snoozed->count(), 'done' => $doneCount, 'rules' => $rules, 'quiet' => $this->quietTimes->count($viewer, $siteFilter, $now)],
             'site' => $siteFilter === null ? 'all' : (string) $siteFilter,
             'q' => $search === '' ? null : $search,
             'sites' => $siteIds === [] ? [] : Site::query()->whereIn('id', $siteIds)->where('is_active', true)->where('archived', false)->orderBy('name')
@@ -122,6 +129,9 @@ final class AlertsPresenter
             // Alerts per week (13b), counted from the alerts themselves. Who was told isn't kept per
             // person or role (the timeline joins the names), so that chart isn't drawn.
             'per_week' => $tab === 'rules' ? $this->perWeek($base, $now) : null,
+            // S&D round 3: Quiet times (13c) from the maintenance windows, On call (13d) from Rostering.
+            'quiet_times' => $tab === 'quiet' ? $this->quietTimes->present($viewer, $siteFilter, $now) : null,
+            'on_call' => $tab === 'oncall' ? $this->onCall->present($viewer, $base, $now) : null,
             'can' => [
                 'acknowledge' => $viewer->canDo('securityDevices.alerts.acknowledge'),
                 'quiet_time' => $viewer->canDo('securityDevices.monitoring.manage'),
@@ -142,6 +152,14 @@ final class AlertsPresenter
         return DeviceAlert::query()->whereIn('device_id', $visible);
     }
 
+    /** @var array<int, string|bool> alert id → AlertWords' $hide, for the alerts on this page */
+    private array $hide = [];
+
+    private function title(DeviceAlert $alert): string
+    {
+        return (new AlertWords($alert, $this->hide[(int) $alert->id] ?? false))->title();
+    }
+
     /** @return array<string, mixed> */
     private function row(DeviceAlert $alert): array
     {
@@ -156,7 +174,7 @@ final class AlertsPresenter
 
         return [
             'id' => (int) $alert->id,
-            'title' => $alert->title,
+            'title' => $this->title($alert),
             'tone' => $tone,
             'state' => $alert->state,
             'opened_at' => $alert->opened_at->toIso8601String(),
@@ -197,10 +215,11 @@ final class AlertsPresenter
         $model = $entry?->model() ?? trim(trim((string) $device?->manufacturer).' '.trim((string) $device?->model));
         $where = trim((string) ($alert->site?->name ?? '').(trim((string) $device?->location_description) !== '' ? ' · '.trim((string) $device->location_description) : ''));
         $affected = $this->affected($viewer, $alert);
+        $words = new AlertWords($alert, SiteStream::carePeople($viewer, collect([$alert]))[(int) $alert->id] ?? false);
 
         return [
             'id' => (int) $alert->id,
-            'title' => $alert->title,
+            'title' => $words->title(),
             'tone' => $alert->state === DeviceAlert::STATE_DONE ? 'success' : ($alert->severity === 'critical' ? 'critical' : 'warning'),
             'state' => $alert->state,
             'label' => match (true) {
@@ -221,7 +240,7 @@ final class AlertsPresenter
                 ['icon' => 'clock', 'text' => '**{time}**', 'at' => $alert->opened_at->toIso8601String()],
                 $device ? ['icon' => 'network', 'text' => $this->checkedBy((int) ($alert->site_id ?? 0)), 'at' => null] : null,
             ])),
-            'saw' => $this->saw($alert),
+            'saw' => (string) $words->text($this->saw($alert)),
             'affects' => $affected,
             'timeline' => $alert->events->map(fn (DeviceAlertEvent $event): array => [
                 'id' => (int) $event->id,
@@ -232,8 +251,8 @@ final class AlertsPresenter
                     'recovered' => 'success',
                     default => 'info',
                 },
-                'title' => $event->text,
-                'sub' => $event->detail,
+                'title' => (string) $words->text($event->text),
+                'sub' => $words->text($event->detail),
             ])->values()->all(),
             'acknowledged' => $alert->acknowledgedBy ? ['by' => $alert->acknowledgedBy->name, 'at' => $alert->acknowledged_at?->toIso8601String(), 'note' => $alert->acknowledgement_note] : null,
             'assigned' => $alert->assignedTo ? ['name' => $alert->assignedTo->name, 'at' => $alert->assigned_at?->toIso8601String()] : null,
@@ -327,22 +346,24 @@ final class AlertsPresenter
     }
 
     /** @return array<string, mixed> */
-    private function done(Builder $base, int $page, CarbonImmutable $now, string $search = ''): array
+    private function done(User $viewer, Builder $base, int $page, CarbonImmutable $now, string $search = ''): array
     {
         $query = (clone $base)->with(['device:id,name', 'site:id,name'])
             ->where('state', DeviceAlert::STATE_DONE)->where('closed_at', '>=', $now->subDays(30));
         if ($search !== '') {
             $like = '%'.addcslashes($search, '%_\\').'%';
-            $query->where(fn (Builder $match) => $match->where('title', 'like', $like)
+            // A care alert's title names its resident: it's found by device or Site only, never by that name.
+            $query->where(fn (Builder $match) => $match->where(fn (Builder $title) => $title->where('title', 'like', $like)->whereNotIn('kind', ['care_out_of_bed', 'care_door_night']))
                 ->orWhereHas('device', fn (Builder $device) => $device->where('name', 'like', $like))
                 ->orWhereHas('site', fn (Builder $site) => $site->where('name', 'like', $like)));
         }
         $paginator = $query->orderByDesc('closed_at')->paginate(self::DONE_PER_PAGE, ['*'], 'page', $page);
+        $this->hide = SiteStream::carePeople($viewer, collect($paginator->items()));
 
         return [
             'rows' => collect($paginator->items())->map(fn (DeviceAlert $alert): array => [
                 'id' => (int) $alert->id,
-                'title' => $alert->title,
+                'title' => $this->title($alert),
                 'site' => $alert->site?->name,
                 'opened_at' => $alert->opened_at->toIso8601String(),
                 'closed_at' => $alert->closed_at?->toIso8601String(),

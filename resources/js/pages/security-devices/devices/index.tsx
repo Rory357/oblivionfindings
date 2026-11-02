@@ -59,11 +59,13 @@ import {
 import { Head, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
+    Archive,
     BatteryMedium,
     BellPlus,
     Cpu,
     Download,
     ExternalLink,
+    EyeOff,
     HardDriveDownload,
     LayoutGrid,
     List,
@@ -78,8 +80,9 @@ import { CameraWall } from './_camera-wall';
 import { DeviceCard } from './_device-card';
 import { DEFAULT_LIST_COLUMNS, DevicesList, LIST_COLUMNS } from './_devices-list';
 import { BlockHead, ColumnsMenu, ListPager, useColumns, ViewSwitch } from './_parts';
-import type { DevicesIndexProps } from './_types';
+import type { DevicesIndexProps, NotWatchedRow, UpkeepView } from './_types';
 import { BatteriesView, UPDATE_COLUMNS, UpdatesView } from './_upkeep';
+import { NOT_WATCHED_COLUMNS, NotWatchedView, RETIRED_COLUMNS, RetiredView } from './_upkeep-watching';
 
 export type { DevicesIndexProps } from './_types';
 
@@ -128,6 +131,10 @@ export default function DevicesIndex(props: DevicesIndexProps) {
     // S&D Phase G (2d): Upkeep › Updates opens pop-up 62; Quiet time is pop-up 44 for the listed devices.
     const updateColumns = useColumns('sd.devices.updates.columns', UPDATE_COLUMNS, UPDATE_COLUMNS.map((column) => column.key));
     const updateMenu = useEntityContextMenu<FirmwareUpdate>();
+    // S&D v13 (2e, 2f): Upkeep › Not watched and Retired.
+    const notWatchedColumns = useColumns('sd.devices.not-watched.columns', NOT_WATCHED_COLUMNS, NOT_WATCHED_COLUMNS.map((column) => column.key));
+    const retiredColumns = useColumns('sd.devices.retired.columns', RETIRED_COLUMNS, RETIRED_COLUMNS.map((column) => column.key));
+    const notWatchedMenu = useEntityContextMenu<NotWatchedRow>();
     const [update, setUpdate] = useState<FirmwareUpdate | null>(null);
     const [quietOpen, setQuietOpen] = useState(false);
     const actorId = (usePage().props as { auth?: { user?: { id?: number } } }).auth?.user?.id;
@@ -152,7 +159,7 @@ export default function DevicesIndex(props: DevicesIndexProps) {
             status: filters.status === 'all' ? undefined : filters.status,
             group: group === 'all' ? undefined : group,
             q: filters.q || undefined,
-            upkeep: tab === 'upkeep' && upkeep === 'updates' ? 'updates' : undefined,
+            upkeep: tab === 'upkeep' && upkeep !== 'batteries' ? upkeep : undefined,
             ...changes,
         };
         return Object.fromEntries(Object.entries(next).filter(([, value]) => value !== undefined && value !== '' && value !== 'all'));
@@ -198,6 +205,12 @@ export default function DevicesIndex(props: DevicesIndexProps) {
     };
     const actionsFor = (device: PopupDevice): MenuItem[] => deviceMenu(device, can, act);
     const contextMenu = (event: MouseEvent, device: PopupDevice) => menu.open(event, device);
+    // Upkeep › Not watched (2e): "Watch this device" (pop-up 9) leads its menu, for people who manage checks.
+    const notWatchedActions = (row: NotWatchedRow): MenuItem[] => {
+        const device: PopupDevice = { id: row.id, name: row.name, sub: row.model, kind: row.kind, state: row.state, address: row.address, site: row.site, site_id: row.site_id, watching: row.watching };
+        const rest = deviceMenu(device, { ...can, watch: false }, act);
+        return can.watch ? [{ label: 'Watch this device', icon: BellPlus, onClick: () => act('watch', device) }, ...rest] : rest;
+    };
 
     const toggle = (id: number, on: boolean) =>
         setSelected((current) => {
@@ -374,19 +387,63 @@ export default function DevicesIndex(props: DevicesIndexProps) {
     );
 
     let body: ReactNode = null;
-    if (props.batteries || props.updates) {
+    if (props.batteries || props.updates || props.not_watched || props.retired) {
         const upkeepSwitch = (
-            <ViewSwitch<'batteries' | 'updates'>
+            <ViewSwitch<UpkeepView>
                 label="Upkeep view"
                 value={upkeep}
-                onChange={(value) => go({ tab: 'upkeep', upkeep: value === 'updates' ? 'updates' : undefined })}
+                onChange={(value) => go({ tab: 'upkeep', upkeep: value === 'batteries' ? undefined : value })}
                 options={[
                     { value: 'batteries', label: 'Batteries', icon: BatteryMedium },
                     { value: 'updates', label: 'Updates', icon: HardDriveDownload },
+                    // S&D v13 (2e, 2f).
+                    { value: 'not_watched', label: 'Not watched', icon: EyeOff },
+                    { value: 'retired', label: 'Retired', icon: Archive },
                 ]}
             />
         );
-        body = props.batteries ? (
+        body = props.not_watched ? (
+            <NotWatchedView
+                data={props.not_watched}
+                shown={notWatchedColumns.shown}
+                now={now}
+                actionsFor={notWatchedActions}
+                onContextMenu={(event, row) => notWatchedMenu.open(event, row)}
+                onPage={(page) => go({ tab: 'upkeep', page })}
+                head={
+                    <BlockHead
+                        title="Not watched"
+                        sub={`Known to Oblivion but not checked · grey, never red · not in the counts above${can.watch ? ' · Watch this device is on each row’s ⋮ menu' : ''}`}
+                        right={
+                            <>
+                                {upkeepSwitch}
+                                <ColumnsMenu all={NOT_WATCHED_COLUMNS} shown={notWatchedColumns.shown} onToggle={notWatchedColumns.toggle} />
+                            </>
+                        }
+                    />
+                }
+            />
+        ) : props.retired ? (
+            <RetiredView
+                data={props.retired}
+                shown={retiredColumns.shown}
+                now={now}
+                onSelect={(row) => go({ tab: 'upkeep', retired: row.id, page: props.retired?.meta.page })}
+                onPage={(page) => go({ tab: 'upkeep', page })}
+                head={
+                    <BlockHead
+                        title="Retired"
+                        sub="Removed devices · read-only · only your Sites, with their history from while they were there · click one to see its last lines"
+                        right={
+                            <>
+                                {upkeepSwitch}
+                                <ColumnsMenu all={RETIRED_COLUMNS} shown={retiredColumns.shown} onToggle={retiredColumns.toggle} />
+                            </>
+                        }
+                    />
+                }
+            />
+        ) : props.batteries ? (
             <BatteriesView
                 data={props.batteries}
                 now={now}
@@ -613,6 +670,16 @@ export default function DevicesIndex(props: DevicesIndexProps) {
                 />
             ) : null}
 
+            {notWatchedMenu.ctx ? (
+                <EntityContextMenu
+                    x={notWatchedMenu.ctx.x}
+                    y={notWatchedMenu.ctx.y}
+                    icon={iconForKind(notWatchedMenu.ctx.record.kind)}
+                    title={notWatchedMenu.ctx.record.name}
+                    items={notWatchedActions(notWatchedMenu.ctx.record)}
+                    onClose={notWatchedMenu.close}
+                />
+            ) : null}
             {updateMenu.ctx ? (
                 <EntityContextMenu
                     x={updateMenu.ctx.x}

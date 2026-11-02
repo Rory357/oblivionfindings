@@ -327,9 +327,10 @@ describe('Site page · Modes tab (pg-sdr-12c)', () => {
             'aria-selected',
             'true',
         );
+        // S&D round 3: the Devices tab (12g) is built and always on the rail; Alerts and Logbook follow their keys.
         expect(
-            screen.queryByRole('tab', { name: /devices|alerts|logbook/i }),
-        ).not.toBeInTheDocument();
+            screen.getByRole('tab', { name: /^Devices/ }),
+        ).toBeInTheDocument();
         expect(screen.getByText('House mode')).toBeInTheDocument();
         expect(
             screen.getByText(
