@@ -332,9 +332,9 @@ function OverviewBody({ overview, now, canActivity }: { overview: NonNullable<Ov
             <SideColumn>
                 {overview.camera_count === 0 ? null : (
                     <Surface title="Cameras" sub={`${overview.camera_count} ${overview.camera_count === 1 ? 'camera' : 'cameras'} · open one to see it`} action={{ label: 'All cameras', href: '/security-devices/devices?tab=cameras' }}>
-                        <ul className="flex flex-col divide-y divide-border">
+                        <ul className="mt-2 flex flex-col divide-y divide-border">
                             {overview.cameras.map((camera) => (
-                                <li key={camera.id} className="flex items-center justify-between gap-3 py-2.5">
+                                <li key={camera.id} className="flex items-center justify-between gap-3 px-[18px] py-2.5">
                                     <div className="min-w-0">
                                         <Link href={camera.href} className="block truncate font-medium underline-offset-2 hover:underline">
                                             {camera.name}
@@ -404,7 +404,7 @@ function Trends({ trends }: { trends: NonNullable<OverviewProps['trends']> }) {
         <div className="flex flex-col gap-5">
             {trends.online ? (
                 <Surface title="Devices online" sub="Every Site, last 30 days · a device counts as online for a day when every check answered">
-                    <div className="h-64 w-full" role="img" aria-label={`Devices online each day for the last 30 days. ${trends.online.note}`}>
+                    <div className="h-64 w-full px-[18px] pt-3" role="img" aria-label={`Devices online each day for the last 30 days. ${trends.online.note}`}>
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                                 <CartesianGrid vertical={false} stroke="var(--border)" />
@@ -416,24 +416,26 @@ function Trends({ trends }: { trends: NonNullable<OverviewProps['trends']> }) {
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
-                    <p className="text-caption mt-2">{trends.online.note}</p>
+                    <p className="text-caption mt-2 border-t border-border px-[18px] py-3">{trends.online.note}</p>
                 </Surface>
             ) : (
                 <QuietLine title="Devices online" text="No device is checked yet, so there’s no history to show." />
             )}
             <div className="grid gap-5 lg:grid-cols-3">
                 <Surface title="Devices by kind">
-                    {trends.device_count === 0 ? (
-                        <p className="text-subtle">No devices yet.</p>
-                    ) : (
-                        <DonutChart
-                            size={140}
-                            thickness={20}
-                            centerValue={trends.device_count}
-                            centerLabel={trends.device_count === 1 ? 'device' : 'devices'}
-                            data={trends.kinds.map((kind, index) => ({ label: devicesTabLabel[kind.tab] ?? kind.tab, value: kind.count, color: KIND_COLOURS[index % KIND_COLOURS.length] }))}
-                        />
-                    )}
+                    <div className="px-[18px] pt-2 pb-4">
+                        {trends.device_count === 0 ? (
+                            <p className="text-subtle">No devices yet.</p>
+                        ) : (
+                            <DonutChart
+                                size={140}
+                                thickness={20}
+                                centerValue={trends.device_count}
+                                centerLabel={trends.device_count === 1 ? 'device' : 'devices'}
+                                data={trends.kinds.map((kind, index) => ({ label: devicesTabLabel[kind.tab] ?? kind.tab, value: kind.count, color: KIND_COLOURS[index % KIND_COLOURS.length] }))}
+                            />
+                        )}
+                    </div>
                 </Surface>
                 {knownWeeks ? (
                     <PointBars
@@ -454,9 +456,9 @@ function Trends({ trends }: { trends: NonNullable<OverviewProps['trends']> }) {
                     <QuietLine title="Batteries to replace soon" text="No battery is at 35% or below." />
                 ) : (
                     <Surface title="Batteries to replace soon" sub="Lowest first, from each device’s latest report">
-                        <ul className="flex flex-col divide-y divide-border">
+                        <ul className="mt-2 flex flex-col divide-y divide-border">
                             {trends.batteries.map((battery) => (
-                                <li key={battery.id} className="flex items-center justify-between gap-3 py-2.5">
+                                <li key={battery.id} className="flex items-center justify-between gap-3 px-[18px] py-2.5">
                                     <div className="min-w-0">
                                         <Link href={battery.href} className="block truncate font-medium underline-offset-2 hover:underline">
                                             {battery.name}
@@ -474,19 +476,19 @@ function Trends({ trends }: { trends: NonNullable<OverviewProps['trends']> }) {
                 <QuietLine title="Slowest devices this week" text="No reply times recorded this week." />
             ) : (
                 <Surface title="Slowest devices this week" sub="Average reply time, with its usual over the 30 days before">
-                    <table className="w-full text-sm">
+                    <table className="mt-3 w-full text-sm">
                         <thead className="bg-muted text-left text-muted-foreground">
                             <tr>
-                                <th className="px-3 py-2 font-medium">Device</th>
+                                <th className="px-[18px] py-2 font-medium">Device</th>
                                 <th className="px-3 py-2 font-medium">Site</th>
                                 <th className="px-3 py-2 font-medium">Average reply</th>
-                                <th className="px-3 py-2 font-medium">Usual</th>
+                                <th className="px-[18px] py-2 font-medium">Usual</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                             {trends.slowest.map((row) => (
                                 <tr key={row.id}>
-                                    <td className="px-3 py-2">
+                                    <td className="px-[18px] py-2">
                                         <Link href={row.href} className="font-medium underline-offset-2 hover:underline">
                                             {row.name}
                                         </Link>
@@ -496,7 +498,7 @@ function Trends({ trends }: { trends: NonNullable<OverviewProps['trends']> }) {
                                     <td className="px-3 py-2">
                                         <StatusBadge variant={row.usual_ms !== null && row.week_ms > row.usual_ms * 2 ? 'warning' : 'success'}>{row.week_ms} ms</StatusBadge>
                                     </td>
-                                    <td className="px-3 py-2 text-muted-foreground">{row.usual_ms === null ? 'Not available' : `${row.usual_ms} ms`}</td>
+                                    <td className="px-[18px] py-2 text-muted-foreground">{row.usual_ms === null ? 'Not available' : `${row.usual_ms} ms`}</td>
                                 </tr>
                             ))}
                         </tbody>

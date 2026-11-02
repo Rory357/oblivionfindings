@@ -66,7 +66,7 @@ export function LogbookTab({ logbook, base, siteName }: { logbook: SiteLogbook; 
             </div>
             <SideColumn>
                 <Surface title="Show">
-                    <div className="grid gap-4">
+                    <div className="grid gap-4 px-[18px] pt-2 pb-4">
                         <div className="grid gap-1.5">
                             <Label htmlFor="logbook-what">What</Label>
                             <Select value={logbook.what} onValueChange={(value) => go({ what: value as LogbookWhat })}>

@@ -1194,6 +1194,14 @@ before.
   switches, into 44 px blocks on a desktop-only screen. ESLint
   `design/no-blanket-descendant-size` checks the chat folders; the three
   existing chat dialogs are rebuilt in the Chat rebuild.
+- **Content placed straight in a `Surface` without inner padding** (corrected
+  2026-11-03, Security & Devices). `.sg-surface` intentionally has no outer
+  padding so full-bleed `<Table>`, `.sg-list` and `border-t` footers span edge
+  to edge while `.sg-head` pads its heading by `14px 18px 0`. Placing custom
+  body content (controls, filter rows above tables, charts, donuts, plain lists)
+  directly inside `<Surface>` leaves it hard against the 1 px card border. Wrap
+  custom body content in `px-[18px] pt-2 pb-4` (or `px-[18px] pt-2` for a
+  toolbar row above a full-bleed `<Table>`).
 
 ## File viewing and downloading (approved by Stephan 2026-09-27)
 

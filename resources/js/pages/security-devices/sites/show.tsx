@@ -382,19 +382,21 @@ function OverviewTab({ overview, siteName, now, onDevices }: { overview: NonNull
             <SideBySide cols="minmax(0, 1fr) 360px">
                 <div className="flex flex-col gap-5">
                     <Surface title={`Devices at ${siteName}`} sub={total === 0 ? undefined : "Open one from the Devices list"} action={total === 0 ? null : { label: 'All devices', onClick: onDevices }}>
-                        {total === 0 ? (
-                            <p className="text-subtle">No devices here yet.</p>
-                        ) : (
-                            <div className="flex flex-wrap items-center gap-6">
-                                <DonutChart
-                                    size={140}
-                                    thickness={20}
-                                    centerValue={total}
-                                    centerLabel={total === 1 ? 'device' : 'devices'}
-                                    data={overview.states.map((row) => ({ label: deviceStateLabel[row.state], value: row.count, color: STATE_COLOUR[row.state] }))}
-                                />
-                            </div>
-                        )}
+                        <div className="px-[18px] pt-2 pb-4">
+                            {total === 0 ? (
+                                <p className="text-subtle">No devices here yet.</p>
+                            ) : (
+                                <div className="flex flex-wrap items-center gap-6">
+                                    <DonutChart
+                                        size={140}
+                                        thickness={20}
+                                        centerValue={total}
+                                        centerLabel={total === 1 ? 'device' : 'devices'}
+                                        data={overview.states.map((row) => ({ label: deviceStateLabel[row.state], value: row.count, color: STATE_COLOUR[row.state] }))}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </Surface>
                     {overview.week && known.length > 0 ? (
                         <PointBars
@@ -413,9 +415,9 @@ function OverviewTab({ overview, siteName, now, onDevices }: { overview: NonNull
                         <QuietLine title="Cameras" text="No cameras at this Site." />
                     ) : (
                         <Surface title="Cameras" sub={`${overview.camera_count} ${overview.camera_count === 1 ? 'camera' : 'cameras'} · open one to see it`}>
-                            <ul className="flex flex-col divide-y divide-border">
+                            <ul className="mt-2 flex flex-col divide-y divide-border">
                                 {overview.cameras.map((camera) => (
-                                    <li key={camera.id} className="flex items-center justify-between gap-3 py-2.5">
+                                    <li key={camera.id} className="flex items-center justify-between gap-3 px-[18px] py-2.5">
                                         <Link href={camera.href} className="min-w-0 truncate font-medium underline-offset-2 hover:underline">
                                             {camera.name}
                                         </Link>
@@ -504,9 +506,9 @@ function InternetTab({ internet, now }: { internet: NonNullable<SitePageProps['i
                     <QuietLine title="Router" text="No router or gateway is added for this Site yet." />
                 ) : (
                     <Surface title={internet.gateways.length === 1 ? 'Router' : 'Routers'} sub="What connects this Site to the internet">
-                        <ul className="flex flex-col divide-y divide-border">
+                        <ul className="mt-2 flex flex-col divide-y divide-border">
                             {internet.gateways.map((row) => (
-                                <li key={row.id} className="flex items-center justify-between gap-3 py-2.5">
+                                <li key={row.id} className="flex items-center justify-between gap-3 px-[18px] py-2.5">
                                     <div className="min-w-0">
                                         <Link href={row.href} className="font-medium underline-offset-2 hover:underline">
                                             {row.name}

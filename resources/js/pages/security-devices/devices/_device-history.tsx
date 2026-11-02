@@ -68,7 +68,7 @@ export function HistoryTabView({
             side={
                 <>
                     <Surface title="Show" sub={showsTerminal ? 'Terminal sessions show only to IT admins' : undefined}>
-                        <div className="mt-3 grid gap-4">
+                        <div className="grid gap-4 px-[18px] pt-2 pb-4">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="sd-history-what">What</Label>
                                 <Select value={history.what} onValueChange={(value) => onFilter({ what: value })}>

@@ -81,7 +81,7 @@ export function PortsTabView({ ports, noun, now }: { ports: PortsTab; noun: stri
                         <QuietLine title="Ports" text={`No port of this ${noun} is read or linked to a device yet.`} />
                     ) : (
                         <Surface title="Ports" sub="Problems and changes first · click a row to open the device · ⋮ or right-click for its menu">
-                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2 px-[18px] pt-2">
                                 <span className="text-subtle">{plural(ports.total, 'port', 'ports')} known</span>
                                 {freeCount > 0 ? (
                                     <Button type="button" variant="outline" size="sm" aria-pressed={showFree} onClick={() => setShowFree((current) => !current)}>
