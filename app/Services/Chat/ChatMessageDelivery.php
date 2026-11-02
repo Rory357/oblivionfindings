@@ -48,6 +48,8 @@ final class ChatMessageDelivery
         }
         // Refresh each recipient's cached unread badge once the message is visible (covers care-team staff too).
         DB::afterCommit(fn () => collect($notified)->each(fn (int $id) => OpsMessageVisibilityService::forgetUnreadCount($id)));
+        // Then each recipient's open tabs get their new count (queued after the same commit).
+        app(ChatRealtime::class)->unreadChanged($notified);
     }
 
     public function recover(?int $messageId = null): int
@@ -132,6 +134,7 @@ final class ChatMessageDelivery
             // The bell keeps one unread entry per conversation: the newest. An unread mention stays
             // until a newer mention replaces it or the conversation is read.
             $this->markConversationNoticesRead($user, $conversation, null, $row->notification_id, keepMentions: $row->event_key !== 'chat.mentioned');
+            app(ChatRealtime::class)->noticeChanged([(int) $user->id], 'message');
 
             return 1;
         });

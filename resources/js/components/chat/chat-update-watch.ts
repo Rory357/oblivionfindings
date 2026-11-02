@@ -1,71 +1,39 @@
+import type { LiveEvent, LiveEventType } from './live/events';
+import { chatSync, type ChatSync, type SyncPoll } from './live/sync';
+
+// Any Chat change wakes a watcher that has not said what it shows.
+const ANY_CHAT_CHANGE: readonly LiveEventType[] = [
+    'conversation.changed',
+    'inbox.changed',
+];
+
+/**
+ * Keep something on screen up to date. Every caller shares the app's one sync loop
+ * (live/sync.ts): one timer, woken by Oblivion Live events that match `topics` and
+ * `match`, and by the window events listed in `events`.
+ *
+ * `interval` is the watcher's own check and keeps running while live (file scans, call
+ * timers). Without it the watcher polls only while live updates are down.
+ */
 export function watchChatUpdates(
     refresh: () => Promise<boolean>,
     options: {
-        interval: () => number;
+        interval?: () => number;
+        poll?: SyncPoll;
         whenHidden?: boolean;
         events?: string[];
+        topics?: readonly LiveEventType[];
+        match?: (event: LiveEvent) => boolean;
     },
+    sync: ChatSync = chatSync,
 ) {
-    let stopped = false;
-    let running = false;
-    let pending = false;
-    let urgent = false;
-    let failures = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const events = options.events ?? ['oblivion:chat-refresh'];
-    const schedule = (delay: number) => {
-        clearTimeout(timer);
-        if (!stopped) timer = setTimeout(() => void run(), delay);
-    };
-    const run = async () => {
-        urgent = false;
-        if (stopped) return;
-        if (running) {
-            pending = true;
-            return;
-        }
-        if (
-            (!options.whenHidden && document.visibilityState !== 'visible') ||
-            !navigator.onLine
-        ) {
-            schedule(options.interval());
-            return;
-        }
-        running = true;
-        try {
-            failures = (await refresh()) ? 0 : failures + 1;
-        } catch {
-            failures++;
-        } finally {
-            running = false;
-            if (pending) {
-                pending = false;
-                schedule(250);
-            } else
-                schedule(
-                    Math.min(
-                        60000,
-                        options.interval() * 2 ** Math.min(failures, 5),
-                    ),
-                );
-        }
-    };
-    const wake = () => {
-        if (running) pending = true;
-        else if (!urgent) {
-            urgent = true;
-            schedule(250);
-        }
-    };
-    for (const event of events) window.addEventListener(event, wake);
-    window.addEventListener('online', wake);
-    document.addEventListener('visibilitychange', wake);
-    void run();
-    return () => {
-        stopped = true;
-        clearTimeout(timer);
-        for (const event of events) window.removeEventListener(event, wake);
-        window.removeEventListener('online', wake);
-        document.removeEventListener('visibilitychange', wake);
-    };
+    const interval = options.interval;
+    return sync.watch({
+        refresh: async () => Boolean(await refresh()),
+        poll: interval ? () => interval() : (options.poll ?? 'fallback'),
+        whenHidden: options.whenHidden,
+        wakeOn: options.events ?? ['oblivion:chat-refresh'],
+        topics: options.topics ?? ANY_CHAT_CHANGE,
+        match: options.match,
+    });
 }

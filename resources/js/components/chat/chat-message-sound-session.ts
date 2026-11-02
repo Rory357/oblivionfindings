@@ -2,7 +2,7 @@ import { isChatAccessDenied } from './api';
 import { chatActorRequest } from './chat-actor-request';
 import { claimChatSound, readChatSoundContext } from './chat-sound-receipts';
 import { visibleChatSoundViews } from './chat-sound-views';
-import { watchChatUpdates } from './chat-update-watch';
+import { chatSync } from './live/sync';
 
 export type MessageSoundState = { enabled: boolean; activeCall: boolean };
 type Arrival = { id: string; conversation_id: number };
@@ -298,13 +298,22 @@ export function startChatMessageSounds(
                         stopWatch
                     )
                         return;
-                    stopWatch = watchChatUpdates(refresh, {
-                        interval: () => 5000,
+                    // Live: woken by a new message or bell notice for this person.
+                    // Otherwise the one sync loop polls (10 s visible, 60 s hidden).
+                    stopWatch = chatSync.watch({
+                        refresh,
+                        topics: ['conversation.changed', 'notice'],
+                        match: (event) =>
+                            event.type === 'notice'
+                                ? event.kind !== 'cleared'
+                                : event.type === 'conversation.changed' &&
+                                  event.kinds.includes('message'),
                         whenHidden: true,
-                        events: [
+                        wakeOn: [
                             'oblivion:chat-refresh',
                             'oblivion:chat-sound-wake',
                         ],
+                        poll: 'fallback',
                     });
                 })
                 .catch(() => undefined);

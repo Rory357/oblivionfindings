@@ -7,7 +7,6 @@ use App\Services\Files\MalwareScanner;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Config\Repository as Config;
-use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -80,21 +79,29 @@ class ChatServiceHealth
 
     protected function realtime(): array
     {
-        if (! $this->config->get('chat.realtime.enabled')) {
-            return ['state' => 'disabled', 'detail' => 'Realtime wake-ups are disabled. Chat uses its polling fallback when available.'];
-        }
-        foreach (['key', 'secret', 'app_id'] as $field) {
-            if (! $this->config->get('broadcasting.connections.chat.'.$field)) {
-                return ['state' => 'not_configured', 'detail' => 'The self-hosted realtime connection is not fully configured.'];
-            }
-        }
-        // The configured broadcaster has bounded HTTP timeouts. No event is published.
-        $result = Broadcast::connection('chat')->getPusher()->get('/channels', ['filter_by_prefix' => 'private-chat.health-check.']);
-        if (! is_object($result) || ! isset($result->channels) || (! is_object($result->channels) && ! is_array($result->channels))) {
-            throw new \RuntimeException('Realtime health response was not recognised.');
+        if (! $this->config->get('chat.live.enabled')) {
+            return ['state' => 'disabled', 'detail' => 'Live updates are switched off. Chat keeps working by polling.'];
         }
 
-        return ['state' => 'passed', 'detail' => 'The realtime server accepted an authenticated read. Browser reconnect and background-worker delivery still require a real session check.'];
+        return $this->live();
+    }
+
+    /** Oblivion Live: a signed read of each gateway node's health. Nothing is published. */
+    protected function live(): array
+    {
+        $live = app(OblivionLive::class);
+        if (! $live->enabled()) {
+            return ['state' => 'not_configured', 'detail' => 'Oblivion Live is switched on, but its secret, key ID or internal address is missing.'];
+        }
+        try {
+            $nodes = $live->health();
+        } catch (Throwable) {
+            return ['state' => 'unavailable', 'detail' => 'Oblivion Live did not answer its signed health check. Chat keeps working by polling until it is back.'];
+        }
+        $connections = array_sum(array_map(fn (array $node) => (int) ($node['connections'] ?? 0), $nodes));
+
+        return ['state' => 'passed', 'detail' => sprintf('Oblivion Live answered a signed health check: %d %s, %d open %s. Browser reconnect still needs a real session check.',
+            count($nodes), count($nodes) === 1 ? 'node' : 'nodes', $connections, $connections === 1 ? 'connection' : 'connections')];
     }
 
     protected function push(): array

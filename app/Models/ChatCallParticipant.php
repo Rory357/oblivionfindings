@@ -28,13 +28,25 @@ class ChatCallParticipant extends Model
     {
         $wake = function (self $participant): void {
             if ($participant->call) {
-                app(ChatRealtime::class)->queueConversation($participant->call->conversation_id);
+                app(ChatRealtime::class)->queueConversation($participant->call->conversation_id, kinds: 'call', callId: $participant->call_id);
             }
         };
-        static::created($wake);
-        static::updated(function (self $participant) use ($wake): void {
+        // Admitted people (accepted or connected) may pass call signalling; anyone else may not.
+        $admitted = fn (?string $status): bool => in_array($status, ['accepted', 'connected'], true);
+        static::created(function (self $participant) use ($wake, $admitted): void {
+            $wake($participant);
+            if ($admitted($participant->status)) {
+                app(ChatRealtime::class)->grantCall($participant->call_id, [(int) $participant->user_id]);
+            }
+        });
+        static::updated(function (self $participant) use ($wake, $admitted): void {
             if ($participant->wasChanged('status') && $participant->status === 'expired' && $participant->call) {
                 app(ChatCallNoticeDelivery::class)->enqueue($participant->call);
+            }
+            if ($participant->wasChanged('status') && $admitted($participant->status) !== $admitted($participant->getOriginal('status'))) {
+                $admitted($participant->status)
+                    ? app(ChatRealtime::class)->grantCall($participant->call_id, [(int) $participant->user_id])
+                    : app(ChatRealtime::class)->revokeCall($participant->call_id, [(int) $participant->user_id]);
             }
             // Polling heartbeats touch updated_at and must never produce a wake-up loop.
             if ($participant->wasChanged(['status', 'device_id', 'left_at'])) {

@@ -178,6 +178,6 @@ final class ChatCallbacks
     {
         DB::table('chat_callback_events')->insert(['callback_id' => $id, 'actor_id' => $actor->id, 'action' => $action, 'created_at' => now()]);
         AuditLog::create(['user_id' => $actor->id, 'client_id' => $conversation->client_id, 'action' => 'chat.callback.'.$action, 'meta' => ['callback_id' => $id, 'conversation_id' => $conversation->id]]);
-        app(ChatRealtime::class)->queueConversation($conversation->id);
+        app(ChatRealtime::class)->queueConversation($conversation->id, kinds: 'callback');
     }
 }

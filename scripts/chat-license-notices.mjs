@@ -68,7 +68,6 @@ function collect(name, from) {
         collect(dependency, directory);
 }
 collect('livekit-client', root);
-collect('pusher-js', root);
 
 // Code copied inside a package's built file rather than installed as its own package, so it
 // ships no licence file. The marker must still appear in the built file, or the entry needs review.
@@ -91,8 +90,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`;
 const embedded = [
     { name: 'ts-debounce', host: 'livekit-client', file: 'dist/livekit-client.esm.mjs', marker: 'Originally from ts-debounce', holder: '2017 Jakub Chodorowicz' },
-    { name: '@stablelib/base64', host: 'pusher-js', file: 'dist/web/pusher.js', marker: 'Copyright (C) 2016 Dmitry Chestnykh', holder: '2016 Dmitry Chestnykh' },
-    { name: '@stablelib/utf8', host: 'pusher-js', file: 'dist/web/pusher.js', marker: 'Package utf8 implements UTF-8 encoding', holder: '2016 Dmitry Chestnykh' },
 ];
 for (const part of embedded) {
     const hostPackage = locate(part.host, root);
@@ -118,7 +115,7 @@ const text = [
     'OBLIVION CHAT — BROWSER THIRD-PARTY NOTICES',
     'Generated from installed runtime packages by scripts/chat-license-notices.mjs.',
     'These components remain the property of their respective copyright holders.',
-    'This inventory covers livekit-client, pusher-js and their declared runtime dependency trees, not the entire application or server image.',
+    'This inventory covers livekit-client and its declared runtime dependency tree, not the entire application or server image.',
     ...entries.map(
         (entry) =>
             `\n${'='.repeat(72)}\n${entry.name}@${entry.version}\nDeclared licence: ${entry.licence}\n${entry.files.map((file) => `\n--- ${file.name} ---\n${file.content}\n`).join('')}`,

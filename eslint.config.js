@@ -6,6 +6,14 @@ import { builtinRules } from 'eslint/use-at-your-own-risk';
 import globals from 'globals';
 import typescript from 'typescript-eslint';
 
+// Chat's live updates are Oblivion Live (clean room, docs/chat-experience/clean-room/). These
+// engines were replaced and must not return without Stephan's approval and a register entry.
+const REPLACED_CHAT_ENGINES = ['pusher-js', 'laravel-echo', 'ws'].map((name) => ({
+    name,
+    message:
+        'Chat live updates use Oblivion Live (resources/js/components/chat/live/). See docs/chat-experience/clean-room/REGISTER.md.',
+}));
+
 /** @type {import('eslint').Linter.Config[]} */
 export default [
     {
@@ -413,6 +421,7 @@ export default [
                 'error',
                 {
                     paths: [
+                        ...REPLACED_CHAT_ENGINES,
                         {
                             // DESIGN.md "Skeleton vs loader" + anti-pattern "Bare <Deferred>".
                             name: '@inertiajs/react',
@@ -453,6 +462,7 @@ export default [
                 'error',
                 {
                     paths: [
+                        ...REPLACED_CHAT_ENGINES,
                         {
                             name: '@/components/page/page-hero',
                             message:
@@ -482,6 +492,39 @@ export default [
                             group: ['@fullcalendar/*'],
                             message:
                                 'Calendars reuse pages/sites/calendar (SiteCalendar + _parts) with a data adapter, not a new FullCalendar skin. See DESIGN.md "Calendars".',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        // The calendar migration targets above skip that block, but not this ban.
+        files: [
+            'resources/js/pages/hr/calendar/index.tsx',
+            'resources/js/pages/operations/clients/calendar.tsx',
+            'resources/js/pages/operations/clients/tabs/legacy-profile-sections.tsx',
+            'resources/js/pages/portal/calendar.tsx',
+            'resources/js/test/client-profile-appointment-access.test.tsx',
+        ],
+        rules: {
+            'no-restricted-imports': ['error', { paths: REPLACED_CHAT_ENGINES }],
+        },
+    },
+    {
+        // The Oblivion Live gateway uses Node's built-in modules only (spec section 1).
+        files: ['live/**/*.mjs'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            // Anything that isn't node:… or a relative path. (A gitignore-style group
+                            // with "!node:*" still refused node:assert/strict and ./helpers.mjs.)
+                            regex: '^(?!node:|\\.\\.?/)',
+                            message:
+                                'The Oblivion Live gateway uses only node: built-ins and its own modules.',
                         },
                     ],
                 },

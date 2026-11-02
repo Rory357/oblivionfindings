@@ -99,6 +99,15 @@ final class ChatConversationManagement
             foreach ($conversation->participants->pluck('user_id')->push($actor->id)->unique() as $id) {
                 Cache::forget("user:{$id}:ops-unread:v1");
             }
+            $realtime = app(ChatRealtime::class);
+            if (in_array($action, ['remove', 'leave'], true)) {
+                // The person who left no longer passes allows(), so they are told by ID.
+                $realtime->inboxChanged([(int) $removed], 'removed');
+                $realtime->unreadChanged([(int) $removed]);
+            }
+            $action === 'rename'
+                ? $realtime->queueConversation($conversation->id, inbox: 'renamed')
+                : $realtime->queueConversation($conversation->id, kinds: 'people');
         });
     }
 }

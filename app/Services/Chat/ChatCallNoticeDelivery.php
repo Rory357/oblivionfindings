@@ -138,6 +138,7 @@ final class ChatCallNoticeDelivery
                 throw new \RuntimeException('Missed call notice was not persisted.');
             }
             $this->finish($id, 'delivered');
+            app(ChatRealtime::class)->noticeChanged([(int) $user->id], 'call');
 
             return 1;
         });
