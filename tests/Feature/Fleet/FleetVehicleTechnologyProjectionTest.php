@@ -132,7 +132,7 @@ class FleetVehicleTechnologyProjectionTest extends TestCase
             ->assertJsonPath('props.vehicle_technology.devices.0.configuration.state', 'drifted')
             ->assertJsonPath('props.vehicle_technology.devices.0.firmware.desired_version', '1.3.0')
             ->assertJsonPath('props.vehicle_technology.devices.0.it_work.items.0.id', $ticket->id)
-            ->assertJsonPath('props.vehicle_technology.links.tracking', '/security-devices/tracking?tab=fleet');
+            ->assertJsonPath('props.vehicle_technology.links.tracking', '/security-devices/devices?tab=trackers');
 
         $payload = json_encode($response->json('props.vehicle_technology'), JSON_THROW_ON_ERROR);
         foreach ([

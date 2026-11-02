@@ -150,8 +150,26 @@ final class ChemicalRegisterReadService
                     'attention' => ['sds_expiring' => $stateCount(['expired', 'expiring']), 'sds_missing' => $stateCount(['missing']),
                         'sds_unknown' => $stateCount(['unknown', 'ambiguous', 'unavailable']), 'awaiting_review' => null, 'exposures' => null]],
                 'badges' => ['sds_to_action' => $stateCount(['expired', 'expiring', 'missing']), 'worksafe_awaiting' => null],
+                // G4-14 (board approved 1 Nov 2026): SDS reviews overdue and the one lead block — active chemicals whose
+                // safety data sheet review is overdue, then those with no current sheet. Nothing when a source needs repair.
+                'register_summary' => $this->registerSummary($active, $parentRepair || $sdsRepair, $stateCount(['expired'])),
                 'exposure_access' => 'restricted', 'sites' => $visibleSites, 'can' => $this->can($current), 'detail' => null];
         });
+    }
+
+    /** @param  array<int, array<string, mixed>>  $active */
+    private function registerSummary(array $active, bool $repair, ?int $overdue): array
+    {
+        if ($repair) {
+            return ['sds_overdue' => null, 'lead' => [], 'lead_total' => null];
+        }
+        $rank = ['expired' => 0, 'missing' => 1];
+        $waiting = array_values(array_filter($active, fn ($row) => isset($rank[$row['sds_state']])));
+        usort($waiting, fn ($a, $b) => ($rank[$a['sds_state']] <=> $rank[$b['sds_state']]) ?: strcasecmp((string) $a['name'], (string) $b['name']));
+
+        return ['sds_overdue' => $overdue,
+            'lead' => array_map(fn ($row) => ['id' => (int) $row['id'], 'name' => $row['name'], 'sds_state' => $row['sds_state']], array_slice($waiting, 0, 3)),
+            'lead_total' => count($waiting)];
     }
 
     public function storageForSite(User $viewer, int $siteId): array

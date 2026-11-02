@@ -38,7 +38,7 @@ final class HanwhaVisionOnvifCameraDriver extends AbstractOnvifCameraDriver
                 ['label' => 'Hanwha Vision Technical Support', 'url' => 'https://www.hanwhavision.com/'],
             ],
             limitationsNote: 'Built against ONVIF Profile S/T and RFC 7616 HTTP Digest specifications.',
-            setupHref: '/security-devices/discovery',
+            setupHref: '/security-devices/setup/hubs?tab=networks',
         );
     }
 

@@ -95,6 +95,37 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $this->assertSame(0, LocationHardware::query()->count());
     }
 
+    public function test_unifi_express_dream_router_and_older_switch_models_are_filed_as_network_gear(): void
+    {
+        $site = Site::factory()->create(['name' => 'North Hub']);
+        $siteConfig = $this->makeSiteConfig($site);
+        $providerConnection = $this->makeProviderConnection();
+        $models = ['UX7' => 'router', 'UX' => 'router', 'UDR' => 'router', 'UDW' => 'router', 'USG-3P' => 'router', 'US-8-60W' => 'switch', 'USL8LP' => 'switch', 'USMINI' => 'switch', 'UP-Chime' => null];
+        $inventory = [];
+        foreach (array_keys($models) as $index => $model) {
+            $inventory[] = [
+                'id' => 'unifi-model-'.$index, 'productLine' => 'network', 'model' => $model,
+                'mac' => sprintf('AA:BB:CC:DD:EF:%02X', $index), 'status' => 'online', 'name' => 'Synthetic '.$model,
+                'lastSeen' => now()->subMinutes(5)->toIso8601String(),
+            ];
+        }
+        $this->fakeUnifiInventory($inventory);
+
+        $result = app(UnifiAdapter::class)->syncDevices($siteConfig, $providerConnection);
+
+        $this->assertTrue($result->isSuccess());
+        foreach ($models as $model => $subcategory) {
+            $device = Device::query()->where('name', 'Synthetic '.$model)->firstOrFail();
+            if ($subcategory === null) {
+                // A model nobody has mapped yet still goes to facilities, as before.
+                $this->assertSame('facilities', $device->domain, $model);
+
+                continue;
+            }
+            $this->assertSame(['it_infrastructure', 'network', $subcategory], [$device->domain, $device->category, $device->subcategory], $model);
+        }
+    }
+
     public function test_unifi_sync_discards_inventory_when_the_exact_connection_is_disabled_in_flight(): void
     {
         $site = Site::factory()->create(['name' => 'Retiring Site']);

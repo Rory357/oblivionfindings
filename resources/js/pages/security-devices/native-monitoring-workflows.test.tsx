@@ -3,12 +3,6 @@ import axios from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-    DiscoveryScopeActionDialog,
-    DiscoveryScopeDialog,
-    type DiscoveryScopeManagement,
-    type GovernedDiscoveryScope,
-} from '@/components/security-devices/discovery-scope-dialogs';
-import {
     NativeMonitorDeactivateDialog,
     NativeMonitorDialog,
     type NativeMonitorManagement,
@@ -113,30 +107,6 @@ const monitor: NativeMonitorTarget = {
         update_url: '/security-devices/monitoring/native-monitors/91',
         deactivate_url:
             '/security-devices/monitoring/native-monitors/91/deactivate',
-    },
-};
-
-const scopeManagement: DiscoveryScopeManagement = {
-    can_manage: true,
-    create_url: '/security-devices/discovery/scopes',
-    protocols: ['icmp', 'tcp', 'dns', 'tls', 'snmp'],
-    sites: [{ id: 14, name: 'Coast Site' }],
-};
-
-const scope: GovernedDiscoveryScope = {
-    id: 33,
-    name: 'Primary Site networks',
-    status: 'active',
-    site: { id: 14, name: 'Coast Site' },
-    collection_mode: 'direct',
-    protocols: ['icmp', 'tcp'],
-    max_targets_per_run: 1024,
-    packets_per_second: 20,
-    actions: {
-        can_manage: true,
-        update_url: '/security-devices/discovery/scopes/33',
-        apply_url: '/security-devices/discovery/scopes/33/apply',
-        deactivate_url: '/security-devices/discovery/scopes/33/deactivate',
     },
 };
 
@@ -273,74 +243,6 @@ describe('native monitoring operator workflows', () => {
                     review_token: 'a'.repeat(64),
                 }),
                 expect.objectContaining({ timeout: 30000 }),
-            );
-        });
-    });
-
-    it('creates a bounded direct discovery scope and never offers a collector field', async () => {
-        render(
-            <DiscoveryScopeDialog
-                open
-                onOpenChange={vi.fn()}
-                management={scopeManagement}
-                scope={null}
-                onSaved={vi.fn()}
-            />,
-        );
-
-        expect(screen.queryByLabelText(/collector/i)).not.toBeInTheDocument();
-        fireEvent.change(screen.getByLabelText('Scope name'), {
-            target: { value: 'Primary Site networks' },
-        });
-        fireEvent.change(screen.getByLabelText('Approved networks'), {
-            target: { value: '10.44.0.0/16' },
-        });
-        await waitFor(() => {
-            expect(
-                screen.getByRole('button', { name: 'Add direct scope' }),
-            ).toBeEnabled();
-        });
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Add direct scope' }),
-        );
-
-        await waitFor(() => {
-            expect(axios.post).toHaveBeenCalledWith(
-                scopeManagement.create_url,
-                expect.objectContaining({
-                    site_id: 14,
-                    cidrs: ['10.44.0.0/16'],
-                    protocols: ['icmp', 'tcp', 'dns', 'tls'],
-                    port_bounds: {
-                        tcp: [22, 80, 443, 161, 5985, 5986],
-                        dns: [53],
-                        tls: [443],
-                    },
-                    max_targets_per_run: 1024,
-                    packets_per_second: 20,
-                }),
-            );
-        });
-    });
-
-    it('queues one governed scope run through the explicit apply action', async () => {
-        render(
-            <DiscoveryScopeActionDialog
-                open
-                onOpenChange={vi.fn()}
-                scope={scope}
-                action="apply"
-                onApplied={vi.fn()}
-            />,
-        );
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Queue discovery run' }),
-        );
-
-        await waitFor(() => {
-            expect(axios.post).toHaveBeenCalledWith(
-                scope.actions.apply_url,
-                {},
             );
         });
     });

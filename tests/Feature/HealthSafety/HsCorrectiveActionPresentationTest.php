@@ -366,10 +366,14 @@ class HsCorrectiveActionPresentationTest extends TestCase
 
     public function test_history_uses_actor_neutral_labels_when_a_manager_is_not_the_owner(): void
     {
-        $owner = User::factory()->create();
+        // D1: a start needs an owner who can still own the action, so the owner is an H&S officer at the event's site.
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $owner = $this->staffAtSite($site, 'health_safety_officer');
         $manager = User::factory()->create();
         $viewer = User::factory()->create();
+        $event = HsEvent::factory()->create(['organization_id' => 1, 'site_id' => $site->id, 'event_category' => HsEvent::CATEGORY_HAZARD]);
         $action = HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $event->id,
             'assigned_to_user_id' => $owner->id,
             'status' => HsCorrectiveAction::STATUS_OPEN,
         ]);
@@ -431,6 +435,18 @@ class HsCorrectiveActionPresentationTest extends TestCase
         $overridesBefore = DB::table('permission_user')->count();
         $verifyUrl = "/health-safety/events/{$event->id}/corrective-actions/{$action->id}/verify";
 
+        // Q22: each person who can't check it is told why; an independent verifier gets no reason.
+        $reasons = [
+            [$actionCreator, 'You added this action, so someone else checks it.'],
+            [$eventReporter, 'You started this safety review, so someone else checks its actions.'],
+            [$owner, 'You marked it done, so someone else checks it.'],
+            [$independentVerifier, null],
+        ];
+        foreach ($reasons as [$viewer, $reason]) {
+            $this->actingAs($viewer)->get("/health-safety/events/{$event->id}")->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->where('detail.corrective_actions.0.verify_blocked_reason', $reason));
+        }
+
         foreach ([$actionCreator, $eventReporter] as $deniedVerifier) {
             $this->actingAs($deniedVerifier)
                 ->get("/health-safety/events/{$event->id}")
@@ -480,7 +496,12 @@ class HsCorrectiveActionPresentationTest extends TestCase
         $this->assertSame($independentVerifier->id, $action->verified_by_user_id);
         $this->assertTrue($action->effectiveness_confirmed);
         $this->assertNotNull($action->verified_at);
-        $this->assertSame($before[0], $event->refresh()->getRawOriginal());
+        // G3 "stage follows actions": the last action checked as working moves the review to "Checking it worked";
+        // nothing else on the review changes.
+        $after = $event->refresh()->getRawOriginal();
+        $this->assertSame(HsEvent::STATUS_MONITORING, $after['status']);
+        $unchanged = ['status' => true, 'updated_at' => true];
+        $this->assertSame(array_diff_key($before[0], $unchanged), array_diff_key($after, $unchanged));
         $this->assertSame($attachmentsBefore, $action->attachments()->count());
         $this->assertSame($rolesBefore, DB::table('role_user')->count());
         $this->assertSame($overridesBefore, DB::table('permission_user')->count());

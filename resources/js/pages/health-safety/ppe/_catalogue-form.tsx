@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { FileDropzone, formatFileSize } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -56,6 +57,10 @@ export function PpeCatalogueForm({ command, actorId, type, onClose, onDone }: {
     const input = (key: keyof Omit<Values, 'documents'>, label: string, inputType = 'text', required = false, maxLength = 255) =>
         <Field label={label} htmlFor={`${id}-${key}`} required={required} error={form.errors[key]}><Input id={`${id}-${key}`} className="frontline-tap" disabled={locked}
             type={inputType} required={required} maxLength={maxLength} value={f[key]} onChange={(event) => change(key, event.target.value)} /></Field>;
+    // G4-11: dates use the approved calendar (Cancel and Use date), never a native date box.
+    const date = (key: 'purchase_date' | 'expiry_date' | 'next_inspection_due', label: string) =>
+        <Field label={label} htmlFor={`${id}-${key}`} error={form.errors[key]}><DatePicker id={`${id}-${key}`} label={label} value={f[key]} allowClear disabled={locked}
+            invalid={!!form.errors[key]} onChange={(value) => change(key, value)} /></Field>;
     const area = (key: 'description' | 'hazards_addressed', label: string) => <Field label={label} htmlFor={`${id}-${key}`} error={form.errors[key]}><Textarea id={`${id}-${key}`} className="frontline-tap" rows={3} maxLength={2000} value={f[key]} disabled={locked} onChange={(event) => change(key, event.target.value)} /></Field>;
     const select = (key: 'category' | 'ppe_type_id' | 'site_id' | 'condition' | 'inspection_frequency', label: string, choices: { value: string; label: string }[], required = false) =>
         <Field label={label} htmlFor={`${id}-${key}`} required={required} error={form.errors[key]}><SelectInput id={`${id}-${key}`} frontline disabled={locked}
@@ -66,7 +71,7 @@ export function PpeCatalogueForm({ command, actorId, type, onClose, onDone }: {
         {select('site_id', 'Site', (source.options?.sites ?? []).map((row) => ({ value: String(row.id), label: row.name })), true)}
         {input('brand', 'Brand')}{input('model', 'Model')}{input('serial_number', 'Serial number')}{input('quantity', 'Quantity', 'number', true)}
         {input('location', 'Storage location')}{select('condition', 'Condition', CONDITION_OPTIONS.map((value) => ({ value, label: condLabel(value) })), true)}
-        {input('purchase_date', 'Purchase date', 'date')}{input('expiry_date', 'Expiry date', 'date')}{input('next_inspection_due', 'Next inspection due', 'date')}
+        {date('purchase_date', 'Purchase date')}{date('expiry_date', 'Expiry date')}{date('next_inspection_due', 'Next inspection due')}
     </div><p className="text-subtle">Quantity is how many are in this batch. If you choose Unsafe to use, the stock goes on hold until someone decides what to do with it.</p>
         <Field label="Files" labelId={`${id}-evidence`} error={form.errors.documents}><FileDropzone multiple disabled={locked} aria-labelledby={`${id}-evidence`} hint="Up to 20 files · 20 MB each"
             onFiles={(files) => change('documents', [...f.documents, ...files.map((file) => ({ file, kind: file.type.startsWith('image/') ? 'photo' : 'document', note: '' }))])} /></Field>

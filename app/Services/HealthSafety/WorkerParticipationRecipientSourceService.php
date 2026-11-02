@@ -181,7 +181,7 @@ final class WorkerParticipationRecipientSourceService
     }
 
     /** Caller supplies OWN source identities; this never discovers staff or recipient candidates. */
-    public function captureOrigins(User $recipient, array $candidates, ?HealthSafetyReadContext $context = null): array
+    public function captureOrigins(User $recipient, array $candidates, ?HealthSafetyReadContext $context = null, bool $assertEach = true): array
     {
         foreach ($candidates as $candidate) {
             if (! is_array($candidate) || ! is_int($candidate['meeting_id'] ?? null) || $candidate['meeting_id'] < 1
@@ -199,10 +199,31 @@ final class WorkerParticipationRecipientSourceService
             return HealthSafetyReadMaterialisationProof::within($active, function ($proof) use ($active, $candidates, $context, $frame, &$origins) { return $active->consumeSourceViewer(self::PERMISSIONS,
                 function ($current, $reads) use ($active, $proof, $candidates, $context, $frame, &$origins): array {
                     $lifetime = $context === null ? null : $this->originalLifetime($current, $active);
+                    // #14 speed: candidates without an expected descriptor are proven per audience in a few set queries
+                    // (same predicates as prepare()); any meeting the batch doesn't admit is concealed exactly as a 404.
+                    $batched = [];
+                    foreach (['attendee', 'workforce_notice'] as $audience) {
+                        $ids = array_values(array_unique(array_map(fn ($c) => $c['meeting_id'], array_filter($candidates,
+                            fn ($c) => $c['audience'] === $audience && ! isset($c['expected_descriptor'])))));
+                        if (count($ids) < 2) { continue; }
+                        try {
+                            foreach ($this->prepareBatch($current, $audience, $ids, $active, $reads, $proof) as $id => $prepared) { $batched[$id.':'.$audience] = $prepared; }
+                        } catch (HttpExceptionInterface $error) {
+                            if ($error->getStatusCode() !== 404) { throw $error; }
+                            $this->assertReceiverFrame($current, $frame);
+                        }
+                        foreach ($ids as $id) { $batched[$id.':'.$audience] ??= false; }
+                    }
                     foreach ($candidates as $candidate) {
                         $this->assertReceiverFrame($current, $frame);
                         try {
-                            [$descriptor, $scope] = $this->prepare($current, $candidate['meeting_id'], $candidate['audience'], $candidate['expected_descriptor'] ?? null, $active, $reads, $proof);
+                            $key = $candidate['meeting_id'].':'.$candidate['audience'];
+                            if (! isset($candidate['expected_descriptor']) && array_key_exists($key, $batched)) {
+                                abort_unless($batched[$key] !== false, 404);
+                                [$descriptor, $scope] = $batched[$key];
+                            } else {
+                                [$descriptor, $scope] = $this->prepare($current, $candidate['meeting_id'], $candidate['audience'], $candidate['expected_descriptor'] ?? null, $active, $reads, $proof);
+                            }
                             [$sql, $bindings] = $this->fixedSql($scope);
                             $factory = \Closure::bind(static fn ($id, $meeting, $query, $values, $zone, $day, $request, $lease) =>
                                 new WorkerParticipationRecipientSourceOrigin($id, $meeting, $query, $values, $zone, $day, $request, $lease), null, WorkerParticipationRecipientSourceOrigin::class);
@@ -219,7 +240,8 @@ final class WorkerParticipationRecipientSourceService
                 }); });
         };
         $context === null ? HealthSafetyReadContext::within($recipient, self::PERMISSIONS, $consume) : $consume($context);
-        foreach ($origins as $origin) { $origin->assertOriginal(); }
+        // A caller that checks each origin right before using it (the inbox reader) may skip this final pass.
+        if ($assertEach) { foreach ($origins as $origin) { $origin->assertOriginal(); } }
         return $origins;
     }
 
@@ -324,6 +346,84 @@ final class WorkerParticipationRecipientSourceService
         }
         abort_unless((clone $scope)->exists(), 404);
         return [$descriptor, $scope];
+    }
+
+    /**
+     * #14 speed: prepare() for several meetings of one receiver audience at once. The same current-staff, Site,
+     * attendance/workforce and receiver-frame predicates select every admitted meeting in one guarded read; their
+     * committees, Sites and attendance rows follow in one guarded read each (all replayed by the response proof). Each
+     * meeting then gets the same exact scope and descriptor prepare() would build, without further queries. A meeting
+     * missing from the result is not admitted (the caller conceals it).
+     *
+     * @param  list<int>  $meetingIds
+     * @return array<int, array{0: array<string, mixed>, 1: Builder}>
+     */
+    private function prepareBatch(User $current, string $audience, array $meetingIds, HealthSafetyReadContext $context, CurrentAuthorizationReads $reads, HealthSafetyReadMaterialisationProof $proof): array
+    {
+        if (! in_array($audience, ['attendee', 'workforce_notice'], true)) { throw new LogicException('Only receiver audiences are batched.'); }
+        $staff = $reads->query(app(HrCurrentStaffService::class)->currentUsersQuery())->whereKey($current->id);
+        abort_unless((clone $staff)->exists(), 404);
+        $sites = app(UserSiteAccessService::class)->accessibleSiteIds($current, [], $reads);
+        $wide = $audience === 'attendee' && $current->canDo('hazards.view') && $current->canDo('healthSafety.viewAllSites');
+        $allowed = $wide ? app(UserSiteAccessService::class)->accessibleSiteIds($current, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, $reads) : $sites;
+        $receiverFrame = isset((self::$receivers ??= new WeakMap)[request()]) && (int) (request()->user()?->id ?? 0) === (int) $current->id
+            ? self::$receivers[request()] : null;
+        if ($receiverFrame !== null) { $this->assertReceiverFrame($current, $receiverFrame); }
+
+        $scopeFor = function (array $ids) use ($reads, $context, $staff, $allowed, $wide, $audience, $current, $receiverFrame): Builder {
+            $scope = $reads->query(HsCommitteeMeeting::query())->whereIn('hs_committee_meetings.id', $ids)
+                ->whereExists($context->originalSourceAuthorityQuery(self::PERMISSIONS, [])->selectRaw('1')->toBase())
+                ->whereExists((clone $staff)->selectRaw('1')->toBase())
+                ->whereHas('committee', function (Builder $committee) use ($allowed, $wide): void {
+                    $committee->where(fn (Builder $inner) => $wide ? $inner->whereIn('site_id', $allowed)->orWhereNull('site_id') : $inner->whereIn('site_id', $allowed));
+                });
+            if ($audience === 'attendee') {
+                $scope->whereExists(DB::table('hs_meeting_attendees')->where('user_id', $current->id)->whereColumn('meeting_id', 'hs_committee_meetings.id')->selectRaw('1'));
+            } else {
+                $scope->whereHas('committee', fn (Builder $committee) => $committee->whereExists(HrEmployeeProfile::query()
+                    ->where('user_id', $current->id)->where(fn (Builder $assigned) => $assigned
+                        ->whereColumn('primary_site_id', 'hs_committees.site_id')
+                        ->orWhereRaw('JSON_CONTAINS(COALESCE(`secondary_site_ids`, JSON_ARRAY()), JSON_ARRAY(`hs_committees`.`site_id`))')
+                        ->orWhereRaw('JSON_CONTAINS(COALESCE(`secondary_site_ids`, JSON_ARRAY()), JSON_ARRAY(CAST(`hs_committees`.`site_id` AS CHAR)))'))
+                    ->selectRaw('1')->toBase()));
+            }
+            if ($receiverFrame !== null) { $scope->whereRaw('EXISTS ('.$receiverFrame['sql'].')', $receiverFrame['bindings']); }
+
+            return $scope;
+        };
+
+        $meetings = $this->guard($scopeFor($meetingIds), $context, $reads, $proof)
+            ->get(['id', 'hs_committee_id', 'deleted_at', 'scheduled_at', 'status', 'location'])->keyBy('id');
+        if ($meetings->isEmpty()) { return []; }
+        $committees = $this->guard(HsCommittee::query()->whereIn('id', $meetings->pluck('hs_committee_id')->unique()->values()->all())
+            ->whereExists((clone $scopeFor($meetings->keys()->all()))->whereColumn('hs_committee_meetings.hs_committee_id', 'hs_committees.id')->selectRaw('1')->toBase()),
+            $context, $reads, $proof)->get(['id', 'site_id', 'status', 'deleted_at'])->keyBy('id');
+        $siteIds = $committees->pluck('site_id')->filter()->unique()->values()->all();
+        $siteRows = $siteIds === [] ? collect() : $this->guard(Site::query()->whereIn('id', $siteIds)->active()->notArchived()->whereNull('archived_at'),
+            $context, $reads, $proof)->get(['id', 'is_active', 'archived', 'archived_at', 'deleted_at'])->keyBy('id');
+        $pivots = $audience !== 'attendee' ? collect() : collect($reads->query(DB::table('hs_meeting_attendees')
+            ->whereIn('meeting_id', $meetings->keys()->all())->where('user_id', $current->id))
+            ->get(['id', 'meeting_id', 'user_id', 'response', 'attended', 'created_at', 'updated_at']))->keyBy('meeting_id');
+
+        $prepared = [];
+        foreach ($meetings as $id => $meeting) {
+            $committee = $committees->get($meeting->hs_committee_id);
+            if ($committee === null) { continue; }
+            $site = $committee->site_id === null ? null : $siteRows->get($committee->site_id);
+            if ($committee->site_id !== null && $site === null) { continue; }
+            $pivot = $audience === 'attendee' ? $pivots->get($id) : null;
+            if ($audience === 'attendee' && $pivot === null) { continue; }
+            $scope = $this->exact($scopeFor([(int) $id]), 'hs_committee_meetings', array_intersect_key($meeting->getRawOriginal(), array_flip(['id', 'hs_committee_id', 'deleted_at'])));
+            $scope->whereExists($this->exact(HsCommittee::query(), 'hs_committees', $committee->getRawOriginal())->selectRaw('1')->toBase());
+            if ($site !== null) { $scope->whereExists($this->exact(Site::query(), 'sites', $site->getRawOriginal())->selectRaw('1')->toBase()); }
+            if ($pivot !== null) { $scope->whereExists($this->exact(DB::table('hs_meeting_attendees'), '', (array) $pivot)->selectRaw('1')); }
+            $scope = $this->exact($scope, 'hs_committee_meetings', array_intersect_key($meeting->getRawOriginal(), array_flip(['id', 'scheduled_at', 'status', 'location'])));
+            $prepared[(int) $id] = [['meeting_id' => (int) $meeting->id, 'committee_id' => (int) $committee->id,
+                'site_id' => $committee->site_id === null ? null : (int) $committee->site_id, 'scheduled_at' => $meeting->getRawOriginal('scheduled_at'),
+                'meeting_status' => $meeting->status, 'committee_status' => $committee->status, 'location' => $meeting->location], $scope];
+        }
+
+        return $prepared;
     }
 
     private function guard(Builder $query, HealthSafetyReadContext $context, CurrentAuthorizationReads $reads, HealthSafetyReadMaterialisationProof $proof, ?\Closure $receiver = null): Builder

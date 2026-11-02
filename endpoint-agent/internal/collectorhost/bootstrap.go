@@ -89,7 +89,7 @@ func ReadBootstrap(reader io.Reader, now time.Time) (Bootstrap, error) {
 
 func ValidateBootstrap(p Bootstrap, now time.Time) error {
 	expiry, err := time.Parse(time.RFC3339Nano, p.ExpiresAt)
-	if err != nil || !expiry.After(now) || expiry.After(now.Add(31*time.Minute)) || p.Version != 1 ||
+	if err != nil || !expiry.After(now) || expiry.After(now.Add(24*time.Hour+time.Minute)) || p.Version != 1 ||
 		p.Component != "site" || p.Platform != "windows" || p.SiteID < 1 || p.SiteID > 999999999999999 ||
 		!collectorUUIDPattern.MatchString(p.CollectorUUID) || !enrolTokenPattern.MatchString(p.Token) {
 		return errBootstrap

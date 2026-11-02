@@ -2,7 +2,6 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
-use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Services\DeviceGroupAutoRuleService;
@@ -16,128 +15,20 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator as ValidatorContract;
-use Inertia\Inertia;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
+/**
+ * Device groups' remaining endpoints. S&D rebuild C6 (D8): the group pages are gone and no screen
+ * calls these any more; a group is now a filter on Devices. Kept until Stephan says yes to
+ * dropping the tables.
+ */
 class DeviceGroupController extends Controller
 {
-    use MapsDevicesForList;
-
     public function __construct(
         private readonly DeviceGroupAutoRuleService $autoRules,
         private readonly SecurityDevicesAccessService $access,
         private readonly DeviceGroupMaintenancePreview $maintenancePreview,
     ) {}
-
-    public function index(Request $request)
-    {
-        $user = $request->user();
-        $this->assertCanManageGroups($user);
-
-        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
-        $query = DeviceGroup::query()->withCount([
-            'devices' => fn ($devices) => $devices->whereIn('devices.id', clone $visibleDeviceIds),
-        ]);
-
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('type') && $request->input('type') !== 'all') {
-            $query->where('type', $request->input('type'));
-        }
-
-        $query->orderBy('name');
-
-        $groups = $query->paginate(30)->withQueryString();
-
-        return Inertia::render('security-devices/device-groups/index', [
-            'groups' => [
-                'data' => $groups->getCollection()->map(fn (DeviceGroup $g) => [
-                    'id' => $g->id,
-                    'name' => $g->name,
-                    'type' => $g->type,
-                    'description' => $g->description,
-                    'devices_count' => $g->devices_count,
-                    'created_at' => $g->created_at?->toISOString(),
-                ]),
-                'links' => $groups->linkCollection()->toArray(),
-                'meta' => [
-                    'current_page' => $groups->currentPage(),
-                    'last_page' => $groups->lastPage(),
-                    'total' => $groups->total(),
-                ],
-            ],
-            'filters' => $request->only(['search', 'type']),
-        ]);
-    }
-
-    public function show(Request $request, DeviceGroup $group)
-    {
-        $user = $request->user();
-        $asOf = now()->toImmutable();
-        $this->assertCanManageGroups($user);
-
-        $visibleDevices = $this->access->visibleDevices($user);
-        $visibleDeviceIds = (clone $visibleDevices)->select('devices.id');
-        $members = $group->devices()
-            ->whereIn('devices.id', clone $visibleDeviceIds)
-            ->with(['assignments' => fn ($q) => $q->active()])
-            ->orderBy('name')
-            ->paginate(30)
-            ->withQueryString();
-
-        // Available devices for the add-member dialog (not already in this group).
-        $existingDeviceIds = $group->devices()->pluck('devices.id');
-        $availableDevices = (clone $visibleDevices)
-            ->whereNotIn('id', $existingDeviceIds)
-            ->operational()
-            ->orderBy('name')
-            ->limit(200)
-            ->get(['id', 'name', 'device_uid', 'domain', 'category']);
-
-        $autoRules = is_array($group->auto_rules) ? $group->auto_rules : null;
-        $autoRuleConditionCount = $autoRules
-            ? count($autoRules['conditions'] ?? [])
-            : 0;
-
-        return Inertia::render('security-devices/device-groups/show', [
-            'actor_id' => (int) $user->id,
-            'as_of' => $asOf->toISOString(),
-            // Same actor rule the preview read enforces, so the page never
-            // offers an action that can only return "unavailable".
-            'can_preview_maintenance' => $this->maintenancePreview->actorMayPreview($user),
-            'group' => [
-                'id' => $group->id,
-                'name' => $group->name,
-                'type' => $group->type,
-                'description' => $group->description,
-                'created_at' => $group->created_at?->toISOString(),
-                'auto_rules' => $autoRules,
-                'auto_rule_condition_count' => $autoRuleConditionCount,
-            ],
-            'members' => [
-                'data' => $members->getCollection()->map(fn (Device $d) => $this->mapDeviceForList($d)),
-                'links' => $members->linkCollection()->toArray(),
-                'meta' => [
-                    'current_page' => $members->currentPage(),
-                    'last_page' => $members->lastPage(),
-                    'total' => $members->total(),
-                ],
-            ],
-            'availableDevices' => $availableDevices->map(fn ($d) => [
-                'id' => $d->id,
-                'name' => $d->name,
-                'device_uid' => $d->device_uid,
-                'domain' => $d->domain,
-                'category' => $d->category,
-            ]),
-        ]);
-    }
 
     public function previewMaintenancePolicy(Request $request, DeviceGroup $group): JsonResponse
     {
@@ -171,13 +62,6 @@ class DeviceGroupController extends Controller
             ->header('Cache-Control', 'private, no-store');
     }
 
-    public function create(Request $request)
-    {
-        $user = $request->user();
-        $this->assertCanManageGroups($user);
-
-        return Inertia::render('security-devices/device-groups/create');
-    }
 
     public function store(Request $request)
     {
@@ -203,21 +87,6 @@ class DeviceGroupController extends Controller
             ->with('success', "Group '{$group->name}' created.");
     }
 
-    public function edit(Request $request, DeviceGroup $group)
-    {
-        $user = $request->user();
-        $this->assertCanManageGroups($user);
-
-        return Inertia::render('security-devices/device-groups/edit', [
-            'group' => [
-                'id' => $group->id,
-                'name' => $group->name,
-                'type' => $group->type,
-                'description' => $group->description,
-                'auto_rules' => is_array($group->auto_rules) ? $group->auto_rules : null,
-            ],
-        ]);
-    }
 
     public function update(Request $request, DeviceGroup $group)
     {

@@ -1,734 +1,497 @@
-import { EntityChip } from '@/components/lists';
+/**
+ * One Site (S&D rebuild drawing pg-sdr-12, with Network map 12b, Internet 12e, Rooms 12d, Modes 12c
+ * and "hub stopped answering" 12f). House modes switch by hand with pop-up 42 and are edited with 43.
+ */
+import { DonutChart } from '@/components/dashboard/donut-chart';
 import {
     PageHeader,
-    PageHeaderFilterButton,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
-    PageHeaderSearch,
     PageHeaderStatusChip,
-    PageHeaderViewToggle,
     PageLayout,
 } from '@/components/page';
-import { AddHubWizard } from '@/components/security-devices/add-hub-wizard';
-import {
-    EditHubDialog,
-    type EditHubTarget,
-} from '@/components/security-devices/edit-hub-dialog';
-import {
-    CoverageIndicator,
-    formatCoverage,
-} from '@/components/security-devices/estate-operations';
-import { SiteProfileAccessRequired } from '@/components/security-devices/permission-destinations';
-import {
-    SiteAlerts,
-    SiteChanges,
-    SiteCollectors,
-    SiteContacts,
-    SiteDevices,
-    SiteEdges,
-    SiteEvidenceFields,
-    SiteEvidenceTime,
-    SiteGroups,
-    SiteItWork,
-    SiteMaintenance,
-    SiteMonitors,
-    technologyLabel,
-} from '@/components/security-devices/site-technology-records';
+import { AddDeviceChooser, DeviceFormPopup, useDeviceFormOptions } from '@/components/security-devices/device-popups';
+import { EditHouseMode, modeIcon, SwitchHouseMode } from '@/components/security-devices/house-mode-popups';
+import { HubPopups, useHubPopups } from '@/components/security-devices/hub-popups';
+import { NetworkCheckPopup } from '@/components/security-devices/network-check-popup';
+import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
 import { SiteTopologyTreeCard } from '@/components/security-devices/site-topology-tree';
-import { Button } from '@/components/ui/button';
-import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
+import type { SiteTopologyTree } from '@/components/security-devices/topology-types';
+import { KnowList, Log, PointBars, QuietLine, SideBySide, SideColumn, Story, Surface } from '@/components/signature/blocks';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import {
-    Activity,
-    BellRing,
-    Building2,
-    Clock3,
-    Cpu,
-    LayoutGrid,
-    List,
-    Network,
-    Plus,
-    RadioTower,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import type { Collector, SiteTechnologyProps } from './_types';
-export type { SiteTechnologyProps } from './_types';
-type ProfileView =
-    | 'overview'
-    | 'network'
-    | 'monitoring'
-    | 'work'
-    | 'changes'
-    | 'devices';
-const views = [
-    { key: 'overview' as const, label: 'Overview', icon: Building2 },
-    { key: 'network' as const, label: 'WAN & topology', icon: Network },
-    { key: 'monitoring' as const, label: 'Monitoring', icon: Activity },
-    { key: 'work' as const, label: 'Alerts & work', icon: BellRing },
-    { key: 'changes' as const, label: 'Recent changes', icon: Clock3 },
-    { key: 'devices' as const, label: 'Devices', icon: Cpu },
-];
-function hashView(): ProfileView {
-    if (typeof window === 'undefined') return 'overview';
-    const key = window.location.hash.replace(/^#site-/, '');
-    return key === 'monitoring-failed'
-        ? 'monitoring'
-        : views.some((view) => view.key === key)
-          ? (key as ProfileView)
-          : 'overview';
-}
-function healthLabel(value: string) {
-    return value === 'healthy'
-        ? 'Healthy'
-        : value === 'critical'
-          ? 'Critical'
-          : value === 'warning'
-            ? 'Needs attention'
-            : 'Unknown health';
-}
-export default function SiteTechnologyShow(props: SiteTechnologyProps) {
-    const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
-    }>().props;
-    const identity = JSON.stringify([auth?.user?.id, auth?.can, props]);
-    return <SiteTechnologyProfile key={identity} {...props} />;
-}
-function SiteTechnologyProfile(props: SiteTechnologyProps) {
-    const {
-        site,
-        devices,
-        summary,
-        wan,
-        topology,
-        deviceGroups,
-        monitoring,
-        alerts,
-        itWork,
-        maintenance,
-        collectors,
-        hub_wizard: hubWizard,
-        changes,
-        contacts,
-        can,
-    } = props;
-    const [view, setView] = useState<ProfileView>(hashView);
-    const [layout, setLayout] = useState<'cards' | 'table'>('cards');
-    const [search, setSearch] = useState('');
-    const [hubWizardOpen, setHubWizardOpen] = useState(false);
-    const [editingHub, setEditingHub] = useState<EditHubTarget | null>(null);
-    const canManageCollectors = Boolean(can.manage_collectors && hubWizard);
-    const refreshSite = () => router.reload({ preserveScroll: true });
-    const openEditHub = (collector: Collector) => {
-        if (!collector.update_url) return;
-        setEditingHub({
-            id: collector.id,
-            name: collector.name,
-            site: collector.home_site
-                ? {
-                      id: collector.home_site.id,
-                      name: collector.home_site.name,
-                  }
-                : { id: site.id, name: site.name },
-            covered_site_ids: collector.covered_site_ids ?? [],
-            update_url: collector.update_url,
-        });
-    };
-    const [failedOnly, setFailedOnly] = useState(
-        () =>
-            typeof window !== 'undefined' &&
-            window.location.hash === '#site-monitoring-failed',
-    );
+import { agoWords, seenTime, timedText } from '@/lib/security-devices/device-time';
+import { deviceStateLabel, deviceStateTone, type DeviceState } from '@/lib/security-devices/device-words';
+import { Head, Link, router } from '@inertiajs/react';
+import { House, Plus, Radar, SunMoon } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ModesTab } from './_modes';
+import { RoomsTab } from './_rooms';
+import type { HouseSummary, SitePageProps, SitePageTab } from './_types';
+
+export type { SitePageProps } from './_types';
+
+// The Devices, Alerts and Logbook tabs (12g–12i) wait for their drawings' approval.
+const TAB_LABEL: Record<SitePageTab, string> = {
+    overview: 'Overview',
+    network: 'Network map',
+    internet: 'Internet',
+    rooms: 'Rooms',
+    modes: 'Modes',
+};
+
+const NO_HOUSE: HouseSummary = { current: null, next: null, modes: [] };
+
+/** Each state's ring colour, from the status tokens (never the brand). */
+const STATE_COLOUR: Record<DeviceState, string> = {
+    online: 'var(--status-success)',
+    problem: 'var(--status-warning)',
+    offline: 'var(--status-critical)',
+    cant_check: 'var(--status-neutral)',
+    not_watched: 'var(--border)',
+    retired: 'var(--border)',
+};
+
+function useNow(): Date {
+    const [now, setNow] = useState(() => new Date());
     useEffect(() => {
-        const update = () => {
-            setView(hashView());
-            setFailedOnly(window.location.hash === '#site-monitoring-failed');
-        };
-        window.addEventListener('hashchange', update);
-        return () => window.removeEventListener('hashchange', update);
+        const timer = window.setInterval(() => setNow(new Date()), 60_000);
+        return () => window.clearInterval(timer);
     }, []);
-    const selectView = (next: ProfileView, onlyFailed = false) => {
-        setView(next);
-        setFailedOnly(onlyFailed);
-        const hash =
-            '#site-' +
-            (next === 'monitoring' && onlyFailed ? 'monitoring-failed' : next);
-        if (window.location.hash !== hash) window.location.hash = hash;
+    return now;
+}
+
+type Popup =
+    | { kind: 'chooser' }
+    | { kind: 'add' }
+    | { kind: 'scan' }
+    | { kind: 'scanning'; runId: number }
+    | { kind: 'switch_mode' }
+    | { kind: 'edit_mode' }
+    | { kind: 'ask_obli'; session: string | null }
+    | null;
+
+/** An IT job's link back to Obli's record: ?tab=network&obli=<session>. */
+function obliSessionFromUrl(): string | null {
+    if (typeof window === 'undefined') return null;
+    const value = new URLSearchParams(window.location.search).get('obli');
+    return value && /^[0-9a-f-]{36}$/i.test(value) ? value : null;
+}
+
+export default function SiteShow(props: SitePageProps) {
+    const { site, tab, flag, hub, meters, can } = props;
+    const house = props.house ?? NO_HOUSE;
+    // Change mode offers every mode but the one the house is in.
+    const switchable = can.switch_mode ? house.modes.filter((mode) => mode.id !== house.current?.id) : [];
+    const now = useNow();
+    const base = `/security-devices/sites/${site.id}`;
+    const [popup, setPopup] = useState<Popup>(() => {
+        const session = can.ask_obli ? obliSessionFromUrl() : null;
+        return session ? { kind: 'ask_obli', session } : null;
+    });
+    // The mode a house mode pop-up is about; kept while it closes so its words don't change.
+    const [modeTarget, setModeTarget] = useState<number | null>(null);
+    const switchMode = (modeId: number) => {
+        setModeTarget(modeId);
+        setPopup({ kind: 'switch_mode' });
     };
-    const monitoringReadable = monitoring.monitored_devices !== null;
-    const filteredDevices = devices.filter((device) =>
-        [
-            device.name,
-            device.device_uid,
-            device.category,
-            device.subcategory,
-            device.manufacturer,
-            device.model,
-            device.provider,
-        ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase()
-            .includes(search.trim().toLowerCase()),
+    const editMode = (modeId: number | null) => {
+        setModeTarget(modeId);
+        setPopup({ kind: 'edit_mode' });
+    };
+    const { form, load } = useDeviceFormOptions();
+    const open = (next: Exclude<Popup, null>) => {
+        load();
+        setPopup(next);
+    };
+    const go = (next: SitePageTab) => router.get(base, next === 'overview' ? {} : { tab: next }, { preserveScroll: true });
+    const hubs = useHubPopups(load);
+    const hubId = hub?.id ?? null;
+
+    // The "watched by" line opens the hub panel (sdr-13) when the viewer may see it.
+    const hubName =
+        hub === null ? null : hubId !== null ? (
+            // eslint-disable-next-line no-restricted-syntax -- the hub's name in the header line, opening its panel; a text link, not a form button.
+            <button type="button" onClick={() => hubs.openPanel(hubId)} className="rounded-sm underline underline-offset-2 outline-none hover:no-underline focus-visible:ring-2 focus-visible:ring-band-foreground">
+                {hub.label}
+            </button>
+        ) : (
+            hub.label
+        );
+    const hubWords =
+        hub === null ? (
+            'no hub watches it yet'
+        ) : hub.own ? (
+            <>its own hub is {hubName}</>
+        ) : (
+            <>watched by {hubName}</>
+        );
+    const openHub = () => {
+        if (hubId !== null) hubs.openPanel(hubId);
+        else if (hub === null && can.add_hub) hubs.openAdd(site.id);
+        else go('overview');
+    };
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/security-devices/sites"
+            icon={House}
+            title={site.name}
+            titleChip={<PageHeaderStatusChip variant={flag.tone}>{flag.text}</PageHeaderStatusChip>}
+            subline={
+                <>
+                    {site.address ? `${site.address} · ` : null}
+                    {hubWords}
+                </>
+            }
+            actions={
+                <>
+                    {can.scan ? (
+                        <PageHeaderGlassButton icon={Radar} onClick={() => open({ kind: 'scan' })}>
+                            Scan now
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {switchable.length > 0 ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <PageHeaderGlassButton icon={SunMoon}>Change mode</PageHeaderGlassButton>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                {switchable.map((mode) => {
+                                    const Icon = modeIcon(mode.name);
+                                    return (
+                                        <DropdownMenuItem key={mode.id} onSelect={() => switchMode(mode.id)}>
+                                            <Icon aria-hidden="true" />
+                                            Switch to {mode.name}
+                                        </DropdownMenuItem>
+                                    );
+                                })}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
+                    {can.add_device || can.scan ? (
+                        <PageHeaderPrimaryButton icon={Plus} onClick={() => open({ kind: 'chooser' })}>
+                            Add device
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Devices online"
+                        tone={meters.online.of > 0 && meters.online.count === meters.online.of ? 'success' : meters.online.of > 0 ? 'warning' : 'brand'}
+                        onClick={() => router.visit(`/security-devices/devices?site=${site.id}`)}
+                        ariaLabel="Show this Site’s devices"
+                    >
+                        <PageHeaderMeterBig>{meters.online.of > 0 ? `${meters.online.count} of ${meters.online.of}` : 'Not available'}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>{timedText(meters.online.caption, now)}</PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock label="House mode" onClick={() => go('modes')} ariaLabel="Show this Site’s house modes">
+                        <PageHeaderMeterBig>{house.current ? house.current.name : house.modes.length > 0 ? 'Not set yet' : 'None yet'}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {house.next
+                                ? timedText({ text: `${house.next.name} starts {time}`, at: house.next.at }, now)
+                                : house.current
+                                  ? timedText({ text: 'Since {time}', at: house.current.since }, now)
+                                  : house.modes.length > 0
+                                    ? 'Switched by hand only'
+                                    : can.edit_modes
+                                      ? 'Add one on the Modes tab'
+                                      : 'No house modes yet'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock label="Alerts open" tone={meters.alerts.count > 0 ? 'warning' : 'success'} onClick={() => router.visit(`/security-devices?site=${site.id}`)} ariaLabel="Show what needs attention at this Site">
+                        <PageHeaderMeterBig>{meters.alerts.count}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>{meters.alerts.caption}</PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {meters.scan ? (
+                        <PageHeaderMeterBlock label="Last scan" onClick={() => router.visit(meters.scan!.href)} ariaLabel="Open the last scan’s results">
+                            <PageHeaderMeterBig>{meters.scan.at ? seenTime(meters.scan.at, now) : 'Not available'}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>{meters.scan.caption}</PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Hub"
+                        tone={hub === null ? 'brand' : hub.answering ? 'success' : 'critical'}
+                        onClick={openHub}
+                        ariaLabel={hubId !== null ? `Open ${hub?.label ?? 'the hub'}` : hub === null && can.add_hub ? 'Add a hub for this Site' : 'Show how the hub is doing'}
+                    >
+                        <PageHeaderMeterBig>{hub === null ? 'None yet' : hub.answering ? 'Answering' : 'Not answering'}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {hub === null ? 'Add a hub to watch this Site' : [hub.label, hub.version ? `version ${hub.version}` : null].filter(Boolean).join(' · ')}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            rail={
+                <PageHeaderRail<SitePageTab>
+                    ariaLabel="About this Site"
+                    items={(Object.keys(TAB_LABEL) as SitePageTab[]).map((key) => ({ key, label: TAB_LABEL[key] }))}
+                    value={tab}
+                    onSelect={go}
+                />
+            }
+        />
     );
-    const monitorRows = failedOnly
-        ? monitoring.monitors.filter((monitor) =>
-              ['failed', 'degraded'].includes(monitor.state),
-          )
-        : monitoring.monitors;
-    const permission = (label: string) => (
-        <p
-            role="note"
-            className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
-        >
-            {label}
-        </p>
-    );
+
+    let body: ReactNode = null;
+    if (tab === 'overview' && props.overview) body = <OverviewTab overview={props.overview} siteName={site.name} now={now} onDevices={() => router.visit(`/security-devices/devices?site=${site.id}`)} />;
+    if (tab === 'network' && props.network)
+        body = (
+            <NetworkTab
+                tree={props.network.tree as SiteTopologyTree | undefined}
+                siteName={site.name}
+                hubLabel={hub?.label ?? null}
+                onAskObli={can.ask_obli ? () => setPopup({ kind: 'ask_obli', session: null }) : null}
+            />
+        );
+    if (tab === 'internet' && props.internet) body = <InternetTab internet={props.internet} now={now} />;
+    if (tab === 'rooms' && props.rooms) body = <RoomsTab rooms={props.rooms} siteName={site.name} />;
+    if (tab === 'modes' && props.modes)
+        body = (
+            <ModesTab
+                modes={props.modes}
+                can={{ switch_mode: !!can.switch_mode }}
+                now={now}
+                onSwitch={switchMode}
+                onEdit={editMode}
+            />
+        );
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Security & Devices', href: '/security-devices' },
+                { title: 'Security & devices', href: '/security-devices' },
                 { title: 'Sites', href: '/security-devices/sites' },
-                {
-                    title: site.name,
-                    href: '/security-devices/sites/' + site.id,
-                },
+                { title: site.name, href: base },
             ]}
         >
-            <Head title={site.name + ' - Security & Devices'} />
-            <PageLayout
-                width="wide"
-                hero={
-                    <PageHeader
-                        variant="profile"
-                        backHref="/security-devices/sites"
-                        icon={Building2}
-                        title={site.name}
-                        titleChip={
-                            <PageHeaderStatusChip
-                                variant={
-                                    summary.health === 'critical'
-                                        ? 'critical'
-                                        : summary.health === 'warning'
-                                          ? 'warning'
-                                          : summary.health === 'healthy'
-                                            ? 'success'
-                                            : 'neutral'
-                                }
-                            >
-                                {healthLabel(summary.health)}
-                            </PageHeaderStatusChip>
-                        }
-                        subline={
-                            <>
-                                <span className="block">
-                                    {site.address ||
-                                        site.city ||
-                                        'No Site address recorded'}
-                                </span>
-                                <span className="block">
-                                    {technologyLabel(site.type)} ·{' '}
-                                    {site.is_active
-                                        ? 'Active Site'
-                                        : 'Inactive Site'}{' '}
-                                    · Technology
-                                </span>
-                            </>
-                        }
-                        mobileSummary={
-                            summary.devices +
-                            ' devices · ' +
-                            summary.attention_devices +
-                            ' need attention'
-                        }
-                        actions={
-                            <>
-                                <PageHeaderSearch
-                                    value={search}
-                                    onChange={(value) => {
-                                        setSearch(value);
-                                        selectView('devices');
-                                    }}
-                                    ariaLabel="Search devices at this Site"
-                                    placeholder="Search Site devices…"
-                                />
-                                {canManageCollectors ? (
-                                    <PageHeaderGlassButton
-                                        icon={Plus}
-                                        onClick={() => setHubWizardOpen(true)}
-                                    >
-                                        Add a hub
-                                    </PageHeaderGlassButton>
-                                ) : null}
-                                {can.view_site_profile ? (
-                                    <PageHeaderGlassButton asChild>
-                                        <Link
-                                            href={
-                                                '/sites/' +
-                                                site.id +
-                                                '?tab=technology'
-                                            }
-                                        >
-                                            Open Site profile
-                                        </Link>
-                                    </PageHeaderGlassButton>
-                                ) : (
-                                    <SiteProfileAccessRequired className="text-band-foreground/80" />
-                                )}
-                            </>
-                        }
-                        meters={
-                            <>
-                                <PageHeaderMeterBlock
-                                    label="Devices"
-                                    ariaLabel="View Site devices"
-                                    onClick={() => {
-                                        setSearch('');
-                                        selectView('devices');
-                                    }}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {summary.devices}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Within this approved Site
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Monitored devices"
-                                    ariaLabel="View Site monitoring"
-                                    onClick={() => selectView('monitoring')}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {monitoring.monitored_devices ??
-                                            'Restricted'}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {monitoringReadable
-                                            ? formatCoverage(
-                                                  summary.coverage_percent,
-                                              )
-                                            : 'Monitoring permission required'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Failed checks"
-                                    ariaLabel="View failed Site checks"
-                                    onClick={() =>
-                                        selectView('monitoring', true)
-                                    }
-                                >
-                                    <PageHeaderMeterBig>
-                                        {monitoring.failed_monitors ??
-                                            'Restricted'}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        Failed or degraded results
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                                <PageHeaderMeterBlock
-                                    label="Open IT work"
-                                    ariaLabel="View Site IT work"
-                                    onClick={() => selectView('work')}
-                                >
-                                    <PageHeaderMeterBig>
-                                        {can.view_it_work
-                                            ? (summary.open_it_work ??
-                                              'Restricted')
-                                            : 'Restricted'}
-                                    </PageHeaderMeterBig>
-                                    <PageHeaderMeterCaption>
-                                        {can.view_it_work
-                                            ? 'Owned by IT & Support'
-                                            : 'IT & Support permission required'}
-                                    </PageHeaderMeterCaption>
-                                </PageHeaderMeterBlock>
-                            </>
-                        }
-                        filters={
-                            <>
-                                {search ? (
-                                    <PageHeaderFilterButton
-                                        onClick={() => setSearch('')}
-                                    >
-                                        Clear device search
-                                    </PageHeaderFilterButton>
-                                ) : null}
-                                <PageHeaderViewToggle
-                                    value={layout}
-                                    onChange={(value) =>
-                                        setLayout(value as 'cards' | 'table')
-                                    }
-                                    options={[
-                                        {
-                                            value: 'cards',
-                                            label: 'Cards',
-                                            icon: LayoutGrid,
-                                        },
-                                        {
-                                            value: 'table',
-                                            label: 'Table',
-                                            icon: List,
-                                        },
-                                    ]}
-                                />
-                            </>
-                        }
-                        rail={
-                            <PageHeaderRail<ProfileView>
-                                items={views}
-                                value={view}
-                                onSelect={(next) => selectView(next)}
-                                ariaLabel="Site technology sections"
-                            />
-                        }
-                    />
-                }
-            >
-                <section
-                    id={'site-' + view}
-                    aria-label={views.find((item) => item.key === view)?.label}
-                    className="space-y-5"
-                >
-                    {view === 'overview' ? (
-                        <>
-                            <div className="grid gap-5 lg:grid-cols-2">
-                                <ReviewCard
-                                    icon={Building2}
-                                    title="Technology at this Site"
-                                >
-                                    <SiteEvidenceFields
-                                        items={[
-                                            ['Devices', summary.devices],
-                                            [
-                                                'Need attention',
-                                                summary.attention_devices,
-                                            ],
-                                            [
-                                                'Offline devices',
-                                                summary.offline_devices,
-                                            ],
-                                            [
-                                                'Without monitoring',
-                                                summary.unmonitored_devices,
-                                            ],
-                                            [
-                                                'Active findings',
-                                                summary.active_findings,
-                                            ],
-                                            [
-                                                'Control Room alerts',
-                                                can.view_control_room
-                                                    ? summary.active_control_room_alerts
-                                                    : null,
-                                            ],
-                                            [
-                                                'Overdue maintenance',
-                                                summary.overdue_maintenance,
-                                            ],
-                                        ]}
-                                    />
-                                </ReviewCard>
-                                <ReviewCard
-                                    icon={RadioTower}
-                                    title="Collection and observations"
-                                >
-                                    <ReviewRow
-                                        label="Monitoring coverage"
-                                        value={
-                                            monitoringReadable
-                                                ? formatCoverage(
-                                                      summary.coverage_percent,
-                                                  )
-                                                : 'Restricted'
-                                        }
-                                    />
-                                    <ReviewRow
-                                        label="Collector state"
-                                        value={
-                                            monitoringReadable
-                                                ? summary.collector.label
-                                                : 'Monitoring permission required'
-                                        }
-                                    />
-                                    <ReviewRow
-                                        label="Local collectors"
-                                        value={
-                                            monitoringReadable
-                                                ? summary.collector.count
-                                                : 'Restricted'
-                                        }
-                                    />
-                                    <ReviewRow
-                                        label="Collector contact"
-                                        value={
-                                            monitoringReadable ? (
-                                                <SiteEvidenceTime
-                                                    value={
-                                                        summary.collector
-                                                            .last_seen_at
-                                                    }
-                                                    empty="No contact recorded"
-                                                />
-                                            ) : (
-                                                'Restricted'
-                                            )
-                                        }
-                                    />
-                                    <ReviewRow
-                                        label="Latest technology change"
-                                        value={
-                                            <SiteEvidenceTime
-                                                value={summary.last_change_at}
-                                                empty="No change recorded"
-                                            />
-                                        }
-                                    />
-                                </ReviewCard>
-                            </div>
-                            {topology.tree &&
-                            (topology.tree.roots.length > 0 ||
-                                topology.tree.unplaced.length > 0) ? (
-                                <ReviewCard
-                                    icon={Network}
-                                    title="Site network map"
-                                >
-                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <p className="text-sm text-muted-foreground">
-                                            {topology.tree.tier_counts.gateways}{' '}
-                                            gateways ·{' '}
-                                            {topology.tree.tier_counts.switches}{' '}
-                                            switches ·{' '}
-                                            {
-                                                topology.tree.tier_counts
-                                                    .access_points
-                                            }{' '}
-                                            access points ·{' '}
-                                            {topology.tree.tier_counts.devices}{' '}
-                                            connected devices
-                                        </p>
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                selectView('network')
-                                            }
-                                        >
-                                            Open Site network map
-                                        </Button>
-                                    </div>
-                                </ReviewCard>
-                            ) : null}
-                            {monitoringReadable ? (
-                                <SiteCollectors
-                                    rows={collectors}
-                                    view={layout}
-                                    onEditHub={
-                                        canManageCollectors
-                                            ? openEditHub
-                                            : undefined
-                                    }
-                                />
-                            ) : (
-                                permission(
-                                    'Monitoring permission is required to view collector details.',
-                                )
-                            )}
-                            <SiteContacts rows={contacts} view={layout} />
-                        </>
-                    ) : null}
-                    {view === 'network' ? (
-                        <>
-                            <SiteTopologyTreeCard
-                                tree={topology.tree}
-                                siteName={site.name}
-                            />
-                            <div className="grid gap-5 lg:grid-cols-2">
-                                <ReviewCard icon={Network} title="WAN context">
-                                    <ReviewRow
-                                        label="Context"
-                                        value={wan.label}
-                                    />
-                                    <ReviewRow
-                                        label="WAN device classification"
-                                        value={
-                                            wan.known
-                                                ? 'Recorded'
-                                                : 'Not recorded'
-                                        }
-                                    />
-                                    <ReviewRow
-                                        label="Address"
-                                        value={
-                                            site.address ||
-                                            site.city ||
-                                            'No Site address recorded'
-                                        }
-                                    />
-                                </ReviewCard>
-                                <ReviewCard
-                                    icon={Network}
-                                    title="Topology evidence"
-                                >
-                                    <ReviewRow
-                                        label="Known links"
-                                        value={topology.edge_count}
-                                    />
-                                    <ReviewRow
-                                        label="Devices"
-                                        value={topology.device_count}
-                                    />
-                                    <ReviewRow
-                                        label="Device groups"
-                                        value={deviceGroups.length}
-                                    />
-                                    <ReviewRow
-                                        label="Relationship coverage"
-                                        value={
-                                            topology.is_complete
-                                                ? 'Recorded'
-                                                : 'Incomplete'
-                                        }
-                                    />
-                                </ReviewCard>
-                            </div>
-                            {!topology.is_complete && devices.length > 1 ? (
-                                <p className="rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning">
-                                    Topology is incomplete. Unknown links are
-                                    not treated as healthy paths.
-                                </p>
-                            ) : null}
-                            <SiteDevices
-                                rows={wan.devices}
-                                view={layout}
-                                title="WAN devices"
-                            />
-                            <SiteEdges rows={topology.edges} view={layout} />
-                            <SiteGroups rows={deviceGroups} view={layout} />
-                        </>
-                    ) : null}
-                    {view === 'monitoring' ? (
-                        monitoringReadable ? (
-                            <>
-                                <ReviewCard
-                                    icon={Activity}
-                                    title="Monitoring coverage"
-                                >
-                                    <CoverageIndicator
-                                        percent={summary.coverage_percent}
-                                        monitored={
-                                            monitoring.monitored_devices!
-                                        }
-                                        total={monitoring.total_devices}
-                                    />
-                                    <SiteEvidenceFields
-                                        items={[
-                                            [
-                                                'Without monitoring',
-                                                monitoring.unmonitored_devices,
-                                            ],
-                                            [
-                                                'Failed or degraded checks',
-                                                monitoring.failed_monitors,
-                                            ],
-                                            [
-                                                'Uncertain checks',
-                                                monitoring.uncertain_monitors,
-                                            ],
-                                        ]}
-                                    />
-                                </ReviewCard>
-                                {failedOnly ? (
-                                    <div className="flex items-center gap-2">
-                                        <EntityChip>
-                                            Failed or degraded checks
-                                        </EntityChip>
-                                        <PageHeaderFilterButton
-                                            onClick={() =>
-                                                selectView('monitoring')
-                                            }
-                                        >
-                                            Show all checks
-                                        </PageHeaderFilterButton>
-                                    </div>
-                                ) : null}
-                                <SiteMonitors
-                                    rows={monitorRows}
-                                    view={layout}
-                                />
-                            </>
-                        ) : (
-                            permission(
-                                'Monitoring permission is required. No restricted readings or collector details are shown.',
-                            )
-                        )
-                    ) : null}
-                    {view === 'work' ? (
-                        <>
-                            {can.view_control_room ? (
-                                <SiteAlerts rows={alerts} view={layout} />
-                            ) : (
-                                permission(
-                                    'Control Room permission is required.',
-                                )
-                            )}
-                            {can.view_it_work ? (
-                                <SiteItWork rows={itWork} view={layout} />
-                            ) : (
-                                permission(
-                                    'IT & Support permission is required.',
-                                )
-                            )}
-                            {summary.overdue_maintenance !== null ? (
-                                <SiteMaintenance
-                                    rows={maintenance}
-                                    view={layout}
-                                />
-                            ) : (
-                                permission(
-                                    'Maintenance permission is required.',
-                                )
-                            )}
-                        </>
-                    ) : null}
-                    {view === 'changes' ? (
-                        <SiteChanges rows={changes} view={layout} />
-                    ) : null}
-                    {view === 'devices' ? (
-                        <SiteDevices
-                            rows={filteredDevices}
-                            view={layout}
-                            total={summary.devices}
-                        />
-                    ) : null}
-                </section>
-            </PageLayout>
-            {canManageCollectors && hubWizard ? (
-                <>
-                    <AddHubWizard
-                        open={hubWizardOpen}
-                        onClose={() => setHubWizardOpen(false)}
-                        onConnected={refreshSite}
-                        defaultSiteId={site.id}
-                        optionsUrl={hubWizard.options_url}
-                        issueUrl={hubWizard.issue_url}
-                    />
-                    <EditHubDialog
-                        open={editingHub !== null}
-                        onOpenChange={(open) => {
-                            if (!open) setEditingHub(null);
-                        }}
-                        hub={editingHub}
-                        sites={hubWizard.sites}
-                        onSaved={refreshSite}
-                    />
-                </>
+            <Head title={site.name} />
+            <PageLayout hero={header}>{body}</PageLayout>
+
+            <AddDeviceChooser
+                open={popup?.kind === 'chooser'}
+                can={{ add: can.add_device, scan: can.scan, connect: false }}
+                onClose={() => setPopup(null)}
+                onChoose={(choice) => setPopup(choice === 'scan' ? { kind: 'scan' } : { kind: 'add' })}
+            />
+            <DeviceFormPopup open={popup?.kind === 'add'} mode="add" form={form} canAssign={can.assign} initialSiteId={site.id} onClose={() => setPopup(null)} />
+            <ScanNetwork
+                open={popup?.kind === 'scan'}
+                form={form}
+                initialSiteId={site.id}
+                onClose={() => setPopup(null)}
+                onStarted={(runId) => setPopup({ kind: 'scanning', runId })}
+            />
+            <ScanningViewer open={popup?.kind === 'scanning'} runId={popup?.kind === 'scanning' ? popup.runId : null} canStop={can.scan} onClose={() => setPopup(null)} />
+            <HubPopups state={hubs} form={form} canApprove={!!can.approve_hub} canStopScan={can.scan} />
+            {can.ask_obli ? (
+                <NetworkCheckPopup
+                    open={popup?.kind === 'ask_obli'}
+                    siteId={site.id}
+                    siteName={site.name}
+                    sessionId={popup?.kind === 'ask_obli' ? popup.session : null}
+                    onClose={() => setPopup(null)}
+                />
+            ) : null}
+            {can.switch_mode ? (
+                <SwitchHouseMode
+                    open={popup?.kind === 'switch_mode'}
+                    onClose={() => setPopup(null)}
+                    siteId={site.id}
+                    siteName={site.name}
+                    house={house}
+                    modeId={modeTarget}
+                />
+            ) : null}
+            {props.modes?.edit ? (
+                <EditHouseMode
+                    open={popup?.kind === 'edit_mode'}
+                    onClose={() => setPopup(null)}
+                    siteId={site.id}
+                    siteName={site.name}
+                    mode={modeTarget !== null ? (props.modes.items.find((mode) => mode.id === modeTarget) ?? null) : null}
+                    options={props.modes.edit}
+                />
             ) : null}
         </AppLayout>
+    );
+}
+
+function OverviewTab({ overview, siteName, now, onDevices }: { overview: NonNullable<SitePageProps['overview']>; siteName: string; now: Date; onDevices: () => void }) {
+    const total = overview.states.reduce((sum, row) => sum + row.count, 0);
+    const known = overview.week ? overview.week.values.map((value, index) => ({ value, label: overview.week!.labels[index] })).filter((day) => day.value !== null) : [];
+
+    return (
+        <div className="flex flex-col gap-5">
+            {overview.hub_down ? (
+                <KnowList
+                    title={`${overview.hub_down.hub} has stopped answering`}
+                    sub={overview.hub_down.seen_at ? `Last heard from ${agoWords(overview.hub_down.seen_at, now)}` : 'Not heard from yet'}
+                    items={[
+                        {
+                            tone: 'none',
+                            text: `${overview.hub_down.cant_check} ${overview.hub_down.cant_check === 1 ? 'device' : 'devices'} it watches can’t be checked until it’s back. They show grey, not red.`,
+                        },
+                        { tone: 'info', text: 'It keeps its checks and sensor readings for at least 24 hours and sends them when it’s back.' },
+                        ...overview.hub_down.still_seen.map((device) => ({
+                            tone: 'success' as const,
+                            text: (
+                                <>
+                                    <Link href={device.href} className="font-medium underline-offset-2 hover:underline">
+                                        {device.name}
+                                    </Link>{' '}
+                                    still reports through its maker’s service
+                                </>
+                            ),
+                        })),
+                    ]}
+                />
+            ) : null}
+            <SideBySide cols="minmax(0, 1fr) 360px">
+                <div className="flex flex-col gap-5">
+                    <Surface title={`Devices at ${siteName}`} sub={total === 0 ? undefined : "Open one from the Devices list"} action={total === 0 ? null : { label: 'All devices', onClick: onDevices }}>
+                        {total === 0 ? (
+                            <p className="text-subtle">No devices here yet.</p>
+                        ) : (
+                            <div className="flex flex-wrap items-center gap-6">
+                                <DonutChart
+                                    size={140}
+                                    thickness={20}
+                                    centerValue={total}
+                                    centerLabel={total === 1 ? 'device' : 'devices'}
+                                    data={overview.states.map((row) => ({ label: deviceStateLabel[row.state], value: row.count, color: STATE_COLOUR[row.state] }))}
+                                />
+                            </div>
+                        )}
+                    </Surface>
+                    {overview.week && known.length > 0 ? (
+                        <PointBars
+                            title="Network over the last 7 days"
+                            sub="Share of the network gear’s checks that answered, each day"
+                            values={known.map((day) => day.value as number)}
+                            labels={known.map((day) => day.label)}
+                            note={overview.week.note}
+                        />
+                    ) : (
+                        <QuietLine title="Network over the last 7 days" text="No network gear here is checked yet, so there’s no week to show." />
+                    )}
+                </div>
+                <SideColumn>
+                    {overview.camera_count === 0 ? (
+                        <QuietLine title="Cameras" text="No cameras at this Site." />
+                    ) : (
+                        <Surface title="Cameras" sub={`${overview.camera_count} ${overview.camera_count === 1 ? 'camera' : 'cameras'} · open one to see it`}>
+                            <ul className="flex flex-col divide-y divide-border">
+                                {overview.cameras.map((camera) => (
+                                    <li key={camera.id} className="flex items-center justify-between gap-3 py-2.5">
+                                        <Link href={camera.href} className="min-w-0 truncate font-medium underline-offset-2 hover:underline">
+                                            {camera.name}
+                                        </Link>
+                                        <StatusBadge variant={deviceStateTone[camera.state]}>{deviceStateLabel[camera.state]}</StatusBadge>
+                                    </li>
+                                ))}
+                            </ul>
+                        </Surface>
+                    )}
+                </SideColumn>
+            </SideBySide>
+        </div>
+    );
+}
+
+function NetworkTab({
+    tree,
+    siteName,
+    hubLabel,
+    onAskObli,
+}: {
+    tree: SiteTopologyTree | undefined;
+    siteName: string;
+    hubLabel: string | null;
+    onAskObli: (() => void) | null;
+}) {
+    const empty = !tree || (tree.roots.length === 0 && tree.unplaced.length === 0);
+
+    return (
+        <div className="flex flex-col gap-5">
+            {empty ? (
+                <QuietLine title="Network map" text="Oblivion hasn’t mapped this Site’s network yet. A scan through its hub fills it in." />
+            ) : (
+                <SiteTopologyTreeCard tree={tree} siteName={siteName} />
+            )}
+            {/* S&D Phase I (pop-up 97): read-only network checks through the hub, for IT. */}
+            {onAskObli ? (
+                <QuietLine
+                    title="Something not working?"
+                    text={`Obli checks the internet, switch ports and Wi-Fi through ${hubLabel ?? 'the Site’s hub'} and tells you what it found. It only looks; it changes nothing.`}
+                    action={{ label: 'Ask Obli', onClick: onAskObli }}
+                />
+            ) : null}
+        </div>
+    );
+}
+
+function InternetTab({ internet, now }: { internet: NonNullable<SitePageProps['internet']>; now: Date }) {
+    return (
+        <SideBySide cols="minmax(0, 1fr) 360px">
+            <div className="flex flex-col gap-5">
+                {internet.gateways.length === 0 ? (
+                    <QuietLine title="Router" text="No router or gateway is added for this Site yet." />
+                ) : (
+                    <Surface title={internet.gateways.length === 1 ? 'Router' : 'Routers'} sub="What connects this Site to the internet">
+                        <ul className="flex flex-col divide-y divide-border">
+                            {internet.gateways.map((row) => (
+                                <li key={row.id} className="flex items-center justify-between gap-3 py-2.5">
+                                    <div className="min-w-0">
+                                        <Link href={row.href} className="font-medium underline-offset-2 hover:underline">
+                                            {row.name}
+                                        </Link>
+                                        <p className="text-caption truncate">
+                                            {row.subline}
+                                            {row.seen_at ? ` · seen ${agoWords(row.seen_at, now)}` : ''}
+                                        </p>
+                                    </div>
+                                    <StatusBadge variant={deviceStateTone[row.state]}>{deviceStateLabel[row.state]}</StatusBadge>
+                                </li>
+                            ))}
+                        </ul>
+                    </Surface>
+                )}
+                {internet.outages.length === 0 ? (
+                    <QuietLine title="Outages" text="No outages recorded for this Site’s router." />
+                ) : (
+                    <Log
+                        title="Outages"
+                        sub="When the router dropped out and came back"
+                        items={internet.outages.map((event) => ({
+                            key: event.id,
+                            time: event.at ? seenTime(event.at, now) : '',
+                            tone: event.tone,
+                            title: event.title,
+                            sub: event.device,
+                        }))}
+                    />
+                )}
+            </div>
+            <SideColumn>
+                <Story
+                    title="If the internet is down"
+                    paras={[
+                        { h: 'What keeps going', t: 'The Site’s hub keeps its checks and sensor readings for at least 24 hours and sends them, with their real times, when the line is back.' },
+                        { h: 'What you’ll see', t: 'Devices behind the router show “Can’t check” in grey, not red, so one outage doesn’t look like many.' },
+                        { h: 'What Oblivion doesn’t know yet', t: 'Which internet line the Site uses and whether it has a backup line.' },
+                    ]}
+                />
+            </SideColumn>
+        </SideBySide>
     );
 }

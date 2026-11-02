@@ -39,8 +39,13 @@ final class BulkDeviceCommandPresenter
         private readonly QueclinkConfigurationProfileService $configurationProfiles,
     ) {}
 
-    /** @return array<string, mixed> */
-    public function present(User $viewer, Builder $scope, string $workspace): array
+    /**
+     * `$withRecent`: false skips the recent batches (the Devices bulk bar, S&D rebuild C6, has no
+     * batch list; results are in each device's logbook).
+     *
+     * @return array<string, mixed>
+     */
+    public function present(User $viewer, Builder $scope, string $workspace, bool $withRecent = true): array
     {
         $capabilityDomain = self::CAPABILITY_DOMAINS[$workspace] ?? null;
         abort_unless($capabilityDomain !== null, 404);
@@ -213,7 +218,7 @@ final class BulkDeviceCommandPresenter
             ->all();
 
         $recentBatches = [];
-        foreach (DeviceCommandBatch::query()
+        foreach (! $withRecent ? [] : DeviceCommandBatch::query()
             ->where('workspace', $workspace)
             ->latest('id')
             ->limit(25)

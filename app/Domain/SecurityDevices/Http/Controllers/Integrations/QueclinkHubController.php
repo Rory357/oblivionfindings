@@ -756,6 +756,15 @@ class QueclinkHubController extends Controller
         $action = $validated['action'];
         $section = $validated['section'] ?? 'all';
 
+        // S&D rebuild C6: several trackers were handed to the old Tracking workspace's bulk review,
+        // which is gone with the workspaces. Until the Devices bulk bar can review a governed action
+        // for several devices, say so before anything is written; one tracker still opens its review.
+        if (count($ids) > 1) {
+            throw ValidationException::withMessages([
+                'device_ids' => 'Choose one tracker at a time. Reviewing a governed action for several trackers at once isn’t available yet.',
+            ]);
+        }
+
         $devices = $this->queclinkAccess->devicesForBulk($request->user(), $ids);
 
         $notPaired = $devices->first(fn (QueclinkDevice $device) => ! $device->isPaired());
@@ -799,29 +808,17 @@ class QueclinkHubController extends Controller
             'reboot' => 'device.reboot',
             'resident_safety_profile', 'apply_preset' => 'configuration.apply',
         };
-        if ($canonicalIds->count() === 1) {
-            $device = $devices->firstOrFail();
-            $parameters = $capability === 'configuration.apply'
-                ? ['command_configuration_profile_id' => (string) $profile?->id]
-                : ($capability === 'configuration.refresh' ? ['command_section' => $section] : []);
+        // One tracker (several are refused above): its governed review on the device's management section.
+        $device = $devices->firstOrFail();
+        $parameters = $capability === 'configuration.apply'
+            ? ['command_configuration_profile_id' => (string) $profile?->id]
+            : ($capability === 'configuration.refresh' ? ['command_section' => $section] : []);
 
-            return $this->deviceManagementHandoff(
-                $device,
-                $capability,
-                'Review the governed action, its current Device evidence, and the required approvals before dispatch.',
-                $parameters,
-            );
-        }
-
-        return redirect()->to('/security-devices/tracking?'.http_build_query([
-            'tab' => 'management',
-            'bulk_action' => $capability,
-            'bulk_device_ids' => $canonicalIds->implode(','),
-            ...($capability === 'configuration.apply' ? ['bulk_configuration_profile_id' => $profile?->id] : []),
-            ...($capability === 'configuration.refresh' ? ['bulk_section' => $section] : []),
-        ], '', '&', PHP_QUERY_RFC3986))->with(
-            'success',
-            'Review every included Device and Site, attach the required IT Change per Device, and approve the governed bulk request before dispatch.',
+        return $this->deviceManagementHandoff(
+            $device,
+            $capability,
+            'Review the governed action, its current Device evidence, and the required approvals before dispatch.',
+            $parameters,
         );
     }
 

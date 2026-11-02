@@ -85,6 +85,7 @@ use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\SyncWorkCalendarsJob;
 use App\Jobs\System\RecordDefaultWorkerHeartbeatJob;
 use App\Models\MedicationIdempotencyResult;
+use App\Services\Chat\SelfHostedCalling;
 use App\Services\Eligibility\WorkforceEligibilityRefresh;
 use App\Services\Fleet\FinanceReviewNotices;
 use App\Services\Medication\PharmacyConnect\PharmacyDispatchService;
@@ -1034,12 +1035,47 @@ app(Schedule::class)->command('medications:chart-backups')->everyMinute()->witho
 
 // Native helper sign-in material has a bounded lifetime, including when Obli is disabled.
 app(Schedule::class)->command('obli:prune-sessions')->daily()->withoutOverlapping();
+// S&D Phase I (D17): Obli's screen pictures go after 7 days (file and row); fix sessions the tray left open end; old fix records are scrubbed.
+app(Schedule::class)->command('obli:fixes-prune')->dailyAt('03:40')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 
 Illuminate\Support\Facades\Schedule::command('endpoints:expire-remote-sessions')->everyMinute()->withoutOverlapping();
 
 // Sealed replies remain recoverable through token expiry, including lost replies.
 app(Schedule::class)->command('monitoring:prune-enrolment-recovery')
     ->everyFiveMinutes()->withoutOverlapping()->name('monitoring.enrolment-recovery.prune');
+
+// S&D Phase B: start each hub's daily network scan once its time has come (off until someone sets a time).
+app(Schedule::class)->command('monitoring:run-daily-discovery')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+
+// S&D Phase D: snoozed device alerts come back on time; open ones nobody has acknowledged remind people after an hour.
+app(Schedule::class)->command('security-devices:alerts-tick')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+
+// S&D Phase E: sensor readings are kept 13 months (Setup › Change history says so).
+app(Schedule::class)->command('security-devices:prune-readings')->dailyAt('03:40')->withoutOverlapping()->onOneServer();
+
+// S&D Phase F: house modes switch at their start times (safe actions only, D12); alarm checks run when due.
+app(Schedule::class)->command('security-devices:house-modes-tick')->everyMinute()->withoutOverlapping()->onOneServer();
+
+// S&D Phase F: house automations that start at a time of day (safe actions only, D12), once per start.
+app(Schedule::class)->command('security-devices:automations-tick')->everyMinute()->withoutOverlapping()->onOneServer();
+
+// S&D Phase H (D15): door badges near a rostered start suggest a clock-in (off until turned on in Setup); gaps 15 min after each start.
+app(Schedule::class)->command('security-devices:door-clockins-tick')->everyMinute()->withoutOverlapping()->onOneServer();
+// Rows that aren't time records go at 90 days, like the names on door events (D14).
+app(Schedule::class)->command('security-devices:door-clockins-tick --prune')->dailyAt('03:50')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+
+// S&D rebuild pg-sdr-18b: last month's report by email on the 1st, 7:00 am NZ (off until turned on in Overview › Reports).
+// Hourly on the 1st to the 3rd, so a run missed at 7 am is caught up; the command sends each month once.
+app(Schedule::class)->command('security-devices:monthly-report-email')->cron('5 * 1-3 * *')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+
+// S&D Phase G (G1): nightly settings backups through the governed request and the Site's hub (off until someone is named).
+app(Schedule::class)->command('security-devices:nightly-settings-backups')->everyTenMinutes()
+    ->between(...App\Domain\SecurityDevices\NetworkConfig\Services\NightlySettingsBackups::window())
+    ->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+
+// S&D Phase I (pop-up 97): Obli's network checks move on (hub checks that ran out of time, answers still to write); sessions go after a year.
+app(Schedule::class)->command('security-devices:network-checks-tick')->everyMinute()->withoutOverlapping()->onOneServer();
+app(Schedule::class)->command('security-devices:network-checks-tick --prune')->dailyAt('03:55')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 
 // Native attempt expiry is bookkeeping only; it never retries a computer action.
 app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
@@ -1080,10 +1116,12 @@ app(Schedule::class)->command('referrals:prune-intake-drafts')->dailyAt('02:20')
 // Chat's 10-second sweeps start only when they have work: the call sweep needs a configured voice
 // server, and delivery needs shared Chat switched on. Otherwise they cost ~17,000 process starts a day.
 app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground()
-    ->when(fn (): bool => app(\App\Services\Chat\SelfHostedCalling::class)->configured());
+    ->when(fn (): bool => app(SelfHostedCalling::class)->configured());
 app(Schedule::class)->command('chat:deliver-notifications')->everyTenSeconds()->withoutOverlapping(2)->runInBackground()
     ->when(fn (): bool => (bool) config('chat.shared_experience'));
 app(Schedule::class)->command('chat:prune')->dailyAt('02:40')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+// Hourly, so a re-hire's gap closes soon after they're current again; until then new messages stay hidden from them too.
+app(Schedule::class)->command('chat:sync-membership-gaps')->hourlyAt(7)->withoutOverlapping()->onOneServer();
 
 // Procedure review assignment delivery is independent of reading or completing work.
 app(Schedule::class)->job(new RecoverProcedureReviewDeliveries)->everyMinute()->onOneServer()->withoutOverlapping();

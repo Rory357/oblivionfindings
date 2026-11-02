@@ -3,6 +3,7 @@
 namespace App\Domain\Monitoring\Services;
 
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Hubs\Exceptions\HubRemoved;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\Request;
@@ -19,9 +20,11 @@ final readonly class CollectorTransportAuthenticator
         $collector = is_string($collectorUuid)
             ? MonitoringCollector::query()->where('collector_uuid', $collectorUuid)->first()
             : null;
-        if ($collector === null || $collector->revoked_at !== null || $collector->status === 'revoked') {
+        if ($collector === null) {
             throw new DomainException('collector_authentication_failed');
         }
+        // A removed hub is told so only after it proves who it is (below), so it wipes its logins.
+        $removed = $collector->revoked_at !== null || $collector->status === 'revoked';
         $certificate = $this->verifiedCertificateFingerprint($request);
         if (! is_string($collector->client_certificate_fingerprint)
             || ! is_string($certificate)
@@ -69,6 +72,9 @@ final readonly class CollectorTransportAuthenticator
         $replayKey = 'monitoring:collector:request:'.hash('sha256', $collector->id.':'.$nonce);
         if (! Cache::store($store)->add($replayKey, true, $skew * 2)) {
             throw new DomainException('collector_authentication_failed');
+        }
+        if ($removed) {
+            throw new HubRemoved;
         }
 
         return $collector;

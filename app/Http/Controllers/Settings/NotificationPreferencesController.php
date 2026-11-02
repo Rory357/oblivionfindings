@@ -10,6 +10,7 @@ use App\Models\UserNotificationPreference;
 use App\Services\AuditLogger;
 use App\Services\Chat\ChatNotificationPreferences;
 use App\Services\Fleet\FleetNotificationPreferences;
+use App\Services\HealthSafety\WorkerParticipationMeetingDeliveryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -59,7 +60,7 @@ class NotificationPreferencesController extends Controller
                 if (ChatNotificationPreferences::supports($key)) {
                     return ChatNotificationPreferences::resolve(null, $items);
                 }
-                if ($key === 'hr.calendar.reminder') {
+                if ($key === 'hr.calendar.reminder' || $key === WorkerParticipationMeetingDeliveryService::EVENT_KEY) {
                     return ['enabled' => $items->contains(fn ($p) => $p->enabled),
                         'inapp' => $items->contains(fn ($p) => $p->enabled && $p->channel_inapp),
                         'email' => $items->contains(fn ($p) => $p->enabled && $p->channel_email), 'push' => false];
@@ -76,7 +77,9 @@ class NotificationPreferencesController extends Controller
                     'email' => $email,
                     'push' => $push,
                 ];
-            })->merge(collect($fleet['events'])->mapWithKeys(fn ($event) => [$event['key'] => ['enabled' => $event['defaults']['inapp'] || $event['defaults']['email'], ...$event['defaults'], 'push' => false]]))->all(),
+            })->merge(collect($fleet['events'])->mapWithKeys(fn ($event) => [$event['key'] => ['enabled' => $event['defaults']['inapp'] || $event['defaults']['email'], ...$event['defaults'], 'push' => false]]))
+                // #14: a participation meeting notice with no role row is on, in the app and by email; never push.
+                ->union([WorkerParticipationMeetingDeliveryService::EVENT_KEY => self::MEETING_DEFAULT])->all(),
             'canManageRoleDefaults' => (bool) ($user->canDo('settings.access.manage')),
         ]);
     }
@@ -104,6 +107,7 @@ class NotificationPreferencesController extends Controller
                 }
                 $channels = $this->normalizeChannels($channels, 'prefs.'.$key);
                 $this->validateChatChannels((string) $key, $channels, 'prefs.'.$key);
+                $channels = $this->withoutUnsupportedPush((string) $key, $channels);
 
                 UserNotificationPreference::updateOrCreate([
                     'user_id' => $user->id,
@@ -178,12 +182,12 @@ class NotificationPreferencesController extends Controller
                     'inapp' => (bool) $pref->channel_inapp,
                     'email' => (bool) $pref->channel_email,
                     'push' => (bool) $pref->channel_push,
-                ] : [
+                ] : ($key === WorkerParticipationMeetingDeliveryService::EVENT_KEY ? self::MEETING_DEFAULT : [
                     'enabled' => true,
                     'inapp' => true,
                     'email' => FleetNotificationPreferences::EVENTS[$key]['email'] ?? false,
                     'push' => false,
-                ]);
+                ]));
             }
             $matrix[$role->id] = $row;
         }
@@ -214,6 +218,7 @@ class NotificationPreferencesController extends Controller
                 foreach ($prefs as $key => $channels) {
                     $channels = $this->normalizeChannels($channels, 'matrix.'.$roleId.'.'.$key);
                     $this->validateChatChannels((string) $key, $channels, 'matrix.'.$roleId.'.'.$key);
+                    $channels = $this->withoutUnsupportedPush((string) $key, $channels);
 
                     RoleNotificationPreference::updateOrCreate([
                         'role_id' => (int) $roleId,
@@ -230,6 +235,18 @@ class NotificationPreferencesController extends Controller
         });
 
         return redirect()->back()->with('success', 'Role notification defaults updated.');
+    }
+
+    /** #14: participation meeting notices go in the app and by email; there is no push for them. */
+    private const MEETING_DEFAULT = ['enabled' => true, 'inapp' => true, 'email' => true, 'push' => false];
+
+    /**
+     * @param  array{enabled: bool, inapp: bool, email: bool, push: bool}  $channels
+     * @return array{enabled: bool, inapp: bool, email: bool, push: bool}
+     */
+    private function withoutUnsupportedPush(string $key, array $channels): array
+    {
+        return $key === WorkerParticipationMeetingDeliveryService::EVENT_KEY ? [...$channels, 'push' => false] : $channels;
     }
 
     /**

@@ -250,7 +250,7 @@ function Capacity({ detail: d, open }: PanelProps) {
 
 function Scheduling() {
     return <>
-        <QuietLine title="Effect on shifts" text={<><b>Roster check not done yet.</b> Nobody has confirmed how this affects current and future shifts.</>} />
+        <QuietLine title="Hours and roster" text={<><b>Roster check not done yet.</b> Nobody has confirmed how this affects current and future shifts.</>} />
         <Note icon={Info}>Once the rostering team reviews this injury, the approved limits, the duties checked and who is handling it will show here. Recording an injury or its recovery doesn’t change anyone’s shifts or confirm they’re fit to work.</Note>
     </>;
 }
@@ -301,31 +301,36 @@ function Connection({ title, record, sourceHref, icon: Icon }: { title: string; 
         <span className="sg-li-lead"><Icon className="size-4" /></span>
         <span className="sg-li-t"><b>{title}</b>
             <small className="break-words">{record.access === 'readable' ? [record.reference, record.title].filter(Boolean).join(' · ') || 'Linked record'
-                : record.access === 'absent' ? 'Not linked'
-                : record.access === 'restricted' ? 'Hidden — you don’t have access' : 'This link needs checking'}</small></span>
+                : record.access === 'absent' ? 'Not linked' : 'This link needs checking'}</small></span>
         {record.access === 'readable' && record.status ? <StatusBadge variant={connectionVariant(record.status)}>{label(record.status)}</StatusBadge> : null}
         {href && <Link href={href} className="sg-act ml-2">Open {title.toLowerCase()}</Link>}
     </div></li>;
 }
 function Connections({ detail: d, sourceHref }: PanelProps) {
     const worksafe = d.connections.worksafe;
+    // Decision 6 (Stephan, 1 Nov 2026): never say a linked record exists when this person can't open it — a restricted
+    // link is left out entirely, the same as no link.
+    const links = ([
+        ['Incident', AlertTriangle, d.connections.incident],
+        ['Safety review', FileCheck, d.connections.health_safety],
+        ['Control room response', Eye, d.connections.control_room],
+    ] as const).filter(([, , record]) => record.access !== 'restricted');
     return <>
         <Surface title="Linked safety records">
             <ul className="sg-list mt-2">
-                <Connection title="Incident" icon={AlertTriangle} record={d.connections.incident} sourceHref={sourceHref} />
-                <Connection title="Safety review" icon={FileCheck} record={d.connections.health_safety} sourceHref={sourceHref} />
-                <Connection title="Control room response" icon={Eye} record={d.connections.control_room} sourceHref={sourceHref} />
+                {links.map(([title, icon, record]) => <Connection key={title} title={title} icon={icon} record={record} sourceHref={sourceHref} />)}
             </ul>
         </Surface>
-        {worksafe.access === 'readable'
+        {worksafe.access === 'restricted' ? null : worksafe.access === 'readable'
             ? <Journey title="WorkSafe notification" sub={`WorkSafe notification: ${label(worksafe.notification_state, WORKSAFE_STATE_LABELS)}`} steps={[
                 { label: 'Decision made', meta: worksafe.decision_state === 'recorded' ? 'Yes' : 'Not yet', state: worksafe.decision_state === 'recorded' ? 'done' : 'now' },
                 { label: 'When WorkSafe was told', meta: injuryTime(worksafe.notified_at), state: worksafe.notified_at ? 'done' : worksafe.decision_state === 'recorded' ? 'now' : 'todo' },
                 { label: 'When WorkSafe replied', meta: injuryTime(worksafe.acknowledged_at), state: worksafe.acknowledged_at ? 'done' : worksafe.notified_at ? 'now' : 'todo' },
                 { label: 'WorkSafe reference', meta: worksafe.reference ?? 'Not recorded', state: worksafe.reference ? 'done' : 'todo' },
             ]} />
-            : <QuietLine title="WorkSafe notification" text={worksafe.access === 'restricted' ? 'Hidden — you need safety review access to see this. Ask a health and safety manager.' : 'Not available — no WorkSafe decision can be shown here yet.'} />}
-        <Note tone="warning" icon={AlertTriangle}>Recording an injury doesn’t tell WorkSafe, alert the control room or complete the safety review. Do those in the safety review.</Note>
+            : <QuietLine title="WorkSafe notification" text="Not available — no WorkSafe decision can be shown here yet." />}
+        {d.connections.health_safety.access === 'restricted' ? null
+            : <Note tone="warning" icon={AlertTriangle}>Recording an injury doesn’t tell WorkSafe, alert the control room or complete the safety review. Do those in the safety review.</Note>}
     </>;
 }
 
@@ -467,18 +472,11 @@ export function InjuryRecordPanel(props: PanelProps) {
     }
 }
 
-/** The side column: who coordinates (on every section), and the clearance ring beside the recovery plan. */
-export function InjuryRecordSide({ detail: d, section, open }: { detail: InjuryRecord; section: InjurySection; open: Open }) {
-    const coordinator = d.coordination.coordinator;
-    return <>
-        {section === 'recovery' && d.rtw_plans !== null ? <ClearanceRing detail={d} /> : null}
-        {coordinator
-            ? <PeopleCards title="Who’s coordinating" action={commandAction(d, 'review', open)} cols={1} items={[{
-                name: coordinator.name,
-                sub: 'Recovery coordinator',
-                foot: 'The safety review and the control room response have their own owners.',
-            }]} />
-            : <QuietLine title="Who’s coordinating" text={`Recovery coordinator: ${d.coordination.attribution_state === 'unassigned' ? 'No owner yet' : 'not clear who’s coordinating — a health and safety manager can set this'}`} />}
-    </>;
+/**
+ * The side column's section extra: the clearance ring beside the recovery plan. The coordinator now shows once, in the
+ * record page's People card (G4-8: one role name, "Coordinator").
+ */
+export function InjuryRecordSide({ detail: d, section }: { detail: InjuryRecord; section: InjurySection; open?: Open }) {
+    return section === 'recovery' && d.rtw_plans ? <ClearanceRing detail={d} /> : null;
 }
 

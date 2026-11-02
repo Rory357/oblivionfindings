@@ -391,6 +391,12 @@ class SafeWorkProcedureService
             }
         }
         if (! $valid) {
+            // E2E (2 Nov): the owner list is built before "Applies to" is chosen. A procedure for every Site needs an owner
+            // who works across all Sites; say so instead of the general refusal. The rule itself is unchanged.
+            if ($candidate && ($record->applicable_sites ?? []) === [] && ! $candidate->canDo('healthSafety.viewAllSites')) {
+                $message = 'This procedure applies to every Site, so its owner must work across all Sites. Choose another owner, or limit “Applies to” to their Sites.';
+                throw ValidationException::withMessages(['assigned_to_user_id' => $message, 'owner_id' => $message]);
+            }
             throw ValidationException::withMessages(['assigned_to_user_id' => 'Choose a named current procedure manager with access to the document and source.', 'owner_id' => 'Choose a current procedure manager with access to its audience.']);
         }
     }

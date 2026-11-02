@@ -1,4 +1,7 @@
-import { chatActorRequest } from '@/components/chat/chat-actor-request';
+import {
+    chatActorFileRequest,
+    chatActorRequest,
+} from '@/components/chat/chat-actor-request';
 
 export type InvestigableConversation = {
     id: number;
@@ -12,6 +15,8 @@ export type InvestigableConversation = {
 export type InvestigationGrant = {
     id: number;
     case_reference: string;
+    /** Links grants made together under one case; null for a grant made on its own. */
+    case_batch: string | null;
     conversation: InvestigableConversation | null;
     expires_at: string;
     revoked_at: string | null;
@@ -83,4 +88,33 @@ export const investigationActionLabels: Record<string, string> = {
     access_refused_expired: 'Refused: case access expired or ended',
     hold_placed: 'Preservation hold placed',
     hold_released: 'Preservation hold released',
+    case_exported: 'Exported a watermarked PDF',
 };
+
+export type InvestigationExportScope = 'conversation' | 'case';
+
+/**
+ * Asks for the watermarked, logged PDF of an active grant and saves it.
+ * Returns the file name and the SHA-256 the server recorded in the audit.
+ */
+export async function exportInvestigation(
+    actorId: number,
+    grantId: number,
+    scope: InvestigationExportScope,
+) {
+    const file = await chatActorFileRequest(
+        actorId,
+        `${INVESTIGATION_API}/grants/${grantId}/export`,
+        { method: 'POST', body: JSON.stringify({ scope }) },
+    );
+    const filename = file.filename ?? 'chat-investigation.pdf';
+    const url = URL.createObjectURL(file.blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return { filename, sha256: file.headers.get('X-Export-Sha256') };
+}

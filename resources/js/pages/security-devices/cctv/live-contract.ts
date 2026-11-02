@@ -25,7 +25,9 @@ export type CctvReason =
     | 'session_expired'
     | 'capacity_unavailable'
     | 'negotiation_failed'
-    | 'transport_unavailable';
+    | 'transport_unavailable'
+    /** S&D Phase E: the camera's privacy hours began. */
+    | 'privacy_hours';
 export type CctvIceServer = CctvRelayPolicy & {
     urls: string[];
     username: string;
@@ -242,6 +244,7 @@ export function cctvSessionReply(
         'capacity_unavailable',
         'negotiation_failed',
         'transport_unavailable',
+        'privacy_hours',
     ];
     if (
         !cctvUuid(r.uuid) ||

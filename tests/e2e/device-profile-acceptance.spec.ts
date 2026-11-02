@@ -15,6 +15,13 @@ async function expectNoPageOverflow(page: Page) {
     expect(layout.scroll).toBeLessThanOrEqual(layout.client);
 }
 
+// S&D rebuild C2/Phase E: a device's plain address now opens its own page for
+// its kind. The capability-driven profile these journeys check still answers
+// with ?section=..., so they open it that way.
+function profileHref(deviceId: number, section: string): string {
+    return `/security-devices/devices/${deviceId}?section=${section}`;
+}
+
 test.describe('Capability-driven device profile', () => {
     let fixture: ReturnType<typeof seedDeviceProfileReadinessFixtures>;
 
@@ -30,7 +37,7 @@ test.describe('Capability-driven device profile', () => {
         test.setTimeout(180_000);
         const errors = collectConsoleErrors(page);
         await loginAsStaff(page);
-        await page.goto(`/security-devices/devices/${fixture.deviceId}`);
+        await page.goto(profileHref(fixture.deviceId, 'health'));
 
         await expect(
             page.getByRole('heading', {
@@ -66,9 +73,10 @@ test.describe('Capability-driven device profile', () => {
                 hasText: fixture.controlRoomReference,
             }),
         ).toBeVisible();
+        // S&D rebuild C6: "View all events" opens Alerts searched for this device.
         await expect(
             page.locator(
-                `a[href="/security-devices/monitoring?device_id=${fixture.deviceId}"]`,
+                `a[href="/security-devices/alerts?q=${encodeURIComponent(fixture.deviceName)}"]`,
             ),
         ).toBeVisible();
 
@@ -133,6 +141,7 @@ test.describe('Capability-driven device profile', () => {
                 level: 1,
             }),
         ).toBeVisible();
+        await page.goto(profileHref(fixture.hrDeviceId, 'assignments'));
         const employeeReturn = page.locator(
             `a[href="/hr/people/${fixture.employeeProfileId}?tab=assets"]`,
             { hasText: fixture.employeeName },
@@ -179,6 +188,7 @@ test.describe('Capability-driven device profile', () => {
                 level: 1,
             }),
         ).toBeVisible();
+        await page.goto(profileHref(fixture.vehicleDeviceId, 'assignments'));
         const vehicleReturn = page.locator(
             `a[href="/fleet-assets/vehicles/${fixture.vehicleId}?tab=technology"]`,
             { hasText: fixture.vehicleName },
@@ -221,8 +231,7 @@ test.describe('Capability-driven device profile', () => {
                 level: 1,
             }),
         ).toBeVisible();
-        await page.getByTestId('device-profile-group-operations').click();
-        await page.getByTestId('device-profile-tab-assignments').click();
+        await page.goto(profileHref(fixture.assetDeviceId, 'assignments'));
         const assetReturn = page.locator(
             `a[href="/fleet-assets/assets/${fixture.assetId}?tab=technology"]`,
             { hasText: fixture.assetName },
@@ -245,7 +254,7 @@ test.describe('Capability-driven device profile', () => {
         test.setTimeout(180_000);
         const errors = collectConsoleErrors(page);
         await loginAsStaff(page);
-        await page.goto(`/security-devices/devices/${fixture.deviceId}`);
+        await page.goto(profileHref(fixture.deviceId, 'health'));
 
         await page.getByTestId('device-profile-group-operations').click();
         await page.getByTestId('device-profile-tab-tickets').click();
@@ -296,8 +305,7 @@ test.describe('Capability-driven device profile', () => {
                 level: 1,
             }),
         ).toBeVisible();
-        await page.getByTestId('device-profile-group-operations').click();
-        await page.getByTestId('device-profile-tab-events').click();
+        await page.goto(profileHref(fixture.deviceId, 'events'));
         await expect(
             page.locator(
                 `a[href="/control-room/alerts/${fixture.controlRoomAlertId}"]`,

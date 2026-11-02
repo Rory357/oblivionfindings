@@ -253,6 +253,7 @@ export function SessionCommandForm({
             {command === 'edit' && (
                 <>
                     <DrillTimeField
+                        pickers
                         label="Expected end"
                         value={form.data.expected_end_at}
                         offset={form.data.time_offset}

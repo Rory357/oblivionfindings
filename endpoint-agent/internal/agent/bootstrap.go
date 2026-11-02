@@ -71,7 +71,7 @@ func ReadBootstrap(reader io.Reader, now time.Time) (Bootstrap, error) {
 func ValidateBootstrap(profile Bootstrap, now time.Time) error {
 	expires, err := time.Parse(time.RFC3339Nano, profile.ExpiresAt)
 	if profile.Version != 1 || profile.Platform != "windows" || !uuidPattern.MatchString(profile.AgentUUID) ||
-		!hexCredential(profile.Token) || err != nil || !expires.After(now) || expires.After(now.Add(31*time.Minute)) {
+		!hexCredential(profile.Token) || err != nil || !expires.After(now) || expires.After(now.Add(24*time.Hour+time.Minute)) {
 		return errors.New("installation profile is expired or invalid; download a new one")
 	}
 	for _, label := range []string{profile.Organisation, profile.DeviceLabel, profile.DeviceUID} {

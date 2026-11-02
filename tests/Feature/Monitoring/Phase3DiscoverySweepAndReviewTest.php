@@ -187,26 +187,25 @@ final class Phase3DiscoverySweepAndReviewTest extends TestCase
 
         $runner->complete($run->id);
 
-        $pageResponse = $this->actingAs($this->admin)
+        // S&D rebuild C6: Discovery & collectors is gone; a scan's results show on Found devices.
+        $this->actingAs($this->admin)
             ->get('/security-devices/discovery?tab=candidates')
+            ->assertRedirect('/security-devices/setup/hubs?tab=networks');
+
+        $pageResponse = $this->actingAs($this->admin)
+            ->get('/security-devices/scans/'.$run->id)
             ->assertOk();
 
-        /** @var list<array<string, mixed>> $candidatesPayload */
-        $candidatesPayload = $pageResponse->viewData('page')['props']['workspace']['candidates'];
-        $this->assertCount(2, $candidatesPayload);
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $pageResponse->viewData('page')['props']['rows'];
+        $this->assertCount(2, $rows);
 
-        $byIp = collect($candidatesPayload)->keyBy('ip_address');
-        $camPayload = $byIp->get('172.16.0.55');
+        $camPayload = collect($rows)->firstWhere('address', '172.16.0.55');
         $this->assertNotNull($camPayload);
-        $this->assertSame('ONVIF camera', $camPayload['type_label']);
-        $this->assertSame('security', $camPayload['domain']);
-        $this->assertSame('cctv', $camPayload['category']);
-        $this->assertSame('ip_camera', $camPayload['subcategory']);
-        $this->assertSame('Hikvision', $camPayload['manufacturer']);
-        $this->assertSame('DS-2CD2387G2-LU', $camPayload['model']);
-        $this->assertStringContainsString('Hikvision', (string) $camPayload['mac_vendor']);
-        $this->assertStringContainsString('ONVIF', (string) $camPayload['identification_reason']);
-        $this->assertSame([80, 554, 8000], $camPayload['open_ports']);
+        $this->assertSame('ONVIF camera', $camPayload['guess']);
+        $this->assertSame('camera', $camPayload['kind']);
+        $this->assertSame('Hikvision', $camPayload['maker']);
+        $this->assertStringContainsString('DS-2CD2387G2-LU', (string) $camPayload['sub']);
 
         // Adopt all unreviewed candidates at Harbour House and verify fingerprinted fields persist onto Device records.
         $this->actingAs($this->admin)

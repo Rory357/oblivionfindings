@@ -25,17 +25,20 @@ use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Feature\SecurityDevices\Concerns\ReadsRetiredWorkspaceProps;
 use Tests\TestCase;
 
 /**
- * Covers the Security & Devices Integrations Hub landing page.
+ * Covers what the old Integrations hub showed. S&D rebuild C6: the page now redirects to Setup ›
+ * Connected services, which reads the same IntegrationsWorkspacePresenter, so its scoping and
+ * redaction rules are checked straight from the presenter (ReadsRetiredWorkspaceProps).
  *
- * Target: App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController
- * Route:  GET /security-devices/integrations
+ * Route: GET /security-devices/integrations (redirect; integrations.view as before)
  */
 class IntegrationsHubTest extends TestCase
 {
     use RefreshDatabase;
+    use ReadsRetiredWorkspaceProps;
 
     private User $admin;
 
@@ -72,9 +75,11 @@ class IntegrationsHubTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->get('/security-devices/integrations')
+            ->assertRedirect('/security-devices/setup/services?tab=connected');
+
+        $this->retiredIntegrationsHub($this->admin)
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('security-devices/integrations')
                 ->where('actor_id', $this->admin->id)
                 ->has('as_of')
                 ->has('providers', 4)
@@ -91,7 +96,7 @@ class IntegrationsHubTest extends TestCase
 
     public function test_provider_catalog_reports_typed_contract_maturity_without_static_live_labels(): void
     {
-        $response = $this->actingAs($this->admin)->get('/security-devices/integrations');
+        $response = $this->retiredIntegrationsHub($this->admin);
 
         $response->assertInertia(function ($page) {
             $providers = collect($page->toArray()['props']['providers']);
@@ -354,7 +359,7 @@ class IntegrationsHubTest extends TestCase
             'status' => IntegrationProviderConnection::STATUS_ERROR,
         ]);
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/integrations');
+        $response = $this->retiredIntegrationsHub($this->admin);
 
         $response->assertInertia(fn ($page) => $page
             ->where('stats.providers_connected', 1)
@@ -395,7 +400,7 @@ class IntegrationsHubTest extends TestCase
             ]);
         }
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/integrations');
+        $response = $this->retiredIntegrationsHub($this->admin);
 
         $response->assertInertia(function ($page) {
             $props = $page->toArray()['props'];
@@ -471,7 +476,7 @@ class IntegrationsHubTest extends TestCase
             'assigned_at' => now(),
         ]);
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/integrations');
+        $response = $this->retiredIntegrationsHub($this->admin);
 
         $response->assertOk()->assertInertia(function ($page): void {
             $props = $page->toArray()['props'];
@@ -511,8 +516,7 @@ class IntegrationsHubTest extends TestCase
             'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/integrations')
+        $this->retiredIntegrationsHub($this->admin)
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('can.manage', false)
@@ -542,8 +546,7 @@ class IntegrationsHubTest extends TestCase
             'meta' => ['capabilities' => ['monitoring' => false]],
         ]);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/integrations')
+        $this->retiredIntegrationsHub($this->admin)
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $provider = collect($page->toArray()['props']['providers'])->firstWhere('slug', 'milesight');
@@ -616,8 +619,7 @@ class IntegrationsHubTest extends TestCase
             'occurred_at' => now(),
         ]);
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/integrations')
+        $this->retiredIntegrationsHub($viewer)
             ->assertOk()
             ->assertInertia(function ($page) use ($allowedSite): void {
                 $unifi = collect($page->toArray()['props']['providers'])->firstWhere('slug', 'unifi');
@@ -655,7 +657,7 @@ class IntegrationsHubTest extends TestCase
             ]);
         }
 
-        $this->actingAs($viewer)->get('/security-devices/integrations')->assertOk()->assertInertia(function ($page): void {
+        $this->retiredIntegrationsHub($viewer)->assertOk()->assertInertia(function ($page): void {
             $unifi = collect($page->toArray()['props']['providers'])->firstWhere('slug', 'unifi');
             $this->assertSame('failed', $unifi['sync']['status']);
             $this->assertSame(3, $unifi['sync']['items_errored']);
@@ -688,7 +690,7 @@ class IntegrationsHubTest extends TestCase
             ]);
         }
 
-        $this->actingAs($viewer)->get('/security-devices/integrations')->assertOk()->assertInertia(function ($page): void {
+        $this->retiredIntegrationsHub($viewer)->assertOk()->assertInertia(function ($page): void {
             $provider = collect($page->toArray()['props']['providers'])->firstWhere('slug', 'unifi');
             $this->assertSame('stale', $provider['sync']['freshness']);
             $this->assertSame(1, $provider['sync']['stale_site_count']);
@@ -718,7 +720,7 @@ class IntegrationsHubTest extends TestCase
             'last_error' => 'Bearer RAW-SITE-ERROR',
         ]);
 
-        $this->actingAs($this->admin)->get('/security-devices/integrations')->assertOk()->assertInertia(function ($page): void {
+        $this->retiredIntegrationsHub($this->admin)->assertOk()->assertInertia(function ($page): void {
             $props = $page->toArray()['props'];
             $provider = collect($props['providers'])->firstWhere('slug', 'milesight');
             $this->assertFalse(collect($provider['exceptions'])->contains('type', 'missing_credentials'));
@@ -766,7 +768,7 @@ class IntegrationsHubTest extends TestCase
             ], $credential));
         }
 
-        $this->actingAs($this->admin)->get('/security-devices/integrations')->assertOk()->assertInertia(function ($page): void {
+        $this->retiredIntegrationsHub($this->admin)->assertOk()->assertInertia(function ($page): void {
             $props = $page->toArray()['props'];
             $providers = collect($props['providers'])->keyBy('slug');
             $milesight = $providers['milesight'];
@@ -827,7 +829,7 @@ class IntegrationsHubTest extends TestCase
         ]);
         $device->update(['external_ref' => ['provider_entity_id' => 'duplicate']]);
 
-        $this->actingAs($this->admin)->get('/security-devices/integrations')->assertOk()->assertInertia(function ($page): void {
+        $this->retiredIntegrationsHub($this->admin)->assertOk()->assertInertia(function ($page): void {
             $provider = collect($page->toArray()['props']['providers'])->firstWhere('slug', 'unifi');
             $exceptions = collect($provider['exceptions'])->keyBy('type');
             $this->assertNull($exceptions['unassigned_import']['href']);
@@ -889,7 +891,7 @@ class IntegrationsHubTest extends TestCase
         foreach ([now()->subDay(), now(), now()->subDay()->subSecond(), now()->addSecond()] as $index => $at) {
             DeviceEvent::create(['device_id' => $device->id, 'source' => 'unifi', 'event_type' => 'window_'.$index, 'severity' => 'warning', 'occurred_at' => $at]);
         }
-        $this->actingAs($this->admin)->get('/security-devices/integrations')->assertOk()->assertInertia(fn ($page) => $page
+        $this->retiredIntegrationsHub($this->admin)->assertOk()->assertInertia(fn ($page) => $page
             ->where('actor_id', $this->admin->id)
             ->where('as_of', now()->toISOString())
             ->where('stats.events_24h', 2)
@@ -912,9 +914,9 @@ class IntegrationsHubTest extends TestCase
         DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $allowed->id, 'assigned_at' => now()->subHour()]);
         DeviceEvent::create(['device_id' => $device->id, 'source' => 'unifi', 'event_type' => 'foreign_history', 'severity' => 'critical', 'occurred_at' => now()->subHours(2)]);
         DeviceEvent::create(['device_id' => $device->id, 'source' => 'unifi', 'event_type' => 'current_permitted', 'severity' => 'warning', 'occurred_at' => now()->subMinutes(30)]);
-        $this->actingAs($viewer)->get('/security-devices/integrations')->assertOk()->assertInertia(fn ($page) => $page
+        $this->retiredIntegrationsHub($viewer)->assertOk()->assertInertia(fn ($page) => $page
             ->where('actor_id', $viewer->id)->where('can.manage', false)
             ->where('stats.events_24h', 1)->where('providers.0.events_24h', 1));
-        $this->actingAs($this->admin)->get('/security-devices/integrations')->assertOk()->assertInertia(fn ($page) => $page->where('stats.events_24h', 2));
+        $this->retiredIntegrationsHub($this->admin)->assertOk()->assertInertia(fn ($page) => $page->where('stats.events_24h', 2));
     }
 }

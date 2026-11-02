@@ -6,129 +6,9 @@ function source(path: string): string {
     return readFileSync(resolve(process.cwd(), path), 'utf8');
 }
 
+// S&D rebuild C6: the checks on the old dashboard, workspaces, discovery, device-group and
+// command-batch pages went with those pages. What stays covers code that is still live.
 describe('Security & Devices canonical workflow links', () => {
-    it('routes estate domains through the shared canonical navigation contract', () => {
-        const dashboard = source(
-            'resources/js/pages/security-devices/dashboard.tsx',
-        );
-        // The dashboard's domain records are built by the shared estate
-        // records module, which owns the canonical domain destinations.
-        const estateRecords = source(
-            'resources/js/components/security-devices/estate-records.tsx',
-        );
-
-        expect(dashboard).toContain(
-            "from '@/components/security-devices/estate-records'",
-        );
-        expect(estateRecords).toContain(
-            'destination: securityDevicesDomainHref(row.domain)',
-        );
-        for (const file of [dashboard, estateRecords]) {
-            expect(file).not.toContain("tracking: '/tracking'");
-            expect(file).not.toContain("iot_healthcare: '/healthcare'");
-            expect(file).not.toContain("it_infrastructure: '/network-it'");
-            expect(file).not.toContain("facilities: '/facilities-iot'");
-        }
-    });
-
-    it('connects Site technology and IT ticket context to the canonical Site profile', () => {
-        const siteTechnology = source(
-            'resources/js/pages/security-devices/sites/show.tsx',
-        );
-        const ticket = source('resources/js/pages/it/tickets/show.tsx');
-
-        expect(siteTechnology).toContain('{can.view_site_profile ? (');
-        expect(siteTechnology).toContain("'?tab=technology'");
-        expect(siteTechnology).toContain('Open Site profile');
-        expect(siteTechnology).toContain('<SiteProfileAccessRequired');
-        expect(ticket).toContain('href={ticket.site.href}');
-        expect(ticket).toContain('v={ticket.site.name}');
-    });
-
-    it('keeps Healthcare Site context visible without emitting inaccessible profile links', () => {
-        const presenter = source(
-            'app/Domain/SecurityDevices/Presenters/HealthcareWorkspacePresenter.php',
-        );
-        const healthcare = source(
-            'resources/js/components/security-devices/healthcare-workspace.tsx',
-        );
-
-        expect(presenter).toContain(
-            "Gate::forUser($viewer)->allows('view', $site)",
-        );
-        expect(presenter).toContain(
-            '\'href\' => $canViewSiteProfile ? "/sites/{$site->id}" : null',
-        );
-        expect(healthcare).toContain('device.location.site.href &&');
-        expect(healthcare).toContain('<SiteProfileAccessRequired');
-    });
-
-    it('keeps operational Site and Device context navigable', () => {
-        const discovery = source(
-            'resources/js/pages/security-devices/discovery.tsx',
-        );
-        const commandBatch = source(
-            'resources/js/pages/security-devices/command-batches/show.tsx',
-        );
-        const groupShow = source(
-            'resources/js/pages/security-devices/device-groups/show.tsx',
-        );
-        const ruleBuilder = source(
-            'resources/js/pages/security-devices/device-groups/auto-rule-builder.tsx',
-        );
-
-        // Collection paths keep their Site; the shared detail view links it
-        // only when the server sent the canonical Security & Devices Site URL.
-        expect(discovery).toContain('site: path.site,');
-        expect(discovery).toContain(
-            "site && site.href === '/security-devices/sites/' + site.id",
-        );
-        expect(discovery).toContain('<Link href={safeSiteHref(entry.site)!}>');
-        expect(commandBatch).toContain('target.site.href');
-        expect(groupShow).toContain(
-            'href={`/security-devices/devices/${device.id}`}',
-        );
-        expect(ruleBuilder).toContain(
-            'href={`/security-devices/devices/${device.id}`}',
-        );
-    });
-
-    it('labels collector-free coverage as configuration and renders truthful discovery limits', () => {
-        const discovery = source(
-            'resources/js/pages/security-devices/discovery.tsx',
-        );
-        const presenter = source(
-            'app/Domain/SecurityDevices/Presenters/DiscoveryOperationsPresenter.php',
-        );
-
-        // The coverage label now comes from the server so every reader uses
-        // the same wording.
-        expect(presenter).toContain(
-            "'path_label' => 'Collector-free monitor configuration'",
-        );
-        expect(discovery).toContain('title={w.direct_coverage.path_label}');
-        expect(discovery).toContain('w.summary.runs_truncated');
-        expect(discovery).toContain('w.summary.candidates_truncated');
-        expect(discovery).toContain('plain(w.limitations.unsupported_state)');
-        expect(discovery).toContain('w.limitations.unsupported_note');
-        expect(discovery).not.toContain('Not assessed');
-        expect(discovery).not.toContain('result drill-down');
-    });
-
-    it('does not claim operational queues are live without freshness evidence', () => {
-        const dashboard = source(
-            'resources/js/pages/security-devices/dashboard.tsx',
-        );
-
-        expect(dashboard).toContain(
-            'Counts and queues from the existing device, monitoring and work records.',
-        );
-        expect(dashboard).toContain(
-            'These are stored changes, not a live feed.',
-        );
-        expect(dashboard).not.toContain('Live operational queues');
-    });
-
     it('routes SLA policy navigation through the supported ticket workspace and opens the real editor', () => {
         const navigation = source('app/Domain/It/ItModuleNavigation.php');
         const itWorkspace = source('resources/js/pages/it/index.tsx');
@@ -159,51 +39,17 @@ describe('Security & Devices canonical workflow links', () => {
         expect(itWorkspace).toContain(
             'if (REQUEST_TABS.has(id)) return can.request;',
         );
-        expect(itWorkspace).toContain(
-            'const tab = tabIsAllowed(requestedTab) ? requestedTab : capabilityDefault;',
-        );
-        expect(itWorkspace).not.toContain(
-            'return can.view; // overview / tickets / provisioning / reports',
-        );
     });
 
-    it('keeps estate actions permission-aware and points open IT work at the supported queue', () => {
-        const presenter = source(
-            'app/Domain/SecurityDevices/Presenters/EstateOperationsPresenter.php',
-        );
-        const dashboard = source(
-            'resources/js/pages/security-devices/dashboard.tsx',
-        );
-        const estateRecords = source(
-            'resources/js/components/security-devices/estate-records.tsx',
-        );
+    it('sends IT navigation to the new Security & devices homes, never a retired page', () => {
+        const navigation = source('app/Domain/It/ItModuleNavigation.php');
 
-        expect(presenter).toContain('/it?tab=tickets&view=all_open');
-        expect(presenter).not.toContain('/it?view=open');
-        expect(presenter).toContain("'restriction_reason'");
-        expect(estateRecords).toContain('row.restriction_reason ||');
-        expect(estateRecords).toContain(
-            'destination: allowed ? row.href : null',
+        expect(navigation).toContain("self::item('Monitoring', '/security-devices/alerts'");
+        expect(navigation).toContain(
+            "self::item('Integrations & API', '/security-devices/setup/services?tab=connected'",
         );
-        expect(dashboard).toContain('data.can.view_devices');
-        expect(dashboard).toContain('data.can.view_events');
-        expect(dashboard).toContain('data.can.view_maintenance');
-        expect(estateRecords).toContain(
-            'Device access is required to open this Site.',
-        );
-    });
-
-    it('explains the command-batch decision minimum accessibly', () => {
-        const commandBatch = source(
-            'resources/js/pages/security-devices/command-batches/show.tsx',
-        );
-
-        expect(commandBatch).toContain(
-            'aria-describedby="batch-decision-comment-help"',
-        );
-        expect(commandBatch).toContain('id="batch-decision-comment-help"');
-        expect(commandBatch).toContain('Minimum 10 characters.');
-        expect(commandBatch).toContain('comment.trim().length < 10');
+        expect(navigation).not.toContain("'/security-devices/monitoring'");
+        expect(navigation).not.toContain("'/security-devices/integrations'");
     });
 
     it('requires a reason and preserves history when a Device relationship is removed', () => {
@@ -231,16 +77,11 @@ describe('Security & Devices canonical workflow links', () => {
     });
 
     it('renders nested command evidence in plain language instead of raw JSON', () => {
-        const batch = source(
-            'resources/js/pages/security-devices/command-batches/show.tsx',
-        );
         const profile = source(
             'resources/js/pages/security-devices/devices/device-profile-sections.tsx',
         );
 
-        expect(batch).toContain('formatReadableOperationalValue(entry)');
         expect(profile).toContain('formatReadableOperationalState(state)');
-        expect(batch).not.toContain('JSON.stringify(entry)');
         expect(profile).not.toContain('JSON.stringify(value)');
     });
 });

@@ -1283,7 +1283,8 @@ export function BlockContent({
                     role="img"
                     aria-label={`${data.title ?? meta.title} chart. Every figure is in the chart figures table below.`}
                 >
-                    <ResponsiveContainer width="100%" height="100%">
+                    {/* A starting size lets the server render (SSR) without measuring -1 × -1; the browser re-measures. */}
+                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 220 }}>
                         <ComposedChart
                             data={data.series}
                             accessibilityLayer={false}

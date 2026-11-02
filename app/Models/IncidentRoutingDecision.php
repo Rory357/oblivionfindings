@@ -9,6 +9,8 @@ final class IncidentRoutingDecision extends Model
 {
     public $timestamps = false;
     protected $guarded = [];
+    /** recorded_at/escalate_at are datetime(6) and digested to the microsecond. */
+    protected $dateFormat = 'Y-m-d H:i:s.u';
 
     protected function casts(): array
     {

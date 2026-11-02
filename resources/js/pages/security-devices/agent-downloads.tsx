@@ -584,8 +584,8 @@ function AgentReleaseList({
                         ) : null}
                         {site && integrationView && can_manage_collectors ? (
                             <Button asChild variant="outline">
-                                <Link href="/security-devices/discovery?tab=collectors">
-                                    Open site collectors
+                                <Link href="/security-devices/setup/hubs?tab=networks">
+                                    Open hubs &amp; networks
                                 </Link>
                             </Button>
                         ) : null}

@@ -1,11 +1,4 @@
-import { router, usePage } from '@inertiajs/react';
-import {
-    HeartPulse,
-    ListPlus,
-    ShieldAlert,
-    StickyNote,
-    Utensils,
-} from 'lucide-react';
+import { HeartPulse, StickyNote, Utensils } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -17,12 +10,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import {
-    launcherWorkflows,
-    ReportLauncher,
-} from '@/pages/health-safety/components/report-launcher';
-import { reportPageFor } from '@/pages/health-safety/components/report-pages';
-import type { SharedData } from '@/types';
 
 import type { MyDayResident } from '../lib/types';
 
@@ -33,27 +20,12 @@ interface Props {
     onNote: (id: number) => void;
     onMeal: () => void;
     onObservation: () => void;
-    onIncident: () => void;
 }
 
 export function RecordCareActions(p: Props) {
+    // Reporting moved to "Something happened?" at the top of My Day (board G4-1): the chooser already starts on an
+    // incident, so Record care keeps only the care records.
     const [choosingPerson, setChoosingPerson] = useState(false);
-    // "Report something" (MASTER for Stephan, 30 Oct, option A): the H&S chooser, showing only what this person may
-    // use. Offered beside "Report incident" when they can report more than an incident.
-    const [reportOpen, setReportOpen] = useState(false);
-    const reportCan = usePage<SharedData>().props.auth
-        ?.can as unknown as Parameters<typeof launcherWorkflows>[0];
-    const moreToReport = launcherWorkflows(reportCan).some(
-        (w) => w.key !== 'incident',
-    );
-    const openReport = (key: string) => {
-        setReportOpen(false);
-        if (key === 'incident') {
-            p.onIncident();
-            return;
-        }
-        router.visit(reportPageFor(key, '/my-day') ?? '/compliance/hazards');
-    };
     const note = () => {
         const person =
             p.people.find((person) => person.id === p.selectedPerson) ??
@@ -61,6 +33,8 @@ export function RecordCareActions(p: Props) {
         if (person) p.onNote(person.id);
         else setChoosingPerson(true);
     };
+    // Nothing to record here (no people today and no observations): no empty card.
+    if (!p.people.length && !p.canRecordObservation) return null;
     return (
         <>
             <Card>
@@ -71,7 +45,7 @@ export function RecordCareActions(p: Props) {
                             Something you’ve already done or noticed.
                         </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                         {p.people.length > 0 && (
                             <>
                                 <Button
@@ -102,32 +76,9 @@ export function RecordCareActions(p: Props) {
                                 Observation
                             </Button>
                         )}
-                        <Button
-                            variant="outline"
-                            className="h-auto min-h-20 flex-col px-2 py-3"
-                            onClick={p.onIncident}
-                        >
-                            <ShieldAlert className="size-5" />
-                            Report incident
-                        </Button>
-                        {moreToReport && (
-                            <Button
-                                variant="outline"
-                                className="h-auto min-h-20 flex-col px-2 py-3"
-                                onClick={() => setReportOpen(true)}
-                            >
-                                <ListPlus className="size-5" />
-                                Report something
-                            </Button>
-                        )}
                     </div>
                 </CardContent>
             </Card>
-            <ReportLauncher
-                open={reportOpen}
-                onClose={() => setReportOpen(false)}
-                onWorkflow={openReport}
-            />
             <Dialog open={choosingPerson} onOpenChange={setChoosingPerson}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>

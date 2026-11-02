@@ -7,7 +7,8 @@
  * sit side by side under the sessions. The coverage and safety caveats keep
  * the code's wording.
  */
-import { boardReportHref } from '@/lib/health-safety/board-reports';
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     canonicalControlRoomAlertId,
     type Alert,
@@ -22,6 +23,14 @@ import {
     words,
 } from '@/components/health-safety/lone-workers/session-panels';
 import { SessionStartForm } from '@/components/health-safety/lone-workers/session-start-form';
+import {
+    LeadBlock,
+    RegisterBlocks,
+    RegisterBoxes,
+    RegisterMoreFilters,
+    RegisterRailLine,
+    type LeadRow,
+} from '@/components/health-safety/register-kit';
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import type {
     SafetySession,
@@ -49,15 +58,10 @@ import {
 } from '@/components/page';
 import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import {
-    PageHeaderNumber,
-    PageHeaderNumbers,
-} from '@/components/page/page-header-strip';
-import {
     Note,
     Ring,
-    SideBySide,
+    QuietLine,
     Surface,
-    Tally,
 } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -77,6 +81,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ClipboardList,
+    Clock,
     ExternalLink,
     Eye,
     FileDown,
@@ -84,6 +89,7 @@ import {
     Plus,
     Radio,
     Siren,
+    UserRound,
     X,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -124,6 +130,8 @@ type Props = {
     filters: Filters;
     pickers: SessionPickers;
     can: { manage: boolean; view: boolean; view_control_room: boolean };
+    /** The shifts on now without a matching session (LoneWorkerCoverageService::monitorableShifts). */
+    options?: { shifts: Array<{ id: number; worker: { id: number; name: string } | null; site: { id: number; name: string } | null; starts_at: string | null; is_lone: boolean }> };
 };
 const sessionStatuses = [
     { value: 'active', label: 'Active' },
@@ -152,8 +160,10 @@ export default function LoneWorkersIndex({
     filters,
     pickers,
     can,
+    options,
 }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const returnTo = loneWorkerReturn(url);
     const drafts = useSafetyWorkspaceDrafts();
     const [search, setSearch] = useState(filters.q ?? '');
@@ -322,34 +332,53 @@ export default function LoneWorkersIndex({
         </>
     );
     const headActions = (
-        <>
-            <Button asChild variant="outline" size="sm">
-                <Link href="/health-safety/analytics">Safety trends</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-                <Link href={boardReportHref('board')}>
-                    Board safety summary
-                </Link>
-            </Button>
-        </>
+        <Button asChild variant="outline" size="sm">
+            <Link href="/health-safety/analytics">Safety trends</Link>
+        </Button>
     );
+    // Header box links keep the Site only.
+    const siteLink = (next: Record<string, string> = {}) => {
+        const query = new URLSearchParams(next);
+        if (filters.site_id) query.set('site_id', String(filters.site_id));
+        return LONE_WORKER_REGISTER + (query.size ? `?${query}` : '');
+    };
+    // G4-14: the lead block — shifts on now that need check-ins and have none set up yet (the server's own list).
+    const unset = (options?.shifts ?? []).filter((shift) => shift.is_lone && (!filters.site_id || shift.site?.id === filters.site_id));
+    const lead: LeadRow[] = unset.slice(0, 4).map((shift) => {
+        const place = shift.site?.name ?? 'Site not recorded';
+        const title = `${place} — ${shift.worker?.name ?? 'worker not recorded'}`;
+        return {
+            key: shift.id,
+            when: shift.starts_at ? { day: formatTime(shift.starts_at), note: 'start' } : null,
+            title,
+            sub: [shift.starts_at ? `Starts ${formatTime(shift.starts_at)}` : null, 'no check-ins set up yet'].filter(Boolean).join(' · '),
+            chip: { label: 'No check-ins set up', tone: 'warning' },
+            action: can.manage ? { label: 'Set up check-ins', onClick: () => toggleCreation(true), ariaLabel: `Set up check-ins: ${title}` } : null,
+            who: can.manage ? null : 'Health and safety set them up',
+        };
+    });
+    const views = [
+        { key: 'sessions', label: 'Working alone now', icon: ClipboardList },
+        ...(can.view_control_room
+            ? [{ key: 'alerts', label: 'Help responses to finish', icon: Siren, count: hero.clusters.alerts.unresolved || undefined }]
+            : []),
+    ];
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
-                { title: 'Lone-worker safety', href: LONE_WORKER_REGISTER },
+                ...safetyHubCrumbs('prevention', safetyCan),
+                { title: 'Working alone', href: LONE_WORKER_REGISTER },
             ]}
         >
-            <Head title="Lone-worker safety" />
+            <Head title="Working alone" />
             <SafetyFormDraftContext.Provider value={drafts.register}>
                 <PageLayout
                     hero={
                         <PageHeader
                             icon={Radio}
-                            title="Lone-worker safety"
-                            subline="Keep contact with workers and follow through when help is needed"
+                            title="Working alone"
+                            subline="Keep in touch with people working alone and follow through when help is needed"
                             actions={
                                 <>
                                     <PageHeaderSearch
@@ -386,180 +415,101 @@ export default function LoneWorkersIndex({
                                             icon={Plus}
                                             onClick={() => toggleCreation(true)}
                                         >
-                                            Start session
+                                            Set up check-ins
                                         </PageHeaderPrimaryButton>
                                     )}
                                 </>
                             }
                             strip={
-                                <PageHeaderNumbers>
-                                    <PageHeaderNumber
-                                        label="Shifts needing a session"
-                                        value={
-                                            coverage.expected_count ?? 'Unknown'
-                                        }
-                                        caption={
-                                            coverage.unknown_count
-                                                ? `${coverage.required_count} known · ${coverage.unknown_count} requirements unknown`
-                                                : 'On shift now'
-                                        }
-                                        tone={
-                                            coverage.expected_count === null
-                                                ? 'warning'
-                                                : undefined
-                                        }
-                                        onClick={focusCoverage}
-                                        pressed={coverageOpen}
-                                        ariaLabel="View current shift coverage: shifts needing a session"
-                                    />
-                                    <PageHeaderNumber
-                                        label="Sessions running"
-                                        value={coverage.monitored_count}
-                                        caption="Matched to a shift"
-                                        onClick={focusCoverage}
-                                        pressed={coverageOpen}
-                                        ariaLabel="View current shift coverage: sessions matched to a shift"
-                                    />
-                                    <PageHeaderNumber
-                                        label="Sessions missing"
-                                        value={coverage.unmonitored_count}
-                                        caption="A shift has no session"
-                                        tone={
-                                            coverage.unmonitored_count > 0
-                                                ? 'critical'
-                                                : undefined
-                                        }
-                                        onClick={focusCoverage}
-                                        pressed={coverageOpen}
-                                        ariaLabel="View current shift coverage: shifts missing a session"
-                                    />
-                                </PageHeaderNumbers>
-                            }
-                            filters={
-                                <>
-                                    <PageHeaderFilterSelect
-                                        label="All sites"
-                                        allValue=""
-                                        value={String(filters.site_id ?? '')}
-                                        onChange={(value) =>
-                                            go({
-                                                site_id: value
-                                                    ? Number(value)
-                                                    : null,
-                                            })
-                                        }
-                                        options={[
-                                            { value: '', label: 'All sites' },
-                                            ...pickers.sites.map((site) => ({
-                                                value: String(site.id),
-                                                label: site.name,
-                                            })),
-                                        ]}
-                                    />
-                                    <PageHeaderFilterSelect
-                                        label="Today"
-                                        allValue="today"
-                                        value={filters.period}
-                                        onChange={(value) =>
-                                            go({
-                                                period: value as Filters['period'],
-                                            })
-                                        }
-                                        options={[
-                                            { value: 'today', label: 'Today' },
-                                            { value: 'week', label: '7 days' },
-                                            { value: '30d', label: '30 days' },
-                                            { value: 'all', label: 'All time' },
-                                        ]}
-                                    />
-                                    {tab === 'sessions' && (
-                                        <PageHeaderFilterSelect
-                                            label="All workers"
-                                            allValue=""
-                                            value={String(
-                                                filters.user_id ?? '',
-                                            )}
-                                            onChange={(value) =>
-                                                go({
-                                                    user_id: value
-                                                        ? Number(value)
-                                                        : null,
-                                                })
-                                            }
-                                            options={[
-                                                {
-                                                    value: '',
-                                                    label: 'All workers',
-                                                },
-                                                ...pickers.workers.map(
-                                                    (worker) => ({
-                                                        value: String(
-                                                            worker.id,
-                                                        ),
-                                                        label: worker.name,
-                                                    }),
-                                                ),
-                                            ]}
-                                        />
-                                    )}
-                                    <PageHeaderFilterSelect
-                                        label="All states"
-                                        allValue=""
-                                        value={filters.status ?? ''}
-                                        onChange={(value) =>
-                                            go({ status: value || null })
-                                        }
-                                        options={[
-                                            { value: '', label: 'All states' },
-                                            ...(tab === 'sessions'
-                                                ? sessionStatuses
-                                                : responseStatuses),
-                                        ]}
-                                    />
-                                    {filtered && (
-                                        <PageHeaderFilterButton
-                                            icon={X}
-                                            onClick={() =>
-                                                go({
-                                                    q: null,
-                                                    site_id: null,
-                                                    user_id: null,
-                                                    status: null,
-                                                    period: 'today',
-                                                })
-                                            }
-                                        >
-                                            Clear filters
-                                        </PageHeaderFilterButton>
-                                    )}
-                                </>
+                                <RegisterBoxes
+                                    boxes={[
+                                        { key: 'unmonitored', label: 'Shifts with no check-ins set up', value: coverage.unmonitored_count, alert: true, icon: ClipboardList, href: siteLink() },
+                                        { key: 'working_alone', label: 'Working alone now', value: live.active, icon: UserRound, href: siteLink({ status: 'active' }) },
+                                        { key: 'missed', label: 'Missed check-ins', value: live.overdue, alert: true, icon: Clock, href: siteLink({ status: 'overdue' }), caption: live.overdue === 0 ? 'None right now' : undefined },
+                                        { key: 'help', label: 'Asked for help now', value: live.emergency, alert: true, icon: Siren, href: siteLink({ status: 'emergency' }), caption: live.emergency === 0 ? 'None right now' : undefined },
+                                    ]}
+                                />
                             }
                             rail={
-                                <SafetyWorkspaceRail
-                                    hub="prevention"
-                                    current="lone-workers"
+                                <RegisterRailLine
+                                    rail={<SafetyWorkspaceRail hub="prevention" current="lone-workers" />}
+                                    filters={
+                                        <>
+                                            <PageHeaderFilterSelect
+                                                label={`All sites · ${pickers.sites.length}`}
+                                                allValue=""
+                                                value={String(filters.site_id ?? '')}
+                                                onChange={(value) => go({ site_id: value ? Number(value) : null })}
+                                                options={[
+                                                    { value: '', label: 'All sites' },
+                                                    ...pickers.sites.map((site) => ({ value: String(site.id), label: site.name })),
+                                                ]}
+                                            />
+                                            <PageHeaderFilterSelect
+                                                label="Today"
+                                                allValue="today"
+                                                value={filters.period}
+                                                onChange={(value) => go({ period: value as Filters['period'] })}
+                                                options={[
+                                                    { value: 'today', label: 'Today' },
+                                                    { value: 'week', label: '7 days' },
+                                                    { value: '30d', label: '30 days' },
+                                                    { value: 'all', label: 'All time' },
+                                                ]}
+                                            />
+                                            <RegisterMoreFilters
+                                                groups={[
+                                                    ...(tab === 'sessions'
+                                                        ? [
+                                                              {
+                                                                  key: 'worker',
+                                                                  label: 'Worker',
+                                                                  value: String(filters.user_id ?? ''),
+                                                                  allValue: '',
+                                                                  options: [
+                                                                      { value: '', label: 'All workers' },
+                                                                      ...pickers.workers.map((worker) => ({ value: String(worker.id), label: worker.name })),
+                                                                  ],
+                                                                  onChange: (value: string) => go({ user_id: value ? Number(value) : null }),
+                                                              },
+                                                          ]
+                                                        : []),
+                                                    {
+                                                        key: 'state',
+                                                        label: 'State',
+                                                        value: filters.status ?? '',
+                                                        allValue: '',
+                                                        options: [{ value: '', label: 'All states' }, ...(tab === 'sessions' ? sessionStatuses : responseStatuses)],
+                                                        onChange: (value: string) => go({ status: value || null }),
+                                                    },
+                                                ]}
+                                                onClear={() => go({ user_id: null, status: null })}
+                                            />
+                                            {filtered && (
+                                                <PageHeaderFilterButton
+                                                    icon={X}
+                                                    onClick={() =>
+                                                        go({
+                                                            q: null,
+                                                            site_id: null,
+                                                            user_id: null,
+                                                            status: null,
+                                                            period: 'today',
+                                                        })
+                                                    }
+                                                >
+                                                    Clear filters
+                                                </PageHeaderFilterButton>
+                                            )}
+                                        </>
+                                    }
                                 />
                             }
                         />
                     }
                     tabs={
                         <TierTwoTabs
-                            tabs={[
-                                {
-                                    key: 'sessions',
-                                    label: 'Sessions',
-                                    icon: ClipboardList,
-                                },
-                                ...(can.view_control_room
-                                    ? [
-                                          {
-                                              key: 'alerts',
-                                              label: 'Responses',
-                                              icon: Siren,
-                                          },
-                                      ]
-                                    : []),
-                            ]}
+                            tabs={views}
                             activeTab={tab}
                             onTab={(value) => go({ tab: value, status: null })}
                             testIdPrefix="lone-worker"
@@ -573,9 +523,28 @@ export default function LoneWorkersIndex({
                     <div
                         id="lone-worker-panel"
                         role="tabpanel"
-                        aria-label={tab === 'sessions' ? 'Sessions' : 'Responses'}
+                        aria-label={tab === 'sessions' ? 'Working alone now' : 'Help responses to finish'}
                         className="grid min-w-0 gap-5"
                     >
+                        {tab === 'sessions' ? (
+                            <RegisterBlocks
+                                lead={
+                                    <LeadBlock
+                                        sub="Shifts on now first"
+                                        rows={lead}
+                                        empty="Every shift on now that needs check-ins has them set up."
+                                        more={unset.length > lead.length ? { text: `${unset.length - lead.length} more shifts have no check-ins set up` } : null}
+                                    />
+                                }
+                                side={
+                                    <QuietLine
+                                        title={filters.site_id ? 'Next 24 hours at the selected sites' : 'Next 24 hours at your sites'}
+                                        text={`${coverage.upcoming_expected_count} ${coverage.upcoming_expected_count === 1 ? 'shift needs' : 'shifts need'} check-ins${coverage.upcoming_unknown_count ? ` · not known for ${coverage.upcoming_unknown_count}` : ''}`}
+                                        action={{ label: 'Shift coverage now', onClick: focusCoverage }}
+                                    />
+                                }
+                            />
+                        ) : null}
                         <Note
                             icon={coverage.state === 'unknown' ? AlertTriangle : Info}
                             tone={
@@ -663,63 +632,6 @@ export default function LoneWorkersIndex({
                                 footer={footer}
                             />
                         )}
-                        {tab === 'sessions' ? (
-                            <SideBySide>
-                                <Tally
-                                    title="Across all your sites"
-                                    items={[
-                                        {
-                                            label: 'Overdue sessions',
-                                            value: live.overdue,
-                                            tone: 'warning',
-                                        },
-                                        {
-                                            label: 'Help requested',
-                                            value: live.emergency,
-                                            tone: 'critical',
-                                        },
-                                        {
-                                            label: 'Ending soon',
-                                            value: live.ending_soon,
-                                        },
-                                    ]}
-                                    calm={[
-                                        live.overdue === 0 &&
-                                            'No session is overdue',
-                                        live.emergency === 0 &&
-                                            'Nobody has asked for help',
-                                        live.ending_soon === 0 &&
-                                            'None ending soon',
-                                    ]
-                                        .filter(Boolean)
-                                        .join(' · ')}
-                                />
-                                <Tally
-                                    title={
-                                        filters.site_id
-                                            ? 'Next 24 hours at the selected sites'
-                                            : 'Next 24 hours at your sites'
-                                    }
-                                    keepZeros
-                                    calm=""
-                                    items={[
-                                        {
-                                            label: 'Shifts that need a session',
-                                            value: coverage.upcoming_expected_count,
-                                        },
-                                        {
-                                            label: 'Not known if a session is needed',
-                                            value: coverage.upcoming_unknown_count,
-                                            tone:
-                                                coverage.upcoming_unknown_count >
-                                                0
-                                                    ? 'warning'
-                                                    : undefined,
-                                        },
-                                    ]}
-                                />
-                            </SideBySide>
-                        ) : null}
                     </div>
                 </PageLayout>
                 {drafts.confirmation}

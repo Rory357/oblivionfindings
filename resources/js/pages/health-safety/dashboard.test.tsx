@@ -71,7 +71,7 @@ describe('Health & Safety dashboard attention worklists', () => {
         );
 
         // Drawn as the approved overview (20): the acceptance list comes first and each row opens its acceptance action.
-        const acceptance = screen.getByText('Waiting for Health & safety to accept');
+        const acceptance = screen.getByText('Waiting for Health and safety to take it on');
         const corrective = screen.getByText('Overdue corrective actions');
         expect(
             acceptance.compareDocumentPosition(corrective) &

@@ -326,7 +326,7 @@ export default function NotificationsIndex({
                                 return (
                                     <Card
                                         key={notif.id}
-                                        className={`transition-all hover:border-border hover:shadow-sm ${!notif.is_read ? 'border-l-2 border-l-primary bg-primary/5' : ''}`}
+                                        className={`transition-all hover:border-border hover:shadow-sm ${!notif.is_read ? 'bg-primary/5' : ''}`}
                                     >
                                         <CardContent className="flex items-center gap-4 p-4">
                                             <div

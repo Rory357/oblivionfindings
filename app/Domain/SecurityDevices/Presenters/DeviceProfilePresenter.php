@@ -44,6 +44,7 @@ use App\Domain\SecurityDevices\Management\Services\DeviceManagementAuthorization
 use App\Domain\SecurityDevices\Management\Services\NetworkDeviceCommandPolicyService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\NetworkConfig\Services\SshHostKeyTrust;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\QueclinkUnitConsoleService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -830,6 +831,11 @@ class DeviceProfilePresenter
         return [
             'canViewSnapshots' => $canViewSnapshots,
             'backupActionHref' => null,
+            // Phase A, item A6: which SSH key is trusted, and any key waiting to be checked.
+            'sshHostKey' => [
+                ...app(SshHostKeyTrust::class)->present($viewer, $device),
+                'trust_url' => route('security-devices.devices.ssh-host-key.trust', ['device' => $device->id], false),
+            ],
             'latestSnapshot' => $snapshotHistory->first(),
             'snapshotHistory' => $snapshotHistory->all(),
             'snapshotHistoryTruncated' => $snapshotCandidates->count() > $snapshotHistory->count(),
@@ -1899,15 +1905,19 @@ class DeviceProfilePresenter
         ?int $canonicalSiteId,
     ): array {
         $canManage = $viewer->canDo('securityDevices.monitoring.manage');
+        // The ping check runs on the server, or on a hub that is approved and not removed (S&D Phase B).
         $activeMonitor = $device->relationLoaded('monitors')
-            ? $monitors->first(fn (Monitor $monitor): bool => $monitor->collector_id === null
+            ? $monitors->first(fn (Monitor $monitor): bool => ($monitor->collector_id === null
+                    || ($monitor->collector?->isApprovedForWork() ?? false))
                 && ($monitor->kind?->value ?? (string) $monitor->kind) === MonitorKind::Icmp->value
                 && (bool) $monitor->affects_availability
                 && (bool) $monitor->is_enabled)
             : ($canManage
                 ? Monitor::query()
                     ->where('device_id', $device->id)
-                    ->whereNull('collector_id')
+                    ->where(fn ($query) => $query
+                        ->whereNull('collector_id')
+                        ->orWhereHas('collector', fn ($hub) => $hub->whereNotNull('approved_at')->whereNull('revoked_at')))
                     ->where('kind', MonitorKind::Icmp->value)
                     ->where('affects_availability', true)
                     ->where('is_enabled', true)
