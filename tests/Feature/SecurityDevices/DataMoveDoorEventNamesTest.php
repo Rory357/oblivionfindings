@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Site;
 use App\Models\TimelineEvent;
@@ -17,7 +18,8 @@ use Illuminate\Support\Str;
  * The dry run only counts. Clearing can't be undone, so it needs --apply --i-have-a-backup; it clears
  * names (and the name inside summaries) on rows older than 90 days only, writes one audit row each
  * without the name, leaves newer rows and the new Access tables alone, and a second run does nothing.
- * Control Room signals copied from door events are cleared the same way (Stephan, 2 Nov: "Yes, same 90 days").
+ * Control Room signals copied from door events, and the alerts opened from them, are cleared the same way
+ * (Stephan, 2 Nov: "Yes, same 90 days").
  */
 
 beforeEach(function (): void {
@@ -50,6 +52,18 @@ beforeEach(function (): void {
         'normalized_data' => ['provider' => 'unifi', 'title' => 'Door forced open', 'description' => 'FORCED: Mereana Synthetica at Front door', 'site_id' => $this->site->id],
     ]);
 
+    // An alert keeps the signal's copies in its context; a later signal replaces signal_payload.
+    $this->alert = fn (int $daysAgo, ?int $lastSignalDaysAgo = null) => ControlRoomAlert::factory()->create([
+        'source' => 'external', 'alert_type' => 'Door Forced', 'severity' => 'high', 'site_id' => $this->site->id,
+        'triggered_at' => now()->subDays($daysAgo),
+        'context' => array_filter([
+            'signal_type_code' => 'integration_door_forced', 'rule_id' => null,
+            'signal_payload' => ['summary' => 'FORCED: Mereana Synthetica at Front door', 'actor_name' => 'Mereana Synthetica', 'door_name' => 'Front door', 'direction' => 'FORCED'],
+            'normalized_data' => ['provider' => 'unifi', 'title' => 'Door forced open', 'description' => 'FORCED: Mereana Synthetica at Front door'],
+            'last_signal_at' => $lastSignalDaysAgo === null ? null : now()->subDays($lastSignalDaysAgo)->toISOString(),
+        ], fn ($value) => $value !== null),
+    ]);
+
     $this->oldIntegration = ($this->integration)(100, 'Mereana Synthetica');
     $this->newIntegration = ($this->integration)(10, 'Mereana Synthetica');
     $this->oldUnnamed = ($this->integration)(100, null);
@@ -59,6 +73,9 @@ beforeEach(function (): void {
     $this->newDeviceEvent = ($this->deviceEvent)(10);
     $this->oldSignal = ($this->signal)(100);
     $this->newSignal = ($this->signal)(10);
+    $this->oldAlert = ($this->alert)(100);
+    $this->newAlert = ($this->alert)(10);
+    $this->oldAlertWithRecentSignal = ($this->alert)(100, 10);
 
     // The new Access tables clear their own names; this move never touches them.
     $console = AccessConsole::query()->create(['site_id' => $this->site->id, 'address' => '10.78.0.40', 'port' => 12445, 'state' => 'ok']);
@@ -75,6 +92,7 @@ it('counts names older than 90 days in a dry run and changes nothing', function 
         ->expectsOutputToContain('normalized_payload: actor_name and summary')
         ->expectsOutputToContain('Not touched: cleared by the Access sync itself')
         ->expectsOutputToContain('payload: actor_name and summary; normalized_data: description')
+        ->expectsOutputToContain('context: signal_payload actor_name and summary; normalized_data description')
         ->expectsOutputToContain('Clearing can’t be undone')
         ->expectsOutputToContain('Dry run: nothing changed')
         ->assertSuccessful();
@@ -83,6 +101,7 @@ it('counts names older than 90 days in a dry run and changes nothing', function 
         ->and($this->oldTimeline->fresh()->meta['user'])->toBe('Mereana Synthetica')
         ->and($this->oldDeviceEvent->fresh()->payload['actor_name'])->toBe('Mereana Synthetica')
         ->and($this->oldSignal->fresh()->payload['actor_name'])->toBe('Mereana Synthetica')
+        ->and($this->oldAlert->fresh()->context['signal_payload']['actor_name'])->toBe('Mereana Synthetica')
         ->and(($this->cleared)())->toBe(0);
 });
 
@@ -101,7 +120,7 @@ it('refuses --apply without --i-have-a-backup, and in production without --force
 
 it('clears only names older than 90 days, audits each row without the name, and is idempotent', function (): void {
     $this->artisan('security-devices:moves:door-event-names', ['--apply' => true, '--i-have-a-backup' => true, '--actor' => $this->actor->id])
-        ->expectsOutputToContain('Clearing names on 4 rows now')
+        ->expectsOutputToContain('Clearing names on 5 rows now')
         ->assertSuccessful();
 
     $integration = $this->oldIntegration->fresh()->normalized_payload;
@@ -125,6 +144,15 @@ it('clears only names older than 90 days, audits each row without the name, and 
         ->and($signal->normalized_data['title'])->toBe('Door forced open')
         ->and(json_encode([$signal->payload, $signal->normalized_data]))->not->toContain('Mereana');
 
+    // The alert opened from it: the same copies inside its context; the rest of the context stays.
+    $alert = $this->oldAlert->fresh()->context;
+    expect($alert['signal_payload'])->not->toHaveKey('actor_name')
+        ->and($alert['signal_payload']['summary'])->toBe('FORCED at Front door (name cleared after 90 days)')
+        ->and($alert['normalized_data']['description'])->toBe('FORCED at Front door (name cleared after 90 days)')
+        ->and($alert['normalized_data']['title'])->toBe('Door forced open')
+        ->and($alert['signal_type_code'])->toBe('integration_door_forced')
+        ->and(json_encode($alert))->not->toContain('Mereana');
+
     // Newer than 90 days, the unnamed row and the new Access tables: untouched.
     expect($this->newIntegration->fresh()->normalized_payload['actor_name'])->toBe('Mereana Synthetica')
         ->and($this->newTimeline->fresh()->meta['user'])->toBe('Mereana Synthetica')
@@ -132,17 +160,21 @@ it('clears only names older than 90 days, audits each row without the name, and 
         ->and($this->oldUnnamed->fresh()->normalized_payload)->toEqual($this->oldUnnamed->normalized_payload)
         ->and($this->accessEvent->fresh()->actor_name)->toBe('Mereana Synthetica')
         ->and($this->newSignal->fresh()->payload['actor_name'])->toBe('Mereana Synthetica')
-        ->and($this->newSignal->fresh()->normalized_data['description'])->toContain('Mereana Synthetica');
+        ->and($this->newSignal->fresh()->normalized_data['description'])->toContain('Mereana Synthetica')
+        ->and($this->newAlert->fresh()->context['signal_payload']['actor_name'])->toBe('Mereana Synthetica')
+        // Opened over 90 days ago, but a signal 10 days ago replaced its copy: not 90 days old yet.
+        ->and($this->oldAlertWithRecentSignal->fresh()->context['signal_payload']['actor_name'])->toBe('Mereana Synthetica')
+        ->and($this->oldAlertWithRecentSignal->fresh()->context['normalized_data']['description'])->toContain('Mereana Synthetica');
 
     // One audit row per cleared row, recorded against the actor, never carrying the name; no model-level
     // update audit copies the old name either.
     $audits = AuditLog::query()->where('action', 'security_devices.data_move.door_event_names.cleared')->get();
-    expect($audits)->toHaveCount(4)
+    expect($audits)->toHaveCount(5)
         ->and($audits->pluck('user_id')->unique()->all())->toBe([$this->actor->id])
         ->and($audits->contains(fn (AuditLog $log): bool => str_contains(json_encode($log->meta), 'Mereana')))->toBeFalse()
         ->and(AuditLog::query()->whereIn('action', ['timelineevent.update', 'integrationevent.update'])->exists())->toBeFalse();
 
     $this->artisan('security-devices:moves:door-event-names', ['--apply' => true, '--i-have-a-backup' => true, '--actor' => $this->actor->id])
         ->assertSuccessful();
-    expect(($this->cleared)())->toBe(4);
+    expect(($this->cleared)())->toBe(5);
 });

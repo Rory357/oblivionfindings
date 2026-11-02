@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Console\Moves;
 
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\TimelineEvent;
 use App\Models\User;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\DB;
  * S&D data move "Names on old door events older than 90 days" (D14; plan: "Names older than 90 days
  * are cleared only after your yes and a backup").
  *
- * Today's door events keep the person's name in four places:
+ * Today's door events keep the person's name in five places:
  *  - integration_events: normalized_payload.actor_name, and the name inside normalized_payload.summary
  *    (UniFi Access events, UnifiAdapter::normalizeAccessLogEntry);
  *  - timeline_events of type "unifi_access": meta.user, and the name inside subject and body
@@ -26,7 +27,10 @@ use Illuminate\Support\Facades\DB;
  *  - device_events: payload.actor_name (read by the door page);
  *  - control_room_signals made from those integration events (IntegrationSignalNormaliser):
  *    payload.actor_name and payload.summary, and normalized_data.description, which copies the summary
- *    (Stephan, 2 Nov: "Yes, same 90 days").
+ *    (Stephan, 2 Nov: "Yes, same 90 days");
+ *  - control_room_alerts opened from those signals (SignalProcessingService): context.signal_payload and
+ *    context.normalized_data, the same copies. An alert counts as older than 90 days only when its last
+ *    signal is too, because a later signal replaces signal_payload.
  *
  * The provider's own raw_payload is left out: verified UniFi events don't keep one
  * (ProviderEventProjector), and older copies hold the name inside the provider's nested structure,
@@ -186,20 +190,43 @@ final class MoveDoorEventNamesCommand extends DataMoveCommand
                     if ($payload === null || ! array_key_exists('actor_name', $payload)) {
                         return null;
                     }
-                    $cleared = self::withoutName($payload);
+                    [$cleared, $normalized] = self::withoutNameInControlRoomCopy($payload, is_array($signal->normalized_data) ? $signal->normalized_data : null);
                     $changes = ['payload' => json_encode($cleared, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)];
-
-                    // The operator-facing description is the door event's summary, with the name in it.
-                    $context = is_array($signal->normalized_data) ? $signal->normalized_data : null;
-                    $name = is_string($payload['actor_name']) ? trim($payload['actor_name']) : '';
-                    $description = $context['description'] ?? null;
-                    if ($context !== null && is_string($description)
-                        && ($description === ($payload['summary'] ?? null) || ($name !== '' && str_contains($description, $name)))) {
-                        $context['description'] = $cleared['summary'] ?? self::summaryWithoutName($payload['direction'] ?? null, $payload['door_name'] ?? null);
-                        $changes['normalized_data'] = json_encode($context, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+                    if ($normalized !== null) {
+                        $changes['normalized_data'] = json_encode($normalized, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
                     }
 
                     return $changes;
+                },
+            ],
+            'control_room_alerts' => [
+                'where' => 'context: signal_payload actor_name and summary; normalized_data description (copied from those signals)',
+                'columns' => ['id', 'site_id', 'alert_type', 'triggered_at', 'context'],
+                'fields' => ['signal_payload.actor_name', 'signal_payload.summary', 'normalized_data.description'],
+                'query' => fn (): Builder => ControlRoomAlert::query()
+                    ->where('triggered_at', '<', $cutoff)
+                    ->whereNotNull('context->signal_payload->actor_name')
+                    ->where(fn (Builder $last): Builder => $last
+                        ->whereNull('context->last_signal_at')
+                        ->orWhere('context->last_signal_at', '<', $cutoff->toISOString())),
+                'clear' => function (Model $alert) use ($cutoff): ?array {
+                    $context = is_array($alert->context) ? $alert->context : null;
+                    $payload = is_array($context['signal_payload'] ?? null) ? $context['signal_payload'] : null;
+                    if ($payload === null || ! array_key_exists('actor_name', $payload)) {
+                        return null;
+                    }
+                    // A later signal joined the alert: its copy isn't 90 days old yet.
+                    $last = $context['last_signal_at'] ?? null;
+                    if (is_string($last) && $last !== '' && CarbonImmutable::parse($last)->greaterThanOrEqualTo($cutoff)) {
+                        return null;
+                    }
+                    [$cleared, $normalized] = self::withoutNameInControlRoomCopy($payload, is_array($context['normalized_data'] ?? null) ? $context['normalized_data'] : null);
+                    $context['signal_payload'] = $cleared;
+                    if ($normalized !== null) {
+                        $context['normalized_data'] = $normalized;
+                    }
+
+                    return ['context' => json_encode($context, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)];
                 },
             ],
             'device_events' => [
@@ -243,6 +270,28 @@ final class MoveDoorEventNamesCommand extends DataMoveCommand
         }
 
         return $payload;
+    }
+
+    /**
+     * A Control Room copy of a door event without the name: the payload loses actor_name and its summary
+     * is rewritten, and the operator-facing description, a copy of that summary, is rewritten too.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>|null  $normalized
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>|null} the new payload, and the new normalized data (null when it holds no name)
+     */
+    private static function withoutNameInControlRoomCopy(array $payload, ?array $normalized): array
+    {
+        $cleared = self::withoutName($payload);
+        $name = is_string($payload['actor_name'] ?? null) ? trim($payload['actor_name']) : '';
+        $description = $normalized['description'] ?? null;
+        if ($normalized === null || ! is_string($description)
+            || ($description !== ($payload['summary'] ?? null) && ($name === '' || ! str_contains($description, $name)))) {
+            return [$cleared, null];
+        }
+        $normalized['description'] = $cleared['summary'] ?? self::summaryWithoutName($payload['direction'] ?? null, $payload['door_name'] ?? null);
+
+        return [$cleared, $normalized];
     }
 
     /** The door event in words, without who: "ACCESS at Front door (name cleared after 90 days)". */
