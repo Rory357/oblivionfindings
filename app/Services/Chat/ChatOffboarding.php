@@ -156,8 +156,9 @@ final class ChatOffboarding
                 app(ChatRealtime::class)->queueConversation($conversation->id);
             }
 
-            // Marks the kept memberships as left, unless the hourly check already has.
-            $this->gaps->sync([$person->id]);
+            // Marks the kept memberships as left, unless the hourly check already has. The relay
+            // revoke below covers this person, so the leaver rule doesn't send its own.
+            $this->gaps->sync([$person->id], revokeRelay: false);
             foreach ($affected->unique() as $id) {
                 Cache::forget("user:{$id}:ops-unread:v1");
             }
@@ -176,6 +177,8 @@ final class ChatOffboarding
             AuditLog::create(['user_id' => $actor->id, 'action' => 'chat.offboarding.completed', 'meta' => [
                 'person_id' => $person->id, 'owner' => $owner ? 'person' : 'care_team', 'owner_id' => $owner?->id, ...$summary,
             ]]);
+            // Oblivion Relay (spec 3.7): their relayed media stops at once. Sent after this commits.
+            app(OblivionRelay::class)->revokePerson($person, 'offboarded', $actor);
 
             return $summary;
         });

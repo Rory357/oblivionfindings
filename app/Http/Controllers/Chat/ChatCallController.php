@@ -15,6 +15,7 @@ use App\Services\Chat\ChatCallHost;
 use App\Services\Chat\ChatCallOutcome;
 use App\Services\Chat\ChatCallReconciler;
 use App\Services\Chat\ChatSettings;
+use App\Services\Chat\OblivionRelay;
 use App\Services\Chat\SelfHostedCalling;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
 use App\Services\Operations\OpsMessageVisibilityService;
@@ -379,12 +380,18 @@ final class ChatCallController extends Controller
             } elseif ($participant->status !== 'invited') {
                 $this->media->remove($locked, $participant);
             }
-            $participant->update(['status' => $participant->status === 'invited' ? 'declined' : 'left', 'left_at' => now()]);
+            $wasInvited = $participant->status === 'invited';
+            $participant->update(['status' => $wasInvited ? 'declined' : 'left', 'left_at' => now()]);
             if ($end) {
                 $locked->update(['status' => $locked->status === 'ringing' && $locked->started_by === $participant->user_id ? 'cancelled' : 'ended', 'ended_at' => now()]);
                 $locked->participants()->whereIn('status', ['accepted', 'connected', 'invited'])->update(['status' => 'left', 'left_at' => now()]);
+                // Oblivion Relay (spec 3.7), after the commit: nothing outlives the call.
+                app(OblivionRelay::class)->revokeCall($locked, 'call_ended');
             } elseif ($locked->host_id === $participant->user_id) {
                 $locked->update(['host_id' => $successor]);
+            }
+            if (! $end && ! $wasInvited) {
+                app(OblivionRelay::class)->revokeCallMember($locked, (int) $participant->user_id, 'left_call');
             }
         });
 
