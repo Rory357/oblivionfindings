@@ -66,7 +66,7 @@ Copy into `provenance/<engine>.md`.
 | Engine | Spec | Status |
 |---|---|---|
 | Oblivion Live (live updates, typing, presence, call signalling) and the Oblivion signer | [specs/oblivion-live.md](specs/oblivion-live.md) | Spec written 23 Oct 2026; ready for a builder session |
-| Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Spec written 23 Oct 2026; ready for a builder session |
+| Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Built 23 Oct 2026 on `claude/reverent-wu-0bdbe2`, package removed; signed off by the checker 23 Oct 2026, no copied code ([provenance](provenance/push-sender.md#similarity-check)). Manual browser acceptance on the test server still open |
 | Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Spec written 23 Oct 2026; ready for a builder session |
 | Oblivion Calls | to write after Oblivion Live (stage 5) | — |
 
