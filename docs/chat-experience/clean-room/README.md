@@ -66,7 +66,7 @@ Copy into `provenance/<engine>.md`.
 
 | Engine | Spec | Status |
 |---|---|---|
-| Oblivion Live (live updates, typing, presence, call signalling) and the Oblivion signer | [specs/oblivion-live.md](specs/oblivion-live.md) | Built 23 Oct 2026 ([provenance](provenance/oblivion-live.md)); Reverb and pusher-js removed; awaiting checker sign-off |
+| Oblivion Live (live updates, typing, presence, call signalling) and the Oblivion signer | [specs/oblivion-live.md](specs/oblivion-live.md) | Built 23 Oct 2026 ([provenance](provenance/oblivion-live.md)); Reverb and pusher-js removed on `claude/oblivion-live-removal-wip` (PR #52); signed off by the checker 3 Nov 2026, no copied code ([provenance](provenance/oblivion-live.md#similarity-check)). The two-browser end-to-end test is still open |
 | Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Built 23 Oct 2026 on `claude/reverent-wu-0bdbe2`, package removed; signed off by the checker 23 Oct 2026, no copied code ([provenance](provenance/push-sender.md#similarity-check)). Manual browser acceptance on the test server still open |
 | Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Built 23 Oct 2026 on `claude/eager-mahavira-c57cd4` ([provenance](provenance/voice-checker.md)). Checked 23 Oct 2026: no copied code. Rechecked the same day: the first four findings were fixed, and two MP4 findings went back to the builder. **Signed off 31 Oct 2026** after a second recheck: both MP4 fixes hold and the tests pass. Real Safari recordings are still to come |
 | Oblivion Calls | to write after Oblivion Live (stage 5) | — |

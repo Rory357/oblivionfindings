@@ -12,10 +12,10 @@
   - PHP manual: `hash_hmac`, `hash_equals`, `random_bytes`, `json_encode` flags. Laravel documentation: HTTP client, queued jobs, `DB::afterCommit`, rate limiting.
   - Oblivion's own code: `ChatRealtime`, `ChatRealtimeController`, `WakeChatClients`, `ChatMessageChanges`, `ChatServiceHealth`, `AddContentSecurityPolicy`, the chat components in `resources/js/components/chat/` (including `chat-realtime-connection.ts`, which is Oblivion's own wrapper), Oblivion's tests and `deploy/chat-calling/` documents.
 - Outside code consulted: none. No file in `vendor/laravel/reverb`, `vendor/pusher`, `vendor/ratchet`, `vendor/react`, `node_modules/pusher-js`, `node_modules/laravel-echo` or any other WebSocket library was opened, searched or fetched, and no WebSocket library documentation or example was read. Every search excluded `vendor/` and `node_modules/`.
-  - Incident, 23 Oct: a repository-wide search for references to the deploy files (patterns `chat-realtime.env`, `REVERB`, …) printed nine lines of `config/reverb.php`, the config file that followed Reverb's template: its `env('CHAT_REVERB_…')` lookups for bind host, port, key, secret, app ID, allowed origins and maximum connections. Nothing from them was used: the gateway's settings come from the spec's section 10 list, and the file is deleted in the removal commit without being opened.
+  - Incident, 23 Oct: a repository-wide search for references to the deploy files (patterns `chat-realtime.env`, `REVERB`, …) printed nine lines of `config/reverb.php`, the config file that followed Reverb's template: its `env('CHAT_REVERB_…')` lookups for bind host, port, key, secret, app ID, allowed origins and maximum connections. Nothing from them was used: the gateway's settings come from the spec's section 10 list, and the file is deleted in the removal commit without being opened. The checker assessed this on 3 November 2026 and found nothing carried over ([Similarity check](#similarity-check)).
   - The worktree's `node_modules/` was installed from the existing lockfile (`npm ci`) because the parent checkout's copy was empty; that includes pusher-js until the removal commit. It was never opened or searched.
 - New outside packages: none. The gateway uses only Node's built-in modules; the browser client uses the browser's own `WebSocket`; the PHP side uses Laravel's existing HTTP client.
-- Similarity check: to be run by the checker session.
+- Similarity check: the repository's [../tools/token-similarity.mjs](../tools/token-similarity.mjs) (structure 12 tokens, literal 6, comments 6) and the Oblivion Relay checker's four-mode Node.js script (structure 12, literal 8, names and values 8, comment and string words 8) with its shared-identifier check, calibrated with four deliberate ports. Result: clean, no copied code ([details](#similarity-check)). By the Oblivion Live checker session (a side session of `local_fae95f7b`), 3 November 2026.
 
 ## Evidence so far (23 Oct 2026)
 
@@ -58,6 +58,143 @@ On this branch with the Chat base and main `0a66dafe2` merged in (`8720d117e`). 
 - **Numeric cursor position.** `messages` and `changes` also return `sync_change_id`, the change ID the encrypted cursor covers, so the thread can skip events its cursor has passed without decrypting anything.
 - **Calls keep their own checks.** While a call is ringing or active the call dock still checks every 3 seconds, and the 15-second availability heartbeat stays (call routing needs it), both on the one sync loop, until Oblivion Calls lands (stage 5).
 - **Other watchers.** Watchers with a check of their own (file scans, publication review, notice previews, preferences, callbacks, search, collections, urgent contact, shift handover, follow-ups) keep their interval on the one loop and are also woken by events; only the seven named in spec section 8 stop polling while live.
+
+## Similarity check
+
+**Clean: no copied code.** Checked on 3 November 2026 by the Oblivion Live checker session, a side session of `local_fae95f7b` that did not build Oblivion Live. It worked on branch `claude/oblivion-live-check`, cut from `claude/oblivion-live-removal-wip` at `c403aa49a`. The checker was the only session to read the outside source. That source stayed in the checker's scratchpad, never in a worktree, the repository or the main checkout. None of its scripts, builds or tests were run, and it was deleted after the check.
+
+- **New code compared:** 47 files, 47,987 tokens.
+  - The gateway: all 20 files in `live/` (`server.mjs`, the 10 `lib/` modules, the 7 test files and both tools).
+  - The browser client: the 8 files in `resources/js/components/chat/live/`, plus `chat-realtime-connection.ts`, its test and `chat-update-watch.ts`.
+  - The PHP side: `OblivionLive`, `ChatPresence`, `ChatRealtime`, `CompactToken`, `InvalidCompactToken`, `ChatLiveController`, `CloseChatLiveConnections`, `PublishChatUnread` and `PublishChatPresence`, with the tests `OblivionLiveTest`, `CompactTokenTest` and `ChatReplacedEnginesGuardTest`.
+  - As prose: `deploy/chat-calling/oblivion-live.env.example`, `oblivion-live.service.example`, `oblivion-live-nginx.conf.example` and `chat-realtime.md`.
+- **Outside source compared.** Each was fetched from GitHub with its tests and documentation (pusher-js from npm as well), at the commit the old lock files recorded where they recorded one:
+  - laravel/reverb 1.12.0, pusher/pusher-php-server 7.3.0, ratchet/rfc6455 0.4.1, react/socket 1.17.0, react/stream 1.4.0 and react/event-loop 1.6.0;
+  - pusher-js 8.6.0: the repository at `v8.6.0` (source, specs and built files), and the npm package the old `package-lock.json` installed, whose code is the same;
+  - laravel-echo 2.6.3, the newest release (Oblivion never installed it);
+  - common Node.js WebSocket code: ws 8.22.0 (the version the register lists), websocket-driver 0.7.4, faye-websocket 0.11.4 and websocket (WebSocket-Node) 1.0.35. Also reconnecting-websocket 4.4.0, for the browser's reconnect logic;
+  - for the signer: firebase/php-jwt 7.0.5, and jose 6.2.12, the JWT library that comes with livekit-client in Oblivion's `node_modules`.
+
+  That is 2,012 files and about 1.18 million code tokens, counting pusher-js once. Reverb's other dependencies were not compared: react/promise, promise-timer, dns and cache, evenement, and clue's Redis packages. Oblivion Live has no promise library, DNS resolver, cache, event emitter or Redis client for them to match. The texts of RFC 6455, 2104, 3629, 4648, 6202, 7515 and 7519, and the spec, were used to tell protocol wording apart from copied wording.
+- **Tools:**
+  - [../tools/token-similarity.mjs](../tools/token-similarity.mjs), as the README asks: greedy string tiling with thresholds of 12 tokens (structure), 6 (literal) and 6 words (comments). It was run on the closest pairings:
+    - the gateway modules against each server library;
+    - the browser client against pusher-js's source and built file, laravel-echo and reconnecting-websocket;
+    - the signer against php-jwt, jose's JWS and JWT code, and pusher-php-server's signing.
+  - The Oblivion Relay checker's Node.js script, written by that session with no outside code. It compares every new file with every source in four modes, with thresholds of 12 tokens (structure), 8 (literal), 8 (names and values) and 8 words (comments and strings). A fifth check lists every shared identifier longer than 3 characters that is neither in the RFC texts and the spec nor in unrelated Oblivion code.
+- **Controls:**
+  - Four positive controls, written in the scratchpad and deleted after scoring:
+    - ws's `sender.js` with every name renamed and every string blanked: 100 % structure.
+    - A close JavaScript port of ws's frame-header reader (`getInfo` to `getMask`), with renamed fields:
+      - repository tool: 60.4 % structure with 48-token runs, and 27.4 % literal;
+      - Relay tool: 73.9 % structure.
+    - A line-by-line JavaScript port of Ratchet's PHP `frameCheck` and close-code checker:
+      - structure stays low across the language change (2.9–13.5 %);
+      - literal reaches 41.8 % and string words 72 %;
+      - the identifier check flags 14 Ratchet names (`frameCheck`, `newCloseFrame`, `checkForMask`, `getRsv1` …).
+    - A lightly renamed PHP copy of php-jwt's `decode`, `encode` and base64url helpers:
+      - 68–77 % in both tools, with runs of 84 to 110 tokens;
+      - 10 php-jwt names flagged (`headb64`, `cryptob64`, `urlsafeB64Decode`, `padlen` …).
+  - Negative controls: 24 unrelated Oblivion files. They are 7 Oblivion Relay modules and one Relay test, the licence-notice script, 7 Chat browser files and 8 Chat PHP files.
+    - Repository tool, 8 of them against the same libraries: 0–10.5 % structure and 0–3.4 % literal.
+    - Relay tool, all 24: 14–68 % structure with runs up to 77 tokens, 0–17 % literal with runs up to 19, and 0–3 % names.
+- **Scores:**
+  - **Repository tool:**
+    - Gateway modules: 0–8.3 % structure and 0–10.8 % literal against every server library.
+      - The one higher structure score is `base64url.mjs` (83 tokens) at 24 %. It comes from one 20-token guard, `typeof … !== 'string' || !pattern.test(…) ||`.
+      - The highest literal score is `connection.mjs` against WebSocket-Node. It is made of 6- to 10-token lines any WebSocket connection class has: `this.socket.end()`, `socket.on('data', (chunk) => …)` and `if (this.state === 'closed') return`.
+    - Browser client: 0–3.8 % structure and 0–7.8 % literal. The 113-token `chat-realtime-connection.ts` reaches 21 % from one 12-token run.
+    - Signer:
+      - `CompactToken.php` against php-jwt: 12.7 % structure, 1.3 % literal;
+      - `token.mjs` against jose: 7.9 % structure, 3.1 % literal.
+  - **Relay tool:** all inside the negative range.
+    - Structure: 0–54 % for engine files and up to 71.5 % for tests.
+    - Literal: 0–9.3 % for engine files and 0–14.1 % for tests.
+    - Names: 0–2.4 %.
+    - The four deploy files score 0 in every mode.
+- **Results.** Every match above the threshold was reviewed by hand. Each one is protocol shape or a common idiom:
+  - **Structure:** 827 regions. All 147 with a run of 20 tokens or more were read on both sides. They are:
+    - `use` and `import` lists at the top of files. The longest, 71 and 89 tokens, are the `use` blocks of `ChatLiveController.php` and `OblivionLiveTest.php`; the unrelated `OblivionRelayTest.php` reaches 73 the same way;
+    - opcode, close-code and settings tables, constructor assignments, object literals and `addEventListener` lists;
+    - Pest, `node:test` and Vitest scaffolding;
+    - three idioms that the RFC or Node fixes:
+      - the RFC 6455 5.3 unmask loop, `payload[index] ^= mask[index & 3]` (`frames.mjs` 66–70). ws's `buffer-util.js` has the same five-line shape: it is the RFC's "i MOD 4" written in JavaScript;
+      - the close-frame body of RFC 6455 5.5.1: `Buffer.allocUnsafe(2 + text.length)`, `payload.writeUInt16BE(code, 0)`, then `text.copy(payload, 2)` (`frames.mjs` 253–258, the same shape as websocket-driver's `hybi.js` 205–207);
+      - the `upgrade` handler's `(request, socket, head)` arguments, from the `node:http` manual.
+
+    The 680 regions of 12–19 tokens follow the same patterns.
+  - **Literal:** 328 regions; all 87 of 10 tokens or more were read.
+    - The longest, 24 tokens, is the opcode table. It is the RFC 6455 11.8 registry, also in websocket-driver and pusher-js's built file.
+    - The rest are:
+      - byte arrays in `frames.test.mjs` (17 and 16 tokens);
+      - Vitest timer and `mock.calls` lines;
+      - `token.split('.')` with a three-part check, RFC 7515's compact form;
+      - the close-code check `isValidCloseCode`. It writes RFC 6455 7.4 as two allowed ranges plus 3000–4999, where ws writes one range with three exclusions;
+      - Node, Laravel collection and test-framework calls.
+  - **Names and values:** 6 runs, the longest 12 tokens: the opcode table again, the `upgrade` and `error` handler pair, and test byte arrays.
+  - **Comment and string words:** 4 runs.
+    - The longest, 19 words, is the `101 Switching Protocols` response in `handshake.mjs` 77–80: the text RFC 6455 4.2.2 fixes.
+    - The other three are `127.0.0.1` and `HTTP/1.1` test strings.
+    - No comment prose matches any source. The deploy files share no run of 8 words with any source, Reverb's README and configuration included.
+  - **Shared identifiers:** 1 to 20 per source, all reviewed. Leaving out the controls' names, they are:
+    - browser and Node names: `onopen`, `readyState`, `setNoDelay`, `allocUnsafe`, `spawn`, `Infinity`;
+    - PHPUnit, Pest and Laravel names: `assertSame`, `toHaveKey`, `withHeader`, `swap`, the `HttpFactory` alias;
+    - plain words: `handleMessage`, `onEvent`, `sendRaw`, `testConfig`, `forged`, `payloadStart`;
+    - the RFC 4648 term, in `decodeBase64url` and `encodeBase64url`;
+    - `maxFragments`, which ws 8.22.0 also has as an option. Both cap the number of fragments in one message and close with 1008. The two share the idea, not the code:
+      - Oblivion refuses before storing a fragment past 128. The "Extra limits" decision gives the reason: empty fragments cost nothing against the byte limit.
+      - ws counts after reading, defaults to 16,384 and treats 0 as no limit.
+      - The name follows the gateway's own `max…` settings (`maxMessageBytes`, `maxSignalBytes`, `maxConnectionsPerUser`).
+- **Compared by eye**, because token tools can miss a reordered port:
+  - **Frame reader** against ws's `Receiver` and Ratchet's `MessageBuffer` and `Frame`. Each is built differently:
+    - ws is a state machine over a list of buffers (`GET_INFO` to `GET_DATA`);
+    - Ratchet builds `Frame` objects and checks them afterwards;
+    - Oblivion parses one whole frame at a time from one buffer, and returns "wait", "fragment stored" or an event.
+
+    Oblivion also refuses a length that is not in its shortest form (RFC 6455 5.2), and a 64-bit length with its top bit set. Neither ws nor Ratchet does.
+  - **Handshake** against ws's `handleUpgrade` and Ratchet's `ServerNegotiator`:
+    - Oblivion follows RFC 6455 4.2.1's own order: method and HTTP version, `Host`, `Upgrade`, `Connection`, then version and key, then `Origin`. It reads `Upgrade` and `Connection` as comma-separated lists.
+    - ws checks the method, then whether `Upgrade` equals `websocket` as a whole, then key and version; it does not check `Host` or `Connection`. Both answer a wrong method with 405, the HTTP status for it.
+    - Ratchet answers a missing `Upgrade` header with 426, where Oblivion and ws answer 400.
+    - For an unknown version, Oblivion and Ratchet answer 426 with `Sec-WebSocket-Version: 13`, as RFC 6455 4.4 asks. ws answers 400 with `13, 8`.
+    - The key pattern (22 base64 characters, then `==`) is the only form a 16-byte value has. Oblivion also decodes the key and checks the 16 bytes.
+  - **Gateway against Reverb.** Reverb is a Pusher-protocol server on ReactPHP, with apps, channels, subscriptions and `pusher:` events. Oblivion Live has none of these: tickets replace channel authorisation, and events fan out per person. Nothing lines up.
+  - **Internal API signing against pusher-php-server:**
+    - Pusher signs the method, path and sorted query (with `body_md5`), and sends the signature as a query parameter.
+    - Oblivion signs `timestamp + "\n" + body`, sends it in headers and adds a replay guard (spec 5).
+  - **Browser client** against pusher-js, laravel-echo and reconnecting-websocket:
+    - `connection.ts` follows Oblivion's own wrapper from before the build (`chat-realtime-connection.ts` on `main`). It keeps that wrapper's `stopped`, `starting`, `blocked` and `attempts` flags, its online, offline and visibility handlers, and its `2 ** Math.min(attempts, …)` backoff, now with the spec's 1–30 s jitter.
+    - pusher-js runs connection strategies through a state machine.
+    - reconnecting-websocket wraps the socket and grows its delay by a factor of 1.3.
+  - **Signer against php-jwt:**
+    - php-jwt parses the header and claims, then checks the algorithm and signature, then the times.
+    - `CompactToken` checks `alg` and `typ` first, then the key named by `kid`, then the 32-byte signature, and only then decodes the claims.
+    - `CompactToken` accepts only canonical unpadded base64url, where php-jwt pads and decodes loosely. It requires `aud` and an integer `exp`; php-jwt never checks `aud` and treats `exp` as optional.
+
+    The gateway's `token.mjs` checks in the same order as `CompactToken`. jose is a general library: it chooses among many algorithms and key types and validates claims in a separate step.
+- **The 23 October incident:**
+  - **Where the lines came from.** The nine lines printed came from Oblivion's own `config/reverb.php`, as it stood on `main` until this branch deleted it. That file followed Reverb's template, but its `CHAT_REVERB_*` names, its defaults and its comma-separated list of origins were Oblivion's own. Reverb's template uses `REVERB_*` names and `['*']` for origins.
+  - **The gateway's settings.** Against both that file and Reverb's own `config/reverb.php`, `live/lib/config.mjs` scores 0 in every mode.
+    - The settings are the spec's section 10 list, plus `LIVE_HOST`, `LIVE_PATH`, `LIVE_MAX_CONNECTIONS` and `LIVE_PREVIOUS_KEY_ID`.
+    - Their defaults differ from the printed ones: port 8091 instead of 8085, and 10,000 connections instead of 1,000.
+  - **The one shared run.** In `config/chat.php`, the `live.allowed_origins` line shares a 15-token run with the printed origins line: `array_values(array_filter(array_map('trim', explode(',', …))))`.
+    - The key is the one spec section 7 names.
+    - The parsing is Oblivion's own: `push_hosts` in `config/chat.php` used it before the build, and so do `config/cctv.php` and `config/endpoint_management.php`.
+    - The new line follows `push_hosts`, including its `(string)` cast, not the printed line.
+  - **Verdict:** nothing from the incident reached the new code.
+- **Removal, notices and guards:**
+  - **Packages.** `composer.lock` no longer holds laravel/reverb, pusher/pusher-php-server, ratchet/rfc6455, any react/ package, evenement or clue's packages. firebase/php-jwt 7.0.5 stays: laravel/socialite needs it, and the LiveKit code uses it until stage 5. `package.json` and `package-lock.json` hold no pusher-js, laravel-echo, tweetnacl or ws.
+  - **Licences and notices.** Reverb's notices file and pusher-php-server's licence are gone from `deploy/chat-calling/licenses/`; only the LiveKit and bufbuild files remain. `scripts/chat-license-notices.mjs` no longer names pusher-js or its parts.
+  - **Guards:**
+    - `ChatReplacedEnginesGuardTest` checks `composer.json` and `composer.lock` for laravel/reverb and pusher/pusher-php-server, and `package.json` for pusher-js, laravel-echo and ws, as spec 12 asks.
+    - ESLint `no-restricted-imports` refuses the same browser packages. In `live/` it refuses anything but `node:` and relative imports.
+    - The CI lint job runs `npm run lint` over the whole repository, so both rules are checked in CI.
+  - **Tests re-run by the checker** at `c403aa49a`: `node --test "live/test/*.test.mjs"` ran 68 tests, and all passed. Pest and Vitest were not re-run, because this worktree has no `vendor/` or `node_modules/`.
+- **For the builder (not blocking):**
+  1. **Committed notices file.** `public/legal/chat-third-party-notices.txt` was last generated on 22 October, and still lists pusher-js 8.6.0, tweetnacl and the two @stablelib parts. `prebuild` regenerates it on every build, so a built site is correct, but the committed copy is not. Regenerating it after `npm ci` is already on this note's list of things still to do.
+  2. **Gateway import rule.** The `live/` pattern allows every relative path, so an import such as `../node_modules/…` passes. As an import rule, it also cannot see `require()` through `createRequire`. Nothing in `live/` does either today. A `node:test` guard like the relay's (`relay/test/allocation-log.test.mjs`) would close both gaps. This was not tried here, because this worktree has no `node_modules`.
+  3. **PHP guard.** It names the two packages spec 12 lists. ratchet/rfc6455 and the ReactPHP parts only ever came in through Reverb, so a direct require of one of them would pass. Adding them is optional.
+- **Still open, and not the checker's to close:** the two-browser end-to-end test and the other end-to-end checks in spec section 11, and the production build.
 
 ## Open questions
 
