@@ -20,6 +20,7 @@ return [
         'push' => env('CHAT_HEALTH_PUSH_OWNER', ''),
         'uploads' => env('CHAT_HEALTH_UPLOADS_OWNER', ''),
         'calling' => env('CHAT_HEALTH_CALLING_OWNER', ''),
+        'relay' => env('CHAT_HEALTH_RELAY_OWNER', ''),
     ]],
     'files' => [
         // Optional server-only ffprobe path, used as a second opinion on voice messages. Oblivion's own
@@ -47,5 +48,23 @@ return [
         'api_secret' => env('CHAT_LIVEKIT_API_SECRET'),
         'verified' => env('CHAT_CALLING_VERIFIED', false),
         'authorization_gateway_verified' => env('CHAT_CALLING_AUTH_GATEWAY_VERIFIED', false),
+    ],
+    // Oblivion Relay, Oblivion's own STUN and TURN server for Chat calls (deploy/chat-calling/oblivion-relay.md).
+    // Empty settings mean no relay entry is issued; there is never a fallback to an outside server.
+    'relay' => [
+        // One to four turn:/turns: URLs, UDP first, then TCP, then TLS.
+        'urls' => array_values(array_filter(array_map('trim', explode(',', (string) env('CHAT_RELAY_URLS', ''))))),
+        // The same secret as the relay's RELAY_CHAT_SECRET, 32 to 512 bytes.
+        'secret' => (string) env('CHAT_RELAY_SECRET', ''),
+        // At most 3,600: the relay refuses longer credentials.
+        'credential_seconds' => (int) env('CHAT_RELAY_CREDENTIAL_SECONDS', 3600),
+        // Beside the app (the test server): the relay's loopback health endpoint. Empty when it has its own server.
+        'health_url' => (string) env('CHAT_RELAY_HEALTH_URL', ''),
+        // The signed control channel that ends a person's relay use at once. Loopback or private addresses only.
+        'control' => [
+            'urls' => array_values(array_filter(array_map('trim', explode(',', (string) env('CHAT_RELAY_CONTROL_URLS', ''))))),
+            'secret' => (string) env('CHAT_RELAY_CONTROL_SECRET', ''),
+            'key_id' => (string) env('CHAT_RELAY_CONTROL_KEY_ID', ''),
+        ],
     ],
 ];

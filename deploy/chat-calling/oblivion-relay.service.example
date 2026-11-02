@@ -1,0 +1,46 @@
+# systemd unit example for Oblivion Relay. Unactivated: adjust paths on the target host.
+# Install as /etc/systemd/system/oblivion-relay.service; see deploy/chat-calling/oblivion-relay.md.
+# A restart drops relayed calls (browsers reconnect); a reload (SIGHUP) never does.
+[Unit]
+Description=Oblivion Relay (STUN and TURN for Chat calls)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Its own user, not www-data: it shares the test server with the app.
+User=oblivion-relay
+Group=oblivion-relay
+WorkingDirectory=/var/www/oblivion/current
+EnvironmentFile=/etc/oblivion/relay.env
+ExecStart=/usr/bin/node --max-old-space-size=256 relay/server.mjs
+# Re-reads secret files, the certificate and the deny list without dropping allocations.
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=2
+KillSignal=SIGTERM
+TimeoutStopSec=10
+LimitNOFILE=65536
+# Needed only to bind 443 on a server of its own (shape A). Harmless on the test server.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+# AF_NETLINK lets it read the host's interface addresses (they are refused as peers).
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+# The test server's caps (spec 10.3): the relay must never push main into swap.
+MemoryHigh=384M
+MemoryMax=512M
+MemorySwapMax=0
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+# /var/lib/oblivion-relay holds revocations.json.
+StateDirectory=oblivion-relay
+StateDirectoryMode=0750
+# The allocation log: created by the install steps as oblivion-relay:oblivion-relay-logs, mode 2750.
+ReadWritePaths=/var/log/oblivion-relay
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
