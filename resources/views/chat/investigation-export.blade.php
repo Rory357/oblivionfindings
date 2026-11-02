@@ -26,8 +26,9 @@
         .summary td { padding: 2px 10px 2px 0; vertical-align: top; }
         .summary td.key { font-weight: bold; white-space: nowrap; }
         .note { margin-top: 8px; padding: 6px 8px; border: 1px solid #c9ccd3; background: #f3f4f6; }
-        .message { margin: 6px 0; padding: 5px 7px; border-left: 2px solid #9aa0ad; page-break-inside: avoid; }
-        .message.removed { border-left-color: #7a1f1f; background: #f8eeee; }
+        .message { margin: 6px 0; padding: 5px 7px; border: 1px solid #c9ccd3; page-break-inside: avoid; }
+        /* No coloured edge line (DESIGN.md non-negotiable 8): the "Removed by sender" tag says it. */
+        .message.removed { background: #f8eeee; }
         .meta { color: #555b66; font-size: 8px; }
         .tag { font-size: 7.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #7a1f1f; }
         .content { white-space: pre-wrap; margin-top: 2px; }

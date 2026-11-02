@@ -277,4 +277,3 @@ it('refuses exports after expiry or ending, for other investigators and for non-
     expect(array_slice($limited, 0, 5))->toBe([200, 200, 200, 200, 200])->and($limited[5])->toBe(429);
     expect(DB::table('chat_investigation_events')->where('action', 'case_exported')->count())->toBe(5);
 });
-
