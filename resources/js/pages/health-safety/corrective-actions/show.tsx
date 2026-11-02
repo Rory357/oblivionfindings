@@ -598,7 +598,7 @@ function ActionRecord({
                 : [],
             empty:
                 ca.status === 'completed'
-                    ? 'Waiting for an independent check: not the owner or the person who did it.'
+                    ? 'Waiting for a check by someone who manages health and safety at this Site and didn’t add, own or do it.'
                     : 'Not checked yet. Someone else checks it once it’s done.',
         },
         closed: {
@@ -911,7 +911,7 @@ function ActionRecord({
                     {ca.status === 'closed'
                         ? 'This corrective action is closed.'
                         : ca.status === 'completed'
-                          ? 'An authorised person independent of the action must review the completion evidence.'
+                          ? `${ca.verify_blocked_reason ? `${ca.verify_blocked_reason} ` : ''}Someone who manages health and safety at this Site, and didn’t add, own or do the action, checks the evidence.`
                           : 'The responsible H&S team manages the next step.'}
                 </Note>
             ) : null}

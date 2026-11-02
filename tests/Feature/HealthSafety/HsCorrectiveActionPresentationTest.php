@@ -435,6 +435,18 @@ class HsCorrectiveActionPresentationTest extends TestCase
         $overridesBefore = DB::table('permission_user')->count();
         $verifyUrl = "/health-safety/events/{$event->id}/corrective-actions/{$action->id}/verify";
 
+        // Q22: each person who can't check it is told why; an independent verifier gets no reason.
+        $reasons = [
+            [$actionCreator, 'You added this action, so someone else checks it.'],
+            [$eventReporter, 'You started this safety review, so someone else checks its actions.'],
+            [$owner, 'You marked it done, so someone else checks it.'],
+            [$independentVerifier, null],
+        ];
+        foreach ($reasons as [$viewer, $reason]) {
+            $this->actingAs($viewer)->get("/health-safety/events/{$event->id}")->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->where('detail.corrective_actions.0.verify_blocked_reason', $reason));
+        }
+
         foreach ([$actionCreator, $eventReporter] as $deniedVerifier) {
             $this->actingAs($deniedVerifier)
                 ->get("/health-safety/events/{$event->id}")

@@ -264,6 +264,8 @@ export type EventCorrectiveAction = {
     completed_by_name: string | null;
     /** manage && status==='completed' && completer !== current viewer — gates Verify. */
     can_verify: boolean;
+    /** Q22: why this viewer, who could otherwise check it, can't (separation of duties). */
+    verify_blocked_reason?: string | null;
     verified_at: string | null;
     verified_by_name?: string | null;
     effectiveness_confirmed: boolean | null;
