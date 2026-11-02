@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Screens\Alerts;
 
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
 use App\Domain\SecurityDevices\Alerts\ItOnCall;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlertEvent;
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\Schema;
 final class OnCallPresenter
 {
     /** The IT alerts that go to the person on call first. */
-    public const array KINDS = ['offline', 'failing', 'hub_offline', 'mqtt_logins'];
+    public const array KINDS = DeviceAlertEngine::ON_CALL_KINDS;
 
     public function __construct(
         private readonly ItOnCall $onCall,

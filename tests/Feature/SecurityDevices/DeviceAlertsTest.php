@@ -14,6 +14,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\SecurityDeviceAlertNotification;
@@ -240,6 +241,37 @@ class DeviceAlertsTest extends TestCase
         CarbonImmutable::setTestNow(now()->addMinutes(31));
         expect($this->engine->tick()['back'])->toBe(1)
             ->and($alert->fresh()->state)->toBe(DeviceAlert::STATE_OPEN);
+    }
+
+    public function test_a_warning_nobody_acknowledges_reaches_the_rest_of_it_once_after_an_hour(): void
+    {
+        // Stephan, 3 Nov: warnings go to the person on call first, then the rest of IT at the hour.
+        Notification::fake();
+        $it = ['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'securityDevices.alerts.acknowledge', 'securityDevices.monitoring.manage'];
+        $jordan = $this->person($it);
+        $sam = $this->person($it);
+        Shift::factory()->create([
+            'site_id' => $this->home->id, 'user_id' => $jordan->id, 'starts_at' => now()->subHours(2), 'ends_at' => now()->addDays(2),
+            'status' => 'scheduled', 'is_on_call' => true, 'published_at' => now(),
+        ]);
+        [, $printer] = $this->watched($this->home, 'Office printer', MonitorKind::Http);
+        [, $wifi] = $this->watched($this->home, 'Lounge Wi-Fi', MonitorKind::Http);
+        $this->goes($printer, MonitorState::Healthy, MonitorState::Degraded);
+        $this->goes($wifi, MonitorState::Healthy, MonitorState::Degraded);
+        [$waiting, $handled] = DeviceAlert::query()->orderBy('id')->get()->all();
+        expect($waiting->severity)->toBe('warning')->and($waiting->kind)->toBe('failing');
+        $this->engine->acknowledge($handled, $jordan, null, false);
+
+        CarbonImmutable::setTestNow(now()->addMinutes(59));
+        expect($this->engine->tick()['reminded'])->toBe(0);
+
+        CarbonImmutable::setTestNow(now()->addMinutes(2));
+        expect($this->engine->tick()['reminded'])->toBe(1);
+        Notification::assertSentTo($sam, SecurityDeviceAlertNotification::class, fn (SecurityDeviceAlertNotification $sent): bool => $sent->alertId === (int) $waiting->id);
+        // Acknowledged: nobody else is told about it.
+        Notification::assertNotSentTo($sam, SecurityDeviceAlertNotification::class, fn (SecurityDeviceAlertNotification $sent): bool => $sent->alertId === (int) $handled->id);
+        // One reminder, as for critical alerts.
+        expect($this->engine->tick()['reminded'])->toBe(0);
     }
 
     public function test_added_devices_are_watched_unless_setup_says_no_and_phones_never_are(): void

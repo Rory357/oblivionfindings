@@ -38,6 +38,9 @@ final class DeviceAlertEngine
     /** Alerts about a device answering at all; closed by Oblivion when it's back. */
     public const array AVAILABILITY_KINDS = ['offline', 'failing', 'hub_offline'];
 
+    /** IT alerts that tell the person on call first (ItOnCall); the rest of IT hears at the reminder. */
+    public const array ON_CALL_KINDS = ['offline', 'failing', 'hub_offline', 'mqtt_logins'];
+
     /**
      * Safety events from the device itself (S&D Phase E): event type → [kind, severity, words].
      * They stay open until a person marks them done; Control Room gets them straight away too,
@@ -575,6 +578,9 @@ final class DeviceAlertEngine
      * Every few minutes: snoozes that have ended come back, and open critical alerts nobody has
      * acknowledged after an hour remind whoever is told about the device (once). Returns counts.
      *
+     * The IT alerts that go to the person on call first (ItOnCall) get the same one reminder at
+     * warning level too, so the rest of IT hears about them (Stephan, 3 Nov: "Yes, after an hour").
+     *
      * @return array{back: int, reminded: int}
      */
     public function tick(?CarbonImmutable $now = null): array
@@ -598,7 +604,8 @@ final class DeviceAlertEngine
         DeviceAlert::query()->with(['device', 'acknowledgedBy'])->where('state', DeviceAlert::STATE_OPEN)
             ->where(fn ($query) => $query
                 ->where(fn ($due) => $due->whereNotNull('remind_at')->where('remind_at', '<=', $now))
-                ->orWhere(fn ($due) => $due->where('severity', 'critical')->whereNull('acknowledged_at')->whereNull('reminded_at')->where('opened_at', '<=', $now->subMinutes(self::REMIND_AFTER_MINUTES))))
+                ->orWhere(fn ($due) => $due->where(fn ($level) => $level->where('severity', 'critical')->orWhereIn('kind', self::ON_CALL_KINDS))
+                    ->whereNull('acknowledged_at')->whereNull('reminded_at')->where('opened_at', '<=', $now->subMinutes(self::REMIND_AFTER_MINUTES))))
             ->orderBy('id')
             ->each(function (DeviceAlert $alert) use ($now, &$reminded): void {
                 $mine = $alert->remind_at !== null && $alert->acknowledgedBy !== null;
