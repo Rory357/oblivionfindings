@@ -58,7 +58,14 @@ class PruneTimelineAndAuditLogs extends Command
         // P09: medication evidence has its own reviewed retention policy.
         // Never apply the generic two-year audit cleanup to these records.
         $auditQuery = AuditLog::query()->where('created_at', '<', $auditCutoff)
-            ->withoutMedicationEvidence();
+            ->withoutMedicationEvidence()
+            ->withoutHealthSafetyEvidence();
+        // Answer 20 (Stephan, 1 Nov 2026): safety review evidence is kept at least 10 years, or longer when the
+        // configured audit retention is longer. It is pruned on its own, later cutoff.
+        $healthSafetyYears = max($auditYears, AuditLog::HEALTH_SAFETY_MIN_RETENTION_YEARS);
+        $healthSafetyQuery = AuditLog::query()->where('created_at', '<', Carbon::now()->subYears($healthSafetyYears))
+            ->withoutMedicationEvidence()
+            ->healthSafetyEvidence();
         $timelineQuery = TimelineEvent::query()
             ->where('occurred_at', '<', $timelineCutoff)
             ->where(function ($q) {
@@ -73,10 +80,12 @@ class PruneTimelineAndAuditLogs extends Command
             ->where('dealt_with_at', '<', $auditCutoff);
 
         $auditCount = $auditQuery->count();
+        $healthSafetyCount = $healthSafetyQuery->count();
         $timelineCount = $timelineQuery->count();
         $alertCount = $alertQuery->count();
 
         $this->info(sprintf('Audit logs older than %d years: %d', $auditYears, $auditCount));
+        $this->info(sprintf('Safety review audit logs older than %d years: %d', $healthSafetyYears, $healthSafetyCount));
         $this->info(sprintf('Timeline events older than %d years: %d (excludes pinned)', $timelineYears, $timelineCount));
         $this->info(sprintf('Medication alerts dealt with, raised over %d years ago: %d', $auditYears, $alertCount));
 
@@ -87,6 +96,7 @@ class PruneTimelineAndAuditLogs extends Command
         }
 
         $auditDeleted = $auditQuery->delete();
+        $auditDeleted += $healthSafetyQuery->delete();
         $timelineDeleted = $timelineQuery->delete();
         // Recipients and events go with each alert (foreign keys cascade).
         $alertsDeleted = $alertQuery->delete();

@@ -17,6 +17,13 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceDocument;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Presenters\DeviceProfilePresenter;
+use App\Domain\SecurityDevices\Screens\DeviceKind;
+use App\Domain\SecurityDevices\Screens\Devices\Pages\CameraPagePresenter;
+use App\Domain\SecurityDevices\Screens\Devices\Pages\DevicePagePresenter;
+use App\Domain\SecurityDevices\Screens\Http\CameraPageController;
+use App\Domain\SecurityDevices\Screens\Http\DevicePageController;
+use App\Domain\SecurityDevices\Screens\Http\SafetyKitPageController;
+use App\Domain\SecurityDevices\Screens\Http\SensorTrackerPageController;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
@@ -52,128 +59,30 @@ class DeviceController extends Controller
         private readonly DeviceProfilePresenter $profilePresenter,
     ) {}
 
-    public function index(Request $request)
-    {
-        $user = $request->user();
-        abort_unless($user->canDo('securityDevices.devices.view'), 403);
-
-        $baseQuery = $this->access->visibleDevices($user);
-        $scopeLabel = null;
-        if ($request->filled('site_id')) {
-            $siteId = $request->integer('site_id');
-            abort_unless(
-                $siteId > 0 && in_array($siteId, $this->access->accessibleSiteIds($user), true),
-                404,
-            );
-            $site = Site::query()
-                ->where('is_active', true)
-                ->where('archived', false)
-                ->whereNull('archived_at')
-                ->findOrFail($siteId);
-            $baseQuery = $this->access->visibleDevicesForSite($user, $siteId);
-            $scopeLabel = $site->name;
-        }
-        $query = (clone $baseQuery)
-            ->with([
-                'assignments' => fn ($q) => $q->active(),
-            ])
-            ->withCount([
-                'monitors as enabled_monitors_count' => fn ($monitor) => $monitor->where('is_enabled', true),
-                'monitors as failing_monitors_count' => fn ($monitor) => $monitor
-                    ->where('is_enabled', true)
-                    ->whereIn('current_state', ['failed', 'degraded']),
-                'monitors as uncertain_monitors_count' => fn ($monitor) => $monitor
-                    ->where('is_enabled', true)
-                    ->whereIn('current_state', ['unknown', 'stale', 'pending']),
-            ]);
-
-        $view = $request->string('view', 'all')->toString();
-        if (! in_array($view, ['all', 'needs_attention', 'offline', 'unmonitored', 'unassigned', 'stale'], true)) {
-            $view = 'all';
-        }
-        $this->applyInventoryView($query, $view);
-
-        // ── Domain/category filters (index-specific, not in trait) ──
-
-        if ($request->filled('domain') && $request->input('domain') !== 'all') {
-            $query->byDomain($request->input('domain'));
-        }
-
-        if ($request->filled('category') && $request->input('category') !== 'all') {
-            $query->byCategory($request->input('category'));
-        }
-
-        // ── Common filters, search, sort (shared via trait) ───────
-
-        $this->applyCommonFilters($request, $query);
-        $this->applyCommonSort($request, $query);
-
-        $devices = $query->paginate(30)->withQueryString();
-
-        // ── Stats ─────────────────────────────────────────────────
-
-        $stats = [
-            'total' => (clone $baseQuery)->count(),
-            'active' => (clone $baseQuery)->where('status', DeviceStatus::Active->value)->count(),
-            'offline' => (clone $baseQuery)->where('status', DeviceStatus::Offline->value)->count(),
-            'attention' => (clone $baseQuery)->needingAttention()->count(),
-        ];
-
-        // ── Filter options ────────────────────────────────────────
-
-        $providers = (clone $baseQuery)->whereNotNull('provider')
-            ->select('provider')
-            ->distinct()
-            ->orderBy('provider')
-            ->pluck('provider');
-
-        return Inertia::render('security-devices/devices/index', [
-            'devices' => [
-                'data' => $devices->getCollection()->map(fn (Device $d) => $this->mapDeviceForList($d)),
-                'links' => $devices->linkCollection()->toArray(),
-                'meta' => [
-                    'current_page' => $devices->currentPage(),
-                    'last_page' => $devices->lastPage(),
-                    'total' => $devices->total(),
-                ],
-            ],
-            'stats' => $stats,
-            'savedViews' => $this->savedViews($baseQuery),
-            'filters' => [
-                ...$request->only(['site_id', 'domain', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction']),
-                'view' => $view,
-            ],
-            'scopeLabel' => $scopeLabel,
-            'filterOptions' => [
-                'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => self::domainLabel($d)]),
-                'categories' => self::categoryFilterOptions($request->input('domain')),
-                'statuses' => collect(DeviceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
-                'healthStatuses' => [
-                    ['value' => 'not_monitored', 'label' => 'Not monitored'],
-                    ...collect(HealthStatus::cases())
-                        ->reject(fn (HealthStatus $h) => $h === HealthStatus::Unknown)
-                        ->map(fn (HealthStatus $h) => ['value' => $h->value, 'label' => $h->label()])
-                        ->values()
-                        ->all(),
-                    ['value' => HealthStatus::Unknown->value, 'label' => HealthStatus::Unknown->label()],
-                ],
-                'providers' => $providers,
-            ],
-            'can' => [
-                'create' => $user->canDo('securityDevices.devices.create'),
-                'export' => $user->canDo('securityDevices.reports.view'),
-                'bulk_select' => $user->canDo('securityDevices.reports.view'),
-            ],
-            'exportHref' => '/security-devices/reports/devices.csv',
-        ]);
-    }
-
     public function show(Request $request, Device $device)
     {
         $user = $request->user();
         $asOf = now()->toImmutable();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
         $this->access->assertCanViewDevice($user, $device);
+
+        // S&D rebuild C2: network gear, computers and other devices get their own page; cameras
+        // and the safety kit keep this profile until Phase E.
+        if (DevicePagePresenter::serves(DeviceKind::of($device)) && ! $request->has('section')) {
+            return app(DevicePageController::class)->show($request, $device);
+        }
+        // S&D rebuild Phase E: cameras get their own page (Live · Recordings · Checks & alerts · Settings).
+        if (CameraPagePresenter::serves($device) && ! $request->has('section')) {
+            return app(CameraPageController::class)->show($request, $device);
+        }
+        // S&D rebuild Phase E: alarm panels and doors get their own pages.
+        if (SafetyKitPageController::serves($device) && ! $request->has('section')) {
+            return app(SafetyKitPageController::class)->show($request, $device);
+        }
+        // S&D rebuild Phase E: sensors (Readings · Alerts) and care trackers (Location · Console) get their own pages.
+        if (SensorTrackerPageController::serves($device) && ! $request->has('section')) {
+            return app(SensorTrackerPageController::class)->show($request, $device);
+        }
 
         $canViewEvents = $user->canDo('securityDevices.events.view');
         $canViewMaintenance = $user->canDo('securityDevices.maintenance.view');
@@ -212,8 +121,9 @@ class DeviceController extends Controller
                 ->with([
                     'profile' => fn ($profile) => $profile
                         ->select('id', 'name', 'interval_seconds', 'stale_after_seconds'),
+                    // approved_at: the offline alert counts a check run by a hub only while that hub is approved.
                     'collector' => fn ($collector) => $collector
-                        ->select('id', 'name', 'site_id', 'status', 'last_seen_at', 'last_heartbeat_at', 'revoked_at'),
+                        ->select('id', 'name', 'site_id', 'status', 'last_seen_at', 'last_heartbeat_at', 'approved_at', 'revoked_at'),
                 ])
                 ->orderBy('name');
         }
@@ -566,52 +476,6 @@ class DeviceController extends Controller
                 ? 'Removed · private cleanup pending'
                 : 'Removed',
             default => 'Storage verification pending',
-        };
-    }
-
-    /** @return array<int, array{key: string, label: string, count: int}> */
-    private function savedViews(Builder $baseQuery): array
-    {
-        return [
-            ['key' => 'all', 'label' => 'All devices', 'count' => (clone $baseQuery)->count()],
-            ['key' => 'needs_attention', 'label' => 'Needs attention', 'count' => (clone $baseQuery)->needingAttention()->count()],
-            ['key' => 'offline', 'label' => 'Offline', 'count' => (clone $baseQuery)->where('status', DeviceStatus::Offline->value)->count()],
-            [
-                'key' => 'unmonitored',
-                'label' => 'Without monitoring',
-                'count' => (clone $baseQuery)->whereDoesntHave('monitors', fn ($monitor) => $monitor->where('is_enabled', true))->count(),
-            ],
-            [
-                'key' => 'unassigned',
-                'label' => 'Unassigned',
-                'count' => (clone $baseQuery)->whereDoesntHave('assignments', fn ($assignment) => $assignment->active())->count(),
-            ],
-            [
-                'key' => 'stale',
-                'label' => 'Stale or never seen',
-                'count' => (clone $baseQuery)
-                    ->whereNotIn('status', [DeviceStatus::Decommissioned->value, DeviceStatus::InStock->value, DeviceStatus::Lost->value])
-                    ->where(fn (Builder $stale) => $stale
-                        ->whereNull('last_seen_at')
-                        ->orWhere('last_seen_at', '<', now()->subMinutes(15)))
-                    ->count(),
-            ],
-        ];
-    }
-
-    private function applyInventoryView(Builder $query, string $view): void
-    {
-        match ($view) {
-            'needs_attention' => $query->needingAttention(),
-            'offline' => $query->where('status', DeviceStatus::Offline->value),
-            'unmonitored' => $query->whereDoesntHave('monitors', fn ($monitor) => $monitor->where('is_enabled', true)),
-            'unassigned' => $query->whereDoesntHave('assignments', fn ($assignment) => $assignment->active()),
-            'stale' => $query
-                ->whereNotIn('status', [DeviceStatus::Decommissioned->value, DeviceStatus::InStock->value, DeviceStatus::Lost->value])
-                ->where(fn (Builder $stale) => $stale
-                    ->whereNull('last_seen_at')
-                    ->orWhere('last_seen_at', '<', now()->subMinutes(15))),
-            default => null,
         };
     }
 
@@ -985,8 +849,13 @@ class DeviceController extends Controller
 
         $this->registry->decommission($device, $user);
 
+        // Removing keeps its history (Stephan, 1 Nov; pop-up 11); the Devices page stays where it was.
+        if ($request->boolean('_modal')) {
+            return redirect()->back()->with('success', "Removed {$device->name}. Its history is kept.");
+        }
+
         return redirect()->route('security-devices.devices.index')
-            ->with('success', "Device '{$device->name}' decommissioned.");
+            ->with('success', "Removed {$device->name}. Its history is kept.");
     }
 
     // ── Mapping helpers ───────────────────────────────────────────
@@ -1003,37 +872,6 @@ class DeviceController extends Controller
             DeviceDomain::Tracking => 'Tracking',
             DeviceDomain::Facilities => 'Facilities & IoT',
         };
-    }
-
-    /**
-     * @return list<array{value: string, label: string}>
-     */
-    private static function categoryFilterOptions(?string $domain): array
-    {
-        $taxonomy = DeviceTaxonomy::all();
-        $trees = is_string($domain) && $domain !== '' && $domain !== 'all' && isset($taxonomy[$domain])
-            ? [$taxonomy[$domain]]
-            : array_values($taxonomy);
-
-        $labels = [];
-        foreach ($trees as $categories) {
-            foreach (array_keys($categories) as $slug) {
-                $labels[$slug] = match ($slug) {
-                    'cctv' => 'CCTV',
-                    'it_environmental' => 'IT environmental',
-                    default => ucfirst(str_replace('_', ' ', $slug)),
-                };
-            }
-        }
-
-        asort($labels);
-
-        $options = [];
-        foreach ($labels as $value => $label) {
-            $options[] = ['value' => $value, 'label' => $label];
-        }
-
-        return $options;
     }
 
     /**

@@ -30,6 +30,10 @@ class RunItRecurrencePlans extends Command
             'Recurrence run: %d created, %d skipped, %d failed.',
             $summary['created'], $summary['skipped'], $summary['failed'],
         ));
+        // A plan whose Site was removed is paused and flagged to its owner, not a failed run.
+        if ($summary['paused'] > 0) {
+            $this->warn(sprintf('%d plan(s) paused because their Site no longer exists; each owner has a "Review plan" task.', $summary['paused']));
+        }
 
         return $summary['failed'] === 0 ? self::SUCCESS : self::FAILURE;
     }

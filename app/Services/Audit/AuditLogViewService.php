@@ -109,9 +109,12 @@ final class AuditLogViewService
                 $search->where('action', 'like', "%{$needle}%")
                     ->orWhere('auditable_type', 'like', "%{$needle}%")
                     ->orWhereHas('user', fn (Builder $users) => $users->where('name', 'like', "%{$needle}%"))
-                    ->orWhereHas('client', fn (Builder $clients) => $clients
-                        ->where('first_name', 'like', "%{$needle}%")
-                        ->orWhere('last_name', 'like', "%{$needle}%"));
+                    // #13: risk assessment rows never show a client, so a client's name can't find them either.
+                    ->orWhere(fn (Builder $byClient) => $byClient
+                        ->where(fn (Builder $notRisk) => $notRisk->whereNull('auditable_type')->orWhereNotIn('auditable_type', self::riskAssessmentTypes()))
+                        ->whereHas('client', fn (Builder $clients) => $clients
+                            ->where('first_name', 'like', "%{$needle}%")
+                            ->orWhere('last_name', 'like', "%{$needle}%")));
             });
         }
 
@@ -120,7 +123,8 @@ final class AuditLogViewService
         }
 
         if ($filters['client_id'] ?? null) {
-            $query->where('client_id', $filters['client_id']);
+            $query->where('client_id', $filters['client_id'])
+                ->where(fn (Builder $notRisk) => $notRisk->whereNull('auditable_type')->orWhereNotIn('auditable_type', self::riskAssessmentTypes()));
         }
 
         if ($filters['module'] ?? null) {
@@ -164,7 +168,7 @@ final class AuditLogViewService
             ->mapWithKeys(fn (string $field): array => [$field => true])
             ->all();
 
-        return [
+        $row = [
             'id' => (int) $log->id,
             'action' => $log->action,
             'description' => Str::of(str_replace(['.', '_'], ' ', $log->action))->headline()->toString(),
@@ -187,6 +191,80 @@ final class AuditLogViewService
             ] : null,
             'created_at' => $log->created_at?->toIso8601String(),
         ];
+
+        return $this->isRiskAssessment($log) ? $this->presentRiskAssessment($log, $row) : $row;
+    }
+
+    /** #13: the risk scoring values an ordinary assessment's audit row may show (never its free text). */
+    private const RISK_VALUE_FIELDS = ['status', 'likelihood', 'consequence', 'risk_score', 'risk_level', 'residual_likelihood',
+        'residual_consequence', 'residual_risk_score', 'residual_risk_level', 'risk_acceptable', 'review_frequency_days', 'review_due_at'];
+
+    private function isRiskAssessment(AuditLog $log): bool
+    {
+        return in_array($log->auditable_type, self::riskAssessmentTypes(), true);
+    }
+
+    /** @return list<string> */
+    private static function riskAssessmentTypes(): array
+    {
+        return array_values(array_unique([\App\Models\HsRiskAssessment::class, (new \App\Models\HsRiskAssessment)->getMorphClass()]));
+    }
+
+    /**
+     * #13 (board 13-3; Stephan, 2 Nov: "Same rule as job 4"). A risk assessment row names the assessment by its
+     * reference and lists which fields changed. An ordinary assessment also shows its title and the scoring values that
+     * changed. One linked to a person (a client, or a safety review about a client or a worker) shows only who changed
+     * what and when: no title (it can name the person), no values and no client, for every viewer.
+     *
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function presentRiskAssessment(AuditLog $log, array $row): array
+    {
+        $risk = $log->auditable_id ? \App\Models\HsRiskAssessment::query()->whereKey($log->auditable_id)
+            ->first(['id', 'reference_number', 'title', 'assessable_type', 'assessable_id', 'hs_event_id']) : null;
+        $marker = \App\Models\HsRiskAssessmentAcceptance::query()->where('audit_log_id', $log->id)
+            ->first(['id', 'before_business', 'business', 'before_binding', 'after_binding']);
+        $personLinked = $this->riskLinkedToPerson($risk, $marker);
+
+        $before = is_array($marker?->before_business['snapshot'] ?? null) ? $marker->before_business['snapshot'] : null;
+        $after = is_array($marker?->business['snapshot'] ?? null) ? $marker->business['snapshot'] : [];
+        $changed = [];
+        if ($before !== null) {
+            foreach ($after as $field => $value) {
+                if (is_string($field) && ($before[$field] ?? null) !== $value) { $changed[] = $field; }
+            }
+        }
+        $label = $risk === null ? 'Risk assessment' : (string) $risk->reference_number;
+        $row['subject_label'] = $personLinked || $risk === null || $risk->title === null ? $label : $label.' · '.$risk->title;
+
+        if ($personLinked) {
+            return [...$row, 'client' => null, 'values_hidden' => 'linked_person',
+                'properties' => ['fields' => SafeOperationalData::auditFields(array_fill_keys($changed, true)), 'before' => [], 'after' => []]];
+        }
+        $pick = fn (array $values): array => collect($values)->only(array_intersect($changed, self::RISK_VALUE_FIELDS))
+            ->filter(fn ($value) => $value === null || is_scalar($value))->all();
+
+        return [...$row, 'values_hidden' => null, 'properties' => ['fields' => SafeOperationalData::auditFields(array_fill_keys($changed, true)),
+            'before' => $pick($before ?? []), 'after' => $pick($after)]];
+    }
+
+    private function riskLinkedToPerson(?\App\Models\HsRiskAssessment $risk, ?\App\Models\HsRiskAssessmentAcceptance $marker): bool
+    {
+        foreach ([$marker?->before_binding, $marker?->after_binding] as $binding) {
+            if (! is_array($binding)) { continue; }
+            if (($binding['client_id'] ?? null) !== null) { return true; }
+            foreach ((array) ($binding['events'] ?? []) as $event) {
+                if (($event['tuple']['client_id'] ?? null) !== null || ($event['tuple']['staff_id'] ?? null) !== null || ($event['exposure'] ?? null) !== null) { return true; }
+            }
+        }
+        if ($risk === null) { return true; } // Nothing to check against: say less, not more.
+        if (in_array($risk->assessable_type, [\App\Models\Client::class, (new \App\Models\Client)->getMorphClass()], true)) { return true; }
+        $eventIds = array_filter([$risk->hs_event_id,
+            in_array($risk->assessable_type, [\App\Models\HsEvent::class, (new \App\Models\HsEvent)->getMorphClass()], true) ? $risk->assessable_id : null]);
+
+        return $eventIds !== [] && \App\Models\HsEvent::withTrashed()->whereIn('id', $eventIds)
+            ->where(fn ($person) => $person->whereNotNull('client_id')->orWhereNotNull('staff_id'))->exists();
     }
 
     /** @return array{users: array<int, array{id:int,name:string}>, clients: array<int, array{id:int,name:string}>} */

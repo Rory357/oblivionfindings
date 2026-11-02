@@ -131,9 +131,9 @@ final class FleetVehicleTechnologyProjectionPresenter
                 'it_work' => $canViewIt,
             ],
             'links' => [
-                'tracking' => '/security-devices/tracking?tab=fleet',
+                'tracking' => '/security-devices/devices?tab=trackers',
                 'devices' => '/security-devices/devices',
-                'maintenance' => $canViewMaintenance ? '/security-devices/maintenance' : null,
+                'maintenance' => $canViewMaintenance ? '/security-devices/devices?tab=upkeep' : null,
                 'it_work' => $canViewIt ? '/it?tab=tickets' : null,
             ],
         ];
@@ -209,7 +209,7 @@ final class FleetVehicleTechnologyProjectionPresenter
                     'status' => $nextMaintenance->status,
                     'scheduled_for' => $nextMaintenance->scheduled_for?->toDateString(),
                 ] : null,
-                'href' => "/security-devices/maintenance?device_id={$device->id}",
+                'href' => "/security-devices/devices/{$device->id}",
             ] : null,
             'it_work' => $canViewIt ? [
                 'open' => $tickets->whereIn('status', ItTicket::OPEN_STATUSES)->count(),

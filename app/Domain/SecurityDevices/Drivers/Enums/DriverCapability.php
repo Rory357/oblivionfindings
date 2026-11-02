@@ -76,8 +76,9 @@ enum DriverCapability: string
             self::NetworkConfigBackup => 'SSH configuration backup & diff',
             self::NetworkPoeCycle => 'PoE port power-cycle',
             self::NetworkReboot => 'Device restart',
-            self::TelemetrySyslog => 'Syslog through Site hub',
-            self::TelemetryNetflow => 'NetFlow & IPFIX through Site hub',
+            // Not "through Site hub": hubs don't receive Syslog or flows (S&D Phase B).
+            self::TelemetrySyslog => 'Syslog events',
+            self::TelemetryNetflow => 'NetFlow & IPFIX traffic flows',
             self::ComputerPosture => 'Health, disk & encryption posture',
             self::ComputerIntuneSync => 'Microsoft Intune discovery & compliance sync',
             self::ComputerServiceControl => 'Windows service restart',

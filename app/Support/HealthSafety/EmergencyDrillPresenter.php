@@ -90,12 +90,19 @@ final class EmergencyDrillPresenter
     public function row(EmergencyDrill $record, User $viewer, ?string $returnTo = null): array
     {
         $record = $this->access->recordForViewer($record, $viewer);
-        $record->loadMissing('site');
+        $record->loadMissing(['site', 'conductor']);
         $participants = $record->participants()->count();
         $attended = $record->participants()->where('attended', true)->count();
-        $findings = $record->findings()->get();
+        $findings = $record->findings()->with('assignee')->get();
         $open = $findings->whereNotIn('status', ['resolved', 'closed', 'accepted'])->count();
         $overdue = $record->status === 'scheduled' && $record->scheduled_at?->isPast();
+        // G4-12: the shared stage cell's who-line — who runs a planned drill, who has its things to fix, and when an
+        // overdue drill's site last ran one.
+        $firstOpen = $findings->whereNotIn('status', ['resolved', 'closed', 'accepted'])
+            ->sortBy(fn ($finding) => $finding->due_date?->toDateString() ?? '9999-12-31')->first();
+        $kinds = in_array($record->drill_type, ['fire', 'fire_evacuation'], true) ? ['fire', 'fire_evacuation'] : [$record->drill_type];
+        $lastRun = $overdue && $record->site_id
+            ? EmergencyDrill::query()->where('site_id', $record->site_id)->whereIn('drill_type', $kinds)->whereNotNull('completed_at')->max('completed_at') : null;
 
         return ['id' => $record->id, 'reference' => 'DR-'.$record->id, 'title' => $record->title, 'drill_type' => $record->drill_type,
             'type_label' => $this->label($record->drill_type === 'fire' ? 'fire_evacuation' : $record->drill_type),
@@ -106,6 +113,8 @@ final class EmergencyDrillPresenter
             'people_label' => $record->status === 'completed' ? $attended.' attended' : $participants.' assigned',
             'findings_count' => $findings->count(), 'findings_open' => $open,
             'flags' => ['overdue' => $overdue, 'running' => $record->status === 'in_progress', 'finding_overdue' => $findings->contains(fn ($finding) => $this->findingOverdue($finding)), 'open_findings' => $open],
+            'coordinator_name' => $record->conductor?->name, 'findings_owner' => $firstOpen?->assignee?->name,
+            'site_last_run_at' => $lastRun ? Carbon::parse($lastRun)->toIso8601String() : null,
             'href' => EmergencyDrillReturn::href($record->id, $returnTo), 'can' => $this->access->commandCan($record, $viewer)];
     }
 

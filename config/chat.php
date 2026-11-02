@@ -8,8 +8,10 @@ return [
     'notifications' => [
         // Keep off until device binding and browser acceptance are verified. No native push here.
         'browser_push_enabled' => env('CHAT_BROWSER_PUSH_ENABLED', false),
-        // Exact trusted browser push hosts only. Never accept these from a subscription request.
-        'push_hosts' => array_values(array_filter(array_map('trim', explode(',', (string) env('CHAT_BROWSER_PUSH_HOSTS', 'fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com'))))),
+        // Trusted browser push hosts (Chat and every PushChannel notice). Never accept these from a subscription request.
+        // Exact hosts, or a leading dot for any host below a domain: Edge's push hosts vary under notify.windows.com
+        // (Stephan approved 23 Oct 2026). Servers that set CHAT_BROWSER_PUSH_HOSTS must add it themselves.
+        'push_hosts' => array_values(array_filter(array_map('trim', explode(',', (string) env('CHAT_BROWSER_PUSH_HOSTS', 'fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com,.notify.windows.com'))))),
     ],
     // Operational contact labels only; never credentials or client information.
     'health' => ['owners' => [
@@ -18,9 +20,11 @@ return [
         'push' => env('CHAT_HEALTH_PUSH_OWNER', ''),
         'uploads' => env('CHAT_HEALTH_UPLOADS_OWNER', ''),
         'calling' => env('CHAT_HEALTH_CALLING_OWNER', ''),
+        'relay' => env('CHAT_HEALTH_RELAY_OWNER', ''),
     ]],
     'files' => [
-        // Server-only local ffprobe path. Never supplied through a client or settings form.
+        // Optional server-only ffprobe path, used as a second opinion on voice messages. Oblivion's own
+        // voice checker decides without it. Never supplied through a client or settings form.
         'voice_probe_binary' => env('CHAT_VOICE_PROBE_BINARY', ''),
         // Server configuration only. An unavailable scanner must never grant a clean verdict.
         'scanner' => [
@@ -44,5 +48,23 @@ return [
         'api_secret' => env('CHAT_LIVEKIT_API_SECRET'),
         'verified' => env('CHAT_CALLING_VERIFIED', false),
         'authorization_gateway_verified' => env('CHAT_CALLING_AUTH_GATEWAY_VERIFIED', false),
+    ],
+    // Oblivion Relay, Oblivion's own STUN and TURN server for Chat calls (deploy/chat-calling/oblivion-relay.md).
+    // Empty settings mean no relay entry is issued; there is never a fallback to an outside server.
+    'relay' => [
+        // One to four turn:/turns: URLs, UDP first, then TCP, then TLS.
+        'urls' => array_values(array_filter(array_map('trim', explode(',', (string) env('CHAT_RELAY_URLS', ''))))),
+        // The same secret as the relay's RELAY_CHAT_SECRET, 32 to 512 bytes.
+        'secret' => (string) env('CHAT_RELAY_SECRET', ''),
+        // At most 3,600: the relay refuses longer credentials.
+        'credential_seconds' => (int) env('CHAT_RELAY_CREDENTIAL_SECONDS', 3600),
+        // Beside the app (the test server): the relay's loopback health endpoint. Empty when it has its own server.
+        'health_url' => (string) env('CHAT_RELAY_HEALTH_URL', ''),
+        // The signed control channel that ends a person's relay use at once. Loopback or private addresses only.
+        'control' => [
+            'urls' => array_values(array_filter(array_map('trim', explode(',', (string) env('CHAT_RELAY_CONTROL_URLS', ''))))),
+            'secret' => (string) env('CHAT_RELAY_CONTROL_SECRET', ''),
+            'key_id' => (string) env('CHAT_RELAY_CONTROL_KEY_ID', ''),
+        ],
     ],
 ];

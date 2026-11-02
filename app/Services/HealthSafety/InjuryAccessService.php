@@ -28,7 +28,10 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 /** Current source authority; historical injured identity is not current employment or fitness. */
 final class InjuryAccessService
 {
-    public const PERMISSIONS = ['hazards.view', 'hazards.create', 'hazards.manage', 'injuries.report', 'hr.wellbeing.view',
+    /** Decision 10 (Stephan, 1 Nov 2026): the coordinator sees duty restrictions only, never medical details. */
+    public const DUTY_RESTRICTIONS = 'injuries.dutyRestrictions.view';
+
+    public const PERMISSIONS = ['hazards.view', 'hazards.create', 'hazards.manage', 'injuries.report', 'hr.wellbeing.view', self::DUTY_RESTRICTIONS,
         'healthSafety.viewAllSites', 'hr.documents.view', 'hr.documents.manage', 'hr.employees.viewAny',
         'hr.employees.viewAllSites', 'incidents.viewAny', 'incidents.viewAssigned', 'incidents.update',
         'incidents.create', 'hr.cases.view', 'clients.viewAny', 'clients.viewAssigned',

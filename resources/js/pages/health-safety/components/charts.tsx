@@ -450,6 +450,7 @@ export function IncidentTrendCard({
             <ResponsiveContainer
                 width="100%"
                 height={variant === 'full' ? 240 : 140}
+                initialDimension={{ width: 600, height: variant === 'full' ? 240 : 140 }}
             >
                 <ComposedChart
                     data={data}

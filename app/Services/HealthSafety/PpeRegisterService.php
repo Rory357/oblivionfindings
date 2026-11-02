@@ -53,6 +53,7 @@ final class PpeRegisterService
                 'site_overview' => ['scope' => 'approved_sites_and_selected_site',
                     'tabCounts' => $this->trustedCounts($overviewCounts, $overviewIntegrity), 'physical_tabCounts' => $overviewCounts, 'source_integrity' => $overviewIntegrity,
                     'hero' => $this->trustedHero($this->hero(clone $siteInv, clone $siteAlloc, null), $overviewIntegrity)],
+                'register_summary' => $this->registerSummary(clone $siteInv, clone $siteAlloc, $reads, $current, $overviewIntegrity),
                 'sites' => $options['sites'], 'staff' => $options['staff'], 'allocatable' => $options['allocatable'],
                 'staff_page' => $options['staff_page'], 'allocatable_page' => $options['allocatable_page'],
                 'can' => ['view' => true, 'manage' => $current->canDo('hazards.manage')],
@@ -106,6 +107,8 @@ final class PpeRegisterService
             ->when($tab === 'inv_inspection', fn ($q) => $q->whereNotNull('next_inspection_due')->whereDate('next_inspection_due', '<=', now('Pacific/Auckland')->addDays(30)->toDateString()))
             ->when($tab === 'inv_expiring', fn ($q) => $q->whereNotNull('expiry_date')->whereDate('expiry_date', '<=', now('Pacific/Auckland')->addDays(60)->toDateString()));
         return $base->with(['ppeType' => fn ($q) => $reads->query($q->getQuery()), 'site' => fn ($q) => $reads->query($q->getQuery())->select(['id', 'name'])])
+            // G4-11: problems first (an overdue inspection, past expiry or poor condition on gear still in use), then newest.
+            ->orderByRaw("CASE WHEN status NOT IN ('condemned', 'disposed') AND ((next_inspection_due IS NOT NULL AND next_inspection_due < ?) OR (expiry_date IS NOT NULL AND expiry_date < ?) OR `condition` = 'poor') THEN 0 ELSE 1 END", [$today, $today])
             ->orderByDesc('created_at')->orderByDesc('id')->paginate(25, ['*'], 'page', max(1, $page))
             ->withQueryString()->through(function (PpeInventory $item) use ($today) {
                 // Prove the exact materialized output, independently of the earlier summary scan.
@@ -117,6 +120,82 @@ final class PpeRegisterService
                 return [...$this->presenter->inventoryRow($item, $today), 'currency' => $this->presenter->currency($item),
                     'attribution_state' => $state, 'source_integrity' => $state === 'recorded' ? 'intact' : 'legacy_unknown'];
             })->toArray();
+    }
+
+    /**
+     * G4-11 (board approved 1 Nov 2026): the four header counts and the one lead block, for the selected Site only (the
+     * header ignores search and the other filters, as the Overview's does). A family whose records need repair gives
+     * null counts and no lead rows from it, never a guessed number. Damaged rows are left out of the lead block.
+     */
+    private function registerSummary(Builder $siteInv, Builder $siteAlloc, CurrentAuthorizationReads $reads, User $current, array $integrity): array
+    {
+        $today = now('Pacific/Auckland')->toDateString();
+        $since30 = now('Pacific/Auckland')->subDays(30)->startOfDay()->utc();
+        $inventoryOk = $integrity['inventory'] !== 'repair_required';
+        $allocationsOk = $integrity['allocations'] !== 'repair_required';
+        $live = fn (Builder $q) => $q->whereNotIn('status', ['condemned', 'disposed']);
+        $problem = fn (Builder $q) => $live($q)->where(fn ($w) => $w
+            ->where(fn ($d) => $d->whereNotNull('next_inspection_due')->whereDate('next_inspection_due', '<', $today))
+            ->orWhere(fn ($d) => $d->whereNotNull('expiry_date')->whereDate('expiry_date', '<', $today))
+            ->orWhere('condition', 'poor'));
+        $noFitTest = fn (Builder $q) => $q->whereNull('returned_at')->where('fit_test_completed', false)
+            ->whereHas('ppeInventory.ppeType', fn ($t) => $t->where('category', 'respiratory'));
+        $commands = app(PpeCommandService::class);
+        $canInspect = $current->canDo('hazards.manage');
+
+        $rows = [];
+        if ($inventoryOk) {
+            $problem(clone $siteInv)->with(['ppeType' => fn ($q) => $reads->query($q->getQuery()), 'site' => fn ($q) => $reads->query($q->getQuery())->select(['id', 'name'])])
+                ->orderByRaw('LEAST(COALESCE(next_inspection_due, ?), COALESCE(expiry_date, ?)) asc', ['9999-12-31', '9999-12-31'])->orderBy('id')
+                ->limit(10)->get()
+                ->each(function (PpeInventory $item) use (&$rows, $commands, $today, $canInspect) {
+                    if (! $item->ppeType || $commands->sourceState($item) === 'repair_required' || $commands->sourceState($item->ppeType) === 'repair_required') {
+                        return;
+                    }
+                    $inspection = PpeReadPresenter::date($item->next_inspection_due);
+                    $expiry = PpeReadPresenter::date($item->expiry_date);
+                    $problems = array_values(array_filter([
+                        $inspection !== null && $inspection < $today ? 'inspection_overdue' : null,
+                        $expiry !== null && $expiry < $today ? 'past_expiry' : null,
+                        $item->condition === 'poor' ? 'poor_condition' : null,
+                    ]));
+                    $dates = array_filter([$inspection !== null && $inspection < $today ? $inspection : null, $expiry !== null && $expiry < $today ? $expiry : null]);
+                    $rows[] = ['kind' => 'inventory', 'id' => (int) $item->id, 'name' => $item->ppeType->name, 'serial_number' => $item->serial_number,
+                        'site' => $item->site?->name, 'location' => $item->location, 'condition' => $item->condition,
+                        'due' => $dates === [] ? null : min($dates), 'expiry_date' => $expiry, 'problems' => $problems,
+                        'can_inspect' => $canInspect];
+                });
+        }
+        if ($allocationsOk) {
+            $noFitTest(clone $siteAlloc)->with(['ppeInventory' => fn ($q) => $reads->query($q->getQuery()), 'ppeInventory.ppeType' => fn ($q) => $reads->query($q->getQuery()),
+                'ppeInventory.site' => fn ($q) => $reads->query($q->getQuery())->select(['id', 'name']), 'user' => fn ($q) => $reads->query($q->getQuery())->select(['id', 'name'])])
+                ->orderBy('allocated_at')->orderBy('id')->limit(10)->get()
+                ->each(function (PpeAllocation $allocation) use (&$rows, $commands) {
+                    $item = $allocation->ppeInventory;
+                    if (! $item || ! $item->ppeType || $commands->sourceState($item) === 'repair_required' || $commands->sourceState($item->ppeType) === 'repair_required') {
+                        return;
+                    }
+                    $rows[] = ['kind' => 'allocation', 'id' => (int) $allocation->id, 'name' => $item->ppeType->name, 'serial_number' => $item->serial_number,
+                        'site' => $item->site?->name, 'worker' => $allocation->user?->name,
+                        'handed_out_at' => PpeReadPresenter::timestamp($allocation->allocated_at), 'problems' => ['no_fit_test']];
+                });
+        }
+        // Overdue equipment first (oldest date first), then gear handed out without a fit test (oldest first).
+        usort($rows, fn ($a, $b) => [$a['kind'] === 'inventory' ? 0 : 1, $a['due'] ?? $a['handed_out_at'] ?? ''] <=> [$b['kind'] === 'inventory' ? 0 : 1, $b['due'] ?? $b['handed_out_at'] ?? '']);
+        $problemCount = $inventoryOk ? $problem(clone $siteInv)->count() : null;
+        $fitTestsMissing = $allocationsOk ? $noFitTest(clone $siteAlloc)->count() : null;
+
+        return [
+            'boxes' => [
+                'inspections_overdue' => $inventoryOk ? $live(clone $siteInv)->whereNotNull('next_inspection_due')->whereDate('next_inspection_due', '<', $today)->count() : null,
+                'past_expiry' => $inventoryOk ? $live(clone $siteInv)->whereNotNull('expiry_date')->whereDate('expiry_date', '<', $today)->count() : null,
+                'fit_tests_missing' => $fitTestsMissing,
+                'handed_out_30d' => $allocationsOk ? (clone $siteAlloc)->where('allocated_at', '>=', $since30)->count() : null,
+            ],
+            'lead' => array_slice($rows, 0, 3),
+            'lead_total' => $problemCount === null && $fitTestsMissing === null ? null : (int) $problemCount + (int) $fitTestsMissing,
+            'unconfirmed' => $allocationsOk ? (clone $siteAlloc)->whereNull('returned_at')->where('acknowledged', false)->count() : null,
+        ];
     }
 
     private function allocationPage(Builder $base, string $tab, int $page, CurrentAuthorizationReads $reads): array

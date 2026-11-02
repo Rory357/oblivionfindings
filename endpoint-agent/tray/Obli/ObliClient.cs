@@ -61,9 +61,9 @@ public sealed partial class ObliClient : IDisposable
     }
     async Task<JsonDocument> SendAsync(HttpMethod method, string path, object? body, StaffSession? session, CancellationToken cancellation)
     {
-        if (!IsComputerContextRoute(method,path) && !IsTicketRoute(method, path) && !IsKnowledgeRoute(method, path) && path is not ("token" or "me" or "logout" or "chat/options" or "chat") && !(path.StartsWith("chat/", StringComparison.Ordinal) && Guid.TryParseExact(path[5..], "D", out _))) throw new InvalidOperationException();
+        if (!IsFixRoute(method,path) && !IsComputerContextRoute(method,path) && !IsTicketRoute(method, path) && !IsKnowledgeRoute(method, path) && path is not ("token" or "me" or "logout" or "chat/options" or "chat") && !(path.StartsWith("chat/", StringComparison.Ordinal) && Guid.TryParseExact(path[5..], "D", out _))) throw new InvalidOperationException();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-        timeout.CancelAfter(TimeSpan.FromSeconds(path == "chat" ? 50 : 20)); cancellation = timeout.Token;
+        timeout.CancelAfter(TimeSpan.FromSeconds(path == "chat" || FixNeedsTime(method,path) ? 50 : 20)); cancellation = timeout.Token;
         using var request = new HttpRequestMessage(method, new Uri(Origin, "/api/obli/" + path));
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         if (session != null)
@@ -94,6 +94,7 @@ public sealed partial class ObliClient : IDisposable
                 _ => "AI chat is not available. Ask your administrator to check Obli settings."
             });
         if (IsComputerContextRoute(method,path) && response.StatusCode!=HttpStatusCode.OK || method==HttpMethod.Post&&path=="tickets"&&response.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.Created))throw new IOException("Oblivion could not confirm this request. Keep your draft.");
+        if (IsFixRoute(method,path) && !response.IsSuccessStatusCode) throw FixFailure(response.StatusCode);
         if (!response.IsSuccessStatusCode) throw new IOException(response.StatusCode == HttpStatusCode.NotFound
             ? "Obli staff support is not enabled on this server yet."
             : "Oblivion could not confirm this request. Keep your draft and try again.");

@@ -9,6 +9,7 @@ use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringThresholdRule;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -155,6 +156,9 @@ final class EffectiveMonitoringPolicyResolver
             ];
         }
 
+        // S&D Phase D: who is told and how when no rule says comes from Setup › Alerts & checks.
+        $settings = app(SecurityDevicesSettings::class);
+
         return [
             'source' => 'default',
             'locked_to_control_room' => false,
@@ -164,11 +168,12 @@ final class EffectiveMonitoringPolicyResolver
             'warning_notify_in_app' => true,
             'warning_notify_email' => false,
             'warning_open_it_ticket' => false,
-            'critical_notify_in_app' => true,
-            'critical_notify_email' => true,
+            'critical_notify_in_app' => $settings->bool(SecurityDevicesSettings::DEVICES_APP),
+            'critical_notify_email' => $settings->bool(SecurityDevicesSettings::DEVICES_EMAIL),
+            'critical_notify_push' => $settings->bool(SecurityDevicesSettings::DEVICES_PUSH),
             'critical_open_it_ticket' => true,
             'critical_escalate_control_room' => false,
-            'recipient_role' => null,
+            'recipient_role' => $settings->role(SecurityDevicesSettings::DEVICES_ROLE),
         ];
     }
 

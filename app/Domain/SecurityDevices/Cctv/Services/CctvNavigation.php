@@ -28,7 +28,7 @@ final class CctvNavigation
                 }
                 $base = '/security-devices/devices/'.$device->id.'/live';
 
-                return ['live_href' => $actor->canDo('securityDevices.cctv.media.view') ? $base : null, 'setup_href' => $actor->canDo('securityDevices.integrations.manage') && $actor->canDo('securityDevices.devices.update') ? $base.'/source' : null, 'reference_href' => $actor->canDo(CctvRecordingReferences::VIEW) && $currentDevice->status !== DeviceStatus::Decommissioned ? '/security-devices/devices/'.$device->id.'/recording-references' : null];
+                return ['live_href' => $actor->canDo('securityDevices.cctv.media.view') && $actor->canDo('securityDevices.cctv.live.watch') ? $base : null, 'setup_href' => $actor->canDo('securityDevices.integrations.manage') && $actor->canDo('securityDevices.devices.update') ? $base.'/source' : null, 'reference_href' => $actor->canDo(CctvRecordingReferences::VIEW) && $currentDevice->status !== DeviceStatus::Decommissioned ? '/security-devices/devices/'.$device->id.'/recording-references' : null];
             });
         } catch (HttpExceptionInterface) {
             return $none;

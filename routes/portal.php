@@ -256,36 +256,48 @@ Route::middleware(['auth'])->group(function () {
         abort_if($request->query->has('notification') && $selectedId === null, 404);
 
         return $broadcasts->respond($user, $request, function (BroadcastRecipientReadContext $context) use ($user, $request, $boardPackAccess, $selectedId) {
-            $query = $boardPackAccess->visibleNotificationQuery($user, broadcastContext: $context);
             $filter = $request->query('filter', 'all');
-            if ($filter === 'unread') {
-                $query->whereNull('read_at');
-            }
-            if ($filter === 'read') {
-                $query->whereNotNull('read_at');
-            }
-
             $type = $request->query('type', 'all');
-            if ($type !== 'all') {
-                $query->where(function ($module) use ($type) {
-                    $module->where('data->module', $type);
-                    if ($type === 'control_room') {
-                        // Still inside every scope above: only admitted own staff messages.
-                        $module->orWhere('type', BroadcastRecipientNotice::class);
-                    }
+            // Private exposure follow-up notices are read inside their H&S context (#16); everyone else reads as before.
+            $inbox = app(\App\Services\HealthSafety\HealthSafetyInboxReads::class);
+            // Read once, and only when this response includes the page's own list (a header-only partial reload skips it).
+            $read = null;
+            $page = function () use (&$read, $inbox, $user, $boardPackAccess, $context, $filter, $type): array {
+                return $read ??= $inbox->within($user, function (?\App\Services\HealthSafety\HealthSafetyReadContext $hs) use ($user, $boardPackAccess, $context, $filter, $type, $inbox): array {
+                $query = $boardPackAccess->visibleNotificationQuery($user, healthSafetyContext: $hs, broadcastContext: $context);
+                if ($filter === 'unread') {
+                    $query->whereNull('read_at');
+                }
+                if ($filter === 'read') {
+                    $query->whereNotNull('read_at');
+                }
+                if ($type !== 'all') {
+                    $query->where(function ($module) use ($type) {
+                        $module->where('data->module', $type);
+                        if ($type === 'control_room') {
+                            // Still inside every scope above: only admitted own staff messages.
+                            $module->orWhere('type', BroadcastRecipientNotice::class);
+                        }
+                    });
+                }
+
+                return [
+                    'notifications' => $query->orderByDesc('created_at')->paginate(50)->through(fn ($n) => $context->project($n) ?? [
+                        'id' => $n->id,
+                        'type' => class_basename($n->type),
+                        'data' => $inbox->data($n, $user, $hs),
+                        'read_at' => $n->read_at?->toISOString(),
+                        'acknowledged_at' => $n->acknowledged_at?->toISOString(),
+                        'created_at' => $n->created_at?->toISOString(),
+                    ])->toArray(),
+                    'unread_count' => $boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, healthSafetyContext: $hs, broadcastContext: $context)->count(),
+                ];
                 });
-            }
+            };
 
             return inertia('notifications/index', [
-                'notifications' => $query->orderByDesc('created_at')->paginate(50)->through(fn ($n) => $context->project($n) ?? [
-                    'id' => $n->id,
-                    'type' => class_basename($n->type),
-                    'data' => $n->data,
-                    'read_at' => $n->read_at,
-                    'acknowledged_at' => $n->acknowledged_at,
-                    'created_at' => $n->created_at,
-                ]),
-                'unread_count' => $boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, broadcastContext: $context)->count(),
+                'notifications' => fn () => $page()['notifications'],
+                'unread_count' => fn () => $page()['unread_count'],
                 'broadcast_reader' => $context->envelope(),
                 'selected_broadcast_notification' => $selectedId === null ? null : $context->selected($selectedId),
                 'filters' => ['filter' => $filter, 'type' => $type],

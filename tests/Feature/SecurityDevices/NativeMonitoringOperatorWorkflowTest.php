@@ -113,10 +113,10 @@ final class NativeMonitoringOperatorWorkflowTest extends TestCase
         $this->assertStringNotContainsString('10.44.0.0/16', $auditJson);
         $this->assertStringNotContainsString('10.44.0.10', $auditJson);
 
-        $monitoringPage = $this->actingAs($manager)->get('/security-devices/monitoring');
-        $monitoringPage->assertOk()->assertDontSee('10.44.0.10', false);
-        $discoveryPage = $this->actingAs($manager)->get('/security-devices/discovery?tab=scopes');
-        $discoveryPage->assertOk()->assertDontSee('10.44.0.0/16', false);
+        // S&D rebuild C6: the monitoring and discovery pages are gone; Alerts never shows a check's target.
+        $this->actingAs($manager)->get('/security-devices/monitoring')->assertRedirect('/security-devices/alerts');
+        $this->actingAs($manager)->get('/security-devices/discovery?tab=scopes')->assertRedirect('/security-devices/setup/hubs?tab=networks');
+        $this->actingAs($manager)->get('/security-devices/alerts')->assertOk()->assertDontSee('10.44.0.10', false);
 
         $this->actingAs($manager)
             ->postJson("/security-devices/monitoring/native-monitors/{$monitor->id}/deactivate", [
@@ -509,13 +509,10 @@ final class NativeMonitoringOperatorWorkflowTest extends TestCase
         $input = $this->nativeReceiptInput($manager, $site, $device);
         $created = $this->actingAs($manager)->postJson('/security-devices/monitoring/native-monitors', $input)->assertCreated();
         $id = $created->json('monitor.id');
-        $this->actingAs($manager)->get('/security-devices/monitoring')->assertOk()->assertInertia(
-            fn (AssertableInertia $page) => $page
-                ->where('workspace.actor_id', $manager->id)
-                ->where('workspace.monitor_management.actor_id', $manager->id)
-                ->where('workspace.monitors', fn ($rows): bool => collect($rows)->contains(fn ($row): bool => $row['id'] === $id
-                    && $row['actions']['actor_id'] === $manager->id && preg_match('/^[0-9a-f]{64}$/D', $row['actions']['review_token']) === 1))
-        )->assertDontSee('10.44.0.10', false);
+        $this->assertNotNull($id);
+        // S&D rebuild C6: the monitoring workspace that projected this review is rebuilt as Alerts.
+        $this->actingAs($manager)->get('/security-devices/monitoring')->assertRedirect('/security-devices/alerts');
+        $this->actingAs($manager)->get('/security-devices/alerts')->assertOk()->assertDontSee('10.44.0.10', false);
     }
 
     public function test_saved_monitor_request_entry_survives_a_lost_create_response_and_keeps_later_changes_distinct(): void

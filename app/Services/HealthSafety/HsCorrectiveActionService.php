@@ -33,6 +33,9 @@ class HsCorrectiveActionService
 
     public const RESPONSIBILITY_NEW = 'new_responsibility';
 
+    /** D1: why a new start waits while the owner needs replacing (the page shows the same words). */
+    public const START_NEEDS_NEW_OWNER = 'Choose a new owner first';
+
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
     ) {}
@@ -200,6 +203,7 @@ class HsCorrectiveActionService
                 $actor,
             );
             $this->syncEventToCorrectiveActionStatus($event);
+            $this->checkEventActionCompletion((int) $event->id);
 
             AuditLogger::logOrFail('healthSafety.investigation.recommendationDispositioned', $locked, [
                 'actor_id' => $actor->id,
@@ -283,10 +287,12 @@ class HsCorrectiveActionService
             );
             $dueDate = $this->requiredDueDate($data);
             $priority = $this->requiredPriority($data);
+            $replaces = $this->replaceableAction($event, $data['replaces_action_id'] ?? null);
 
             $action = HsCorrectiveAction::create([
                 'hs_event_id' => $event->id,
                 'hs_investigation_id' => $data['hs_investigation_id'] ?? null,
+                'replaces_action_id' => $replaces?->id,
                 'source_control_room_task_id' => $data['source_control_room_task_id'] ?? null,
                 'reference_number' => HsCorrectiveAction::generateReferenceNumber(),
                 'action_type' => $data['action_type'] ?? HsCorrectiveAction::TYPE_CORRECTIVE,
@@ -303,6 +309,7 @@ class HsCorrectiveActionService
             ]);
 
             $this->syncEventToCorrectiveActionStatus($event);
+            $this->checkEventActionCompletion((int) $event->id);
             AuditLogger::logOrFail('healthSafety.correctiveAction.created', $action, [
                 'actor_id' => $actor->id,
                 'hs_event_id' => $event->id,
@@ -310,6 +317,7 @@ class HsCorrectiveActionService
                 'due_date' => $dueDate,
                 'priority' => $priority,
                 'source_control_room_task_id' => $action->source_control_room_task_id,
+                'replaces_action_id' => $action->replaces_action_id,
             ]);
             $this->notifyOwner($action, $owner);
 
@@ -321,6 +329,31 @@ class HsCorrectiveActionService
 
             return $action->fresh('assignedTo');
         }, 3);
+    }
+
+    /**
+     * Q11: a revised action may only replace an action on the same safety review whose check said it didn't work.
+     * Locked so two people can't both read a stale state while adding revisions.
+     */
+    private function replaceableAction(HsEvent $event, mixed $replacesActionId): ?HsCorrectiveAction
+    {
+        if ($replacesActionId === null || $replacesActionId === '') {
+            return null;
+        }
+        if (! is_numeric($replacesActionId) || (int) $replacesActionId < 1) {
+            throw new InvalidArgumentException('Choose the action whose check said it didn\'t work.');
+        }
+
+        $replaced = HsCorrectiveAction::query()
+            ->whereKey((int) $replacesActionId)
+            ->where('hs_event_id', $event->id)
+            ->lockForUpdate()
+            ->first();
+        if ($replaced === null || ! $replaced->checkedIneffective()) {
+            throw new InvalidArgumentException('A revised action can only replace an action on this safety review whose check said it didn\'t work.');
+        }
+
+        return $replaced;
     }
 
     /**
@@ -389,10 +422,25 @@ class HsCorrectiveActionService
                 ->whereKey($action->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            // An exact retry of a start that was already accepted returns the first result, whatever has changed since.
+            if ($action->status === HsCorrectiveAction::STATUS_IN_PROGRESS
+                && $action->assigned_to_user_id
+                && (! $assigneeId || (int) $action->assigned_to_user_id === $assigneeId)) {
+                return $action;
+            }
+
             $this->assertTransition($action, HsCorrectiveAction::STATUS_IN_PROGRESS);
 
             if (! $action->assigned_to_user_id || ($assigneeId && (int) $action->assigned_to_user_id !== $assigneeId)) {
                 throw new InvalidArgumentException('Assign the accountable owner on the action page before starting work.');
+            }
+
+            // D1 (H&S UI/UX plan B1.6): a new start waits while the owner needs replacing (left, lost access or lost the site).
+            $owner = User::query()->find($action->assigned_to_user_id);
+            $event = $action->hsEvent()->first();
+            if (! $owner || ! $event || ! app(HsCorrectiveActionOwnershipService::class)->eligible($owner, $event)) {
+                throw new InvalidArgumentException(self::START_NEEDS_NEW_OWNER);
             }
 
             $updates = [
@@ -447,6 +495,8 @@ class HsCorrectiveActionService
                 'updated_by' => auth()->id(),
             ]);
 
+            $this->checkEventActionCompletion((int) $action->hs_event_id);
+
             Log::info('HsCorrectiveActionService: action completed', [
                 'action_id' => $action->id,
             ]);
@@ -472,6 +522,8 @@ class HsCorrectiveActionService
                 'verification_notes' => $reason,
                 'updated_by' => auth()->id(),
             ]);
+
+            $this->checkEventActionCompletion((int) $action->hs_event_id);
 
             Log::info('HsCorrectiveActionService: action returned for rework', [
                 'action_id' => $action->id,
@@ -543,6 +595,8 @@ class HsCorrectiveActionService
                 'updated_by' => auth()->id(),
             ]);
 
+            $this->checkEventActionCompletion((int) $action->hs_event_id);
+
             Log::info('HsCorrectiveActionService: action verified', [
                 'action_id' => $action->id,
                 'effectiveness_confirmed' => $data['effectiveness_confirmed'],
@@ -589,8 +643,8 @@ class HsCorrectiveActionService
     /* ------------------------------------------------------------------ */
 
     /**
-     * Check if all corrective actions for an event are verified or closed.
-     * If so, move the HsEvent to monitoring status.
+     * Keep the safety review's stage in step with its actions: "Checking it worked" (monitoring) once every action is
+     * done and no failed check is waiting for its revised action, otherwise "Actions under way" (corrective_action).
      */
     public function checkEventActionCompletion(int $hsEventId): void
     {
@@ -606,31 +660,35 @@ class HsCorrectiveActionService
             return;
         }
 
-        $resolvedActions = HsCorrectiveAction::where('hs_event_id', $hsEventId)
+        // Decision 2 (Stephan, 1 Nov 2026): "Checking it worked" (monitoring) as soon as every action is done — not only
+        // once every action is checked — unless a failed check still needs its revised action (Q11). A new or revised
+        // action, or one sent back, puts the review back to "Actions under way". Only these two stages move here;
+        // open / investigating reviews and closed ones are left alone.
+        $notDone = HsCorrectiveAction::where('hs_event_id', $hsEventId)
+            ->whereIn('status', [HsCorrectiveAction::STATUS_OPEN, HsCorrectiveAction::STATUS_IN_PROGRESS])
+            ->exists();
+        // A failed check with no revised action yet means there is still work to add, so it stays "Actions under way".
+        // Once the revised action is done it is waiting for its own check, which is "Checking it worked".
+        $failedWithoutRevision = HsCorrectiveAction::where('hs_event_id', $hsEventId)
             ->whereIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
-            ->count();
+            ->where('effectiveness_confirmed', false)
+            ->whereDoesntHave('revisions')
+            ->exists();
+        $target = ! $notDone && ! $failedWithoutRevision
+            ? HsEvent::STATUS_MONITORING
+            : HsEvent::STATUS_CORRECTIVE_ACTION;
 
-        if ($resolvedActions === $totalActions) {
-            // All actions resolved — event can move to monitoring
-            $eventOrder = [
-                HsEvent::STATUS_OPEN => 0,
-                HsEvent::STATUS_INVESTIGATING => 1,
-                HsEvent::STATUS_CORRECTIVE_ACTION => 2,
-                HsEvent::STATUS_MONITORING => 3,
-                HsEvent::STATUS_CLOSED => 4,
-            ];
+        if (in_array($hsEvent->status, [HsEvent::STATUS_CORRECTIVE_ACTION, HsEvent::STATUS_MONITORING], true)
+            && $hsEvent->status !== $target) {
+            $from = $hsEvent->status;
+            $hsEvent->update(['status' => $target]);
 
-            $currentRank = $eventOrder[$hsEvent->status] ?? 0;
-            $monitoringRank = $eventOrder[HsEvent::STATUS_MONITORING] ?? 3;
-
-            if ($monitoringRank > $currentRank) {
-                $hsEvent->update(['status' => HsEvent::STATUS_MONITORING]);
-
-                Log::info('HsCorrectiveActionService: all actions resolved, event moved to monitoring', [
-                    'hs_event_id' => $hsEventId,
-                    'total_actions' => $totalActions,
-                ]);
-            }
+            Log::info('HsCorrectiveActionService: safety review stage follows its actions', [
+                'hs_event_id' => $hsEventId,
+                'from' => $from,
+                'to' => $target,
+                'total_actions' => $totalActions,
+            ]);
         }
     }
 

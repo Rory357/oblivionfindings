@@ -30,7 +30,8 @@ const specs = (action: Action): Spec[] => action === 'capture' || action === 'co
     action === 'complete_followup' ? [{ key: 'completed_at', label: 'Completed at', required: true, time: true }, { key: 'completion_notes', label: 'Completion notes', required: true, multiline: true, max: 5000 }] :
     action === 'upload_evidence' ? [{ key: 'description', label: 'Evidence description', multiline: true, max: 2000 }] :
     [{ key: 'reason', label: 'Reason for removing this evidence', required: true, multiline: true, max: 2000 }];
-const label = (value: string) => value.replaceAll('_', ' ');
+// "skin_contact" → "Skin contact" (E2E: the review showed raw values such as "inhalation").
+const label = (value: string) => value.replaceAll('_', ' ').replace(/^./, (first) => first.toUpperCase());
 const FIELD_LABELS: Record<string, string> = { user_id: 'Worker involved', site_id: 'Site where this happened', exposed_at: 'Exposure date and time',
     exposure_type: 'Exposure route', exposure_duration: 'Recorded duration', circumstances: 'What happened', symptoms: 'Reported symptoms',
     first_aid_given: 'First aid given', medical_attention_sought: 'Medical attention sought', medical_treatment: 'Recorded treatment',
@@ -163,6 +164,10 @@ export function ExposureCommandForm({ action, actorId, detail: suppliedDetail, c
     const currentChoices = choices.choices; const sites = currentChoices?.sites ?? capture?.sites ?? (detail?.record ? [detail.record.site] : []);
     const staff = ['assign_followup', 'reassign_followup'].includes(action) && currentChoices && 'receivers' in currentChoices ? currentChoices.receivers : currentChoices?.staff;
     const staffOptions = (staff?.items ?? []).map((row) => ({ value: String(row.id), label: row.name }));
+    // Names already shown in the picker, so the review still names a chosen worker after the search changes
+    // (E2E: it showed "Worker reference 51").
+    const seenStaff = useRef<Record<string, string>>({});
+    for (const row of staffOptions) seenStaff.current[row.value] = row.label;
     const pinnedWorker = detail?.record?.worker;
     if (action === 'correct' && pinnedWorker && values.user_id === String(pinnedWorker.id) && values.site_id === String(detail?.record?.site.id)
         && !staffOptions.some((row) => row.value === String(pinnedWorker.id))) staffOptions.unshift({ value: String(pinnedWorker.id), label: pinnedWorker.name + ' · retained recorded worker' });
@@ -173,8 +178,9 @@ export function ExposureCommandForm({ action, actorId, detail: suppliedDetail, c
         ...(['assign_followup', 'reassign_followup'].includes(action) ? ['assigned_to'] : []), ...(action === 'upload_evidence' ? ['file'] : [])]);
     const reviewValue = (key: string, value: unknown) => {
         if (EXPOSURE_REPORTED_FACTS.includes(key as ExposureReportedFact) && value === null) return 'Unknown';
-        if (key === 'user_id') return staffOptions.find((row) => row.value === String(value))?.label ?? 'Worker reference ' + value;
-        if (key === 'assigned_to') return staffOptions.find((row) => row.value === String(value))?.label ?? 'Assignee reference ' + value;
+        if (key === 'user_id') return seenStaff.current[String(value)] ?? 'Worker reference ' + value;
+        if (key === 'assigned_to') return seenStaff.current[String(value)] ?? 'Assignee reference ' + value;
+        if (key === 'exposure_type' && typeof value === 'string' && value) return label(value);
         if (key === 'site_id') return sites.find((row) => row.id === Number(value))?.name ?? 'Site reference ' + value;
         if (key === 'related_incident_id') return value === null ? 'No related incident retained' : optionIncident?.items?.find((row) => row.id === Number(value))?.reference ?? 'Incident reference ' + value;
         if (typeof value === 'boolean') return value ? 'Yes' : 'No';

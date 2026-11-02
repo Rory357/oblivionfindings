@@ -15,6 +15,7 @@
         "seed:fresh": "php artisan migrate:fresh --seed",
         "test": "vitest run",
         "test:watch": "vitest",
+        "test:relay": "node --test \"relay/test/*.test.mjs\"",
         "types": "node --max-old-space-size=6144 ./node_modules/typescript/bin/tsc --noEmit",
         "visual:test": "playwright test -c playwright.config.ts",
         "visual:test:legacy": "playwright test -c playwright.config.ts --project=chromium-desktop --project=chromium-desktop-visual",

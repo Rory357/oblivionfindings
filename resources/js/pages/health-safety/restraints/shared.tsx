@@ -60,6 +60,8 @@ export type EventRow = {
     client: EntityRef | null;
     site: EntityRef | null;
     restraint_type: string;
+    /** One short "what happened" line for the title; older records have none. */
+    summary?: string | null;
     severity: string;
     started_at: string | null;
     ended_at: string | null;
@@ -104,6 +106,8 @@ export type EventDetail = {
     client: EntityRef | null;
     site: EntityRef | null;
     restraint_type: string;
+    /** One short "what happened" line for the title; older records have none. */
+    summary?: string | null;
     severity: string;
     started_at: string | null;
     ended_at: string | null;

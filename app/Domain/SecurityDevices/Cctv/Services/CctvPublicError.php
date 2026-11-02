@@ -15,7 +15,7 @@ final class CctvPublicError
         $allowed = match ($status) {
             400 => ['invalid_request'],
             401, 403, 404 => ['unavailable'],
-            409 => ['context_changed', 'active_source_exists', 'source_unavailable', 'capacity_unavailable'],
+            409 => ['context_changed', 'active_source_exists', 'source_unavailable', 'capacity_unavailable', CameraPrivacy::REFUSAL],
             default => ['temporarily_unavailable'],
         };
         // Only closed public codes can survive. Provider/internal exception text

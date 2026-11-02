@@ -10,6 +10,7 @@ import (
 	"oblivion.local/endpoint-agent/internal/securefs"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -94,6 +95,51 @@ func checkRepairIdentity(data []byte, uuid string, site int64, origin string) er
 	if json.Unmarshal(fields["collector_id"], &actualUUID) != nil || json.Unmarshal(fields["site_id"], &actualSite) != nil ||
 		json.Unmarshal(fields["central_url"], &actualOrigin) != nil || actualUUID != uuid || actualSite != site || actualOrigin != origin {
 		return invalid
+	}
+	return nil
+}
+
+// DeregisterInstalled tells Oblivion this hub is being removed ("Remove like any other app",
+// windows tab E), through the PHP hub's deregister command on its own signed connection. It
+// returns nil only when Oblivion confirmed (or already had the hub as removed). Setup calls it
+// with the service stopped, from the release folder the service last ran.
+func DeregisterInstalled(ctx context.Context, stage, state *securefs.Directory) error {
+	if stage == nil || state == nil {
+		return errInstallation
+	}
+	worker := &installed{state: state}
+	defer worker.Close()
+	var err error
+	if worker.code, err = worker.child(stage, "site", false); err != nil {
+		return errInstallation
+	}
+	if err = worker.holdCodeTree(worker.code, 0, new(int)); err != nil {
+		return err
+	}
+	for _, name := range []string{"Temp", "quarantine", "command-journal"} {
+		if _, err = worker.child(state, name, true); err != nil {
+			return errInstallation
+		}
+	}
+	if err = worker.validatePrivateState(); err != nil {
+		return err
+	}
+	system, err := windows.GetSystemDirectory()
+	if err != nil {
+		return errInstallation
+	}
+	windir, err := windows.GetWindowsDirectory()
+	if err != nil {
+		return errInstallation
+	}
+	runtime := filepath.Join(worker.code.Path(), "runtime")
+	worker.environment = []string{"SystemRoot=" + windir, "WINDIR=" + windir, "PATH=" + strings.Join([]string{runtime, system}, ";"),
+		"TEMP=" + filepath.Join(state.Path(), "Temp"), "TMP=" + filepath.Join(state.Path(), "Temp")}
+	bounded, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	code, err := runChild(bounded, worker.call("deregister"))
+	if err != nil || code != 0 {
+		return errors.New("Oblivion did not confirm the hub was removed")
 	}
 	return nil
 }

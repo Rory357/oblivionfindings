@@ -1,0 +1,81 @@
+<section class="board" id="m11"><div class="wide">
+  <div class="board-head"><span class="tag">M11 · packages B2 + B3</span><h3>Compliance lead — deciding a "close anyway" request</h3></div>
+  <div class="board-notes">
+    <ul>
+      <li>Today nobody is told when a "close anyway" request is waiting. The compliance lead's start leads with them, and admins see them in their queue (M1). Needs a worklist, a /tasks entry and a notice (K6).</li>
+      <li>The rest of the page is read-only and folded: the compliance lead reads health and safety work but doesn't act on it. No board reports (no board access).</li>
+    </ul>
+    <ul>
+      <li>The decision pop-up (720) shows the one item the request covers, what can't be skipped, the reason and evidence, and the two dates the server keeps: "review on" (on or before the lapse date) and when the request lapses.</li>
+      <li>Approving records a decision and closes nothing. Then the owner, or, as here with no owner, anyone who may close reviews at that site, can close it while both dates are ahead, so until the review date (end of that day, NZ time). Nobody decides their own request. Who may approve stays today's rule unless you change it in Q12.</li><li>No "Report incident" in the top bar: compliance leads can't report incidents.</li>
+    </ul>
+  </div>
+  <div class="stage-frame" id="f-m11"><div class="scaler"><div class="m" style="position:relative;min-height:1000px">
+    {{TOP PN}}
+    <div class="body">
+      {{SIDE full hs:Overview}}
+      <main class="main">
+        <div class="crumbs">Home {{I right}} <b>Health and safety</b></div>
+        <div class="sky">
+          <div class="idrow">
+            <div class="ring">{{I shield}}</div>
+            <div><div class="title">Health and safety</div><div class="subline">All sites · counts only records you can open</div></div>
+            <div class="cluster"><span class="glass search">{{I search}} Search health and safety</span></div>
+          </div>
+          <div class="nums">
+            <div class="num alert"><span class="v">1</span><div><div class="l">Close-anyway requests</div><div class="c">Now · waiting for your decision</div></div></div>
+            <div class="num crit"><span class="v">3</span><div><div class="l">WorkSafe: decide or tell</div><div class="c">Now · Health and safety act</div></div></div>
+            <div class="num"><span class="v">8</span><div><div class="l">Actions overdue</div><div class="c">Now · past their due date</div></div></div>
+            <div class="num"><span class="v">29</span><div><div class="l">Open safety reviews</div><div class="c">Now · all sites</div></div></div>
+          </div>
+          <div class="filters"><span class="fchip">{{I cal}} Period: <b>last 30 days</b> {{I down}}</span><span class="fchip">All sites · 12 {{I down}}</span></div>
+          <div class="rail"><span class="tab on">Overview</span><span class="tab">Prevention <span class="cnt">7 due</span></span><span class="tab">Harm and injuries</span><span class="tab">Legal duties</span><span class="tab find">{{I search}} Find</span></div>
+        </div>
+        <div class="grid g-main">
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="surface lead">
+              <div class="sh"><h4>Close-anyway requests</h4><span class="s">1 waiting for your decision</span><span class="r">All tasks {{I arrow}}</span></div>
+              <div class="row hl"><div class="when"><b>28 Oct</b>3 days</div><div class="what"><b>Worn hoist sling — Rimu House</b><span>Asked by Dana Hall · the investigation isn't needed · <span class="ref">HS-2026-0083</span></span></div><span class="badge b-warn">Waiting for a decision</span><span class="btn pri sm">Decide</span><span class="kebab">{{I more}}</span></div>
+            </section>
+            <section class="surface fyi">
+              <div class="sh"><h4>Health and safety are handling</h4><span class="s">Health and safety act on these; you can follow each one</span><span class="r">{{I right}} Show</span></div>
+            </section>
+          </div>
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="surface"><div class="sh"><h4>Checks due</h4><span class="s">Most overdue first</span></div>
+              <div class="row" style="grid-template-columns:minmax(0,1fr) auto 28px"><div class="what"><b>Emergency drills · 4 overdue</b><span>Fire evacuation, Tōtara House — overdue 9 months</span></div><span class="badge b-crit">Overdue</span><span class="kebab">{{I right}}</span></div></section>
+          </div>
+        </div>
+      </main>
+    </div>
+    <div class="veil"></div>
+    <div class="popup w720" style="left:400px;top:110px">
+      <div class="ph"><span class="lens">{{I hand}}</span><div><h5>Decide: close anyway?</h5><p>Dana Hall asked to close this safety review with one item still open.</p></div><span class="x">{{I x}}</span></div>
+      <div class="ctx">Worn hoist sling — Rimu House · <span class="ref">HS-2026-0083</span> · asked Wed 28 Oct, 4:12 pm by Dana Hall · no owner</div>
+      <div class="pb">
+        <div style="border:1px solid var(--m-border);border-radius:11px;overflow:hidden">
+          <div class="checks">
+            <div class="ck" style="border-top:0;background:var(--m-muted);font-size:12px;font-weight:650;color:var(--m-muted-fg)">The request covers</div>
+            <div class="ck"><span class="mark" style="color:var(--m-muted-fg)">{{I list}}</span><div>The investigation isn't finished. Dana says one isn't needed: the sling was found worn on a routine check, before anyone was hurt, and replaced the same day</div><span class="who">Investigation not needed</span></div>
+            <div class="ck" style="background:var(--m-muted);font-size:12px;font-weight:650;color:var(--m-muted-fg)">Can't be skipped — all done</div>
+            <div class="ck"><span class="mark y">{{I check}}</span><div>WorkSafe decision: not a notifiable event</div><span class="who">Dana · 28 Oct</span></div>
+            <div class="ck"><span class="mark y">{{I check}}</span><div>Record checks: all passed</div><span class="who"></span></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+          <div><div class="small muted">Why Dana asked</div>Found on the monthly hoist check, taken out of use at once and replaced that afternoon. Nobody used it after it was found.</div>
+          <div><div class="small muted">Evidence</div>Hoist check 28 Oct and a photo of the new sling · Files</div>
+          <div><div class="small muted">Review on</div><b>Fri 20 Nov 2026</b></div>
+          <div><div class="small muted">Request lapses</div><b>Thu 26 Nov 2026</b></div>
+        </div>
+        <div class="tiles">
+          <div class="tile on"><span class="radio"></span><div><b>Approve</b><span>Then anyone who can close safety reviews at Rimu House can close it, until Fri 20 Nov</span></div></div>
+          <div class="tile"><span class="radio"></span><div><b>Decline — keep it open</b><span>Dana sees your reason on the record</span></div></div>
+        </div>
+        <div class="field"><label>Your reason</label><div class="textarea">Found before harm and replaced the same day; the check record shows it.</div></div>
+      </div>
+      <div class="pf"><span class="left">Recorded as Priya Nair, compliance lead</span><span class="btn out">Cancel</span><span class="btn pri">{{I check}} Record: approve</span></div>
+    </div>
+  </div></div></div>
+  <div class="frame-tools"><button type="button" data-full="f-m11">Full size</button><span>Compliance lead (Priya Nair) · admins decide the same way</span></div>
+</div></section>

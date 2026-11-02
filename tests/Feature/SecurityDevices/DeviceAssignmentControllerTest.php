@@ -284,7 +284,7 @@ class DeviceAssignmentControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}");
+            ->get("/security-devices/devices/{$device->id}?section=assignments");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page

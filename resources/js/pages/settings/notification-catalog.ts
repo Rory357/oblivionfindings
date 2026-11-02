@@ -97,6 +97,16 @@ export const NOTIFICATION_META: Record<string, NotificationMeta> = {
         name: 'High Severity Unreviewed Reminder',
         description: 'Reminder for unreviewed high-severity incidents',
     },
+    'health_safety.chemical_exposure_followup_assigned': {
+        name: 'Exposure follow-up assigned to you',
+        description:
+            'When a private chemical exposure follow-up is assigned to you. In the app only.',
+    },
+    'healthSafety.meeting_update': {
+        name: 'Health and safety committee meetings',
+        description:
+            'When you are invited to a committee meeting, or one at your Site is scheduled. In the app and by email.',
+    },
     'followups.created': {
         name: 'Follow-up Created',
         description: 'When a new follow-up task is created',
@@ -178,6 +188,8 @@ export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
             'incidents.high_severity_alert',
             'breakglass.daily_report',
             'incidents.high_unreviewed_reminder',
+            'health_safety.chemical_exposure_followup_assigned',
+            'healthSafety.meeting_update',
         ],
     },
     followups: {

@@ -7,7 +7,7 @@ Stephan decided on 22 October 2026 (decision D1 in [../2026-10-22-rebuild-plan.h
 
 ## What stays outside Oblivion's code
 
-The platform every product runs on stays, with its notices: PHP, Laravel, Inertia, React, Radix, Tailwind, lucide, MySQL, Node.js, and the browser's built-in WebRTC, MediaRecorder, Web Audio and Push. Standard separate programs stay separate: ClamAV (virus scanning) and coturn (the firewall relay for calls, decision D4). Browser push still travels through the push services run by Google, Mozilla and Apple.
+The platform every product runs on stays, with its notices: PHP, Laravel, Inertia, React, Radix, Tailwind, lucide, MySQL, Node.js, and the browser's built-in WebRTC, MediaRecorder, Web Audio and Push. Standard separate programs stay separate: ClamAV (virus scanning). The firewall relay for calls is no longer one of them: on 1 November 2026 Rory changed decision D4 from coturn to Oblivion's own relay, Oblivion Relay, built through this clean room. Browser push still travels through the push services run by Google, Mozilla and Apple.
 
 Ownership of AI-written code is not settled law everywhere. A lawyer should confirm Oblivion's position before it is relied on commercially.
 
@@ -32,6 +32,7 @@ Ownership of AI-written code is not settled law everywhere. A lawyer should conf
 | Oblivion push sender | minishlink/web-push and its web-token, spomky-labs and brick/math parts | RFC 8030 (Web Push), RFC 8291 (message encryption), RFC 8292 (VAPID), RFC 8188 (aes128gcm), RFC 7515 and 7518 (JWS, ES256) |
 | Oblivion signer | Chat's direct use of firebase/php-jwt | RFC 7519 (JWT), RFC 7515 (JWS), RFC 2104 (HMAC-SHA256) |
 | Oblivion Calls | livekit-client, its bundled helpers, the LiveKit server | W3C WebRTC 1.0, RFC 8829 (JSEP), RFC 8445 (ICE), RFC 8656 (TURN, client side), RFC 4566 and 8866 (SDP) |
+| Oblivion Relay (firewall relay for calls: STUN and TURN) | coturn (planned under D4, never installed) and, once LiveKit goes, the LiveKit server's built-in TURN. Never open coturn, LiveKit's TURN, pion/turn or any other STUN or TURN implementation | RFC 8489 (STUN), RFC 8656 (TURN), RFC 5769 (STUN test vectors), RFC 7983 (first-byte demultiplexing), RFC 2104 (HMAC), RFC 8446 and 5246 (TLS), draft-uberti-behave-turn-rest-00 (TURN REST credentials), the Node.js documentation, and nginx's documentation for the PROXY protocol header it sends. RFC 6062 (TCP relaying) is out of scope |
 | Voice-note checker | ffprobe for chat voice notes | Matroska and WebM specification, RFC 7845 (Ogg Opus), RFC 3533 (Ogg), ISO base media file format as published, RFC 6716 (Opus) |
 | Emoji data | (new; never import emoji-mart, Twemoji or similar) | Unicode emoji data files (Unicode Licence v3, notice kept); Oblivion writes its own keywords, including te reo Māori |
 
@@ -39,7 +40,7 @@ Ownership of AI-written code is not settled law everywhere. A lawyer should conf
 
 Before an engine merges, the checker:
 
-1. Runs a token-similarity comparison between the new files and the replaced library's source, and reviews every match above a low threshold by hand.
+1. Runs a token-similarity comparison between the new files and the replaced library's source, and reviews every match above a low threshold by hand. [tools/token-similarity.mjs](tools/token-similarity.mjs) does this across PHP, TypeScript and C. Download the outside source to a scratch folder outside the repository, and calibrate the tool with a deliberate port of one outside function (kept outside the repository) and with unrelated Oblivion files.
 2. Confirms the replaced packages are uninstalled, their licence copies removed from `deploy/chat-calling/licenses/`, and `scripts/chat-license-notices.mjs` updated.
 3. Adds a guard so the package can't come back unnoticed (ESLint `no-restricted-imports` for browser packages; a test that reads `composer.json` for PHP packages).
 4. Marks the engine "signed off" in REGISTER.md with the date and the provenance note.
@@ -66,8 +67,9 @@ Copy into `provenance/<engine>.md`.
 | Engine | Spec | Status |
 |---|---|---|
 | Oblivion Live (live updates, typing, presence, call signalling) and the Oblivion signer | [specs/oblivion-live.md](specs/oblivion-live.md) | Spec written 23 Oct 2026; ready for a builder session |
-| Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Spec written 23 Oct 2026; ready for a builder session |
-| Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Spec written 23 Oct 2026; ready for a builder session |
+| Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Built 23 Oct 2026 on `claude/reverent-wu-0bdbe2`, package removed; signed off by the checker 23 Oct 2026, no copied code ([provenance](provenance/push-sender.md#similarity-check)). Manual browser acceptance on the test server still open |
+| Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Built 23 Oct 2026 on `claude/eager-mahavira-c57cd4` ([provenance](provenance/voice-checker.md)). Checked 23 Oct 2026: no copied code. Rechecked the same day: the first four findings were fixed, and two MP4 findings went back to the builder. **Signed off 31 Oct 2026** after a second recheck: both MP4 fixes hold and the tests pass. Real Safari recordings are still to come |
 | Oblivion Calls | to write after Oblivion Live (stage 5) | — |
+| Oblivion Relay (firewall relay for calls) | [specs/oblivion-relay.md](specs/oblivion-relay.md) | Spec written 1 Nov 2026, and updated the same day with the user's answers (instant cut-off over a control channel, fuller logs kept 14 days, running beside nginx on the test server, installed by Stephan, for Chat calls only, with CCTV and remote support deferred). Built 1 Nov 2026 on branch `claude/oblivion-relay-build-ea1d70`; signed off by the checker 1 Nov 2026, no copied code ([provenance](provenance/oblivion-relay.md#similarity-check)). Installing it on the test server and the acceptance checks (spec section 12) are still open |
 
 The session that wrote these specs opened the built files of livekit-client and pusher-js to read their licence headers, so it does not build those replacements itself.

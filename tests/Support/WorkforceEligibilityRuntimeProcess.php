@@ -233,7 +233,11 @@ final class WorkforceEligibilityRuntimeProcess
         if (! is_file($base.'/.env')) {
             return;
         }
-        if ($ci !== 'true' || $github !== 'true' || $database !== 'oblivion_findings_codex_test_'.$owner || $owner < 1) {
+        // The owner's throwaway `<base>_<pid>` schema, or the kept slot it provably holds.
+        $owned = $database === 'oblivion_findings_codex_test_'.$owner
+            || (preg_match('/\Aoblivion_findings_codex_test_k[0-9a-f]{6}_[0-9]+\z/D', $database) === 1
+                && OwnedTestDatabase::isOwnedBy($database, $owner));
+        if ($ci !== 'true' || $github !== 'true' || ! $owned || $owner < 1) {
             throw new RuntimeException('Only the existing PID-isolated GitHub CI dotenv contract is supported.');
         }
         // Anchor the template to this helper's known checkout, never the supplied environment directory.

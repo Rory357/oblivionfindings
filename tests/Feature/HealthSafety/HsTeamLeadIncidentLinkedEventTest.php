@@ -41,6 +41,11 @@ final class HsTeamLeadIncidentLinkedEventTest extends TestCase
     {
         $site = Site::factory()->create(['is_active' => true]);
         $lead = $this->teamLead($site);
+        // Since Q21 (Stephan, 2 Nov 2026) team leads read incidents at their own Sites (RoleQ21AccessTest). This keeps the
+        // event-only path covered for a lead whose incident read is turned off.
+        $read = \App\Models\Permission::where('key', 'incidents.viewAny')->sole();
+        $lead->permissionOverrides()->syncWithoutDetaching([$read->id => ['allowed' => false]]);
+        $lead = $lead->fresh();
         [$incident, $event] = $this->incidentLinkedEvent($site, $lead);
         $attachment = ClientIncidentAttachment::query()->create(['incident_id' => $incident->id, 'uploaded_by' => $lead->id,
             'disk' => 'public', 'original_name' => 'scene.txt', 'path' => 'incident_attachments/scene.txt',
@@ -115,7 +120,11 @@ final class HsTeamLeadIncidentLinkedEventTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('detail.source', null)->where('detail.linked_access.incident', 'restricted'));
         $this->assertStringNotContainsString('PRIVATE-INCIDENT-NARRATIVE', $detail->getContent());
-        $this->actingAs($lead)->get('/incidents?incident='.$incident->id)->assertForbidden();
+        // Q21: the register now opens for a team lead at their own Site, but an HR-confidential incident stays out of it
+        // and its own page stays closed (IncidentAccessService needs hr.cases.view).
+        $register = $this->actingAs($lead)->get('/incidents?incident='.$incident->id)->assertOk();
+        $this->assertStringNotContainsString('PRIVATE-INCIDENT-NARRATIVE', $register->getContent());
+        $this->assertContains($this->actingAs($lead)->get('/incidents/'.$incident->id)->status(), [403, 404]);
         $this->actingAs($lead)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/accept-handover", ['acceptance_notes' => 'Accepted without the HR narrative.'])
             ->assertSessionHas('success');

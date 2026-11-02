@@ -10,7 +10,9 @@ use App\Domain\SecurityDevices\Drivers\Enums\DriverSupportLevel;
 use App\Domain\SecurityDevices\Models\Device;
 
 /**
- * NetFlow v5, NetFlow v9 (RFC 3954), IPFIX (RFC 7011), and sFlow v5 through the local Site hub.
+ * NetFlow / IPFIX / sFlow received by the Site hub. Not built yet (S&D Phase B): the hub runs
+ * short work cycles and has no network listener, so the hub-side receiver was removed. The
+ * server can still accept flow items a hub uploads, and has its own flow listener.
  */
 final class HubNetflowTelemetryDriver implements DeviceDriver
 {
@@ -28,20 +30,18 @@ final class HubNetflowTelemetryDriver implements DeviceDriver
             brand: 'IETF IPFIX & Cisco NetFlow Standard',
             name: 'NetFlow v5 / v9, IPFIX & sFlow v5 via Site Hub',
             deviceClass: DriverDeviceClass::Telemetry,
-            supportLevel: DriverSupportLevel::BuiltFromDocs,
-            transportSummary: 'Private-LAN UDP NetFlow / IPFIX into Site hub -> XChaCha20-Poly1305 encrypted spool -> HTTPS upload',
+            supportLevel: DriverSupportLevel::Planned,
+            transportSummary: 'Not built yet: the Site hub does not receive NetFlow, IPFIX or sFlow',
             models: ['Cisco Catalyst / ISR', 'FortiGate (NetFlow v9 / IPFIX)', 'MikroTik Traffic Flow (v5 / v9 / IPFIX)', 'HPE Aruba (sFlow v5 / IPFIX)'],
             capabilities: [
                 DriverCapability::TelemetryNetflow,
-                DriverCapability::NetworkHealth,
             ],
-            summary: 'Collects NetFlow v5, NetFlow v9, IPFIX, and sFlow v5 flow exports from private-LAN routers and switches through the Site hub, validates exporter sequence health, and aggregates Site traffic metrics.',
+            summary: 'Not built yet. The Site hub has no flow receiver, so routers and switches at a house cannot send traffic flows to Oblivion through their hub.',
             officialDocs: [
                 ['label' => 'RFC 7011 — IPFIX Protocol Specification', 'url' => 'https://datatracker.ietf.org/doc/html/rfc7011'],
                 ['label' => 'RFC 3954 — Cisco Systems NetFlow Services Export v9', 'url' => 'https://datatracker.ietf.org/doc/html/rfc3954'],
             ],
-            limitationsNote: 'Aggregates flow metadata (bytes, packets, ports, sequence gaps); deep packet inspection payloads are never captured.',
-            setupHref: '/security-devices/collectors',
+            limitationsNote: 'Planned for a later phase. No traffic flows are collected through a hub today.',
         );
     }
 

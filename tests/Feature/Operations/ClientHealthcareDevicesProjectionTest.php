@@ -100,7 +100,7 @@ class ClientHealthcareDevicesProjectionTest extends TestCase
             ->assertJsonPath('props.healthcare_devices.devices.0.technical.battery.level', 64)
             ->assertJsonPath('props.healthcare_devices.devices.0.technical.flow.state', 'offline')
             ->assertJsonPath('props.healthcare_devices.devices.0.it_tickets.0.id', $ticket->id)
-            ->assertJsonPath('props.healthcare_devices.links.healthcare', '/security-devices/healthcare?tab=client-devices');
+            ->assertJsonPath('props.healthcare_devices.links.healthcare', '/security-devices/devices?tab=sensors&group=health');
 
         $payload = json_encode($response->json('props.healthcare_devices'), JSON_THROW_ON_ERROR);
         foreach ([

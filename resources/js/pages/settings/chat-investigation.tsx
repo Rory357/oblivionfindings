@@ -1,3 +1,4 @@
+import { InvestigationExportDialog } from '@/components/chat-governance/investigation-export-dialog';
 import {
     conversationLabel,
     governanceRequest,
@@ -10,8 +11,9 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { formatDateTime } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import { Head, usePage } from '@inertiajs/react';
-import { Eye, Paperclip } from 'lucide-react';
+import { Eye, FileDown, Paperclip } from 'lucide-react';
 import { useState } from 'react';
 
 export type InvestigationMessage = {
@@ -33,10 +35,17 @@ export type InvestigationPage = {
     grant: {
         id: number;
         case_reference: string;
+        case_batch: string | null;
         reason: string;
         expires_at: string;
     };
     conversation: InvestigableConversation;
+    /** Every conversation granted under this case, this one included (metadata only). */
+    case_conversations: {
+        grant_id: number;
+        conversation: InvestigableConversation | null;
+        active: boolean;
+    }[];
     holds: {
         id: number;
         case_reference: string;
@@ -63,7 +72,16 @@ export default function ChatInvestigationView({
     const [loading, setLoading] = useState(false);
     const [ended, setEnded] = useState(false);
     const [error, setError] = useState('');
+    const [exporting, setExporting] = useState(false);
     const { grant, conversation } = investigation;
+    const caseConversations = investigation.case_conversations ?? [];
+    // The export is offered only while this grant is active; the server checks again.
+    const [loadedAt] = useState(() => Date.now());
+    const canExport = !ended && new Date(grant.expires_at).getTime() > loadedAt;
+    const activeInCase = Math.max(
+        1,
+        caseConversations.filter((item) => item.active).length,
+    );
     const activeHold = investigation.holds.find((hold) => hold.active);
 
     async function loadEarlier() {
@@ -138,7 +156,13 @@ export default function ChatInvestigationView({
                                 )}
                             </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                            {canExport && (
+                                <Button onClick={() => setExporting(true)}>
+                                    <FileDown className="size-4" />
+                                    Export PDF
+                                </Button>
+                            )}
                             <Button asChild variant="outline">
                                 <a href="/settings/chat/investigations">
                                     Back to investigations
@@ -175,6 +199,64 @@ export default function ChatInvestigationView({
                                 'None remaining'}
                         </p>
                     </section>
+                    {caseConversations.length > 1 && (
+                        <nav
+                            aria-label="Conversations in this case"
+                            className="grid gap-2 rounded-2xl border bg-card p-5 text-sm shadow-xs"
+                        >
+                            <h2 className="text-section-title">
+                                Conversations in this case
+                            </h2>
+                            <ul className="grid gap-1">
+                                {caseConversations.map((item) => {
+                                    const current = item.grant_id === grant.id;
+                                    const label = item.conversation
+                                        ? conversationLabel(item.conversation)
+                                        : 'Conversation unavailable';
+                                    return (
+                                        <li
+                                            key={item.grant_id}
+                                            className={cn(
+                                                'flex flex-wrap items-center justify-between gap-2 rounded-md px-3 py-2',
+                                                current && 'bg-muted',
+                                            )}
+                                        >
+                                            {item.active && !current ? (
+                                                <a
+                                                    href={`/settings/chat/investigations/${item.grant_id}`}
+                                                    className="min-w-0 break-words underline underline-offset-4"
+                                                >
+                                                    {label}
+                                                </a>
+                                            ) : (
+                                                <span
+                                                    className="min-w-0 break-words"
+                                                    aria-current={
+                                                        current
+                                                            ? 'page'
+                                                            : undefined
+                                                    }
+                                                >
+                                                    {label}
+                                                </span>
+                                            )}
+                                            {current ? (
+                                                <StatusBadge variant="info">
+                                                    Viewing
+                                                </StatusBadge>
+                                            ) : (
+                                                !item.active && (
+                                                    <StatusBadge variant="neutral">
+                                                        Access ended
+                                                    </StatusBadge>
+                                                )
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </nav>
+                    )}
                     {error && (
                         <p
                             role="alert"
@@ -293,6 +375,16 @@ export default function ChatInvestigationView({
                         </section>
                     )}
                 </div>
+                {canExport && (
+                    <InvestigationExportDialog
+                        actorId={auth.user.id}
+                        grantId={grant.id}
+                        caseReference={grant.case_reference}
+                        activeInCase={activeInCase}
+                        open={exporting}
+                        onOpenChange={setExporting}
+                    />
+                )}
             </SettingsLayout>
         </AppLayout>
     );

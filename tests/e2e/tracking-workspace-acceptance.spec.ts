@@ -7,6 +7,10 @@ import {
 } from './helpers';
 import { seedTrackingWorkspaceReadinessFixtures } from './tracking-workspace-fixtures';
 
+// S&D rebuild C6 retired the Tracking workspace: trackers are Fleet's and
+// read-only here, on Devices › Trackers and each tracker's own page. The old
+// Fleet, Assets, Geofences and History tabs live on Fleet's own pages.
+
 async function expectNoPageOverflow(page: Page) {
     const widths = await page.evaluate(() => ({
         client: document.documentElement.clientWidth,
@@ -16,103 +20,110 @@ async function expectNoPageOverflow(page: Page) {
     expect(widths.scroll).toBeLessThanOrEqual(widths.client);
 }
 
-test.describe('Tracking specialist workspace', () => {
+async function expectTrackersTab(page: Page) {
+    await expect(
+        page.getByRole('heading', { name: 'Devices', level: 1, exact: true }),
+    ).toBeVisible();
+    await expect(
+        page
+            .getByRole('tablist', { name: 'Kinds of device' })
+            .getByRole('tab', { name: /^Trackers/ }),
+    ).toHaveAttribute('aria-selected', 'true');
+}
+
+test.describe('Tracking on Security & Devices', () => {
     let fixture: ReturnType<typeof seedTrackingWorkspaceReadinessFixtures>;
 
     test.beforeAll(() => {
         fixture = seedTrackingWorkspaceReadinessFixtures();
     });
 
-    test('purpose, consent, source links, geofences and history remain clear and privacy-safe', async ({
+    test('consent, source links and the client round trip remain clear and privacy-safe', async ({
         page,
     }) => {
         test.setTimeout(180_000);
         const errors = collectConsoleErrors(page);
 
         await loginAsStaff(page);
-        await page.goto('/security-devices/tracking');
-
+        await page.goto(
+            `/security-devices/devices?tab=trackers&q=${encodeURIComponent(fixture.activeDeviceName)}`,
+        );
+        await expectTrackersTab(page);
         await expect(
-            page.getByRole('heading', { name: 'Tracking', level: 1 }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole('heading', {
-                name: 'Location access follows purpose',
-                level: 2,
-            }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole('heading', {
-                name: 'Tracking at a glance',
-                level: 2,
-            }),
+            page.getByText(fixture.activeDeviceName, { exact: true }).first(),
         ).toBeVisible();
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expectNoPageOverflow(page);
 
-        const tabs = page.getByRole('navigation', {
-            name: 'Tracking workspace tabs',
-        });
-        await tabs
-            .getByRole('link', { name: 'Personal safety', exact: true })
-            .click();
-
-        const activeCard = page.getByRole('article', {
-            name: fixture.activeDeviceName,
-        });
-        await expect(activeCard).toContainText(fixture.activeClientName);
-        await expect(activeCard).toContainText('Consent active');
-        await expect(activeCard).toContainText('Last location');
-        const clientLocationLink = activeCard.getByRole('link', {
-            name: 'Open client location',
-        });
-        await expect(clientLocationLink).toHaveAttribute(
-            'href',
-            `/operations/clients/${fixture.activeClientId}?tab=location`,
-        );
-        const deviceDetailHref = await activeCard
-            .getByRole('link', { name: fixture.activeDeviceName })
-            .getAttribute('href');
-        expect(deviceDetailHref).not.toBeNull();
-        const deviceDetailResponse = await page.request.get(
-            deviceDetailHref as string,
-        );
-        expect(deviceDetailResponse.ok()).toBe(true);
-        const deviceDetailPayload = await deviceDetailResponse.text();
-        expect(deviceDetailPayload).not.toContain(fixture.rawSentinel);
-        expect(deviceDetailPayload).not.toContain('-36.84850000');
-
-        const withdrawnCard = page.getByRole('article', {
-            name: fixture.withdrawnDeviceName,
-        });
-        await expect(withdrawnCard).toContainText(fixture.withdrawnClientName);
-        await expect(withdrawnCard).toContainText('Consent withdrawn');
-        await expect(withdrawnCard).not.toContainText('Last location');
+        // Active consent: the tracker names its client, and its page never carries
+        // the provider envelope or another unit's location.
+        const activeDeviceHref = `/security-devices/devices/${fixture.activeDeviceId}`;
+        await page.goto(activeDeviceHref);
         await expect(
-            withdrawnCard.getByRole('link', { name: 'Open client location' }),
+            page.getByRole('heading', {
+                name: fixture.activeDeviceName,
+                level: 1,
+                exact: true,
+            }),
+        ).toBeVisible();
+        const linkedClient = page.locator(
+            `a[href="/clients/${fixture.activeClientId}"]`,
+        );
+        await expect(linkedClient).toContainText(fixture.activeClientName);
+        await expect(
+            linkedClient.getByText('Consent active', { exact: true }),
+        ).toBeVisible();
+        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
+        const activePayload = await (
+            await page.request.get(activeDeviceHref)
+        ).text();
+        expect(activePayload).not.toContain(fixture.rawSentinel);
+        expect(activePayload).not.toContain('-36.84850000');
+        await expectNoPageOverflow(page);
+
+        // Withdrawn consent: no location, and the page says what still works.
+        const withdrawnDeviceHref = `/security-devices/devices/${fixture.withdrawnDeviceId}`;
+        await page.goto(withdrawnDeviceHref);
+        await expect(
+            page.getByRole('heading', {
+                name: fixture.withdrawnDeviceName,
+                level: 1,
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByText('Consent not active', { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText('What still works without consent'),
+        ).toBeVisible();
+        await expect(
+            page.getByText('Consent active', { exact: true }),
         ).toHaveCount(0);
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
+        const withdrawnPayload = await (
+            await page.request.get(withdrawnDeviceHref)
+        ).text();
+        expect(withdrawnPayload).not.toContain(fixture.rawSentinel);
         await expectNoPageOverflow(page);
 
-        await clientLocationLink.click();
-        await expect(page).toHaveURL(
-            new RegExp(
-                `/operations/clients/${fixture.activeClientId}\\?tab=location$`,
-            ),
+        // The client's location tab links to the tracker and to Devices › Trackers.
+        await page.goto(
+            `/operations/clients/${fixture.activeClientId}?tab=location`,
         );
-        const trackingWorkspaceLink = page.getByRole('link', {
+        const trackersLink = page.getByRole('link', {
             name: 'Open Tracking workspace',
         });
-        await expect(trackingWorkspaceLink).toHaveAttribute(
+        await expect(trackersLink).toHaveAttribute(
             'href',
-            '/security-devices/tracking?tab=personal-safety',
+            '/security-devices/devices?tab=trackers',
         );
         const deviceProfileLink = page.getByRole('link', {
             name: 'Open Device Profile',
         });
         await expect(deviceProfileLink).toHaveAttribute(
             'href',
-            `/security-devices/devices/${fixture.activeDeviceId}`,
+            activeDeviceHref,
         );
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expectNoPageOverflow(page);
@@ -125,87 +136,25 @@ test.describe('Tracking specialist workspace', () => {
             page.waitForURL(deviceProfileUrl, { timeout: 30_000 }),
             deviceProfileLink.click(),
         ]);
-        await expect(page).toHaveURL(
-            new RegExp(
-                `/security-devices/devices/${fixture.activeDeviceId}(?:\\?.*)?$`,
-            ),
-        );
         await expect(
             page.getByRole('heading', {
                 name: fixture.activeDeviceName,
                 level: 1,
+                exact: true,
             }),
         ).toBeVisible();
-        const clientReturnLink = page.getByRole('main').getByRole('link', {
-            name: fixture.activeClientProfileName,
-            exact: true,
-        });
-        await expect(clientReturnLink).toHaveAttribute(
-            'href',
+        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
+
+        await page.goto(
             `/operations/clients/${fixture.activeClientId}?tab=location`,
         );
-        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
-        await expectNoPageOverflow(page);
-
-        await clientReturnLink.click();
-        await expect(page).toHaveURL(
-            new RegExp(
-                `/operations/clients/${fixture.activeClientId}\\?tab=location$`,
-            ),
-        );
-        await trackingWorkspaceLink.click();
-        await expect(page).toHaveURL(
-            /\/security-devices\/tracking\?tab=personal-safety$/,
-        );
-        await expect(
-            page.getByRole('article', { name: fixture.activeDeviceName }),
-        ).toBeVisible();
-        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
-        await expectNoPageOverflow(page);
-
-        await tabs.getByRole('link', { name: 'Fleet', exact: true }).click();
-        const fleetCard = page.getByRole('article', {
-            name: fixture.vehicleDeviceName,
-        });
-        await expect(fleetCard).toContainText(fixture.vehicleName);
-        await expect(fleetCard).toContainText('Operational access');
-        await expect(
-            fleetCard.getByRole('link', { name: 'Open vehicle in Fleet' }),
-        ).toHaveAttribute('href', /\/fleet-assets\/vehicles\/\d+/);
-        await expect(page.locator('.leaflet-container')).toBeVisible();
-        await expectNoPageOverflow(page);
-
-        await tabs.getByRole('link', { name: 'Assets', exact: true }).click();
-        const assetCard = page.getByRole('article', {
-            name: fixture.assetDeviceName,
-        });
-        await expect(assetCard).toContainText(fixture.assetName);
-        await expect(
-            assetCard.getByRole('link', { name: 'Open asset record' }),
-        ).toHaveAttribute('href', /\/fleet-assets\/assets\/\d+/);
-        await expectNoPageOverflow(page);
-
-        await tabs
-            .getByRole('link', { name: 'Geofences', exact: true })
-            .click();
-        await expect(page.getByText(fixture.geofenceName)).toBeVisible();
-        await expect(
-            page.getByRole('link', { name: 'Open Fleet geofences' }),
-        ).toHaveAttribute('href', '/fleet-assets/geofences');
-        await expect(page.locator('.leaflet-container')).toBeVisible();
-        await expectNoPageOverflow(page);
-
-        await tabs.getByRole('link', { name: 'History', exact: true }).click();
-        await expect(
-            page.getByRole('heading', {
-                name: 'Retained location history',
-                level: 2,
+        await Promise.all([
+            page.waitForURL(/\/security-devices\/devices\?tab=trackers$/, {
+                timeout: 30_000,
             }),
-        ).toBeVisible();
-        await expect(page.getByText('365-day retention window')).toBeVisible();
-        await expect(
-            page.getByText('Playwright Location Report'),
-        ).toBeVisible();
+            trackersLink.click(),
+        ]);
+        await expectTrackersTab(page);
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expectNoPageOverflow(page);
 

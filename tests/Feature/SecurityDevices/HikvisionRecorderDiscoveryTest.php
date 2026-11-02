@@ -278,6 +278,17 @@ final class HikvisionRecorderDiscoveryTest extends TestCase
         return array_map(fn ($v) => [$v], ['kind', 'recorder_site', 'network', 'credential_version', 'credential_capability', 'actor', 'collector_revoked']);
     }
 
+    /**
+     * S&D Phase B: a removed hub that still signs with its own key is told 410 (wipe your saved
+     * logins); every other change is refused as before.
+     *
+     * @return list<int>
+     */
+    private function deniedStatuses(string $kind): array
+    {
+        return $kind === 'collector_revoked' ? [410] : [401, 404, 409, 503];
+    }
+
     private function change(string $kind): void
     {
         match ($kind) {
@@ -316,7 +327,7 @@ final class HikvisionRecorderDiscoveryTest extends TestCase
         $this->postCollector('results', $body)->assertOk();
         $row = HikvisionDiscoveryRequest::query()->firstOrFail();
         $this->change($kind);
-        self::assertContains($this->postCollector('results', $body)->status(), [401, 404, 409, 503]);
+        self::assertContains($this->postCollector('results', $body)->status(), $this->deniedStatuses($kind));
         self::assertSame($row->result_hash, $row->fresh()->result_hash);
         self::assertSame(1, AuditLog::query()->where('action', 'cctv.hikvision.discovery.result_recorded')->count());
     }
@@ -412,7 +423,7 @@ final class HikvisionRecorderDiscoveryTest extends TestCase
         $op = $this->dispatched();
         $body = $this->resultBody($this->observation($op));
         $this->change($kind);
-        self::assertContains($this->postCollector('results', $body)->status(), [401, 404, 409, 503]);
+        self::assertContains($this->postCollector('results', $body)->status(), $this->deniedStatuses($kind));
         self::assertNull(HikvisionDiscoveryRequest::query()->firstOrFail()->result_hash);
         self::assertSame('issued', CredentialLeaseGrant::query()->firstOrFail()->status);
         self::assertSame(0, AuditLog::query()->where('action', 'cctv.hikvision.discovery.result_recorded')->count());

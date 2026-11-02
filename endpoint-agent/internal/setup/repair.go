@@ -18,6 +18,25 @@ var repairDigest = regexp.MustCompile("^[a-f0-9]{64}$")
 // decodeRepairInstallation uses the protected receipt, not a new enrolment grant.
 // It still requires the exact currently valid publisher archive and destination.
 func decodeRepairInstallation(data []byte, m release.Manifest, digest, server, role string) (Journal, error) {
+	j, err := decodeInstalledRecord(data, server, role)
+	if err != nil {
+		return Journal{}, err
+	}
+	if !recordMatchesPackage(j, m, digest) {
+		return Journal{}, errors.New("installation record does not match this release and computer; approved repair or update is required")
+	}
+	return j, nil
+}
+
+// recordMatchesPackage: the record names exactly this signed release.
+func recordMatchesPackage(j Journal, m release.Manifest, digest string) bool {
+	return j.Version == m.Version && j.Revision == m.Revision && j.ManifestSHA256 == digest && j.Architecture == m.Architecture
+}
+
+// decodeInstalledRecord reads a completed installation record with the same strict checks as
+// before, but against the release the record itself names. Callers then decide which signed
+// package each part must match (a hub that updated itself runs a newer site part).
+func decodeInstalledRecord(data []byte, server, role string) (Journal, error) {
 	var found Journal
 	if len(data) > 32768 || json.Unmarshal(data, &found) != nil {
 		return Journal{}, errors.New("installed record requires administrator review")
@@ -38,10 +57,6 @@ func decodeRepairInstallation(data []byte, m release.Manifest, digest, server, r
 		}
 	}
 	expected := found
-	expected.Version = m.Version
-	expected.Revision = m.Revision
-	expected.ManifestSHA256 = digest
-	expected.Architecture = m.Architecture
 	expected.ServerURL = server
 	expected.Role = role
 	j, err := decodeJournal(data, expected)

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\SecurityDevices;
 
-use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -48,7 +47,8 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
         $this->auditor->roles()->attach(Role::where('name', 'auditor')->firstOrFail());
     }
 
-    #[DataProvider('workspaceRouteProvider')]
+    /** S&D rebuild C6: the six-entry menu (Overview · Devices · Sites · Access · Alerts · Setup). */
+    #[DataProvider('menuRouteProvider')]
     public function test_grouped_navigation_destinations_resolve_to_production_backed_pages(
         string $route,
         string $component,
@@ -59,124 +59,63 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertInertia(fn ($page) => $page->component($component));
     }
 
-    public static function workspaceRouteProvider(): array
+    public static function menuRouteProvider(): array
     {
         return [
-            'network and IT' => ['/security-devices/network-it', 'security-devices/category'],
-            'security' => ['/security-devices/security', 'security-devices/category'],
-            'healthcare' => ['/security-devices/healthcare', 'security-devices/category'],
-            'tracking' => ['/security-devices/tracking', 'security-devices/category'],
-            'facilities and IoT' => ['/security-devices/facilities-iot', 'security-devices/category'],
-            'monitoring' => ['/security-devices/monitoring', 'security-devices/monitoring'],
-            'maintenance' => ['/security-devices/maintenance', 'security-devices/maintenance'],
-            'discovery' => ['/security-devices/discovery', 'security-devices/discovery'],
-            'settings' => ['/security-devices/settings', 'security-devices/settings'],
+            'overview' => ['/security-devices', 'security-devices/overview/index'],
+            'devices' => ['/security-devices/devices', 'security-devices/devices/index'],
+            'sites' => ['/security-devices/sites', 'security-devices/sites/index'],
+            'access' => ['/security-devices/access', 'security-devices/access/index'],
+            'alerts' => ['/security-devices/alerts', 'security-devices/alerts/index'],
+            'setup' => ['/security-devices/setup', 'security-devices/setup/index'],
         ];
     }
 
-    #[DataProvider('canonicalWorkspaceProvider')]
-    public function test_canonical_workspace_routes_use_the_approved_plain_language_title(
-        string $route,
-        string $slug,
-        string $title,
-    ): void {
-        $this->actingAs($this->admin)
-            ->get($route)
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('security-devices/category')
-                ->where('pageConfig.slug', $slug)
-                ->where('pageConfig.title', $title)
-            );
+    /** The old workspaces and operations pages now send people into the menu above. */
+    #[DataProvider('retiredRouteProvider')]
+    public function test_retired_pages_redirect_into_the_six_entry_menu(string $route, string $target): void
+    {
+        $this->actingAs($this->admin)->get($route)->assertRedirect($target);
     }
 
-    public static function canonicalWorkspaceProvider(): array
+    public static function retiredRouteProvider(): array
     {
         return [
-            'network and IT' => ['/security-devices/network-it', 'network-it', 'Network & IT'],
-            'security' => ['/security-devices/security', 'security', 'Security'],
-            'healthcare' => ['/security-devices/healthcare', 'healthcare', 'Healthcare'],
-            'tracking' => ['/security-devices/tracking', 'tracking', 'Tracking'],
-            'facilities and IoT' => ['/security-devices/facilities-iot', 'facilities-iot', 'Facilities & IoT'],
+            'network and IT' => ['/security-devices/network-it', '/security-devices/devices?tab=network'],
+            'security' => ['/security-devices/security', '/security-devices/devices?tab=alarms_doors'],
+            'healthcare' => ['/security-devices/healthcare', '/security-devices/devices?tab=sensors&group=health'],
+            'tracking' => ['/security-devices/tracking', '/security-devices/devices?tab=trackers'],
+            'facilities and IoT' => ['/security-devices/facilities-iot', '/security-devices/devices?tab=sensors'],
+            'monitoring' => ['/security-devices/monitoring', '/security-devices/alerts'],
+            'maintenance' => ['/security-devices/maintenance', '/security-devices/devices?tab=upkeep'],
+            'discovery' => ['/security-devices/discovery', '/security-devices/setup/hubs?tab=networks'],
+            'settings' => ['/security-devices/settings', '/security-devices/setup'],
         ];
     }
 
-    public function test_category_registration_capability_matches_the_exact_create_permission(): void
+    public function test_device_registration_capability_matches_the_exact_create_permission(): void
     {
         $this->actingAs($this->auditor)
-            ->get('/security-devices/security')
+            ->get('/security-devices/devices')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('can.registerDevice', false));
+            ->assertInertia(fn ($page) => $page->where('can.add', false));
 
         $this->actingAs($this->admin)
-            ->get('/security-devices/security')
+            ->get('/security-devices/devices')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('can.registerDevice', true));
+            ->assertInertia(fn ($page) => $page->where('can.add', true));
     }
 
-    #[DataProvider('canonicalOperationsProvider')]
-    public function test_canonical_operations_routes_use_the_approved_plain_language_title(
-        string $route,
-        string $component,
-        string $title,
-    ): void {
-        $this->actingAs($this->admin)
-            ->get($route)
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component($component)
-                ->where('pageMeta.title', $title)
-            );
-    }
-
-    public static function canonicalOperationsProvider(): array
+    public function test_settings_readers_reach_only_the_setup_sections_they_can_open(): void
     {
-        return [
-            'monitoring' => ['/security-devices/monitoring', 'security-devices/monitoring', 'Monitoring'],
-            'maintenance' => ['/security-devices/maintenance', 'security-devices/maintenance', 'Maintenance'],
-        ];
-    }
+        $this->actingAs($this->auditor)->get('/security-devices/settings')->assertRedirect('/security-devices/setup');
 
-    public function test_discovery_summary_reports_stale_collectors_from_real_heartbeat_times(): void
-    {
-        MonitoringCollector::factory()->create([
-            'name' => 'Online collector',
-            'status' => 'online',
-            'last_seen_at' => now()->subMinute(),
-        ]);
-        MonitoringCollector::factory()->create([
-            'name' => 'Stale collector',
-            'status' => 'offline',
-            'last_seen_at' => now()->subMinutes(10),
-        ]);
-        MonitoringCollector::factory()->create([
-            'name' => 'Unassigned collector',
-            'status' => 'offline',
-            'last_seen_at' => null,
-        ]);
-
-        $this->actingAs($this->admin)
-            ->get('/security-devices/discovery')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('security-devices/discovery')
-                ->has('workspace.collectors', 3)
-                ->where('workspace.summary.collectors', 3)
-                ->where('workspace.summary.online_collectors', 1)
-                ->where('workspace.summary.collection_paths_unavailable', 2)
-            );
-    }
-
-    public function test_settings_only_lists_areas_the_user_can_open(): void
-    {
         $this->actingAs($this->auditor)
-            ->get('/security-devices/settings')
+            ->get('/security-devices/setup')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('security-devices/settings')
-                ->has('areas', 1)
-                ->where('areas.0.title', 'Reports')
-                ->where('areas.0.href', '/security-devices/reports')
+                ->component('security-devices/setup/index')
+                ->where('sections', fn ($sections) => collect($sections)->pluck('key')->all() === ['overview', 'history'])
             );
     }
 
@@ -190,8 +129,8 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/sites/index')
-                ->has('sites', 2)
-                ->where('sites.0.name', 'Kea Lodge')
+                ->has('cards', 2)
+                ->where('cards.0.name', 'Kea Lodge')
             );
     }
 
@@ -206,8 +145,8 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/sites/show')
                 ->where('site.name', 'Koru House')
-                ->has('devices')
-                ->has('summary')
+                ->has('meters')
+                ->has('overview')
             );
 
         $this->actingAs($this->admin)

@@ -8,6 +8,7 @@
  * wizard pop-ups, the rest open in place above the record. Drafts survive section changes; a record whose source
  * needs repair withholds its facts and commands; a worker's own issue shows only their own facts.
  */
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { PageHeader, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageHeaderStatusChip, PageLayout } from '@/components/page';
 import { PageHeaderFacts, PageHeaderStages, type PageHeaderFact, type PageHeaderNextStep, type PageHeaderStage } from '@/components/page/page-header-strip';
 import { Note, Surface } from '@/components/signature/blocks';
@@ -124,6 +125,7 @@ function issueStages(d: PpeAllocation): { steps: PageHeaderStage[]; next: PageHe
 export default function PpeShow(props: (PpeRecord | PpeRepairRecord) & { return_to?: string | null }) { return <PpeWorkspace key={`${props.kind}:${props.detail.id}`} {...props} />; }
 function PpeWorkspace(props: (PpeRecord | PpeRepairRecord) & { return_to?: string | null }) {
     const { url, props: shared } = usePage<SharedData>();
+    const safetyCan = shared.auth.can;
     const damaged = props.detail.source_integrity === 'repair_required';
     // The last readable record keeps retained drafts mounted while a repair withholds the source; its commands are all off.
     const [lastReadable, setLastReadable] = useState<PpeRecord | null>(() => (damaged ? null : props as PpeRecord));
@@ -186,8 +188,8 @@ function PpeWorkspace(props: (PpeRecord | PpeRepairRecord) & { return_to?: strin
     const stages = damaged || record.kind === 'inspections' ? null : record.kind === 'inventory' ? equipmentStages(record.detail) : issueStages(record.detail);
 
     const inlineActive = !!command && !WIZARD_COMMANDS.includes(command) && (permitted || !!retained[commandKey]);
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' },
-        ...(own ? [] : [{ title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' }]),
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' },
+        ...(own ? safetyHubCrumbs('prevention', safetyCan).slice(0, 1) : safetyHubCrumbs('prevention', safetyCan)),
         { title: 'PPE & equipment', href: own ? returnTo : PPE_REGISTER }, { title, href: ppeHref(record.kind, record.detail.id) }]}>
         <Head title={`${title} · PPE & equipment`} />
         <SafetyFormDraftContext.Provider value={drafts.register}>

@@ -2422,7 +2422,7 @@ it('installs the forward receipt bridge on an already-applied baseline schema', 
     $baseDatabase = DB::getDatabaseName();
     $upgradeDatabase = $baseDatabase.'_upgrade_'.bin2hex(random_bytes(4));
     if (preg_match(
-        '/^oblivion_findings_codex_test_[0-9]+_upgrade_[0-9a-f]{8}$/',
+        '/^oblivion_findings_codex_test_(?:k[0-9a-f]{6}_)?[0-9]+_upgrade_[0-9a-f]{8}$/',
         $upgradeDatabase,
     ) !== 1) {
         throw new RuntimeException('Refusing to create an upgrade schema outside the PID test boundary.');

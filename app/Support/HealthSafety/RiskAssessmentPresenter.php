@@ -133,6 +133,90 @@ class RiskAssessmentPresenter
         return $rows;
     }
 
+    /** Link columns the register's eager loads are bound to (see bindProvenEagerLoads()). */
+    private const REGISTER_LINKS = ['id', 'assessable_type', 'assessable_id', 'hs_event_id', 'assessed_by_user_id', 'approved_by_user_id', 'created_by'];
+
+    /**
+     * Speed R3b (MASTER for Stephan, 31 Oct 2026; the approved speed option B rule). The register ran its full guard
+     * (Site scope, risk authority, linked-event source chain: a ~260 KB statement) in every tab count, hero count, the
+     * page query and each eager load, and the final barrier replayed each one (~20 runs, ~4.5 s for a manager). Here the
+     * guarded register scope runs ONCE, unpaged, reading each readable assessment's id and links. Its read stays tracked
+     * (the clone keeps the materialisation proof's hooks), so the final barrier replays it and any change withholds the
+     * page (404). Every count and the page query are then "their own filters AND id IN that set"; the set lives only in
+     * this read (one request, one viewer). PROOF_PARITY compares the set with the guarded scope.
+     *
+     * @return array{ids: list<int>, rows: array<int, array<string, mixed>>}
+     */
+    public static function proveRegisterScope(Builder $scope, User $viewer, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+        $context->assertActive();
+        $base = (clone $scope)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->toBase()
+            ->cloneWithout(['columns'])->cloneWithoutBindings(['select'])
+            ->select(array_map(fn (string $column): string => 'hs_risk_assessments.'.$column, self::REGISTER_LINKS));
+        $rows = [];
+        foreach ($base->get() as $row) {
+            $raw = (array) $row;
+            $rows[(int) $raw['id']] = $raw;
+        }
+        ksort($rows);
+
+        return ['ids' => array_keys($rows), 'rows' => $rows];
+    }
+
+    /** "id IN the proven register set" (see proveRegisterScope()), tracked for the final barrier. */
+    public static function provenRegisterQuery(array $proven, HealthSafetyReadContext $context): Builder
+    {
+        return self::track(HsRiskAssessment::query()->whereIn('hs_risk_assessments.id', $proven['ids']), $context);
+    }
+
+    /**
+     * guardEagerQuery()'s eager-load bindings for a page query over the proven register set: each related row must be
+     * linked from a proven assessment, by the link values read in the proving query, instead of re-embedding the whole
+     * guard per relation. The page's assessments are a subset of the proven set, so the related rows loaded for them
+     * are the same. Only the relations the register loads are supported; anything else must use guardEagerQuery().
+     */
+    public static function bindProvenEagerLoads(Builder $query, array $proven, HealthSafetyReadContext $context): Builder
+    {
+        $context->assertActive();
+        $values = function (string $column, ?array $types = null) use ($proven): array {
+            $out = [];
+            foreach ($proven['rows'] as $row) {
+                if ($types !== null && ! in_array($row['assessable_type'], $types, true)) { continue; }
+                if ($row[$column] !== null) { $out[(int) $row[$column]] = true; }
+            }
+            ksort($out);
+            return array_keys($out);
+        };
+        $columns = ['hsEvent' => 'hs_event_id', 'assessedBy' => 'assessed_by_user_id', 'approvedBy' => 'approved_by_user_id', 'creator' => 'created_by'];
+        foreach ($query->getEagerLoads() as $name => $original) {
+            if (isset($columns[$name])) {
+                $ids = $values($columns[$name]);
+                $query->with([$name => function ($relation) use ($original, $ids, $context): void {
+                    $original($relation); $relation->whereIn($relation->getRelated()->qualifyColumn('id'), $ids);
+                    self::track($relation->getQuery(), $context);
+                }]);
+            } elseif ($name === 'assessable') {
+                $query->with(['assessable' => function (MorphTo $relation) use ($original, $values, $context): void {
+                    $original($relation);
+                    $constraints = [];
+                    foreach ([Site::class, Client::class, HsEvent::class] as $type) {
+                        $ids = $values('assessable_id', array_values(array_unique([$type, (new $type)->getMorphClass()])));
+                        $constraints[$type] = function (Builder $target) use ($ids, $context): void {
+                            $target->whereIn($target->getModel()->qualifyColumn('id'), $ids);
+                            self::track($target, $context);
+                        };
+                    }
+                    $relation->constrain($constraints);
+                }]);
+            } else {
+                throw new \LogicException("The proven register set does not bind the [{$name}] relation; use guardEagerQuery().");
+            }
+        }
+
+        return self::track($query, $context);
+    }
+
     /** The register row's fields, from an assessment that has already passed its proof. */
     private static function rowPayload(HsRiskAssessment $ra, User $viewer, HealthSafetyReadContext $context): array
     {
@@ -193,6 +277,12 @@ class RiskAssessmentPresenter
                 $reviewReasons[] = 'Record whether residual risk is acceptable.';
             }
 
+            // #13: the sealed change history is checked every time the page is read. A chain that doesn't check out hides
+            // the history and the change buttons (the server refuses changes) and is logged for an administrator.
+            $seal = self::sealedHistory($ra, $viewer, $context);
+            $broken = $seal['state'] === 'broken';
+            $canManage = $canManage && ! $broken;
+
             return array_merge(self::row($ra, $viewer, $context, $original), [
                 'existing_controls' => $ra->existing_controls,
                 'additional_controls' => $ra->additional_controls,
@@ -224,7 +314,8 @@ class RiskAssessmentPresenter
                     'remove_evidence' => $canManage && $mutable,
                 ],
                 'connections' => $connections,
-                'history' => self::history($ra, $original, $context),
+                'history' => $broken ? [] : self::history($ra, $original, $context, $seal),
+                'history_integrity' => ['state' => $seal['state'], 'sealed_count' => $seal['count'], 'sealed_since' => $seal['since']],
                 'review_completion_gate' => ['eligible' => $reviewReasons === [], 'reasons' => $reviewReasons],
                 'form' => self::formPrefill($ra),
             ]);
@@ -393,7 +484,36 @@ class RiskAssessmentPresenter
     }
 
     /** Business history only: no request metadata, storage paths, or inferred actors. */
-    private static function history(HsRiskAssessment $assessment, Builder $original, HealthSafetyReadContext $context): array
+    /**
+     * #13: the assessment's sealed chain for this viewer: 'checked' (every sealed change is chained to the one before),
+     * 'unsealed' (nothing sealed yet), 'unavailable' (this viewer can't prove the attachment's own source), or 'broken'.
+     *
+     * @return array{state: string, count: int, since: string|null, sealed: array<string, array{sequence: int, snapshot: array}>}
+     */
+    private static function sealedHistory(HsRiskAssessment $ra, User $viewer, HealthSafetyReadContext $context): array
+    {
+        try {
+            $history = app(\App\Services\HealthSafety\RiskAssessmentAcceptanceService::class)->history((int) $ra->getKey(), $viewer, $context);
+        } catch (\LogicException $broken) {
+            \Illuminate\Support\Facades\Log::error('Risk assessment sealed history does not check out', ['assessment_id' => (int) $ra->getKey(),
+                'reference' => $ra->reference_number, 'viewer_id' => (int) $viewer->id, 'problem' => $broken->getMessage()]);
+
+            return ['state' => 'broken', 'count' => 0, 'since' => null, 'sealed' => []];
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $denied) {
+            if (! in_array($denied->getStatusCode(), [403, 404], true)) { throw $denied; }
+
+            return ['state' => 'unavailable', 'count' => 0, 'since' => null, 'sealed' => []];
+        }
+        $sealed = [];
+        foreach ($history['items'] as $item) {
+            $sealed[(string) $item['id']] = ['sequence' => (int) $item['sequence'], 'snapshot' => is_array($item['snapshot']) ? $item['snapshot'] : []];
+        }
+
+        return ['state' => $sealed === [] ? 'unsealed' : 'checked', 'count' => count($sealed),
+            'since' => $history['items'][0]['occurred_at'] ?? null, 'sealed' => $sealed];
+    }
+
+    private static function history(HsRiskAssessment $assessment, Builder $original, HealthSafetyReadContext $context, array $seal = ['sealed' => []]): array
     {
         $query = AuditLog::query()->whereIn('auditable_type', array_unique([HsRiskAssessment::class, $assessment->getMorphClass()]))
             ->where('auditable_id', $assessment->id)
@@ -406,7 +526,7 @@ class RiskAssessmentPresenter
         $semanticCreation = $logs->contains('action', 'risk_assessment.created');
 
         return $logs->reject(fn (AuditLog $log) => $semanticCreation && $log->action === 'hsriskassessment.create')
-            ->map(function (AuditLog $log): array {
+            ->map(function (AuditLog $log) use ($seal): array {
                 $meta = $log->meta ?? [];
                 $legacy = str_starts_with($log->action, 'hsriskassessment.');
                 $raw = $legacy ? ($meta['after'] ?? []) : ($meta['snapshot'] ?? []);
@@ -432,7 +552,27 @@ class RiskAssessmentPresenter
                         ->map(fn ($name) => basename(str_replace('\\', '/', $name)))->values()->all();
                 }
 
-                return ['id' => 'audit-'.$log->id, 'action' => $log->action, 'title' => $title,
+                $id = 'audit-'.$log->id;
+                $sealedEntry = $seal['sealed'][$id] ?? null;
+                $changes = [];
+                if ($sealedEntry !== null) {
+                    // The sealed snapshot itself, and what it changed against the sealed change before it.
+                    $names = $snapshot['names'] ?? null;
+                    $snapshot = self::historySnapshot($sealedEntry['snapshot']);
+                    if ($names !== null) { $snapshot['names'] = $names; }
+                    $previous = null;
+                    foreach ($seal['sealed'] as $other) {
+                        if ($other['sequence'] === $sealedEntry['sequence'] - 1) { $previous = self::historySnapshot($other['snapshot']); }
+                    }
+                    if ($previous !== null) {
+                        foreach (self::historySnapshot($sealedEntry['snapshot']) as $field => $value) {
+                            if (($previous[$field] ?? null) !== $value) { $changes[] = ['field' => $field, 'before' => $previous[$field] ?? null, 'after' => $value]; }
+                        }
+                    }
+                }
+
+                return ['id' => $id, 'action' => $log->action, 'title' => $title,
+                    'sealed' => $sealedEntry === null ? null : ['change' => $sealedEntry['sequence'], 'changes' => $changes],
                     'actor' => $log->user ? ['id' => $log->user->id, 'name' => $log->user->name] : null,
                     'occurred_at' => $log->created_at?->toIso8601String(),
                     'note' => is_string($note) ? $note : null, 'snapshot' => $snapshot, 'legacy' => $legacy];
@@ -453,6 +593,8 @@ class RiskAssessmentPresenter
     {
         return array_values(array_unique([...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS,
             ...InjuryAccessService::PERMISSIONS, ...SafeWorkProcedureAccessService::PERMISSIONS, ...EmergencyDrillAccessService::PERMISSIONS, ...\App\Services\ControlRoom\ControlRoomGovernanceReadService::PERMISSIONS,
+            // #13: the sealed history's own source checks (it prepares, never grants).
+            ...\App\Services\HealthSafety\RiskAssessmentAcceptanceService::PERMISSIONS,
             'governance.view', 'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view']));
     }
 

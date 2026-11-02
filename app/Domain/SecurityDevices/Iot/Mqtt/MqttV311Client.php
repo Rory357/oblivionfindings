@@ -11,7 +11,7 @@ use RuntimeException;
  * Clean-room implementation from the OASIS Standard:
  * - http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
  */
-final class MqttV311Client
+final class MqttV311Client implements MqttSubscriber
 {
     public const int PACKET_CONNECT = 1;
 
@@ -166,8 +166,12 @@ final class MqttV311Client
 
     public function ping(): bool
     {
-        $this->writePacket("\xC0\x00");
-        $packet = $this->readPacket();
+        try {
+            $this->writePacket("\xC0\x00");
+            $packet = $this->readPacket();
+        } catch (RuntimeException) {
+            return false;
+        }
 
         return $packet !== null && $packet['type'] === self::PACKET_PINGRESP;
     }
@@ -445,8 +449,15 @@ final class MqttV311Client
         while (strlen($buffer) < $length) {
             $chunk = @fread($this->stream, $length - strlen($buffer));
             if ($chunk === false || $chunk === '') {
+                // Phase A, item A4: a closed connection used to look the same as a quiet one, so the
+                // listener never reconnected. Now a closed connection is reported as lost.
+                if (feof($this->stream)) {
+                    $this->closeStream();
+                    throw new MqttConnectionLost('The MQTT broker closed the connection.');
+                }
+
                 $meta = stream_get_meta_data($this->stream);
-                if (($meta['timed_out'] ?? false) === true || feof($this->stream)) {
+                if (($meta['timed_out'] ?? false) === true) {
                     return strlen($buffer) === 0 ? null : throw new RuntimeException('Truncated MQTT stream read.');
                 }
 

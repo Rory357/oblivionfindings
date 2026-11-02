@@ -69,6 +69,7 @@ class EmergencyDrillController extends Controller
                     'attention' => ['sites_overdue' => $summary['overdue'], 'findings_open' => $openFindings, 'findings_overdue' => $overdueFindings, 'awaiting_writeup' => (int) ($counts['in_progress'] ?? 0)],
                     'badges' => ['sites_drilled_pct' => $summary['pct'], 'drills_overdue' => $overdue, 'sites_overdue' => $summary['overdue'], 'fenz_reviews_due' => $plansDue]],
                 'filters' => ['q' => $request->input('q'), 'tab' => $tab, 'period' => $request->input('period', '6mo'), 'drill_type' => $request->input('drill_type'), 'outcome' => $request->input('outcome'), 'site_id' => $request->filled('site_id') ? $request->integer('site_id') : null],
+                'register_summary' => $this->registerSummary($summarySites, $plansDue),
                 'sites' => $pickers['sites'], 'staff' => $pickers['staff'], 'pickers' => $pickers, 'detail' => null,
                 'can' => ['manage' => $current->canDo('hazards.manage'), 'schedule' => $this->access->canCreate($current)],
                 'exports' => ['register_href' => '/health-safety/drills/export'.($request->query() === [] ? '' : '?'.http_build_query($request->except(['drill', 'schedule', 'action', 'return_to'])))],
@@ -265,6 +266,58 @@ class EmergencyDrillController extends Controller
             'period' => ['nullable', Rule::in(['30d', 'quarter', '6mo', 'all'])],
             'drill_type' => ['nullable', Rule::in([...EmergencyDrillService::DRILL_TYPES, 'fire'])],
             'outcome' => ['nullable', Rule::in(['passed', 'passed_actions', 'failed'])]]);
+    }
+
+    /**
+     * G4-12 (board approved 1 Nov 2026): the four header counts and the one lead block for the selected Site, whatever
+     * the period, search or view: things to fix that are overdue, evacuation-scheme reviews due, drills run and Sites
+     * that ran one in the last 90 days. The lead block holds overdue planned drills and overdue things to fix, oldest
+     * due date first, with how many more overdue drills there are and where.
+     *
+     * @param  array<int, int>  $sites
+     */
+    private function registerSummary(array $sites, int $plansDue): array
+    {
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $since90 = now()->subDays(90);
+        $drills = fn () => $this->access->scopeForSites(EmergencyDrill::query(), $sites);
+        $overdueFindings = fn () => EmergencyDrillFinding::query()->whereNotIn('status', self::TERMINAL_FINDINGS)
+            ->whereNotNull('due_date')->where('due_date', '<', $today)
+            ->whereIn('emergency_drill_id', $drills()->select('id'));
+        $overdueDrills = $drills()->where('status', 'scheduled')->where('scheduled_at', '<', now())
+            ->with('site:id,name')->orderBy('scheduled_at')->orderBy('id')->get();
+        // "Not run since": the last time this Site ran this kind of drill (fire and fire evacuation are one kind).
+        $types = fn (?string $type) => in_array($type, ['fire', 'fire_evacuation'], true) ? ['fire', 'fire_evacuation'] : [$type];
+        $lastRun = fn (EmergencyDrill $drill) => $drill->site_id ? $drills()->where('site_id', $drill->site_id)->whereIn('drill_type', $types($drill->drill_type))
+            ->whereNotNull('completed_at')->max('completed_at') : null;
+
+        $rows = $overdueDrills->map(fn (EmergencyDrill $drill) => [
+            'kind' => 'drill', 'id' => (int) $drill->id, 'title' => $drill->title, 'site' => $drill->site?->name,
+            'site_id' => $drill->site_id, 'due' => $drill->scheduled_at?->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
+            'last_run_at' => ($last = $lastRun($drill)) ? Carbon::parse($last)->toIso8601String() : null,
+        ])->all();
+        foreach ($overdueFindings()->with(['emergencyDrill' => fn ($q) => $q->with('site:id,name'), 'assignee:id,name'])->orderBy('due_date')->orderBy('id')->limit(10)->get() as $finding) {
+            $drill = $finding->emergencyDrill;
+            $rows[] = ['kind' => 'finding', 'id' => (int) $finding->id, 'drill_id' => (int) $finding->emergency_drill_id,
+                'title' => $finding->description, 'site' => $drill?->site?->name, 'drill_type' => $drill?->drill_type,
+                'drill_on' => ($drill?->completed_at ?? $drill?->scheduled_at)?->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
+                'owner' => $finding->assignee?->name, 'due' => $finding->due_date?->toDateString()];
+        }
+        usort($rows, fn ($a, $b) => [$a['due'] ?? '9999-12-31', $a['kind']] <=> [$b['due'] ?? '9999-12-31', $b['kind']]);
+        $lead = array_slice($rows, 0, 3);
+        $shownDrills = array_column(array_filter($lead, fn ($row) => $row['kind'] === 'drill'), 'id');
+        $moreDrills = $overdueDrills->reject(fn ($drill) => in_array((int) $drill->id, $shownDrills, true));
+
+        return [
+            'boxes' => [
+                'things_to_fix_overdue' => $overdueFindings()->count(),
+                'evacuation_reviews_due' => $plansDue,
+                'drills_run_90d' => $drills()->whereNotNull('completed_at')->where('completed_at', '>=', $since90)->count(),
+                'sites_drilled_90d' => $drills()->whereNotNull('completed_at')->where('completed_at', '>=', $since90)->distinct()->count('site_id'),
+            ],
+            'lead' => $lead,
+            'more_overdue' => ['count' => $moreDrills->count(), 'sites' => $moreDrills->pluck('site.name')->filter()->unique()->values()->all()],
+        ];
     }
 
     private function base(Request $request, array $sites): Builder

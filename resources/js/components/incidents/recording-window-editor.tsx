@@ -165,7 +165,7 @@ function WindowEditor({ preview, previewAvailable, actorId, incidentId, refreshi
                 <p className="text-subtle">Record the period to review and the cameras included. This does not retrieve or preserve footage. Earlier windows and links remain in the history.</p>
             </div>
             <div className="space-y-4 p-4 sm:px-9 sm:py-5">
-                {!canRecord ? <p role="alert" className="text-subtle">You cannot record a new evidence window with your current access.</p> : null}
+                {!canRecord ? <p className="text-subtle">You cannot record a new evidence window with your current access.</p> : null}
                 {!previewAvailable ? <p role="alert" className="text-subtle">Current choices could not be verified. Any original submission is retained privately in this tab; refresh access or check its save result.</p> : null}
                 {stale ? <p role="alert" className="text-subtle">Incident details or camera choices changed. Check any pending save before reviewing the latest choices.</p> : null}
                 {showDetails && submitted ? <dl className="grid gap-4 sm:grid-cols-2">

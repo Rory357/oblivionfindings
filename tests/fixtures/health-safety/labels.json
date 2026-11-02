@@ -108,6 +108,20 @@
             "restricted": "Hidden — you don't have access",
             "original_context_restricted": "Hidden — you don't have access",
             "unavailable": "Not available"
+        },
+        "action_check": {
+            "worked": "Checked — it worked",
+            "not_worked": "Checked — it didn't work"
+        },
+        "owner_state": {
+            "unassigned": "No owner yet",
+            "replacement_needed": "Owner needs replacing"
+        },
+        "handover_status": {
+            "not_ready": "Not passed on yet",
+            "awaiting_acceptance": "Waiting for Health and safety to take it on",
+            "accepted": "Taken on by Health and safety",
+            "not_required": "Not needed"
         }
     },
     "humanise": {

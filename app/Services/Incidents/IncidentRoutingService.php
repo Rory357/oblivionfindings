@@ -232,14 +232,22 @@ final class IncidentRoutingService
         $attempted = 0; $failed = 0;
         $intents = IncidentRoutingIntent::query()->where('id', '>', max(0, $afterIntentId))->whereIn('state', ['pending', 'error'])->orderBy('id')->limit($limit)->pluck('id');
         foreach ($intents as $id) {
-            try { $this->consume((int) $id); } catch (Throwable) { $failed++; }
+            try { $this->consume((int) $id); } catch (Throwable $error) {
+                $failed++;
+                IncidentRoutingValues::logFailure('routing.consume', $error, ['intent_id' => (int) $id,
+                    'incident_id' => ($incident = rescue(fn () => IncidentRoutingIntent::query()->whereKey($id)->value('incident_id'), null, false)) === null ? null : (int) $incident]);
+            }
             $attempted++;
         }
         $owned = ClientIncident::query()->where('id', '>', $afterIncidentId)->where(fn ($q) => $q->whereNotNull('incident_owner_user_id')->orWhere('owner_revision', '>', 0))->whereNotIn('status', ['draft', 'closed'])->orderBy('id')->limit($limit)->pluck('id');
         foreach ($owned as $id) {
+            $intent = null;
             try {
                 if ($intent = $this->stageForReplacement((int) $id)) { $this->consume($intent); }
-            } catch (Throwable) { $failed++; }
+            } catch (Throwable $error) {
+                $failed++;
+                IncidentRoutingValues::logFailure($intent ? 'routing.replacement.consume' : 'routing.replacement.stage', $error, ['intent_id' => $intent, 'incident_id' => (int) $id]);
+            }
             $attempted++; // One selected replacement check, whether no change, consumed, or failed.
         }
         return ['attempted' => $attempted, 'failed' => $failed, 'next_incident_cursor' => $owned->count() === $limit ? (int) $owned->last() : null,

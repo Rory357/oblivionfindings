@@ -5,11 +5,22 @@ import (
 	"errors"
 )
 
-// VerifyExecutable checks that filename is a valid Windows PE executable image
-// (not a DLL) targeting the expected architecture. Publisher authority is
-// enforced by the Ed25519-signed release manifest (OBLIVION-RELEASE-V1) and
-// download catalogue (OBLIVION-DOWNLOADS-V1) so unsigned Windows builds can be
-// verified cross-platform without an X.509 Authenticode certificate.
+// UnsignedTestBuild is the explicit switch that lets a build accept Windows programs without an
+// Authenticode signature. It is set only with
+//
+//	-ldflags "-X oblivion.local/endpoint-agent/internal/release.UnsignedTestBuild=true"
+//
+// and CI sets it only while no code-signing certificate exists (D1: unsigned while testing).
+// Once signing exists, release builds leave it off, so a signed install can never be swapped
+// for an unsigned update.
+var UnsignedTestBuild = "false"
+
+var errUnsigned = errors.New("release executable signature or certificate status could not be verified")
+
+// VerifyExecutable checks that filename is a standalone Windows program for the expected
+// architecture and, unless this is an unsigned test build, that it carries a valid Authenticode
+// signature chain. The publisher-signed manifest (OBLIVION-RELEASE-V1) separately approves
+// these exact bytes.
 func VerifyExecutable(filename, architecture string) error {
 	file, err := openArchive(filename)
 	if err != nil {
@@ -36,7 +47,13 @@ func VerifyExecutable(filename, architecture string) error {
 	if executable.Machine != expected {
 		return errors.New("release executable architecture does not match this installation")
 	}
-	return nil
+	if verifyAuthenticode(filename, file) == nil {
+		return nil
+	}
+	if UnsignedTestBuild == "true" {
+		return nil
+	}
+	return errUnsigned
 }
 
 func verifyBuildExecutable(filename, architecture string) error {

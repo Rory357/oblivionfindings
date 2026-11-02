@@ -18,6 +18,7 @@ import {
     ItChangeDestination,
     ItWorkspaceAccessRequired,
 } from '@/components/security-devices/permission-destinations';
+import { SshHostKeyNotice } from '@/components/security-devices/ssh-host-key-notice';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -1220,7 +1221,7 @@ function DeviceManagementWorkspace({
                                         'mismatch',
                                     ].includes(command.status)) && (
                                     <>
-                                        <div className="mt-3 rounded-lg border-l-4 border-l-primary bg-muted/30 p-3 text-sm">
+                                        <div className="mt-3 rounded-lg bg-muted/30 p-3 text-sm">
                                             <span className="font-medium">
                                                 Next action:
                                             </span>{' '}
@@ -2932,6 +2933,7 @@ export function DeviceConfigurationSection({
         latestSnapshot,
         snapshotHistory,
         snapshotHistoryTruncated,
+        sshHostKey,
     } = profile.configuration;
     const [diffTarget, setDiffTarget] =
         useState<ConfigurationDiffTarget | null>(null);
@@ -2941,7 +2943,9 @@ export function DeviceConfigurationSection({
     const showBackupsCard =
         Boolean(backupActionHref) ||
         Boolean(latestSnapshot) ||
-        (snapshotHistory?.length ?? 0) > 0;
+        (snapshotHistory?.length ?? 0) > 0 ||
+        Boolean(sshHostKey?.offered) ||
+        Boolean(sshHostKey?.trusted);
 
     return (
         <div className="space-y-4">
@@ -3130,6 +3134,7 @@ export function DeviceConfigurationSection({
                         ) : null}
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        <SshHostKeyNotice state={sshHostKey} />
                         {canViewSnapshots === false ? (
                             <p className="text-sm text-muted-foreground">
                                 Configuration snapshot downloads and version

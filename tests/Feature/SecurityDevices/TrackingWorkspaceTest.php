@@ -26,11 +26,13 @@ use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\AuthoritativeConsentFixture;
+use Tests\Feature\SecurityDevices\Concerns\ReadsRetiredWorkspaceProps;
 use Tests\TestCase;
 
 class TrackingWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
+    use ReadsRetiredWorkspaceProps;
 
     private User $admin;
 
@@ -73,8 +75,7 @@ class TrackingWorkspaceTest extends TestCase
         $this->link($fleetTracker, $vehicle, 'installed_in');
         $this->link($assetTracker, $asset);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/tracking')
+        $this->retiredWorkspace($this->admin, 'tracking', '')
             ->assertOk()
             ->assertInertia(function ($page) use ($unrelated): void {
                 $tracking = $page->toArray()['props']['trackingWorkspace'];
@@ -105,8 +106,7 @@ class TrackingWorkspaceTest extends TestCase
             ->tracking()
             ->create([]);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/tracking')
+        $this->retiredWorkspace($this->admin, 'tracking', '')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $activeTab = $page->toArray()['props']['trackingWorkspace']['activeTab'];
@@ -130,8 +130,7 @@ class TrackingWorkspaceTest extends TestCase
             'name' => 'Healthy tracker',
         ]);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/tracking?tab=overview&attention=offline')
+        $this->retiredWorkspace($this->admin, 'tracking', 'tab=overview&attention=offline')
             ->assertOk()
             ->assertInertia(function ($page) use ($offline): void {
                 $active = $page->toArray()['props']['trackingWorkspace']['activeTab'];
@@ -167,8 +166,7 @@ class TrackingWorkspaceTest extends TestCase
 
         $viewer = $this->viewerWithRole('provider_manager');
         $this->assignViewerToSite($viewer, $site);
-        $this->actingAs($viewer)
-            ->get('/security-devices/tracking?tab=personal-safety')
+        $this->retiredWorkspace($viewer, 'tracking', 'tab=personal-safety')
             ->assertOk()
             ->assertInertia(function ($page) use ($client, $device): void {
                 $props = $page->toArray()['props'];
@@ -213,8 +211,7 @@ class TrackingWorkspaceTest extends TestCase
 
         $consent->update(['status' => 'withdrawn', 'withdrawn_at' => now()]);
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/tracking?tab=personal-safety')
+        $this->retiredWorkspace($viewer, 'tracking', 'tab=personal-safety')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $row = $page->toArray()['props']['trackingWorkspace']['activeTab']['devices'][0];
@@ -233,8 +230,7 @@ class TrackingWorkspaceTest extends TestCase
             'purpose' => 'Authorise approved photographs only',
         ]);
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/tracking?tab=personal-safety')
+        $this->retiredWorkspace($viewer, 'tracking', 'tab=personal-safety')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $row = $page->toArray()['props']['trackingWorkspace']['activeTab']['devices'][0];
@@ -297,8 +293,7 @@ class TrackingWorkspaceTest extends TestCase
         $this->assertSame('consent_withdrawn', $withdrawnAssignment->collection_stop_reason);
         $this->assertSame('consent_not_active', $inactiveAssignment->collection_stop_reason);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/tracking?tab=personal-safety')
+        $this->retiredWorkspace($this->admin, 'tracking', 'tab=personal-safety')
             ->assertOk()
             ->assertInertia(function ($page) use ($inactiveDevice, $withdrawnDevice): void {
                 $rows = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['devices']);
@@ -361,8 +356,7 @@ class TrackingWorkspaceTest extends TestCase
             'securityDevices.devices.view',
             'assets.telemetry.view',
         ]);
-        $this->actingAs($technicalViewer)
-            ->get('/security-devices/tracking?tab=personal-safety')
+        $this->retiredWorkspace($technicalViewer, 'tracking', 'tab=personal-safety')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $props = $page->toArray()['props'];
@@ -372,8 +366,7 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame([], $props['trackingWorkspace']['activeTab']['devices']);
             });
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/tracking?tab=personal-safety')
+        $this->retiredWorkspace($viewer, 'tracking', 'tab=personal-safety')
             ->assertOk()
             ->assertInertia(function ($page) use ($session, $worker): void {
                 $row = $page->toArray()['props']['trackingWorkspace']['activeTab']['devices'][0];
@@ -391,8 +384,7 @@ class TrackingWorkspaceTest extends TestCase
 
         $session->update(['status' => 'completed', 'ended_at' => now()]);
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/tracking?tab=personal-safety')
+        $this->retiredWorkspace($viewer, 'tracking', 'tab=personal-safety')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $row = $page->toArray()['props']['trackingWorkspace']['activeTab']['devices'][0];
@@ -431,8 +423,7 @@ class TrackingWorkspaceTest extends TestCase
         ]);
         $this->assignViewerToSite($viewer, $localSite);
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/tracking?tab=personal-safety')
+        $this->retiredWorkspace($viewer, 'tracking', 'tab=personal-safety')
             ->assertOk()
             ->assertInertia(function ($page) use ($device, $worker): void {
                 $row = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['devices'])
@@ -445,7 +436,7 @@ class TrackingWorkspaceTest extends TestCase
             });
 
         $this->actingAs($viewer)
-            ->get("/security-devices/devices/{$device->id}")
+            ->get("/security-devices/devices/{$device->id}?section=health")
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $location = $page->toArray()['props']['profile']['header']['location'];
@@ -453,6 +444,18 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame('staff', $location['type']);
                 $this->assertSame('Remote Security Worker', $location['name']);
                 $this->assertNull($location['href']);
+            });
+
+        // S&D rebuild Phase E: the tracker's own page never links the worker to HR either.
+        $this->actingAs($viewer)
+            ->get("/security-devices/devices/{$device->id}")
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $props = $page->toArray()['props'];
+                $this->assertSame('security-devices/devices/tracker', $page->toArray()['component']);
+                $own = array_intersect_key($props, array_flip(['device', 'tab', 'tabs', 'meters', 'can', 'privacy', 'commands', 'location', 'console']));
+                $this->assertNotSame([], $own);
+                $this->assertStringNotContainsString('/hr/people/', json_encode($own, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
             });
     }
 
@@ -476,8 +479,7 @@ class TrackingWorkspaceTest extends TestCase
 
         $viewer = $this->viewerWithRole('provider_manager');
         $this->assignViewerToSite($viewer, $site);
-        $this->actingAs($viewer)
-            ->get('/security-devices/tracking?tab=fleet')
+        $this->retiredWorkspace($viewer, 'tracking', 'tab=fleet')
             ->assertOk()
             ->assertInertia(function ($page) use ($vehicle, $vehicleDevice): void {
                 $tracking = $page->toArray()['props']['trackingWorkspace'];
@@ -490,8 +492,7 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame("/fleet-assets/vehicles/{$vehicle->id}", $row['canonicalHref']);
             });
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/tracking?tab=assets')
+        $this->retiredWorkspace($viewer, 'tracking', 'tab=assets')
             ->assertOk()
             ->assertInertia(function ($page) use ($asset, $assetDevice): void {
                 $row = $page->toArray()['props']['trackingWorkspace']['activeTab']['devices'][0];
@@ -502,8 +503,7 @@ class TrackingWorkspaceTest extends TestCase
             });
 
         $itViewer = $this->viewerWithRole('it_manager');
-        $this->actingAs($itViewer)
-            ->get('/security-devices/tracking?tab=fleet')
+        $this->retiredWorkspace($itViewer, 'tracking', 'tab=fleet')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $props = $page->toArray()['props'];
@@ -562,8 +562,7 @@ class TrackingWorkspaceTest extends TestCase
         $this->event($vehicle, $vehicleTracker, $vehicleDevice, 'outside-retention', now()->subDays(400));
         $this->event($vehicle, $vehicleTracker, $vehicleDevice, 'blocked-current', now()->subMinutes(3), true);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/tracking?tab=geofences')
+        $this->retiredWorkspace($this->admin, 'tracking', 'tab=geofences')
             ->assertOk()
             ->assertInertia(function ($page) use ($residentGeofence, $vehicleGeofence): void {
                 $rows = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['geofences']);
@@ -575,8 +574,7 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame('active_client_tracking_consent', $rows->firstWhere('id', $residentGeofence->id)['privacy']['basis']);
             });
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/tracking?tab=history')
+        $this->retiredWorkspace($this->admin, 'tracking', 'tab=history')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $tracking = $page->toArray()['props']['trackingWorkspace'];
@@ -593,16 +591,14 @@ class TrackingWorkspaceTest extends TestCase
 
         $consent->update(['status' => 'withdrawn', 'withdrawn_at' => now()]);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/tracking?tab=geofences')
+        $this->retiredWorkspace($this->admin, 'tracking', 'tab=geofences')
             ->assertOk()
             ->assertInertia(function ($page) use ($residentGeofence, $vehicleGeofence): void {
                 $ids = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['geofences'])->pluck('id')->all();
                 $this->assertContains($vehicleGeofence->id, $ids);
                 $this->assertNotContains($residentGeofence->id, $ids);
             });
-        $this->actingAs($this->admin)
-            ->get('/security-devices/tracking?tab=history')
+        $this->retiredWorkspace($this->admin, 'tracking', 'tab=history')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $types = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['history'])->pluck('eventType')->all();
@@ -688,7 +684,7 @@ class TrackingWorkspaceTest extends TestCase
         $counts = collect(['client_consents', 'consent_type_versions', 'device_assignments', 'permission_user', 'role_user'])
             ->mapWithKeys(fn (string $table): array => [$table => DB::table($table)->count()])->all();
 
-        $this->actingAs($this->admin)->get('/security-devices/tracking?tab=personal-safety')
+        $this->retiredWorkspace($this->admin, 'tracking', 'tab=personal-safety')
             ->assertOk()->assertInertia(function ($page) use ($device): void {
                 $props = $page->toArray()['props'];
                 $rows = collect($props['trackingWorkspace']['activeTab']['devices']);
@@ -707,7 +703,7 @@ class TrackingWorkspaceTest extends TestCase
                 );
                 $this->assertStringNotContainsString('GENERIC-PRIVATE-PROVIDER-EVIDENCE', json_encode($props, JSON_THROW_ON_ERROR));
             });
-        $this->get("/operations/clients/{$client->id}?tab=location")
+        $this->actingAs($this->admin)->get("/operations/clients/{$client->id}?tab=location")
             ->assertOk()->assertInertia(fn ($page) => $page
             ->where('location.trackingRestricted', true)
             ->where('location.tracker', null)
@@ -817,8 +813,7 @@ class TrackingWorkspaceTest extends TestCase
             'status' => QueclinkDevice::STATUS_PAIRED,
         ]);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/tracking?tab=fleet')
+        $this->retiredWorkspace($this->admin, 'tracking', 'tab=fleet')
             ->assertOk()
             ->assertInertia(function ($page) use ($tracker): void {
                 $workspace = $page->toArray()['props']['trackingWorkspace'];
@@ -838,8 +833,7 @@ class TrackingWorkspaceTest extends TestCase
             Permission::query()->where('key', 'securityDevices.integrations.manage')->value('id') => ['allowed' => false],
         ]);
 
-        $this->actingAs($restrictedViewer)
-            ->get('/security-devices/tracking?tab=fleet')
+        $this->retiredWorkspace($restrictedViewer, 'tracking', 'tab=fleet')
             ->assertOk()
             ->assertInertia(function ($page) use ($tracker): void {
                 $row = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['devices'])

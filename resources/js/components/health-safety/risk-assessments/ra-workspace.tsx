@@ -41,6 +41,7 @@ import {
     type SgTone,
 } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import {
     SafetyFormDraftContext,
@@ -72,9 +73,11 @@ import {
     History,
     Info,
     Link2,
+    Lock,
     MapPin,
     Paperclip,
     ShieldAlert,
+    ShieldCheck,
     Trash2,
     User,
     Zap,
@@ -599,15 +602,20 @@ export function RaWorkspace({
                         icon={ShieldAlert}
                         title={d.title}
                         titleChip={
-                            <PageHeaderStatusChip
-                                variant={
-                                    status.tone === 'info'
-                                        ? 'neutral'
-                                        : status.tone
-                                }
-                            >
-                                {raStatusLabel(d.status)}
-                            </PageHeaderStatusChip>
+                            d.history_integrity?.state === 'broken' ? (
+                                // #13: the sealed history doesn't check out; changes are refused until it's checked.
+                                <PageHeaderStatusChip variant="warning">History needs checking</PageHeaderStatusChip>
+                            ) : (
+                                <PageHeaderStatusChip
+                                    variant={
+                                        status.tone === 'info'
+                                            ? 'neutral'
+                                            : status.tone
+                                    }
+                                >
+                                    {raStatusLabel(d.status)}
+                                </PageHeaderStatusChip>
+                            )
                         }
                         subline={`${d.reference_number} · ${d.attached_to.name}`}
                         actions={
@@ -955,8 +963,35 @@ function snapshotValue(value: RaHistoryEntry['snapshot'][string]): string {
             : String(value);
 }
 
+/**
+ * #13 (boards 13-1 and 13-2, approved by Stephan 2 Nov): the History tab. One line on top says whether the sealed
+ * history checks out (checked every time the page is read). Sealed changes carry their number and "What changed"
+ * (before → after against the sealed change before). Changes made before sealing began are listed as older entries,
+ * as recorded. If the chain doesn't check out, the history isn't shown at all.
+ */
 export function RiskHistory({ detail: d }: { detail: RaDetail }) {
     const [open, setOpen] = useState<string | null>(null);
+    const [asItWas, setAsItWas] = useState<string | null>(null);
+    const integrity = d.history_integrity;
+    if (integrity?.state === 'broken')
+        return (
+            <Surface aria-label="History">
+                <div className="grid gap-3 p-[18px]">
+                    <Note tone="critical" icon={AlertTriangle}>
+                        <p>
+                            <b>The history doesn't check out.</b> One of its sealed changes was altered or removed outside the
+                            app. To avoid showing anything wrong, the history isn't shown, and the assessment can't be
+                            changed until it's checked.
+                        </p>
+                    </Note>
+                    <p className="text-caption flex items-center gap-2 text-muted-foreground">
+                        <Info className="size-4" aria-hidden="true" />
+                        This has been logged for your system administrator with the reference {d.reference_number}. The
+                        rest of the assessment still opens as normal.
+                    </p>
+                </div>
+            </Surface>
+        );
     const history = d.history ?? [];
     if (!history.length)
         return (
@@ -965,13 +1000,17 @@ export function RiskHistory({ detail: d }: { detail: RaDetail }) {
                 text="No recorded history is available here. Assessor and approval details remain in Overview."
             />
         );
-    const shown = history.find((entry) => entry.id === open);
+    const sealed = history.filter((entry) => entry.sealed);
+    const older = history.filter((entry) => !entry.sealed);
     const fields = (entry: RaHistoryEntry) =>
         Object.entries(entry.snapshot).filter(
             ([key]) =>
                 !['approval_note', 'last_review_note', 'names'].includes(key),
         );
-    const items: LogItem[] = history.map((entry) => {
+    const label = (field: string) => cap(field.replaceAll('_', ' '));
+    const toggle = (setter: typeof setOpen, id: string) =>
+        setter((current) => (current === id ? null : id));
+    const row = (entry: RaHistoryEntry): LogItem => {
         const names = Array.isArray(entry.snapshot.names)
             ? (entry.snapshot.names as string[]).join(', ')
             : null;
@@ -979,7 +1018,17 @@ export function RiskHistory({ detail: d }: { detail: RaDetail }) {
             key: entry.id,
             time: day(entry.occurred_at) ?? 'Date not recorded',
             tone: HISTORY_TONES[entry.title] ?? 'none',
-            title: entry.title,
+            title: entry.sealed ? (
+                <span className="inline-flex flex-wrap items-center gap-2">
+                    {entry.title}
+                    <StatusBadge variant="neutral">
+                        <Lock className="size-3" aria-hidden="true" />
+                        Change {entry.sealed.change}
+                    </StatusBadge>
+                </span>
+            ) : (
+                entry.title
+            ),
             sub: (
                 <span className="whitespace-normal">
                     {[
@@ -995,36 +1044,93 @@ export function RiskHistory({ detail: d }: { detail: RaDetail }) {
                         .join(' · ')}
                 </span>
             ),
-            action: fields(entry).length
-                ? {
-                      label: open === entry.id ? 'Hide' : 'View as it was',
-                      onClick: () =>
-                          setOpen((current) =>
-                              current === entry.id ? null : entry.id,
-                          ),
-                  }
-                : null,
+            action: entry.sealed
+                ? entry.sealed.changes.length
+                    ? { label: open === entry.id ? 'Hide' : 'What changed', onClick: () => toggle(setOpen, entry.id) }
+                    : fields(entry).length
+                      ? { label: asItWas === entry.id ? 'Hide' : 'View as it was', onClick: () => toggle(setAsItWas, entry.id) }
+                      : null
+                : fields(entry).length
+                  ? { label: asItWas === entry.id ? 'Hide' : 'View as it was', onClick: () => toggle(setAsItWas, entry.id) }
+                  : null,
         };
-    });
+    };
+    const changed = history.find((entry) => entry.id === open && entry.sealed?.changes.length);
+    const whole = history.find((entry) => entry.id === asItWas);
     return (
         <>
-            <Log
-                title="History"
-                sub="Each entry shows the assessment as it was then"
-                items={items}
-                limit={items.length}
-            />
-            {shown ? (
+            {integrity?.state === 'checked' ? (
+                <Surface aria-label="History check">
+                    <div className="flex items-center gap-3 p-[18px]">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-status-success-bg text-status-success">
+                            <ShieldCheck className="size-5" aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0">
+                            <b className="block text-sm font-semibold">The history checks out</b>
+                            <span className="text-caption text-muted-foreground">
+                                {integrity.sealed_count} {integrity.sealed_count === 1 ? 'change' : 'changes'}
+                                {integrity.sealed_since ? ` since sealing began on ${day(integrity.sealed_since)}` : ''}, each sealed
+                                to the one before it · checked when you opened this tab
+                            </span>
+                        </div>
+                    </div>
+                </Surface>
+            ) : null}
+            {sealed.length ? (
+                <Log
+                    title="History"
+                    sub="Newest first · each change shows what it changed"
+                    items={sealed.map(row)}
+                    limit={sealed.length}
+                />
+            ) : null}
+            {changed?.sealed ? (
+                <Surface title={`What changed · ${changed.title}`} sub={`Change ${changed.sealed.change} · ${formatDateTime(changed.occurred_at)}`} aria-label="What changed">
+                    <div className="overflow-x-auto px-[18px] pb-[18px]">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-caption text-left text-muted-foreground">
+                                    <th className="py-2 pr-4 font-semibold">What changed</th>
+                                    <th className="py-2 pr-4 font-semibold">Before</th>
+                                    <th className="py-2 font-semibold">After</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {changed.sealed.changes.map((change) => (
+                                    <tr key={change.field} className="border-t border-border">
+                                        <td className="py-2 pr-4">{label(change.field)}</td>
+                                        <td className="py-2 pr-4 text-muted-foreground">{snapshotValue(change.before)}</td>
+                                        <td className="py-2">{snapshotValue(change.after)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <Button type="button" variant="link" size="sm" className="mt-2 h-auto px-0" onClick={() => setAsItWas(changed.id)}>
+                            See the whole assessment as it was
+                        </Button>
+                    </div>
+                </Surface>
+            ) : null}
+            {older.length ? (
+                <Log
+                    title={sealed.length ? 'Older entries' : 'History'}
+                    sub={
+                        sealed.length && integrity?.sealed_since
+                            ? `Before ${day(integrity.sealed_since)} · shown as recorded (not sealed)`
+                            : 'Each entry shows the assessment as it was then'
+                    }
+                    items={older.map(row)}
+                    limit={older.length}
+                />
+            ) : null}
+            {whole ? (
                 <FactRows
                     aria-label="Recorded assessment"
-                    title={`As it was · ${shown.title}`}
-                    sub={formatDateTime(shown.occurred_at)}
-                    rows={fields(shown).map(
+                    title={`As it was · ${whole.title}`}
+                    sub={formatDateTime(whole.occurred_at)}
+                    rows={fields(whole).map(
                         ([key, value]) =>
-                            [
-                                cap(key.replaceAll('_', ' ')),
-                                snapshotValue(value),
-                            ] as [string, string],
+                            [label(key), snapshotValue(value)] as [string, string],
                     )}
                 />
             ) : null}

@@ -32,7 +32,7 @@ class IncidentOwnershipController extends Controller
         ]);
         $owners->assign($request->user(), $incident, (int) $data['owner_user_id'], (int) $data['expected_revision'], $data['request_uuid'], $data['reason'] ?? null);
 
-        return back()->with('success', 'Incident owner saved. Notification delivery is tracked separately.');
+        return back()->with('success', 'Incident owner saved. We’ll let them know.');
     }
 
     public function retry(Request $request, ClientIncident $incident, IncidentOwnerDelivery $delivery, IncidentOwnerEligibility $eligibility)

@@ -1,7 +1,7 @@
 /**
  * Signature page blocks — the body parts of the approved Health & safety drawings (Stephan, 23 Oct 2026, design
- * viewer v35). Each block answers one question in Oblivion's own shapes: the surface with its horizon line, the
- * ring (state and progress) and the Journey line. Styles: resources/css/signature-blocks.css.
+ * viewer v35). Each block answers one question in Oblivion's own shapes: the plain surface (no coloured line on any
+ * edge, DESIGN.md non-negotiable 8), the ring (state and progress) and the Journey line. Styles: resources/css/signature-blocks.css.
  *
  * The props mirror the drawing blocks, so a page port reads straight from its drawing. Colour is never the only
  * signal: every ring sits beside words, and rings carry a screen-reader state.
@@ -49,7 +49,7 @@ export interface SgAction {
     ariaLabel?: string;
 }
 
-function ActionLink({ action, className }: { action: SgAction; className?: string }) {
+export function ActionLink({ action, className }: { action: SgAction; className?: string }) {
     if (action.href) {
         return (
             <Link href={action.href} aria-label={action.ariaLabel} className={cn('sg-act', className)} onClick={action.onClick}>
@@ -96,14 +96,14 @@ export interface SurfaceProps {
     title?: string;
     sub?: ReactNode;
     action?: SgAction | null;
-    /** The horizon line takes a status tone when the block carries one. */
+    /** A status tone colours the block's ring and kicker (never a line on its edge). */
     tone?: SgStatusTone | null;
     className?: string;
     children?: ReactNode;
     'aria-label'?: string;
 }
 
-/** A card with the horizon line on its top edge and an optional head (title · sub · action). */
+/** A plain card with an optional head (title · sub · action). No coloured line on any edge (DESIGN.md non-negotiable 8). */
 export function Surface({ title, sub, action, tone, className, children, ...rest }: SurfaceProps) {
     return (
         <section
@@ -477,6 +477,11 @@ export interface PlaceCardItem {
     flag?: ReactNode;
     facts?: { tone: SgTone; text: ReactNode }[];
     href?: string;
+    /** The card's menu: a kebab in its corner, and the same items on right-click (DESIGN.md entity rows). */
+    menu?: MenuItem[];
+    onContextMenu?: (event: MouseEvent<HTMLElement>) => void;
+    /** Stable identity when two places could share a name. */
+    id?: string | number;
 }
 
 /** Places (or options, registers) as cards: name, one flag, facts read by their rings. */
@@ -508,7 +513,7 @@ export function PlaceCards({ title, sub, action, cols = 3, items, lines = false 
                         </>
                     );
                     return (
-                        <li key={p.name} className="sg-surface sg-place">
+                        <li key={p.id ?? p.name} className={cn('sg-surface sg-place', p.menu?.length && 'relative pr-10')} onContextMenu={p.onContextMenu}>
                             {p.href ? (
                                 <Link href={p.href} className="grid gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     {body}
@@ -516,6 +521,9 @@ export function PlaceCards({ title, sub, action, cols = 3, items, lines = false 
                             ) : (
                                 body
                             )}
+                            {p.menu?.length ? (
+                                <EntityKebab actions={p.menu} label={`Actions for ${p.name}`} className="absolute top-3 right-2" />
+                            ) : null}
                         </li>
                     );
                 })}

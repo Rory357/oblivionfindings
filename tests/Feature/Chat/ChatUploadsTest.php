@@ -105,11 +105,29 @@ it('requires an audio inspection before voice staging can be sent and checks sto
     $this->get(route('chat.attachment', $attachment->id))->assertStatus(415);
 });
 
+it('checks a browser recording with Oblivion\'s own voice checker when ffprobe is not installed', function () {
+    config(['chat.files.voice_probe_binary' => '']);
+    expect(app(ChatSettings::class)->publicPolicy($this->conversation)['voice_notes_available'])->toBeTrue();
+    $bytes = file_get_contents(base_path('tests/fixtures/chat-voice/chrome-webm-opus-5s.webm'));
+    $id = (string) Str::uuid();
+    // The browser's claimed length is ignored; the checker reads 4,860 ms from the audio blocks.
+    $this->postJson(route('chat.uploads.store', [$this->conversation, $id]), ['file' => UploadedFile::fake()->createWithContent('Voice message.webm', $bytes), 'media_kind' => 'voice_note', 'duration_ms' => 1])
+        ->assertOk()->assertJsonPath('state', 'ready')->assertJsonPath('mime_type', 'audio/webm')->assertJsonPath('duration_ms', 4860);
+    $this->postJson(route('chat.send', $this->conversation), ['mutation_id' => (string) Str::uuid(), 'upload_ids' => [$id]])
+        ->assertCreated()->assertJsonPath('message.attachments.0.media_kind', 'voice_note')->assertJsonPath('message.attachments.0.duration_ms', 4860);
+    $this->postJson(route('chat.uploads.store', [$this->conversation, (string) Str::uuid()]), ['file' => UploadedFile::fake()->createWithContent('Voice message.webm', substr($bytes, 0, 20_000)), 'media_kind' => 'voice_note'])
+        ->assertOk()->assertJsonPath('state', 'blocked')->assertJsonPath('error_code', 'voice_file_invalid')->assertJsonPath('duration_ms', null);
+});
+
 it('retains voice files privately when inspection is unavailable and respects disabled voice policy on retry and send', function () {
+    // Inspection is unavailable only when the stored file cannot be read or the configured ffprobe second opinion fails.
+    $probe = Mockery::mock(ChatVoiceInspector::class);
+    $probe->shouldReceive('configured')->andReturn(true);
+    $probe->shouldReceive('inspect')->andReturn(new ChatVoiceInspection('unavailable', errorCode: 'voice_check_failed'));
+    app()->instance(ChatVoiceInspector::class, $probe);
     $id = (string) Str::uuid();
     $file = UploadedFile::fake()->createWithContent('voice.ogg', "OggS\0\2".str_repeat("\0", 20)."\1\23OpusHead".str_repeat("\0", 11));
-    config(['chat.files.voice_probe_binary' => '']);
-    $this->postJson(route('chat.uploads.store', [$this->conversation, $id]), ['file' => $file, 'media_kind' => 'voice_note'])->assertOk()->assertJsonPath('state', 'unavailable')->assertJsonPath('error_code', 'voice_check_unavailable');
+    $this->postJson(route('chat.uploads.store', [$this->conversation, $id]), ['file' => $file, 'media_kind' => 'voice_note'])->assertOk()->assertJsonPath('state', 'unavailable')->assertJsonPath('error_code', 'voice_check_failed');
     $this->postJson(route('chat.send', $this->conversation), ['mutation_id' => (string) Str::uuid(), 'upload_ids' => [$id]])->assertConflict();
     AppSetting::where('key', ChatSettings::KEY)->update(['value' => json_encode(['voice_notes_enabled' => false])]);
     $this->postJson(route('chat.uploads.retry', [$this->conversation, $id]))->assertForbidden();

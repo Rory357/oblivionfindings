@@ -11,6 +11,7 @@ use App\Models\HsRepresentative;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\WorkerParticipationMeetingEvent;
 use App\Notifications\HealthSafety\CommitteeMeetingScheduled;
 use App\Services\Sites\Calendar\Providers\WorkerParticipationObligationProvider;
 use Database\Seeders\RbacSeeder;
@@ -274,7 +275,8 @@ class WorkerParticipationTest extends TestCase
         $meeting = HsCommitteeMeeting::where('hs_committee_id', $committee->id)->firstOrFail();
         $this->assertSame('scheduled', $meeting->status);
         $this->assertTrue($meeting->attendeeUsers()->where('users.id', $member->id)->exists());
-        Notification::assertSentTo($member, CommitteeMeetingScheduled::class);
+        $this->assertTrue(WorkerParticipationMeetingEvent::query()->where('meeting_id', $meeting->id)->where('purpose', 'scheduled')->exists(), 'The meeting notice is staged in the save (#14).');
+        Notification::assertNotSentTo($member, CommitteeMeetingScheduled::class);
     }
 
     /* ---- meetings: pivot attendees + notifications ------------------- */
@@ -295,7 +297,8 @@ class WorkerParticipationTest extends TestCase
 
         $meeting = HsCommitteeMeeting::where('hs_committee_id', $c->id)->firstOrFail();
         $this->assertTrue($meeting->attendeeUsers()->where('users.id', $attendee->id)->exists());
-        Notification::assertSentTo($attendee, CommitteeMeetingScheduled::class);
+        $this->assertTrue(WorkerParticipationMeetingEvent::query()->where('meeting_id', $meeting->id)->where('purpose', 'scheduled')->exists(), 'The meeting notice is staged in the save (#14).');
+        Notification::assertNotSentTo($attendee, CommitteeMeetingScheduled::class);
     }
 
     public function test_complete_meeting_records_attendance_and_actions_due(): void

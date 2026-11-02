@@ -4,6 +4,7 @@
  * immediate action / witnesses) → Assign & due → Review. POSTs to
  * /sites/{site}/hazards with the photo File[] (forceFormData) and refreshes in
  * place. Reused by the global register and the per-site surfaces. NZ-only. */
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import {
     HAZARD_LABELS,
     HazardRiskMatrix,
@@ -654,12 +655,12 @@ export function HazardCreateDialog({
                             />
                         </Field>
                         <Field label="Resolution due date">
-                            <Input
-                                type="date"
+                            <DatePicker
+                                id="hazard-resolution-due"
+                                label="Resolution due date"
                                 value={form.data.due_date}
-                                onChange={(e) =>
-                                    form.setData('due_date', e.target.value)
-                                }
+                                allowClear
+                                onChange={(value) => form.setData('due_date', value)}
                             />
                         </Field>
                         {risk ? (

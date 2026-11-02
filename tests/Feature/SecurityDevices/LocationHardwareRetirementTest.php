@@ -183,14 +183,23 @@ class LocationHardwareRetirementTest extends TestCase
 
     public function test_security_devices_dashboard_reads_from_canonical_devices(): void
     {
-        Device::factory()->count(3)->create();
+        foreach (Device::factory()->count(3)->create() as $device) {
+            DeviceAssignment::create([
+                'device_id' => $device->id,
+                'assignable_type' => 'site',
+                'assignable_id' => $this->site->id,
+                'assigned_at' => now(),
+            ]);
+        }
 
+        // S&D rebuild C4: the dashboard became the Overview; its Trends tab counts the registry.
         $response = $this->actingAs($this->admin)
-            ->get('/security-devices');
+            ->get('/security-devices?tab=trends');
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->where('stats.totalDevices', 3)
+            ->component('security-devices/overview/index')
+            ->where('trends.device_count', 3)
         );
     }
 

@@ -191,6 +191,6 @@ it('keeps failed signal processing separate from a recorded safety review and a 
     expect(screen.getByText('Response signal processing failed')).toBeTruthy();
     expect(screen.queryByText(/Control Room notified/i)).toBeNull();
     expect(
-        screen.queryByRole('button', { name: 'Schedule next drill' }),
+        screen.queryByRole('button', { name: 'Plan the next drill' }),
     ).toBeNull();
 });

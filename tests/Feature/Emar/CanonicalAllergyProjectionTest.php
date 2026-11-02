@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 /** Current allergy meaning must agree across the person's profile, MAR, API and clinical views. */
@@ -188,7 +189,10 @@ class CanonicalAllergyProjectionTest extends TestCase
         $this->assertSame('mysql', $primary->getPdo()->getAttribute(\PDO::ATTR_DRIVER_NAME));
         $this->assertSame('127.0.0.1', $primary->getConfig('host'));
         $this->assertSame(self::$isolatedMysqlDatabase, $primary->getDatabaseName());
-        $this->assertStringEndsWith('_'.getmypid(), $primary->getDatabaseName());
+        $this->assertTrue(
+            str_ends_with($primary->getDatabaseName(), '_'.getmypid())
+            || OwnedTestDatabase::isOwnedBy($primary->getDatabaseName(), getmypid()),
+        );
         $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         DB::commit();
         $name = 'concurrent_canonical_allergy_writer';

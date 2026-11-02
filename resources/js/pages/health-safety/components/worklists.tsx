@@ -178,7 +178,7 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
         pill: {
             label:
                 r.status === 'completed'
-                    ? 'Waiting for verification'
+                    ? hsLabel('action_status', 'completed')
                     : r.days_overdue != null
                       ? `${r.days_overdue}d overdue`
                       : 'Overdue',
@@ -517,7 +517,7 @@ export function HsWorklists({
             key: 'acceptance',
             icon: ShieldAlert,
             iconTone: 'warning',
-            title: 'Waiting for Health & safety to accept',
+            title: hsLabel('handover_status', 'awaiting_acceptance'),
             subtitle:
                 worklists.attention[0]?.help ??
                 'A named Health & safety owner must accept responsibility for each one',
