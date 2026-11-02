@@ -258,7 +258,7 @@ final class OverviewPresenter
                     ? ($hubs->count() === 1 ? 'The hub is answering' : 'All '.$hubs->count().' hubs are answering')
                     : null,
             ],
-            'activity' => $this->activity($entries, 6),
+            'activity' => $this->activity($viewer, $entries, 6),
         ];
     }
 
@@ -490,24 +490,29 @@ final class OverviewPresenter
     }
 
     /**
-     * The latest things that happened to the viewer's devices.
+     * The latest things that happened to the viewer's devices: only for people who may see device
+     * events, only from while the device was somewhere they can see (a moved device never brings
+     * another Site's history with it), and never a reading stamped in the future.
      *
      * @param  Collection<int, DeviceEntry>  $entries
      * @return list<array<string, mixed>>
      */
-    private function activity(Collection $entries, int $limit): array
+    private function activity(User $viewer, Collection $entries, int $limit): array
     {
-        if ($entries->isEmpty()) {
+        if ($entries->isEmpty() || ! $viewer->canDo('securityDevices.events.view')) {
             return [];
         }
         $byId = $entries->keyBy(fn (DeviceEntry $entry): int => $entry->id());
+        $query = DeviceEvent::query()
+            ->whereIn('device_events.device_id', $byId->keys()->all())
+            ->where('device_events.occurred_at', '<=', now());
+        $this->access->applyTemporalEventCustodyScope($query, $viewer);
 
-        return DeviceEvent::query()
-            ->whereIn('device_id', $byId->keys()->all())
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('id')
+        return $query
+            ->orderByDesc('device_events.occurred_at')
+            ->orderByDesc('device_events.id')
             ->limit($limit)
-            ->get(['id', 'device_id', 'event_type', 'severity', 'occurred_at'])
+            ->get(['device_events.id', 'device_events.device_id', 'device_events.event_type', 'device_events.severity', 'device_events.occurred_at'])
             ->map(function (DeviceEvent $event) use ($byId): array {
                 $entry = $byId->get((int) $event->device_id);
 

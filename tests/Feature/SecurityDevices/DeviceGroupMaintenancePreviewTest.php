@@ -24,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 final class DeviceGroupMaintenancePreviewTest extends TestCase
@@ -255,15 +256,39 @@ final class DeviceGroupMaintenancePreviewTest extends TestCase
 
     public function test_fresh_permission_withdrawal_denies_both_modes_even_with_a_cached_allowed_principal(): void
     {
-        $this->actor->load(['permissionOverrides', 'roles.permissions']);
-        foreach (['securityDevices.groups.manage', 'securityDevices.monitoring.manage', 'securityDevices.devices.viewAllSites'] as $key) {
+        $reader = app(DeviceGroupMaintenancePreview::class);
+        $modes = [$this->input(), ['mode' => 'choices', 'expected_actor_id' => (string) $this->actor->id, 'device_id' => (string) $this->device->id]];
+        // Every page view now reads the viewer's keys afresh (HandleInertiaRequests, 31 Oct), so over HTTP the
+        // route's own permission check refuses first (403) for the keys it names; the read refuses the rest (404).
+        foreach ([
+            'securityDevices.groups.manage' => 403,
+            'securityDevices.monitoring.manage' => 403,
+            'securityDevices.devices.viewAllSites' => 404,
+        ] as $key => $routeStatus) {
             $this->preview()->assertOk();
             $this->choices()->assertOk();
+            $cached = User::query()->findOrFail($this->actor->id)->load(['permissionOverrides', 'roles.permissions']);
             $id = Permission::query()->where('key', $key)->value('id');
             DB::table('permission_user')->where('user_id', $this->actor->id)->where('permission_id', $id)->update(['allowed' => false]);
-            self::assertTrue($this->actor->canDo($key), 'The simulated principal deliberately retains its old grant.');
-            $this->preview()->assertNotFound()->assertJsonPath('message', 'unavailable');
-            $this->choices()->assertNotFound()->assertJsonPath('message', 'unavailable');
+            self::assertTrue($cached->canDo($key), 'The simulated principal deliberately retains its old grant.');
+
+            // The read itself never trusts the principal it is handed: it re-reads the grant and refuses with a
+            // 404 (which the controller always answers with the one private "unavailable" body).
+            foreach ($modes as $query) {
+                try {
+                    $reader->read($cached, (int) $this->group->id, $query, http_build_query($query, '', '&', PHP_QUERY_RFC3986));
+                    self::fail("The {$query['mode']} read served a principal whose {$key} grant was withdrawn.");
+                } catch (HttpException $error) {
+                    self::assertSame(404, $error->getStatusCode());
+                }
+            }
+
+            $this->preview()->assertStatus($routeStatus);
+            $this->choices()->assertStatus($routeStatus);
+            if ($routeStatus === 404) {
+                $this->preview()->assertJsonPath('message', 'unavailable');
+                $this->choices()->assertJsonPath('message', 'unavailable');
+            }
             DB::table('permission_user')->where('user_id', $this->actor->id)->where('permission_id', $id)->update(['allowed' => true]);
             $this->preview()->assertOk();
             $this->choices()->assertOk();

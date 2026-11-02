@@ -115,7 +115,7 @@ final class DeviceLast24Hours
 
             // Behind something that is down: those failed hours were never the device's own fault.
             if ($entry->state === DeviceState::CantCheck) {
-                $marks = preg_replace('/c+$/', fn (array $m): string => str_repeat('n', strlen($m[0])), $marks) ?? $marks;
+                $marks = preg_replace_callback('/c+$/', fn (array $m): string => str_repeat('n', strlen($m[0])), $marks) ?? $marks;
             }
 
             $sparkValues = array_values(array_filter($spark, fn (?float $value): bool => $value !== null));

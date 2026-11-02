@@ -3,29 +3,31 @@
 namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\Monitoring\Enums\MonitorState;
-use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
-use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
-use App\Domain\SecurityDevices\Models\DeviceGroup;
-use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
-use App\Domain\SecurityDevices\Models\DeviceRelationship;
+use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
-use App\Models\SiteContact;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
+/**
+ * The estate and one Site. S&D rebuild C3/C4: the old dashboard's estate panel became the Overview
+ * and the Site technology page became Sites (pg-sdr-11) and the Site page (pg-sdr-12). The old pages'
+ * coverage, WAN, topology, group, IT work and contact props went with them; their Site scoping, their
+ * honesty about empty or unwatched Sites and their Control Room and event-history privacy are checked
+ * here against the new pages.
+ */
 class EstateSiteOperationsTest extends TestCase
 {
     use RefreshDatabase;
@@ -40,257 +42,55 @@ class EstateSiteOperationsTest extends TestCase
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
         $this->admin = User::factory()->create([
-
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
     }
 
-    public function test_estate_overview_answers_coverage_change_site_impact_and_required_action(): void
+    public function test_sites_never_present_empty_or_unwatched_sites_as_healthy(): void
     {
-        $siteA = Site::factory()->create(['name' => 'Harbour House']);
-        $siteB = Site::factory()->create(['name' => 'Kauri House']);
-        $unrelatedSite = Site::factory()->create(['name' => 'Unrelated House']);
-
-        $failed = Device::factory()->offline()->create([
-            'name' => 'Harbour edge gateway',
-            'health_status' => HealthStatus::Critical,
-            'updated_at' => now()->subMinutes(2),
-        ]);
-        $healthy = Device::factory()->create([
-            'name' => 'Harbour switch',
-            'updated_at' => now()->subMinutes(8),
-        ]);
-        $unmonitored = Device::factory()->create([
-            'name' => 'Kauri camera',
-            'updated_at' => now()->subMinutes(5),
-        ]);
-        $unrelated = Device::factory()->offline()->create([
-            'name' => 'Unrelated gateway',
-            'health_status' => HealthStatus::Critical,
-            'updated_at' => now(),
-        ]);
-
-        $this->assignToSite($failed, $siteA);
-        $this->assignToSite($healthy, $siteA);
-        $this->assignToSite($unmonitored, $siteB);
-        $this->assignToSite($unrelated, $unrelatedSite);
-
-        $profile = MonitoringProfile::factory()->create([]);
-        Monitor::factory()->create([
-            'profile_id' => $profile->id,
-            'device_id' => $failed->id,
-            'current_state' => MonitorState::Failed,
-            'last_observation_at' => now()->subMinute(),
-        ]);
-        Monitor::factory()->create([
-            'profile_id' => $profile->id,
-            'device_id' => $healthy->id,
-            'current_state' => MonitorState::Healthy,
-            'last_observation_at' => now()->subMinute(),
-        ]);
-
-        DeviceEvent::create([
-            'device_id' => $failed->id,
-            'event_type' => 'availability_failed',
-            'severity' => 'critical',
-            'occurred_at' => now()->subMinute(),
-        ]);
-        DeviceMaintenanceRecord::create([
-            'device_id' => $failed->id,
-            'type' => 'repair',
-            'status' => 'scheduled',
-            'description' => 'Restore edge gateway',
-            'scheduled_for' => now()->subDay(),
-        ]);
-        ItTicket::factory()->create([
-            'site_id' => $siteA->id,
-            'requester_user_id' => $this->admin->id,
-            'title' => 'Harbour internet unavailable',
-            'status' => 'open',
-        ]);
-        ItTicket::factory()->create([
-            'site_id' => $unrelatedSite->id,
-            'requester_user_id' => $this->admin->id,
-            'title' => 'Unrelated work',
-            'status' => 'open',
-        ]);
-
-        $response = $this->actingAs($this->admin)->get('/security-devices');
-
-        $response->assertOk()->assertInertia(function ($page): void {
-            $operations = $page->toArray()['props']['operations'];
-
-            $this->assertSame(4, $operations['coverage']['total_devices']);
-            $this->assertSame(2, $operations['coverage']['monitored_devices']);
-            $this->assertSame(2, $operations['coverage']['unmonitored_devices']);
-            $this->assertSame(50, $operations['coverage']['percent']);
-            $this->assertSame(3, $operations['summary']['affected_sites']);
-            $this->assertSame(1, $operations['summary']['active_findings']);
-            $this->assertSame(2, $operations['summary']['open_it_work']);
-            $this->assertSame(
-                ['Harbour House', 'Kauri House', 'Unrelated House'],
-                collect($operations['site_impact'])->pluck('name')->sort()->values()->all(),
-            );
-            $this->assertContains(
-                'Unrelated gateway',
-                collect($operations['recent_changes'])->pluck('device_name')->all(),
-            );
-            $this->assertSame(
-                ['failed_monitors', 'unmonitored_devices', 'overdue_maintenance', 'open_it_work'],
-                collect($operations['action_queue'])->pluck('key')->all(),
-            );
-        });
-    }
-
-    public function test_sites_reconcile_counts_and_never_present_empty_or_unmonitored_sites_as_healthy(): void
-    {
-        $siteA = Site::factory()->create(['name' => 'Action Site']);
-        $siteB = Site::factory()->create(['name' => 'Empty Site']);
-        $unassignedDeviceSite = Site::factory()->create(['name' => 'Rimu House']);
+        $hubDown = Site::factory()->create(['name' => 'Action Site']);
+        $empty = Site::factory()->create(['name' => 'Empty Site']);
+        $unwatched = Site::factory()->create(['name' => 'Rimu House']);
 
         $device = Device::factory()->offline()->create([
             'health_status' => HealthStatus::Critical,
             'updated_at' => now()->subMinute(),
         ]);
-        $this->assignToSite($device, $siteA);
-        DeviceEvent::create([
-            'device_id' => $device->id,
-            'event_type' => 'offline',
-            'severity' => 'critical',
-            'occurred_at' => now(),
-        ]);
-        DeviceMaintenanceRecord::create([
-            'device_id' => $device->id,
-            'type' => 'repair',
-            'status' => 'scheduled',
-            'description' => 'Overdue repair',
-            'scheduled_for' => now()->subDay(),
-        ]);
-        MonitoringCollector::factory()->create([
-            'site_id' => $siteA->id,
-            'status' => 'offline',
-            'last_seen_at' => now()->subMinutes(10),
-        ]);
-        ItTicket::factory()->create([
-            'site_id' => $siteA->id,
-            'requester_user_id' => $this->admin->id,
-            'status' => 'open',
-        ]);
+        $this->assignToSite($device, $hubDown);
+        $this->hub($hubDown, 'offline');
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/sites');
+        // A device whose stored health says "healthy" but that nothing checks.
+        $this->assignToSite(Device::factory()->create(['health_status' => HealthStatus::Healthy]), $unwatched);
+        $this->hub($unwatched, 'online');
 
-        $response->assertOk()->assertInertia(function ($page) use ($unassignedDeviceSite, $siteA, $siteB): void {
-            $props = $page->toArray()['props'];
-            $sites = collect($props['sites'])->keyBy('id');
+        $this->actingAs($this->admin)
+            ->get('/security-devices/sites')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($hubDown, $empty, $unwatched): void {
+                $props = $page->toArray()['props'];
+                $cards = collect($props['cards'])->keyBy('id');
 
-            $this->assertSame(
-                collect([$siteA->id, $siteB->id, $unassignedDeviceSite->id])->sort()->values()->all(),
-                $sites->keys()->sort()->values()->all(),
-            );
-            $this->assertSame(3, $props['summary']['total']);
-            $this->assertSame(1, $props['summary']['requiring_attention']);
+                $this->assertSame(
+                    collect([$hubDown->id, $empty->id, $unwatched->id])->sort()->values()->all(),
+                    $cards->keys()->sort()->values()->all(),
+                );
+                $this->assertSame(3, $props['tabs']['all']);
+                $this->assertSame(1, $props['tabs']['attention']);
 
-            $action = $sites[$siteA->id];
-            $this->assertSame('critical', $action['health']);
-            $this->assertSame(1, $action['devices']);
-            $this->assertSame(0, $action['monitored_devices']);
-            $this->assertSame(1, $action['unmonitored_devices']);
-            $this->assertSame(0, $action['coverage_percent']);
-            $this->assertSame(1, $action['active_findings']);
-            $this->assertSame(1, $action['open_it_work']);
-            $this->assertSame(1, $action['overdue_maintenance']);
-            $this->assertSame('stale', $action['collector']['state']);
-            $this->assertNotNull($action['last_change_at']);
+                $this->assertSame('critical', $cards[$hubDown->id]['flag']['tone']);
+                $this->assertSame('Hub not answering', $cards[$hubDown->id]['flag']['text']);
+                $this->assertTrue($cards[$hubDown->id]['needs_attention']);
 
-            $empty = $sites[$siteB->id];
-            $this->assertSame('unknown', $empty['health']);
-            $this->assertNull($empty['coverage_percent']);
-            $this->assertSame('not_configured', $empty['collector']['state']);
-        });
-    }
-
-    public function test_site_technology_combines_canonical_context_without_duplicating_source_records(): void
-    {
-        $site = Site::factory()->create(['name' => 'Technology House']);
-        $router = Device::factory()->itInfrastructure()->create([
-            'name' => 'SD-WAN gateway',
-            'subcategory' => 'edge_router',
-        ]);
-        $camera = Device::factory()->security()->create([
-            'name' => 'Front camera',
-        ]);
-        $this->assignToSite($router, $site);
-        $this->assignToSite($camera, $site);
-
-        DeviceRelationship::create([
-            'parent_device_id' => $router->id,
-            'child_device_id' => $camera->id,
-            'relationship_type' => 'connected_to',
-            'created_by_user_id' => $this->admin->id,
-        ]);
-        $group = DeviceGroup::create([
-            'name' => 'Front entrance',
-            'type' => 'location',
-        ]);
-        $group->devices()->attach([$router->id, $camera->id]);
-
-        $profile = MonitoringProfile::factory()->create([]);
-        Monitor::factory()->create([
-            'profile_id' => $profile->id,
-            'device_id' => $router->id,
-            'current_state' => MonitorState::Healthy,
-            'last_observation_at' => now(),
-        ]);
-        ControlRoomAlert::factory()->critical()->create([
-            'site_id' => $site->id,
-            'status' => ControlRoomAlert::STATUS_OPEN,
-            'alert_type' => 'WAN path unavailable',
-        ]);
-        ItTicket::factory()->create([
-            'site_id' => $site->id,
-            'requester_user_id' => $this->admin->id,
-            'title' => 'Review WAN failover',
-            'status' => 'open',
-        ]);
-        DeviceMaintenanceRecord::create([
-            'device_id' => $camera->id,
-            'type' => 'inspection',
-            'status' => 'scheduled',
-            'description' => 'Camera inspection',
-            'scheduled_for' => now()->addDay(),
-        ]);
-        SiteContact::create([
-            'site_id' => $site->id,
-            'type' => 'technology',
-            'name' => 'Alex Technician',
-            'role' => 'Site technology contact',
-            'email' => 'alex@example.test',
-            'is_primary' => true,
-        ]);
-
-        $response = $this->actingAs($this->admin)->get("/security-devices/sites/{$site->id}");
-
-        $response->assertOk()->assertInertia(function ($page): void {
-            $props = $page->toArray()['props'];
-
-            $this->assertTrue($props['wan']['known']);
-            $this->assertSame(['SD-WAN gateway'], collect($props['wan']['devices'])->pluck('name')->all());
-            $this->assertSame(1, $props['topology']['edge_count']);
-            $this->assertSame(2, $props['topology']['device_count']);
-            $this->assertSame(['Front entrance'], collect($props['deviceGroups'])->pluck('name')->all());
-            $this->assertSame(2, $props['monitoring']['total_devices']);
-            $this->assertSame(1, $props['monitoring']['unmonitored_devices']);
-            $this->assertSame(['WAN path unavailable'], collect($props['alerts'])->pluck('title')->all());
-            $this->assertSame('available', $props['alerts'][0]['access']['state']);
-            $this->assertNotNull($props['alerts'][0]['href']);
-            $this->assertSame(['Review WAN failover'], collect($props['itWork'])->pluck('title')->all());
-            $this->assertSame(['Camera inspection'], collect($props['maintenance'])->pluck('description')->all());
-            $this->assertSame(['Alex Technician'], collect($props['contacts'])->pluck('name')->all());
-            $this->assertTrue($props['can']['view_control_room']);
-            $this->assertTrue($props['can']['view_it_work']);
-            $this->assertTrue($props['can']['view_site_profile']);
-        });
+                foreach ([$empty->id, $unwatched->id] as $id) {
+                    $this->assertSame('neutral', $cards[$id]['flag']['tone']);
+                    $this->assertNotSame('All online', $cards[$id]['flag']['text']);
+                    $this->assertFalse($cards[$id]['needs_attention']);
+                }
+                $this->assertSame('No hub yet', $cards[$empty->id]['flag']['text']);
+                $this->assertFalse($cards[$empty->id]['set_up']);
+                $this->assertSame('Nothing watched yet', $cards[$unwatched->id]['flag']['text']);
+            });
     }
 
     public function test_site_access_and_cross_module_projections_require_their_own_permissions(): void
@@ -298,7 +98,6 @@ class EstateSiteOperationsTest extends TestCase
         $allowedSite = Site::factory()->create(['name' => 'Allowed Site']);
         $hiddenSite = Site::factory()->create(['name' => 'Hidden Site']);
         $viewer = User::factory()->create([
-
             'approved_at' => now(),
         ]);
         $viewer->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
@@ -319,38 +118,36 @@ class EstateSiteOperationsTest extends TestCase
             'secondary_site_ids' => [],
         ]);
 
+        $devices = [];
         foreach ([$allowedSite, $hiddenSite] as $site) {
-            $device = Device::factory()->create([]);
-            $this->assignToSite($device, $site);
+            $devices[$site->id] = Device::factory()->create(['name' => $site->name.' device']);
+            $this->assignToSite($devices[$site->id], $site);
         }
-        ControlRoomAlert::factory()->create([
-            'site_id' => $allowedSite->id,
-            'status' => ControlRoomAlert::STATUS_OPEN,
-        ]);
+        $this->controlRoomAlertFor($devices[$allowedSite->id], $allowedSite, 'Allowed-site control room detail');
         ItTicket::factory()->create([
             'site_id' => $allowedSite->id,
             'requester_user_id' => $viewer->id,
+            'title' => 'Allowed-site IT work detail',
             'status' => 'open',
         ]);
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/sites')
-            ->assertOk()
+        $index = $this->actingAs($viewer)->get('/security-devices/sites');
+        $index->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('sites', 1)
-                ->where('sites.0.id', $allowedSite->id)
-                ->where('sites.0.open_it_work', null)
-                ->where('sites.0.active_control_room_alerts', null));
+                ->has('cards', 1)
+                ->where('cards.0.id', $allowedSite->id));
+        foreach (['Hidden Site', 'Allowed-site control room detail', 'Allowed-site IT work detail'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $index->getContent());
+        }
 
-        $this->actingAs($viewer)
-            ->get("/security-devices/sites/{$allowedSite->id}")
-            ->assertOk()
+        $page = $this->actingAs($viewer)->get("/security-devices/sites/{$allowedSite->id}");
+        $page->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('alerts', 0)
-                ->has('itWork', 0)
-                ->where('can.view_control_room', false)
-                ->where('can.view_it_work', false)
-                ->where('can.view_site_profile', false));
+                ->where('site.id', $allowedSite->id)
+                ->where('meters.alerts.count', 0));
+        foreach (['Allowed-site control room detail', 'Allowed-site IT work detail'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $page->getContent());
+        }
 
         $this->actingAs($viewer)
             ->get("/security-devices/sites/{$hiddenSite->id}")
@@ -366,7 +163,7 @@ class EstateSiteOperationsTest extends TestCase
             ->assertOk();
     }
 
-    public function test_all_sites_security_scope_retains_only_restricted_control_room_context(): void
+    public function test_all_sites_security_scope_never_shows_another_sites_control_room_detail(): void
     {
         $assignedSite = Site::factory()->create();
         $unrelatedSite = Site::factory()->create();
@@ -387,24 +184,24 @@ class EstateSiteOperationsTest extends TestCase
             'primary_site_id' => $assignedSite->id,
             'secondary_site_ids' => [],
         ]);
-        ControlRoomAlert::factory()->critical()->create([
-            'site_id' => $unrelatedSite->id,
-            'status' => ControlRoomAlert::STATUS_OPEN,
-            'alert_type' => 'Private site alert detail',
-        ]);
+        $device = Device::factory()->create(['name' => 'Unrelated Site gateway']);
+        $this->assignToSite($device, $unrelatedSite);
+        $this->controlRoomAlertFor($device, $unrelatedSite, 'Private site alert detail');
 
-        $this->actingAs($viewer)
+        // All Sites in Security & devices doesn't widen Control Room: the device shows, its alert doesn't.
+        $page = $this->actingAs($viewer)->get("/security-devices/sites/{$unrelatedSite->id}");
+        $page->assertOk()->assertInertia(fn ($page) => $page->where('site.id', $unrelatedSite->id)->where('meters.alerts.count', 0));
+        $this->assertStringNotContainsString('Private site alert detail', $page->getContent());
+
+        $index = $this->actingAs($viewer)->get('/security-devices/sites');
+        $index->assertOk();
+        $this->assertStringNotContainsString('Private site alert detail', $index->getContent());
+
+        // Someone Control Room lets read it sees it on the same page.
+        $this->actingAs($this->admin)
             ->get("/security-devices/sites/{$unrelatedSite->id}")
             ->assertOk()
-            ->assertInertia(function ($page): void {
-                $alert = $page->toArray()['props']['alerts'][0];
-
-                $this->assertSame('restricted', $alert['access']['state']);
-                $this->assertNull($alert['href']);
-                $this->assertNull($alert['reference']);
-                $this->assertSame('Control Room alert', $alert['title']);
-                $this->assertNotSame('Private site alert detail', $alert['title']);
-            });
+            ->assertInertia(fn ($page) => $page->where('meters.alerts.count', 1)->where('meters.alerts.caption', 'Private site alert detail'));
     }
 
     public function test_site_profile_destination_requires_exact_canonical_site_visibility(): void
@@ -428,11 +225,61 @@ class EstateSiteOperationsTest extends TestCase
             'secondary_site_ids' => [],
         ]);
 
+        // The Rooms tab links to Sites & locations only for a Site that module lets the viewer open.
         $this->actingAs($viewer)
-            ->get("/security-devices/sites/{$unrelatedSite->id}")
+            ->get("/security-devices/sites/{$unrelatedSite->id}?tab=rooms")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('can.view_site_profile', false));
+                ->where('tab', 'rooms')
+                ->where('rooms.profile_href', null));
+        $this->actingAs($viewer)
+            ->get("/security-devices/sites/{$assignedSite->id}?tab=rooms")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('rooms.profile_href', '/sites/'.$assignedSite->id));
+    }
+
+    public function test_estate_and_site_findings_do_not_inherit_foreign_event_history_when_a_device_moves(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $allowed = Site::factory()->create();
+        $hidden = Site::factory()->create();
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create(['user_id' => $viewer->id, 'primary_site_id' => $allowed->id, 'secondary_site_ids' => [], 'is_active' => true]);
+        // maintenance.view: someone who looks after devices, so the IT Overview (with its activity) opens.
+        foreach (['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'securityDevices.maintenance.view'] as $key) {
+            $permission = Permission::query()->where('key', $key)->firstOrFail();
+            $viewer->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+        }
+        $device = Device::factory()->itInfrastructure()->create(['name' => 'Currently permitted router', 'subcategory' => 'router']);
+        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $hidden->id, 'assigned_at' => now()->subDays(2), 'released_at' => now()->subHour()]);
+        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $allowed->id, 'assigned_at' => now()->subHour()]);
+        DeviceEvent::create(['device_id' => $device->id, 'event_type' => 'hidden_past_offline', 'severity' => 'critical', 'source' => 'Private foreign history', 'occurred_at' => now()->subHours(2)]);
+        DeviceEvent::create(['device_id' => $device->id, 'event_type' => 'visible_online', 'severity' => 'warning', 'source' => 'test', 'occurred_at' => now()->subMinutes(30)]);
+
+        $overview = $this->actingAs($viewer)->get('/security-devices');
+        $overview->assertOk()->assertInertia(fn ($page) => $page
+            ->component('security-devices/overview/index')
+            ->has('overview.activity', 1)
+            ->where('overview.activity.0.title', 'Visible online'));
+
+        $internet = $this->actingAs($viewer)->get('/security-devices/sites/'.$allowed->id.'?tab=internet');
+        $internet->assertOk()->assertInertia(fn ($page) => $page
+            ->where('tab', 'internet')
+            ->has('internet.outages', 1)
+            ->where('internet.outages.0.title', 'Visible online'));
+
+        foreach ([$overview, $internet] as $response) {
+            foreach (['Private foreign history', 'hidden_past_offline', 'Hidden past offline'] as $forbidden) {
+                $this->assertStringNotContainsString($forbidden, $response->getContent());
+            }
+        }
+
+        // Without the device-events key there is no activity and no drop-out history at all.
+        $permission = Permission::query()->where('key', 'securityDevices.events.view')->firstOrFail();
+        $viewer->permissionOverrides()->updateExistingPivot($permission->id, ['allowed' => false]);
+        $viewer = $viewer->fresh();
+        $this->actingAs($viewer)->get('/security-devices')->assertOk()->assertInertia(fn ($page) => $page->where('overview.activity', []));
+        $this->actingAs($viewer)->get('/security-devices/sites/'.$allowed->id.'?tab=internet')->assertOk()->assertInertia(fn ($page) => $page->where('internet.outages', []));
     }
 
     private function assignToSite(Device $device, Site $site): void
@@ -445,26 +292,34 @@ class EstateSiteOperationsTest extends TestCase
         ]);
     }
 
-    public function test_estate_and_site_findings_do_not_inherit_foreign_event_history_when_a_device_moves(): void
+    private function hub(Site $site, string $status): MonitoringCollector
     {
-        $this->travelTo(now()->startOfSecond());
-        $allowed = Site::factory()->create();
-        $hidden = Site::factory()->create();
-        $viewer = User::factory()->create(['approved_at' => now()]);
-        HrEmployeeProfile::factory()->create(['user_id' => $viewer->id, 'primary_site_id' => $allowed->id, 'secondary_site_ids' => [], 'is_active' => true]);
-        foreach (['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view'] as $key) {
-            $permission = Permission::query()->where('key', $key)->firstOrFail();
-            $viewer->permissionOverrides()->attach($permission->id, ['allowed' => true]);
-        }
-        $device = Device::factory()->create(['name' => 'Currently permitted device']);
-        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $hidden->id, 'assigned_at' => now()->subDays(2), 'released_at' => now()->subHour()]);
-        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $allowed->id, 'assigned_at' => now()->subHour()]);
-        DeviceEvent::create(['device_id' => $device->id, 'event_type' => 'hidden_past_event', 'severity' => 'critical', 'source' => 'Private foreign history', 'occurred_at' => now()->subHours(2)]);
-        DeviceEvent::create(['device_id' => $device->id, 'event_type' => 'visible_event', 'severity' => 'warning', 'source' => 'test', 'occurred_at' => now()->subMinutes(30)]);
-        $this->actingAs($viewer)->get('/security-devices')->assertOk()->assertInertia(fn ($page) => $page
-            ->where('actor_id', $viewer->id)->where('stats.criticalEvents24h', 0)->where('stats.warningEvents24h', 1)->has('recentEvents', 1)->where('recentEvents.0.event_type', 'visible_event')->where('operations.summary.active_findings', 1));
-        $this->get('/security-devices/sites/'.$allowed->id)->assertOk()->assertInertia(fn ($page) => $page->where('summary.active_findings', 1));
-        $this->assertStringNotContainsString('Private foreign history', $this->get('/security-devices')->getContent());
-        $this->assertStringNotContainsString('hidden_past_event', $this->get('/security-devices')->getContent());
+        return MonitoringCollector::factory()->create([
+            'site_id' => $site->id,
+            'name' => $site->name.' hub',
+            'collector_uuid' => (string) Str::uuid(),
+            'status' => $status,
+            'last_seen_at' => now()->subMinutes(10),
+            'approved_at' => now()->subDay(),
+            'revoked_at' => null,
+        ]);
+    }
+
+    private function controlRoomAlertFor(Device $device, Site $site, string $type): ControlRoomAlert
+    {
+        $controlRoomDevice = ControlRoomDevice::query()->create([
+            'name' => $device->name,
+            'type' => ControlRoomDevice::TYPE_NETWORK,
+            'site_id' => $site->id,
+            'status' => 'online',
+            'canonical_device_id' => $device->id,
+        ]);
+
+        return ControlRoomAlert::factory()->critical()->create([
+            'site_id' => $site->id,
+            'device_id' => $controlRoomDevice->id,
+            'status' => ControlRoomAlert::STATUS_OPEN,
+            'alert_type' => $type,
+        ]);
     }
 }

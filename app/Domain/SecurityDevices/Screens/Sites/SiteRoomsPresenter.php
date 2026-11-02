@@ -65,8 +65,9 @@ final class SiteRoomsPresenter
                 'names' => array_map(fn (DeviceEntry $entry): string => $entry->name(), array_slice($unplaced, 0, 6)),
                 'more' => max(0, count($unplaced) - 6),
             ],
-            // Rooms are added and renamed in Sites & locations, for those who may open it.
-            'profile_href' => $viewer->canDo('sites.viewAny') ? '/sites/'.$site->id : null,
+            // Rooms are added and renamed in Sites & locations, for those who may open this Site there
+            // (Sites' own policy: all Sites in Security & devices doesn't widen Sites & locations).
+            'profile_href' => Gate::forUser($viewer)->allows('view', $site) ? '/sites/'.$site->id : null,
         ];
     }
 

@@ -192,20 +192,21 @@ final class SecurityDevicesSettings
                 $errors[$key] = 'Choose a role that exists.';
             }
         }
-        if ($errors === [] && $reason === null) {
-            foreach ($changes as $key => $value) {
-                $loosens = self::DEFINITIONS[$key]['loosens'];
-                if ($loosens !== null && $value === $loosens && $this->value($key) !== $value) {
-                    $errors['reason'] = 'Say why you’re loosening this safety check.';
-                }
-            }
-        }
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
+        // Permission first: someone who can't change a setting is refused before being asked for a reason.
         foreach (array_keys($changes) as $key) {
             if (! $actor->canDo(self::DEFINITIONS[$key]['permission'])) {
                 throw new AuthorizationException('You can’t change this setting.');
+            }
+        }
+        if ($reason === null) {
+            foreach ($changes as $key => $value) {
+                $loosens = self::DEFINITIONS[$key]['loosens'];
+                if ($loosens !== null && $value === $loosens && $this->value($key) !== $value) {
+                    throw ValidationException::withMessages(['reason' => 'Say why you’re loosening this safety check.']);
+                }
             }
         }
 

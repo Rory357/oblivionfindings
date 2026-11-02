@@ -427,8 +427,17 @@ class QueclinkHubControllerTest extends TestCase
             DeviceConfigurationProfile::STATUS_RETIRED,
             $applicationPreset->fresh()->configurationProfile->fresh()->status,
         );
+        // S&D rebuild C6 (Stephan, 1 Nov: trackers are read-only in S&D): several trackers at once are
+        // refused before anything is read or written, in words that say nothing about the other Site's tracker.
         $this->actingAs($viewer)->post('/security-devices/integrations/queclink/bulk', [
             'device_ids' => [$ownDevice->id, $foreignPaired->id],
+            'action' => 'resident_safety_profile',
+        ])->assertRedirect()->assertSessionHasErrors([
+            'device_ids' => 'Choose one tracker at a time. Reviewing a governed action for several trackers at once isn’t available yet.',
+        ]);
+        // One tracker from another Site is still concealed.
+        $this->actingAs($viewer)->post('/security-devices/integrations/queclink/bulk', [
+            'device_ids' => [$foreignPaired->id],
             'action' => 'resident_safety_profile',
         ])->assertNotFound();
         $this->assertSame($before, QueclinkPendingCommand::query()->count());

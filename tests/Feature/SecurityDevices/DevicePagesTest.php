@@ -246,12 +246,14 @@ class DevicePagesTest extends TestCase
             'parent_device_id' => $router->id,
             'child_device_id' => $switch->id,
             'relationship_type' => RelationshipType::UplinksTo,
+            'created_by_user_id' => $this->viewer->id,
         ]);
         $hidden = $this->device($this->other, ['name' => 'Synthetic Lodge switch', 'subcategory' => 'switch']);
         DeviceRelationship::query()->create([
             'parent_device_id' => $router->id,
             'child_device_id' => $hidden->id,
             'relationship_type' => RelationshipType::UplinksTo,
+            'created_by_user_id' => $this->viewer->id,
         ]);
 
         $response = $this->actingAs($this->viewer)->get('/security-devices/devices/'.$router->id);

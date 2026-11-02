@@ -244,7 +244,10 @@ it('keeps the Site Profile technology tab bound to its canonical optional projec
     $page = file_get_contents($root.'/resources/js/pages/sites/show.tsx');
     $registry = file_get_contents($root.'/resources/js/pages/sites/tabs/registry.ts');
     $projection = file_get_contents($root.'/resources/js/components/sites/site-technology-projection.tsx');
-    $securitySite = file_get_contents($root.'/resources/js/pages/security-devices/sites/show.tsx');
+    // S&D rebuild C3: the Security & Devices Site page (pg-sdr-12) links to the Site profile only from
+    // its Rooms tab, with a link the server builds for someone that profile lets in.
+    $securityRooms = file_get_contents($root.'/resources/js/pages/security-devices/sites/_rooms.tsx');
+    $securityRoomsPresenter = file_get_contents($root.'/app/Domain/SecurityDevices/Screens/Sites/SiteRoomsPresenter.php');
 
     expect($controller)
         ->toContain("'viewTechnology' => \$technology->canView(\$user, \$site)")
@@ -261,12 +264,14 @@ it('keeps the Site Profile technology tab bound to its canonical optional projec
         ->toContain('<SiteTechnologyProjectionPanel')
         ->toContain('data={tabData as SiteTechnologyProjection}')
         ->toContain('canViewHardwarePlacement={props.can.viewHardwarePlacement}')
-        // The Security & Devices Site header links to the Site profile's
-        // technology tab only for someone who may view that profile.
-        ->and($securitySite)
-        ->toContain('{can.view_site_profile ? (')
-        ->toContain("'?tab=technology'")
-        ->toContain('<SiteProfileAccessRequired')
+        // The Security & Devices Site page links to the Site profile only for
+        // someone who may view that profile, and never builds the link itself.
+        ->and($securityRoomsPresenter)
+        ->toContain("'profile_href' => Gate::forUser(\$viewer)->allows('view', \$site) ? '/sites/'.\$site->id : null")
+        ->and($securityRooms)
+        ->toContain('rooms.profile_href')
+        ->toContain('href: rooms.profile_href')
+        ->not->toContain('`/sites/${')
         ->and($projection)
         ->toContain('canViewHardwarePlacement &&')
         ->toContain('data.can.view_room_placement ? (')
@@ -1259,9 +1264,14 @@ it('does not retain the obsolete HR organisation context concern', function () {
 it('keeps visible IT and Security Devices copy on application and Site language', function () {
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
     $copyContracts = [
+        // S&D rebuild C3: the new Sites page (pg-sdr-11) says it in Site words, never organisation ones.
         'resources/js/pages/security-devices/sites/index.tsx' => [
-            'required' => ['No active Sites are available within your approved Site access.'],
-            'rejected' => ['No active sites are available within your current organisation and site access.'],
+            'required' => ['No Sites yet.', 'No Sites match. Try another search or region.'],
+            'rejected' => [
+                'No active sites are available within your current organisation and site access.',
+                'organisation',
+                'organization',
+            ],
         ],
         'resources/js/components/it/it-api-identity-contract.ts' => [
             'required' => [
@@ -1486,7 +1496,9 @@ function itSecurityCompatibilityEvidenceFingerprints(): array
         // no-effect assertions changed; the three legacy storage writes remain.
         'tests/Feature/Monitoring/MonitoringSchemaTest.php' => '3159c9921ee8f28862c9234c2386233d249ab011919c709b793f2c5f3db2a6cd',
         'tests/Feature/Monitoring/RuntimeEnvelopePersistenceTest.php' => 'af83c6c0b9e9cd1dcd91aa27740df2a2ebaad85462926a9a49b3878751aeada2',
-        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php' => '7806861b4bfebd475b15fcfbff40439ee20f40e20deb55d6fa79f29b64523a69',
+        // Reviewed S&D end-gate change: the fresh-withdrawal case now reads the stale principal through
+        // the preview service itself (page views reload keys since 31 Oct); its one tenant_id assertion is unchanged.
+        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php' => '6c0cdd0d2e5f1f104fed4b45c5161e662dabdb3824ba0a4a67b8f840e4bb9b5b',
         'tests/Feature/SecurityDevices/HikvisionDiscoveryTest.php' => '9f8026a7a883a95d888572e0a5fcadb54c161c59f169d66ec0587e871bb52360',
         'tests/Unit/SecurityDevices/HikvisionDiscoveryMigrationTest.php' => '0953f8d830067600a33153b476e216f726fe0a42ae7da6af5b9eba865dc98866',
         'tests/Unit/SecurityDevices/HikvisionSourceMigrationTest.php' => '150ebfb00b38ee3d835bf80898e7d3868c50228ccfc30bb79960fcd7d66e444d',

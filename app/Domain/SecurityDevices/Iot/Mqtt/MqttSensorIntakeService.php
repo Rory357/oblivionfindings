@@ -176,7 +176,7 @@ final class MqttSensorIntakeService
             $observed = is_array($meta['observed'] ?? null) ? $meta['observed'] : [];
             $existingReadings = is_array($observed['sensor_readings'] ?? null) ? $observed['sensor_readings'] : [];
 
-            // S&D Phase E: a reading that changes state opens or closes its alert (after this commit).
+            // S&D Phase E: a reading that changes state opens or closes its alert once this commit lands.
             foreach ($newReadings as $key => $reading) {
                 $before = is_array($existingReadings[$key] ?? null) ? (string) ($existingReadings[$key]['state'] ?? 'healthy') : 'healthy';
                 if ($before !== $reading['state']) {

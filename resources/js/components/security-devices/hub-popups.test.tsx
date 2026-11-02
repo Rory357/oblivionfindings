@@ -103,6 +103,8 @@ afterEach(() => {
 describe('Hub pop-ups', () => {
     it('12 · Add a hub: one download for the Site, waits live for the hello, then approve, networks and the first scan', async () => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
+        // The fixtures are on 1 Nov (setup code until 2 Nov, hello at 9:52 pm NZ): run on that day.
+        vi.setSystemTime(new Date('2026-11-01T08:55:00Z'));
         const changed = vi.fn();
         const seeScan = vi.fn();
         http.post.mockImplementation((url: string) => {

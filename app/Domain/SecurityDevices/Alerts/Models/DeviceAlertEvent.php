@@ -24,7 +24,7 @@ final class DeviceAlertEvent extends Model
         'at' => 'immutable_datetime',
     ];
 
-    public function alert(): BelongsTo
+    public function deviceAlert(): BelongsTo
     {
         return $this->belongsTo(DeviceAlert::class, 'alert_id');
     }

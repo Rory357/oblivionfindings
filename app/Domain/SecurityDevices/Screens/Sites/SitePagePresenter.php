@@ -47,7 +47,8 @@ final class SitePagePresenter
     public function site(User $viewer, int $siteId): Site
     {
         $this->access->assertCanViewSite($viewer, $siteId);
-        $site = Site::query()->whereKey($siteId)->firstOrFail(['id', 'name', 'address_line_1', 'suburb', 'city', 'region', 'is_active', 'archived', 'archived_at']);
+        // type: Sites & locations' own policy reads it before the Rooms tab links there.
+        $site = Site::query()->whereKey($siteId)->firstOrFail(['id', 'name', 'type', 'address_line_1', 'suburb', 'city', 'region', 'is_active', 'archived', 'archived_at']);
         abort_unless($site->is_active && ! $site->archived && $site->archived_at === null, 404);
 
         return $site;
@@ -92,7 +93,7 @@ final class SitePagePresenter
             'house' => $this->modes->house($site, $entries),
             'overview' => $tab === 'overview' ? $this->overview($entries, $hub, $hubDown) : null,
             'network' => $tab === 'network' ? $this->network($site, $entries) : null,
-            'internet' => $tab === 'internet' ? $this->internet($entries) : null,
+            'internet' => $tab === 'internet' ? $this->internet($viewer, $entries) : null,
             'rooms' => $tab === 'rooms' ? $this->rooms->present($viewer, $site, $entries) : null,
             'modes' => $tab === 'modes' ? $this->modes->present($site, $entries, $viewer->canDo('securityDevices.automations.manage')) : null,
             'can' => [
@@ -208,19 +209,22 @@ final class SitePagePresenter
      * @param  Collection<int, DeviceEntry>  $entries
      * @return array<string, mixed>
      */
-    private function internet(Collection $entries): array
+    private function internet(User $viewer, Collection $entries): array
     {
         $gateways = $entries->filter(fn (DeviceEntry $entry): bool => $entry->kind === DeviceKind::Router
             || ($entry->kind === DeviceKind::NetworkDevice && preg_match('/router|gateway|firewall|wan/i', implode(' ', [
                 (string) $entry->device->subcategory, (string) $entry->device->category, $entry->name(),
             ])) === 1))->values();
-        $outages = $gateways->isEmpty() ? collect() : DeviceEvent::query()
-            ->whereIn('device_id', $gateways->map(fn (DeviceEntry $entry): int => $entry->id())->all())
-            ->where(fn ($query) => $query->where('event_type', 'like', '%offline%')->orWhere('event_type', 'like', '%online%')
-                ->orWhere('event_type', 'like', '%wan%')->orWhere('event_type', 'like', '%failover%'))
-            ->orderByDesc('occurred_at')
+        // Drop-outs are device events: only for people who may see them, and only from while the
+        // router was somewhere they can see (a router moved here doesn't bring another Site's history).
+        $outages = $gateways->isEmpty() || ! $viewer->canDo('securityDevices.events.view') ? collect() : $this->access
+            ->applyTemporalEventCustodyScope(DeviceEvent::query()
+                ->whereIn('device_events.device_id', $gateways->map(fn (DeviceEntry $entry): int => $entry->id())->all()), $viewer)
+            ->where(fn ($query) => $query->where('device_events.event_type', 'like', '%offline%')->orWhere('device_events.event_type', 'like', '%online%')
+                ->orWhere('device_events.event_type', 'like', '%wan%')->orWhere('device_events.event_type', 'like', '%failover%'))
+            ->orderByDesc('device_events.occurred_at')
             ->limit(12)
-            ->get(['id', 'device_id', 'event_type', 'severity', 'occurred_at']);
+            ->get(['device_events.id', 'device_events.device_id', 'device_events.event_type', 'device_events.severity', 'device_events.occurred_at']);
         $names = $gateways->mapWithKeys(fn (DeviceEntry $entry): array => [$entry->id() => $entry->name()]);
 
         return [

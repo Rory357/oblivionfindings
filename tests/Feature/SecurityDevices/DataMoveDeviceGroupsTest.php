@@ -12,6 +12,7 @@ use App\Models\SiteRoom;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
+use Illuminate\Support\Facades\Artisan;
 
 /*
  * S&D data move "Device groups → rooms and filters" (D8, security-devices:moves:device-groups).
@@ -67,12 +68,16 @@ beforeEach(function (): void {
 it('shows each group’s filter and the members it would place, and changes nothing', function (): void {
     $tables = ($this->groupTables)();
 
-    $this->artisan('security-devices:moves:device-groups')
-        ->expectsOutputToContain('/security-devices/devices?group='.$this->kitchenGroup->id)
-        ->expectsOutputToContain('Kitchen: 3 without a room')
-        ->expectsOutputToContain('A future drop, after Stephan’s yes, would remove 3 groups')
-        ->expectsOutputToContain('Dry run: nothing changed')
-        ->assertSuccessful();
+    // The filter and the room hint share one table row, and expectsOutputToContain lets one written
+    // line satisfy only one expectation, so read the whole output instead.
+    $exit = Artisan::call('security-devices:moves:device-groups');
+    expect($exit)->toBe(0)
+        ->and(Artisan::output())->toContain(
+            '/security-devices/devices?group='.$this->kitchenGroup->id,
+            'Kitchen: 3 without a room',
+            'A future drop, after Stephan’s yes, would remove 3 groups',
+            'Dry run: nothing changed',
+        );
 
     expect(($this->roomOf)($this->first))->toBeNull()
         ->and(($this->groupTables)())->toBe($tables)

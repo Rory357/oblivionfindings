@@ -44,6 +44,8 @@ beforeEach(function (): void {
         'assignment_type' => 'permanent', 'assigned_at' => now()->subWeek(),
     ]);
 
+    // Each upload carries the hub's next sequence number; a repeated number is a replay and is never read again.
+    $this->sequence = 0;
     $this->relayed = function (array $overrides = [], ?CarbonImmutable $receivedAt = null): array {
         $receivedAt ??= CarbonImmutable::now('UTC')->subMinutes(8)->startOfSecond();
         $payload = array_replace([
@@ -56,7 +58,7 @@ beforeEach(function (): void {
 
         return app(CollectorIngestService::class)->ingest($this->hub->fresh(), [[
             'id' => 'sensor-reading:'.Str::random(12),
-            'source_sequence' => 1,
+            'source_sequence' => ++$this->sequence,
             'created_at' => $receivedAt->format(DATE_ATOM),
             'payload' => $payload,
         ]]);
@@ -133,10 +135,15 @@ it('stops sending a revoked login to the hub', function (): void {
 
 it('records the daily public-port check and alerts when Oblivion answers MQTT from the internet (D21)', function (): void {
     $hubDevice = Device::factory()->create(['name' => 'Rata House hub PC']);
+    // Enrolment registers the hub's own device at its Site.
+    DeviceAssignment::query()->create([
+        'device_id' => $hubDevice->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $this->site->id,
+        'assignment_type' => 'permanent', 'assigned_at' => now()->subWeek(),
+    ]);
     $this->hub->forceFill(['collector_device_id' => $hubDevice->id])->save();
     $send = fn (array $ports): array => app(CollectorIngestService::class)->ingest($this->hub->fresh(), [[
         'id' => 'broker-exposure:'.Str::random(8),
-        'source_sequence' => 1,
+        'source_sequence' => ++$this->sequence,
         'created_at' => now()->toIso8601String(),
         'payload' => ['item_type' => 'broker_exposure_check', 'host' => 'oblivion.example', 'ports' => $ports, 'checked_at' => now()->toIso8601String()],
     ]]);
@@ -153,6 +160,10 @@ it('records the daily public-port check and alerts when Oblivion answers MQTT fr
 
 it('turns 5 wrong logins at the relay into an alert on the hub for IT', function (): void {
     $hubDevice = Device::factory()->create(['name' => 'Rata House hub PC']);
+    DeviceAssignment::query()->create([
+        'device_id' => $hubDevice->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $this->site->id,
+        'assignment_type' => 'permanent', 'assigned_at' => now()->subWeek(),
+    ]);
     $this->hub->forceFill(['collector_device_id' => $hubDevice->id])->save();
 
     app(CollectorIngestService::class)->ingest($this->hub->fresh(), [[

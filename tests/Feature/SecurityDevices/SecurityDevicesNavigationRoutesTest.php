@@ -129,8 +129,8 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/sites/index')
-                ->has('sites', 2)
-                ->where('sites.0.name', 'Kea Lodge')
+                ->has('cards', 2)
+                ->where('cards.0.name', 'Kea Lodge')
             );
     }
 
@@ -145,8 +145,8 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/sites/show')
                 ->where('site.name', 'Koru House')
-                ->has('devices')
-                ->has('summary')
+                ->has('meters')
+                ->has('overview')
             );
 
         $this->actingAs($this->admin)

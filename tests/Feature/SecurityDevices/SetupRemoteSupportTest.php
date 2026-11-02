@@ -26,6 +26,10 @@ beforeEach(function (): void {
 });
 
 it('turns remote support on and off through today’s setting, audited', function (): void {
+    // Remote support needs computer management and a relay first (the settings save refuses it otherwise).
+    config()->set('endpoint_management.enabled', true);
+    config()->set('endpoint_management.remote_support.relay_urls', ['turns:relay.example.test:5349?transport=tcp']);
+    config()->set('endpoint_management.remote_support.relay_secret', str_repeat('relay-fixture-', 4));
     $admin = ($this->person)(['securityDevices.viewAny', 'settings.access.manage', 'integrations.manage_secrets']);
 
     $this->actingAs($admin)->get('/security-devices/setup/computers?tab=remote')->assertOk()

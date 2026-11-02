@@ -161,7 +161,7 @@ it('projects endpoint posture and section for canonical computers and omits them
     endpointPostureAgent($server, $this->site, $this->admin);
 
     $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$computer->id}")
+        ->get("/security-devices/devices/{$computer->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(function ($page): void {
             $profile = $page->toArray()['props']['profile'];
@@ -178,12 +178,12 @@ it('projects endpoint posture and section for canonical computers and omits them
         });
 
     $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$server->id}")
+        ->get("/security-devices/devices/{$server->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(fn ($page) => $page->where('profile.endpointPosture.agent.state', 'fresh'));
 
     $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$gateway->id}")
+        ->get("/security-devices/devices/{$gateway->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(function ($page): void {
             $profile = $page->toArray()['props']['profile'];
@@ -205,7 +205,7 @@ it('withholds diagnostic inventory from viewers without endpoint diagnostics per
     ]);
 
     $response = $this->actingAs($integrationViewer)
-        ->get("/security-devices/devices/{$computer->id}")
+        ->get("/security-devices/devices/{$computer->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('profile.endpointPosture.agent.state', 'fresh')
@@ -214,6 +214,25 @@ it('withholds diagnostic inventory from viewers without endpoint diagnostics per
 
     $response->assertDontSee('KAURI-SECRET-HOSTNAME-01');
     $response->assertDontSee('Confidential Diagnostic Tool');
+
+    // S&D rebuild C2: the computer's own page reads the same posture and withholds it too.
+    $this->actingAs($integrationViewer)
+        ->get("/security-devices/devices/{$computer->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('security-devices/devices/device')
+            ->where('overview.restricted', true)
+            ->where('overview.now', null))
+        ->assertDontSee('KAURI-SECRET-HOSTNAME-01')
+        ->assertDontSee('Confidential Diagnostic Tool');
+    $this->actingAs($integrationViewer)
+        ->get("/security-devices/devices/{$computer->id}?tab=health")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('health.restricted', true)
+            ->where('health.available', false))
+        ->assertDontSee('KAURI-SECRET-HOSTNAME-01')
+        ->assertDontSee('Confidential Diagnostic Tool');
 
     // Move the computer to another accessible Site after enrolment -> assignment_drift withholds inventory even for admin.
     $otherSite = Site::factory()->create(['name' => 'Totara House', 'is_active' => true, 'archived' => false]);
@@ -228,7 +247,7 @@ it('withholds diagnostic inventory from viewers without endpoint diagnostics per
     ]);
 
     $driftResponse = $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$computer->id}")
+        ->get("/security-devices/devices/{$computer->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('profile.endpointPosture.agent.state', 'assignment_drift')
@@ -351,7 +370,7 @@ it('projects Windows service command outcomes and readback on device management 
     ]);
 
     $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$computer->id}")
+        ->get("/security-devices/devices/{$computer->id}?section=management")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('profile.management.history.0.capability', 'endpoint.service.manage')

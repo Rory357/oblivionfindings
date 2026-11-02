@@ -25,8 +25,8 @@ beforeEach(function () {
 
 function sdOncePerRequestManager(Site $site): User
 {
-    $user = User::factory()->create(['approved_at' => now(), 'role' => 'manager', 'external_clinical_account' => false]);
-    $user->roles()->sync([Role::query()->where('name', 'manager')->value('id')]);
+    $user = User::factory()->create(['approved_at' => now(), 'role' => 'provider_manager', 'external_clinical_account' => false]);
+    $user->roles()->sync([Role::query()->where('name', 'provider_manager')->value('id')]);
     HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [],
         'is_active' => true, 'start_date' => '2020-01-01', 'end_date' => null]);
 
@@ -65,6 +65,9 @@ it('gives the same Sites and assets as before', function () {
 
 it('asks the schema at most once and reads the viewer\'s Sites once, however many assets are checked', function () {
     $manager = sdOncePerRequestManager($this->home);
+    // As on a page view: HandleInertiaRequests loads the viewer's roles and overrides once,
+    // so each canDo() reads memory and only the S&D lookups are counted here.
+    $manager->load(['permissionOverrides:id,key', 'roles.permissions:id,key']);
     $assets = Asset::factory()->count(20)->create(['site_id' => $this->home->id]);
 
     // Each run is its own "request": the scoped service starts empty, and the asset
@@ -115,12 +118,13 @@ it('starts each queue job with a fresh service, so a Site change between jobs is
     RecordAccessibleSiteIds::$seen = [];
 
     RecordAccessibleSiteIds::dispatch($manager->id)->onConnection('database')->onQueue('sd-scope-test');
-    $this->artisan('queue:work', ['connection' => 'database', '--queue' => 'sd-scope-test', '--stop-when-empty' => true])->assertExitCode(0);
+    // The test process is already past the worker's default 128 MB, which would stop it with exit 12.
+    $this->artisan('queue:work', ['connection' => 'database', '--queue' => 'sd-scope-test', '--stop-when-empty' => true, '--memory' => 4096])->assertExitCode(0);
 
     HrEmployeeProfile::query()->where('user_id', $manager->id)->update(['primary_site_id' => $this->away->id]);
 
     RecordAccessibleSiteIds::dispatch($manager->id)->onConnection('database')->onQueue('sd-scope-test');
-    $this->artisan('queue:work', ['connection' => 'database', '--queue' => 'sd-scope-test', '--stop-when-empty' => true])->assertExitCode(0);
+    $this->artisan('queue:work', ['connection' => 'database', '--queue' => 'sd-scope-test', '--stop-when-empty' => true, '--memory' => 4096])->assertExitCode(0);
 
     expect(RecordAccessibleSiteIds::$seen)->toBe([[$this->home->id], [$this->away->id]]);
 });

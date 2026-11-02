@@ -104,12 +104,21 @@ final class HubLinuxSetupController extends Controller
 
     private function refuse(string $message): string
     {
-        return "#!/bin/sh\necho ".escapeshellarg($message)." >&2\nexit 1\n";
+        return "#!/bin/sh\necho ".self::shellQuote($message)." >&2\nexit 1\n";
+    }
+
+    /**
+     * POSIX single quotes for the sh script the hub runs, whatever the server's own OS
+     * (escapeshellarg uses cmd.exe double quotes on Windows, where sh would expand $(…)).
+     */
+    private static function shellQuote(string $value): string
+    {
+        return "'".str_replace("'", "'\\''", $value)."'";
     }
 
     private function installer(string $server, string $code, string $siteName): string
     {
-        $vars = 'SERVER='.escapeshellarg($server)."\nCODE=".escapeshellarg($code)."\nSITE=".escapeshellarg($siteName)."\n";
+        $vars = 'SERVER='.self::shellQuote($server)."\nCODE=".self::shellQuote($code)."\nSITE=".self::shellQuote($siteName)."\n";
 
         return "#!/bin/sh\n# Oblivion hub setup. Downloads the hub, checks it, installs it with its own runtime\n# (nothing from apt), connects, then waits for an admin's approval in Oblivion.\nset -eu\n".$vars.<<<'SH'
 say() { printf '%s\n' "$*"; }

@@ -257,7 +257,8 @@ it('checks every action and never sends one it refuses', function (array $act, a
     'Alt+F4' => [fixesAct('key', ['text' => 'alt+F4']), [], 'wait', 'key_not_allowed'],
     'a point outside the picture' => [fixesAct('left_click', ['coordinate' => [5000, 10]]), [], 'wait', 'outside_picture'],
     'a click with keys held' => [fixesAct('left_click', ['coordinate' => [10, 10], 'text' => 'ctrl']), [], 'wait', 'not_supported'],
-    'typing into a command window' => [fixesAct('type', ['text' => 'ipconfig']), ['window_title' => 'Terminal', 'process' => 'WindowsTerminal.exe'], 'wait', 'terminal'],
+    // A command window in front is a blocked window now (review fix): Obli stops before the AI is asked.
+    'typing into a command window' => [fixesAct('type', ['text' => 'ipconfig']), ['window_title' => 'Terminal', 'process' => 'WindowsTerminal.exe'], 'stopped', 'blocked_window'],
     'typing that turns off protection' => [fixesAct('type', ['text' => 'Set-MpPreference -DisableRealtimeMonitoring $true']), ['window_title' => 'Notes', 'process' => 'notepad.exe'], 'wait', 'unsafe'],
     'a fix that isn’t on for this computer' => [fixesAct('run_fix', ['fix_key' => 'service:Spooler:restart'], 'Step 1: restarting printing', null), [], 'wait', 'fix_not_on'],
     'a one-off request to turn off the firewall' => [fixesAct('ask_it', ['what' => 'Turn off the firewall for Teams', 'commands' => ['netsh advfirewall set allprofiles state off']], 'Step 1: asking IT', null), [], 'stopped', 'unsafe'],
@@ -385,7 +386,8 @@ it('refuses to start when fixes are off or the AI isn’t Anthropic', function (
     $token = fixesToken($this);
     $body = ['request_uuid' => (string) Str::uuid(), 'problem' => 'The printer won’t print at all today.', 'site_id' => $this->fixSite->id, 'screen' => ['width' => 320, 'height' => 200]];
     AppSetting::query()->where('key', ObliFixSettings::KEY)->update(['value' => json_encode(['version' => 2, 'enabled' => false])]);
-    $this->withToken($token)->postJson('/api/obli/fixes', $body)->assertStatus(503)->assertHeader('Cache-Control', 'no-store, private');
+    // ProtectObliResponses sets private, no-store, max-age=0 on every api/obli reply.
+    $this->withToken($token)->postJson('/api/obli/fixes', $body)->assertStatus(503)->assertHeader('Cache-Control', 'max-age=0, no-store, private');
 
     AppSetting::query()->where('key', ObliFixSettings::KEY)->update(['value' => json_encode(['version' => 3, 'enabled' => true])]);
     $ai = AppSetting::query()->where('key', ObliAiSettings::KEY)->first();

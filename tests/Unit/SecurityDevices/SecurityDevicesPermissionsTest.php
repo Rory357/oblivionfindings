@@ -75,11 +75,13 @@ class SecurityDevicesPermissionsTest extends TestCase
         }
     }
 
-    public function test_exactly_50_security_devices_permissions(): void
+    public function test_exactly_66_security_devices_permissions(): void
     {
         $count = Permission::where('key', 'like', 'securityDevices.%')->count();
 
-        $this->assertEquals(50, $count);
+        // 50 before the S&D rebuild, plus its 16 new securityDevices.* keys (SecurityDevicesRebuildPermissions,
+        // granted by 2026_11_01_000100_grant_security_devices_rebuild_permissions).
+        $this->assertEquals(66, $count);
     }
 
     public function test_permissions_have_correct_group_and_module(): void

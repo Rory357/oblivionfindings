@@ -13,8 +13,15 @@ uses(TestCase::class);
 it('defines the complete provider-neutral management catalogue with safe policy defaults', function () {
     $capabilities = app(CommandCapabilityRegistry::class)->all();
 
-    expect($capabilities)->toHaveCount(42)
+    // S&D Phase H added five governed UniFi Access capabilities (keep unlocked, end it, lockdown, evacuate, end the emergency).
+    expect($capabilities)->toHaveCount(47)
         ->and($capabilities->keys()->all())->toContain(
+            'access.door.keep_unlocked',
+            'access.door.keep_unlocked_end',
+            'access.site.lockdown',
+            'access.site.evacuate',
+            'access.site.emergency_end',
+            'camera.snapshot.capture',
             'diagnostics.ping',
             'endpoint.script.run',
             'tracking.location_refresh',

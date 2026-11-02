@@ -227,7 +227,7 @@ it('puts the offline check on the hub that covers the Site, preferring its home 
         ->and(DiscoveryScope::query()->where('collector_id', $houseHub->id)->sole()->cidrs)->toBe(['192.168.20.15/32'])
         ->and(DiscoveryScope::query()->whereNull('collector_id')->exists())->toBeFalse();
 
-    $this->actingAs($this->admin)->get("/security-devices/devices/{$device->id}")
+    $this->actingAs($this->admin)->get("/security-devices/devices/{$device->id}?section=monitors")
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('profile.offlineAlert.enabled', true)

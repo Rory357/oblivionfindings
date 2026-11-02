@@ -79,7 +79,8 @@ it('links a sensor to a person only while their consent to monitoring is active'
     ($this->link)()->assertCreated();
     $link = DevicePersonLink::query()->sole();
     expect($link->purpose)->toBe('falls')
-        ->and($link->rule)->toBe(['minutes' => 10, 'from' => '22:00', 'to' => '06:00'])
+        // MySQL JSON keeps its own key order, so compare the values, not the order.
+        ->and($link->rule)->toEqual(['minutes' => 10, 'from' => '22:00', 'to' => '06:00'])
         ->and($link->consent_id)->not->toBeNull();
     $this->assertDatabaseHas('audit_logs', ['action' => 'security_devices.person_link.created']);
 
@@ -167,7 +168,8 @@ it('opens a scald alert after three hot readings, a person raises the hazard, an
     $this->actingAs($this->keeper)->postJson("/security-devices/alerts/{$alert->id}/hazard")->assertCreated();
     expect(SiteHazard::query()->count())->toBe(1);
 
-    foreach ([4, 14, 28] as $hours) {
+    // Three cool readings inside the last 24 hours before the check at hour 29 (the window starts at hour 5).
+    foreach ([6, 16, 28] as $hours) {
         $history->record($tap->id, ['temperature' => 42.0], $start->addHours($hours));
     }
     expect(app(ScaldWatch::class)->tick($start->addHours(29)))->toBe(1)

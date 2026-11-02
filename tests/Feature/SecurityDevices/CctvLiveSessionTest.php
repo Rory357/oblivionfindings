@@ -570,7 +570,9 @@ final class CctvLiveSessionTest extends TestCase
     public function test_camera_navigation_is_server_owned_and_gated_by_current_media_and_management_permissions(): void
     {
         $base = '/security-devices/devices/'.$this->camera->id.'/live';
-        $this->get('/security-devices/devices/'.$this->camera->id)->assertOk()->assertInertia(fn ($page) => $page->where('profile.cctv.live_href', $base)->where('profile.cctv.setup_href', $base.'/source'));
+        // S&D rebuild: the old profile (?section=) keeps the server-owned CCTV links; the camera page gates its Live card on the same key.
+        $this->get('/security-devices/devices/'.$this->camera->id.'?section=health')->assertOk()->assertInertia(fn ($page) => $page->where('profile.cctv.live_href', $base)->where('profile.cctv.setup_href', $base.'/source'));
+        $this->get('/security-devices/devices/'.$this->camera->id)->assertOk()->assertInertia(fn ($page) => $page->component('security-devices/devices/camera')->where('can.see_picture', true)->whereNot('live', null));
         // S&D rebuild C6: the Security workspace's CCTV tab is gone (it opens Devices › Cameras).
         $this->get('/security-devices/security?tab=cctv')->assertRedirect('/security-devices/devices?tab=cameras');
         foreach (['securityDevices.cctv.media.view', 'securityDevices.integrations.manage'] as $key) {
@@ -578,7 +580,8 @@ final class CctvLiveSessionTest extends TestCase
             $this->actor->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
         }
         $this->actor->unsetRelations();
-        $this->get('/security-devices/devices/'.$this->camera->id)->assertOk()->assertInertia(fn ($page) => $page->where('profile.cctv.live_href', null)->where('profile.cctv.setup_href', null));
+        $this->get('/security-devices/devices/'.$this->camera->id.'?section=health')->assertOk()->assertInertia(fn ($page) => $page->where('profile.cctv.live_href', null)->where('profile.cctv.setup_href', null));
+        $this->get('/security-devices/devices/'.$this->camera->id)->assertOk()->assertInertia(fn ($page) => $page->where('can.see_picture', false)->where('can.watch_live', false)->where('live', null));
     }
 
     #[DataProvider('liveDecommissionCases')]
@@ -639,7 +642,7 @@ final class CctvLiveSessionTest extends TestCase
         $this->assertSame('not_verified', $reference['window_coverage']);
         $this->assertSame($input['requested_end_at'], $reference['requested_end_at']);
         $this->get('/security-devices/devices/'.$this->camera->id.'/live')->assertOk()->assertInertia(fn ($p) => $p->where('reference_href', $this->referencePath()));
-        $this->get('/security-devices/devices/'.$this->camera->id)->assertOk()->assertInertia(fn ($p) => $p->where('profile.cctv.reference_href', $this->referencePath()));
+        $this->get('/security-devices/devices/'.$this->camera->id.'?section=health')->assertOk()->assertInertia(fn ($p) => $p->where('profile.cctv.reference_href', $this->referencePath()));
         $this->assertGreaterThan($created['server_now'], $reference['requested_end_at']);
         $this->assertStringNotContainsString('rtsps:', json_encode($created));
         $this->assertStringNotContainsString('isolated-unifi-key', json_encode($created));
@@ -676,7 +679,13 @@ final class CctvLiveSessionTest extends TestCase
         $this->getJson($this->referencePath())->assertNotFound();
         $this->postJson($this->referencePath(), $this->referenceInput())->assertNotFound();
         $this->get('/security-devices/devices/'.$this->camera->id.'/live')->assertOk()->assertInertia(fn ($p) => $p->where('reference_href', null));
-        $this->get('/security-devices/devices/'.$this->camera->id)->assertOk()->assertInertia(fn ($p) => $p->where('profile.cctv.reference_href', null));
+        $this->get('/security-devices/devices/'.$this->camera->id.'?section=health')->assertOk()->assertInertia(fn ($p) => $p->where('profile.cctv.reference_href', null));
+        // The camera page: no Recordings tab and no clips without the view key, even with live media.
+        $this->get('/security-devices/devices/'.$this->camera->id.'?tab=recordings')->assertOk()->assertInertia(fn ($p) => $p
+            ->where('can.see_clips', false)
+            ->where('tab', 'live')
+            ->where('recordings', null)
+            ->where('tabs', fn ($tabs) => ! collect($tabs)->contains('key', 'recordings')));
         $admin->permissions()->attach($view);
         $admin->permissions()->detach($create);
         $this->getJson($this->referencePath())->assertOk()->assertJsonPath('permissions.can_create', false)->assertJsonPath('create_href', null);

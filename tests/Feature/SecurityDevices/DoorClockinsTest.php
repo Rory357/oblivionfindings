@@ -438,5 +438,5 @@ it('keeps only which suggestion was answered when someone clocks in now instead'
 
     $session = HrAttendanceSession::query()->where('user_id', $this->worker->id)->sole();
     expect($session->source)->toBe('manual')
-        ->and($session->meta['door_badge_suggestion'] ?? null)->toBe(['clockin_id' => $row->id, 'chose' => 'now']);
+        ->and($session->meta['door_badge_suggestion'] ?? null)->toEqual(['clockin_id' => $row->id, 'chose' => 'now']);
 });

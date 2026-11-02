@@ -340,12 +340,13 @@ final class WebPages
         $host = preg_quote($session->address, '#');
         $default = ($session->scheme === 'http' && (int) $session->port === 80) || ($session->scheme === 'https' && (int) $session->port === 443);
         $port = $default ? '(?::'.(int) $session->port.')?' : ':'.(int) $session->port;
-        // Absolute links to the device itself.
-        $body = (string) preg_replace('#https?://'.$host.$port.'(?=[/"\'\s?#)]|$)#i', $prefix, $body);
         // Root-relative links in attributes and CSS (not protocol-relative ones).
         $body = (string) preg_replace('#((?:href|src|action|formaction)\s*=\s*["\'])/(?!/)#i', '$1'.$prefix.'/', $body);
+        $body = (string) preg_replace('#(url\(\s*["\']?)/(?!/)#i', '$1'.$prefix.'/', $body);
 
-        return (string) preg_replace('#(url\(\s*["\']?)/(?!/)#i', '$1'.$prefix.'/', $body);
+        // Absolute links to the device itself, last, so a link it makes is never prefixed twice.
+        // The # in the class is escaped: it is also the delimiter.
+        return (string) preg_replace('#https?://'.$host.$port.'(?=[/"\'\s?\#)]|$)#i', $prefix, $body);
     }
 
     private function rewriteUrl(Models\WebSession $session, string $token, string $url): ?string

@@ -436,7 +436,7 @@ class TrackingWorkspaceTest extends TestCase
             });
 
         $this->actingAs($viewer)
-            ->get("/security-devices/devices/{$device->id}")
+            ->get("/security-devices/devices/{$device->id}?section=health")
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $location = $page->toArray()['props']['profile']['header']['location'];
@@ -444,6 +444,18 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame('staff', $location['type']);
                 $this->assertSame('Remote Security Worker', $location['name']);
                 $this->assertNull($location['href']);
+            });
+
+        // S&D rebuild Phase E: the tracker's own page never links the worker to HR either.
+        $this->actingAs($viewer)
+            ->get("/security-devices/devices/{$device->id}")
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $props = $page->toArray()['props'];
+                $this->assertSame('security-devices/devices/tracker', $page->toArray()['component']);
+                $own = array_intersect_key($props, array_flip(['device', 'tab', 'tabs', 'meters', 'can', 'privacy', 'commands', 'location', 'console']));
+                $this->assertNotSame([], $own);
+                $this->assertStringNotContainsString('/hr/people/', json_encode($own, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
             });
     }
 
@@ -691,7 +703,7 @@ class TrackingWorkspaceTest extends TestCase
                 );
                 $this->assertStringNotContainsString('GENERIC-PRIVATE-PROVIDER-EVIDENCE', json_encode($props, JSON_THROW_ON_ERROR));
             });
-        $this->get("/operations/clients/{$client->id}?tab=location")
+        $this->actingAs($this->admin)->get("/operations/clients/{$client->id}?tab=location")
             ->assertOk()->assertInertia(fn ($page) => $page
             ->where('location.trackingRestricted', true)
             ->where('location.tracker', null)

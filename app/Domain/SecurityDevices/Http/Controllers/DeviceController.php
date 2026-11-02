@@ -121,8 +121,9 @@ class DeviceController extends Controller
                 ->with([
                     'profile' => fn ($profile) => $profile
                         ->select('id', 'name', 'interval_seconds', 'stale_after_seconds'),
+                    // approved_at: the offline alert counts a check run by a hub only while that hub is approved.
                     'collector' => fn ($collector) => $collector
-                        ->select('id', 'name', 'site_id', 'status', 'last_seen_at', 'last_heartbeat_at', 'revoked_at'),
+                        ->select('id', 'name', 'site_id', 'status', 'last_seen_at', 'last_heartbeat_at', 'approved_at', 'revoked_at'),
                 ])
                 ->orderBy('name');
         }

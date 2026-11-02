@@ -123,7 +123,8 @@ it('gives the hub each request with its session details signed, and keeps the an
     ]]]);
     $done = $request->fresh();
     expect($done->state)->toBe('done')
-        ->and($done->response_headers)->toBe(['content-type' => 'text/html', 'location' => 'http://10.66.1.40/next']);
+        // MySQL JSON keeps its own key order (shortest key first), so compare the values.
+        ->and($done->response_headers)->toEqual(['content-type' => 'text/html', 'location' => 'http://10.66.1.40/next']);
 
     $answer = app(WebPages::class)->answer($session, $token, $done);
     expect($answer['headers']['Content-Security-Policy'])->toContain('sandbox allow-scripts allow-forms')

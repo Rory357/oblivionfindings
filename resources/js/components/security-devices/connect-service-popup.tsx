@@ -242,7 +242,7 @@ export function ConnectService({ open, onClose, onChanged }: { open: boolean; on
         const next: Record<string, string> = {};
         if (service === 'unifi' && apiKey.trim() === '' && !state.unifi.has_key) next.api_key = 'Paste the API key from unifi.ui.com.';
         if (service === 'intune' && (typedIntune || !state.intune.has_key || !state.intune.ids_saved)) {
-            if (directoryId.trim() === '') next.directory_id = 'Paste the directory (tenant) ID.';
+            if (directoryId.trim() === '') next.directory_id = 'Paste the Microsoft directory ID.';
             if (clientId.trim() === '') next.client_id = 'Paste the application (client) ID.';
             if (clientSecret === '') next.client_secret = 'Paste the client secret.';
         }
@@ -585,7 +585,7 @@ export function ConnectService({ open, onClose, onChanged }: { open: boolean; on
             <>
                 <StepQuestion icon={KeyRound} title="Sign in to Microsoft Intune" line="Paste your app registration’s IDs and client secret from Microsoft Entra. The secret is stored encrypted in Oblivion." />
                 <PopupSection icon={KeyRound} title="Microsoft app registration" columns={2}>
-                    <PopupField label="Directory (tenant) ID" htmlFor="sd-connect-intune-directory" required={replacing} error={errors.directory_id}>
+                    <PopupField label="Microsoft directory ID" htmlFor="sd-connect-intune-directory" required={replacing} error={errors.directory_id}>
                         <Input id="sd-connect-intune-directory" autoComplete="off" spellCheck={false} value={directoryId} onChange={(event) => {
                             setDirectoryId(event.target.value);
                             setTestedNow(false);

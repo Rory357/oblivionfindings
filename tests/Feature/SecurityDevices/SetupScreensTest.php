@@ -72,6 +72,8 @@ class SetupScreensTest extends TestCase
         return MonitoringCollector::factory()->create([
             'site_id' => $site->id, 'name' => $site->name, 'collector_uuid' => (string) Str::uuid(),
             'status' => $status, 'approved_at' => now()->subDay(), 'revoked_at' => null, 'last_seen_at' => now()->subHour(),
+            // A real hub enrolled before it was approved; Setup lists enrolled hubs only.
+            'enrolled_at' => now()->subDays(2),
         ]);
     }
 
@@ -108,12 +110,14 @@ class SetupScreensTest extends TestCase
             ->where('sections.1.key', 'hubs')
             ->where('sections.1.tabs.0.key', 'networks')
             ->where('sections.2.key', 'services')
-            ->where('sections.3.key', 'history')
-            ->has('sections', 4)
+            // Phase H: Doors & access, for people who look after services. Computers & Obli needs its own keys.
+            ->where('sections.3.key', 'access')
+            ->where('sections.4.key', 'history')
+            ->has('sections', 5)
             ->has('meters', 6)
             ->where('meters.1.key', 'hubs')
             ->where('meters.1.value', '1 of 1')
-            ->where('overview.todo.0.text', '**Spare PC is waiting for approval.** It gets no work and no saved logins until an admin approves it.')
+            ->where('overview.todo.0.text', '**Spare PC hub is waiting for approval.** It gets no work and no saved logins until an admin approves it.')
             // Approving needs securityDevices.hubs.approve, which this viewer hasn't got.
             ->where('overview.todo.0.action', null)
             ->where('can.manage', false));
@@ -148,9 +152,10 @@ class SetupScreensTest extends TestCase
             ->where('networks.rows.0.next.text', '{time}')
             // Next 6:00 am in Auckland is tomorrow, 17:00 UTC today.
             ->where('networks.rows.0.next.at', '2026-11-02T17:00:00+00:00')
-            ->where('settings.scans\.daily.on', true)
-            ->where('settings.scans\.server_direct.on', false)
-            ->where('settings.scans\.server_direct.can_change', false));
+            // Setting keys hold dots, which dot paths can't address: read them from the whole list.
+            ->where('settings', fn ($settings): bool => $settings['scans.daily']['on'] === true
+                && $settings['scans.server_direct']['on'] === false
+                && $settings['scans.server_direct']['can_change'] === false));
         $this->assertStringNotContainsString('10.30.0.0/24', $response->getContent());
     }
 
@@ -165,12 +170,12 @@ class SetupScreensTest extends TestCase
             ->patchJson('/security-devices/setup/settings', ['changes' => ['scans.server_direct' => true, 'scans.daily' => true]])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('reason');
-        $this->actingAs($manager)
+        $saved = $this->actingAs($manager)
             ->patchJson('/security-devices/setup/settings', ['changes' => ['scans.server_direct' => true, 'scans.daily' => true], 'reason' => 'The server sits on the head office network'])
             ->assertOk()
-            ->assertJsonPath('changed', ['scans.server_direct'])
-            ->assertJsonPath('settings.scans\.server_direct.on', true)
-            ->assertJsonPath('settings.scans\.server_direct.loosens_when_on', true);
+            ->assertJsonPath('changed', ['scans.server_direct']);
+        $this->assertTrue($saved->json('settings')['scans.server_direct']['on']);
+        $this->assertTrue($saved->json('settings')['scans.server_direct']['loosens_when_on']);
 
         $this->actingAs($manager)
             ->patchJson('/security-devices/setup/settings', ['changes' => ['scans.nonsense' => true]])
@@ -257,8 +262,8 @@ class SetupScreensTest extends TestCase
                 ->where('section', 'alerts')
                 ->where('tab', 'rules')
                 ->where('sections', fn ($sections): bool => collect($sections)->pluck('key')->all() === ['overview', 'alerts', 'history'])
-                ->where('settings.alerts\.devices\.app.on', true)
-                ->where('settings.alerts\.devices\.app.loosens_when_off', true)
+                ->where('settings', fn ($settings): bool => $settings['alerts.devices.app']['on'] === true
+                    && $settings['alerts.devices.app']['loosens_when_off'] === true)
                 ->where('alerts.rules', 0));
         // Hubs, services and saved logins stay out of reach.
         $this->actingAs($alerts)->get('/security-devices/setup/services?tab=logins')->assertNotFound();

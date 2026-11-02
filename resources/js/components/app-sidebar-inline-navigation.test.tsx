@@ -253,8 +253,8 @@ describe('inline application navigation', () => {
             within(navigation).getByRole('link', { name: 'Devices' }),
         ).toHaveAttribute('aria-current', 'page');
         expect(
-            within(navigation).getByRole('link', { name: 'Alerts & upkeep' }),
-        ).toHaveAttribute('href', '/security-devices/monitoring');
+            within(navigation).getByRole('link', { name: 'Alerts' }),
+        ).toHaveAttribute('href', '/security-devices/alerts');
         expect(
             screen.queryByRole('button', { name: 'Close menu' }),
         ).not.toBeInTheDocument();

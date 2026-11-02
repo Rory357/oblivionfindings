@@ -18,13 +18,16 @@ use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
 use App\Domain\SecurityDevices\Credentials\Services\CommandCredentialLeaseService;
 use App\Domain\SecurityDevices\Management\Contracts\CommandHttpTransport;
 use App\Domain\SecurityDevices\Management\Data\CommandHttpResponse;
+use App\Domain\SecurityDevices\Management\Data\CommandDecisionInput;
 use App\Domain\SecurityDevices\Management\Data\CommandRequestInput;
+use App\Domain\SecurityDevices\Management\Enums\CommandApprovalDecision;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
 use App\Domain\SecurityDevices\Management\Services\CommandExecutionAdapterRegistry;
 use App\Domain\SecurityDevices\Management\Services\CommandExecutionRouteResolver;
+use App\Domain\SecurityDevices\Management\Services\DeviceCommandApprovalService;
 use App\Domain\SecurityDevices\Management\Services\DeviceCommandRequestService;
 use App\Domain\SecurityDevices\Management\Services\GovernedCommandDispatchService;
 use App\Domain\SecurityDevices\Models\Device;
@@ -123,11 +126,19 @@ beforeEach(function (): void {
     $this->manager = User::factory()->create(['approved_at' => now(), 'two_factor_secret' => encrypt('JBSWY3DPEHPK3PXP'), 'two_factor_confirmed_at' => now()]);
     $this->manager->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
     HrEmployeeProfile::factory()->create(['user_id' => $this->manager->id, 'primary_site_id' => $this->site->id, 'secondary_site_ids' => [], 'is_active' => true]);
+    // Arming is high risk: a second person approves it before it is sent.
+    $this->approver = User::factory()->create(['approved_at' => now(), 'two_factor_secret' => encrypt('JBSWY3DPEHPK3PXP'), 'two_factor_confirmed_at' => now()]);
+    $this->approver->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+    HrEmployeeProfile::factory()->create(['user_id' => $this->approver->id, 'primary_site_id' => $this->site->id, 'secondary_site_ids' => [], 'is_active' => true]);
 
     $this->requestArm = function (string $key): array {
         $command = app(DeviceCommandRequestService::class)->request($this->panel->fresh(), $this->manager, new CommandRequestInput(
             capability: 'alarm.arm', parameters: ['area' => 'zone-main'], reason: 'Night arm after the last staff member left.',
             idempotencyKey: $key, stepUpConfirmedAt: CarbonImmutable::now('UTC'), impactAcknowledged: true,
+        ));
+        expect($command->status)->toBe(CommandStatus::AwaitingApproval);
+        $command = app(DeviceCommandApprovalService::class)->decide($command->fresh(), $this->approver, new CommandDecisionInput(
+            CommandApprovalDecision::Approved, 'Approved: the house is empty and the night arm is due.',
         ));
         $attempt = app(GovernedCommandDispatchService::class)->dispatch($command->fresh(), $this->manager);
 
@@ -254,7 +265,8 @@ it('leaves an already-queued alarm job out of the config if the hub went back to
     [$command, $attempt] = ($this->requestArm)('hub-alarm-downgrade');
     $this->hub->forceFill(['runtime_status' => ['version' => '2026.10.1']])->save();
 
-    expect(($this->hubJobs)()['commands'] ?? [])->toBe([]);
+    // The alarm job was this hub's only work, so with it left out the server signs no config at all.
+    expect(fn () => ($this->hubJobs)())->toThrow(DomainException::class, 'Collector has no executable work');
 });
 
 it('never falls back to the server when the covering hub is offline', function (): void {

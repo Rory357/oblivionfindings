@@ -1272,6 +1272,11 @@ it('derives script navigation from current account grants and approved Site evid
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->where('can_view_script_catalogue', false));
     scriptCatalogueGrant($actor, EndpointScripts::REVIEW);
+    // Every page view reads the viewer's keys afresh (HandleInertiaRequests, 31 Oct), onto this same
+    // object, so it still holds the withdrawal the last page saw. The next page view shows the link again.
+    $this->get('https://localhost/it/remote-support')->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('can_view_script_catalogue', true));
     expect($service->canOpen($actor))->toBeTrue();
     User::whereKey($actor->id)->update(['two_factor_confirmed_at' => null]);
     expect($service->canOpen($actor))->toBeFalse();
