@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Screens\Devices;
 
 use App\Domain\SecurityDevices\Cctv\Services\CameraPrivacy;
+use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Screens\DeviceState;
@@ -61,10 +62,11 @@ final class DevicesIndexPresenter
             ->values();
         $groups = $this->groupOptions($scoped);
         $group = $this->groupFilter($input['group'] ?? null, $groups);
+        $serials = $this->serialMatches($scoped, $search);
         $filtered = $scoped
             ->filter(fn (DeviceEntry $entry): bool => $status === 'all' || $entry->state->value === $status)
             ->filter(fn (DeviceEntry $entry): bool => $this->inGroup($entry, $group, $groups))
-            ->filter(fn (DeviceEntry $entry): bool => $this->matches($entry, $search))
+            ->filter(fn (DeviceEntry $entry): bool => $this->matches($entry, $search) || isset($serials[$entry->id()]))
             ->values();
         $inTab = $tab === 'all' || $tab === 'upkeep'
             ? $filtered
@@ -204,6 +206,31 @@ final class DevicesIndexPresenter
         $domain = $entry->device->domain;
 
         return ($domain instanceof \BackedEnum ? $domain->value : (string) $domain) === 'iot_healthcare';
+    }
+
+    /**
+     * Devices (of the ones this person may see) whose serial number contains the search: the recorded
+     * serial, or the one the device's own system reports (UniFi keeps it in provider_observed_state).
+     * A separate small read, so the shared device list doesn't carry serials for every page.
+     *
+     * @param  Collection<int, DeviceEntry>  $entries
+     * @return array<int, true>
+     */
+    private function serialMatches(Collection $entries, string $search): array
+    {
+        if (mb_strlen($search) < 3 || $entries->isEmpty()) {
+            return [];
+        }
+        $like = '%'.addcslashes(mb_strtolower($search), '%_\\').'%';
+
+        return Device::query()
+            ->whereKey($entries->map(fn (DeviceEntry $entry): int => $entry->id())->all())
+            ->where(fn ($query) => $query
+                ->whereRaw('lower(serial_number) like ?', [$like])
+                ->orWhereRaw("lower(json_unquote(json_extract(provider_observed_state, '$.serial_number.value'))) like ?", [$like]))
+            ->pluck('id')
+            ->mapWithKeys(fn (mixed $id): array => [(int) $id => true])
+            ->all();
     }
 
     private function matches(DeviceEntry $entry, string $search): bool

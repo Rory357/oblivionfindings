@@ -102,6 +102,26 @@ class DevicesMenuPresenterTest extends TestCase
         $this->actingAs($this->viewer)->get('/security-devices/devices?site='.$this->other->id)->assertNotFound();
     }
 
+    public function test_search_matches_serial_numbers_but_never_another_sites_device(): void
+    {
+        $this->device($this->home, ['name' => 'Aurora House switch', 'serial_number' => 'SW-7741-AUR']);
+        $this->device($this->home, ['name' => 'Aurora House access point', 'serial_number' => null, 'provider_observed_state' => ['serial_number' => ['value' => 'UNIFI-0099', 'source' => 'unifi']]]);
+        $this->device($this->home, ['name' => 'Aurora House printer', 'serial_number' => 'PR-1000']);
+        $this->device($this->other, ['name' => 'Kōwhai Lodge switch', 'serial_number' => 'SW-7741-KOW']);
+
+        $rows = fn (string $q) => $this->actingAs($this->viewer)->get('/security-devices/devices?layout=list&q='.urlencode($q));
+
+        // The recorded serial, in any case; the other Site's switch with the same prefix never shows.
+        $response = $rows('sw-7741');
+        $response->assertOk()->assertInertia(fn ($page) => $page->where('list.meta.total', 1)->where('list.rows.0.name', 'Aurora House switch'));
+        $this->assertStringNotContainsString('Kōwhai Lodge switch', $response->getContent());
+        // The serial a UniFi device reports.
+        $rows('unifi-0099')->assertOk()->assertInertia(fn ($page) => $page->where('list.meta.total', 1)->where('list.rows.0.name', 'Aurora House access point'));
+        // Names still match, and a % in the search is a plain character.
+        $rows('printer')->assertOk()->assertInertia(fn ($page) => $page->where('list.meta.total', 1));
+        $rows('sw-%')->assertOk()->assertInertia(fn ($page) => $page->where('list.meta.total', 0));
+    }
+
     public function test_each_tab_carries_its_count_and_upkeep_has_none(): void
     {
         $this->device($this->home, ['name' => 'Hallway camera'], MonitorState::Healthy, 'security');

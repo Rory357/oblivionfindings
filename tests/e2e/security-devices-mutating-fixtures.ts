@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import { loginAs, runLaravelJson } from './helpers';
 
@@ -294,20 +294,6 @@ echo json_encode([
     'deviceName' => $monitorDevice->name,
 ], JSON_THROW_ON_ERROR);
 `);
-}
-
-export async function chooseSelectOption(
-    scope: Page | Locator,
-    label: string,
-    optionName: string,
-) {
-    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    await scope.getByLabel(new RegExp(`^${escapedLabel}\\s*\\*?$`)).click();
-    const page =
-        'page' in scope && typeof scope.page === 'function'
-            ? scope.page()
-            : (scope as Page);
-    await page.getByRole('option', { name: optionName, exact: true }).click();
 }
 
 export async function confirmPasswordIfAsked(page: Page) {

@@ -5,6 +5,7 @@ namespace App\Domain\It\Services;
 use App\Models\ItRecurrencePlan;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
@@ -24,6 +25,12 @@ final class ItRecurrenceService
 {
     /** At most this many overdue occurrences are examined per plan per run. */
     private const CATCH_UP_WINDOW = 25;
+
+    /**
+     * Why an occurrence of a plan whose Site was removed made no ticket. Kept on the run row, which the
+     * plan owner's "Review plan" task shows (ItRecurrenceFailureTaskProvider adds the full stop).
+     */
+    public const SITE_GONE = 'The plan’s Site no longer exists, so no ticket was made and the plan is paused until IT picks a Site';
 
     public function __construct(private readonly ItTicketRoutingService $routing) {}
 
@@ -96,11 +103,16 @@ final class ItRecurrenceService
         });
     }
 
-    /** @return array{created: int, skipped: int, failed: int} */
+    /**
+     * `paused`: plans paused because their Site no longer exists. They are flagged to their owner, not
+     * counted as failed, so a removed Site doesn't fail every scheduler run.
+     *
+     * @return array{created: int, skipped: int, failed: int, paused: int}
+     */
     public function runDue(?CarbonImmutable $now = null): array
     {
         $now = $now ?? CarbonImmutable::now();
-        $summary = ['created' => 0, 'skipped' => 0, 'failed' => 0];
+        $summary = ['created' => 0, 'skipped' => 0, 'failed' => 0, 'paused' => 0];
         $planIds = ItRecurrencePlan::query()->where('status', 'active')
             ->whereNotNull('next_due_at')->where('next_due_at', '<=', $now)->pluck('id');
 
@@ -137,6 +149,29 @@ final class ItRecurrenceService
                     ])->save();
 
                     if ($latest === null) {
+                        return null;
+                    }
+
+                    // A plan whose Site was removed can't make a ticket. Record the occurrence as failed
+                    // with the reason (so its owner gets the "Review plan" task) and pause the plan until
+                    // IT picks a Site, instead of failing this and every later scheduler run.
+                    $siteId = (int) data_get($plan->ticket_template, 'site_id');
+                    if ($siteId <= 0 || ! Site::query()->whereKey($siteId)->exists()) {
+                        $plan->runs()->firstOrCreate(
+                            ['occurrence_key' => $latest->toIso8601String()],
+                            ['status' => 'failed', 'detail' => self::SITE_GONE, 'created_at' => now()],
+                        );
+                        $summary['paused']++;
+                        $plan->forceFill([
+                            'status' => 'paused',
+                            'next_due_at' => null,
+                            'lock_version' => $plan->lock_version + 1,
+                        ])->save();
+                        AuditLogger::logOrFail('it.recurrence.paused', $plan, [
+                            'reason' => 'site_missing',
+                            'site_id' => $siteId > 0 ? $siteId : null,
+                        ], systemActor: true);
+
                         return null;
                     }
 

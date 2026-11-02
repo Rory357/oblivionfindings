@@ -3,6 +3,7 @@ import { seedNetworkItWorkspaceReadinessFixtures } from './network-it-workspace-
 import { seedOperationsWorkspaceFixtures } from './operations-workspaces-fixtures';
 
 export type NativeMonitoringRuntimeFixture = {
+    allowedSiteId: number;
     allowedSiteName: string;
     hiddenSiteName: string;
     hiddenSiteId: number;
@@ -509,6 +510,7 @@ $restricted->permissionOverrides()->syncWithoutDetaching($permissionIds);
 );
 
 echo json_encode([
+    'allowedSiteId' => $allowedSite->id,
     'allowedSiteName' => $allowedSite->name,
     'hiddenSiteName' => $hiddenSite->name,
     'hiddenSiteId' => $hiddenSite->id,
@@ -531,7 +533,7 @@ echo json_encode([
 ]);
 `);
 
-    const jsonStart = output.lastIndexOf('{"allowedSiteName"');
+    const jsonStart = output.lastIndexOf('{"allowedSiteId"');
     if (jsonStart === -1) throw new Error(output.trim());
 
     return {
@@ -542,36 +544,4 @@ echo json_encode([
         operations,
         network,
     };
-}
-
-export function markCollectorOrderedReturn(collectorUuid: string) {
-    runLaravelPhp(`
-$collector = \\App\\Domain\\Monitoring\\Models\\MonitoringCollector::query()
-    ->where('collector_uuid', '${collectorUuid}')
-    ->firstOrFail();
-$collector->forceFill([
-    'status' => 'online',
-    'runtime_state' => 'healthy',
-    'backlog_items' => 0,
-    'gap_count' => 0,
-    'last_heartbeat_at' => now(),
-    'last_seen_at' => now(),
-])->save();
-`);
-}
-
-export function markCollectorOutage(collectorUuid: string) {
-    runLaravelPhp(`
-$collector = \\App\\Domain\\Monitoring\\Models\\MonitoringCollector::query()
-    ->where('collector_uuid', '${collectorUuid}')
-    ->firstOrFail();
-$collector->forceFill([
-    'status' => 'offline',
-    'runtime_state' => 'unavailable',
-    'backlog_items' => 7,
-    'gap_count' => 1,
-    'last_heartbeat_at' => now()->subMinutes(20),
-    'last_seen_at' => now()->subMinutes(20),
-])->save();
-`);
 }
