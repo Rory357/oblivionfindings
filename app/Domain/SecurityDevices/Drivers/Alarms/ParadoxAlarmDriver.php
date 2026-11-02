@@ -32,19 +32,18 @@ final class ParadoxAlarmDriver implements DeviceDriver
             name: 'EVO / Magellan / Spectra (PRT3 / IP150)',
             deviceClass: DriverDeviceClass::AlarmPanel,
             supportLevel: DriverSupportLevel::Planned,
-            transportSummary: 'SIA DC-09 / Contact ID IP (available now) · Paradox PRT3 ASCII protocol (planned)',
+            transportSummary: 'Alarm reports (SIA DC-09) to Oblivion’s alarm receiver · no direct control',
             models: ['Paradox EVO192 / EVOHD', 'Paradox SP5500 / SP6000', 'Paradox MG5050', 'IP150+'],
             capabilities: [
                 DriverCapability::AlarmEventsSiaDc09,
                 DriverCapability::AlarmZoneStatus,
-                DriverCapability::AlarmArm,
-                DriverCapability::AlarmDisarm,
             ],
-            summary: 'Live IP event reporting works today via Paradox IP150 / PCS modules configured for SIA DC-09 Contact ID. Direct PRT3 serial/IP control is planned.',
+            summary: 'A Paradox panel with an IP150 or PCS module can send its alarm reports to Oblivion’s alarm receiver. View only: Oblivion can’t arm or disarm it. Not tested on real hardware.',
             officialDocs: [
                 ['label' => 'Paradox Security Systems', 'url' => 'https://www.paradox.com/'],
             ],
             limitationsNote: 'Newer IP150 firmware restricts local third-party sessions to Swan cloud unless PRT3 integration hardware is installed.',
+            viewOnly: true,
         );
     }
 

@@ -29,7 +29,8 @@ final class UniFiProtectCameraDriver implements CameraDeviceDriver
             name: 'UniFi Protect local camera API',
             deviceClass: DriverDeviceClass::Camera,
             supportLevel: DriverSupportLevel::BuiltFromDocs,
-            transportSummary: 'Local HTTPS API (`/proxy/protect/integration/v1`) through the Site hub with `X-API-KEY`',
+            // From the server, not the hub: the hub-side Protect client was never wired in and was removed (S&D Phase B).
+            transportSummary: 'Local HTTPS API (`/proxy/protect/integration/v1`) with `X-API-KEY`, from the server; the console must be reachable from the server',
             models: ['G4 Bullet / Dome / Pro / Instant', 'G5 Bullet / Dome / Turret Ultra / Flex', 'AI Pro / AI Theta / AI PTZ'],
             capabilities: [
                 DriverCapability::CameraSnapshot,

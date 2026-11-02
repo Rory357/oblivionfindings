@@ -6,6 +6,10 @@ import GlobalNavSearch from '@/components/global-nav-search';
 import { useChatCalling } from '@/components/chat/chat-calling';
 import GlobalQueryBar from '@/components/global-query-bar';
 import InboxMenus from '@/components/inbox-menus';
+import {
+    ReportSomethingDialog,
+    useCanReportSomething,
+} from '@/components/report-something';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -29,6 +33,7 @@ import {
     MessageSquareText,
     ShieldAlert,
 } from 'lucide-react';
+import { useState } from 'react';
 
 /**
  * The Event Horizon command header (APP_SHELL_STYLE_GUIDE.md §2).
@@ -37,7 +42,7 @@ import {
  * ink chrome (dark in light mode by design). Anatomy, left → right: ring-O
  * wordmark, day + date pinned to the sidebar seam (left-[256px] = w-64),
  * truly-centred command search (grid 1fr/auto/1fr — flex spacers drift
- * off-centre), then Report incident / Clock in-out / Ask / Messages /
+ * off-centre), then Report something / Clock in-out / Ask / Messages /
  * inbox bells / user avatar. No "Live"/sync chip — removed by design.
  * The centred search never yields to the date: full date ≥1440px, short
  * form 1320–1440px, hidden below 1320px.
@@ -64,7 +69,9 @@ export function AppHeader({
     const unreadMessages = Number(chatUnread ?? (auth as any)?.unreadMessageCount ?? 0);
     const getInitials = useInitials();
 
-    const canReportIncident = !!can?.incidents?.create;
+    // Decision 9 (G4-2): "Report something" opens the H&S chooser on every page, for anyone with a choice in it.
+    const canReport = useCanReportSomething();
+    const [reportOpen, setReportOpen] = useState(false);
     const canClock = !!(
         can?.timesheets?.viewAny ||
         can?.timesheets?.viewAssigned ||
@@ -182,16 +189,15 @@ export function AppHeader({
                     data-slot="app-header-actions"
                     className="flex items-center justify-end gap-1 md:gap-1.5"
                 >
-                    {canReportIncident && (
+                    {canReport && (
                         <Button
-                            asChild
+                            type="button"
                             size="sm"
                             className="hidden lg:inline-flex"
+                            onClick={() => setReportOpen(true)}
                         >
-                            <Link href="/incidents/create" prefetch>
-                                <AlertTriangle className="size-4" />
-                                Report incident
-                            </Link>
+                            <AlertTriangle className="size-4" />
+                            Report something
                         </Button>
                     )}
                     {canClock && (
@@ -267,6 +273,12 @@ export function AppHeader({
                     )}
                 </div>
             </header>
+            {canReport ? (
+                <ReportSomethingDialog
+                    open={reportOpen}
+                    onClose={() => setReportOpen(false)}
+                />
+            ) : null}
         </>
     );
 }

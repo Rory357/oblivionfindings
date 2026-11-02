@@ -77,6 +77,9 @@ final class OnvifCameraProfileClient
         private readonly ?Closure $httpTransport = null,
     ) {}
 
+    /** The trusted public-key pin for the current https camera, set per operation (Phase A, item A5). */
+    private ?string $tlsPin = null;
+
     public static function supportsPtz(Device $device): bool
     {
         if (strtolower((string) $device->subcategory) === 'ptz_camera') {
@@ -127,8 +130,10 @@ final class OnvifCameraProfileClient
                 'message' => $endpoint['message'],
                 'profiles' => [],
                 'device_info' => $emptyDeviceInfo,
+                'tls_trust' => $endpoint['tls_trust'] ?? null,
             ];
         }
+        $this->tlsPin = $endpoint['tls_pin'] ?? null;
 
         $lease = null;
         $material = [];
@@ -268,8 +273,10 @@ final class OnvifCameraProfileClient
                 'message' => $endpoint['message'],
                 'data_uri' => null,
                 'captured_at' => $capturedAt,
+                'tls_trust' => $endpoint['tls_trust'] ?? null,
             ];
         }
+        $this->tlsPin = $endpoint['tls_pin'] ?? null;
 
         $lease = null;
         $material = [];
@@ -397,6 +404,16 @@ final class OnvifCameraProfileClient
 
             $imageResponse = $this->fetchSnapshotBytesWithDigestSupport($safeSnapshotUrl, $username, $password);
 
+            if (($imageResponse['refusal'] ?? null) === 'basic_auth_refused') {
+                return [
+                    'ok' => false,
+                    'reason_code' => 'basic_auth_refused',
+                    'message' => 'This camera asks for a plain (Basic) password, which anyone on the network could read, so Oblivion didn’t send it. Turn on Digest authentication in the camera’s settings.',
+                    'data_uri' => null,
+                    'captured_at' => $capturedAt,
+                ];
+            }
+
             if ($imageResponse['status'] < 200 || $imageResponse['status'] >= 300 || $imageResponse['body'] === '') {
                 return [
                     'ok' => false,
@@ -490,8 +507,10 @@ final class OnvifCameraProfileClient
                 'reason_code' => $endpoint['reason_code'],
                 'message' => $endpoint['message'],
                 'action' => $action,
+                'tls_trust' => $endpoint['tls_trust'] ?? null,
             ];
         }
+        $this->tlsPin = $endpoint['tls_pin'] ?? null;
 
         $lease = null;
         $material = [];
@@ -949,7 +968,31 @@ final class OnvifCameraProfileClient
      *     ptz_path?: string
      * }
      */
-    private function authoriseCameraEndpoint(Device $device): array
+    /**
+     * S&D Phase E (R5): the camera's ONVIF address for the Site hub. The same address, Site scope and
+     * port checks as the server's own path; the hub reads the certificate itself, so it is not
+     * checked here.
+     *
+     * @return array<string, mixed>
+     */
+    public function authoriseHubEndpoint(Device $device): array
+    {
+        return $this->authoriseCameraEndpoint($device, checkCertificate: false);
+    }
+
+    /** S&D Phase E (R5): whether the Site has a saved camera login for this camera. */
+    public function hasCameraCredential(Device $device, int $siteId): bool
+    {
+        return $this->credentialReference($device, $siteId) !== null;
+    }
+
+    /** S&D Phase E (R5): the camera login lease, sealed to the Site hub for the hub route. */
+    public function acquireCameraCredentialForHub(Device $device, int $siteId): ?CredentialLease
+    {
+        return $this->acquireOptionalCredential($device, $siteId);
+    }
+
+    private function authoriseCameraEndpoint(Device $device, bool $checkCertificate = true): array
     {
         $rawIp = trim((string) ($device->ip_address ?? ''));
         if ($rawIp === '') {
@@ -1022,6 +1065,22 @@ final class OnvifCameraProfileClient
             ];
         }
 
+        // Phase A, item A5: an https camera gets no password until its certificate is publicly valid
+        // or someone has trusted it ("Trust this camera?"); later requests accept only the trusted key.
+        $tlsPin = null;
+        if ($scheme === 'https' && $checkCertificate) {
+            $gate = app(CameraEndpointTrustService::class)->gate($siteId, $canonicalIp, $port);
+            if (! $gate['ok']) {
+                return [
+                    'ok' => false,
+                    'reason_code' => $gate['reason_code'],
+                    'message' => $gate['message'],
+                    'tls_trust' => $gate['trust'],
+                ];
+            }
+            $tlsPin = $gate['pin'];
+        }
+
         $hostBracketed = str_contains($canonicalIp, ':') ? "[{$canonicalIp}]" : $canonicalIp;
         $defaultPort = ($scheme === 'http' && $port === 80) || ($scheme === 'https' && $port === 443);
         $baseUrl = $scheme.'://'.$hostBracketed.($defaultPort ? '' : ':'.$port);
@@ -1048,12 +1107,15 @@ final class OnvifCameraProfileClient
             'reason_code' => 'authorised',
             'message' => 'Camera ONVIF endpoint authorised.',
             'ip' => $canonicalIp,
+            'port' => $port,
+            'scheme' => $scheme,
             'site_id' => $siteId,
             'base_url' => $baseUrl,
             'device_path' => $devicePath,
             'media_path' => $mediaPath,
             'media2_path' => $media2Path,
             'ptz_path' => $ptzPath,
+            'tls_pin' => $tlsPin,
         ];
     }
 
@@ -1172,29 +1234,7 @@ final class OnvifCameraProfileClient
 
     private function acquireOptionalCredential(Device $device, int $siteId): ?CredentialLease
     {
-        $providers = array_values(array_unique(array_filter([
-            strtolower(trim((string) $device->provider)),
-            strtolower(trim((string) $device->manufacturer)),
-            'onvif',
-            'hikvision',
-            'dahua',
-            'uniview',
-            'axis',
-            'hanwha',
-        ])));
-
-        $reference = CredentialReference::query()
-            ->where('site_id', $siteId)
-            ->whereIn('provider', $providers)
-            ->whereIn('purpose', ['device_management', 'monitoring'])
-            ->where('status', CredentialReferenceStatus::Active->value)
-            ->whereNotIn('rotation_status', [
-                CredentialRotationStatus::Overdue->value,
-                CredentialRotationStatus::Failed->value,
-            ])
-            ->orderByDesc('id')
-            ->first();
-
+        $reference = $this->credentialReference($device, $siteId);
         if (! $reference) {
             return null;
         }
@@ -1209,6 +1249,32 @@ final class OnvifCameraProfileClient
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function credentialReference(Device $device, int $siteId): ?CredentialReference
+    {
+        $providers = array_values(array_unique(array_filter([
+            strtolower(trim((string) $device->provider)),
+            strtolower(trim((string) $device->manufacturer)),
+            'onvif',
+            'hikvision',
+            'dahua',
+            'uniview',
+            'axis',
+            'hanwha',
+        ])));
+
+        return CredentialReference::query()
+            ->where('site_id', $siteId)
+            ->whereIn('provider', $providers)
+            ->whereIn('purpose', ['device_management', 'monitoring'])
+            ->where('status', CredentialReferenceStatus::Active->value)
+            ->whereNotIn('rotation_status', [
+                CredentialRotationStatus::Overdue->value,
+                CredentialRotationStatus::Failed->value,
+            ])
+            ->orderByDesc('id')
+            ->first();
     }
 
     /**
@@ -1316,19 +1382,25 @@ final class OnvifCameraProfileClient
     }
 
     /**
-     * Fetch snapshot image bytes using HTTP Basic or RFC 7616 HTTP Digest challenge-response.
+     * Fetch snapshot image bytes with RFC 7616 HTTP Digest only.
+     *
+     * Phase A, item A5: the password used to go out up front as plain Basic auth, readable by anything
+     * on the path or answering at the address. Now the first request carries no password; only a Digest
+     * challenge is answered, and a camera that asks for Basic gets nothing (`basic_auth_refused`).
      *
      * @return array{status: int, content_type: string, body: string, headers?: array<string, string>}
      */
     private function fetchSnapshotBytesWithDigestSupport(string $safeSnapshotUrl, ?string $username, ?string $password): array
     {
         $headers = ['Accept' => 'image/jpeg, image/png, image/webp'];
-        if ($username !== null && $password !== null) {
-            $headers['Authorization'] = 'Basic '.base64_encode($username.':'.$password);
-        }
 
         $response = $this->sendHttp('GET', $safeSnapshotUrl, $headers, null, 4000);
-        unset($headers['Authorization']);
+
+        if ($response['status'] === 401 && $username !== null && $password !== null) {
+            if (! preg_match('/^\s*Digest\s/i', $this->extractWwwAuthenticate($response))) {
+                return ['status' => 401, 'content_type' => '', 'body' => '', 'headers' => [], 'refusal' => 'basic_auth_refused'];
+            }
+        }
 
         if ($response['status'] === 401 && $username !== null && $password !== null) {
             $challenge = $this->extractWwwAuthenticate($response);
@@ -1587,11 +1659,13 @@ final class OnvifCameraProfileClient
         }
 
         try {
+            // Phase A, item A5: certificate checks stay on. A self-signed camera that someone has
+            // trusted is reached with its key pinned; plain http (port 80 and friends) uses Digest only.
             $pending = Http::withHeaders($headers)
                 ->timeout(max(1, (int) ceil($timeoutMs / 1000)))
                 ->connectTimeout(2)
                 ->withoutRedirecting()
-                ->withoutVerifying();
+                ->withOptions(CameraEndpointTrustService::httpOptions($this->tlsPin));
 
             $response = strtoupper($method) === 'POST'
                 ? $pending->withBody((string) $body, $headers['Content-Type'] ?? 'application/soap+xml; charset=utf-8')->post($url)

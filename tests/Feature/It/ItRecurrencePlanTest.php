@@ -166,3 +166,47 @@ test('a failed occurrence surfaces as the plan owner task until a later occurren
     ]);
     expect($provider->authorizedTasks($this->agent->fresh()))->toBe([]);
 });
+
+test('a plan whose Site was removed is paused and flagged to its owner instead of failing the scheduler', function () {
+    $removed = Site::factory()->create(['name' => 'Synthetic removed Site']);
+    $archived = Site::factory()->create(['name' => 'Synthetic soft-deleted Site']);
+    $healthy = $this->recurrence->create($this->agent, recurrencePlanData($this, ['cron_expression' => '0 9 * * *']));
+    $orphan = $this->recurrence->create($this->agent, recurrencePlanData($this, [
+        'name' => 'Weekly printer check', 'cron_expression' => '0 9 * * *', 'ticket_template' => ['site_id' => $removed->id],
+    ]));
+    $softOrphan = $this->recurrence->create($this->agent, recurrencePlanData($this, [
+        'name' => 'Weekly door check', 'cron_expression' => '0 9 * * *', 'ticket_template' => ['site_id' => $archived->id],
+    ]));
+    // As on the .com in D9, the Site row is gone; a soft-deleted Site counts as gone too.
+    $removed->forceDelete();
+    $archived->delete();
+    $due = CarbonImmutable::parse($healthy->next_due_at)->addMinute();
+
+    $summary = $this->recurrence->runDue($due);
+
+    expect($summary)->toBe(['created' => 1, 'skipped' => 0, 'failed' => 0, 'paused' => 2])
+        ->and(ItTicket::query()->sole()->site_id)->toBe($this->site->id);
+    foreach ([$orphan, $softOrphan] as $plan) {
+        $fresh = $plan->fresh();
+        $run = $fresh->runs()->sole();
+        expect($fresh->status)->toBe('paused')
+            ->and($fresh->next_due_at)->toBeNull()
+            ->and($fresh->lock_version)->toBe($plan->lock_version + 1)
+            ->and($run->status)->toBe('failed')
+            ->and($run->detail)->toBe(ItRecurrenceService::SITE_GONE)
+            ->and($run->ticket_id)->toBeNull();
+        $audit = App\Models\AuditLog::query()->where('action', 'it.recurrence.paused')->where('auditable_id', $plan->id)->sole();
+        expect($audit->user_id)->toBeNull()
+            ->and($audit->meta['reason'])->toBe('site_missing');
+    }
+
+    // The owner is told, with the reason, on the existing "Review plan" task.
+    $tasks = collect((new ItRecurrenceFailureTaskProvider)->authorizedTasks($this->agent->fresh()));
+    expect($tasks->pluck('ref')->sort()->values()->all())->toBe(collect(['REC-'.$orphan->id, 'REC-'.$softOrphan->id])->sort()->values()->all())
+        ->and($tasks->first()->actionHelp)->toContain('no longer exists');
+
+    // A paused plan isn't due again, and the scheduled command now succeeds.
+    expect($this->recurrence->runDue($due->addDay()))->toMatchArray(['failed' => 0, 'paused' => 0]);
+    $this->travelTo($due->addDays(2));
+    $this->artisan('it:run-recurrence')->assertSuccessful();
+});

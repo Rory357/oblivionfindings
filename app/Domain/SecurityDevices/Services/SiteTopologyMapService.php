@@ -464,6 +464,8 @@ final class SiteTopologyMapService
      * @param  Collection<int, Device>  $devices
      * @param  Collection<int, array<string, mixed>>  $deviceRows
      * @param  Collection<int, DeviceRelationship>  $relationships
+     * @param  bool  $confirmedOnly  only the relationships people added or confirmed (the S&D Site page,
+     *                               pg-sdr-12j): found links and subnet guesses wait in "Links found"
      * @return array<string, mixed>
      */
     public function buildSiteTree(
@@ -471,6 +473,7 @@ final class SiteTopologyMapService
         Collection $devices,
         Collection $deviceRows,
         Collection $relationships,
+        bool $confirmedOnly = false,
     ): array {
         $rowsById = $deviceRows->keyBy('id');
         $devicesById = $devices->keyBy('id');
@@ -508,6 +511,10 @@ final class SiteTopologyMapService
                 continue;
             }
             $isAuto = is_string($rel->notes) && str_starts_with($rel->notes, self::AUTO_NOTE_PREFIX);
+            if ($isAuto && $confirmedOnly) {
+                // Saved by a scan on its own: a found link, not one a person added or confirmed.
+                continue;
+            }
             $protocol = $isAuto ? $this->protocolFromAutoNote($rel->notes, $rel->port) : 'manual';
             $priority = $isAuto ? 90 : 110;
             $sourcesSeen[$protocol] = true;
@@ -524,7 +531,7 @@ final class SiteTopologyMapService
         }
 
         // 2. Latest completed TopologySnapshot edges for this Site
-        $latestSnapshots = $deviceIds === []
+        $latestSnapshots = $deviceIds === [] || $confirmedOnly
             ? collect()
             : TopologySnapshot::query()
                 ->where('site_id', $site->id)
@@ -601,7 +608,7 @@ final class SiteTopologyMapService
             }
         }
 
-        foreach ($devices as $device) {
+        foreach ($confirmedOnly ? [] : $devices as $device) {
             $id = (int) $device->id;
             if (isset($uplinkByChild[$id]) || ($tiersById[$id] ?? 'device') === 'gateway') {
                 continue;

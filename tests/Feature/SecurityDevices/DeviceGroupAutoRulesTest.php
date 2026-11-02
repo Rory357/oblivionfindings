@@ -186,13 +186,12 @@ class DeviceGroupAutoRulesTest extends TestCase
         $group = DeviceGroup::where('name', 'Managed cameras')->firstOrFail();
         $this->assertEquals($rules, $group->auto_rules);
 
+        // S&D rebuild C6 (D8): the edit page is gone (it opens Devices filtered to the group); the
+        // rules stay stored as written, read-only.
         $this->actingAs($this->admin)
             ->get("/security-devices/device-groups/{$group->id}/edit")
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('security-devices/device-groups/edit')
-                ->where('group.auto_rules', $rules)
-            );
+            ->assertRedirect("/security-devices/devices?group={$group->id}");
+        $this->assertEquals($rules, $group->fresh()->auto_rules);
     }
 
     public function test_group_rules_reject_unrecognised_or_unsafe_conditions(): void

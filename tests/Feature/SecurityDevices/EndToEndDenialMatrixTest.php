@@ -105,15 +105,16 @@ class EndToEndDenialMatrixTest extends TestCase
         }
 
         $this->actingAs($actor)
-            ->get('/security-devices/devices')
+            ->get('/security-devices/devices?layout=list')
             ->assertOk()
             ->assertInertia(function ($page) use ($visible, $concealed): void {
                 $props = $page->toArray()['props'];
                 $payload = json_encode($props, JSON_THROW_ON_ERROR);
 
-                $this->assertSame(1, $props['devices']['meta']['total']);
-                $this->assertSame(1, $props['stats']['total']);
-                $this->assertSame($visible->id, $props['devices']['data'][0]['id']);
+                // S&D rebuild C1: the Devices page (list layout) replaced the old list.
+                $this->assertSame(1, $props['list']['meta']['total']);
+                $this->assertSame(1, collect($props['tabs'])->firstWhere('key', 'all')['count']);
+                $this->assertSame($visible->id, $props['list']['rows'][0]['id']);
                 foreach ($concealed as $device) {
                     $this->assertStringNotContainsString($device->name, $payload);
                 }
@@ -121,9 +122,9 @@ class EndToEndDenialMatrixTest extends TestCase
 
         foreach ($concealed as $device) {
             $this->actingAs($actor)
-                ->get('/security-devices/devices?search='.urlencode($device->name))
+                ->get('/security-devices/devices?layout=list&search='.urlencode($device->name))
                 ->assertOk()
-                ->assertInertia(fn ($page) => $page->where('devices.meta.total', 0));
+                ->assertInertia(fn ($page) => $page->where('list.meta.total', 0));
             $this->actingAs($actor)
                 ->get("/security-devices/devices/{$device->id}")
                 ->assertNotFound();

@@ -355,16 +355,33 @@ it('removes offboarded staff from direct chat access directories and unread coun
     $this->actingAs($recipient)
         ->get(route('operations.messages.index'))
         ->assertForbidden();
+    $this->get(route('operations.messages.show', $conversation))->assertForbidden();
+    $this->post(route('operations.messages.store', $conversation), ['content' => 'Still here?'])->assertForbidden();
+});
+
+it('keeps a direct staff chat open for the remaining member when the other leaves', function () {
+    // Stephan, 31 Oct 2026: the leaver loses access; the others keep the chat and its history.
+    $site = Site::factory()->create();
+    $creator = makeCurrentOpsConversationStaff($site);
+    $recipient = makeCurrentOpsConversationStaff($site);
+    [$conversation] = makeDirectStaffConversation($recipient, $creator);
+
+    HrEmployeeProfile::query()
+        ->where('user_id', $recipient->id)
+        ->update([
+            'is_active' => false,
+            'end_date' => now()->subDay()->toDateString(),
+        ]);
 
     $this->actingAs($creator)
         ->get(route('operations.messages.index'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->has('conversations', 0)
-            ->where('auth.unreadMessageCount', 0));
+            ->has('conversations', 1)
+            ->where('auth.unreadMessageCount', 1));
 
     $this->get(route('operations.messages.show', $conversation))
-        ->assertForbidden();
+        ->assertOk();
 });
 
 it('tracks unread state independently for every conversation participant', function () {

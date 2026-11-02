@@ -71,13 +71,18 @@ it('explains a refused retry in plain words', async () => {
     await waitFor(() => expect(screen.getByText('A later save replaced this delivery.')).toBeInTheDocument());
 });
 
-it('shows a follow-up attempt as a notice that is not sent', async () => {
-    io.get.mockResolvedValueOnce({ data: list([row({ kind: 'followup', attempt_state: 'pending', destination: { state: 'unconfirmed', can_deliver: false, blocked_reason: null },
-        automatic: undefined, blocked_reason: 'followup_notices_off' })]) });
+it('shows a follow-up notice as sent, or as turned off by the named person (#16)', async () => {
+    io.get.mockResolvedValueOnce({ data: list([
+        row({ id: 41, kind: 'followup', attempt_state: 'delivered', destination: { state: 'inbox_present', can_deliver: true, blocked_reason: null }, automatic: undefined }),
+        row({ id: 42, kind: 'followup', attempt_state: 'pending', destination: { state: 'unconfirmed', can_deliver: false, blocked_reason: 'recipient_opted_out' },
+            automatic: { failed_attempts: 1, failure: 'turned_off', needs_manager: false, next_attempt_at: null, last_attempted_at: null, stuck: true }, blocked_reason: 'recipient_opted_out' }),
+    ]) });
     render(<ExposureDeliveryPanel actorId={7} detail={detail()} active />);
     fireEvent.click(screen.getByRole('button', { name: 'Check delivery records' }));
-    await waitFor(() => expect(screen.getByText('Notice not sent')).toBeInTheDocument());
-    expect(screen.getByText('Follow-up notices are off. The assignee sees this work in Tasks.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Notice sent')).toBeInTheDocument());
+    expect(screen.getByText('Notice turned off')).toBeInTheDocument();
+    expect(screen.getAllByText('The named person turned this notice off. They still see the follow-up in their Tasks.').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Notice not sent')).not.toBeInTheDocument();
 });
 
 it('shows withheld history as unavailable, and refuses a malformed collection', async () => {

@@ -71,10 +71,8 @@ export function IncomingCallCard({
         <section
             aria-label="Incoming voice call"
             role="region"
-            className={cn(
-                'rounded-[17px] border border-t-4 bg-card px-5 pt-2.5 pb-3.5 text-card-foreground',
-                family ? 'border-t-status-success' : 'border-t-primary-fill',
-            )}
+            // No coloured top line (DESIGN.md non-negotiable 8); the heading below says which call it is.
+            className="rounded-[17px] border bg-card px-5 pt-2.5 pb-3.5 text-card-foreground"
         >
             <div
                 className={cn(

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { HS_LABELS, hsBadge, hsLabel, humaniseHsValue } from './hs-labels';
+import { HS_LABELS, hsActionStatus, hsBadge, hsLabel, humaniseHsValue } from './hs-labels';
 
 const fixture = JSON.parse(
     readFileSync(resolve(__dirname, '../../../../tests/fixtures/health-safety/labels.json'), 'utf8'),
@@ -30,5 +30,12 @@ describe('H&S labels', () => {
         expect(hsLabel('record_state', undefined)).toBe('Not available');
         expect(hsBadge('severity', 'high')).toEqual({ label: 'High', variant: 'critical' });
         expect(hsBadge('severity', 'odd')).toEqual({ label: 'Odd', variant: 'neutral' });
+    });
+
+    it('gives an action one status, and a checked action says whether it worked (B1.1)', () => {
+        expect(hsActionStatus({ status: 'completed' }).label).toBe('Done — waiting to be checked');
+        expect(hsActionStatus({ status: 'verified', effectiveness_confirmed: true })).toEqual({ label: 'Checked — it worked', variant: 'success' });
+        expect(hsActionStatus({ status: 'verified', effectiveness_confirmed: false }).label).toBe('Checked — it didn’t work');
+        expect(hsActionStatus({ status: 'verified', effectiveness_confirmed: null }).label).toBe('Checked');
     });
 });

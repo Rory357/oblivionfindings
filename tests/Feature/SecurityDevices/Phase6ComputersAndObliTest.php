@@ -11,6 +11,7 @@ use App\Domain\SecurityDevices\Endpoints\Services\EndpointAgentIdentity;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointCommandSigner;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteSupportSettings;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptPolicy;
+use App\Domain\SecurityDevices\Endpoints\Services\StunRelayProbe;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Integration\IntegrationProviderConnection;
@@ -85,6 +86,14 @@ class Phase6ComputersAndObliTest extends TestCase
         $this->assertFalse($settings->sessionBrokerEnabled());
         $this->assertFalse($settings->isAvailableFor($this->admin));
 
+        // Phase A walk step 8: with no relay set up, "Test relay" says so and never "Verified".
+        $this->actingAs($this->admin)
+            ->postJson('/settings/obli/remote-support/verify-relay')
+            ->assertOk()
+            ->assertJsonPath('verification.ok', false)
+            ->assertJsonPath('verification.status', 'not_configured')
+            ->assertJsonPath('verification.message', 'No relay set up. Save a relay address and its shared secret, then test again.');
+
         $saveResponse = $this->actingAs($this->admin)
             ->putJson('/settings/obli/remote-support', [
                 'expected_actor_id' => $this->admin->id,
@@ -110,14 +119,42 @@ class Phase6ComputersAndObliTest extends TestCase
         $generatedSecret = (string) $saveResponse->json('generated_relay_secret');
         $this->assertSame(64, strlen($generatedSecret));
 
+        // Phase A, item A2: "Test relay" contacts each relay (here a stand-in that answers) and never
+        // claims more than "answered". tests/Unit/SecurityDevices/StunRelayProbeTest.php covers the probe.
+        $this->app->instance(StunRelayProbe::class, new class extends StunRelayProbe
+        {
+            public function probe(string $relayUrl, float $timeoutSeconds = 3.0): array
+            {
+                return ['answered' => true, 'milliseconds' => 12, 'problem' => null];
+            }
+        });
+
         $this->actingAs($this->admin)
             ->postJson('/settings/obli/remote-support/verify-relay')
             ->assertOk()
             ->assertJsonPath('verification.ok', true)
-            ->assertJsonPath('verification.status', 'verified')
+            ->assertJsonPath('verification.status', 'relay_answered')
+            ->assertJsonPath('verification.relays_answered', 1)
             ->assertJsonPath('verification.turn_rest_hmac_ready', true)
             ->assertJsonPath('verification.command_signing_ready', true)
-            ->assertJsonPath('verification.https_origin_ready', true);
+            ->assertJsonPath('verification.https_origin_ready', true)
+            ->assertJsonPath('verification.message', fn (string $message): bool => str_contains($message, 'The relay answered: turns:turn.oblivionfindings.test:5349?transport=tcp (12 ms)')
+                && ! str_contains($message, 'Verified'));
+
+        $this->app->instance(StunRelayProbe::class, new class extends StunRelayProbe
+        {
+            public function probe(string $relayUrl, float $timeoutSeconds = 3.0): array
+            {
+                return ['answered' => false, 'milliseconds' => null, 'problem' => 'no answer'];
+            }
+        });
+
+        $this->actingAs($this->admin)
+            ->postJson('/settings/obli/remote-support/verify-relay')
+            ->assertOk()
+            ->assertJsonPath('verification.ok', false)
+            ->assertJsonPath('verification.status', 'unreachable')
+            ->assertJsonPath('verification.message', 'No answer from turns:turn.oblivionfindings.test:5349?transport=tcp (no answer).');
 
         $computer = Device::factory()->create([
             'name' => 'KAURI-RECEPTION-PC',
@@ -423,16 +460,15 @@ class Phase6ComputersAndObliTest extends TestCase
         $this->assertTrue($intuneDriver->matchesDevice($intunePc));
         $this->assertFalse($intuneDriver->matchesDevice($nativePc));
 
+        // S&D rebuild C5: Setup › Services & logins › Supported devices lists both computer drivers.
         $this->actingAs($this->admin)
-            ->get('/security-devices/supported-devices')
+            ->get('/security-devices/setup/services?tab=supported')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('security-devices/supported-devices')
-                ->where('classes', fn ($classes): bool => collect($classes)->contains(
-                    static fn (array $item): bool => $item['key'] === 'computer'
-                        && $item['label'] === 'Computers & endpoints'
-                        && $item['count'] === 2,
-                )));
+                ->component('security-devices/setup/index')
+                ->where('supported.tables.1.rows', fn ($rows): bool => collect($rows)
+                    ->where('kind', 'Computers & endpoints')
+                    ->count() === 2));
 
         // Phase 6.4 invariant: arbitrary script execution stays OFF.
         $this->assertFalse((bool) config('endpoint_management.scripts.release_enabled'));

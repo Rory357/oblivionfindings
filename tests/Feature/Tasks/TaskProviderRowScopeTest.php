@@ -883,6 +883,8 @@ function taskRbacMatrix(): array
         // to exposure and H&S managers only.
         'chemical_exposure_delivery' => ['visible' => [], 'hidden' => []],
         'hs_event_review' => ['visible' => [], 'hidden' => []],
+        // No close-anyway requests here; HsClosureExceptionWorklistTest proves who sees them.
+        'hs_closure_exception' => ['visible' => [], 'hidden' => []],
     ];
 
     return [

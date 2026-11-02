@@ -177,7 +177,7 @@ it('rejects a change-governed decision when the reviewer lacks IT change access'
         ->assertSessionHasErrors('decision');
 
     $this->actingAs($reviewer)
-        ->get("/security-devices/devices/{$command->device_id}")
+        ->get("/security-devices/devices/{$command->device_id}?section=management")
         ->assertOk()
         ->assertInertia(function ($page): void {
             $history = $page->toArray()['props']['profile']['management']['history'];
@@ -202,7 +202,7 @@ it('omits a participant-visible command change unless the viewer also has the IT
     ]);
 
     $this->actingAs($participant)
-        ->get("/security-devices/devices/{$command->device_id}")
+        ->get("/security-devices/devices/{$command->device_id}?section=management")
         ->assertOk()
         ->assertInertia(function ($page): void {
             $history = $page->toArray()['props']['profile']['management']['history'];
@@ -212,7 +212,7 @@ it('omits a participant-visible command change unless the viewer also has the IT
         });
 
     $this->actingAs($requester)
-        ->get("/security-devices/devices/{$command->device_id}")
+        ->get("/security-devices/devices/{$command->device_id}?section=management")
         ->assertOk()
         ->assertInertia(function ($page) use ($command): void {
             $change = $page->toArray()['props']['profile']['management']['history'][0]['change'];

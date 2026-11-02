@@ -35,7 +35,8 @@ class CreateOnlyReportingGrantsTest extends TestCase
 
         $lead = $keys('team_lead');
         $this->assertContains('safeguarding.create', $lead);
-        foreach (['incidents.viewAny', 'incidents.viewAssigned', 'safeguarding.viewAny'] as $notGranted) {
+        // Q21 (Stephan, 2 Nov 2026): team leads now read incidents at their own Sites (incidents.viewAny, RoleQ21AccessTest).
+        foreach (['incidents.viewAssigned', 'safeguarding.viewAny'] as $notGranted) {
             $this->assertNotContains($notGranted, $lead, 'team_lead must not gain '.$notGranted);
         }
 
@@ -62,9 +63,10 @@ class CreateOnlyReportingGrantsTest extends TestCase
         ])->assertRedirect('/safeguarding/create');
         $this->assertDatabaseHas('safeguarding_concerns', ['reported_by_user_id' => $lead->id]);
 
-        // Raising a concern opens no register.
+        // Raising a concern opens no safeguarding register. (Q21, 2 Nov 2026: the incident register now opens for team
+        // leads at their own Sites.)
         $this->get('/safeguarding')->assertForbidden();
-        $this->get('/incidents')->assertForbidden();
+        $this->get('/incidents')->assertOk();
     }
 
     public function test_an_hs_officer_can_raise_a_safeguarding_concern_but_not_read_the_register(): void

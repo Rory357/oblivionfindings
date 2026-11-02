@@ -133,9 +133,11 @@ class HsCorrectiveActionWorkspaceTest extends TestCase
         $this->actingAs($owner)->from($url)->post("{$base}/start")->assertRedirect($url)->assertSessionHas('success');
         $this->from($url)->post("{$base}/complete", ['completion_notes' => 'Completed repair, with recorded evidence.'])->assertRedirect($url)->assertSessionHas('success');
         $this->get($url)->assertInertia(fn (Assert $page) => $page->where('workspace.can.verify', false)->where('workspace.action.status', 'completed'));
-        $this->assertSame('corrective_action', $event->fresh()->status);
+        // Decision 2 (1 Nov 2026): every action done → the review is "Checking it worked" (monitoring).
+        $this->assertSame('monitoring', $event->fresh()->status);
         $this->actingAs($verifier)->get($url)->assertInertia(fn (Assert $page) => $page->where('workspace.can.verify', true));
         $this->from($url)->post("{$base}/return", ['reason' => 'Add the inspection outcome.'])->assertRedirect($url)->assertSessionHas('success');
+        $this->assertSame('corrective_action', $event->fresh()->status, 'Sent back: actions under way again.');
         $this->actingAs($owner)->get($url)->assertInertia(fn (Assert $page) => $page->where('workspace.can.complete', true)->where('workspace.action.rework.latest_reason', 'Add the inspection outcome.'));
         $this->from($url)->post("{$base}/complete", ['completion_notes' => 'Repair and inspection completed.'])->assertSessionHas('success');
         $this->actingAs($verifier)->from($url)->post("{$base}/verify", ['evidence_reviewed' => true, 'effective' => true, 'verification_notes' => 'Control is effective.'])->assertRedirect($url)->assertSessionHas('success');

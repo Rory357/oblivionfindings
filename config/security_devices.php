@@ -157,6 +157,20 @@ $capabilities = [
         'duration_seconds' => ['type' => 'integer', 'min' => 5, 'max' => 60],
     ], ['duration_seconds'], true),
     'access.door.lock' => $high('Lock door', 'security', 'door_lock_state', [], [], true),
+    // S&D Phase H (pop-up 70): keep a UniFi Access door unlocked for up to 4 hours, through the Site's hub.
+    // A person only; automations never unlock (SafeActions). Ending it early only locks the door again.
+    'access.door.keep_unlocked' => $high('Keep door unlocked', 'security', 'door_keep_unlocked_state', [
+        'minutes' => ['type' => 'integer', 'min' => 5, 'max' => 240],
+    ], ['minutes'], true),
+    'access.door.keep_unlocked_end' => array_replace(
+        $definition('Lock door again now', 'security', 'control', 'medium', true, false, false, false, 300, 'door_keep_unlocked_state'),
+        ['confirmation_mode' => 'acknowledge_impact'],
+    ),
+    // S&D Phase H (pop-up 86): UniFi Access's own Site-wide emergency modes, through the Site's hub.
+    // Every door has an exit button and a handle (Stephan, 30 Oct), so lockdown never shuts anyone in.
+    'access.site.lockdown' => $critical('Lock down the Site', 'security', 'site_emergency_state'),
+    'access.site.evacuate' => $critical('Evacuate the Site', 'security', 'site_emergency_state'),
+    'access.site.emergency_end' => $high('End lockdown or evacuation', 'security', 'site_emergency_state', [], [], true),
     'access.door.lockdown' => $critical('Lock down door', 'security', 'door_lockdown_state'),
     'access.schedule.update' => array_replace($high('Update access schedule', 'security', 'access_schedule_hash_matches', [
         'schedule_reference' => ['type' => 'string', 'max_length' => 120],
@@ -184,6 +198,11 @@ $capabilities = [
         'area' => ['type' => 'string', 'max_length' => 80],
         'mode' => ['type' => 'string', 'enum' => ['enabled', 'disabled']],
     ], ['area', 'mode']),
+    // S&D Phase B: one still picture through the Site hub. Read only; nothing on the camera changes.
+    'camera.snapshot.capture' => array_replace(
+        $definition('Check camera picture', 'security', 'observe', 'low', false, false, false, false, 120, 'fresh_camera_picture'),
+        ['requires_fresh_observation' => false, 'allowed_current_states' => ['active', 'degraded', 'offline', 'maintenance']],
+    ),
     'camera.privacy.enable' => $high('Enable camera privacy mode', 'security', 'camera_privacy_state'),
     'camera.privacy.disable' => $critical('Disable camera privacy mode', 'security', 'camera_privacy_state', [], [], false),
     'camera.recording.update' => $high('Update camera recording', 'security', 'camera_recording_state', [
@@ -300,6 +319,9 @@ $authorise(
     ['access_control'],
     sensitivity: 'security_control',
 );
+// S&D Phase H: keep a door unlocked (the door's device), and the Site emergency modes (the console's device).
+$authorise(['access.door.keep_unlocked', 'access.door.keep_unlocked_end'], ['security'], ['access_control'], ['securityDevices.doors.unlock'], 'security_control');
+$authorise(['access.site.lockdown', 'access.site.evacuate', 'access.site.emergency_end'], ['security'], ['access_control'], ['securityDevices.access.lockdown'], 'security_control');
 $authorise(
     ['alarm.arm', 'alarm.disarm', 'alarm.bypass', 'alarm.reset', 'alarm.emergency_mode.set'],
     ['security'],
@@ -308,6 +330,7 @@ $authorise(
 );
 $authorise(
     [
+        'camera.snapshot.capture',
         'camera.privacy.enable',
         'camera.privacy.disable',
         'camera.recording.update',
@@ -374,6 +397,11 @@ $guidance = [
     'network.firewall_policy.apply' => ['Changes network security policy and may affect Site connectivity.', 'A fresh configuration hash matches the approved firewall policy.'],
     'access.door.unlock_timed' => ['Temporarily unlocks this exact door for the approved attendance window.', 'The provider confirms the door returns to locked after the bounded window.'],
     'access.door.lock' => ['Locks this exact door and may prevent physical entry or exit.', 'A fresh provider observation confirms the door is locked.'],
+    'access.door.keep_unlocked' => ['Leaves this door unlocked until the time chosen: anyone can walk in until then. It locks again by itself.', 'The hub reads the door back and UniFi Access shows it kept unlocked.'],
+    'access.door.keep_unlocked_end' => ['Locks this door again now, ending a keep unlocked early.', 'The hub reads the door back and UniFi Access no longer shows it kept unlocked.'],
+    'access.site.lockdown' => ['Stops every card, PIN and phone opening the doors at this Site from outside. People inside can always leave by the exit button and handle.', 'The hub reads UniFi Access back and it shows the Site in lockdown.'],
+    'access.site.evacuate' => ['Unlocks every door at this Site so everyone can get out, until someone ends it.', 'The hub reads UniFi Access back and it shows the Site evacuating.'],
+    'access.site.emergency_end' => ['Ends lockdown or evacuation: the doors go back to their usual schedules and lock.', 'The hub reads UniFi Access back and it shows no emergency at the Site.'],
     'access.door.lockdown' => ['Places this exact door into lockdown and may materially affect life safety and access.', 'A fresh provider observation confirms locked and lockdown state.'],
     'access.schedule.update' => ['Changes when approved credentials may use this access point.', 'A fresh access-schedule hash matches the approved schedule.'],
     'access.credential.revoke' => ['Immediately removes the referenced credential access.', 'The provider freshly confirms the credential is revoked.'],
@@ -383,6 +411,7 @@ $guidance = [
     'alarm.bypass' => ['Temporarily bypasses one alarm zone and reduces protection for the bounded period.', 'A fresh provider observation confirms the exact bounded bypass.'],
     'alarm.reset' => ['Resets the alarm fault state and may clear an active operational condition.', 'A fresh provider observation confirms the resulting alarm fault state.'],
     'alarm.emergency_mode.set' => ['Changes emergency alarm behaviour for the selected area.', 'A fresh provider observation confirms the requested emergency mode.'],
+    'camera.snapshot.capture' => ['Takes one still picture from the camera through the Site hub. Nothing on the camera changes.', 'The picture is shown once to the person who asked and kept for two minutes at most; it is never stored.'],
     'camera.privacy.enable' => ['Enables privacy mode and stops normal camera observation.', 'A fresh provider observation confirms privacy mode is enabled.'],
     'camera.privacy.disable' => ['Disables privacy mode and resumes camera observation of the protected area.', 'A fresh provider observation confirms privacy mode is disabled.'],
     'camera.recording.update' => ['Changes how this camera records and may alter storage or privacy impact.', 'A fresh provider observation confirms the approved recording mode.'],
@@ -417,4 +446,46 @@ return [
     'command_observation_stale_after_seconds' => 900,
     'reconciliation_grace_seconds' => 5,
     'command_capabilities' => $capabilities,
+
+    /*
+     * Long-running listeners that supervisor keeps alive (ops/supervisor/oblivion-sd-listeners.conf).
+     * Each is off until switched on here; when on, Settings › Server readiness checks its heartbeat.
+     */
+    'listeners' => [
+        // A heartbeat older than this means the listener has stopped.
+        'heartbeat_stale_seconds' => (int) env('SECURITY_DEVICES_LISTENER_STALE_SECONDS', 120),
+
+        // Alarm receiver for SIA DC-09 reports (Phase A, item A3). Listens on this server only unless
+        // SIA_DC09_BIND_HOST is set (for example 0.0.0.0 so panels on the network can reach it).
+        'sia_dc09' => [
+            'enabled' => (bool) env('SIA_DC09_ENABLED', false),
+            'bind_host' => (string) env('SIA_DC09_BIND_HOST', '127.0.0.1'),
+            'port' => (int) env('SIA_DC09_PORT', 51100),
+        ],
+
+        // MQTT sensor listener (Phase A, item A4). Read here, not with env() in the command, so the
+        // password still works once settings are cached. Which broker it uses waits for review item R8.
+        'mqtt_sensors' => [
+            'enabled' => (bool) env('MQTT_SENSORS_ENABLED', false),
+            'site_id' => (int) env('MQTT_SENSORS_SITE_ID', 0),
+            'host' => (string) env('MQTT_SENSORS_HOST', ''),
+            'port' => (int) env('MQTT_SENSORS_PORT', 1883),
+            'tls' => (bool) env('MQTT_SENSORS_TLS', false),
+            'username' => env('MQTT_SENSORS_USERNAME'),
+            'password' => env('MQTT_BROKER_PASSWORD'),
+            'topic' => (string) env('MQTT_SENSORS_TOPIC', 'oblivion/sensors/#'),
+        ],
+    ],
+
+    /*
+     * S&D Phase G (G1): nightly settings backups for routers and switches. Governed commands always
+     * have a person behind them, so the nightly run asks in the name of the Oblivion user named here
+     * (their permissions and Site access are checked again every night). Nobody named: off.
+     * The window is NZ time; security-devices:nightly-settings-backups runs every ten minutes in it.
+     */
+    'nightly_settings_backups' => [
+        'requested_by_user_id' => (int) env('SECURITY_DEVICES_NIGHTLY_BACKUP_USER_ID', 0),
+        'from' => (string) env('SECURITY_DEVICES_NIGHTLY_BACKUP_FROM', '02:00'),
+        'until' => (string) env('SECURITY_DEVICES_NIGHTLY_BACKUP_UNTIL', '05:00'),
+    ],
 ];

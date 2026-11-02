@@ -361,7 +361,7 @@ it('preserves staff profile and history location access with active tracking con
             ->where('location.tracker.id', $device->id)
             ->where('location.tracker.detail_url', "/security-devices/devices/{$device->id}")
             ->where('location.tracker.detail_access.state', 'available')
-            ->where('location.tracker.tracking_workspace_url', '/security-devices/tracking?tab=personal-safety')
+            ->where('location.tracker.tracking_workspace_url', '/security-devices/devices?tab=trackers')
             ->where('location.tracker.tracking_workspace_access.state', 'available'));
 
     $this->get("/security-devices/devices/{$device->id}")->assertOk();

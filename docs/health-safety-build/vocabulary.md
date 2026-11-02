@@ -60,8 +60,8 @@ the legal meaning is unchanged), **"Urgent"** for the top action priority.
 | Emergency practice | **emergency drill** · "Plan a drill" · "Record how it went" · "things to fix" | | findings, remedy, drill_failure |
 | Working alone | **working alone** ("Start working alone") · **check in** (verb) / **check-in** (noun) · "Ask for help" | | Lone-worker check-in for starting a session, checkpoint, safety session |
 | Worker participation (**LEGAL**) | **worker participation** · **health and safety representative** (HSR only after the full name) · **health and safety committee** · "No longer a representative" | How staff have a say in health and safety (HSWA 2015 Part 3) | HSR alone, rep(s), Mark stood-down |
-| Passing an incident to H&S | "**Pass to Health and safety**" · "Waiting for Health and safety to take it on" | | handover acceptance, admitted |
-| Person responsible | **owner** · "Suggested owner" · "No owner yet" | The one person responsible for getting this done | accountable owner, assignee (for the same role) |
+| Passing an incident to H&S | "**Pass to Health and safety**" · "Waiting for Health and safety to take it on" · "Taken on by Health and safety" · "Not passed on yet" · "Not needed" | | handover acceptance, admitted |
+| Person responsible | **owner** · "Suggested owner" · "No owner yet" · "Owner needs replacing" · "Choose a new owner" | The one person responsible for getting this done | accountable owner, assignee (for the same role) |
 | Closing | **Close** · "Before this can close: 2 of 5 done" · "Close anyway (reason needed)" | | closure exception, hard safety blockers |
 | Severity (incident, restraint, drill problem) | Low · Medium · High · Critical, through `<StatusBadge>`: Low neutral · Medium warning · High and Critical critical | | three colour maps for one scale |
 | Safety review stage | Open · Being investigated · Actions under way · Checking it worked · Closed | | corrective_action, monitoring |

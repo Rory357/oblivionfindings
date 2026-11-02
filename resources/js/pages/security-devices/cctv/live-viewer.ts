@@ -350,6 +350,8 @@ export class CctvViewer {
             return 'The camera configuration changed. Review it before starting again.';
         if (this.session.reason_code === 'worker_unavailable')
             return 'The Site collector is unavailable. Check its connection before trying again.';
+        if (this.session.reason_code === 'privacy_hours')
+            return 'Privacy hours began for this camera, so the live view stopped. No picture is shown until they end.';
         return 'This live view is no longer available. Start again when the camera connection is ready.';
     }
     private end(status: CctvViewerState['status'], message: string) {

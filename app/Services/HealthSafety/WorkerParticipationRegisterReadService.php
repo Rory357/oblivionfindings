@@ -49,6 +49,7 @@ final class WorkerParticipationRegisterReadService
                 'tabCounts' => $metrics['tabCounts'],
                 'rows' => $this->rows($request, $filters, $active),
                 'hero' => $metrics['hero'],
+                'representatives_summary' => $metrics['representatives'],
                 'detail' => $this->detail($values, $active, $site),
                 'can' => ['manage' => $manage],
                 'sites' => $this->access->sitesQuery($active)->orderBy('name')->get(['id', 'name'])->toArray(),
@@ -106,7 +107,9 @@ final class WorkerParticipationRegisterReadService
     {
         $kind = $filters['tab']; $site = $filters['site_id'];
         $query = $this->focus($this->listed($kind, $context, $site, $filters['records'] !== CurrentRecords::ALL), $filters['focus'])
-            ->when($filters['status'], fn (Builder $rows, $status) => $rows->where('status', $status));
+            // G4-13: "No longer a representative" is every representative who isn't active.
+            ->when($filters['status'], fn (Builder $rows, $status) => $kind === 'representatives' && $status === 'former'
+                ? $rows->where('status', '!=', 'active') : $rows->where('status', $status));
         if ($kind === 'representatives') {
             if ($filters['q']) {
                 $names = $this->access->relatedQuery($kind, 'user', $context, $site)
@@ -194,13 +197,18 @@ final class WorkerParticipationRegisterReadService
     /** Five guarded aggregate statements preserve all original operands without repeating each source count. */
     private function metrics(HealthSafetyReadContext $context, ?int $site, bool $currentOnly = true): array
     {
+        // G4-13: representatives elected in the last 12 months, on the worker calendar.
+        $electedSince = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'))->subMonths(12)->toDateString();
         $quarter = $this->periodStart('quarter');
         $quarterEnd = $quarter->copy()->addQuarter()->utc()->format('Y-m-d H:i:s.u');
         $quarterStart = $quarter->utc()->format('Y-m-d H:i:s.u');
         $reps = $this->listed('representatives', $context, $site, $currentOnly)->selectRaw('COUNT(*) AS tab_count,
             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS active_reps,
             COUNT(DISTINCT CASE WHEN status = ? THEN site_id ELSE NULL END) AS covered_sites,
-            SUM(CASE WHEN status = ? AND training_days_completed < 2 THEN 1 ELSE 0 END) AS training_below', ['active', 'active', 'active'])->get()->first();
+            SUM(CASE WHEN status = ? AND training_days_completed < 2 THEN 1 ELSE 0 END) AS training_below,
+            SUM(CASE WHEN status != ? THEN 1 ELSE 0 END) AS former_reps,
+            SUM(CASE WHEN elected_at >= ? THEN 1 ELSE 0 END) AS elected_recently,
+            SUM(CASE WHEN status = ? THEN training_days_completed ELSE 0 END) AS training_days', ['active', 'active', 'active', 'active', $electedSince, 'active'])->get()->first();
         $meetings = $this->listed('meetings', $context, $site, $currentOnly)->selectRaw('COUNT(*) AS tab_count,
             SUM(CASE WHEN status = ? AND (minutes_document_path IS NULL OR LENGTH(minutes_document_path) = 0) THEN 1 ELSE 0 END) AS missing_minutes,
             SUM(CASE WHEN status != ? AND actions_due_count > 0 THEN 1 ELSE 0 END) AS outstanding_meetings,
@@ -226,7 +234,21 @@ final class WorkerParticipationRegisterReadService
             'badges' => ['reps_coverage_pct' => $totalSites > 0 ? (int) round($coveredSites / $totalSites * 100) : 0,
                 'sites_total' => $totalSites, 'sites_covered' => $coveredSites, 'minutes_overdue' => $minutes,
                 'consultations_awaiting' => $awaiting,
-                'training_below_minimum' => (int) $reps->training_below]]];
+                'training_below_minimum' => (int) $reps->training_below]],
+            // G4-13: the representatives page's own numbers. Faces are the first three active representatives by name.
+            'representatives' => ['active' => $activeReps, 'former' => (int) $reps->former_reps,
+                'elected_12m' => (int) $reps->elected_recently, 'training_days' => (int) $reps->training_days,
+                'faces' => $this->activeFaces($context, $site, $currentOnly)]];
+    }
+
+    /** Up to three active representatives' names, by name, through the same correlated user read as the rows. */
+    private function activeFaces(HealthSafetyReadContext $context, ?int $site, bool $currentOnly): array
+    {
+        $userIds = $this->listed('representatives', $context, $site, $currentOnly)->where('status', 'active')->pluck('user_id')->filter()->unique()->values()->all();
+        if ($userIds === []) { return []; }
+
+        return $this->access->relatedQuery('representatives', 'user', $context, $site)->whereKey($userIds)
+            ->orderBy('users.name')->limit(3)->pluck('users.name')->values()->all();
     }
 
     private function detail(array $values, HealthSafetyReadContext $context, ?int $site): ?array

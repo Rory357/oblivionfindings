@@ -31,6 +31,8 @@ export interface SafetyNavigationPermissions {
     governance?: { view?: boolean };
     compliance?: { view?: boolean };
     privacy?: { viewRequests?: boolean };
+    checklists?: { view?: boolean };
+    sites?: { viewAny?: boolean };
 }
 type Can = SafetyNavigationPermissions | null | undefined;
 type Visibility = (can: Can) => boolean;
@@ -176,6 +178,8 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 visible: (can) =>
                     !!can?.safeguarding?.create && !can?.safeguarding?.viewAny,
                 keywords: ['Safeguarding'],
+                // B5.3: a way to report, not a list; it is already a choice in "Report something".
+                shortcut: true,
             },
             {
                 key: 'fleet-incidents',
@@ -184,7 +188,9 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 icon: Truck,
                 description:
                     'Follow up incidents involving vehicles and assets.',
+                // B5.3: in the H&S rail for H&S readers; everyone else reaches it from Fleet & Assets.
                 visible: (can) =>
+                    safetyReader(can) &&
                     !!(can?.fleet?.viewAny || can?.assets?.viewAny),
             },
         ],
@@ -420,6 +426,27 @@ export const SAFETY_HUBS: SafetyHub[] = [
 
 export function visibleSafetyViews(hub: SafetyHub, can: Can): SafetyView[] {
     return hub.views.filter((view) => view.visible(can));
+}
+/**
+ * B5.1 (H&S UI/UX plan): the "Health and safety" and hub crumbs. The hub crumb opens the viewer's first tab in that
+ * hub (not the old registers card page); the "Health and safety" crumb links only for people who can open the
+ * Overview (HR with wellbeing access only gets plain text, not a link the server would refuse).
+ */
+export function safetyHubCrumbs(
+    hub: SafetyHubKey,
+    can: Can,
+): { title: string; href?: string }[] {
+    const overview = SAFETY_HUBS.find((item) => item.key === 'overview')!;
+    const group = SAFETY_HUBS.find((item) => item.key === hub)!;
+    const first = visibleSafetyViews(group, can).find((view) => !view.shortcut);
+    return [
+        visibleSafetyViews(overview, can).length
+            ? { title: 'Health and safety', href: '/health-safety' }
+            : { title: 'Health and safety' },
+        first
+            ? { title: group.label, href: first.href }
+            : { title: group.label },
+    ];
 }
 export function safetySidebar(can: Can) {
     return SAFETY_HUBS.flatMap((hub) => {

@@ -38,7 +38,14 @@ static class Program
    Reject(()=>StatusProtocol.ReadAsync(new MemoryStream(incomplete),CancellationToken.None).GetAwaiter().GetResult(),"Truncated frame accepted.");passed++;
    var stale=new AgentStatus(1,"test","https://care.example.test","connected",DateTimeOffset.UtcNow.AddMinutes(-8),false,false,false);
    Check(stale.ConnectionLabel(DateTimeOffset.UtcNow)!="Connected to Oblivion","Stale contact claimed live connection.");passed++;
-   var app=new App();app.InitializeComponent();
+   // WPF queues App.OnStartup from App's constructor. The checks never start the real tray (single-instance
+   // lock, tray icon, service pipe), and left queued it ran at the first dispatcher pump and shut the app down.
+   System.Windows.Threading.DispatcherHookEventHandler skipStartup=(_,e)=>{if(e.Operation.Priority==System.Windows.Threading.DispatcherPriority.Send)e.Operation.Abort();};
+   var hooks=System.Windows.Threading.Dispatcher.CurrentDispatcher.Hooks;
+   hooks.OperationPosted+=skipStartup;
+   var app=new App();
+   hooks.OperationPosted-=skipStartup;
+   app.InitializeComponent();
    var window=new MainWindow();
    window.Navigate("device");
    Check(((FrameworkElement)window.FindName("DevicePane")).Visibility==Visibility.Visible&&((FrameworkElement)window.FindName("HelpPane")).Visibility==Visibility.Collapsed,"Device navigation failed.");
@@ -69,6 +76,8 @@ static class Program
    passed += SoftwareChecks.Run();
    passed += DesktopChecks.Run();
    passed += DesktopChecks.RunAsync().GetAwaiter().GetResult();
+   passed += FixChecks.Run();
+   passed += FixChecks.RunAsync().GetAwaiter().GetResult();
    Console.WriteLine($"{passed} native helper check groups passed.");app.Shutdown();return 0;
   }
   catch(Exception error){Console.Error.WriteLine(error);return 1;}

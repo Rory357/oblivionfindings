@@ -167,7 +167,8 @@ describe('incident register header', () => {
         const rail = screen.getByRole('tablist', {
             name: 'Incidents and safety reviews views',
         });
-        expect(within(rail).getAllByRole('tab')).toHaveLength(3);
+        // B5.3: Fleet incidents is in the H&S rail for H&S readers only; this viewer opens it from Fleet & Assets.
+        expect(within(rail).getAllByRole('tab')).toHaveLength(2);
         fireEvent.click(
             within(rail).getByRole('tab', {
                 name: 'Safeguarding concerns',

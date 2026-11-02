@@ -6,11 +6,14 @@ import {
     loginAs,
     loginAsStaff,
 } from './helpers';
-import {
-    markCollectorOrderedReturn,
-    markCollectorOutage,
-    seedNativeMonitoringRuntimeFixtures,
-} from './native-monitoring-runtime-fixtures';
+import { seedNativeMonitoringRuntimeFixtures } from './native-monitoring-runtime-fixtures';
+
+// S&D rebuild C6 retired the Monitoring, Discovery, Network & IT, Integrations
+// and Settings pages this journey used to walk; their screens are covered by
+// OverviewScreenTest, DeviceAlertsTest, SitesScreensTest, SetupScreensTest,
+// DevicePagesTest and the pages' vitest files. What stays here is the privacy
+// promise: raw monitoring evidence never reaches the new pages, and another
+// Site stays hidden.
 
 function approvedDesktopViewport(projectName: string) {
     if (projectName === 'it-security-desktop-1440') {
@@ -57,29 +60,46 @@ async function expectNoPageOverflow(page: Page) {
     ).toBeLessThanOrEqual(layout.client);
 }
 
-async function selectPageTab(page: Page, label: string, expectedValue: string) {
-    await page.getByRole('tab', { name: label, exact: true }).click();
-    await expect
-        .poll(() => new URL(page.url()).searchParams.get('tab'), {
-            timeout: 30_000,
-        })
-        .toBe(expectedValue);
-}
-
-async function expectSafePage(page: Page, rawSentinels: string[]) {
-    for (const rawSentinel of rawSentinels) {
-        await expect(page.getByText(rawSentinel)).toHaveCount(0);
+/** Nothing on screen shows the given values, and the page fits its viewport. */
+async function expectNoneShown(page: Page, values: readonly string[]) {
+    for (const value of values) {
+        await expect(page.getByText(value)).toHaveCount(0);
     }
-    await expect(
-        page.getByRole('button', {
-            name: /^(scan|discover|adopt|execute|replay|restart|wipe|push|apply|upgrade|run command)$/i,
-        }),
-    ).toHaveCount(0);
     await expectNoPageOverflow(page);
 }
 
+/** The page source, Inertia props included, never carries the given values. */
+async function expectSourceWithout(
+    page: Page,
+    route: string,
+    values: readonly string[],
+) {
+    const response = await page.request.get(route);
+    expect(response.ok(), `${route} response`).toBe(true);
+    const source = await response.text();
+    for (const value of values) {
+        expect(source, `${route} source`).not.toContain(value);
+    }
+}
+
+/** Finds a device on Devices by searching for it and returns its page address. */
+async function deviceHref(page: Page, name: string): Promise<string> {
+    await page.goto(`/security-devices/devices?q=${encodeURIComponent(name)}`);
+    await expect(
+        page.getByRole('heading', { name: 'Devices', level: 1, exact: true }),
+    ).toBeVisible();
+    const link = page
+        .locator('a[href^="/security-devices/devices/"]', { hasText: name })
+        .first();
+    await expect(link).toBeVisible();
+    const href = await link.getAttribute('href');
+    expect(href).toMatch(/^\/security-devices\/devices\/\d+$/);
+
+    return href as string;
+}
+
 test.describe('native monitoring runtime desktop acceptance', () => {
-    test('keeps the end-to-end operational story clear at the approved project viewport', async ({
+    test('keeps raw monitoring evidence off every new Security & devices page at the approved project viewport', async ({
         page,
     }, testInfo) => {
         test.setTimeout(900_000);
@@ -107,159 +127,68 @@ test.describe('native monitoring runtime desktop acceptance', () => {
 
         await loginAsStaff(page);
 
-        await page.goto('/security-devices/monitoring');
-        await expect(
-            page.getByRole('heading', { name: 'Monitoring', level: 1 }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole('link', { name: fixture.rootMonitorName }).first(),
-        ).toBeVisible();
-        await expect(page.getByText(fixture.tlsMonitorName)).toBeVisible();
-        await expect(
-            page
-                .getByRole('link', {
-                    name: new RegExp(
-                        `Review Control Room correlation ${fixture.controlRoomReference}`,
-                    ),
-                })
-                .first(),
-        ).toBeVisible();
-        await expect(
-            page
-                .getByRole('link', {
-                    name: new RegExp(
-                        `IT incident ${fixture.ticketReference}.*technician closure pending`,
-                    ),
-                })
-                .first(),
-        ).toBeVisible();
-        await expectSafePage(page, rawSentinels);
+        const pages: Array<[string, string]> = [
+            ['/security-devices', 'Security & devices'],
+            ['/security-devices?tab=trends', 'Security & devices'],
+            ['/security-devices/alerts', 'Alerts'],
+            ['/security-devices/alerts?tab=rules', 'Alerts'],
+            ['/security-devices/devices?tab=network', 'Devices'],
+            ['/security-devices/devices?tab=upkeep', 'Devices'],
+            [
+                `/security-devices/sites/${fixture.allowedSiteId}`,
+                fixture.allowedSiteName,
+            ],
+            [
+                `/security-devices/sites/${fixture.allowedSiteId}?tab=network`,
+                fixture.allowedSiteName,
+            ],
+            [
+                `/security-devices/sites/${fixture.allowedSiteId}?tab=internet`,
+                fixture.allowedSiteName,
+            ],
+            ['/security-devices/setup/hubs?tab=networks', 'Setup'],
+            ['/security-devices/setup/services?tab=connected', 'Setup'],
+            ['/security-devices/setup/history', 'Setup'],
+        ];
 
-        await selectPageTab(page, 'Dependencies', 'dependencies');
-        await expect(
-            page.getByText(/3 suppressed symptoms remain inspectable/),
-        ).toBeVisible();
-        for (const symptomName of fixture.symptomNames) {
-            await expect(page.getByText(symptomName)).toBeVisible();
+        for (const [route, heading] of pages) {
+            await test.step(route, async () => {
+                const response = await page.goto(route);
+                expect(response?.status(), `${route} response`).toBe(200);
+                await expect(
+                    page.getByRole('heading', {
+                        name: heading,
+                        level: 1,
+                        exact: true,
+                    }),
+                ).toBeVisible();
+                await expectNoneShown(page, rawSentinels);
+                await expectSourceWithout(page, route, rawSentinels);
+            });
         }
-        await expect(page.getByText('96% confidence').first()).toBeVisible();
-        await expectSafePage(page, rawSentinels);
 
-        await selectPageTab(page, 'Trends', 'trends');
-        await expect(
-            page.getByText('External history and retention', {
-                exact: true,
-            }),
-        ).toBeVisible();
-        await expect(page.getByText(/p95 86\.2/)).toBeVisible();
-        await expect(page.getByText(/Trend Not Configured/)).toBeVisible();
-        await expectSafePage(page, rawSentinels);
-
-        markCollectorOutage(fixture.collectorUuid);
-        await page.goto('/security-devices/discovery');
-        await expect(
-            page.getByText(fixture.collectorName).first(),
-        ).toBeVisible();
-        await expect(
-            page.getByText(/7 buffered · 1 sequence gaps/),
-        ).toBeVisible();
-        const affectedCollector = page.getByRole('article', {
-            name: `Collector ${fixture.collectorName}`,
-        });
-        await expect(
-            affectedCollector.getByText(/results are uncertain/),
-        ).toBeVisible();
-        await expectSafePage(page, rawSentinels);
-
-        await selectPageTab(page, 'Discovery scopes', 'scopes');
-        await expect(page.getByText(fixture.discoveryScopeName)).toBeVisible();
-        const discoveryScope = page.getByRole('article', {
-            name: `Discovery scope ${fixture.discoveryScopeName}`,
-        });
-        await expect(
-            discoveryScope.getByText(/1 network ranges · 1 exclusions/),
-        ).toBeVisible();
-
-        await selectPageTab(page, 'Runs', 'runs');
-        await expect(
-            page.getByText('3 found · 1 matched · 1 proposed · 1 unresolved'),
-        ).toBeVisible();
-
-        await selectPageTab(page, 'Candidates', 'candidates');
-        await expect(
-            page.getByRole('link', { name: fixture.matchedDeviceName }),
-        ).toBeVisible();
-        await expect(page.getByText('Matched', { exact: true })).toBeVisible();
-        await expect(page.getByText('Proposed', { exact: true })).toBeVisible();
-        await expect(
-            page.getByText('Ambiguous', { exact: true }),
-        ).toBeVisible();
-        await expectSafePage(page, rawSentinels);
-
-        markCollectorOrderedReturn(fixture.collectorUuid);
-        await page.goto('/security-devices/discovery?tab=collectors');
-        await expect(
-            page.getByText(fixture.collectorName).first(),
-        ).toBeVisible();
-        await expect(
-            page.getByText(/7 buffered · 1 sequence gaps/),
-        ).toHaveCount(0);
-        await expect(page.getByText('Available').first()).toBeVisible();
-        await expectSafePage(page, rawSentinels);
-
-        await page.goto('/security-devices/network-it');
-        const networkTabs = page.getByRole('navigation', {
-            name: 'Network & IT workspace tabs',
-        });
-        await networkTabs
-            .getByRole('link', { name: 'Map', exact: true })
-            .click();
-        await expect(
-            page.getByRole('heading', {
-                name: 'Known topology evidence',
-                level: 2,
-            }),
-        ).toBeVisible();
-        await expect(page.getByLabel('Topology visual overview')).toBeVisible();
-        await expect(
-            page.getByLabel('Keyboard-readable topology relationships'),
-        ).toBeVisible();
-        await expect(page.getByText(/97% confidence/)).toBeVisible();
-        await expect(page.getByText(/2 changes/)).toBeVisible();
-        await expectSafePage(page, rawSentinels);
-
-        await networkTabs
-            .getByRole('link', {
-                name: 'Configuration & firmware',
-                exact: true,
-            })
-            .click();
-        await expect(page.getByText('Latest saved snapshot')).toBeVisible();
-        await expect(page.getByText(/Approved read only/i)).toBeVisible();
-        await expect(page.getByText(/2,048 bytes|2048 bytes/)).toBeVisible();
-        await expectSafePage(page, rawSentinels);
-
-        await page.goto('/security-devices/integrations');
-        const unifiRuntime = page.getByLabel('UniFi runtime capabilities');
-        await expect(unifiRuntime).toContainText('Runtime contract v1.5');
-        await expect(unifiRuntime).toContainText('device sync');
-        await expect(unifiRuntime).toContainText('Page limit');
-        await expect(unifiRuntime).toContainText('backfill limit');
-        await expect(unifiRuntime).toContainText('1 cursor scopes');
-        await expect(unifiRuntime).toContainText('1 runtime exceptions');
-        await expectSafePage(page, rawSentinels);
-
-        await page.goto('/security-devices/settings');
-        await page.getByRole('tab', { name: 'Retention' }).click();
-        await expect(page.getByText(fixture.retentionPolicyName)).toBeVisible();
-        await expect(
-            page.getByText('Runtime workers, queues and dead letters', {
-                exact: true,
-            }),
-        ).toBeVisible();
-        await expect(page.getByText(/1 dead letters/)).toBeVisible();
-        await expect(page.getByText(/read-only and append-only/)).toBeVisible();
-        await expectSafePage(page, rawSentinels);
+        // Each monitored device's own page: the root failure, the device behind
+        // the remote collector, and the mapped gateway and switch.
+        for (const name of [
+            fixture.matchedDeviceName,
+            fixture.operations.remoteDeviceName,
+            fixture.network.gatewayName,
+            fixture.network.switchName,
+        ]) {
+            await test.step(name, async () => {
+                const href = await deviceHref(page, name);
+                await page.goto(href);
+                await expect(
+                    page.getByRole('heading', {
+                        name,
+                        level: 1,
+                        exact: true,
+                    }),
+                ).toBeVisible();
+                await expectNoneShown(page, rawSentinels);
+                await expectSourceWithout(page, href, rawSentinels);
+            });
+        }
 
         expectNoConsoleErrors(consoleErrors);
         expect(failedRequests).toEqual([]);
@@ -278,41 +207,61 @@ test.describe('native monitoring runtime desktop acceptance', () => {
             fixture.operations.rawSentinel,
             fixture.network.rawSentinel,
         ];
+        const hidden = [fixture.hiddenDeviceName, fixture.hiddenSiteName];
         const consoleErrors = collectConsoleErrors(page);
         await loginAs(page, fixture.restrictedEmail, 'password');
 
-        await page.goto('/security-devices/monitoring');
-        await expect(
-            page.getByRole('link', { name: fixture.rootMonitorName }).first(),
-        ).toBeVisible();
-        await expect(page.getByText(fixture.hiddenDeviceName)).toHaveCount(0);
-        await expect(page.getByText(fixture.hiddenSiteName)).toHaveCount(0);
-        await expectSafePage(page, rawSentinels);
-
+        // The person's own Site's device shows; another Site's never does, even searched for.
         await page.goto(
-            `/security-devices/monitoring?site_id=${fixture.hiddenSiteId}`,
+            `/security-devices/devices?q=${encodeURIComponent(fixture.matchedDeviceName)}`,
         );
-        await expect(page.getByText(fixture.hiddenDeviceName)).toHaveCount(0);
-        await expect(page.getByText(fixture.hiddenSiteName)).toHaveCount(0);
-        await expectSafePage(page, rawSentinels);
+        await expect(
+            page.getByText(fixture.matchedDeviceName).first(),
+        ).toBeVisible();
+        // A search that matches the hidden device's name (but doesn't echo it whole).
+        const hiddenSearch = `/security-devices/devices?q=${encodeURIComponent('Playwright denied')}`;
+        await page.goto(hiddenSearch);
+        await expect(
+            page.getByRole('heading', { name: 'Devices', level: 1, exact: true }),
+        ).toBeVisible();
+        await expectNoneShown(page, [...hidden, ...rawSentinels]);
+        await expectSourceWithout(page, hiddenSearch, [
+            ...hidden,
+            ...rawSentinels,
+        ]);
+
+        // Alerts ignore another Site's filter instead of showing it.
+        for (const route of [
+            '/security-devices/alerts',
+            `/security-devices/alerts?site=${fixture.hiddenSiteId}`,
+        ]) {
+            const response = await page.goto(route);
+            expect(response?.status(), `${route} response`).toBe(200);
+            await expect(
+                page.getByRole('heading', { name: 'Alerts', level: 1, exact: true }),
+            ).toBeVisible();
+            await expectNoneShown(page, [...hidden, ...rawSentinels]);
+            await expectSourceWithout(page, route, [...hidden, ...rawSentinels]);
+        }
 
         expectNoConsoleErrors(consoleErrors);
         consoleErrors.length = 0;
 
-        const denied = await page.goto(
+        // Another Site's Devices filter, Site page and device page are refused.
+        for (const route of [
+            `/security-devices/devices?site=${fixture.hiddenSiteId}`,
+            `/security-devices/sites/${fixture.hiddenSiteId}`,
             `/security-devices/devices/${fixture.hiddenDeviceId}`,
-        );
-        const deniedStatus = denied?.status();
-        expect([403, 404]).toContain(deniedStatus);
-        await expect(page.getByText(fixture.hiddenDeviceName)).toHaveCount(0);
-        await expect(page.getByText(fixture.hiddenSiteName)).toHaveCount(0);
-        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
+        ]) {
+            const denied = await page.goto(route);
+            expect([403, 404], `${route} status`).toContain(denied?.status());
+            await expect(page.getByText(fixture.hiddenDeviceName)).toHaveCount(0);
+            await expect(page.getByText(fixture.hiddenSiteName)).toHaveCount(0);
+            await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
+        }
 
         expect(
-            consoleErrors.filter(
-                (error) => !error.includes(`status of ${deniedStatus}`),
-            ),
+            consoleErrors.filter((error) => !/status of 40[34]/.test(error)),
         ).toEqual([]);
-        expect(consoleErrors.length).toBeLessThanOrEqual(1);
     });
 });

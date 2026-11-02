@@ -40,7 +40,8 @@ abstract class ChemicalExposureRecoveryTestCase extends ChemicalExposureCommandT
     {
         foreach ($queries as $query) {
             $sql = strtolower(str_replace(['`', '"'], '', $query['query']));
-            $this->assertDoesNotMatchRegularExpression('/select\s+(?:substance_exposure_records\.)?\*\s+from\s+substance_exposure_records/', $sql);
+            // An exists(select * ...) Site probe returns no columns; only a real row read of the record is a body read.
+            $this->assertDoesNotMatchRegularExpression('/(?<!exists\()select\s+(?:substance_exposure_records\.)?\*\s+from\s+substance_exposure_records/', $sql);
             foreach (['symptoms', 'medical_outcome', 'medical_treatment', 'medical_attention_sought', 'circumstances', 'exposed_at'] as $field) {
                 $this->assertStringNotContainsString($field, $sql);
             }

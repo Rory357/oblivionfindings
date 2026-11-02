@@ -55,6 +55,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/grants', [ChatInvestigationController::class, 'store'])->name('store');
         Route::get('/grants/{grant}/messages', [ChatInvestigationController::class, 'messages'])->whereNumber('grant')->name('messages');
         Route::post('/grants/{grant}/end', [ChatInvestigationController::class, 'end'])->whereNumber('grant')->name('end');
+        // Controlled export: an active grant only, a few per investigator at a time.
+        Route::post('/grants/{grant}/export', [ChatInvestigationController::class, 'export'])->whereNumber('grant')->middleware('throttle:5,10,chat-investigation-export:')->name('export');
         Route::post('/holds', [ChatInvestigationController::class, 'placeHold'])->name('holds.store');
         Route::post('/holds/{hold}/release', [ChatInvestigationController::class, 'releaseHold'])->whereNumber('hold')->name('holds.release');
     });

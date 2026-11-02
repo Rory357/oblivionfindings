@@ -104,32 +104,9 @@ final class MonitoringDeadLetterWorkspaceTest extends TestCase
             app(SecurityDevicesAccessService::class)->accessibleSiteIds($operator),
         );
 
-        $response = $this->actingAs($operator)->get('/security-devices/monitoring?tab=collection');
-
-        $response->assertOk()->assertInertia(function ($page): void {
-            $delivery = $page->toArray()['props']['workspace']['delivery'];
-
-            $this->assertSame(2, $delivery['contracts']['envelope_current']);
-            $this->assertSame([1, 2], $delivery['contracts']['envelope_accepted']);
-            $this->assertSame(6, $delivery['contracts']['commands']['standard_current']);
-            $this->assertSame(7, $delivery['contracts']['commands']['break_glass_current']);
-            $this->assertTrue($delivery['dead_letters']['visible']);
-            $this->assertCount(2, $delivery['dead_letters']['rows']);
-            $this->assertSame(
-                ['00000203', '00000201'],
-                collect($delivery['dead_letters']['rows'])->pluck('message_reference')->all(),
-            );
-            $this->assertNotContains(
-                '00000202',
-                collect($delivery['dead_letters']['rows'])->pluck('message_reference')->all(),
-            );
-            $this->assertCount(1, collect($delivery['dead_letters']['rows'])->where('can_replay', true));
-            $this->assertFalse(collect($delivery['dead_letters']['rows'])->firstWhere('reason_code', 'invalid_signature')['can_replay']);
-        });
-        $response
-            ->assertDontSee('Hidden delivery Site', false)
-            ->assertDontSee('{not-json', false)
-            ->assertDontSee('workspace-test-key', false);
+        // S&D rebuild C6: the monitoring page's delivery list is gone (server repair, not a staff task:
+        // plan "Setup › Hubs › Server check"); replay and discard stay on their routes.
+        $this->actingAs($operator)->get('/security-devices/monitoring?tab=collection')->assertRedirect('/security-devices/alerts');
 
         $this->actingAs($operator)
             ->post("/security-devices/monitoring/dead-letters/{$allowed->id}/replay", [
@@ -161,14 +138,7 @@ final class MonitoringDeadLetterWorkspaceTest extends TestCase
 
         $this->actingAs($viewer)
             ->get('/security-devices/monitoring?tab=collection')
-            ->assertOk()
-            ->assertInertia(function ($page): void {
-                $deadLetters = $page->toArray()['props']['workspace']['delivery']['dead_letters'];
-
-                $this->assertFalse($deadLetters['visible']);
-                $this->assertNull($deadLetters['total']);
-                $this->assertSame([], $deadLetters['rows']);
-            });
+            ->assertRedirect('/security-devices/alerts');
 
         $this->actingAs($viewer)
             ->post("/security-devices/monitoring/dead-letters/{$letter->id}/replay", [

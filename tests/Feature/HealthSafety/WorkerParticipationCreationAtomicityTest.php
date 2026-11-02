@@ -8,6 +8,7 @@ use App\Models\HsCommitteeMeeting;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\WorkerParticipationMeetingEvent;
 use App\Notifications\HealthSafety\CommitteeMeetingScheduled;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
@@ -114,7 +115,8 @@ final class WorkerParticipationCreationAtomicityTest extends TestCase
         $this->assertSame([$this->actor->id], $meeting->attendeeUsers()->pluck('users.id')->all());
         $this->assertSame(2, DB::table('hs_meeting_attendees')->count());
         $this->assertSame($initialLevel, DB::connection()->transactionLevel());
-        Notification::assertSentTo($this->actor, CommitteeMeetingScheduled::class, fn ($notice) => $notice->meeting->id === $meeting->id);
+        $this->assertTrue(WorkerParticipationMeetingEvent::query()->where('meeting_id', $meeting->id)->where('purpose', 'scheduled')->exists(), 'The meeting notice is staged in the save (#14).');
+        Notification::assertNotSentTo($this->actor, CommitteeMeetingScheduled::class);
     }
 
     public function test_committee_only_creation_retains_existing_redirect_and_creates_no_meeting_or_notice(): void

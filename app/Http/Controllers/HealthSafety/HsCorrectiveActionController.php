@@ -13,6 +13,7 @@ use App\Services\HealthSafety\HsCorrectiveActionOwnershipService;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\HsCorrectiveActionWorkspace;
 use App\Services\HealthSafety\HsEventAccessService;
+use App\Services\HealthSafety\HsIncidentStoryReadService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -131,7 +132,10 @@ class HsCorrectiveActionController extends Controller
 
     private function startWithinSourceAuthority(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
-        $event = $this->resolveAccessibleEvent($request, $event);
+        // Answer 23: a story reader starts only their own action, never reassigning it.
+        $reassigning = $request->filled('assigned_to_user_id') && (int) $request->input('assigned_to_user_id') !== (int) $request->user()->id;
+        $event = ($reassigning ? null : app(HsIncidentStoryReadService::class)->eventForOwnedAction($request->user(), $event, $action))
+            ?? $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $action);
 
         $data = $request->validate(['assigned_to_user_id' => ['nullable', 'integer']]);
@@ -160,7 +164,9 @@ class HsCorrectiveActionController extends Controller
 
     private function completeWithinSourceAuthority(Request $request, HsEvent $event, HsCorrectiveAction $action)
     {
-        $event = $this->resolveAccessibleEvent($request, $event, []);
+        // Answer 23: a story reader may finish their own action.
+        $event = app(HsIncidentStoryReadService::class)->eventForOwnedAction($request->user(), $event, $action)
+            ?? $this->resolveAccessibleEvent($request, $event, []);
         $this->ensureBelongs($event, $action);
 
         $data = $request->validate([

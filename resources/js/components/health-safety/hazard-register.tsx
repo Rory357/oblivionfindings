@@ -1,12 +1,21 @@
 /**
- * Hazards (approved H&S drawing pg-hsn-60 — Stephan 23 Oct 2026): one header
- * with two number boxes (due in 7 days, needs an owner) and four filter chips,
- * the hazard views as a tier-two strip, then the register table. Shared by the
+ * Hazards (board G4-14, approved by Stephan 1 Nov 2026; first drawn as pg-hsn-60): the G2 header — four boxes, then
+ * one line with the Risks and prevention pages, the filters and Find — the status views as a tier-two strip, one lead
+ * block ("Needs doing now"), the closed hazards as a quiet row, then the register table. Shared by the
  * global register, the per-Site register and the Site profile link-through;
  * domain commands stay on the hazard page (rows open it, menus deep-link a pane).
  */
-import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
 import { HazardCreateDialog } from '@/components/health-safety/hazard-create-dialog';
+import {
+    LeadBlock,
+    QuietRows,
+    RegisterBlocks,
+    RegisterBoxes,
+    RegisterRailLine,
+    overdueNote,
+    shortDay,
+    type LeadRow,
+} from '@/components/health-safety/register-kit';
 import {
     RiskChip,
     SeverityChip,
@@ -46,13 +55,8 @@ import {
     TierTwoTabs,
     type GroupedProfileNavTab,
 } from '@/components/page/grouped-profile-nav';
-import {
-    PageHeaderNumber,
-    PageHeaderNumbers,
-} from '@/components/page/page-header-strip';
 import { EntityFilter } from '@/components/rostering';
 import { Ring } from '@/components/signature/blocks';
-import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Popover,
@@ -142,9 +146,9 @@ export type HazardRegisterData = {
     likelihoodOptions: string[];
     riskRatings: string[];
     recommendedBySiteType: Record<string, Chip[]>;
+    /** G4-14: the lead block (no owner or past due first, then not started) and what closed in the last 30 days. */
+    register_summary?: { lead: HazardRow[]; lead_total: number; closed_30d: number };
 };
-
-const BOARD_REPORTS = boardReportLinks();
 
 /**
  * The register's views. The five drawn ones are the tier-two strip ("Open"
@@ -159,17 +163,18 @@ const VIEWS: {
     icon: GroupedProfileNavTab['icon'];
     drawn: boolean;
 }[] = [
+    // G4-14: the four status views drawn under the header; the rest stay reachable from More filters and the boxes.
     { key: 'all', tab: 'All', option: 'All', title: 'All hazards', icon: LayoutList, drawn: true },
-    { key: 'active', tab: 'Open', option: 'Open work', title: 'Open hazards', icon: AlertTriangle, drawn: true },
-    { key: 'overdue', tab: 'Overdue', option: 'Overdue', title: 'Overdue hazards', icon: Flame, drawn: true },
-    { key: 'critical', tab: 'Critical', option: 'Critical', title: 'Critical open', icon: ShieldAlert, drawn: true },
-    { key: 'closed', tab: 'Closed & mitigated', option: 'Closed & mitigated', title: 'Closed & mitigated', icon: CheckCircle2, drawn: true },
-    { key: 'open', tab: 'Not started', option: 'Open', title: 'Open, not started', icon: CircleDot, drawn: false },
-    { key: 'in_progress', tab: 'In progress', option: 'In progress', title: 'In progress', icon: Play, drawn: false },
+    { key: 'open', tab: 'Not started', option: 'Not started', title: 'Open, not started', icon: CircleDot, drawn: true },
+    { key: 'in_progress', tab: 'In progress', option: 'In progress', title: 'In progress', icon: Play, drawn: true },
+    { key: 'mitigated', tab: 'Ready to close', option: 'Ready to close', title: 'Ready to close', icon: ShieldCheck, drawn: true },
+    { key: 'closed_only', tab: 'Closed', option: 'Closed', title: 'Closed hazards', icon: CheckCircle2, drawn: true },
+    { key: 'active', tab: 'Open', option: 'Open work', title: 'Open hazards', icon: AlertTriangle, drawn: false },
+    { key: 'overdue', tab: 'Past due date', option: 'Past due date', title: 'Hazards past their due date', icon: Flame, drawn: false },
+    { key: 'critical', tab: 'Critical', option: 'Critical', title: 'Critical open', icon: ShieldAlert, drawn: false },
+    { key: 'closed', tab: 'Closed & ready to close', option: 'Closed & ready to close', title: 'Closed and ready to close', icon: CheckCircle2, drawn: false },
     { key: 'due_soon', tab: 'Due in 7 days', option: 'Due in 7 days', title: 'Due in the next 7 days', icon: AlertTriangle, drawn: false },
-    { key: 'unassigned', tab: 'Needs an owner', option: 'Needs an owner', title: 'Hazards needing an owner', icon: UserPlus, drawn: false },
-    { key: 'mitigated', tab: 'Awaiting closure', option: 'Awaiting closure', title: 'Awaiting closure', icon: ShieldCheck, drawn: false },
-    { key: 'closed_only', tab: 'Closed only', option: 'Closed only', title: 'Closed hazards', icon: CheckCircle2, drawn: false },
+    { key: 'unassigned', tab: 'No owner yet', option: 'No owner yet', title: 'Hazards with no owner yet', icon: UserPlus, drawn: false },
 ];
 
 function sentence(value: string): string {
@@ -207,16 +212,8 @@ export function HazardRegister({
 
     const headerMenu = useEntityContextMenu<'register'>();
     const [createOpen, setCreateOpen] = useState(false);
-    const [boardOpen, setBoardOpen] = useState(false);
     const canBrowseSites =
         !!usePage<SharedData>().props.auth.can?.sites?.viewAny;
-    const canGovernance = Boolean(
-        (
-            usePage().props as {
-                auth?: { can?: { governance?: { view?: boolean } } };
-            }
-        ).auth?.can?.governance?.view,
-    );
 
     // Auto-open the create wizard when arriving via a "Log hazard" deep-link
     // (e.g. the site-profile embed's ?action=add).
@@ -366,11 +363,6 @@ export function HazardRegister({
             icon: FileText,
             onClick: () => window.open(exportUrl, '_blank'),
         },
-        canGovernance && {
-            label: 'Board reports',
-            icon: FileText,
-            onClick: () => setBoardOpen(true),
-        },
         !scopedSite && canBrowseSites && { separator: true },
         !scopedSite &&
             canBrowseSites && {
@@ -380,7 +372,6 @@ export function HazardRegister({
             },
     ]);
 
-    const reportSite = scopedSite?.id ?? filters.site_id;
     const views: GroupedProfileNavTab[] = VIEWS.filter(
         (view) => view.drawn || view.key === tab,
     ).map((view) => ({
@@ -396,9 +387,7 @@ export function HazardRegister({
             : `Showing ${hazards.data.length} of ${hazards.total}`;
     const pager = (
         <>
-            <p className="text-subtle">
-                Showing {hazards.data.length} of {hazards.total}
-            </p>
+            <p className="text-subtle">{range}</p>
             {hazards.last_page > 1 ? (
                 <LaravelPagination
                     links={hazards.links}
@@ -407,6 +396,43 @@ export function HazardRegister({
             ) : null}
         </>
     );
+    // Header box links: the same register with that view, keeping the Site and the other filters.
+    const viewHref = (view: string) =>
+        `${baseUrl}?${new URLSearchParams(
+            Object.entries({ ...filters, tab: view })
+                .filter(([, value]) => value != null && value !== '')
+                .map(([key, value]) => [key, String(value)]),
+        )}`;
+    const summary = data.register_summary;
+    // G4-14: "Needs doing now" — no owner or past its due date first, then not started; the button the person may use.
+    const lead: LeadRow[] = (summary?.lead ?? []).map((h) => {
+        const title = `${hazardLabelOf(h)}${!scopedSite && h.site_name ? ` — ${h.site_name}` : ''}`;
+        const late = h.flags.overdue && h.due_date;
+        const noOwner = !h.assigned_to_id;
+        return {
+            key: h.id,
+            when: late ? { day: shortDay(h.due_date), note: overdueNote(h.due_date) } : h.due_date ? { day: shortDay(h.due_date), note: 'due' } : null,
+            title,
+            sub: [
+                noOwner ? 'No owner yet' : `owner ${h.assigned_to_name ?? 'not recorded'}`,
+                late ? `past due date (${shortDay(h.due_date)})` : null,
+                h.reported_by_name ? `reported by ${h.reported_by_name}${h.created_at ? `, ${shortDay(toDateInput(h.created_at))}` : ''}` : null,
+            ].filter(Boolean).join(' · '),
+            chip: noOwner && late
+                ? { label: 'No owner yet · Past due date', tone: 'critical' }
+                : noOwner
+                  ? { label: 'No owner yet', tone: 'warning' }
+                  : late
+                    ? { label: 'Past due date', tone: 'critical' }
+                    : { label: 'Not started', tone: 'neutral' },
+            action: noOwner
+                ? can.assign ? { label: 'Choose owner', onClick: () => openHazard(h.id, { action: 'assign' }), ariaLabel: `Choose owner: ${title}` } : null
+                : h.status === 'open' && can.manage
+                  ? { label: 'Start', onClick: () => openHazard(h.id, { action: 'start' }), ariaLabel: `Start: ${title}` }
+                  : { label: 'Open', onClick: () => openHazard(h.id), ariaLabel: `Open: ${title}` },
+            who: noOwner && !can.assign ? 'A manager chooses the owner' : null,
+        };
+    });
 
     return (
         <>
@@ -417,7 +443,7 @@ export function HazardRegister({
                     title={
                         scopedSite ? `${scopedSite.name} hazards` : 'Hazards'
                     }
-                    subline="Find hazards, give each one an owner and keep controls up to date"
+                    subline="Hazards at every site, who owns each and what’s being done"
                     actions={
                         <>
                             <SafetyRegisterSearch
@@ -431,40 +457,6 @@ export function HazardRegister({
                                     Export
                                 </a>
                             </PageHeaderGlassButton>
-                            {canGovernance && (
-                                <Popover
-                                    open={boardOpen}
-                                    onOpenChange={setBoardOpen}
-                                >
-                                    <PopoverTrigger asChild>
-                                        <PageHeaderGlassButton>
-                                            {BOARD_REPORTS_LABEL}
-                                        </PageHeaderGlassButton>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                        align="end"
-                                        className="w-72 max-w-[calc(100vw-2rem)] p-1.5"
-                                    >
-                                        {BOARD_REPORTS.map((report) => (
-                                            <Button
-                                                key={report.href}
-                                                unstyled
-                                                className="frontline-focus flex w-full items-center rounded-md p-2.5 text-left text-sm hover:bg-muted"
-                                                onClick={() =>
-                                                    router.visit(
-                                                        report.href +
-                                                            (reportSite
-                                                                ? `&site_id=${reportSite}`
-                                                                : ''),
-                                                    )
-                                                }
-                                            >
-                                                {report.label}
-                                            </Button>
-                                        ))}
-                                    </PopoverContent>
-                                </Popover>
-                            )}
                             {can.create && (
                                 <PageHeaderPrimaryButton
                                     icon={Plus}
@@ -476,106 +468,77 @@ export function HazardRegister({
                         </>
                     }
                     strip={
-                        <PageHeaderNumbers>
-                            <PageHeaderNumber
-                                label="Due in 7 days"
-                                value={hero.attention.due_soon}
-                                caption="Today and the next 7 days"
-                                tone={
-                                    hero.attention.due_soon > 0
-                                        ? 'warning'
-                                        : undefined
-                                }
-                                onClick={() => setTab('due_soon')}
-                                pressed={tab === 'due_soon'}
-                            />
-                            <PageHeaderNumber
-                                label="Needs an owner"
-                                value={hero.attention.unassigned}
-                                caption={
-                                    hero.attention.unassigned > 0
-                                        ? 'Choose someone'
-                                        : 'Every open hazard has an owner'
-                                }
-                                tone={
-                                    hero.attention.unassigned > 0
-                                        ? 'warning'
-                                        : undefined
-                                }
-                                onClick={() => setTab('unassigned')}
-                                pressed={tab === 'unassigned'}
-                            />
-                        </PageHeaderNumbers>
-                    }
-                    filters={
-                        <>
-                            {!scopedSite && sites.length > 0 && (
-                                <EntityFilter
-                                    label="Site"
-                                    allLabel="All sites"
-                                    items={sites.map((site) => ({
-                                        id: site.id,
-                                        name: site.name,
-                                        description: siteTypeLabel(site.type),
-                                    }))}
-                                    value={filters.site_id}
-                                    onChange={(id) => go({ site_id: id })}
-                                    onDark
-                                />
-                            )}
-                            <SafetyDateFilter
-                                label="Logged"
-                                from={filters.from ?? null}
-                                to={filters.to ?? null}
-                                onChange={go}
-                            />
-                            {!scopedSite && (
-                                <PageHeaderFilterSelect
-                                    label="All types"
-                                    allValue=""
-                                    value={filters.site_type ?? ''}
-                                    onChange={(value) =>
-                                        go({ site_type: value || null })
-                                    }
-                                    options={[
-                                        { value: '', label: 'All types' },
-                                        { value: 'house', label: 'Houses' },
-                                        {
-                                            value: 'facility',
-                                            label: 'Facilities',
-                                        },
-                                        {
-                                            value: 'head_office',
-                                            label: 'Head office',
-                                        },
-                                    ]}
-                                />
-                            )}
-                            <MoreFilters
-                                active={moreActive}
-                                filters={filters}
-                                tab={tab}
-                                tabCounts={tabCounts}
-                                severityOptions={severityOptions}
-                                riskRatings={riskRatings}
-                                assignees={assignees}
-                                onTab={setTab}
-                                onChange={go}
-                            />
-                            {hasFilters && (
-                                <PageHeaderFilterButton
-                                    icon={X}
-                                    onClick={clearFilters}
-                                >
-                                    Clear filters
-                                </PageHeaderFilterButton>
-                            )}
-                        </>
+                        <RegisterBoxes
+                            boxes={[
+                                { key: 'unassigned', label: 'No owner yet', value: hero.attention.unassigned, alert: true, icon: UserPlus, href: viewHref('unassigned') },
+                                { key: 'overdue', label: 'Past due date', value: hero.live.overdue, alert: true, icon: Flame, href: viewHref('overdue') },
+                                { key: 'due_soon', label: 'Due in the next 7 days', value: hero.attention.due_soon, icon: AlertTriangle, href: viewHref('due_soon') },
+                                { key: 'open', label: 'Open hazards', value: tabCounts.active ?? null, icon: ShieldAlert, href: viewHref('active') },
+                            ]}
+                        />
                     }
                     rail={
-                        <SafetyWorkspaceRail
-                            hub="prevention"
-                            current="hazards"
+                        <RegisterRailLine
+                            rail={<SafetyWorkspaceRail hub="prevention" current="hazards" />}
+                            filters={
+                                <>
+                                    {!scopedSite && sites.length > 0 && (
+                                        <EntityFilter
+                                            label="Site"
+                                            allLabel={`All sites · ${sites.length}`}
+                                            items={sites.map((site) => ({
+                                                id: site.id,
+                                                name: site.name,
+                                                description: siteTypeLabel(site.type),
+                                            }))}
+                                            value={filters.site_id}
+                                            onChange={(id) => go({ site_id: id })}
+                                            onDark
+                                        />
+                                    )}
+                                    <SafetyDateFilter
+                                        label="Logged"
+                                        from={filters.from ?? null}
+                                        to={filters.to ?? null}
+                                        onChange={go}
+                                    />
+                                    {!scopedSite && (
+                                        <PageHeaderFilterSelect
+                                            label="All types"
+                                            allValue=""
+                                            value={filters.site_type ?? ''}
+                                            onChange={(value) =>
+                                                go({ site_type: value || null })
+                                            }
+                                            options={[
+                                                { value: '', label: 'All types' },
+                                                { value: 'house', label: 'Houses' },
+                                                { value: 'facility', label: 'Facilities' },
+                                                { value: 'head_office', label: 'Head office' },
+                                            ]}
+                                        />
+                                    )}
+                                    <MoreFilters
+                                        active={moreActive}
+                                        filters={filters}
+                                        tab={tab}
+                                        tabCounts={tabCounts}
+                                        severityOptions={severityOptions}
+                                        riskRatings={riskRatings}
+                                        assignees={assignees}
+                                        onTab={setTab}
+                                        onChange={go}
+                                    />
+                                    {hasFilters && (
+                                        <PageHeaderFilterButton
+                                            icon={X}
+                                            onClick={clearFilters}
+                                        >
+                                            Clear filters
+                                        </PageHeaderFilterButton>
+                                    )}
+                                </>
+                            }
                         />
                     }
                 />
@@ -598,8 +561,37 @@ export function HazardRegister({
                 id="hazard-register-panel"
                 role="tabpanel"
                 aria-label={current?.title ?? 'Hazards'}
-                className="min-w-0"
+                className="grid min-w-0 gap-5"
             >
+                {summary ? (
+                    <RegisterBlocks
+                        lead={
+                            <LeadBlock
+                                rows={lead}
+                                empty="Every open hazard has an owner and nothing is past its due date or waiting to start."
+                                more={
+                                    summary.lead_total > lead.length
+                                        ? { text: `${summary.lead_total - lead.length} more need doing`, action: { label: 'See all', href: viewHref('active') } }
+                                        : null
+                                }
+                            />
+                        }
+                        side={
+                            <QuietRows
+                                rows={[
+                                    {
+                                        key: 'closed',
+                                        icon: CheckCircle2,
+                                        title: 'Closed · controls in place',
+                                        sub: 'Last 30 days',
+                                        aside: String(summary.closed_30d),
+                                        href: viewHref('closed_only'),
+                                    },
+                                ]}
+                            />
+                        }
+                    />
+                ) : null}
                 <HazardTable
                     title={current?.title ?? 'Hazards'}
                     sub={range}

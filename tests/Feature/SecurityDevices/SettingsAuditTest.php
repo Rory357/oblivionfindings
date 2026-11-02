@@ -34,11 +34,13 @@ use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Feature\SecurityDevices\Concerns\ReadsRetiredWorkspaceProps;
 use Tests\TestCase;
 
 class SettingsAuditTest extends TestCase
 {
     use RefreshDatabase;
+    use ReadsRetiredWorkspaceProps;
 
     private User $admin;
 
@@ -67,14 +69,18 @@ class SettingsAuditTest extends TestCase
             $user->permissionOverrides()->attach($permission->id, ['allowed' => true]);
         }
 
+        // S&D rebuild C6: Settings & audit redirects to Setup; a command administrator who can't open
+        // Setup still has the menu's Setup entry, which takes them to the Obli downloads.
+        $this->actingAs($user)->get('/security-devices/settings')->assertRedirect('/security-devices/setup');
         $this->actingAs($user)
-            ->get('/security-devices/settings')
+            ->get('/security-devices')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('auth.can.securityDevices.viewAny', true)
                 ->where('auth.can.securityDevices.commandsAdmin', true)
                 ->where('auth.can.securityDevices.groupsManage', false)
-                ->where('auth.can.securityDevices.reportsView', false));
+                ->where('auth.can.securityDevices.reportsView', false)
+                ->where('auth.can.securityDevices.setupOpen', false));
     }
 
     public function test_settings_projects_real_safe_defaults_profiles_exceptions_and_feature_support(): void
@@ -104,8 +110,7 @@ class SettingsAuditTest extends TestCase
         Device::factory()->create(['provider' => 'unifi']);
         Device::factory()->create(['provider' => 'unifi']);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->admin)
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $props = $page->toArray()['props'];
@@ -157,8 +162,7 @@ class SettingsAuditTest extends TestCase
             'meta' => ['fields' => ['name']],
         ]);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->admin)
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $audit = $page->toArray()['props']['audit'];
@@ -176,8 +180,7 @@ class SettingsAuditTest extends TestCase
         $this->admin->permissionOverrides()->attach($reports->id, ['allowed' => false]);
         $this->admin->unsetRelation('permissionOverrides');
         $this->admin->unsetRelation('roles');
-        $this->actingAs($this->admin)
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->admin)
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('audit.entries', [])->where('audit.visible', false));
     }
@@ -334,10 +337,10 @@ class SettingsAuditTest extends TestCase
         $rightfulViewer = $this->siteRestrictedViewer($canonicalSite);
         $unrelatedViewer = $this->siteRestrictedViewer($unrelatedSite);
 
-        $this->actingAs($rightfulViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($device): void {
+        $this->retiredSettingsAudit($rightfulViewer)->assertOk()->assertInertia(function ($page) use ($device): void {
             $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$device->id));
         });
-        $this->actingAs($unrelatedViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($device): void {
+        $this->retiredSettingsAudit($unrelatedViewer)->assertOk()->assertInertia(function ($page) use ($device): void {
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$device->id));
         });
     }
@@ -392,13 +395,13 @@ class SettingsAuditTest extends TestCase
         $hiddenViewer = $this->siteRestrictedViewer($hiddenSite);
         $unrelatedViewer = $this->siteRestrictedViewer($unrelatedSite);
 
-        $this->actingAs($rightfulViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($link): void {
+        $this->retiredSettingsAudit($rightfulViewer)->assertOk()->assertInertia(function ($page) use ($link): void {
             $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$link->id));
         });
-        $this->actingAs($hiddenViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($link): void {
+        $this->retiredSettingsAudit($hiddenViewer)->assertOk()->assertInertia(function ($page) use ($link): void {
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$link->id));
         });
-        $this->actingAs($unrelatedViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($link): void {
+        $this->retiredSettingsAudit($unrelatedViewer)->assertOk()->assertInertia(function ($page) use ($link): void {
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$link->id));
         });
     }
@@ -451,10 +454,10 @@ class SettingsAuditTest extends TestCase
 
         $rightfulViewer = $this->siteRestrictedViewer($canonicalSite);
         $unrelatedViewer = $this->siteRestrictedViewer($unrelatedSite);
-        $this->actingAs($rightfulViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($record): void {
+        $this->retiredSettingsAudit($rightfulViewer)->assertOk()->assertInertia(function ($page) use ($record): void {
             $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$record->id));
         });
-        $this->actingAs($unrelatedViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($record): void {
+        $this->retiredSettingsAudit($unrelatedViewer)->assertOk()->assertInertia(function ($page) use ($record): void {
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$record->id));
         });
 
@@ -560,7 +563,7 @@ class SettingsAuditTest extends TestCase
         }
 
         foreach ([$this->siteRestrictedViewer($canonicalSite), $this->siteRestrictedViewer($unrelatedSite)] as $viewer) {
-            $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page): void {
+            $this->retiredSettingsAudit($viewer)->assertOk()->assertInertia(function ($page): void {
                 $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'));
             });
         }
@@ -595,14 +598,12 @@ class SettingsAuditTest extends TestCase
         $this->assertSame([$targetSite->id], data_get($audit->meta, 'scope.site_ids'));
         $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
 
-        $this->actingAs($this->siteRestrictedViewer($targetSite))
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->siteRestrictedViewer($targetSite))
             ->assertOk()
             ->assertInertia(fn ($page) => $this->assertTrue(
                 collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
             ));
-        $this->actingAs($this->siteRestrictedViewer($callerSite))
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->siteRestrictedViewer($callerSite))
             ->assertOk()
             ->assertInertia(fn ($page) => $this->assertFalse(
                 collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
@@ -645,14 +646,12 @@ class SettingsAuditTest extends TestCase
         $this->assertSame([$canonicalSite->id], data_get($audit->meta, 'scope.site_ids'));
         $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
 
-        $this->actingAs($this->siteRestrictedViewer($canonicalSite))
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->siteRestrictedViewer($canonicalSite))
             ->assertOk()
             ->assertInertia(fn ($page) => $this->assertTrue(
                 collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
             ));
-        $this->actingAs($this->siteRestrictedViewer($unrelatedSite))
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->siteRestrictedViewer($unrelatedSite))
             ->assertOk()
             ->assertInertia(fn ($page) => $this->assertFalse(
                 collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
@@ -689,14 +688,12 @@ class SettingsAuditTest extends TestCase
         $this->assertSame([$targetSite->id], data_get($audit->meta, 'scope.site_ids'));
         $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
 
-        $this->actingAs($this->siteRestrictedViewer($targetSite))
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->siteRestrictedViewer($targetSite))
             ->assertOk()
             ->assertInertia(fn ($page) => $this->assertTrue(
                 collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
             ));
-        $this->actingAs($this->siteRestrictedViewer($callerSite))
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->siteRestrictedViewer($callerSite))
             ->assertOk()
             ->assertInertia(fn ($page) => $this->assertFalse(
                 collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
@@ -742,13 +739,12 @@ class SettingsAuditTest extends TestCase
         $secondAdmin = User::factory()->create(['approved_at' => now()]);
         $secondAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         foreach ([$this->admin, $secondAdmin] as $viewer) {
-            $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page): void {
+            $this->retiredSettingsAudit($viewer)->assertOk()->assertInertia(function ($page): void {
                 $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'));
             });
         }
 
-        $this->actingAs($this->siteRestrictedViewer($canonicalSite))
-            ->get('/security-devices/settings')
+        $this->retiredSettingsAudit($this->siteRestrictedViewer($canonicalSite))
             ->assertOk()
             ->assertInertia(fn ($page) => $this->assertFalse(
                 collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
@@ -859,10 +855,10 @@ class SettingsAuditTest extends TestCase
         $previousViewer = $this->siteRestrictedViewer($previousSite);
         $currentViewer = $this->siteRestrictedViewer($currentSite);
 
-        $this->actingAs($previousViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($device): void {
+        $this->retiredSettingsAudit($previousViewer)->assertOk()->assertInertia(function ($page) use ($device): void {
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$device->id));
         });
-        $this->actingAs($currentViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($device): void {
+        $this->retiredSettingsAudit($currentViewer)->assertOk()->assertInertia(function ($page) use ($device): void {
             $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$device->id));
         });
     }
@@ -891,14 +887,14 @@ class SettingsAuditTest extends TestCase
         $previousViewer = $this->siteRestrictedViewer($previousSite);
         $currentViewer = $this->siteRestrictedViewer($currentSite);
 
-        $this->actingAs($previousViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($previousAssignment, $currentAssignment): void {
+        $this->retiredSettingsAudit($previousViewer)->assertOk()->assertInertia(function ($page) use ($previousAssignment, $currentAssignment): void {
             $references = collect($page->toArray()['props']['audit']['entries'])
                 ->where('record_type', 'DeviceAssignment')
                 ->pluck('record_reference');
             $this->assertContains('#'.$previousAssignment->id, $references);
             $this->assertNotContains('#'.$currentAssignment->id, $references);
         });
-        $this->actingAs($currentViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($previousAssignment, $currentAssignment): void {
+        $this->retiredSettingsAudit($currentViewer)->assertOk()->assertInertia(function ($page) use ($previousAssignment, $currentAssignment): void {
             $references = collect($page->toArray()['props']['audit']['entries'])
                 ->where('record_type', 'DeviceAssignment')
                 ->pluck('record_reference');
@@ -953,7 +949,7 @@ class SettingsAuditTest extends TestCase
             'site_id' => $hiddenSite->id, 'provider' => 'milesight', 'is_active' => true,
         ]);
 
-        $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($allowed, $hidden): void {
+        $this->retiredSettingsAudit($viewer)->assertOk()->assertInertia(function ($page) use ($allowed, $hidden): void {
             $references = collect($page->toArray()['props']['audit']['entries'])->pluck('record_reference');
             $this->assertContains('#'.$allowed->id, $references);
             $this->assertNotContains('#'.$hidden->id, $references);
@@ -999,7 +995,7 @@ class SettingsAuditTest extends TestCase
             'started_at' => now(),
         ]);
 
-        $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($allowedId, $hiddenId): void {
+        $this->retiredSettingsAudit($viewer)->assertOk()->assertInertia(function ($page) use ($allowedId, $hiddenId): void {
             $references = collect($page->toArray()['props']['audit']['entries'])
                 ->where('action', 'integrationsiteconfig.delete')->pluck('record_reference');
             $this->assertContains('#'.$allowedId, $references);
@@ -1007,7 +1003,7 @@ class SettingsAuditTest extends TestCase
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('action', 'integrationsynclog.create'));
         });
 
-        $this->actingAs($this->admin)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($allowedId, $hiddenId): void {
+        $this->retiredSettingsAudit($this->admin)->assertOk()->assertInertia(function ($page) use ($allowedId, $hiddenId): void {
             $entries = collect($page->toArray()['props']['audit']['entries']);
             $deletedReferences = $entries->where('action', 'integrationsiteconfig.delete')->pluck('record_reference');
             $this->assertContains('#'.$allowedId, $deletedReferences);
@@ -1082,7 +1078,7 @@ class SettingsAuditTest extends TestCase
             'primary_site_id' => $site->id, 'secondary_site_ids' => [],
         ]);
 
-        $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($deletedDeviceIds, $deletedAssignmentIds): void {
+        $this->retiredSettingsAudit($viewer)->assertOk()->assertInertia(function ($page) use ($deletedDeviceIds, $deletedAssignmentIds): void {
             $entries = collect($page->toArray()['props']['audit']['entries']);
             $deletions = $entries->whereIn('action', ['device.delete', 'deviceassignment.delete']);
             $this->assertCount(12, $deletions);
@@ -1118,7 +1114,7 @@ class SettingsAuditTest extends TestCase
             $group->devices()->attach($device->id);
         }
 
-        $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()
+        $this->retiredSettingsAudit($viewer)->assertOk()
             ->assertInertia(fn ($page) => $page->where('summary.device_groups', 1));
     }
 }

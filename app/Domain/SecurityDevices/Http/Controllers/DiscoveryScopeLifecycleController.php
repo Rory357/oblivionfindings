@@ -167,6 +167,8 @@ final class DiscoveryScopeLifecycleController extends Controller
             'port_bounds.*.*' => ['integer', 'between:1,65535'],
             'max_targets_per_run' => ['sometimes', 'integer', 'between:1,65536'],
             'packets_per_second' => ['sometimes', 'integer', 'between:1,1000'],
+            // Daily scan on the hub, "HH:MM" New Zealand time; null switches it off.
+            'daily_scan_at' => ['sometimes', 'nullable', 'string', 'regex:/\A([01]\d|2[0-3]):[0-5]\d\z/'],
         ];
     }
 
@@ -184,6 +186,7 @@ final class DiscoveryScopeLifecycleController extends Controller
             'network_range_count' => count($scope->cidrs ?? []),
             'seed_host_count' => count($scope->seed_hosts ?? []),
             'exclusion_count' => count($scope->exclusions ?? []),
+            'daily_scan_at' => $scope->daily_scan_at,
         ];
     }
 }

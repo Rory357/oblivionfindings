@@ -37,6 +37,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\Support\ConnectedCareSwitches;
 use Tests\Support\ExternalClinicalFixtures;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 final class ExternalClinicalAccessTest extends TestCase
@@ -84,10 +85,13 @@ final class ExternalClinicalAccessTest extends TestCase
         $this->assertSame('mysql', $primary->getPdo()->getAttribute(\PDO::ATTR_DRIVER_NAME));
         $this->assertSame('127.0.0.1', $primary->getConfig('host'));
         $this->assertGreaterThan(0, getmypid());
-        $this->assertContains($primary->getDatabaseName(), [
-            'oblivion_findings_codex_test_'.getmypid(),
-            'emar_connected_external_20261007_'.getmypid(),
-        ]);
+        $this->assertTrue(
+            in_array($primary->getDatabaseName(), [
+                'oblivion_findings_codex_test_'.getmypid(),
+                'emar_connected_external_20261007_'.getmypid(),
+            ], true)
+            || OwnedTestDatabase::isOwnedBy($primary->getDatabaseName(), getmypid()),
+        );
         $this->assertSame(self::$isolatedMysqlDatabase, $primary->getDatabaseName());
         $this->assertSame($primary->getDatabaseName(), $primary->selectOne('SELECT DATABASE() AS owned_database')->owned_database);
         $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));

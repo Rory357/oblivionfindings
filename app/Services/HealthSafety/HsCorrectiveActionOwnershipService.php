@@ -191,8 +191,10 @@ final class HsCorrectiveActionOwnershipService
             ->incidentRelated(HsEvent::query()->whereKey($event->id))->exists();
         if ($incidentLinked) {
             // Incident-linked events are refused outside the H&S read, so check through the event page's read: the
-            // owner must be able to read the incident.
-            return app(HsEventAccessService::class)->canReadEvent($viewer, $event);
+            // owner must be able to read the incident — or, answer 23 (Stephan, 1 Nov 2026), read its story and hold
+            // healthSafety.actions.ownOnStoryReviews (team leads own and finish actions; never the review itself).
+            return app(HsEventAccessService::class)->canReadEvent($viewer, $event)
+                || app(HsIncidentStoryReadService::class)->canOwnActionThroughStory($viewer, $event);
         }
 
         return DB::transaction(function () use ($viewer, $event): bool {

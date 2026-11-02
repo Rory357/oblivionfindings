@@ -62,7 +62,7 @@ class HazardWorkspaceConnectionsTest extends TestCase
         $this->assertSame([$local->id], array_column($detail['actions'], 'id'));
         $this->assertSame($event->id, $detail['connections']['safety_reviews'][0]['id']);
         $this->assertSame($action->id, $detail['connections']['corrective_actions'][0]['id']);
-        $this->assertSame('Awaiting independent verification', $detail['connections']['corrective_actions'][0]['display_state']);
+        $this->assertSame('Done — waiting to be checked', $detail['connections']['corrective_actions'][0]['display_state']);
         $this->assertSame('2026-10-15', $detail['connections']['corrective_actions'][0]['due_date']);
         $this->assertSame('resolved', $detail['connections']['control_room'][0]['status']);
         $this->assertStringContainsString('return_to=%2Fhazards%2F'.$hazard->id, $detail['connections']['control_room'][0]['href']);

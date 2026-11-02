@@ -8,73 +8,49 @@ import {
     seedSecurityDevicesOperationsReadinessFixtures,
 } from './helpers';
 
-const workspaceTabs = {
-    '/security-devices/network-it': [
-        'overview',
-        'map',
-        'devices',
-        'interfaces',
-        'services',
-        'traffic-capacity',
-        'configuration-firmware',
+// S&D rebuild C6: the old workspaces, Monitoring, Maintenance and Discovery
+// pages redirect into these pages, so their tabs are checked here instead.
+const pageTabs = {
+    '/security-devices': ['overview', 'trends', 'reports'],
+    '/security-devices/devices': [
+        'all',
+        'network',
+        'cameras',
+        'alarms_doors',
+        'sensors',
+        'trackers',
+        'computers',
+        'other',
+        'upkeep',
     ],
-    '/security-devices/security': [
-        'overview',
-        'cctv',
-        'alarms',
-        'access-control',
-        'events',
-    ],
-    '/security-devices/healthcare': [
-        'overview',
-        'client-devices',
-        'shared-site-devices',
-        'data-flow',
-        'calibration-maintenance',
-    ],
-    '/security-devices/tracking': [
-        'overview',
-        'personal-safety',
-        'fleet',
-        'assets',
-        'geofences',
-        'history',
-    ],
-    '/security-devices/facilities-iot': [
-        'overview',
-        'environment',
-        'building-systems',
-        'utilities',
-        'automations',
-        'history',
-    ],
-    '/security-devices/monitoring': [
-        'overview',
-        'findings',
-        'coverage',
-        'dependencies',
-        'trends',
-        'collection',
-    ],
-    '/security-devices/maintenance': [
-        'overview',
-        'due',
-        'planned',
-        'in-progress',
-        'completed',
-        'calibration',
-        'firmware-configuration',
-    ],
-    '/security-devices/discovery': [
-        'overview',
-        'scopes',
-        'runs',
-        'candidates',
-        'collectors',
-        'paths',
-        'limitations',
+    '/security-devices/sites': ['all', 'attention', 'not_set_up'],
+    '/security-devices/alerts': ['open', 'snoozed', 'done', 'rules'],
+    '/security-devices/access': [
+        'doors',
+        'people',
+        'visitors',
+        'schedules',
+        'activity',
+        'clockins',
     ],
 } as const;
+
+const siteTabs = ['overview', 'network', 'internet', 'rooms', 'modes'] as const;
+
+const setupSections = [
+    '/security-devices/setup',
+    '/security-devices/setup/hubs?tab=networks',
+    '/security-devices/setup/hubs?tab=broker',
+    '/security-devices/setup/services?tab=connected',
+    '/security-devices/setup/services?tab=logins',
+    '/security-devices/setup/services?tab=supported',
+    '/security-devices/setup/alerts?tab=rules',
+    '/security-devices/setup/alerts?tab=checks',
+    '/security-devices/setup/access?tab=unifi',
+    '/security-devices/setup/access?tab=clockins',
+    '/security-devices/setup/computers?tab=remote',
+    '/security-devices/setup/history',
+] as const;
 
 const deviceSections = [
     'health',
@@ -145,10 +121,17 @@ async function blockingAxeViolations(page: Page, route: string) {
         );
 }
 
-function tabRoutes(): string[] {
-    return Object.entries(workspaceTabs).flatMap(([base, tabs]) =>
-        tabs.map((tab) => `${base}?tab=${tab}`),
-    );
+function tabRoutes(siteId: number): string[] {
+    return [
+        ...Object.entries(pageTabs).flatMap(([base, tabs]) =>
+            tabs.map((tab) => `${base}?tab=${tab}`),
+        ),
+        '/security-devices/devices?tab=upkeep&upkeep=updates',
+        ...siteTabs.map(
+            (tab) => `/security-devices/sites/${siteId}?tab=${tab}`,
+        ),
+        ...setupSections,
+    ];
 }
 
 async function expectAccessibleRoutes(page: Page, routes: string[]) {
@@ -213,24 +196,22 @@ test.describe('Security & Devices accessibility', () => {
             `/security-devices/sites/${fixture.siteId}`,
             '/security-devices/devices',
             '/security-devices/devices/create',
+            `/security-devices/devices/${fixture.deviceId}`,
             `/security-devices/devices/${fixture.deviceId}/edit`,
-            '/security-devices/alerts-events',
-            '/security-devices/maintenance-health',
-            '/security-devices/device-groups',
-            '/security-devices/device-groups/create',
+            '/security-devices/alerts',
+            '/security-devices/access',
             '/security-devices/reports',
-            '/security-devices/integrations',
+            '/security-devices/setup',
             '/security-devices/integrations/unifi',
             '/security-devices/integrations/milesight',
             '/security-devices/integrations/queclink',
-            '/security-devices/settings',
         ]);
     });
 
-    test('workspace tabs have no serious or critical axe violations', async ({
+    test('page tabs and Setup sections have no serious or critical axe violations', async ({
         page,
     }) => {
-        await expectAccessibleRoutes(page, tabRoutes());
+        await expectAccessibleRoutes(page, tabRoutes(fixture.siteId));
     });
 
     test('device profile sections have no serious or critical axe violations', async ({

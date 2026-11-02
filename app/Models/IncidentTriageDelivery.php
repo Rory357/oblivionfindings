@@ -10,6 +10,8 @@ final class IncidentTriageDelivery extends Model
     public $incrementing = false;
     protected $keyType = 'string';
     protected $guarded = [];
+    /** due_at must equal the decision's microsecond time. The datetime(0) timestamps still read back (Eloquent falls back to parse). */
+    protected $dateFormat = 'Y-m-d H:i:s.u';
 
     protected function casts(): array
     {

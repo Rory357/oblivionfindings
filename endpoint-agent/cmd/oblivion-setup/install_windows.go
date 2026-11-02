@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 
+	"oblivion.local/endpoint-agent/internal/agent"
 	"oblivion.local/endpoint-agent/internal/release"
 	"oblivion.local/endpoint-agent/internal/setup"
 )
@@ -27,11 +28,37 @@ func verifySetupExecutable(pack *release.Package) error {
 	return nil
 }
 
-func installOnPlatform(ctx context.Context, pack *release.Package, profiles setup.Profiles, confirmedServer, confirmedCollector string) (setup.Journal, error) {
+func installOnPlatform(ctx context.Context, pack *release.Package, profiles setup.Profiles, confirmedServer, confirmedCollector string, progress setup.Progress) (setup.Journal, error) {
 	if err := verifySetupExecutable(pack); err != nil {
 		return setup.Journal{}, err
 	}
-	return setup.Install(ctx, pack, profiles, confirmedServer, confirmedCollector)
+	return setup.InstallWithProgress(ctx, pack, profiles, confirmedServer, confirmedCollector, progress)
+}
+
+func updateOnPlatform(ctx context.Context, pack *release.Package, progress setup.Progress) (setup.Journal, error) {
+	if err := verifySetupExecutable(pack); err != nil {
+		return setup.Journal{}, err
+	}
+	return setup.Update(ctx, pack, progress)
+}
+
+func installUserOnPlatform(ctx context.Context, pack *release.Package, profile agent.Bootstrap, confirmedServer string, progress setup.Progress) (any, error) {
+	if err := verifySetupExecutable(pack); err != nil {
+		return nil, err
+	}
+	return setup.InstallForUser(ctx, pack, profile, confirmedServer, progress)
+}
+
+func removeOnPlatform(ctx context.Context) (removeResult, error) {
+	result, err := setup.Remove(ctx)
+	return removeResult{role: result.Role, serverTold: result.ServerTold, restartNeeded: result.RestartNeeded}, err
+}
+
+func removeUserOnPlatform() error { return setup.RemoveForUser() }
+
+func machineStatusOnPlatform() machineStatus {
+	s := setup.ReadMachineStatus()
+	return machineStatus{installed: s.Installed, running: s.Running, role: s.Role, version: s.Version}
 }
 
 func repairOnPlatform(ctx context.Context, pack *release.Package, server, collector, role string, confirmation ...string) (setup.RepairReceipt, error) {
@@ -52,4 +79,11 @@ func reviewRepairOnPlatform(ctx context.Context, pack *release.Package) (setup.R
 		return setup.RepairReview{}, err
 	}
 	return setup.ReviewServiceRepair(ctx, pack)
+}
+
+func repairInstalledOnPlatform(ctx context.Context, pack *release.Package) (setup.RepairReceipt, error) {
+	if err := verifySetupExecutable(pack); err != nil {
+		return setup.RepairReceipt{}, err
+	}
+	return setup.RepairInstalled(ctx, pack)
 }

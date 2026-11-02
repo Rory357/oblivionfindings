@@ -9,6 +9,7 @@
         "ext-json": "*",
         "ext-sockets": "*",
         "ext-sodium": "*",
+        "phpseclib/phpseclib": "^3.0.52",
         "symfony/process": "^7.3"
     },
     "require-dev": {

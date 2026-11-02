@@ -1493,15 +1493,11 @@ class IncidentControllerTest extends TestCase
             ->andThrow(new \RuntimeException('Injected journey failure'));
         $this->app->instance(IncidentJourneyService::class, $journeys);
 
-        $this->withoutExceptionHandling();
-
-        try {
-            $this->actingAs($this->staff)
-                ->post('/incidents', $this->reportPayload(['intent' => 'submit']));
-            $this->fail('The injected journey failure was not thrown.');
-        } catch (\RuntimeException $exception) {
-            $this->assertSame('Injected journey failure', $exception->getMessage());
-        }
+        // #255: a plain message on the form, never a 500; nothing half-saved.
+        $payload = $this->reportPayload(['intent' => 'submit']);
+        $this->actingAs($this->staff)->from('/incidents')->post('/incidents', $payload)
+            ->assertRedirect('/incidents')
+            ->assertSessionHasErrors(['incident' => 'This report couldn’t be submitted just now. Please try again. If it keeps happening, tell your administrator.']);
 
         $this->assertSame(0, ClientIncident::query()->count());
         $this->assertSame(0, HsEvent::query()->count());
@@ -2220,14 +2216,12 @@ class IncidentControllerTest extends TestCase
             ->once()
             ->andThrow(new \RuntimeException('Injected submit journey failure'));
         $this->app->instance(IncidentJourneyService::class, $journeys);
-        $this->withoutExceptionHandling();
 
-        try {
-            $this->actingAs($this->staff)->post("/incidents/{$incident->id}/submit");
-            $this->fail('The injected submit journey failure was not thrown.');
-        } catch (\RuntimeException $exception) {
-            $this->assertSame('Injected submit journey failure', $exception->getMessage());
-        }
+        // #255: the reporter sees a plain message on the form, never a 500, and the report stays a draft.
+        $this->actingAs($this->staff)->from("/incidents/{$incident->id}")
+            ->post("/incidents/{$incident->id}/submit")
+            ->assertRedirect("/incidents/{$incident->id}")
+            ->assertSessionHasErrors(['incident' => 'This report couldn’t be submitted just now, so it is still saved as a draft. Please try again. If it keeps happening, tell your administrator.']);
 
         $incident->refresh();
         $this->assertSame('draft', $incident->status);
@@ -2236,6 +2230,46 @@ class IncidentControllerTest extends TestCase
         $this->assertNull($incident->control_room_alert_id);
         $this->assertSame(0, HsEvent::query()->count());
         $this->assertSame(0, ControlRoomAlert::query()->count());
+    }
+
+    public function test_submit_retires_a_deleted_events_key_and_creates_a_fresh_event_without_restoring_it(): void
+    {
+        $this->mockNotificationService();
+        $incident = ClientIncident::factory()->create([
+            'status' => 'draft',
+            'client_id' => $this->client->id,
+            'reported_by' => $this->staff->id,
+            'type' => 'fall',
+        ]);
+        // #255: an earlier tidy-up soft-deleted the event that still holds this draft's key.
+        $key = HsEvent::buildIdempotencyKey(ClientIncident::class, $incident->id, HsEvent::CATEGORY_INCIDENT);
+        $deleted = HsEvent::factory()->create([
+            'source_type' => ClientIncident::class,
+            'source_id' => $incident->id,
+            'event_category' => HsEvent::CATEGORY_INCIDENT,
+            'site_id' => $this->site->id,
+            'client_id' => $this->client->id,
+            'idempotency_key' => $key,
+        ]);
+        $deleted->delete();
+
+        $this->actingAs($this->staff)->post("/incidents/{$incident->id}/submit")->assertRedirect()->assertSessionHasNoErrors();
+
+        $incident->refresh();
+        $this->assertSame('submitted', $incident->status);
+        $fresh = HsEvent::query()->where('idempotency_key', $key)->sole();
+        $this->assertNotSame($deleted->id, $fresh->id);
+        $this->assertSame($fresh->id, $incident->hs_event_id);
+
+        $old = HsEvent::withTrashed()->findOrFail($deleted->id);
+        $this->assertTrue($old->trashed(), 'The deleted event stays deleted; it is never restored.');
+        $this->assertSame(\App\Services\HealthSafety\HsEventService::retiredIdempotencyKey($deleted->id, $key), $old->idempotency_key);
+
+        $audit = \App\Models\AuditLog::query()->where('action', 'healthSafety.event.idempotencyKeyRetired')->sole();
+        $this->assertSame($deleted->id, (int) $audit->auditable_id);
+        $this->assertSame($fresh->id, (int) $audit->meta['new_event_id']);
+        $this->assertSame($deleted->id, (int) $audit->meta['retired_event_id']);
+        $this->assertNotEmpty($audit->meta['reason']);
     }
 
     public function test_submit_sends_notification(): void

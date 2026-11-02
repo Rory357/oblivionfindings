@@ -58,8 +58,26 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     private function accept(HsRiskAssessment $risk, string $action = 'risk_assessment.created', ?array $before = null): array
     {
+        // #13: the risk writer now seals its own changes, so an assessment created by a person already has its sealed
+        // creation; the suite's "accept the creation" reads that marker instead of recording a second one.
+        if ($action === 'risk_assessment.created'
+            && ($sealed = HsRiskAssessmentAcceptance::where('assessment_id', $risk->id)->where('action', $action)->first()) !== null) {
+            return ['id' => (int) $sealed->id, 'assessment_id' => (int) $risk->id, 'audit_log_id' => (int) $sealed->audit_log_id,
+                'sequence' => (int) $sealed->sequence, 'attribution_state' => 'recorded_business'];
+        }
+        return $this->record($risk, $action, $before);
+    }
+
+    private function record(HsRiskAssessment $risk, string $action = 'risk_assessment.created', ?array $before = null): array
+    {
         return DB::transaction(fn () => $this->inside(fn ($context) => $this->acceptance()->record($risk->id, $this->manager,
             $context, $action, $before, 'Retained milestone')));
+    }
+
+    private function refusedWith409(callable $operation): void
+    {
+        try { $operation(); $this->fail('The sealed save must be refused.'); }
+        catch (\Symfony\Component\HttpKernel\Exception\HttpException $refused) { $this->assertSame(409, $refused->getStatusCode()); }
     }
 
     private function history(HsRiskAssessment $risk, ?User $viewer = null): array
@@ -85,11 +103,8 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
     public function test_two_actual_business_milestones_retain_previous_anchor_and_actor_snapshot(): void
     {
         $risk = $this->ordinary(); $first = $this->accept($risk); $before = $this->tuple($risk);
-        DB::transaction(function () use ($risk, $before): void {
-            app(HsRiskAssessmentService::class)->activate($risk, ['approver_note' => 'Actual approval'], $this->manager);
-            $this->inside(fn ($context) => $this->acceptance()->record($risk->id, $this->manager, $context,
-                'risk_assessment.status_changed', $before, 'Activated', ['from' => 'draft', 'to' => 'active']));
-        });
+        // #13: the writer seals the activation itself, chained to the sealed creation.
+        app(HsRiskAssessmentService::class)->activate($risk, ['approver_note' => 'Actual approval'], $this->manager);
         $marker = HsRiskAssessmentAcceptance::where('assessment_id', $risk->id)->orderByDesc('sequence')->firstOrFail();
         $this->assertSame($first['id'], $marker->prior_id);
         $originalName = $this->manager->name;
@@ -103,7 +118,10 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_legacy_history_without_marker_is_unconfirmed_and_never_body_hydrated(): void
     {
-        $risk = $this->ordinary();
+        // #13: a person's create is sealed now; an assessment written without a person stays unsealed (legacy).
+        $risk = HsRiskAssessment::factory()->create(['assessable_type' => Site::class, 'assessable_id' => $this->site->id,
+            'title' => 'Older site risk', 'assessed_by_user_id' => $this->manager->id, 'created_by' => $this->manager->id]);
+        app(HsRiskAssessmentService::class)->audit('risk_assessment.created', $risk, null);
         [$result, $queries] = $this->capturedQueries(fn () => $this->history($risk));
         $this->assertSame([], $result['items']); $this->assertSame('unconfirmed', $result['history_state']);
         foreach ($queries as $query) {
@@ -113,32 +131,28 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_audit_save_veto_rolls_back_actual_business_change_and_marker(): void
     {
-        $risk = $this->ordinary(); $auditCount = AuditLog::count();
+        $risk = $this->ordinary(); $auditCount = AuditLog::count(); $markerCount = HsRiskAssessmentAcceptance::count();
         $dispatcher = AuditLog::getEventDispatcher(); AuditLog::setEventDispatcher(clone $dispatcher);
         AuditLog::saving(fn (AuditLog $row) => isset($row->meta['risk_acceptance_token']) ? false : null);
         try {
-            $this->integrity(fn () => DB::transaction(function () use ($risk): void {
-                app(HsRiskAssessmentService::class)->activate($risk, [], $this->manager);
-                $this->inside(fn ($context) => $this->acceptance()->record($risk->id, $this->manager, $context, 'risk_assessment.status_changed', $this->tuple($risk)));
-            }));
+            // #13: the writer seals in the same save; a refused seal refuses the whole save with a plain 409.
+            $this->refusedWith409(fn () => app(HsRiskAssessmentService::class)->activate($risk, [], $this->manager));
         } finally { AuditLog::setEventDispatcher($dispatcher); }
         $this->assertSame('draft', $risk->fresh()->status); $this->assertSame($auditCount, AuditLog::count());
-        $this->assertSame(0, HsRiskAssessmentAcceptance::count());
+        $this->assertSame($markerCount, HsRiskAssessmentAcceptance::count());
     }
 
     public function test_marker_save_veto_rolls_back_semantic_audit_and_business_change(): void
     {
-        $risk = $this->ordinary(); $auditCount = AuditLog::count();
+        $risk = $this->ordinary(); $auditCount = AuditLog::count(); $markerCount = HsRiskAssessmentAcceptance::count();
         $dispatcher = HsRiskAssessmentAcceptance::getEventDispatcher(); HsRiskAssessmentAcceptance::setEventDispatcher(clone $dispatcher);
         HsRiskAssessmentAcceptance::saving(fn () => false);
         try {
-            $this->integrity(fn () => DB::transaction(function () use ($risk): void {
-                app(HsRiskAssessmentService::class)->activate($risk, [], $this->manager);
-                $this->inside(fn ($context) => $this->acceptance()->record($risk->id, $this->manager, $context, 'risk_assessment.status_changed', $this->tuple($risk)));
-            }));
+            // #13: the writer seals in the same save; a refused seal refuses the whole save with a plain 409.
+            $this->refusedWith409(fn () => app(HsRiskAssessmentService::class)->activate($risk, [], $this->manager));
         } finally { HsRiskAssessmentAcceptance::setEventDispatcher($dispatcher); }
         $this->assertSame('draft', $risk->fresh()->status); $this->assertSame($auditCount, AuditLog::count());
-        $this->assertSame(0, HsRiskAssessmentAcceptance::count());
+        $this->assertSame($markerCount, HsRiskAssessmentAcceptance::count());
     }
 
     public function test_audit_payload_mutation_invalidates_retained_business_history(): void
@@ -200,14 +214,17 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_changed_primary_tuple_between_identity_and_body_is_rejected_before_business_hydration(): void
     {
-        $risk = $this->ordinary(); $changed = false; $dispatcher = HsRiskAssessment::getEventDispatcher();
+        // #13: an unsealed assessment, so the creation is genuinely recorded here (a person's create is sealed already).
+        $risk = HsRiskAssessment::factory()->create(['assessable_type' => Site::class, 'assessable_id' => $this->site->id,
+            'title' => 'Unsealed site risk', 'assessed_by_user_id' => $this->manager->id, 'created_by' => $this->manager->id]);
+        $changed = false; $dispatcher = HsRiskAssessment::getEventDispatcher();
         HsRiskAssessment::setEventDispatcher(clone $dispatcher);
         HsRiskAssessment::retrieved(function (HsRiskAssessment $row) use ($risk, &$changed): void {
             if (! $changed && $row->id === $risk->id && ! array_key_exists('title', $row->getAttributes())) {
                 $changed = true; DB::table('hs_risk_assessments')->where('id', $risk->id)->update(['assessable_id' => $this->foreignSite->id]);
             }
         });
-        try { $this->denial(fn () => $this->accept($risk), 404); }
+        try { $this->denial(fn () => $this->record($risk), 404); }
         finally { HsRiskAssessment::setEventDispatcher($dispatcher); }
         $this->assertTrue($changed); $this->assertSame(0, HsRiskAssessmentAcceptance::count());
     }
@@ -215,14 +232,13 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
     public function test_creation_cannot_replace_existing_chain_and_missing_before_attachment_is_not_guessed(): void
     {
         $risk = $this->ordinary(); $this->accept($risk);
-        $this->integrity(fn () => $this->accept($risk));
-        $this->integrity(fn () => $this->accept($risk, 'risk_assessment.draft_updated'));
+        $this->integrity(fn () => $this->record($risk));
+        $this->integrity(fn () => $this->record($risk, 'risk_assessment.draft_updated'));
         $this->assertSame(1, HsRiskAssessmentAcceptance::count());
     }
 
     public function test_actual_private_source_delivery_risk_and_acceptance_chain_retains_original_version(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $r = $this->accept($risk);
         $marker = HsRiskAssessmentAcceptance::findOrFail($r['id']); $ref = $marker->after_binding['events'][0]['exposure'];
         $this->assertSame('recorded', $ref['attribution_state']); $this->assertGreaterThan(0, $ref['source_version_id']);
@@ -231,21 +247,23 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
         $this->assertCount(1, $this->history($risk)['items']);
     }
 
-    public function test_private_acceptance_refuses_until_real_general_audit_recognition_is_mounted(): void
+    /**
+     * Re-pointed (#13): Codex refused a private acceptance until a per-viewer general-audit recognition was mounted.
+     * Stephan (2 Nov, "Same rule as job 4") chose instead that the audit page shows a person-linked assessment as who
+     * changed what and when only, values hidden for everyone; so the acceptance is sealed and its audit row hides values.
+     */
+    public function test_private_acceptance_is_sealed_and_its_audit_row_shows_only_who_changed_what_and_when(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it). Its exposure fixture also runs Codex\'s unmounted exposure delivery pipeline, which refuses the H&S event the restored exposure observer now creates on save.', 'wire risk acceptance with the general audit recognition patch and the exposure delivery pipeline.'));
-        $risk = $this->linked();
-        if (! method_exists(app(ChemicalExposureAuditAccessService::class), 'scopeRiskAcceptanceSubjects')) {
-            $this->integrity(fn () => $this->accept($risk)); $this->assertSame(0, HsRiskAssessmentAcceptance::count());
-            return;
-        }
-        $r = $this->accept($risk);
-        $this->assertFalse(app(ChemicalExposureAuditAccessService::class)->scopeRiskAcceptanceSubjects(AuditLog::whereKey($r['audit_log_id']))->exists());
+        $risk = $this->linked(); $r = $this->accept($risk);
+        $this->assertSame(1, HsRiskAssessmentAcceptance::count());
+        $row = app(\App\Services\Audit\AuditLogViewService::class)->present(AuditLog::findOrFail($r['audit_log_id']));
+        $this->assertSame('linked_person', $row['values_hidden']);
+        $this->assertSame([], $row['properties']['before']); $this->assertSame([], $row['properties']['after']);
+        $this->assertNull($row['client']);
     }
 
     public function test_private_grant_withdrawal_precedes_risk_business_and_private_version_queries(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $this->accept($risk); $this->manager->load(['roles.permissions','permissionOverrides']);
         $this->allow($this->manager, 'hr.wellbeing.view', false);
         [, $queries] = $this->capturedQueries(function () use ($risk): array { $this->denial(fn () => $this->history($risk)); return []; });
@@ -259,17 +277,16 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_private_current_staff_withdrawal_refuses_history_and_restores(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $this->accept($risk);
         HrEmployeeProfile::where('user_id', $this->manager->id)->update(['is_active' => false]);
-        $this->denial(fn () => $this->history($risk));
+        // Concealed (404) rather than refused (403): no approved Site is left to prove the source at.
+        $this->denial(fn () => $this->history($risk), 404);
         HrEmployeeProfile::where('user_id', $this->manager->id)->update(['is_active' => true]);
         $this->assertCount(1, $this->history($risk)['items']);
     }
 
     public function test_private_detach_and_changed_parent_cannot_replace_original_binding(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $this->accept($risk); $before = $this->tuple($risk);
         DB::transaction(function () use ($risk, $before): void {
             DB::table('hs_risk_assessments')->where('id', $risk->id)->update(['hs_event_id' => null]);
@@ -280,7 +297,6 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_legacy_hse_identity_and_dual_same_parent_are_retained_without_normalizing_storage(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked();
         $risk->forceFill(['assessable_type' => HsEvent::class, 'assessable_id' => $risk->hs_event_id])->saveQuietly();
         $r = $this->accept($risk); $binding = HsRiskAssessmentAcceptance::findOrFail($r['id'])->after_binding;
@@ -291,7 +307,6 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_conflicting_dual_parent_site_is_concealed_before_private_risk_facts(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it). Its exposure fixture also runs Codex\'s unmounted exposure delivery pipeline, which refuses the H&S event the restored exposure observer now creates on save.', 'wire risk acceptance with the general audit recognition patch and the exposure delivery pipeline.'));
         $risk = $this->linked();
         $foreign = HsEvent::factory()->create(['site_id' => $this->foreignSite->id]);
         $risk->forceFill(['assessable_type' => HsEvent::class, 'assessable_id' => $foreign->id])->saveQuietly();
@@ -309,7 +324,6 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_corrupted_private_flag_cannot_let_generic_auditor_read_private_marker_payload(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $r = $this->accept($risk);
         DB::table('hs_risk_assessment_acceptances')->where('id', $r['id'])->update(['has_exposure' => false]);
         $auditor = $this->staff(['audit.viewAny']); $this->allow($auditor, 'hr.wellbeing.view', false);
@@ -317,7 +331,6 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
     }
     public function test_original_incident_client_withdrawal_and_restore_gate_private_history(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         foreach (['incidents.viewAny','clients.viewAny'] as $key) { $this->allow($this->manager, $key); }
         $client = \App\Models\Client::factory()->create(['site_id' => $this->site->id]);
         $incident = \App\Models\ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id,
@@ -330,7 +343,6 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_current_incident_context_move_is_not_inferred_as_original_accepted_context(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         foreach (['incidents.viewAny','clients.viewAny'] as $key) { $this->allow($this->manager, $key); }
         $client = \App\Models\Client::factory()->create(['site_id' => $this->site->id]);
         $incident = \App\Models\ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id,
@@ -345,7 +357,6 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_general_audit_recognition_count_search_and_page_exclude_corrupt_marker_under_current_callback(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $this->allow($this->manager, 'audit.viewAny'); $risk = $this->ordinary(); $r = $this->accept($risk);
         $audit = app(ChemicalExposureAuditAccessService::class);
         $visible = $audit->materialize($this->manager, fn ($actor, $context) => $audit->scope(AuditLog::whereKey($r['audit_log_id']), $actor, $context)->count());
@@ -360,7 +371,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_unknown_binding_metadata_and_no_context_audit_queries_never_certify_a_private_flag(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Stephan (2 Nov, "Same rule as job 4"): no per-viewer audit guard is built; the audit page shows every risk assessment row by reference and changed field names, with values hidden for person-linked ones (AuditLogViewService, RiskAssessmentSealedHistoryTest). This case tests Codex\'s unmounted ChemicalExposureAuditAccessService guard on unknown binding metadata.', 'none: replaced by the job 4 rule.'));
         $risk = $this->ordinary(); $r = $this->accept($risk);
         DB::table('hs_risk_assessment_acceptances')->where('id', $r['id'])->update(['after_binding' => json_encode(['schema_version' => 99]), 'has_exposure' => false]);
         $this->assertFalse(app(ChemicalExposureAuditAccessService::class)->scope(AuditLog::whereKey($r['audit_log_id']))->exists());
@@ -379,7 +390,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
     }
     public function test_missing_marker_partial_null_metadata_is_concealed_while_ordinary_legacy_audit_stays_visible(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Stephan (2 Nov, "Same rule as job 4"): no per-viewer audit guard is built; the audit page shows every risk assessment row by reference and changed field names, with values hidden for person-linked ones (AuditLogViewService, RiskAssessmentSealedHistoryTest). This case tests Codex\'s unmounted ChemicalExposureAuditAccessService guard on malformed rows.', 'none: replaced by the job 4 rule.'));
         $risk = $this->ordinary(); $this->allow($this->manager, 'audit.viewAny');
         $ordinary = AuditLog::where('auditable_type', $risk->getMorphClass())->where('auditable_id', $risk->id)->where('action', 'risk_assessment.created')->sole();
         $audit = app(ChemicalExposureAuditAccessService::class);
@@ -407,11 +418,9 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
     {
         $risk = $this->ordinary(); $this->accept($risk); $before = $this->tuple($risk);
         HrEmployeeProfile::where('user_id', $this->manager->id)->firstOrFail()->update(['secondary_site_ids' => [$this->foreignSite->id]]);
-        DB::transaction(function () use ($risk, $before): void {
-            app(HsRiskAssessmentService::class)->updateDraft($risk, ['title' => 'Actual corrected Site risk', 'likelihood' => 2,
-                'consequence' => 2, 'assessable_type' => Site::class, 'assessable_id' => $this->foreignSite->id], $this->manager);
-            $this->inside(fn ($context) => $this->acceptance()->record($risk->id, $this->manager, $context, 'risk_assessment.draft_updated', $before));
-        });
+        // #13: the writer seals the corrected draft itself, with the attachment it had before the change.
+        app(HsRiskAssessmentService::class)->updateDraft($risk, ['title' => 'Actual corrected Site risk', 'likelihood' => 2,
+            'consequence' => 2, 'assessable_type' => Site::class, 'assessable_id' => $this->foreignSite->id], $this->manager);
         HrEmployeeProfile::where('user_id', $this->manager->id)->firstOrFail()->update(['primary_site_id' => $this->foreignSite->id, 'secondary_site_ids' => []]);
         $this->denial(fn () => $this->history($risk), 404);
         HrEmployeeProfile::where('user_id', $this->manager->id)->firstOrFail()->update(['secondary_site_ids' => [$this->site->id]]);

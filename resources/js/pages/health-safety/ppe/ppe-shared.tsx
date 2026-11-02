@@ -218,7 +218,7 @@ export function statusLabel(status?: string | null): string {
         case 'available':
             return 'In stock';
         case 'allocated':
-            return 'Issued';
+            return 'Handed out';
         case 'maintenance':
             return 'On hold';
         case 'condemned':
@@ -239,7 +239,7 @@ export const CONDITION_OPTIONS = [
 ] as const;
 export const STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
     { value: 'available', label: 'In stock' },
-    { value: 'allocated', label: 'Issued' },
+    { value: 'allocated', label: 'Handed out' },
     { value: 'maintenance', label: 'On hold' },
     { value: 'condemned', label: 'Taken out of use' },
     { value: 'disposed', label: 'Disposed of' },

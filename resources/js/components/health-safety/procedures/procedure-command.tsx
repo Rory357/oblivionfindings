@@ -1,4 +1,5 @@
 import { Note, Surface } from '@/components/signature/blocks';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -177,13 +178,13 @@ export function ProcedureCommand({
             )}
             {(command === 'approve' || command === 'record-review') && (
                 <Field label="Next review date" error={form.errors.review_date}>
-                    <Input
-                        className="frontline-tap"
-                        type="date"
+                    <DatePicker
+                        id="procedure-command-review-date"
+                        label="Next review date"
                         value={form.data.review_date}
-                        onChange={(e) =>
-                            form.setData('review_date', e.target.value)
-                        }
+                        allowClear
+                        invalid={!!form.errors.review_date}
+                        onChange={(value) => form.setData('review_date', value)}
                     />
                 </Field>
             )}

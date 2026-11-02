@@ -14,6 +14,7 @@ import { SkeletonCard, SkeletonStats } from '@/components/ui/skeleton-card';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { hsLabel, hsVariant } from '@/lib/health-safety/hs-labels';
 import AppLayout from '@/layouts/app-layout';
+import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState, type ReactNode } from 'react';
 
@@ -31,6 +32,9 @@ import {
     type HeroFilters,
     type HeroLeadingLagging,
 } from './components/command-centre-hero';
+import type { HeaderBoxes } from './components/overview-header-boxes';
+import { OverviewHeaderCharts } from './components/overview-header-charts';
+import { OverviewQueue, ReviewStages, type OverviewQueueData } from './components/overview-queue';
 import { searchDashboardWorklists } from './components/dashboard-search';
 import {
     buildHsTabItems,
@@ -44,6 +48,7 @@ import { ReportIncidentDialog } from './components/report-incident-dialog';
 import { ReportLauncher } from './components/report-launcher';
 import { reportPageFor } from './components/report-pages';
 import { RoleStart } from './components/role-start';
+import { CloseAnywayWorklist } from './components/close-anyway-worklist';
 import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { completedAgo, HsWorklists, type WorklistsPayload } from './components/worklists';
 import type { ParticipationCoverage } from './participation-source-state';
@@ -112,6 +117,12 @@ type Props = {
     };
     /** Where open incidents are up to, by stage (optional: hidden until the source sends it). */
     incident_stages?: IncidentStagesData | null;
+    /** G2: which four header boxes this person gets (the boxes themselves load as `header_boxes`). */
+    header_box_set?: HeaderBoxes['set'];
+    /** Board M11: this person decides close-anyway requests, so the Overview leads with the ones waiting. */
+    close_anyway_decider?: boolean;
+    /** G2: incident charts need incident read; otherwise the chart row is the hazard version. */
+    header_chart_kind?: 'incidents' | 'hazards';
 
     // Background group "headline".
     kpis?: Kpis;
@@ -187,9 +198,13 @@ export default function HealthSafetyDashboard({
     procedures,
     worklists,
     incident_stages = null,
+    header_box_set,
+    close_anyway_decider = false,
+    header_chart_kind,
 }: Props) {
     // A tab can be opened from a link (?tab=leading); unknown values fall back to the overview.
     const pageUrl = usePage().url;
+    const viewerName = usePage<SharedData>().props.auth?.user?.name ?? null;
     const [tab, setTab] = useState<string>(() => {
         const requested = new URLSearchParams(pageUrl.split('?')[1] ?? '').get('tab');
         return requested && ['overview', 'leading', 'lagging', 'compliance'].includes(requested) ? requested : 'overview';
@@ -343,7 +358,7 @@ export default function HealthSafetyDashboard({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Health and safety', href: '/health-safety' },
             ]}
         >
             <Head title="Health & safety" />
@@ -357,6 +372,15 @@ export default function HealthSafetyDashboard({
                         onReport={() => setLauncherOpen(true)}
                         orgName={org_name}
                         search={{ value: search, onChange: setSearch }}
+                        boxSet={header_box_set}
+                        charts={
+                            header_box_set ? (
+                                <OverviewHeaderCharts
+                                    hazards={header_chart_kind ? header_chart_kind === 'hazards' : header_box_set === 'hazards'}
+                                    link={destination}
+                                />
+                            ) : undefined
+                        }
                         rail={
                             <PageHeaderRail
                                 items={tabItems.map((item) => ({
@@ -387,7 +411,7 @@ export default function HealthSafetyDashboard({
                             for your shift, medicines and reporting tasks.
                         </p>
                     )}
-                    {source_completeness === 'unknown' && (
+                    {source_completeness === 'unknown' && !header_box_set && (
                         <p className="text-subtle" role="status">
                             These measures cover records you can access. The
                             full picture may be incomplete.
@@ -402,7 +426,68 @@ export default function HealthSafetyDashboard({
                         </p>
                     )}
 
-                    {tab === 'overview' && (
+                    {tab === 'overview' && header_box_set && filters.lens !== 'frontline' && (
+                        // G2 (B2.2, approved boards M1/M3): one queue in D1's blocks, where reviews are up to, then the
+                        // side column. The person's own numbers sit in the header.
+                        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+                            <div className="grid min-w-0 gap-5">
+                                <CloseAnywayWorklist enabled={close_anyway_decider} viewerName={viewerName} />
+                                <DeferredPanel<WorkValues & { queue: OverviewQueueData }>
+                                    data={[...WORK_KEYS, 'queue']}
+                                    label="Your queue"
+                                    fallback={<SkeletonCard rows={6} />}
+                                >
+                                    {({ worklists: lists, queue }) => (
+                                        <OverviewQueue
+                                            queue={queue}
+                                            lists={visible(lists)}
+                                            link={destination}
+                                            title="Your queue"
+                                        />
+                                    )}
+                                </DeferredPanel>
+                                {header_box_set === 'queue' || header_box_set === 'compliance' ? (
+                                    <DeferredPanel<{ queue: OverviewQueueData }> data="queue" label="Where safety reviews are up to" fallback={<SkeletonStats count={5} />}>
+                                        {({ queue }) => <ReviewStages stages={queue.stages} link={destination} />}
+                                    </DeferredPanel>
+                                ) : null}
+                            </div>
+                            <SideColumn>
+                                {header_box_set === 'queue' ? (
+                                    <DeferredPanel<{ leading_lagging: HeroLeadingLagging }> data="leading_lagging" label="Days since a lost-time injury" fallback={<SkeletonStats count={1} />}>
+                                        {({ leading_lagging }) =>
+                                            leading_lagging.lagging.days_since_lti === null ? null : (
+                                                <Tally
+                                                    keepZeros
+                                                    items={[
+                                                        {
+                                                            value: String(leading_lagging.lagging.days_since_lti),
+                                                            label: 'Days since a lost-time injury',
+                                                            sub: 'Rates are on "Harm and injuries"',
+                                                            href: destination('/health-safety/analytics'),
+                                                        },
+                                                    ]}
+                                                />
+                                            )
+                                        }
+                                    </DeferredPanel>
+                                ) : null}
+                                {worklist(['expiring'], 'Checks due')}
+                                <DeferredPanel<{ site_league: SiteLeague }>
+                                    data="site_league"
+                                    label="Sites"
+                                    fallback={<SkeletonCard rows={4} />}
+                                >
+                                    {({ site_league }) =>
+                                        // B2.7: a side-by-side table only with two or more Sites.
+                                        site_league.length >= 2 ? <SiteSafetyComparisonCard data={visibleSites(site_league)} /> : null
+                                    }
+                                </DeferredPanel>
+                            </SideColumn>
+                        </div>
+                    )}
+
+                    {tab === 'overview' && !(header_box_set && filters.lens !== 'frontline') && (
                         <>
                             <RoleStart lens={filters.lens} onWorkflow={openWorkflow} />
                             {filters.lens !== 'governance' && incident_stages ? (
@@ -669,7 +754,7 @@ function NeedsYouNow({ worklists }: { worklists: WorklistsPayload }) {
             time: shortDay(c.due_date),
             tone: 'critical',
             // Marked completed but not yet verified: say what is waiting, counted from completion.
-            title: `${c.status === 'completed' ? 'Waiting for verification' : 'Corrective action overdue'} — ${c.title ?? c.reference ?? `#${c.id}`}`,
+            title: `${c.status === 'completed' ? hsLabel('action_status', 'completed') : 'Action overdue'} — ${c.title ?? c.reference ?? `#${c.id}`}`,
             sub: [
                 c.reference,
                 c.priority ? `${hsLabel('action_priority', c.priority)} priority` : null,
@@ -692,7 +777,7 @@ function NeedsYouNow({ worklists }: { worklists: WorklistsPayload }) {
             sortAt: accept.reported_at ?? '',
             time: shortDay(accept.reported_at),
             tone: 'warning',
-            title: `Accept for Health & safety — ${accept.title}`,
+            title: `${hsLabel('handover_status', 'awaiting_acceptance')} — ${accept.title}`,
             sub: [accept.event_reference, accept.client, accept.site, accept.owner ? `proposed owner ${accept.owner}` : null]
                 .filter(Boolean)
                 .join(' · '),
