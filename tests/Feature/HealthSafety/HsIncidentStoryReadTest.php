@@ -103,15 +103,17 @@ class HsIncidentStoryReadTest extends TestCase
         $service = app(HsIncidentStoryReadService::class);
         $this->assertTrue($service->canReadStory($this->lead, $event));
 
-        // Team leads hold exactly the two new G3 keys on top of what they had, and still no incident read.
+        // Team leads hold the two G3 keys. Since Q21 (Stephan, 2 Nov 2026) they also read incidents at their own Sites
+        // (incidents.viewAny); the story read itself still widens nothing (below).
         $this->assertTrue($this->lead->canDo('healthSafety.events.readIncidentStory'));
         $this->assertTrue($this->lead->canDo('healthSafety.actions.ownOnStoryReviews'));
-        $this->assertFalse($this->lead->canDo('incidents.viewAny'));
+        $this->assertTrue($this->lead->canDo('incidents.viewAny'));
         $this->assertFalse($this->lead->canDo('incidents.viewAssigned'));
 
-        // It never counts as reading the event or the incident.
+        // It never counts as reading the event. (Since Q21 the incident page at their own Site opens through
+        // incidents.viewAny, not through the story read.)
         $this->assertFalse(app(HsEventAccessService::class)->canReadEvent($this->lead, $event));
-        $this->actingAs($this->lead)->get("/incidents/{$incident->id}")->assertStatus(403);
+        $this->actingAs($this->lead)->get("/incidents/{$incident->id}")->assertOk();
         $decidedBefore = $event->fresh()->worksafe_decided_at;
         $this->actingAs($this->lead)
             ->post("/health-safety/events/{$event->id}/worksafe/decision", ['notifiable' => false, 'reason' => 'Bruise only, first aid only.'])
