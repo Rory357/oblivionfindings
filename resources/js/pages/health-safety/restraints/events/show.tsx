@@ -1,23 +1,37 @@
 /**
- * Restraint record (approved H&S drawings pg-hsn-102 … 102i —
- * Stephan 23 Oct 2026): one record header — the restraint and the person,
- * its review state, the facts that need someone, and where it is up to with
- * the next step — then each section as signature blocks.
+ * The restraint record (boards G4-5 and G4-7, approved by Stephan 1 Nov 2026; DESIGN.md "Records: status steps in the
+ * header, the Progress card under it").
  *
- * Every recorded fact is kept: observations, debriefs and reviews are source
- * records whose fields vary, so each shows all of its facts with who recorded
- * it and the source revision. Restraint wording (plan use, authorization,
- * review state, delivery) stays word for word. Commands open the unchanged
- * RestraintEventCommandForm, gated by eventCommandAllowed; unsaved drafts still
- * ask before leaving.
+ * The header carries only the restraint's own track — Recorded › Restraint review owner › Monitoring › Debrief ›
+ * Restraint review — and those round steps are the step picker. Under it the Progress card holds the record's only
+ * filled button (the next step, from the server's own command gates) and the picked step's pane. The safety review is its
+ * own record: a card in the side column, shown only to someone who can open it (decision 6), and never offered here —
+ * taking it on happens on the safety review itself, where its authoriser isn't offered it (decision 12). The title is the
+ * same plain title as on its safety review and in every list (decision 15).
+ *
+ * Every recorded fact is kept: observations, debriefs and reviews are source records whose fields vary, so their own
+ * sections still show all of their facts with who recorded them and the version. Commands open the unchanged
+ * RestraintEventCommandForm, gated by eventCommandAllowed; unsaved drafts still ask before leaving.
  */
-import { type SharedData } from '@/types';
-import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     EVENT_COMMAND_LABELS,
     eventCommandAllowed,
     RestraintEventCommandForm,
 } from '@/components/health-safety/restraints/event-command-form';
+import { FOLLOWUP_OUTCOME_LABEL } from '@/components/health-safety/restraints/followup-outcomes';
+import {
+    LinkedSafetyReviewCard,
+    reviewCloserSentence,
+    WhoFinishesCard,
+} from '@/components/health-safety/restraints/linked-safety-review-card';
+import {
+    currentRestraintStep,
+    restraintNextBar,
+    restraintRoundSteps,
+    restraintStepPane,
+    RESTRAINT_STEP_ORDER,
+    type RestraintStepKey,
+} from '@/components/health-safety/restraints/restraint-progress';
 import type {
     RestraintAttachment,
     RestraintEventDetail,
@@ -26,29 +40,19 @@ import type {
     SourceFact,
     SourcePerson,
 } from '@/components/health-safety/restraints/types';
-import {
-    RecordIdentity,
-    RecordPerson,
-    RecordTable,
-    type RecordTableColumn,
-} from '@/components/incidents/record-table';
 import { dateTimeWithYear } from '@/components/incidents/incident-stages';
+import { RecordIdentity, RecordPerson, RecordTable, type RecordTableColumn } from '@/components/incidents/record-table';
 import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import {
     PageHeader,
     PageHeaderGlassButton,
-    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderStatusChip,
     PageLayout,
+    type PageHeaderRailItem,
 } from '@/components/page';
-import {
-    PageHeaderFacts,
-    PageHeaderStages,
-    type PageHeaderFact,
-    type PageHeaderNextStep,
-    type PageHeaderStage,
-} from '@/components/page/page-header-strip';
+import { TabSearchPalette, useGroupedProfileSearchShortcut, type GroupedProfileNavGroup } from '@/components/page/grouped-profile-nav';
+import { PageHeaderFacts, PageHeaderSteps, type PageHeaderFact } from '@/components/page/page-header-strip';
 import {
     FactRows,
     KnowList,
@@ -64,20 +68,14 @@ import {
     type RowItem,
     type SgTone,
 } from '@/components/signature/blocks';
+import { RecordProgress } from '@/components/signature/record-progress';
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusBadge } from '@/components/ui/status-badge';
-import {
-    SafetyFormDraftContext,
-    useSafetyWorkspaceDrafts,
-} from '@/hooks/use-safety-workspace-drafts';
+import { SafetyFormDraftContext, useSafetyWorkspaceDrafts } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatDateTimeLong, formatTime } from '@/lib/datetime';
+import { formatDate, formatDateTimeLong, formatDurationMinutes, formatTime } from '@/lib/datetime';
+import { hsBadge, hsLabel, humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import {
     RESTRAINT_REGISTER,
     restraintHref,
@@ -87,46 +85,40 @@ import {
     type RestraintEventSection,
     type RestraintWorkspace,
 } from '@/lib/health-safety/restraint-navigation';
-import { Head, router, usePage } from '@inertiajs/react';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
+import { type SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ClipboardCheck,
     ClipboardList,
-    Clock,
     Download,
     FileText,
     HeartPulse,
     History,
     Link2,
-    MapPin,
     MessageCircle,
     MoreHorizontal,
     Paperclip,
     Pencil,
     ShieldAlert,
-    Timer,
     Trash2,
     UserCog,
     UserRound,
     type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
-import {
-    hsBadge,
-    hsLabel,
-    humaniseHsValue,
-} from '@/lib/health-safety/hs-labels';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ATTACHMENT_CATEGORY_LABEL } from '../shared';
 
-const SECTIONS = [
+const SECTIONS: { key: RestraintEventSection; label: string; icon: LucideIcon }[] = [
     { key: 'overview', label: 'Overview', icon: FileText },
-    { key: 'review', label: 'Review and owner', icon: ClipboardCheck },
+    { key: 'review', label: 'Restraint review', icon: ClipboardCheck },
     { key: 'monitoring', label: 'Monitoring', icon: HeartPulse },
     { key: 'debrief', label: 'Debrief', icon: MessageCircle },
     { key: 'followups', label: 'Follow-ups', icon: ClipboardList },
-    { key: 'evidence', label: 'Evidence', icon: Paperclip },
+    { key: 'evidence', label: 'Files', icon: Paperclip },
     { key: 'history', label: 'History', icon: History },
     { key: 'connections', label: 'Linked records', icon: Link2 },
-] as const;
+];
 const COMMAND_ICONS: Partial<Record<RestraintEventCommand, LucideIcon>> = {
     review: ClipboardCheck,
     'assign-review': UserCog,
@@ -135,6 +127,7 @@ const COMMAND_ICONS: Partial<Record<RestraintEventCommand, LucideIcon>> = {
     'record-debrief': MessageCircle,
     'add-evidence': Paperclip,
     correct: Pencil,
+    'link-incident': Link2,
 };
 type Props = {
     detail: RestraintEventDetail;
@@ -142,8 +135,7 @@ type Props = {
     pickers?: Partial<RestraintPickers>;
     return_to?: string | null;
 };
-const personName = (person: SourcePerson | null) =>
-    person?.name ?? (person ? 'Name hidden — you don’t have access' : 'Not recorded');
+const personName = (person: SourcePerson | null) => person?.name ?? (person ? 'Name hidden — you don’t have access' : 'Not recorded');
 const when = (value: string | null | undefined) => (value ? formatDateTimeLong(value) : 'Not recorded');
 /** Plain words for the plan-approval check when the record has no explanation of its own. */
 const PLAN_AUTHORIZATION_LABEL: Record<string, string> = {
@@ -160,7 +152,7 @@ const DELIVERY_PURPOSE_LABEL: Record<string, string> = {
     source_review: 'Sent to health and safety for a safety review',
     source_reconcile: 'Linked incident checked',
     operational_bridge: 'Control room told',
-    review_assignment: 'Review owner told',
+    review_assignment: 'Restraint review owner told',
     followup_assignment: 'Follow-up owner told',
     evidence_removal: 'File removed',
     due_reminder: 'Reminder sent',
@@ -171,17 +163,7 @@ const DELIVERY_STATUS_LABEL: Record<string, string> = {
     delivered: 'Done',
     skipped: 'Not needed',
 };
-const FOLLOWUP_OUTCOME_LABEL: Record<string, string> = {
-    recorded: 'Done',
-    contacted: 'Contact made',
-    attempted: 'Tried to make contact',
-    unable_to_contact: 'Couldn’t make contact',
-    declined: 'Declined',
-    not_required: 'Not needed',
-    other: 'Done (other)',
-};
-const label = (map: Record<string, string>, value: string | null | undefined) =>
-    value ? (map[value] ?? humaniseHsValue(value)) : 'Not recorded';
+const label = (map: Record<string, string>, value: string | null | undefined) => (value ? (map[value] ?? humaniseHsValue(value)) : 'Not recorded');
 /** A recorded value made readable: dates through the house format, stored codes as words. */
 const readable = (value: string | number) => {
     if (typeof value === 'number') return String(value);
@@ -201,6 +183,8 @@ const sectionForCommand = (command: RestraintEventCommand): RestraintEventSectio
               : command === 'correct'
                 ? 'overview'
                 : 'review';
+const factTone = (variant: string): PageHeaderFact['tone'] =>
+    variant === 'critical' || variant === 'warning' || variant === 'success' ? variant : 'neutral';
 
 export default function RestraintEventShow(props: Props) {
     return <EventWorkspace key={props.detail.event.id} {...props} />;
@@ -208,8 +192,9 @@ export default function RestraintEventShow(props: Props) {
 
 function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
     const d = detail.event;
-    const { url } = usePage();
-    const safetyCan = usePage<SharedData>().props.auth.can;
+    const { url, props: shared } = usePage<SharedData>();
+    const viewerId = shared.auth.user?.id ?? null;
+    const viewerName = shared.auth.user?.name ?? null;
     const location = restraintLocation(url, 'events');
     const section = location.section as RestraintEventSection;
     const command = location.command as RestraintEventCommand | null;
@@ -223,10 +208,14 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
     const returnTo = return_to ? restraintReturn(return_to) : workspace === 'view' ? RESTRAINT_REGISTER : '/my-day';
     const drafts = useSafetyWorkspaceDrafts();
     const panel = useRef<HTMLDivElement>(null);
-    const interacted = useRef(false);
+    // Focus moves to the panel only after the person has moved around the page (state, so render never reads a ref).
+    const [interacted, setInteracted] = useState(false);
+    const [picked, setPicked] = useState<RestraintStepKey | null>(null);
+    const [findOpen, setFindOpen] = useState(false);
     const reference = d.reference_number ?? `RE-${d.id}`;
     const typeLabel = hsLabel('restraint_type', d.restraint_type);
     const severity = hsBadge('severity', d.severity);
+    const title = d.title ?? `Restraint — ${d.client.name}`;
     const href = (next: RestraintEventSection, action: RestraintEventCommand | null = null, id?: number | null) =>
         restraintHref('events', d.id, {
             workspace: workspace as RestraintWorkspace,
@@ -243,136 +232,131 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                     : 'followup',
         });
     const replace = (next: RestraintEventSection, action: RestraintEventCommand | null = null, id?: number | null) => {
-        interacted.current = true;
+        setInteracted(true);
         router.replace({ url: href(next, action, id), preserveState: true, preserveScroll: true });
     };
     const move = (next: RestraintEventSection, action: RestraintEventCommand | null = null, id?: number | null) =>
         drafts.request(() => replace(next, action, id));
     const act = (action: RestraintEventCommand, id?: number) => move(sectionForCommand(action), action, id);
     const allowed = (action: RestraintEventCommand, id?: number) => eventCommandAllowed(detail, action, id);
+    const openFind = useCallback(() => setFindOpen(true), []);
+    useGroupedProfileSearchShortcut(openFind);
     useEffect(() => {
-        if (interacted.current) panel.current?.focus();
+        if (interacted) panel.current?.focus();
         if (!command && location.followup) {
             const target = document.getElementById(`restraint-followup-${location.followup}`);
             target?.focus();
             target?.scrollIntoView({ block: 'nearest' });
         }
-    }, [command, section, location.followup]);
+    }, [command, section, location.followup, interacted]);
 
     const openFollowups = d.followups.filter((item) => !item.completed_at && !item.cancelled_at);
-    const owner = d.review_owner_id ? personName(d.review_owner_id) : null;
+    const files = d.attachments.filter((item) => !item.removed_at);
+    const owner = d.review_owner_id;
 
-    // Header actions: the same commands and gates as before, the review first while it is needed.
-    const actions = (['review', 'assign-review', 'add-followup', 'add-observation', 'record-debrief', 'add-evidence', 'correct'] as RestraintEventCommand[])
-        .filter((key) => allowed(key))
+    // The Progress card's next-step bar holds the only filled button; the header keeps "Add follow-up" and "More".
+    const nextBar = restraintNextBar(detail, viewerId, act);
+    const currentStep = currentRestraintStep(d);
+    const selectedStep = picked ?? currentStep;
+    const pickStep = (key: string) => {
+        const step = RESTRAINT_STEP_ORDER.find((item) => item === key);
+        if (step) setPicked(step === currentStep ? null : step);
+    };
+    const stepPane = restraintStepPane(detail, selectedStep, viewerId, {
+        onBack: selectedStep !== currentStep ? () => setPicked(null) : undefined,
+        onHistory: () => move('history'),
+        run: act,
+    });
+
+    const more = (['review', 'record-debrief', 'add-observation', 'assign-review', 'add-evidence', 'link-incident', 'correct'] as RestraintEventCommand[])
+        .filter((key) => key !== nextBar.owns && allowed(key))
+        .filter((key) => key !== 'link-incident' || !detail.connections.incident)
         .map((key) => ({ key, label: EVENT_COMMAND_LABELS[key], icon: COMMAND_ICONS[key] ?? ClipboardCheck, run: () => act(key) }));
-    const primary = (d.needs_review ? actions.find((item) => item.key === 'review') : null) ?? actions[0] ?? null;
-    const rest = actions.filter((item) => item !== primary);
-    const glass = rest.slice(0, 2);
-    const overflow = rest.slice(2);
-    const header = actions.length ? (
-        <>
-            {glass.map((item) => (
-                <PageHeaderGlassButton key={item.key} onClick={item.run}>
-                    {item.label}
-                </PageHeaderGlassButton>
-            ))}
-            {overflow.length ? (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <PageHeaderGlassButton icon={MoreHorizontal} aria-label="More restraint actions" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        {overflow.map((item) => (
-                            <DropdownMenuItem key={item.key} onSelect={item.run}>
-                                <item.icon className="size-4" />
-                                {item.label}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            ) : null}
-            {primary ? (
-                <PageHeaderPrimaryButton icon={primary.icon} onClick={primary.run}>
-                    {primary.label}
-                </PageHeaderPrimaryButton>
-            ) : null}
-        </>
-    ) : null;
+    const header =
+        allowed('add-followup') || more.length ? (
+            <>
+                {allowed('add-followup') && nextBar.owns !== 'add-followup' ? (
+                    <PageHeaderGlassButton icon={ClipboardList} onClick={() => act('add-followup')}>
+                        {EVENT_COMMAND_LABELS['add-followup']}
+                    </PageHeaderGlassButton>
+                ) : null}
+                {more.length ? (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <PageHeaderGlassButton icon={MoreHorizontal} aria-label="More restraint actions">
+                                More
+                            </PageHeaderGlassButton>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            {more.map((item) => (
+                                <DropdownMenuItem key={item.key} onSelect={item.run}>
+                                    <item.icon className="size-4" />
+                                    {item.label}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ) : null}
+            </>
+        ) : null;
 
     const facts: PageHeaderFact[] = [
-        { value: typeLabel, label: 'Restraint type', tone: d.within_support_plan ? undefined : 'critical' },
-        { value: severity.label, label: 'Severity', tone: severity.variant === 'success' || severity.variant === 'warning' || severity.variant === 'critical' ? severity.variant : undefined },
-        ...(d.review_due_at && d.needs_review ? [{ value: dateTimeWithYear(d.review_due_at), label: 'Review due', tone: 'warning' as const }] : []),
-        ...(openFollowups.length
-            ? [{ value: String(openFollowups.length), label: openFollowups.length === 1 ? 'Open follow-up' : 'Open follow-ups' }]
-            : []),
+        { value: `${severity.label} severity`, tone: factTone(severity.variant) },
+        {
+            value: d.within_support_plan ? 'In the plan (as reported)' : 'Outside the plan (as reported)',
+            tone: d.within_support_plan ? 'neutral' : 'critical',
+        },
+        { value: d.injury_occurred ? 'Injury recorded' : 'No injury recorded', tone: d.injury_occurred ? 'warning' : 'neutral' },
     ];
-    const lastDebrief = d.debriefs.at(-1);
-    const stages: PageHeaderStage[] = [
-        {
-            label: 'Recorded',
-            meta: [d.created_by?.name, d.started_at ? formatDate(d.started_at) : null].filter(Boolean).join(' · ') || undefined,
-            state: 'done',
-        },
-        { label: 'Review owner', meta: owner ?? 'Unassigned', state: owner ? 'done' : 'now', tone: owner ? undefined : 'warning' },
-        {
-            label: 'Monitoring',
-            meta: d.observations.length ? `${d.observations.length} ${d.observations.length === 1 ? 'check' : 'checks'}` : 'None recorded',
-            state: d.observations.length ? 'done' : 'todo',
-        },
-        {
-            label: 'Debrief',
-            meta: lastDebrief ? formatDate(lastDebrief.occurred_at ?? lastDebrief.created_at ?? '') : 'Not recorded',
-            state: lastDebrief ? 'done' : 'todo',
-        },
-        d.needs_review
-            ? { label: 'Review', meta: d.review_due_at ? `Due ${formatDate(d.review_due_at)}` : 'Due time not set', state: owner ? 'now' : 'todo', tone: 'warning' }
-            : { label: 'Review', meta: d.reviewed_at ? formatDate(d.reviewed_at) : 'Recorded', state: 'done' },
-    ];
-    const next: PageHeaderNextStep | undefined = !d.needs_review
-        ? undefined
-        : owner
-          ? {
-                label: d.review_due_at ? `Next step · due ${formatDate(d.review_due_at)}, ${formatTime(d.review_due_at)}` : 'Next step',
-                text: `${owner} records the review`,
-                meta: [
-                    `Review owner · ${d.reviewed_at ? 'Changed since the last review' : 'First review not recorded yet'}`,
-                    allowed('review') ? null : `You can’t record this review · ask ${owner} or a health and safety manager`,
-                ]
-                    .filter(Boolean)
-                    .join(' · '),
-                tone: 'warning',
-            }
-          : {
-                label: 'Next step',
-                text: EVENT_COMMAND_LABELS['assign-review'],
-                meta: allowed('assign-review')
-                    ? 'Nobody owns the review yet'
-                    : 'Nobody owns the review yet · ask a health and safety manager to choose one',
-                tone: 'warning',
-            };
+
+    const railItems: PageHeaderRailItem<RestraintEventSection>[] = SECTIONS.map((item) => ({
+        key: item.key,
+        label: item.label,
+        ...(item.key === 'followups' && openFollowups.length ? { count: openFollowups.length } : {}),
+        ...(item.key === 'evidence' && files.length ? { count: files.length } : {}),
+    }));
+    const findGroups: GroupedProfileNavGroup[] = [{ key: 'restraint', label: 'Restraint', icon: ShieldAlert, tabs: SECTIONS }];
 
     const people: PersonCardItem[] = [];
     const addPerson = (name: string | null | undefined, role: string) => {
         if (!name) return;
         const same = people.find((item) => item.name === name);
-        if (same) same.sub = `${same.sub} · ${role}`;
+        if (same) same.sub = `${same.sub} · ${role.charAt(0).toLowerCase()}${role.slice(1)}`;
         else people.push({ name, sub: role });
     };
     addPerson(d.client.name, `The person · ${d.site?.name ?? 'Site not recorded'}`);
-    addPerson(d.review_owner_id?.name, 'Review owner');
+    addPerson(owner?.name, 'Restraint review owner');
+    addPerson(d.authorised_by?.name, 'Authorised it');
     addPerson(d.created_by?.name, 'Recorded it');
     for (const item of d.staff_involved) addPerson('kind' in item ? item.text : item.name, 'Staff involved');
-    addPerson(d.authorised_by?.name, 'Authorised by');
 
     const correctAction = (kind: 'monitoring' | 'debrief', item: SourceFact, superseded: boolean) => {
         const cmd = kind === 'monitoring' ? 'correct-observation' : 'correct-debrief';
-        return detail.can.review && !superseded && allowed(cmd, item.id)
-            ? { label: EVENT_COMMAND_LABELS[cmd], onClick: () => act(cmd, item.id) }
-            : null;
+        return detail.can.review && !superseded && allowed(cmd, item.id) ? { label: EVENT_COMMAND_LABELS[cmd], onClick: () => act(cmd, item.id) } : null;
     };
+    const followupMenu = (item: RestraintFollowup) =>
+        compactMenu(
+            (['complete-followup', 'reassign-followup', 'correct-followup', 'cancel-followup'] as RestraintEventCommand[]).map(
+                (cmd) =>
+                    allowed(cmd, item.id) && {
+                        label: EVENT_COMMAND_LABELS[cmd],
+                        danger: cmd === 'cancel-followup',
+                        onClick: () => act(cmd, item.id),
+                    },
+            ),
+        );
+    const followupTable = (
+        <FollowupTable
+            rows={d.followups}
+            viewerId={viewerId}
+            menuFor={followupMenu}
+            onComplete={(item) => act('complete-followup', item.id)}
+            canComplete={(item) => allowed('complete-followup', item.id)}
+            onAdd={allowed('add-followup') ? () => act('add-followup') : undefined}
+        />
+    );
 
+    const minutes = d.duration_minutes;
     const main = command ? (
         <Surface aria-label="Current restraint action">
             <div className="p-5">
@@ -392,16 +376,14 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
     ) : section === 'review' ? (
         <>
             <FactRows
-                title="Review and owner"
+                title="Restraint review and owner"
                 rows={[
-                    ['Review owner', personName(d.review_owner_id)],
-                    ['Review due', when(d.review_due_at)],
-                    ['First review', when(d.reviewed_at)],
+                    ['Restraint review owner', personName(owner)],
+                    ['Restraint review due', when(d.review_due_at)],
+                    ['First restraint review', when(d.reviewed_at)],
                     [
                         'Version reviewed',
-                        d.reviewed_source_revision === null
-                            ? 'Not reviewed yet'
-                            : `Version ${d.reviewed_source_revision} (latest is ${d.source_revision})`,
+                        d.reviewed_source_revision === null ? 'Not reviewed yet' : `Version ${d.reviewed_source_revision} (latest is ${d.source_revision})`,
                     ],
                 ]}
                 action={
@@ -414,39 +396,20 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                           : null
                 }
             />
-            <SourceFacts rows={d.reviews} empty="No reviews yet." title="Review" />
+            <SourceFacts rows={d.reviews} empty="No restraint reviews yet." title="Restraint review" />
         </>
     ) : section === 'monitoring' ? (
         <SourceFacts rows={d.observations} empty="No checks recorded yet." title="Check" correct={(item, superseded) => correctAction('monitoring', item, superseded)} />
     ) : section === 'debrief' ? (
         <SourceFacts rows={d.debriefs} empty="No debrief recorded yet." title="Debrief" correct={(item, superseded) => correctAction('debrief', item, superseded)} />
     ) : section === 'followups' ? (
-        <FollowupTable
-            rows={d.followups}
-            menuFor={(item) =>
-                compactMenu(
-                    (['complete-followup', 'reassign-followup', 'correct-followup', 'cancel-followup'] as RestraintEventCommand[]).map(
-                        (cmd) =>
-                            allowed(cmd, item.id) && {
-                                label: EVENT_COMMAND_LABELS[cmd],
-                                danger: cmd === 'cancel-followup',
-                                onClick: () => act(cmd, item.id),
-                            },
-                    ),
-                )
-            }
-            onAdd={allowed('add-followup') ? () => act('add-followup') : undefined}
-        />
+        followupTable
     ) : section === 'evidence' ? (
         <EvidenceTable
             rows={d.attachments}
             menuFor={(item) =>
                 compactMenu([
-                    item.download_url && {
-                        label: 'Download file',
-                        icon: Download,
-                        onClick: () => window.location.assign(item.download_url!),
-                    },
+                    item.download_url && { label: 'Download file', icon: Download, onClick: () => window.location.assign(item.download_url!) },
                     allowed('remove-evidence', item.id) && {
                         label: EVENT_COMMAND_LABELS['remove-evidence'],
                         icon: Trash2,
@@ -463,81 +426,41 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
             {d.deliveries.length ? (
                 <Log
                     title="Updates and reminders"
-                    sub="Who was told and when. Sending an update doesn’t complete the review."
+                    sub="Who was told and when. Sending an update doesn’t record the restraint review."
                     limit={d.deliveries.length}
                     items={d.deliveries.map((item, index) => ({
                         key: index,
                         time: item.delivered_at ? formatTime(item.delivered_at) : item.created_at ? formatTime(item.created_at) : '',
                         tone: item.failure_code ? 'warning' : item.delivered_at ? 'success' : 'info',
                         title: `${label(DELIVERY_PURPOSE_LABEL, item.purpose)} · ${label(DELIVERY_STATUS_LABEL, item.status)}`,
-                        sub: [
-                            item.delivered_at ? when(item.delivered_at) : item.created_at ? when(item.created_at) : null,
-                            item.failure_code ? 'Didn’t go through' : null,
-                        ]
+                        sub: [item.delivered_at ? when(item.delivered_at) : item.created_at ? when(item.created_at) : null, item.failure_code ? 'Didn’t go through' : null]
                             .filter(Boolean)
                             .join(' · '),
                     }))}
                 />
             ) : (
-                <QuietLine
-                    title="Updates and reminders"
-                    sub="Who was told and when. Sending an update doesn’t complete the review."
-                    text="No updates sent yet."
-                />
+                <QuietLine title="Updates and reminders" sub="Who was told and when. Sending an update doesn’t record the restraint review." text="No updates sent yet." />
             )}
         </>
     ) : section === 'connections' ? (
-        <RowList
-            title="Linked records"
-            sub="Each linked record has its own owner and steps"
-            items={(
-                [
-                    ['incident', 'Incident', Link2],
-                    ['plan', 'Behaviour support plan', FileText],
-                    ['plan_version', 'Plan version used', FileText],
-                    ['plan_approval', 'Plan approval', ClipboardCheck],
-                    ['health_safety', 'Safety review', ClipboardCheck],
-                    ['control_room', 'Control room response', ShieldAlert],
-                    ['stay', 'Respite stay', Link2],
-                    ['client', 'Person', UserRound],
-                ] as const
-            ).map(([key, label, Icon]): RowItem => {
-                const link = detail.connections[key];
-                return {
-                    key,
-                    leading: <Icon aria-hidden="true" className="size-4" />,
-                    title: label,
-                    sub: link ? undefined : 'Not linked, or you don’t have access — ask a health and safety manager',
-                    href: link
-                        ? `${link.href}${link.href.includes('?') ? '&' : '?'}return_to=${encodeURIComponent(restraintHref('events', d.id, { workspace, section: 'connections' }))}`
-                        : undefined,
-                };
-            })}
-        />
+        <LinkedRecords detail={detail} back={restraintHref('events', d.id, { workspace, section: 'connections' })} />
     ) : (
         <>
             {d.source_provenance === 'legacy_uncertainty' ? (
                 <Note tone="warning">
-                    Older record from before the current system. Approval and other details that weren’t recorded at the time
-                    haven’t been added afterwards.
+                    Older record from before the current system. Approval and other details that weren’t recorded at the time haven’t been added
+                    afterwards.
                 </Note>
             ) : null}
             <Story
                 title="What happened"
-                facts={[
-                    { icon: MapPin, text: d.site?.name ?? 'Site not recorded' },
-                    {
-                        icon: Clock,
-                        text: (
-                            <>
-                                <b>{formatDate(d.started_at)}</b>, {formatTime(d.started_at)}
-                                {d.ended_at ? ` – ${formatTime(d.ended_at)}` : ''}
-                            </>
-                        ),
-                    },
-                    { icon: Timer, text: d.duration_minutes === null ? 'Duration not recorded' : `${d.duration_minutes} minutes` },
-                    { icon: HeartPulse, text: d.injury_occurred ? 'Injury recorded' : 'No injury recorded' },
-                ]}
+                sub={[
+                    d.created_by?.name ? `In ${d.created_by.name}’s words` : null,
+                    `${formatTime(d.started_at)}${d.ended_at ? ` – ${formatTime(d.ended_at)}` : ''}`,
+                    minutes === null ? null : minutes < 1 ? 'under a minute' : minutes === 1 ? '1 minute' : formatDurationMinutes(minutes),
+                ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 paras={(
                     [
                         ['What led to it', d.trigger_description],
@@ -545,50 +468,62 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                         ['What happened', d.restraint_description],
                         ['Person’s response', d.person_response],
                         ['Support afterwards', d.post_incident_support],
-                        ...(d.injury_occurred
-                            ? ([['Injury', d.injury_details || 'Injury recorded — no details given']] as [string, string | null][])
-                            : []),
+                        ['Injury', d.injury_occurred ? d.injury_details || 'Injury recorded — no details given' : 'No injury recorded.'],
                     ] as [string, string | null][]
                 ).map(([h, t]) => ({ h, t: <span className="whitespace-pre-wrap">{t ?? 'Not recorded'}</span> }))}
             />
-            <FactRows
-                title="On record"
-                rows={[
-                    ['Started', when(d.started_at)],
-                    ['Ended', when(d.ended_at)],
-                    [
-                        'Staff involved',
-                        d.staff_involved.map((item) => ('kind' in item ? item.text : personName(item))).join(', ') || 'Not recorded',
-                    ],
-                    ['Authorised by', personName(d.authorised_by)],
-                ]}
-            />
+            {followupTable}
         </>
     );
 
     const planTone: SgTone = d.within_support_plan ? 'success' : 'critical';
+    const recordCloser = (
+        <>
+            This restraint is finished when its restraint review is recorded: by {owner?.name ?? 'its owner once one is chosen'}, or anyone who reviews
+            restraints{d.site ? ` at ${d.site.name}` : ''}
+            {detail.can.review ? ' (you included)' : ''}.
+        </>
+    );
     const side = (
         <>
-            {!command && section === 'overview' ? (
-                <KnowList
-                    title="Compared with the plan"
-                    items={[
-                        { tone: planTone, text: <b>{d.within_support_plan ? 'In the plan (as reported)' : 'Outside the plan (as reported)'}</b> },
-                        {
-                            tone: d.within_support_plan ? 'info' : 'warning',
-                            text: (
-                                <>
-                                    <b>Plan approval</b> · {d.plan_authorization.explanation ?? label(PLAN_AUTHORIZATION_LABEL, d.plan_authorization.state)}
-                                </>
-                            ),
-                        },
-                        ...(d.deviation_reason
-                            ? [{ tone: 'warning' as SgTone, text: <><b>Why it was different from the plan</b> · {d.deviation_reason}</> }]
-                            : []),
-                    ]}
-                />
-            ) : null}
-            <PeopleCards title="People" cols={1} items={people} />
+            <WhoFinishesCard record={recordCloser} review={detail.safety_review ? reviewCloserSentence(detail.safety_review, viewerName) : null} />
+            <LinkedSafetyReviewCard review={detail.safety_review} viewerName={viewerName} />
+            <KnowList
+                title="Compared with the plan"
+                items={[
+                    { tone: planTone, text: <b>{d.within_support_plan ? 'In the plan (as reported)' : 'Outside the plan (as reported)'}</b> },
+                    {
+                        tone: d.within_support_plan ? 'info' : 'warning',
+                        text: (
+                            <>
+                                <b>Plan approval</b> · {d.plan_authorization.explanation ?? label(PLAN_AUTHORIZATION_LABEL, d.plan_authorization.state)}
+                            </>
+                        ),
+                    },
+                    ...(detail.connections.plan
+                        ? [
+                              {
+                                  tone: 'info' as SgTone,
+                                  text: (
+                                      <>
+                                          <b>Plan</b> ·{' '}
+                                          <Link href={detail.connections.plan.href} className="sg-act ml-0">
+                                              Open the behaviour support plan
+                                          </Link>
+                                      </>
+                                  ),
+                              },
+                          ]
+                        : []),
+                    ...(d.deviation_reason ? [{ tone: 'warning' as SgTone, text: <><b>Why it was different from the plan</b> · {d.deviation_reason}</> }] : []),
+                ]}
+            />
+            <PeopleCards
+                title="People"
+                cols={1}
+                action={d.needs_review && allowed('assign-review') ? { label: owner ? 'Change owner' : 'Choose owner', onClick: () => act('assign-review') } : null}
+                items={people}
+            />
         </>
     );
 
@@ -596,16 +531,11 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                ...(workspace === 'view'
-                    ? [
-                          ...safetyHubCrumbs('care', safetyCan),
-                          { title: 'Restraints', href: RESTRAINT_REGISTER },
-                      ]
-                    : []),
-                { title: `${typeLabel} restraint — ${d.client.name}`, href: href('overview') },
+                ...(workspace === 'view' ? [...safetyHubCrumbs('care', shared.auth.can), { title: 'Restraints', href: RESTRAINT_REGISTER }] : []),
+                { title, href: href('overview') },
             ]}
         >
-            <Head title={`${typeLabel} restraint · ${reference}`} />
+            <Head title={`${title} · ${reference}`} />
             <SafetyFormDraftContext.Provider value={drafts.register}>
                 <PageLayout
                     hero={
@@ -614,50 +544,100 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                             wrapTitle
                             backHref={returnTo}
                             icon={ShieldAlert}
-                            title={`${typeLabel} restraint — ${d.client.name}`}
+                            title={title}
                             titleChip={
                                 <PageHeaderStatusChip variant={d.needs_review ? 'warning' : 'success'}>
-                                    {d.needs_review ? 'Needs review' : 'Reviewed'}
+                                    {d.needs_review ? 'Restraint review needed' : 'Restraint review recorded'}
                                 </PageHeaderStatusChip>
                             }
-                            subline={[
-                                reference,
-                                d.site?.name ?? 'Site not recorded',
-                                dateTimeWithYear(d.started_at),
-                                owner ? `Review owner ${owner}` : 'No review owner',
-                            ].join(' · ')}
+                            subline={['Restraint', typeLabel.toLowerCase(), d.site?.name ?? 'Site not recorded', dateTimeWithYear(d.started_at), `Restraint ${reference}`].join(' · ')}
                             actions={command ? undefined : header}
                             facts={<PageHeaderFacts items={facts} />}
-                            strip={command ? undefined : <PageHeaderStages steps={stages} next={next} ariaLabel="Restraint stage" />}
+                            strip={
+                                <PageHeaderSteps
+                                    steps={restraintRoundSteps(d)}
+                                    selected={selectedStep}
+                                    onSelect={pickStep}
+                                    ariaLabel="Where the restraint is up to"
+                                />
+                            }
                             rail={
                                 <PageHeaderRail
-                                    items={[...SECTIONS]}
+                                    items={railItems}
                                     value={section}
                                     onSelect={(next) => move(next)}
+                                    onFind={openFind}
+                                    maxVisible={6}
                                     ariaLabel="Restraint sections"
                                 />
                             }
                         />
                     }
                 >
-                    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
-                        <div
-                            ref={panel}
-                            tabIndex={-1}
-                            role="tabpanel"
-                            aria-label={command ? EVENT_COMMAND_LABELS[command] : SECTIONS.find((item) => item.key === section)?.label}
-                            className="grid min-w-0 gap-5 outline-none"
-                        >
-                            {main}
+                    <div className="grid min-w-0 gap-5">
+                        <RecordProgress next={nextBar} pane={stepPane} />
+                        <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                            <div
+                                ref={panel}
+                                tabIndex={-1}
+                                role="tabpanel"
+                                aria-label={command ? EVENT_COMMAND_LABELS[command] : SECTIONS.find((item) => item.key === section)?.label}
+                                className="grid min-w-0 gap-5 outline-none"
+                            >
+                                {main}
+                            </div>
+                            <aside className="min-w-0" aria-label="Who finishes what, the safety review and people">
+                                <SideColumn>{side}</SideColumn>
+                            </aside>
                         </div>
-                        <aside className="min-w-0" aria-label="Plan use and people">
-                            <SideColumn>{side}</SideColumn>
-                        </aside>
                     </div>
                 </PageLayout>
                 {drafts.confirmation}
             </SafetyFormDraftContext.Provider>
+            <TabSearchPalette
+                open={findOpen}
+                onClose={() => setFindOpen(false)}
+                groups={findGroups}
+                onTab={(key) => {
+                    const target = SECTIONS.find((item) => item.key === key);
+                    if (target) move(target.key);
+                }}
+                testIdPrefix="restraint-workspace"
+                searchLabel="Find a restraint section"
+            />
         </AppLayout>
+    );
+}
+
+/** Decision 6: only links this viewer can open are listed; nothing is said about the rest. */
+function LinkedRecords({ detail, back }: { detail: RestraintEventDetail; back: string }) {
+    const items = (
+        [
+            ['incident', 'Incident', Link2],
+            ['plan', 'Behaviour support plan', FileText],
+            ['plan_version', 'Plan version used', FileText],
+            ['plan_approval', 'Plan approval', ClipboardCheck],
+            ['health_safety', 'Safety review', ClipboardCheck],
+            ['control_room', 'Control room response', ShieldAlert],
+            ['stay', 'Respite stay', Link2],
+            ['client', 'Person', UserRound],
+        ] as const
+    ).flatMap(([key, title, Icon]): RowItem[] => {
+        const link = detail.connections[key];
+        if (!link) return [];
+        return [
+            {
+                key,
+                leading: <Icon aria-hidden="true" className="size-4" />,
+                title,
+                href: `${link.href}${link.href.includes('?') ? '&' : '?'}return_to=${encodeURIComponent(back)}`,
+            },
+        ];
+    });
+    return items.length ? (
+        <RowList title="Linked records" sub="Each linked record has its own owner and steps" items={items} />
+    ) : (
+        <QuietLine title="Linked records" text="No linked records you can open." />
     );
 }
 
@@ -678,13 +658,11 @@ function SourceFacts({
         <>
             {[...rows].reverse().map((item) => {
                 const superseded = rows.some((row) => row.supersedes_id === item.id);
-                const facts = Object.entries(item.facts).filter(
-                    ([, value]) => typeof value === 'string' || typeof value === 'number' || Array.isArray(value),
-                );
+                const facts = Object.entries(item.facts).filter(([, value]) => typeof value === 'string' || typeof value === 'number' || Array.isArray(value));
                 return (
                     <FactRows
                         key={item.id}
-                        title={`${title} · ${dateTimeWithYear(item.occurred_at ?? item.created_at, "Time not recorded")}`}
+                        title={`${title} · ${dateTimeWithYear(item.occurred_at ?? item.created_at, 'Time not recorded')}`}
                         sub={[
                             `Recorded by ${personName(item.recorder)}`,
                             item.actual_actor ? `Done by ${personName(item.actual_actor)}` : null,
@@ -713,42 +691,41 @@ function SourceFacts({
 
 function FollowupTable({
     rows,
+    viewerId,
     menuFor,
+    onComplete,
+    canComplete,
     onAdd,
 }: {
     rows: RestraintFollowup[];
+    viewerId: number | null;
     menuFor: (row: RestraintFollowup) => MenuItem[];
+    onComplete: (row: RestraintFollowup) => void;
+    canComplete: (row: RestraintFollowup) => boolean;
     onAdd?: () => void;
 }) {
+    const ownerName = (item: RestraintFollowup) => (item.assignee?.id != null && item.assignee.id === viewerId ? 'You' : item.assignee?.name);
     const columns: RecordTableColumn<RestraintFollowup>[] = [
         {
             key: 'followup',
             label: 'Follow-up',
             className: 'min-w-[16rem]',
-            cell: (item) => (
-                <RecordIdentity
-                    title={<span className="whitespace-pre-wrap">{item.notes}</span>}
-                    sub={item.completion_outcome?.notes ?? undefined}
-                />
-            ),
+            cell: (item) => <RecordIdentity title={<span className="whitespace-pre-wrap">{item.notes}</span>} sub={item.completion_outcome?.notes ?? undefined} />,
         },
         {
             key: 'owner',
             label: 'Owner',
             nowrap: true,
-            cell: (item) =>
-                item.assignee?.name ? <RecordPerson name={item.assignee.name} /> : <span className="text-muted-foreground">{personName(item.assignee)}</span>,
+            cell: (item) => {
+                const name = ownerName(item);
+                return name ? <RecordPerson name={name} /> : <span className="text-muted-foreground">{personName(item.assignee)}</span>;
+            },
         },
         {
             key: 'due',
             label: 'Due',
             nowrap: true,
-            cell: (item) =>
-                item.due_at ? (
-                    <RecordIdentity title={formatDate(item.due_at)} sub={formatTime(item.due_at)} />
-                ) : (
-                    <span className="text-muted-foreground">Due time not set</span>
-                ),
+            cell: (item) => (item.due_at ? formatDate(item.due_at) : <span className="text-muted-foreground">Due time not set</span>),
         },
         {
             key: 'status',
@@ -759,18 +736,31 @@ function FollowupTable({
                     <RecordIdentity title={<StatusBadge variant="neutral">Cancelled</StatusBadge>} sub={item.cancellation_reason ?? undefined} />
                 ) : item.completed_at ? (
                     <RecordIdentity
-                        title={<StatusBadge variant="success">{item.completion_outcome?.outcome ? label(FOLLOWUP_OUTCOME_LABEL, item.completion_outcome.outcome) : 'Done'}</StatusBadge>}
-                        sub={when(item.completed_at)}
+                        title={
+                            <StatusBadge variant="success">
+                                {item.completion_outcome?.outcome ? label(FOLLOWUP_OUTCOME_LABEL, item.completion_outcome.outcome) : 'Done'}
+                            </StatusBadge>
+                        }
+                        sub={formatDate(item.completed_at)}
                     />
                 ) : (
-                    <StatusBadge variant="warning">Open</StatusBadge>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge variant="warning">Open</StatusBadge>
+                        {canComplete(item) ? (
+                            <Button type="button" variant="outline" size="sm" onClick={() => onComplete(item)}>
+                                {EVENT_COMMAND_LABELS['complete-followup']}
+                            </Button>
+                        ) : item.assignee?.name ? (
+                            <span className="text-caption">{item.assignee.name} records it</span>
+                        ) : null}
+                    </div>
                 ),
         },
     ];
     return (
         <RecordTable
             title="Follow-ups"
-            sub="Each follow-up has an owner · only the owner can record the outcome"
+            sub="Only the owner records the outcome"
             actions={
                 onAdd ? (
                     <Button variant="outline" size="sm" onClick={onAdd}>
@@ -794,15 +784,7 @@ function FollowupTable({
     );
 }
 
-function EvidenceTable({
-    rows,
-    menuFor,
-    onAdd,
-}: {
-    rows: RestraintAttachment[];
-    menuFor: (row: RestraintAttachment) => MenuItem[];
-    onAdd?: () => void;
-}) {
+function EvidenceTable({ rows, menuFor, onAdd }: { rows: RestraintAttachment[]; menuFor: (row: RestraintAttachment) => MenuItem[]; onAdd?: () => void }) {
     const columns: RecordTableColumn<RestraintAttachment>[] = [
         {
             key: 'file',
@@ -822,7 +804,7 @@ function EvidenceTable({
                             item.original_name
                         )
                     }
-                    sub={[item.category ? label(ATTACHMENT_CATEGORY_LABEL, item.category) : 'Evidence', item.notes].filter(Boolean).join(' · ')}
+                    sub={[item.category ? label(ATTACHMENT_CATEGORY_LABEL, item.category) : 'File', item.notes].filter(Boolean).join(' · ')}
                 />
             ),
         },
@@ -833,10 +815,7 @@ function EvidenceTable({
             nowrap: true,
             cell: (item) =>
                 item.removed_at ? (
-                    <RecordIdentity
-                        title={<StatusBadge variant="neutral">Removed</StatusBadge>}
-                        sub={item.removal_reason ? `Removal reason: ${item.removal_reason}` : undefined}
-                    />
+                    <RecordIdentity title={<StatusBadge variant="neutral">Removed</StatusBadge>} sub={item.removal_reason ? `Removal reason: ${item.removal_reason}` : undefined} />
                 ) : item.availability === 'available' ? (
                     <StatusBadge variant="success">Available</StatusBadge>
                 ) : (
@@ -846,8 +825,8 @@ function EvidenceTable({
     ];
     return (
         <RecordTable
-            title="Evidence"
-            sub="Files · use each file’s menu to download or remove it"
+            title="Files"
+            sub="Use each file’s menu to download or remove it"
             actions={
                 onAdd ? (
                     <Button variant="outline" size="sm" onClick={onAdd}>

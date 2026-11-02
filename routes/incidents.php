@@ -59,6 +59,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/incidents/{incident}', [IncidentController::class, 'show'])
         ->middleware(\App\Http\Middleware\CurrentIncidentRegisterAccess::class)
         ->whereNumber('incident')->name('incidents.show');
+    Route::get('/incidents/{incident}/pdf', [IncidentController::class, 'pdf'])
+        ->middleware(\App\Http\Middleware\CurrentIncidentRegisterAccess::class)
+        ->whereNumber('incident')->name('incidents.pdf');
     Route::get('/incidents/{incident}/attachments/{attachment}/download', [IncidentController::class, 'downloadAttachment'])
         ->middleware(\App\Http\Middleware\CurrentIncidentRegisterAccess::class)
         ->whereNumber(['incident', 'attachment'])->name('incidents.attachments.download');

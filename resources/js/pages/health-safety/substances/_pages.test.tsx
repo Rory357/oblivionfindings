@@ -48,7 +48,8 @@ it('opens permanent chemical records with exact filtered Back and source-backed 
     const back = new URL(href, 'https://example.invalid').searchParams.get('return_to')!;
     expect(new URL(back, 'https://example.invalid').searchParams.get('site_id')).toBe('3');
     expect(new URL(back, 'https://example.invalid').searchParams.get('q')).toBe('cleaning');
-    const current = new URL(screen.getByRole('link', { name: 'View current safety data sheets' }).getAttribute('href')!, 'https://example.invalid');
+    // G4-14: the G2 header boxes; each is a link to its view, keeping the Site but never the search.
+    const current = new URL(screen.getByRole('link', { name: /^Current SDS: 0. No trend yet/ }).getAttribute('href')!, 'https://example.invalid');
     expect(current.searchParams.get('tab')).toBe('active'); expect(current.searchParams.get('sds_state')).toBe('current'); expect(current.searchParams.get('site_id')).toBe('3');
     expect(current.searchParams.has('q')).toBe(false); expect(screen.queryByRole('button', { name: 'Board reports' })).not.toBeInTheDocument();
 });
@@ -57,8 +58,10 @@ it('withholds repair identities and keeps unknown header measures separate from 
     props.hero.live.active = null; props.hero.live.controlled = null; props.hero.live.sds_current = null; props.hero.attention.sds_expiring = null; props.hero.attention.sds_missing = null;
     render(<ChemicalRegister {...props} />);
     expect(screen.queryByText('STALE-CHEMICAL-NAME')).not.toBeInTheDocument(); expect(screen.queryByText('STALE-COMMON-NAME')).not.toBeInTheDocument();
-    // The one header number (current sheets) and the row's storage count read "Not available", never zero.
-    expect(screen.getAllByText('Not available')).toHaveLength(2);
+    // Unconfirmed header counts are left out (never a 0) and the row's storage count reads "Not available".
+    expect(screen.queryByRole('link', { name: /^Current SDS:/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^No current SDS:/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Not available')).toHaveLength(1);
     expect(screen.getByText(/only people with wellbeing access can open them/)).toBeInTheDocument();
 });
 it('uses in-page record sections and refuses unproved child action bookmarks', () => {
@@ -126,4 +129,18 @@ it('keeps current-facts review unavailable while the original write remains unce
 it('records an unknown audit quantity as null and preserves actual negative checks rather than replacing them with defaults', () => {
     const payload = chemicalFormPayload('audit_storage', { current_quantity: '', properly_labelled: '0', segregation_compliant: '1', last_audit_date: '2026-09-19', storage_notes: '' }, null);
     expect(payload).toMatchObject({ current_quantity: null, properly_labelled: false, segregation_compliant: true, last_audit_date: '2026-09-19', storage_notes: null });
+});
+it('leads with overdue SDS reviews, then chemicals with no current sheet, with the button only for managers (G4-14)', () => {
+    const props = index();
+    props.register_summary = { sds_overdue: 1, lead: [{ id: 21, name: 'Bleach, 5 L', sds_state: 'expired' }, { id: 22, name: 'Oven cleaner', sds_state: 'missing' }], lead_total: 2 };
+    const view = render(<ChemicalRegister {...props} />);
+    const lead = screen.getByRole('region', { name: 'Needs doing now' });
+    expect(lead).toHaveTextContent('Bleach, 5 L'); expect(lead).toHaveTextContent('SDS review overdue');
+    expect(screen.getByRole('link', { name: 'Review SDS: Bleach, 5 L' }).getAttribute('href')).toContain('/health-safety/substances/21?section=sds');
+    expect(screen.getByRole('link', { name: 'Add SDS: Oven cleaner' }).getAttribute('href')).toContain('action=add_sds');
+    expect(screen.getByRole('link', { name: /^SDS reviews overdue: 1\./ })).toBeInTheDocument();
+    view.unmount();
+    render(<ChemicalRegister {...{ ...props, can: { create: false, manage: false } }} />);
+    expect(screen.queryByRole('link', { name: /^Review SDS/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Health and safety update it')).toHaveLength(2);
 });

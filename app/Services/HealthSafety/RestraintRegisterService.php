@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\Incidents\IncidentAccessService;
 use App\Services\Respite\RespiteStayScope;
+use App\Support\HealthSafety\HsRecordTitle;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -271,8 +272,8 @@ final class RestraintRegisterService
         });
         $siteIds = $filters['site_id'] ? [$filters['site_id']] : $sites;
         $siteRows = $reads->query(Site::query())->active()->notArchived()->whereNull('archived_at')->whereKey($siteIds)->orderBy('name')->get()->map(fn ($s) => ['id' => (int) $s->id, 'name' => $s->name])->all();
-        $people = $reviewers = [];
-        $reads->query($this->staff->currentUsersQuery())->orderBy('name')->orderBy('id')->chunk(200, function ($rows) use (&$people, &$reviewers, $siteRows, $reads, $event, $current, $sites) {
+        $people = $reviewers = $owners = [];
+        $reads->query($this->staff->currentUsersQuery())->orderBy('name')->orderBy('id')->chunk(200, function ($rows) use (&$people, &$reviewers, &$owners, $siteRows, $reads, $event, $current, $sites) {
             foreach ($rows as $row) {
                 foreach ($siteRows as $site) {
                     if ($this->allowed(fn () => $this->access->eligibleStaff((int) $row->id, $site['id'], $reads))) {
@@ -280,6 +281,11 @@ final class RestraintRegisterService
                     }
                     if ($event && $this->allowed(fn () => $this->access->assertStaffId((int) $row->id, $current, $reads, $sites, 'review_owner', $event))) {
                         $reviewers[(int) $row->id] = ['id' => (int) $row->id, 'name' => $row->name];
+                    }
+                    // Decision 4: a follow-up can go to anyone who could record its outcome here, including a support
+                    // worker with restraints.followups.own at this Site — the same test the save uses.
+                    if ($event && ! isset($owners[(int) $row->id]) && $this->allowed(fn () => $this->access->assertStaffId((int) $row->id, $current, $reads, $sites, 'followup_recipient', $event))) {
+                        $owners[(int) $row->id] = ['id' => (int) $row->id, 'name' => $row->name];
                     }
                 }
             }
@@ -330,7 +336,7 @@ final class RestraintRegisterService
             }
         });
 
-        return ['clients' => array_values($clients), 'sites' => $siteRows, 'staff' => array_values($people), 'reviewers' => array_values($reviewers), 'followupOwners' => array_values($reviewers), 'incidents' => $incidents, 'plansForPicker' => $plans];
+        return ['clients' => array_values($clients), 'sites' => $siteRows, 'staff' => array_values($people), 'reviewers' => array_values($reviewers), 'followupOwners' => array_values($owners), 'incidents' => $incidents, 'plansForPicker' => $plans];
     }
 
     private function eventRow(RestraintEvent $row, User $current, CurrentAuthorizationReads $reads, array $sites): array
@@ -342,7 +348,10 @@ final class RestraintRegisterService
         $plan = $row->behaviour_support_plan_id ? $reads->query(BehaviourSupportPlan::withTrashed())->find($row->behaviour_support_plan_id) : null;
         $planId = $plan && $this->allowed(fn () => $this->access->assertPlan($plan, $current, $reads, $sites)) ? (int) $plan->id : null;
 
-        return ['id' => (int) $row->id, 'reference' => $this->ref($row, 'RE', 3), 'client' => ['id' => (int) $row->client->id, 'name' => trim($row->client->first_name.' '.$row->client->last_name)], 'site' => $site ? ['id' => (int) $site->id, 'name' => $site->name] : null, 'restraint_type' => $row->restraint_type, 'severity' => $row->severity, 'started_at' => $row->started_at?->toIso8601String(), 'ended_at' => $row->ended_at?->toIso8601String(), 'duration_minutes' => $row->duration_minutes, 'within_support_plan' => (bool) $row->within_support_plan, 'injury_occurred' => (bool) $row->injury_occurred, 'reviewed_at' => $row->reviewed_at?->toIso8601String(), 'behaviour_support_plan_id' => $planId, 'related_incident_id' => $incidentId, 'source_revision' => (int) $row->source_revision, 'needs_review' => $row->needsReview(), 'flags' => ['unreviewed' => $row->needsReview(), 'out_of_plan' => ! $row->within_support_plan, 'injury' => (bool) $row->injury_occurred, 'linked_incident' => $incidentId !== null]];
+        $clientName = trim($row->client->first_name.' '.$row->client->last_name);
+
+        // Decision 15: the record's own plain title, the same as on its record page and its safety review.
+        return ['id' => (int) $row->id, 'reference' => $this->ref($row, 'RE', 3), 'title' => HsRecordTitle::restraint($clientName, $site?->name, $row->summary), 'summary' => $row->summary, 'client' => ['id' => (int) $row->client->id, 'name' => $clientName], 'site' => $site ? ['id' => (int) $site->id, 'name' => $site->name] : null, 'restraint_type' => $row->restraint_type, 'severity' => $row->severity, 'started_at' => $row->started_at?->toIso8601String(), 'ended_at' => $row->ended_at?->toIso8601String(), 'duration_minutes' => $row->duration_minutes, 'within_support_plan' => (bool) $row->within_support_plan, 'injury_occurred' => (bool) $row->injury_occurred, 'reviewed_at' => $row->reviewed_at?->toIso8601String(), 'behaviour_support_plan_id' => $planId, 'related_incident_id' => $incidentId, 'source_revision' => (int) $row->source_revision, 'needs_review' => $row->needsReview(), 'flags' => ['unreviewed' => $row->needsReview(), 'out_of_plan' => ! $row->within_support_plan, 'injury' => (bool) $row->injury_occurred, 'linked_incident' => $incidentId !== null]];
     }
 
     private function planRow(BehaviourSupportPlan $row, User $current, CurrentAuthorizationReads $reads, array $sites): array

@@ -10,7 +10,8 @@
  */
 import { PageHeader, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageHeaderStatusChip, PageLayout } from '@/components/page';
 import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
-import { PageHeaderStages, type PageHeaderNextStep, type PageHeaderStage } from '@/components/page/page-header-strip';
+import { PageHeaderSteps, type PageHeaderStep } from '@/components/page/page-header-strip';
+import { PaneLink, RecordProgress, type RecordProgressNext, type RecordProgressPane } from '@/components/signature/record-progress';
 import { dateTimeWithYear } from '@/components/incidents/incident-stages';
 import { Note, SideColumn, Surface } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
@@ -19,13 +20,14 @@ import { SafetyFormDraftContext, useSafetyWorkspaceDrafts } from '@/hooks/use-sa
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, toDateInput } from '@/lib/datetime';
 import { CHEMICAL_EXPOSURES, exposureHref, exposureLocation, exposureReturn, type ExposureAction, type ExposurePageKey, type ExposureSection } from '@/lib/health-safety/chemical-exposure-navigation';
-import type { ExposureEvidence, ExposureFollowup, ExposureWorkspaceDetail } from '@/lib/health-safety/chemical-exposure-read-contract';
+import type { ExposureEvidence, ExposureFollowup, ExposureHistoryItem, ExposureWorkspaceDetail } from '@/lib/health-safety/chemical-exposure-read-contract';
 import type { SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { ClipboardCheck, FileText, History, Link2, ListChecks, LockKeyhole, MoreHorizontal, Paperclip, PencilLine, RefreshCw, TriangleAlert, UserPlus } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, FileText, History, Link2, ListChecks, LockKeyhole, MoreHorizontal, Paperclip, PencilLine, RefreshCw, TriangleAlert, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ExposureCommandForm } from './components/exposure-command-form';
 import { ExposureDeliveryPanel } from './components/exposure-delivery-panel';
+import { earlierLinkChip, ExposureEarlierLink, type EarlierLink } from './components/exposure-earlier-link';
 import { ExposureRecordSide } from './components/exposure-overview';
 import { ExposureRecordPanel } from './components/exposure-record-panels';
 import type { ExposureReceipt } from './components/use-exposure-command';
@@ -35,7 +37,9 @@ const SECTIONS = [{ key: 'overview', label: 'Recorded facts', icon: LockKeyhole 
     { key: 'history', label: 'History', icon: History }, { key: 'connections', label: 'Connections', icon: Link2 }] as const;
 /** Exposure managers only (job 3): this exposure hasn't reached the H&S register yet. */
 type DeliveryAlert = { state: 'needs_manager' | 'failed' | 'overdue'; since: string | null };
-type Props = { detail: ExposureWorkspaceDetail; return_to: string | null; chemical_exposure_confirmation: ExposureReceipt | null; delivery_alert?: DeliveryAlert | null };
+type Props = { detail: ExposureWorkspaceDetail; return_to: string | null; chemical_exposure_confirmation: ExposureReceipt | null; delivery_alert?: DeliveryAlert | null;
+    /** #15: an earlier, unconfirmed link to an incident and its later reviews (null when the record has none). */
+    earlier_link?: EarlierLink | null };
 const DELIVERY_ALERT: Record<DeliveryAlert['state'], string> = {
     needs_manager: 'The automatic delivery stopped because the record needs checking. Check it and retry from Connections.',
     failed: 'The automatic delivery failed and is trying again. If it keeps failing, retry it from Connections.',
@@ -44,39 +48,105 @@ const DELIVERY_ALERT: Record<DeliveryAlert['state'], string> = {
 type Pending = { action: ExposureAction; sourceId?: number; child?: ExposureFollowup | ExposureEvidence };
 const dayOf = (value?: string | null) => (value && toDateInput(value) ? formatDateOnly(toDateInput(value)) : 'Not recorded');
 
-/** Reported, reviewed, follow-ups, medical outcome — from the record and the loaded first pages of its reviews and follow-ups. */
-function exposureStages(detail: ExposureWorkspaceDetail): { steps: PageHeaderStage[]; next: PageHeaderNextStep | null } {
+type ExposureStepKey = 'reported' | 'reviewed' | 'followups' | 'outcome';
+type ExposureReviewRow = Extract<NonNullable<ExposureWorkspaceDetail['reviews']['items']>[number], { outcome: string }>;
+
+/**
+ * Decision 26: reported, reviewed, follow-ups, medical outcome as round status steps, from the record and the loaded
+ * first pages of its reviews and follow-ups; the next-step bar and the picked step's pane read the same facts.
+ */
+function exposureStages(detail: ExposureWorkspaceDetail) {
     const record = detail.record!;
-    const reviews = (detail.reviews.items ?? []).filter((row) => row.attribution_state !== 'repair_required') as Extract<NonNullable<typeof detail.reviews.items>[number], { outcome: string }>[];
+    const reviews = (detail.reviews.items ?? []).filter((row) => row.attribution_state !== 'repair_required') as ExposureReviewRow[];
     const followups = (detail.followups.items ?? []).filter((row) => row.attribution_state !== 'repair_required') as ExposureFollowup[];
     const latest = reviews[0]; const reviewed = latest !== undefined || (detail.reviews.page?.total ?? 0) > 0;
     const open = followups.filter((row) => row.completed_at === null).sort((a, b) => (a.due_at ?? '9999').localeCompare(b.due_at ?? '9999'));
     const first = open[0]; const now = Date.now();
     const overdue = !!first?.due_at && new Date(first.due_at).getTime() < now;
-    const today = !!first?.due_at && toDateInput(first.due_at) === toDateInput(new Date().toISOString());
     const careReview = record.response?.care_review_needed === true && record.response.harm_assessment === 'unassessed';
-    const steps: PageHeaderStage[] = [
-        { label: 'Reported', meta: [record.recorded_by?.name, record.created_at ? dayOf(record.created_at) : null].filter(Boolean).join(' · ') || undefined, state: 'done' },
-        reviewed ? { label: 'Reviewed', meta: latest ? [latest.recorded_by?.name, latest.reviewed_at ? dayOf(latest.reviewed_at) : null].filter(Boolean).join(' · ') || undefined : undefined, state: 'done' }
-            : { label: 'Reviewed', meta: careReview ? 'Care answers need review' : 'Not yet', state: 'now', tone: careReview ? 'warning' : undefined },
-        first ? { label: 'Follow-ups', meta: first.due_at ? `Next due ${dayOf(first.due_at)}` : 'Open', state: 'now', tone: overdue ? 'critical' : today ? 'warning' : undefined }
-            : { label: 'Follow-ups', meta: followups.length ? 'Done on this page' : 'None on this page', state: followups.length ? 'done' : 'todo' },
-        record.medical_outcome ? { label: 'Medical outcome', meta: 'Recorded', state: 'done' } : { label: 'Medical outcome', meta: 'No outcome yet', state: 'todo' },
+    const steps: PageHeaderStep[] = [
+        { key: 'reported', label: 'Reported', meta: [record.recorded_by?.name, record.created_at ? dayOf(record.created_at) : null].filter(Boolean).join(' · ') || undefined, state: 'done' },
+        reviewed ? { key: 'reviewed', label: 'Reviewed', meta: latest ? [latest.recorded_by?.name, latest.reviewed_at ? dayOf(latest.reviewed_at) : null].filter(Boolean).join(' · ') || undefined : undefined, state: 'done' }
+            : { key: 'reviewed', label: 'Reviewed', meta: careReview ? 'Care answers need review' : 'Not yet', state: 'now' },
+        first ? { key: 'followups', label: 'Follow-ups', meta: first.due_at ? `Next due ${dayOf(first.due_at)}` : 'Open', state: reviewed ? 'now' : 'todo' }
+            : { key: 'followups', label: 'Follow-ups', meta: followups.length ? 'Done on this page' : 'None on this page', state: followups.length ? 'done' : 'todo' },
+        record.medical_outcome ? { key: 'outcome', label: 'Medical outcome', meta: 'Recorded', state: 'done' } : { key: 'outcome', label: 'Medical outcome', meta: 'No outcome yet', state: 'todo' },
     ];
-    const next: PageHeaderNextStep | null = first
-        ? { label: first.due_at ? `Next step · ${overdue ? 'was due' : 'due'} ${dateTimeWithYear(first.due_at)}` : 'Next step', text: first.instruction, tone: overdue ? 'critical' : today ? 'warning' : undefined,
-            meta: <>Follow-up for <b>{first.assigned_to?.name ?? 'a named person'}</b>{first.recorded_by ? <> · assigned by {first.recorded_by.name}</> : null}</> }
-        : !reviewed && careReview ? { label: 'Next step', text: 'Review the reported care answers', tone: 'warning', meta: 'Care answers need review' }
-            : null;
-    return { steps, next };
+    const current: ExposureStepKey = !reviewed ? 'reviewed' : first ? 'followups' : !record.medical_outcome ? 'outcome' : 'reported';
+    return { steps, current, reviewed, latest, reviews, followups, open, first, overdue, careReview };
+}
+type ExposureStages = ReturnType<typeof exposureStages>;
+
+/** Which step a history entry belongs to: reviews, follow-ups, a medical outcome change, else the report itself. */
+function exposureStepOf(entry: ExposureHistoryItem): ExposureStepKey {
+    if (/review/.test(entry.command)) return 'reviewed';
+    if (/followup/.test(entry.command)) return 'followups';
+    if (entry.after.medical_outcome !== undefined && entry.after.medical_outcome !== (entry.before?.medical_outcome ?? null)) return 'outcome';
+    return 'reported';
+}
+
+/** The picked step's pane: what was recorded there, then its activity from the loaded history page. */
+function exposureStepPane(detail: ExposureWorkspaceDetail, stages: ExposureStages, shown: ExposureStepKey,
+    go: (section: ExposureSection) => void, onBack?: () => void): RecordProgressPane {
+    const record = detail.record!;
+    const step = stages.steps.find((item) => item.key === shown);
+    const body: Record<ExposureStepKey, Omit<RecordProgressPane, 'title' | 'meta' | 'onBack' | 'activity'>> = {
+        reported: { items: [
+            { key: 'by', label: 'Reported by', value: record.recorded_by?.name ?? 'Not recorded', meta: record.created_at ? dateTimeWithYear(record.created_at) : undefined },
+            { key: 'chemical', label: 'Chemical', value: record.substance.name },
+            { key: 'site', label: 'Site', value: record.site.name },
+        ] },
+        reviewed: {
+            items: stages.latest ? [{ key: 'latest', label: 'Latest review', value: stages.latest.outcome,
+                meta: [stages.latest.recorded_by?.name, stages.latest.reviewed_at ? dateTimeWithYear(stages.latest.reviewed_at) : null].filter(Boolean).join(' · ') || undefined,
+                action: <PaneLink onClick={() => go('reviews')}>All reviews</PaneLink> }] : [],
+            empty: stages.careReview ? 'The reported care answers need a review.' : 'Not reviewed yet.',
+        },
+        followups: {
+            items: stages.open.length ? [{ key: 'open', label: 'Open follow-ups', value: `${stages.open.length} on this page`,
+                action: <PaneLink onClick={() => go('followups')}>All follow-ups</PaneLink> }] : [],
+            children: stages.open.length ? (
+                <ul className="grid gap-1 px-[18px] pb-3 text-sm">
+                    {stages.open.map((item) => (
+                        <li key={item.id}>
+                            <b className="font-medium">{item.instruction}</b>
+                            <span className="text-muted-foreground"> · {item.assigned_to?.name ?? 'a named person'}{item.due_at ? ` · due ${dayOf(item.due_at)}` : ''}</span>
+                        </li>
+                    ))}
+                </ul>
+            ) : undefined,
+            empty: stages.followups.length ? 'The follow-ups on this page are done.' : 'No follow-ups on this page.',
+        },
+        outcome: {
+            items: record.medical_outcome ? [{ key: 'outcome', label: 'Medical outcome', value: record.medical_outcome }] : [],
+            empty: 'No medical outcome recorded yet. Correct the recorded facts when it is known.',
+        },
+    };
+    return {
+        title: step?.label ?? 'Step', meta: step?.meta, onBack, ...body[shown],
+        activity: {
+            items: (detail.history.items ?? []).filter((entry) => exposureStepOf(entry) === shown).map((entry) => ({
+                key: entry.id, time: dateTimeWithYear(entry.recorded_at), who: entry.recorded_by?.name,
+                what: `${entry.command.replace(/_/g, ' ')}${entry.reason ? `: ${entry.reason}` : ''}`,
+            })),
+            onAll: () => go('history'),
+        },
+    };
+}
+
+/** The Progress card for an exposure: the fixed next-step bar, then the picked step's pane. */
+function ExposureProgress({ next, detail, stages, shown, onGo, onBack }: { next: RecordProgressNext | null; detail: ExposureWorkspaceDetail;
+    stages: ExposureStages; shown: ExposureStepKey; onGo: (section: ExposureSection) => void; onBack?: () => void }) {
+    return <RecordProgress next={next} pane={exposureStepPane(detail, stages, shown, onGo, onBack)} />;
 }
 
 export default function ChemicalExposureShow(props: Props) {
     const { props: shared } = usePage<SharedData>();
     return <ExposureWorkspace key={`${shared.auth.user.id}:${props.detail.id}`} {...props} />;
 }
-function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, delivery_alert = null }: Props) {
+function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, delivery_alert = null, earlier_link = null }: Props) {
     const { url, props: shared } = usePage<SharedData>(); const location = exposureLocation(url); const drafts = useSafetyWorkspaceDrafts();
+    const [picked, setPicked] = useState<ExposureStepKey | null>(null);
     const [withdrawn, setWithdrawn] = useState(false); const onWithdraw = useCallback(() => setWithdrawn(true), []);
     const admitted = !withdrawn && detail.exposure_access === 'readable' && detail.record?.id === detail.id
         && detail.record.attribution_state !== 'repair_required' && detail.source_integrity !== 'repair_required';
@@ -121,7 +191,28 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
     const checkAccess = () => drafts.request(() => router.get(href('overview'), {}, { preserveState: false, preserveScroll: true }));
     useEffect(() => { if (!action && focusedFollowupId === null && (interacted.current || requestedFocus !== null)) panel.current?.focus(); }, [section, action, focusedFollowupId, requestedFocus]);
 
-    // Header actions: the same commands and current flags as before; Record a review leads.
+    // Decision 26: the Progress card under the header holds the record's one filled button in its next-step bar.
+    const stages = admitted ? exposureStages(detail) : null;
+    const commandShown = !!action && !!retained[commandKey];
+    const shownStep: ExposureStepKey | null = stages ? picked ?? stages.current : null;
+    const progressShown = !!stages && section === 'overview' && !commandShown;
+    const completeNext = commandReady && stages?.first?.can_complete ? stages.first : null;
+    const barUsesReview = !completeNext && commandReady && detail.can.review;
+    const nextButton = completeNext ? (
+        <Button onClick={() => open('complete_followup', completeNext.id)}><CheckCircle2 aria-hidden="true" />Complete the follow-up</Button>
+    ) : barUsesReview ? (
+        <Button onClick={() => open('review')}><ClipboardCheck aria-hidden="true" />Record a review</Button>
+    ) : undefined;
+    const next: RecordProgressNext | null = !stages ? null : stages.first ? {
+        kicker: stages.first.due_at ? `Next step · ${stages.overdue ? 'was due' : 'due'} ${dateTimeWithYear(stages.first.due_at)}` : 'Next step', title: stages.first.instruction,
+        text: <>Follow-up for <b>{stages.first.assigned_to?.name ?? 'a named person'}</b>{stages.first.recorded_by ? <> · assigned by {stages.first.recorded_by.name}</> : null}</>, action: nextButton,
+    } : !stages.reviewed ? {
+        title: stages.careReview ? 'Review the reported care answers' : 'Record a review', text: stages.careReview ? 'Care answers need review' : 'Nobody has reviewed this exposure yet.', action: nextButton,
+    } : !detail.record!.medical_outcome ? {
+        title: 'Record the medical outcome when it is known', text: 'Correct the recorded facts to add it.', action: nextButton,
+    } : { kicker: 'Up to date', title: 'Nothing waiting', text: 'Reviewed, with no open follow-ups on this page.', tone: 'done' };
+
+    // Header actions: the same commands and current flags as before; Record a review sits in the next-step bar while it shows.
     const header = [
         commandReady && detail.can.correct ? { key: 'correct', label: 'Correct recorded facts', icon: PencilLine } : null,
         commandReady && detail.can.assign_followup ? { key: 'assign_followup', label: 'Assign a follow-up', icon: UserPlus } : null,
@@ -132,22 +223,20 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
         {glass.map((item) => <PageHeaderGlassButton key={item.key} icon={item.icon} onClick={() => open(item.key)}>{item.label}</PageHeaderGlassButton>)}
         {overflow.length ? <DropdownMenu><DropdownMenuTrigger asChild><PageHeaderGlassButton icon={MoreHorizontal} aria-label="More exposure actions" /></DropdownMenuTrigger>
             <DropdownMenuContent align="end">{overflow.map((item) => <DropdownMenuItem key={item.key} onSelect={() => open(item.key)}><item.icon className="size-4" />{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu> : null}
-        {commandReady && detail.can.review ? <PageHeaderPrimaryButton icon={ClipboardCheck} onClick={() => open('review')}>Record a review</PageHeaderPrimaryButton> : null}
+        {commandReady && detail.can.review && !(progressShown && barUsesReview) ? <PageHeaderGlassButton icon={ClipboardCheck} onClick={() => open('review')}>Record a review</PageHeaderGlassButton> : null}
     </> : <PageHeaderPrimaryButton icon={RefreshCw} onClick={checkAccess}>Check current access</PageHeaderPrimaryButton>;
     const counted = (total: number | null | undefined) => (admitted && typeof total === 'number' ? { count: total } : {});
     const rail = admitted ? [SECTIONS[0], { ...SECTIONS[1], ...counted(detail.reviews.page?.total) }, { ...SECTIONS[2], ...counted(detail.followups.page?.total) },
         { ...SECTIONS[3], ...counted(detail.attachments.page?.total) }, { ...SECTIONS[4], ...counted(detail.history.page?.total) }, SECTIONS[5]] : [SECTIONS[0]];
-    const stages = admitted ? exposureStages(detail) : null;
-    const commandShown = !!action && !!retained[commandKey];
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, ...safetyHubCrumbs('care', shared.auth.can),
         { title: 'Private exposures', href: CHEMICAL_EXPOSURES }, { title, href: exposureHref(detail.id) }]}>
         <Head title={title} /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" wrapTitle title={title} icon={LockKeyhole} backHref={returnTo}
-                subline={admitted ? `${detail.record!.substance.name} · ${detail.record!.site.name}` : 'Current access or source history could not be confirmed'}
+                subline={admitted ? `${detail.record!.substance.name} · ${detail.record!.site.name}` : earlier_link ? 'An older record saved with an unconfirmed link to an incident · its private details stay withheld' : 'Current access or source history could not be confirmed'}
                 actions={actions}
-                titleChip={<PageHeaderStatusChip variant={admitted && detail.source_integrity === 'recorded' ? 'neutral' : 'warning'}>
-                    {admitted ? detail.source_integrity === 'legacy_unknown' ? 'Earlier provenance unconfirmed' : 'Private recorded source' : 'Details withheld'}</PageHeaderStatusChip>}
-                strip={stages ? <PageHeaderStages steps={stages.steps} next={stages.next} ariaLabel="Exposure stage" /> : undefined}
+                titleChip={<PageHeaderStatusChip variant={admitted && (detail.source_integrity === 'recorded' || earlier_link?.state === 'reviewed') ? 'neutral' : 'warning'}>
+                    {admitted ? detail.source_integrity === 'legacy_unknown' ? earlierLinkChip(earlier_link) ?? 'Earlier provenance unconfirmed' : 'Private recorded source' : earlierLinkChip(earlier_link) ?? 'Details withheld'}</PageHeaderStatusChip>}
+                strip={stages ? <PageHeaderSteps steps={stages.steps} selected={progressShown ? shownStep : null} onSelect={(key) => { setPicked(key === stages.current ? null : key as ExposureStepKey); if (section !== 'overview' || action) drafts.request(() => move('overview')); }} ariaLabel="Exposure steps" /> : undefined}
                 rail={<PageHeaderRail items={rail} value={section} onSelect={(next) => move(next)} ariaLabel="Private exposure sections" />} />}>
                 <div className="grid min-w-0 gap-5">
                     {admitted && delivery_alert ? (
@@ -171,8 +260,15 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
                     <div className={admitted ? 'grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]' : 'grid min-w-0 gap-5'}>
                         <div ref={panel} tabIndex={-1} role="tabpanel" aria-label={SECTIONS.find((item) => item.key === section)?.label} className="grid min-w-0 gap-5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             {admitted ? <>{requestedFocus !== null && focusedFollowupId === null && <p role="status" className="text-subtle text-status-warning">The linked follow-up cannot currently be confirmed. No follow-up has been selected.</p>}
+                                {progressShown && stages && shownStep ? <ExposureProgress next={next} detail={detail} stages={stages} shown={shownStep} onGo={(target) => drafts.request(() => move(target))} onBack={shownStep !== stages.current ? () => setPicked(null) : undefined} /> : null}
                                 <ExposureRecordPanel detail={current} section={section} open={open} onPage={onPage} focusedFollowupId={focusedFollowupId} /></>
-                                : <div role="status"><Note tone="warning">Saved private details and changes are withheld. Retained entries stay in memory until you leave or discard them.</Note></div>}
+                                : earlier_link ? (
+                                    // #15: the private details of an older record with an unconfirmed link stay sealed; its link can still be reviewed.
+                                    <ExposureEarlierLink key={`${shared.auth.user.id}:${earlier_link.expected_version ?? 'r'}`} link={earlier_link} exposureId={detail.id} />
+                                ) : <div role="status"><Note tone="warning">Saved private details and changes are withheld. Retained entries stay in memory until you leave or discard them.</Note></div>}
+                            {admitted && section === 'connections' && earlier_link ? (
+                                <ExposureEarlierLink key={`${shared.auth.user.id}:${earlier_link.expected_version ?? 'r'}`} link={earlier_link} exposureId={detail.id} />
+                            ) : null}
                             <ExposureDeliveryPanel key={shared.auth.user.id} actorId={shared.auth.user.id} detail={current} active={admitted && section === 'connections'} autoCheck={!!delivery_alert} onWithdraw={onWithdraw} />
                         </div>
                         {admitted ? <aside className="min-w-0" aria-label="Care answers and record"><SideColumn><ExposureRecordSide detail={current} /></SideColumn></aside> : null}

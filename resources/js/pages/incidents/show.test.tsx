@@ -865,6 +865,29 @@ describe('Permanent incident workspace', () => {
         expect(within(steps).getByRole('button', { name: /Manager review/ })).toHaveAttribute('aria-pressed', 'true');
     });
 
+    it('shows the reporter’s timed ticks under “Done straight away” (decision 18)', () => {
+        const incident = Object.assign(detail(), {
+            status: 'submitted',
+            immediate_response: [
+                { key: 'made_safe', done: true, at: '2026-10-26T06:45:00Z', detail: null },
+                { key: 'medical_rung', done: true, at: '2026-10-26T06:50:00Z', detail: 'On-call nurse' },
+                { key: 'family_told', done: false, at: null, detail: 'Hemi will ring tomorrow morning' },
+            ],
+        });
+        render(<IncidentShow detail={incident} />);
+        const steps = within(screen.getByRole('banner')).getByRole('list', { name: /Where the incident is up to/ });
+        fireEvent.click(within(steps).getByRole('button', { name: /Reported/ }));
+        const ticks = within(screen.getByRole('region', { name: 'Progress' })).getByRole('list', {
+            name: 'Done straight away',
+        });
+        const items = within(ticks).getAllByRole('listitem');
+        expect(items.map((item) => item.textContent)).toEqual([
+            'Checked the person and made them safe7:45 pm',
+            'Nurse, GP or 111 rung · On-call nurse7:50 pm',
+            'Family/whānau told · Hemi will ring tomorrow morningNot yet',
+        ]);
+    });
+
     it('tells a viewer who cannot do the next step who does, without a disabled button', () => {
         const incident = detail();
         incident.status = 'submitted';
@@ -970,16 +993,17 @@ describe('Permanent incident workspace', () => {
             },
         );
         fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+        // The pop-up kit's discard guard ("Discard this draft?" · Keep editing · Discard draft).
         fireEvent.click(
             within(screen.getByRole('alertdialog')).getByRole('button', {
-                name: 'Cancel',
+                name: 'Keep editing',
             }),
         );
-        expect(within(dialog).getByRole('textbox')).toHaveValue(
+        expect(within(screen.getByRole('dialog')).getByRole('textbox')).toHaveValue(
             'Please coordinate additional support at the house.',
         );
         fireEvent.click(
-            within(dialog).getByRole('button', { name: 'Request response' }),
+            within(screen.getByRole('dialog')).getByRole('button', { name: 'Request response' }),
         );
         expect(state.post).toHaveBeenCalledWith(
             '/control-room/incidents/create-alert',

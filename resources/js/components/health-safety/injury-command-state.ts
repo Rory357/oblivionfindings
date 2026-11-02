@@ -126,7 +126,7 @@ export const INJURY_COMMAND_LABELS: Record<InjuryCommand, string> = {
     add_rtw: 'Add recovery plan',
     add_capacity: 'Record fitness-for-work check',
     edit: 'Edit injury details',
-    assign: 'Change injury owner',
+    assign: 'Change coordinator',
     review: 'Record recovery review',
     edit_rtw: 'Edit recovery plan',
     add_duty: 'Add modified duties',

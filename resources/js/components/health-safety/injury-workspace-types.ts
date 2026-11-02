@@ -6,12 +6,27 @@ import type {
     ModifiedDuty,
     RtwPlan,
 } from '@/components/health-safety/injury-types';
+import type { LinkedSafetyReview } from '@/components/health-safety/restraints/linked-safety-review-card';
 import type {
     InjuryWorkspaceCommand,
     InjuryWorkspaceSection,
 } from '@/lib/health-safety/injury-navigation';
 
 export type InjuryIdentity = { id: number | null; name: string } | null;
+/** Mirrors InjuryWorkspaceService::dutyRestrictions(): what the worker can do at work, never why. */
+export type InjuryDutyRestrictions = {
+    items: {
+        id: number;
+        status: string | null;
+        start_date: string | null;
+        end_date: string | null;
+        duties: string | null;
+        restrictions: string | null;
+        hours_per_day: number | null;
+        set_by: string | null;
+        set_at: string | null;
+    }[];
+};
 export type InjurySourceAccess = 'absent' | 'readable' | 'restricted' | 'unavailable';
 export type InjuryConnection = {
     access: InjurySourceAccess;
@@ -82,6 +97,16 @@ export type InjuryHistory = {
 /** Current scalar projection; null private collections never mean an empty register. */
 export type InjuryRecord = Omit<InjuryDetail,
     'rtw_plans' | 'capacity_assessments' | 'attachments' | 'audits' | 'can'> & {
+    /** Decision 15: the same plain title as its safety review and every list ("Cut left index finger — Mere Tane"). */
+    title?: string;
+    /** The injury in plain words ("Cut left index finger"). */
+    injury_words?: string;
+    /** Who reported it (a factual fact, like the date). */
+    reported_by?: string | null;
+    /** The safety review card: only when this viewer can open the review (decision 6). */
+    safety_review?: LinkedSafetyReview | null;
+    /** Decision 10: the coordinating team lead's duty restrictions — never medical details (null for everyone else). */
+    duty_restrictions?: InjuryDutyRestrictions | null;
     source_version: number;
     source_integrity: 'valid' | 'unknown' | 'repair_required';
     medical_access: 'readable' | 'restricted';

@@ -104,8 +104,9 @@ class HsOverviewHeaderBoxesTest extends TestCase
         $manager = $this->viewer('provider_manager');
         $officer = $this->viewer('health_safety_officer');
 
-        // A team lead has no incident read, so their chart row is the hazard version (never zero incident charts).
-        $this->assertSame('hazards', $this->chartFor($this->viewer('team_lead'), 'due')['kind']);
+        // Since Q21 (Stephan, 2 Nov 2026) a team lead reads incidents at their own Sites, so their chart row is the
+        // incident-reader version, like a provider manager's (it used to be the hazard version).
+        $this->assertSame('actions', $this->chartFor($this->viewer('team_lead'), 'due')['kind']);
 
         $due = $this->chartFor($manager, 'due');
         $this->assertSame('actions', $due['kind']);

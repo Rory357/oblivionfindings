@@ -70,9 +70,15 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── PR5: H&S Backbone Views (Events, Actions, Risk Assessments) ──
     Route::middleware('permission:hazards.view')->group(function () {
         Route::get('/events', [HsEventController::class, 'index'])->name('events.index');
+        // Board M11: "close anyway" requests waiting for this person's decision (the Overview's worklist).
+        Route::get('/events/close-anyway-requests', [HsEventController::class, 'closeAnywayRequests'])->name('events.close-anyway-requests');
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
         // G3 History tab: the review's activity log (read only, the event read).
         Route::get('/events/{hsEvent}/activity', [HsEventController::class, 'activity'])->whereNumber('hsEvent')->name('events.activity');
+        // G3 board M5c: the review as a PDF (the final record once closed; a summary marked in progress otherwise).
+        Route::get('/events/{hsEvent}/pdf', [HsEventController::class, 'pdf'])->whereNumber('hsEvent')->name('events.pdf');
+        // G3 board M5d: open or play a file on a review's step (the review's normal read; each open is logged).
+        Route::get('/events/{event}/files/{file}', [\App\Http\Controllers\HealthSafety\HsEventFileController::class, 'show'])->whereNumber('event')->name('events.files.show');
         Route::get('/events/{hsEvent}/incident-attachments/{attachment}/download', [HsEventController::class, 'downloadIncidentAttachment'])->name('events.incident-attachments.download');
         Route::get('/events/{hsEvent}/control-room-evidence/{item}/download', [HsEventController::class, 'downloadControlRoomEvidence'])->name('events.control-room-evidence.download');
         Route::get('/corrective-actions', [HsEventController::class, 'correctiveActions'])->name('corrective-actions.index');
@@ -98,6 +104,9 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::post('/events/{hsEvent}/accept-handover', [HsEventController::class, 'acceptHandover'])->name('events.handover.accept');
         // Q2 (G3): change a safety review's owner, with a reason.
         Route::post('/events/{hsEvent}/owner', [HsEventController::class, 'changeOwner'])->name('events.owner.change');
+        // G3 board M5d: add photos, videos and documents to a review's step, or hide one with a reason.
+        Route::post('/events/{event}/files', [\App\Http\Controllers\HealthSafety\HsEventFileController::class, 'store'])->whereNumber('event')->name('events.files.store');
+        Route::post('/events/{event}/files/{file}/hide', [\App\Http\Controllers\HealthSafety\HsEventFileController::class, 'hide'])->whereNumber('event')->name('events.files.hide');
         // Answer 20 (G3): corrections to agreed findings go through independent review and approval.
         Route::post('/events/{event}/investigations/{investigation}/corrections', [\App\Http\Controllers\HealthSafety\HsInvestigationCorrectionController::class, 'store'])->whereNumber('event')->name('events.investigations.corrections.store');
         Route::post('/events/{event}/corrections/{correction}/review', [\App\Http\Controllers\HealthSafety\HsInvestigationCorrectionController::class, 'review'])->whereNumber('event')->name('events.corrections.review');
@@ -195,6 +204,12 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
     // ── Phase 5B: Restraint Register ────────────────────────────────────
     Route::prefix('restraints')->name('restraints.')->group(function () {
+
+        // Decision 4 (G4): a support worker's own restraint follow-ups — only theirs, never the restraint record.
+        Route::middleware('permission:restraints.followups.own')->group(function () {
+            Route::get('/my-followups', [\App\Http\Controllers\HealthSafety\RestraintOwnFollowupController::class, 'index'])->name('my-followups');
+            Route::post('/my-followups/{followup}/complete', [\App\Http\Controllers\HealthSafety\RestraintOwnFollowupController::class, 'complete'])->whereNumber('followup')->name('my-followups.complete');
+        });
 
         // The register, source workspaces and bounded review/signoff reads retain separate grants.
         Route::middleware('permission:restraints.view')->group(function () {
@@ -371,6 +386,11 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::put('/{exposure}/followups/{followup}/complete', [ChemicalExposureWorkspaceController::class, 'completeFollowup'])->whereNumber(['exposure', 'followup'])->name('followups.complete');
             Route::post('/{exposure}/evidence', [ChemicalExposureWorkspaceController::class, 'uploadEvidence'])->whereNumber('exposure')->name('evidence.store');
             Route::delete('/{exposure}/evidence/{evidence}', [ChemicalExposureWorkspaceController::class, 'removeEvidence'])->whereNumber(['exposure', 'evidence'])->name('evidence.destroy');
+            // #15: a later review of an earlier, unconfirmed link to an incident (exposure managers; the service re-checks).
+            Route::get('/{exposure}/earlier-link/incidents', [ChemicalExposureWorkspaceController::class, 'earlierLinkIncidents'])->whereNumber('exposure')->name('earlier-link.incidents');
+            Route::post('/{exposure}/earlier-link/reviews', [ChemicalExposureWorkspaceController::class, 'reviewEarlierLink'])->whereNumber('exposure')->middleware('throttle:30,1')->name('earlier-link.reviews.store');
+            Route::post('/{exposure}/earlier-link/files', [ChemicalExposureWorkspaceController::class, 'addEarlierLinkFile'])->whereNumber('exposure')->middleware('throttle:30,1')->name('earlier-link.files.store');
+            Route::get('/{exposure}/earlier-link/files/{file}/download', [ChemicalExposureWorkspaceController::class, 'downloadEarlierLinkFile'])->whereNumber(['exposure', 'file'])->name('earlier-link.files.download');
         });
 
     // Public chemical routes use raw IDs; exposure actions retain their separate owner.

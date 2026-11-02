@@ -123,7 +123,7 @@ it('clears the unsupported worker filter when changing to Responses and does not
     expect(
         screen.getByRole('tablist', { name: 'Lone-worker views' }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: 'Responses' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Help responses to finish' }));
     expect(state.get.mock.calls[0][1]).not.toHaveProperty('user_id');
     state.tab = 'alerts';
     view.rerender(<Register {...props()} tab="alerts" />);
@@ -222,4 +222,27 @@ it('exports the same derived overdue state that staff see on the session row', a
     );
     fireEvent.click(screen.getByRole('button', { name: 'Export this page' }));
     expect(await exported()).toContain('"Check-in overdue"');
+});
+it('names the page Working alone and leads with shifts on now that have no check-ins set up (G4-14)', () => {
+    render(
+        <Register
+            {...props()}
+            can={{ view: true, manage: true, view_control_room: true }}
+            hero={{ ...props().hero, clusters: { ...props().hero.clusters, live: { active: 3, overdue: 0, emergency: 0, ending_soon: 0 } } }}
+            options={{
+                shifts: [
+                    { id: 41, worker: { id: 7, name: 'Mere' }, site: { id: 2, name: 'Tōtara House' }, starts_at: '2026-10-31T09:00:00Z', is_lone: true },
+                    { id: 42, worker: { id: 8, name: 'Sam' }, site: { id: 3, name: 'Rimu House' }, starts_at: '2026-10-31T09:00:00Z', is_lone: false },
+                ],
+            }}
+        />,
+    );
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Working alone');
+    const lead = screen.getByRole('region', { name: 'Needs doing now' });
+    expect(lead).toHaveTextContent('Tōtara House — Mere');
+    expect(lead).not.toHaveTextContent('Rimu House');
+    expect(screen.getByRole('button', { name: 'Set up check-ins: Tōtara House — Mere' })).toBeInTheDocument();
+    // Zero counts that need nobody say so plainly instead of a trend.
+    expect(screen.getByRole('link', { name: /^Missed check-ins: 0\. None right now/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Working alone now: 3\. No trend yet/ })).toBeInTheDocument();
 });

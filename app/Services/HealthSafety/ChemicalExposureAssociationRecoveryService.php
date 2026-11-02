@@ -119,6 +119,82 @@ final class ChemicalExposureAssociationRecoveryService
         }, $context);
     }
 
+    /**
+     * #15 (board 15-1/15-3, approved 2 Nov): the exposure page's "Earlier link to an incident" card for an exposure
+     * manager. Every later review newest first (the latest is the answer, earlier ones show as replaced), each with its
+     * reviewer, dates, reason and notes, read from its proven accepted body; the linked incident and any reviewed
+     * incident are named only when the manager can open them now. Review files list by name. Detached scalars only.
+     */
+    public function card(User $viewer, int $exposureId, ?HealthSafetyReadContext $context = null): array
+    {
+        return $this->within($viewer, $exposureId, function ($identity, $case, $current, $reads, $sites) {
+            $incident = function (?int $id) use ($current, $reads): ?array {
+                if ($id === null) { return null; }
+                $row = app(IncidentAccessService::class)->apply(ClientIncident::query(), $current, $reads)
+                    ->whereKey($id)->first(['id', 'reference_number', 'title', 'occurred_at']);
+                return $row === null ? ['id' => null, 'reference' => null, 'title' => null, 'occurred_at' => null, 'readable' => false]
+                    : ['id' => (int) $row->id, 'reference' => $row->reference_number === null ? null : (string) $row->reference_number, 'title' => $row->title === null ? null : (string) $row->title,
+                        'occurred_at' => $row->occurred_at?->toISOString(), 'readable' => true];
+            };
+            $reviews = []; $files = [];
+            if ($case !== null) {
+                foreach ($this->proveCase($case, $identity, $current, $reads, $sites) as $version) {
+                    $row = $reads->query(ChemicalExposureRecoveryVersion::query())->where('case_id', $case->id)->whereKey($version->id)
+                        ->where('content_digest', $version->content_digest)->whereRaw('SHA2(CAST(content AS BINARY), 256) = ?', [$version->content_digest])
+                        ->firstOrFail(['id', 'content']);
+                    if (hash('sha256', $row->getRawOriginal('content')) !== $version->content_digest) { throw new LogicException('Later review body differs from admitted bytes.'); }
+                    $facts = is_array($row->content['facts'] ?? null) ? $row->content['facts'] : [];
+                    $actor = is_array($row->content['actor'] ?? null) ? $row->content['actor'] : [];
+                    if ($version->command === 'record_legacy_review') {
+                        $reviews[] = ['id' => (int) $version->id, 'revision' => (int) $version->revision, 'decision' => (string) $version->decision,
+                            'reviewed_at' => $version->reviewed_at?->toISOString(), 'recorded_at' => $version->recorded_at?->toISOString(),
+                            'reviewer' => is_string($actor['name'] ?? null) ? $actor['name'] : null,
+                            // As inspect(): a review's own words show only once it confirms the link; an unresolved or
+                            // "not linked" basis stays on file, unread (it may describe the wrong incident).
+                            'reason' => $version->decision === 'reviewed_association' && is_string($facts['reason'] ?? null) ? $facts['reason'] : null,
+                            'notes' => $version->decision === 'reviewed_association' && is_string($facts['notes'] ?? null) ? $facts['notes'] : null,
+                            'incident' => $version->decision === 'reviewed_association' ? $incident(isset($version->review_context['incident_id']) ? (int) $version->review_context['incident_id'] : null) : null];
+                    } elseif ($version->command === 'upload_review_basis') {
+                        $evidence = is_array($facts['file_evidence'] ?? null) ? $facts['file_evidence'] : [];
+                        $file = $reads->query(\App\Models\ChemicalExposureRecoveryEvidence::query())->where('case_id', $case->id)
+                            ->where('version_id', $version->id)->first(['id']);
+                        $files[] = ['id' => $file === null ? null : (int) $file->id, 'name' => is_string($evidence['original_name'] ?? null) ? $evidence['original_name'] : 'File',
+                            'size' => is_int($evidence['size'] ?? null) ? $evidence['size'] : null,
+                            'description' => is_string($facts['description'] ?? null) ? $facts['description'] : null,
+                            'recorded_at' => $version->recorded_at?->toISOString(), 'reviewer' => is_string($actor['name'] ?? null) ? $actor['name'] : null,
+                            // The download proves its own basis again; only a basis kept with a reviewed association opens.
+                            'downloadable' => $file !== null && $version->decision === 'reviewed_association' && $version->review_context !== null];
+                    }
+                }
+            }
+            return ['linked_incident' => $incident($identity['related_incident_id'] === null ? null : (int) $identity['related_incident_id']),
+                'expected_version' => (int) ($case?->revision ?? 0), 'reviews' => array_reverse($reviews), 'files' => array_reverse($files),
+                'can' => ['record_review' => true, 'add_file' => $case !== null]];
+        }, $context);
+    }
+
+    /**
+     * #15: the review form's incident choices: incidents at the exposure's own Site that this manager can open now,
+     * newest first, by reference or title. The review itself proves the picked incident again.
+     *
+     * @return list<array{id: int, reference: string, title: string|null, occurred_at: string|null}>
+     */
+    public function incidentChoices(User $viewer, int $exposureId, string $search = ''): array
+    {
+        return $this->within($viewer, $exposureId, function ($identity, $case, $current, $reads) use ($search): array {
+            $query = app(IncidentAccessService::class)->apply(ClientIncident::query(), $current, $reads)
+                ->where('site_id', $identity['site_id'])->orderByDesc('occurred_at')->orderByDesc('id')->limit(25);
+            $search = trim(mb_substr($search, 0, 100));
+            if ($search !== '') {
+                $query->where(fn ($match) => $match->where('reference_number', 'like', '%'.$search.'%')->orWhere('title', 'like', '%'.$search.'%'));
+            }
+
+            return $query->get(['id', 'reference_number', 'title', 'occurred_at'])->map(fn (ClientIncident $row): array => ['id' => (int) $row->id,
+                'reference' => $row->reference_number === null ? null : (string) $row->reference_number, 'title' => $row->title === null ? null : (string) $row->title,
+                'occurred_at' => $row->occurred_at?->toISOString()])->values()->all();
+        });
+    }
+
     public function recordReview(User $actor, int $exposureId, array $input, ?HealthSafetyReadContext $context = null): array
     {
         $v = ChemicalCommandValues::normalize($input, ['decision' => ['required', 'in:unresolved,reviewed_association,reviewed_no_association'],

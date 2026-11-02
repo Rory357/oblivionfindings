@@ -1240,7 +1240,7 @@ describe('EventDetailDialog closure governance', () => {
     it('lists every blocker in plain language and does not offer an unauthorised override', () => {
         renderDialog();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
 
         expect(
             screen.getByRole('link', {
@@ -1259,7 +1259,7 @@ describe('EventDetailDialog closure governance', () => {
             screen.queryByRole('textbox', { name: /Override reason/ }),
         ).not.toBeInTheDocument();
         expect(
-            screen.getByRole('button', { name: 'Close event' }),
+            screen.getByRole('button', { name: 'Close safety review' }),
         ).toBeDisabled();
     });
 
@@ -1314,12 +1314,12 @@ describe('EventDetailDialog closure governance', () => {
             } as EventDetailOverrides),
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
         fireEvent.change(
             screen.getByRole('textbox', { name: /Closure summary/ }),
             { target: { value: 'Closed under the formal exception process.' } },
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
 
         expect(inertia.post).toHaveBeenCalledWith(
             '/health-safety/events/17/close',
@@ -1378,13 +1378,13 @@ describe('EventDetailDialog closure governance', () => {
         );
 
         expect(
-            screen.queryByRole('button', { name: 'Close event' }),
+            screen.queryByRole('button', { name: 'Close safety review' }),
         ).not.toBeInTheDocument();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Review closure exception' }),
+            screen.getByRole('button', { name: 'Review a close-anyway request' }),
         );
         expect(
-            screen.getByRole('heading', { name: 'Review closure exception' }),
+            screen.getByRole('heading', { name: 'Review a close-anyway request' }),
         ).toBeInTheDocument();
         fireEvent.change(
             screen.getByRole('textbox', {
@@ -1470,13 +1470,13 @@ describe('EventDetailDialog WorkSafe governance', () => {
         );
 
         expect(
-            screen.queryByRole('button', { name: 'Close event' }),
+            screen.queryByRole('button', { name: 'Close safety review' }),
         ).not.toBeInTheDocument();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Review closure exception' }),
+            screen.getByRole('button', { name: 'Review a close-anyway request' }),
         );
         expect(
-            screen.getByRole('heading', { name: 'Review closure exception' }),
+            screen.getByRole('heading', { name: 'Review a close-anyway request' }),
         ).toBeInTheDocument();
         expect(
             screen.getByText(/You asked for this, so someone else decides it./),
@@ -1773,7 +1773,7 @@ describe('EventDetailDialog WorkSafe governance', () => {
             }),
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
 
         expect(
             screen.getByRole('link', {
@@ -1808,7 +1808,7 @@ describe('EventDetailDialog WorkSafe governance', () => {
         });
         const { unmount } = renderDialog(pending);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
         expect(
             screen.getByRole('link', {
                 name: 'Record the WorkSafe notification before closing this event.',
@@ -2650,7 +2650,7 @@ describe('K1a: who can close (B1.5)', () => {
             screen.getAllByText(/Only Jordan Peri, the owner/),
         ).toHaveLength(1);
         expect(
-            screen.queryByRole('button', { name: 'Close event' }),
+            screen.queryByRole('button', { name: 'Close safety review' }),
         ).not.toBeInTheDocument();
     });
 });
@@ -2737,8 +2737,8 @@ describe('G3 safety review page: the ways through rules 1 and 2', () => {
         expect(within(progress).getAllByText('Choose the owner').length).toBeGreaterThan(0);
         fireEvent.click(within(progress).getAllByRole('button', { name: 'Choose owner' })[0]);
         const dialog = screen.getByRole('dialog', { name: 'Choose the owner' });
-        fireEvent.click(within(dialog).getByRole('combobox', { name: 'Choose a person' }));
-        fireEvent.click(screen.getByRole('option', { name: 'Moana Rangi' }));
+        // Board M8: one list of the people who can own it; "Note for the history" is optional for a first owner.
+        fireEvent.click(within(dialog).getByRole('radio', { name: /Moana Rangi/ }));
         fireEvent.click(within(dialog).getByRole('button', { name: 'Choose owner' }));
         expect(inertia.post).toHaveBeenCalledWith('/health-safety/events/17/owner', {
             owner_user_id: '8',
@@ -2795,14 +2795,20 @@ describe('G3 safety review page: the ways through rules 1 and 2', () => {
         const progress = screen.getByRole('region', { name: 'Progress' });
         fireEvent.click(within(progress).getAllByRole('button', { name: /Add revised action/ })[0]);
         expect(onPaneChange).toHaveBeenCalledWith({ kind: 'ca_add', replacesActionId: 141 }, 'overview');
-        expect(screen.getByText('Add a revised action')).toBeInTheDocument();
-        fireEvent.change(screen.getByPlaceholderText(/Install a grab rail/), {
+        // Board M8: the Add action pop-up, naming the failed action and its check result.
+        const dialog = screen.getByRole('dialog', { name: 'Add a revised action' });
+        expect(within(dialog).getByText(/Replaces CA-2026-0141/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/Check result: The rug still slides/)).toBeInTheDocument();
+        fireEvent.change(within(dialog).getByLabelText(/What needs to happen/), {
             target: { value: 'Replace the lounge rug with a non-slip rug' },
         });
-        fireEvent.change(screen.getByLabelText(/^Due/), { target: { value: '2026-08-01' } });
-        fireEvent.click(screen.getByRole('combobox', { name: /Choose owner/ }));
+        fireEvent.click(within(dialog).getByRole('combobox', { name: 'Choose the owner' }));
         fireEvent.click(screen.getByRole('option', { name: 'Moana Rangi' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Add action' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: /^Due date/ }));
+        const days = screen.getAllByRole('button').filter((button) => /\b20\d\d$/.test(button.getAttribute('aria-label') ?? ''));
+        fireEvent.click(days[days.length - 1]);
+        fireEvent.click(screen.getByRole('button', { name: 'Use date' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Add action' }));
         expect(inertia.post).toHaveBeenCalledWith(
             '/health-safety/events/17/corrective-actions',
             expect.objectContaining({

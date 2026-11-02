@@ -413,6 +413,7 @@ function SessionStartEntry({
                 </div>
             )}
             <DrillTimeField
+                pickers
                 label="Expected end"
                 value={data.expected_end_at}
                 offset={data.time_offset}

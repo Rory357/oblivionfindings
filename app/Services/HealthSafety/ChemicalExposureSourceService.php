@@ -914,8 +914,8 @@ final class ChemicalExposureSourceService
             if ($version) {
                 $this->stageDelivery($root, $version, $current, 'health_safety');
                 if (in_array($command, ['assign_followup', 'reassign_followup'], true)) {
-                    // Kept as the named receiver's durable record. Follow-up notices stay off (Stephan, job 3, 26 Oct):
-                    // nothing sends this row and a retry refuses it; the assignee sees the work in /tasks.
+                    // The named receiver's in-app notice (#16): sent straight after the save by the system delivery,
+                    // then retried like the H&S delivery. The assignee also sees the work in /tasks.
                     $this->stageDelivery($root, $version, $current, 'followup', $facts['recipient_id'] ?? null);
                 }
             }

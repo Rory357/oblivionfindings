@@ -1,7 +1,9 @@
-/* "Report something" — the one chooser opened from the H&S Overview header (approved drawing D2, MASTER for Stephan,
- * 30 Oct). Plain-words choices in three groups, on the pop-up kit (PopupForm, 720). The chosen tile says what its form
- * will ask; the main button names the form it opens. Each choice shows only to people allowed to use it (the same
- * permission its route checks), so nobody picks something that then refuses them. Tokens only. */
+/* "Report something" — the one chooser (approved drawing D2, MASTER for Stephan, 30 Oct; board G4-2, 1 Nov): opened
+ * from the top bar on every page (decision 9), My Day's "Something happened?", the staff pages' More sheet and the
+ * H&S Overview header. Plain-words choices in groups, on the pop-up kit (PopupForm, 720), with "A person was hurt, or
+ * nearly hurt" already chosen. The chosen tile says what its form will ask; the main button names the form it opens.
+ * Each choice shows only to people allowed to use it (the same permission its route checks), so nobody picks
+ * something that then refuses them. Tokens only. */
 import { PopupForm, PopupSection } from '@/components/popup';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
@@ -30,7 +32,7 @@ type Workflow = {
     opens: string;
     /** What that form will ask (shown on the chosen tile). */
     asks: string;
-    group: 'hurt' | 'harm' | 'work';
+    group: 'hurt' | 'worried' | 'harm' | 'work';
     /** Mirrors the permission the destination route checks. */
     allowed: (can: Can) => boolean;
 };
@@ -43,7 +45,7 @@ const WORKFLOWS: Workflow[] = [
         key: 'incident',
         icon: ShieldAlert,
         label: 'A person was hurt, or nearly hurt',
-        opens: 'Report an incident',
+        opens: 'Report incident',
         asks: 'Who, where, what happened and what you did straight away.',
         group: 'hurt',
         allowed: (can) => Boolean(can?.incidents?.create),
@@ -114,13 +116,15 @@ const WORKFLOWS: Workflow[] = [
         label: 'You’re worried a person is being harmed',
         opens: 'Raise a safeguarding concern',
         asks: 'What you saw or were told. It goes only to the safeguarding lead.',
-        group: 'work',
+        group: 'worried',
         allowed: (can) => Boolean(can?.safeguarding?.create),
     },
 ];
 
 const GROUPS: { key: Workflow['group']; title: string }[] = [
-    { key: 'hurt', title: 'Someone was hurt, or nearly' },
+    // It holds the restraint tile too, so it names a person, not only an injury (board G4-2).
+    { key: 'hurt', title: 'Something happened to a person' },
+    { key: 'worried', title: 'Worried about someone' },
     { key: 'harm', title: 'Something could hurt someone' },
     { key: 'work', title: 'Before or during work' },
 ];
@@ -158,8 +162,16 @@ export function ReportLauncher({
             title="Report something"
             description={
                 workflows.length
-                    ? 'Choose what happened. We’ll open the right form.'
+                    ? 'Choose what happened — we’ll open the right form'
                     : 'You can’t record health and safety work.'
+            }
+            callout={
+                workflows.length
+                    ? {
+                          tone: 'critical',
+                          content: 'Someone in danger? Call 111 first, then report.',
+                      }
+                    : undefined
             }
             submitLabel={chosen?.opens ?? 'Continue'}
             submitDisabled={!chosen}
@@ -199,7 +211,7 @@ export function ReportLauncher({
                                             aria-checked={on}
                                             onClick={() => setPicked(w.key)}
                                             onDoubleClick={() => onWorkflow(w.key)}
-                                            className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors ${on ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-accent'}`}
+                                            className={`flex min-h-[66px] items-start gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${on ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-accent'}`}
                                         >
                                             <span className="popup-lens size-9 shrink-0">
                                                 <w.icon

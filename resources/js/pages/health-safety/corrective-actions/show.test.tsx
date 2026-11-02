@@ -299,7 +299,7 @@ describe('An action whose owner has left (M13, B1.6)', () => {
         data.next_step = { key: 'choose_owner', can: true };
         render(<ActionShow workspace={data} />);
 
-        expect(screen.getByText('What happens next')).toBeInTheDocument();
+        expect(screen.getByText('Owner needs replacing')).toBeInTheDocument();
         expect(screen.getAllByRole('button', { name: 'Choose a new owner' }).length).toBeGreaterThan(0);
         const start = screen.getByRole('button', { name: 'Start action' });
         expect(start).toBeDisabled();

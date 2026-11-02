@@ -46,6 +46,8 @@ class ClientIncident extends Model implements EmitsToTimeline
 
         'requires_followup',
         'immediate_action_taken',
+        // Decision 18 (G4-2): the reporter's timed "done straight away" ticks — [{key, done, at, detail}].
+        'immediate_response',
         'witnesses',
 
         // legacy compatibility (kept for existing UI/db)
@@ -108,6 +110,7 @@ class ClientIncident extends Model implements EmitsToTimeline
         'occurred_at' => 'datetime',
         'submitted_at' => 'datetime',
         'metadata' => 'array',
+        'immediate_response' => 'array',
         'requires_followup' => 'boolean',
         'portal_visible' => 'boolean',
         'reviewed_at' => 'datetime',

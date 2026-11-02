@@ -31,6 +31,11 @@ class TeamLeadIncidentReportingTest extends TestCase
     public function test_a_team_lead_reports_from_the_standalone_page_for_clients_at_their_sites_only(): void
     {
         [$lead, $site] = $this->teamLeadAt();
+        // Since Q21 (Stephan, 2 Nov 2026) team leads read the register, so they report there; this keeps the standalone
+        // page covered for a create-only reporter (a team lead whose incident read is turned off).
+        $read = \App\Models\Permission::where('key', 'incidents.viewAny')->sole();
+        $lead->permissionOverrides()->syncWithoutDetaching([$read->id => ['allowed' => false]]);
+        $lead = $lead->fresh();
         $own = Client::factory()->create(['site_id' => $site->id, 'first_name' => 'Aroha', 'last_name' => 'Here']);
         $elsewhere = Client::factory()->create(['site_id' => Site::factory()->create(['is_active' => true])->id]);
 
@@ -105,7 +110,7 @@ class TeamLeadIncidentReportingTest extends TestCase
         $granted = $role->permissions()->pluck('key')->all();
         $this->assertContains('incidents.create', $granted);
         $this->assertContains('clients.viewAny', $granted);
-        $this->assertNotContains('incidents.viewAny', $granted);
+        // This migration adds exactly its two keys (asserted above); incidents.viewAny now comes from Q21's own migration.
         $this->assertNotContains('incidents.viewAssigned', $granted);
     }
 

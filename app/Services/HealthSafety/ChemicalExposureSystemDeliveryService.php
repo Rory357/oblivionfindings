@@ -31,7 +31,12 @@ use Throwable;
  * audit as Codex's manager delivery, under its own audit action, with the command's actor recorded.
  *
  * A failed attempt is kept: lock clashes and errors retry 30 s doubling to 15 min; an integrity refusal stops and waits
- * for a manager's retry. Follow-up notices stay off (Stephan), so only Health and Safety rows are delivered here.
+ * for a manager's retry.
+ *
+ * #16 (Stephan, 31 Oct: "Turn them on"): a follow-up's in-app notice to its named person goes the same way, straight
+ * after the save and then by the same retry, through the follow-up destination (which checks the person who assigned
+ * it, the named person's own current access and their notification preference). If the named person has turned the
+ * notice off, it isn't retried; the follow-up still shows in their Tasks.
  */
 final class ChemicalExposureSystemDeliveryService
 {
@@ -58,6 +63,13 @@ final class ChemicalExposureSystemDeliveryService
         $ids = ChemicalExposureSourceDelivery::query()->where('exposure_id', $exposureId)->where('kind', 'health_safety')
             ->where('state', 'pending')->where('needs_manager', false)->orderByDesc('id')->pluck('id');
         foreach ($ids as $id) { $this->attempt((int) $id); }
+        // A follow-up notice is confirmed only after its own commit, so it never starts inside a caller's transaction;
+        // a save that is still inside one leaves it to the every-minute recovery.
+        if (DB::transactionLevel() === 0) {
+            $followups = ChemicalExposureSourceDelivery::query()->where('exposure_id', $exposureId)->where('kind', 'followup')
+                ->where('state', 'pending')->where('needs_manager', false)->where('failed_attempts', 0)->orderByDesc('id')->pluck('id');
+            foreach ($followups as $id) { $this->attemptFollowup((int) $id); }
+        }
     }
 
     /** Scheduled every minute: rows whose retry is due, and rows the inline delivery never reached. */
@@ -73,7 +85,65 @@ final class ChemicalExposureSystemDeliveryService
                     ->where('created_at', '<=', $now->copy()->subSeconds(self::INLINE_GRACE_SECONDS))))
             ->orderByDesc('id')->limit($limit)->pluck('id');
         foreach ($ids as $id) { $outcomes[(int) $id] = $this->attempt((int) $id); }
+        if (DB::transactionLevel() === 0) {
+            // Follow-up notices: due retries, and rows the inline attempt never reached. A notice the named person
+            // turned off has no next attempt and isn't picked up again.
+            $followups = ChemicalExposureSourceDelivery::query()->where('state', 'pending')->where('kind', 'followup')
+                ->where('needs_manager', false)
+                ->where(fn (Builder $due) => $due->where('next_attempt_at', '<=', $now)
+                    ->orWhere(fn (Builder $never) => $never->whereNull('next_attempt_at')->where('failed_attempts', 0)
+                        ->where('created_at', '<=', $now->copy()->subSeconds(self::INLINE_GRACE_SECONDS))))
+                ->orderByDesc('id')->limit($limit)->pluck('id');
+            foreach ($followups as $id) { $outcomes[(int) $id] = $this->attemptFollowup((int) $id); }
+        }
         return $outcomes;
+    }
+
+    /**
+     * One follow-up notice attempt, as the person who assigned the follow-up. The destination opens its own transaction
+     * and checks that person's current access, the named person's current access and preference, and the exact source
+     * revision. Returns delivered, superseded, failed, turned_off or the row's settled state.
+     */
+    public function attemptFollowup(int $deliveryId): string
+    {
+        try {
+            $row = ChemicalExposureSourceDelivery::query()->whereKey($deliveryId)->first(['id', 'kind', 'state', 'actor_id']);
+            if ($row === null) { throw new ModelNotFoundException('Exposure delivery is unavailable.'); }
+            if ($row->kind !== 'followup') { throw new LogicException('Only follow-up notices are delivered here.'); }
+            if ($row->state !== 'pending') { return (string) $row->state; }
+            $actor = User::query()->find($row->actor_id);
+            if ($actor === null) { throw new ModelNotFoundException('The person who assigned this follow-up is unavailable.'); }
+            $result = app(ChemicalExposureFollowupDestinationService::class)->deliverForViewer($actor, $deliveryId);
+
+            return (string) ($result['state'] ?? $result['attempt_state'] ?? 'delivered');
+        } catch (\Illuminate\Validation\ValidationException $declined) {
+            if (array_keys($declined->errors()) !== ['delivery']) {
+                $this->recordFailure($deliveryId, $declined);
+
+                return 'failed';
+            }
+            // The named person turned this notice off. Not an error, and retrying won't change it.
+            $this->recordTurnedOff($deliveryId);
+
+            return 'turned_off';
+        } catch (Throwable $error) {
+            $this->recordFailure($deliveryId, $error);
+
+            return 'failed';
+        }
+    }
+
+    private function recordTurnedOff(int $id): void
+    {
+        try {
+            DB::table('chemical_exposure_source_deliveries')->where('id', $id)->where('state', 'pending')->update([
+                'failed_attempts' => DB::raw('failed_attempts + 1'), 'failure_code' => 'turned_off', 'needs_manager' => false,
+                'last_attempted_at' => Carbon::now()->format('Y-m-d H:i:s.u'), 'next_attempt_at' => null,
+                'updated_at' => Carbon::now()->format('Y-m-d H:i:s.u'),
+            ]);
+        } catch (Throwable $recording) {
+            report($recording);
+        }
     }
 
     /** One attempt in its own transaction. Returns delivered, superseded, failed or the row's settled state. */
@@ -514,6 +584,8 @@ final class ChemicalExposureSystemDeliveryService
     {
         if ($error instanceof QueryException && in_array((int) ($error->errorInfo[1] ?? 0), [1205, 1213, 3572], true)) { return 'busy'; }
         if ($error instanceof ModelNotFoundException) { return 'unavailable'; }
+        // A follow-up notice refused because someone's access changed: retrying won't help until a manager looks.
+        if ($error instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) { return 'unavailable'; }
         if ($error instanceof LogicException) { return 'integrity'; }
         return 'error';
     }

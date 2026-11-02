@@ -44,11 +44,21 @@ import {
     type InvestigationCorrection,
 } from '@/components/health-safety/review-correction';
 import {
+    REVIEW_STEP_LABELS,
     ReviewHistory,
     useReviewActivity,
     type ReviewStepKey,
 } from '@/components/health-safety/review-history';
-import { ReviewOwnerDialog } from '@/components/health-safety/review-owner-dialog';
+import {
+    AddActionDialog,
+    AskCloseAnywayDialog,
+    CloseReviewDialog,
+    DownloadPdfDialog,
+    DecideCloseAnywayDialog,
+    ReviewOwnerDialog,
+    WorksafeDecisionDialog,
+    WorksafeToldDialog,
+} from '@/components/health-safety/review-dialogs';
 import {
     ClosureReadinessLine,
     agreedInvestigation,
@@ -59,6 +69,7 @@ import {
     reviewStepPane,
 } from '@/components/health-safety/review-progress';
 import { RecordProgress } from '@/components/signature/record-progress';
+import { AddFilesDialog, ReviewFilesSurface, type ReviewFile } from '@/components/health-safety/review-files';
 import {
     ShiftContextMenu,
     type ShiftCtxItem,
@@ -137,6 +148,7 @@ import {
 import { correctiveActionHref } from '@/lib/health-safety/navigation';
 import { incidentWorkspaceHref } from '@/lib/incidents/navigation';
 import { cn } from '@/lib/utils';
+import { PopupCallout } from '@/components/popup';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -145,6 +157,7 @@ import {
     ChevronRight,
     Clock,
     ExternalLink,
+    FileDown,
     FileText,
     History,
     Link2,
@@ -251,6 +264,8 @@ export type EventCorrectiveAction = {
     completed_by_name: string | null;
     /** manage && status==='completed' && completer !== current viewer — gates Verify. */
     can_verify: boolean;
+    /** Q22: why this viewer, who could otherwise check it, can't (separation of duties). */
+    verify_blocked_reason?: string | null;
     verified_at: string | null;
     verified_by_name?: string | null;
     effectiveness_confirmed: boolean | null;
@@ -521,6 +536,8 @@ export type EventDetail = {
     corrective_actions: EventCorrectiveAction[];
     risk_assessments: EventRiskAssessment[];
     attachments: EventAttachment[];
+    /** G3 board M5d: photos, videos and documents on the review's steps. */
+    files?: ReviewFile[];
     handover: EventHandover;
     lifecycle: EventLifecycle;
     handover_summary: EventHandoverSummary;
@@ -556,12 +573,15 @@ export type EventDetail = {
     /** K1a: who can close this review (said to viewers who can't). */
     close_authority?: { who: 'owner_or_close_any' | 'anyone_at_site'; text: string };
     journey_state: string;
-    assignable_staff: Array<{ id: number; name: string }>;
+    /** detail: "Provider manager · Kauri House, Rimu House" (board M8). */
+    assignable_staff: Array<{ id: number; name: string; detail?: string | null }>;
     action_handover: CorrectiveActionHandover;
     can: {
         manage: boolean;
         /** Decision 3 + Q2 (G3): choose the first owner, or change it with a reason. */
         change_owner?: boolean;
+        /** G3 board M5d: add photos, videos and documents to a step. */
+        add_files?: boolean;
         request_procedure_review?: boolean;
         view_procedure_requests?: boolean;
         close: boolean;
@@ -1231,7 +1251,7 @@ function EventWorkspace({
                             : ''
                     }
                 >
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Close event
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Close safety review
                 </Button>
             ) : null}
             {!canClose && canReviewClosureExceptions ? (
@@ -1240,8 +1260,7 @@ function EventWorkspace({
                     variant="outline"
                     onClick={() => setPane({ kind: 'close' })}
                 >
-                    <ShieldCheck className="mr-1.5 h-4 w-4" /> Review closure
-                    exception
+                    <ShieldCheck className="mr-1.5 h-4 w-4" /> Review a close-anyway request
                 </Button>
             ) : null}
         </div>
@@ -1588,7 +1607,7 @@ function reviewHeaderActions(
     else if (canReviewClosureExceptions)
         items.push({
             key: 'exception',
-            label: 'Review closure exception',
+            label: 'Review a close-anyway request',
             icon: ShieldCheck,
             pane: { kind: 'close' },
         });
@@ -1671,7 +1690,51 @@ function SafetyReviewPage({
     const [ownerOpen, setOwnerOpen] = useState(openOwnerFirst && !!d.can.change_owner);
     const [correcting, setCorrecting] = useState<EventInvestigation | null>(null);
     const activity = useReviewActivity(d.id, true, d);
-    const viewerName = (usePage().props as { auth?: { user?: { name?: string } } }).auth?.user?.name ?? null;
+    const viewer = (usePage().props as { auth?: { user?: { id?: number; name?: string } } }).auth?.user;
+    const viewerName = viewer?.name ?? null;
+    // Board M8: adding an action, telling WorkSafe and an ordinary close open as kit pop-ups over the page; every
+    // other step (and a close that still needs "close anyway") keeps its pane.
+    // An approved, current "close anyway" that covers every item left (the same test as the close pane).
+    const nowMs = Date.now();
+    const exceptionalLeft = d.close_readiness.exceptional_blockers;
+    const authorising = exceptionalLeft.length
+        ? d.closure_exceptions.find(
+              (exception) =>
+                  exception.status === 'approved' &&
+                  !!exception.expires_at &&
+                  new Date(exception.expires_at).getTime() > nowMs &&
+                  !!exception.review_at &&
+                  new Date(exception.review_at).getTime() > nowMs &&
+                  exceptionalLeft.every((blocker) => exception.scope.includes(blocker.key)),
+          )
+        : undefined;
+    const closeReady = d.can.close && d.close_readiness.hard_blockers.length === 0 && (exceptionalLeft.length === 0 || !!authorising);
+    const dialogPane =
+        pane &&
+        (pane.kind === 'ca_add' ||
+            pane.kind === 'worksafe_notify' ||
+            pane.kind === 'worksafe_decision' ||
+            (pane.kind === 'close' && closeReady))
+            ? pane
+            : null;
+    // M12: one request covers one item, so "Ask to close anyway" is offered only when exactly one is left.
+    const pendingException = d.closure_exceptions.find((exception) => exception.status === 'pending') ?? null;
+    const canAskCloseAnyway =
+        d.status !== 'closed' &&
+        d.can.request_closure_exception &&
+        d.close_readiness.hard_blockers.length === 0 &&
+        exceptionalLeft.length === 1 &&
+        !pendingException &&
+        !authorising;
+    const [askOpen, setAskOpen] = useState(false);
+    const [filesStep, setFilesStep] = useState<ReviewStepKey | null>(null);
+    const [pdfOpen, setPdfOpen] = useState(false);
+    const [deciding, setDeciding] = useState(false);
+    const inlinePane = dialogPane ? null : pane;
+    const replaced =
+        dialogPane?.kind === 'ca_add' && dialogPane.replacesActionId
+            ? (d.corrective_actions.find((action) => action.id === dialogPane.replacesActionId) ?? null)
+            : null;
     const chip = reviewStatusChip(d, stage.label);
 
     // Board M5: the header holds More (Print summary comes with the PDF round); the Progress card's next-step bar
@@ -1691,8 +1754,17 @@ function SafetyReviewPage({
         d.can.change_owner && d.status !== 'closed'
             ? { key: 'owner', label: owner ? 'Change owner…' : 'Choose owner…', icon: UserIcon, run: () => setOwnerOpen(true) }
             : null;
-    const headerActions =
-        more.length || ownerItem ? (
+    const askItem = canAskCloseAnyway
+        ? { key: 'ask-close-anyway', label: 'Ask to close anyway…', icon: ShieldCheck, run: () => setAskOpen(true) }
+        : null;
+    // Board M5c: "Download PDF" once closed (one button, no second one); open records keep "Print summary".
+    const pdfButton = (
+        <PageHeaderGlassButton icon={FileDown} onClick={() => setPdfOpen(true)}>
+            {d.status === 'closed' ? 'Download PDF' : 'Print summary'}
+        </PageHeaderGlassButton>
+    );
+    const moreMenu =
+        more.length || ownerItem || askItem ? (
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <PageHeaderGlassButton icon={MoreHorizontal} aria-label="More safety review actions">
@@ -1706,6 +1778,12 @@ function SafetyReviewPage({
                             {ownerItem.label}
                         </DropdownMenuItem>
                     ) : null}
+                    {askItem ? (
+                        <DropdownMenuItem onSelect={askItem.run}>
+                            <askItem.icon className="size-4" />
+                            {askItem.label}
+                        </DropdownMenuItem>
+                    ) : null}
                     {more.map((action) => (
                         <DropdownMenuItem key={action.key} title={action.title} onSelect={() => onPane(action.pane)}>
                             <action.icon className="size-4" />
@@ -1715,6 +1793,12 @@ function SafetyReviewPage({
                 </DropdownMenuContent>
             </DropdownMenu>
         ) : null;
+    const headerActions = (
+        <>
+            {pdfButton}
+            {moreMenu}
+        </>
+    );
 
     const handlers = {
         onPane: (next: SafetyReviewPane) => onPane(next),
@@ -1734,9 +1818,22 @@ function SafetyReviewPage({
                     ...handlers,
                     onBack: picked !== current ? () => setPicked(current) : undefined,
                     onHistory: () => onSection('history'),
+                    onAddFiles: (step) => setFilesStep(step),
+                    onPdf: () => setPdfOpen(true),
                 })}
             />
             <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
+            {pendingException ? (
+                <QuietLine
+                    title="“Close anyway” request"
+                    text={
+                        pendingException.can_decide
+                            ? `${pendingException.requester?.name ?? 'Someone'} asked to close this safety review with one item still open. It’s waiting for your decision.`
+                            : `${pendingException.requester?.name ?? 'Someone'} asked to close this safety review with one item still open. It’s waiting for a decision${pendingException.decide_blocked_reason ? `: ${pendingException.decide_blocked_reason}` : '.'}`
+                    }
+                    action={pendingException.can_decide ? { label: 'Decide', onClick: () => setDeciding(true) } : null}
+                />
+            ) : null}
             {picked === 'assigned' ? <ReviewHandover d={d} /> : null}
             <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
                 <div className="grid min-w-0 content-start gap-5">
@@ -1792,10 +1889,10 @@ function SafetyReviewPage({
         </>
     );
 
-    const main = pane ? (
+    const main = inlinePane ? (
         <Surface aria-label="Current safety review action">
             <div className="p-5">
-                <PaneRenderer pane={pane} d={d} onDone={onPaneDone} onCancel={() => onPane(null)} />
+                <PaneRenderer pane={inlinePane} d={d} onDone={onPaneDone} onCancel={() => onPane(null)} />
             </div>
         </Surface>
     ) : tab === 'investigation' ? (
@@ -1818,7 +1915,16 @@ function SafetyReviewPage({
             <ReviewRisk d={d} />
         </>
     ) : tab === 'evidence' ? (
-        <ReviewEvidence d={d} />
+        <>
+            <ReviewFilesSurface
+                eventId={d.id}
+                files={d.files ?? []}
+                stepLabel={(step) => REVIEW_STEP_LABELS[step as ReviewStepKey] ?? step}
+                canAdd={!!d.can.add_files}
+                onAdd={() => setFilesStep(current)}
+            />
+            <ReviewEvidence d={d} />
+        </>
     ) : tab === 'history' ? (
         <ReviewHistory activity={activity} />
     ) : (
@@ -1851,7 +1957,7 @@ function SafetyReviewPage({
                     ]
                         .filter(Boolean)
                         .join(' · ')}
-                    actions={pane ? undefined : headerActions}
+                    actions={inlinePane ? undefined : headerActions}
                     facts={
                         <PageHeaderFacts
                             items={[
@@ -1863,7 +1969,7 @@ function SafetyReviewPage({
                     strip={
                         <PageHeaderSteps
                             steps={reviewRoundSteps(d)}
-                            selected={!pane && tab === 'overview' ? picked : null}
+                            selected={!inlinePane && tab === 'overview' ? picked : null}
                             onSelect={(key) => {
                                 setPicked(key as ReviewStepKey);
                                 if (pane) onPane(null);
@@ -1886,7 +1992,7 @@ function SafetyReviewPage({
             <div
                 id="safety-review-panel"
                 role="tabpanel"
-                aria-label={pane ? 'Current action' : (reviewTabs(d).find((item) => item.key === tab)?.label ?? 'Overview')}
+                aria-label={inlinePane ? 'Current action' : (reviewTabs(d).find((item) => item.key === tab)?.label ?? 'Overview')}
                 className="grid min-w-0 gap-5"
             >
                 {main}
@@ -1900,6 +2006,59 @@ function SafetyReviewPage({
                 siteName={d.site?.name ?? null}
                 currentOwner={d.handover.owner}
                 candidates={d.assignable_staff}
+                viewerId={viewer?.id ?? null}
+            />
+            <AddActionDialog
+                key={dialogPane?.kind === 'ca_add' ? `add-${replaced?.id ?? 0}` : 'add'}
+                open={dialogPane?.kind === 'ca_add'}
+                onClose={() => onPane(null)}
+                onDone={onPaneDone}
+                d={d}
+                replaces={replaced}
+            />
+            <WorksafeToldDialog
+                open={dialogPane?.kind === 'worksafe_notify'}
+                onClose={() => onPane(null)}
+                onDone={onPaneDone}
+                d={d}
+                viewerName={viewerName}
+            />
+            <WorksafeDecisionDialog
+                key={dialogPane?.kind === 'worksafe_decision' ? 'decision-open' : 'decision'}
+                open={dialogPane?.kind === 'worksafe_decision'}
+                onClose={() => onPane(null)}
+                onDone={(notifiable) => (notifiable ? onPane({ kind: 'worksafe_notify' }) : onPaneDone())}
+                d={d}
+            />
+            {filesStep ? (
+                <AddFilesDialog
+                    open
+                    onClose={() => setFilesStep(null)}
+                    eventId={d.id}
+                    step={filesStep}
+                    stepLabel={REVIEW_STEP_LABELS[filesStep]}
+                    context={[safetyReviewTitle(d), d.site?.name, d.reference_number].filter(Boolean).join(' · ')}
+                    viewerName={viewerName}
+                />
+            ) : null}
+            <DownloadPdfDialog open={pdfOpen} onClose={() => setPdfOpen(false)} d={d} />
+            <AskCloseAnywayDialog open={askOpen} onClose={() => setAskOpen(false)} onDone={() => setAskOpen(false)} d={d} />
+            {pendingException?.can_decide ? (
+                <DecideCloseAnywayDialog
+                    open={deciding}
+                    onClose={() => setDeciding(false)}
+                    d={d}
+                    exception={pendingException}
+                    viewerName={viewerName}
+                />
+            ) : null}
+            <CloseReviewDialog
+                open={dialogPane?.kind === 'close'}
+                onClose={() => onPane(null)}
+                onDone={onPaneDone}
+                d={d}
+                exceptionId={authorising?.id ?? null}
+                incidentCloser={d.source?.type === 'ClientIncident' ? `a manager at ${d.site?.name ?? 'the site'}` : null}
             />
             {correcting ? (
                 <CorrectFindingsDialog
@@ -2494,7 +2653,7 @@ function ReviewHandover({ d }: { d: EventDetail }) {
         summary.potential_consequence
             ? {
                   icon: TriangleAlert,
-                  text: `Could have caused: ${summary.potential_consequence}`,
+                  text: `Consequence: ${summary.potential_consequence}`,
               }
             : null,
     ].filter((fact) => fact !== null);
@@ -3699,11 +3858,11 @@ function CloseEventPane({
         <div className="flex flex-col gap-4">
             <StepHead
                 icon={CheckCircle2}
-                title={d.can.close ? 'Close event' : 'Review closure exception'}
+                title={d.can.close ? 'Close safety review' : 'Review a close-anyway request'}
                 blurb={
                     d.can.close
-                        ? 'The statutory and protective checks are hard gates. An independently approved, current exception can cover only the named internal-governance blocker.'
-                        : 'Review the request, evidence, scope and time limit independently. This authority does not grant ordinary closure permission.'
+                        ? 'Everything below must be done first. WorkSafe and safety checks can never be skipped; an approved exception can only cover an internal record that can’t be finished in time.'
+                        : 'Check the request, its evidence and its time limit. Approving it does not let you close the review yourself.'
                 }
             />
 
@@ -3719,27 +3878,36 @@ function CloseEventPane({
             <JourneyGateList gate={d.close_gate} />
 
             {hardBlockers.length > 0 ? (
-                <InfoCard icon={AlertTriangle} tone="crit">
-                    <p className="font-semibold">Hard safety blockers</p>
-                    <p className="mt-2">
-                        These WorkSafe, Site-preservation, Site-scope,
-                        active-alert or protective-work checks cannot be
-                        bypassed by an exception.
+                <PopupCallout tone="critical">
+                    <p className="font-semibold">
+                        {hardBlockers.length === 1
+                            ? 'This must be done before the review can close'
+                            : `These ${hardBlockers.length} things must be done before the review can close`}
                     </p>
-                </InfoCard>
+                    <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+                        {hardBlockers.map((blocker) => (
+                            <li key={blocker.key}>{blocker.label}</li>
+                        ))}
+                    </ul>
+                    <p className="mt-1.5">
+                        An exception can’t cover these, even an approved one.
+                    </p>
+                </PopupCallout>
             ) : null}
 
             {exceptionalBlockers.length > 0 ? (
-                <InfoCard icon={ShieldCheck} tone="warn">
+                <PopupCallout tone={authorisingException ? 'success' : 'warning'}>
                     <p className="font-semibold">
-                        Exceptional internal blocker
-                    </p>
-                    <p className="mt-2">
                         {authorisingException
-                            ? `Approved exception #${authorisingException.id} covers the current blocker until ${authorisingException.expires_at ? formatDateTime(authorisingException.expires_at) : 'its recorded expiry'}. It will be rechecked when you close.`
-                            : 'A separate requester and approver must record a current, evidence-backed exception for the exact blocker. Free text cannot authorise closure.'}
+                            ? `Covered by approved exception #${authorisingException.id}`
+                            : 'An internal record isn’t finished'}
                     </p>
-                </InfoCard>
+                    <p className="mt-1">
+                        {authorisingException
+                            ? `It covers ${exceptionalBlockers.map((blocker) => blocker.label).join('; ')} until ${authorisingException.expires_at ? formatDateTime(authorisingException.expires_at) : 'its expiry'}. It is checked again when you close.${hardBlockers.length > 0 ? ' The items above still need doing first.' : ''}`
+                            : 'If it truly can’t be finished in time, someone can ask to close anyway below, and a different person must approve it with evidence.'}
+                    </p>
+                </PopupCallout>
             ) : null}
 
             {d.can.close ? (
@@ -3758,6 +3926,17 @@ function CloseEventPane({
                             placeholder="How was this event resolved? What did the investigation and corrective actions conclude?"
                         />
                     </Field>
+                    {!canSubmit && !form.processing ? (
+                        <p className="text-caption text-right">
+                            {hardBlockers.length > 0
+                                ? 'You can close once the items above are done.'
+                                : exceptionalBlockers.length > 0 && !authorisingException
+                                  ? 'You can close once the internal record is finished or an exception is approved.'
+                                  : form.data.closure_summary.trim() === ''
+                                    ? 'Add a closure summary to close.'
+                                    : null}
+                        </p>
+                    ) : null}
                     <div className="flex justify-end gap-2">
                         <Button
                             type="button"
@@ -3770,7 +3949,7 @@ function CloseEventPane({
                             type="submit"
                             disabled={form.processing || !canSubmit}
                         >
-                            Close event
+                            Close safety review
                         </Button>
                     </div>
                 </form>
@@ -3819,6 +3998,12 @@ function ClosureExceptionPanel({
         e.preventDefault();
         request.post(`/health-safety/events/${d.id}/closure-exceptions`, {
             preserveScroll: true,
+            // A sent request shows in the record above; clear the form so it isn't sent twice by accident.
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) {
+                    request.reset('reason', 'evidence_reference');
+                }
+            },
         });
     };
 
@@ -3980,9 +4165,6 @@ function ClosureExceptionRecord({
                     Decision: {exception.decision_reason}
                 </p>
             ) : null}
-            <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                Provenance {exception.provenance_hash.slice(0, 16)}
-            </p>
 
             {exception.status === 'pending' &&
             exception.can_decide === false &&
@@ -4097,7 +4279,7 @@ function AcceptHandoverPane({
             </InfoCard>
             <Field
                 label="H&S owner"
-                hint="Optional — leave blank to assign yourself if you work at this site"
+                hint="Choose who owns it. You can leave it blank only if you work at this Site — then it is yours."
                 error={form.errors.owner_user_id}
             >
                 <StaffSelect

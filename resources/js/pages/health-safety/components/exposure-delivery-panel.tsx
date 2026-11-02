@@ -4,8 +4,8 @@
  * `GET /health-safety/chemical-exposures/{id}/deliveries`: each attempt with its checked destination (whether the H&S
  * event is really there), what the automatic delivery did (failed attempts, why, the next try) and whether the viewer
  * may retry it. Exposure managers retry with an explicit POST to `…/deliveries/{delivery}/retry`; the server proves the
- * record again and reports the result. GET never sends anything. Follow-up notices are off, so a follow-up attempt is
- * shown but never sent. A refused read (401/403/404) withdraws the private view, as before. */
+ * record again and reports the result. GET never sends anything. A follow-up attempt is its in-app notice to the named
+ * person (#16): sent, turned off by them, or retrying. A refused read (401/403/404) withdraws the private view, as before. */
 import { Note, Surface } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export type ExposureDeliveryAutomatic = {
     failed_attempts: number;
-    failure: 'busy' | 'error' | 'integrity' | 'unavailable' | null;
+    failure: 'busy' | 'error' | 'integrity' | 'unavailable' | 'turned_off' | null;
     needs_manager: boolean;
     next_attempt_at: string | null;
     last_attempted_at: string | null;
@@ -46,7 +46,7 @@ const object = (value: unknown): value is Record<string, unknown> => !!value && 
 const count = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 const optionalText = (value: unknown) => value === null || typeof value === 'string';
 function automatic(value: unknown): value is ExposureDeliveryAutomatic {
-    return object(value) && count(value.failed_attempts) && (value.failure === null || ['busy', 'error', 'integrity', 'unavailable'].includes(String(value.failure)))
+    return object(value) && count(value.failed_attempts) && (value.failure === null || ['busy', 'error', 'integrity', 'unavailable', 'turned_off'].includes(String(value.failure)))
         && typeof value.needs_manager === 'boolean' && optionalText(value.next_attempt_at) && optionalText(value.last_attempted_at) && typeof value.stuck === 'boolean';
 }
 function attempt(value: unknown): value is ExposureDeliveryAttempt {
@@ -68,8 +68,10 @@ function collection(value: unknown): value is ExposureDeliveryCollection {
 /** One plain answer per attempt: where the work is now. */
 function stateOf(row: ExposureDeliveryAttempt): { label: string; variant: StatusVariant } {
     if (row.acceptance_integrity === 'repair_required' || row.destination.state === 'repair_required') return { label: 'Needs checking', variant: 'critical' };
-    if (row.kind === 'followup') return { label: 'Notice not sent', variant: 'neutral' };
     if (row.attempt_state === 'superseded' || row.currency === 'superseded') return { label: 'Replaced by a later save', variant: 'neutral' };
+    // #16: a follow-up's in-app notice to its named person.
+    if (row.kind === 'followup' && row.destination.state === 'inbox_present') return { label: 'Notice sent', variant: 'success' };
+    if (row.kind === 'followup' && row.automatic?.failure === 'turned_off') return { label: 'Notice turned off', variant: 'neutral' };
     if (row.destination.state === 'hs_event_present') return { label: 'On the H&S register', variant: 'success' };
     if (row.automatic?.needs_manager) return { label: 'Needs a manager', variant: 'critical' };
     if (row.automatic?.failure) return { label: 'Failed · trying again', variant: 'warning' };
@@ -82,11 +84,12 @@ const FAILURE: Record<string, string> = {
     error: 'Something went wrong while saving it to the register.',
     integrity: 'The record’s saved history didn’t check out, so it wasn’t sent.',
     unavailable: 'The record or its H&S event couldn’t be found.',
+    turned_off: 'The named person turned this notice off. They still see the follow-up in their Tasks.',
 };
 const BLOCKED: Record<string, string> = {
     current_manage_required: 'Only an exposure manager can retry this delivery.',
     source_advanced: 'A later save replaced this delivery.',
-    followup_notices_off: 'Follow-up notices are off. The assignee sees this work in Tasks.',
+    recipient_opted_out: 'The named person turned this notice off. They still see the follow-up in their Tasks.',
     response_floor_pending: 'The H&S event’s severity is below what the exposure needs. A retry raises it.',
 };
 

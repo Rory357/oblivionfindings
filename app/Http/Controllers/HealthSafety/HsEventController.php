@@ -122,6 +122,16 @@ class HsEventController extends Controller
                     ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
                 'correctiveActions as awaiting_verification_count' => fn (Builder $q) => $q
                     ->where('status', HsCorrectiveAction::STATUS_COMPLETED),
+                // G3 board M6: where each review is up to and its next step.
+                'investigations as completed_investigations_count' => fn (Builder $q) => $q
+                    ->where('status', HsInvestigation::STATUS_COMPLETED),
+                'correctiveActions as actions_count',
+                'correctiveActions as done_actions_count' => fn (Builder $q) => $q
+                    ->whereIn('status', [HsCorrectiveAction::STATUS_COMPLETED, HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
+                'correctiveActions as failed_unrevised_count' => fn (Builder $q) => $q
+                    ->whereIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                    ->where('effectiveness_confirmed', false)
+                    ->whereDoesntHave('revisions'),
             ])
             ->orderByDesc('reported_at');
 
@@ -177,6 +187,7 @@ class HsEventController extends Controller
                 ],
                 'has_investigation' => $e->investigations_count > 0,
                 'has_open_actions' => $e->open_actions_count > 0,
+                ...$this->listProgress($e, $request->user()),
             ];
         });
 
@@ -200,7 +211,7 @@ class HsEventController extends Controller
                 ->count(),
             'worksafe' => (int) $this->scopedBase($request, $context)->where('worksafe_notifiable', true)->count(),
         ];
-        foreach (['investigation_due', 'awaiting_verification', 'worksafe_pending'] as $attentionTab) {
+        foreach (['investigation_due', 'awaiting_verification', 'worksafe_pending', 'needs_owner', 'decide_or_tell', 'not_closed', 'blocked'] as $attentionTab) {
             $attentionQuery = $this->scopedBase($request, $context);
             $this->applyTab($attentionQuery, $attentionTab);
             $tabCounts[$attentionTab] = $attentionQuery->count();
@@ -325,8 +336,76 @@ class HsEventController extends Controller
             'decide_or_tell' => $query->worksafeDecideOrTell(),
             'not_closed' => $query->where('status', '!=', HsEvent::STATUS_CLOSED),
             'close_anyway' => $query->whereHas('closureExceptions', fn (Builder $q) => $q->where('status', HsClosureException::STATUS_PENDING)),
+            // G3 board M6 (decision 17): "Blocked" = can't move until someone chooses its owner (open, no owner, not
+            // waiting on a handover). Each row says who chooses, for this viewer.
+            'blocked' => $query->where('status', '!=', HsEvent::STATUS_CLOSED)->whereNull('owner_user_id')
+                ->whereIn('handover_status', [HsEvent::HANDOVER_ACCEPTED, HsEvent::HANDOVER_NOT_REQUIRED]),
             default => $query, // 'all'
         };
+    }
+
+    /**
+     * G3 board M6: one row's "where it's up to" and its one next step — the same order as the review page's next step
+     * (HsEventController::buildEventDetail). `can` is the route's own permission for this viewer; the review page opened
+     * by `href` checks everything again before anything is recorded. A step this viewer can't take says who does.
+     *
+     * @return array{summary: string, next: ?array{key: string, label: string, can: bool, who: ?string, href: string}, blocked: ?string}
+     */
+    private function listProgress(HsEvent $e, User $viewer): array
+    {
+        $base = "/health-safety/events/{$e->id}";
+        $site = $e->site?->name ?? 'this site';
+        $manages = $viewer->canDo('hazards.manage');
+        $owner = $e->owner?->name;
+        $who = $owner ? "{$owner} or a health and safety manager at {$site}" : "A health and safety manager at {$site}";
+        $signed = $e->hasSignedWorksafeDecision();
+        $handoverDone = in_array($e->handover_status, [HsEvent::HANDOVER_ACCEPTED, HsEvent::HANDOVER_NOT_REQUIRED], true);
+        $actions = (int) $e->actions_count;
+        $done = (int) $e->done_actions_count;
+        $failed = (int) $e->failed_unrevised_count;
+
+        if ($e->status === HsEvent::STATUS_CLOSED) {
+            return ['summary' => 'Closed'.($e->closed_at ? ' '.$e->closed_at->timezone('Pacific/Auckland')->format('j M Y') : ''), 'next' => null, 'blocked' => null];
+        }
+
+        $step = fn (string $key, string $label, bool $can, string $href, ?string $doer = null): array => [
+            'key' => $key, 'label' => $label, 'can' => $can, 'who' => $can ? null : ($doer ?? "{$who} does it"), 'href' => $href,
+        ];
+        $next = match (true) {
+            $e->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE => $step('take_on', 'Take it on', $manages,
+                "{$base}?action=accept-handover", "A health and safety manager at {$site} takes it on"),
+            ! $signed => $step('worksafe_decision', 'Record WorkSafe decision', $manages && $handoverDone, "{$base}?action=worksafe-decision"),
+            $e->worksafe_notifiable === true && $e->worksafe_status === HsEvent::WORKSAFE_PENDING => $step('worksafe_notify',
+                'Record that WorkSafe was told', $manages, "{$base}?action=worksafe-notify"),
+            $e->worksafe_status === HsEvent::WORKSAFE_NOTIFIED => $step('worksafe_acknowledge', 'Record the acknowledgement',
+                $manages, "{$base}?action=worksafe-acknowledge"),
+            $e->owner_user_id === null => $step('choose_owner', 'Choose owner', $manages && $handoverDone, "{$base}?action=choose-owner",
+                "A health and safety manager at {$site} chooses the owner"),
+            $e->investigation_required && (int) $e->completed_investigations_count === 0 => $step('investigation',
+                'Open the investigation', $manages, "{$base}?section=investigation"),
+            $failed > 0 => $step('revised_action', 'Add revised action', $manages, $base),
+            (int) $e->open_actions_count > 0 => $step('actions', 'Open actions', true, "{$base}?section=actions"),
+            default => $step('close', 'Close safety review', $viewer->canDo('healthSafety.events.close'), "{$base}?action=close",
+                ($owner ? "{$owner}, the owner, or someone" : 'Someone')." who closes safety reviews at {$site} closes it"),
+        };
+
+        $summary = match (true) {
+            $e->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE => 'Waiting for Health and safety',
+            ! $signed => 'WorkSafe decision still to record',
+            $e->worksafe_notifiable === true && $e->worksafe_status === HsEvent::WORKSAFE_PENDING => 'Notifiable — WorkSafe still to be told',
+            $e->owner_user_id === null => 'Owner still needed',
+            $failed > 0 => ($failed === 1 ? 'A fix didn’t work' : "{$failed} fixes didn’t work").' · revised action needed',
+            $actions > 0 => "{$done} of {$actions} ".($actions === 1 ? 'action' : 'actions').' done',
+            $e->investigation_required && (int) $e->completed_investigations_count === 0 => 'Investigation under way',
+            default => 'Ready to close',
+        };
+
+        // Decision 17: "Blocked" shows the real status plus why it can't move, for this viewer.
+        $blocked = $e->owner_user_id === null && $handoverDone
+            ? ($manages ? 'Owner still needed — choose one' : "Owner still needed — a health and safety manager at {$site} chooses")
+            : null;
+
+        return ['summary' => $summary, 'next' => $next, 'blocked' => $blocked];
     }
 
     private function validateRegisterPeriod(Request $request): void
@@ -433,6 +512,32 @@ class HsEventController extends Controller
         $request->attributes->set(TaskAggregator::NAVIGATION_EVENT_ATTRIBUTE, $projection['event_id']);
 
         return Inertia::render('health-safety/events/show', ['detail' => $projection['detail']]);
+    }
+
+    /**
+     * G3 board M5c (decisions 21, 25): the review as a PDF — the final record once closed, otherwise a summary marked
+     * "In progress, not final". Built from exactly the page payload this person gets (the same read and projection as
+     * show()), so whole-record viewers only: the team-lead story view has no download. Photos only when ticked.
+     */
+    public function pdf(Request $request, int $hsEvent): \Symfony\Component\HttpFoundation\Response
+    {
+        $request->validate(['photos' => ['nullable', 'boolean']]);
+
+        return DB::transaction(function () use ($request, $hsEvent) {
+            $projection = HealthSafetyReadContext::within($request->user(), $this->detailReadPermissionKeys(), function (HealthSafetyReadContext $context) use ($request, $hsEvent): array {
+                $context->assertCurrentStaff();
+                $event = $this->resolveAccessibleEvent($request, $hsEvent, $context);
+                $detail = $context->consumeViewer($this->detailReadPermissionKeys(),
+                    fn (User $current): array => $this->buildEventDetail($event, $current, $context));
+
+                return ['event_id' => (int) $event->id, 'detail' => $detail];
+            });
+            // The read returns only materialised data; the review row for the audit entry is loaded after it.
+            $event = HsEvent::query()->findOrFail($projection['event_id']);
+
+            return app(\App\Services\HealthSafety\HsReviewPdfService::class)
+                ->download($event, $projection['detail'], $request->user(), $request->boolean('photos'));
+        });
     }
 
     /** Close through the one canonical H&S readiness/exception aggregate. */
@@ -590,6 +695,71 @@ class HsEventController extends Controller
             fn (HsEvent $event): array => app(\App\Services\HealthSafety\HsEventActivityService::class)->forEvent($event, $request->user()), false));
 
         return response()->json(['entries' => $entries]);
+    }
+
+    /**
+     * Board M11 (G3, approved by Stephan 1 Nov 2026): the "close anyway" requests waiting for this person's decision,
+     * for the Overview's worklist and its Decide pop-up. Only people who approve them, never for their own request;
+     * each review is read exactly as its page reads it (one read per review, as the PDF does), and a row is listed only
+     * when that read says this person may decide it now. At most 10.
+     */
+    public function closeAnywayRequests(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $viewer = $request->user();
+        abort_unless($viewer->canDo('hazards.view') && $viewer->canDo('healthSafety.closureExceptions.approve'), 403);
+        $viewerId = (int) $viewer->id;
+
+        $ids = DB::transaction(fn () => HealthSafetyReadContext::within($viewer, $this->detailReadPermissionKeys(),
+            function (HealthSafetyReadContext $context) use ($request, $viewerId): array {
+                $context->assertCurrentStaff();
+
+                return $this->scopedBase($request, $context)
+                    ->where('hs_events.status', '!=', HsEvent::STATUS_CLOSED)
+                    ->whereHas('closureExceptions', fn (Builder $waiting) => $waiting
+                        ->whereDoesntHave('decisions')
+                        ->where('expires_at', '>', now())
+                        ->where('review_at', '>', now())
+                        ->where('requested_by_user_id', '!=', $viewerId))
+                    ->orderBy('hs_events.id')
+                    ->limit(10)
+                    ->pluck('hs_events.id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->all();
+            }));
+
+        $rows = [];
+        foreach ($ids as $id) {
+            $detail = DB::transaction(fn () => HealthSafetyReadContext::within($viewer, $this->detailReadPermissionKeys(),
+                function (HealthSafetyReadContext $context) use ($request, $id): ?array {
+                    $context->assertCurrentStaff();
+                    try {
+                        $event = $this->resolveAccessibleEvent($request, $id, $context);
+                    } catch (NotFoundHttpException|\Illuminate\Database\Eloquent\ModelNotFoundException) {
+                        return null;
+                    }
+
+                    return $context->consumeViewer($this->detailReadPermissionKeys(),
+                        fn (User $current): array => $this->buildEventDetail($event, $current, $context));
+                }));
+            $exception = $detail === null ? null : collect($detail['closure_exceptions'] ?? [])
+                ->first(fn (array $row): bool => $row['status'] === 'pending' && ($row['can_decide'] ?? false) === true);
+            if ($exception === null) {
+                continue;
+            }
+            $rows[] = [
+                'review' => [
+                    'id' => $detail['id'],
+                    'title' => $detail['title'] ?? null,
+                    'reference_number' => $detail['reference_number'],
+                    'site' => $detail['site'] ?? null,
+                    'handover' => ['owner' => $detail['handover']['owner'] ?? null],
+                    'close_readiness' => ['requirements' => $detail['close_readiness']['requirements'] ?? []],
+                ],
+                'exception' => $exception,
+            ];
+        }
+
+        return response()->json(['requests' => $rows]);
     }
 
     /**
@@ -913,9 +1083,23 @@ class HsEventController extends Controller
             default => $source !== null,
         };
         $client = $event->client ? trim($event->client->first_name.' '.$event->client->last_name) : null;
+        // Decision 15 (G4): an injury review reads like its record ("Cut left index finger — Mere Tane"), only for a
+        // viewer who can read the injury (its type and body part are already on the injury register for them).
+        $injury = $basename === 'WorkplaceInjury' && $source !== null
+            ? \App\Models\WorkplaceInjury::query()->find($event->source_id, ['id', 'injury_type', 'body_part_affected'])
+            : null;
+        // Restraint summary (Stephan, 2 Nov 2026): a restraint review reads like its record ("Held arm to stop a fall —
+        // Aroha Kingi"), only for a viewer who can read the restraint; no summary keeps "Restraint — Aroha Kingi".
+        $restraintSummary = $basename === 'RestraintEvent' && $source !== null
+            ? \App\Models\RestraintEvent::withTrashed()->whereKey($event->source_id)->value('summary')
+            : null;
 
         return \App\Support\HealthSafety\HsReviewTitle::make((string) $event->event_category, $readable,
-            $basename === 'ClientIncident' ? $readableIncident?->title : null,
+            match (true) {
+                $basename === 'ClientIncident' => $readableIncident?->title,
+                $injury !== null => \App\Support\HealthSafety\HsRecordTitle::injuryWords($injury->injury_type, $injury->body_part_affected),
+                default => $restraintSummary,
+            },
             $firstAid && $source === null ? null : $client, $event->staff?->name, $event->site?->name, $firstAid);
     }
 
@@ -1033,14 +1217,29 @@ class HsEventController extends Controller
 
         $assignableStaff = [];
         if ($canManage) {
-            $assignableStaff = $this->handoverOwnerQuery($hsEvent, $currentUser)
-                ->with(['permissionOverrides', 'roles.permissions'])
+            $owners = $this->handoverOwnerQuery($hsEvent, $currentUser)
+                ->with(['permissionOverrides', 'roles.permissions', 'hrEmployeeProfile:id,user_id,primary_site_id,secondary_site_ids'])
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->filter(fn (User $user): bool => $this->canOwnEvent($user, $hsEvent, $currentUser))
-                ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
-                ->values()
-                ->all();
+                ->values();
+            // Board M8: each person's role and Sites under their name ("Provider manager · Kauri House, Rimu House").
+            $ownerSiteIds = $owners->flatMap(fn (User $user): array => array_filter([
+                $user->hrEmployeeProfile?->primary_site_id, ...($user->hrEmployeeProfile?->secondary_site_ids ?? []),
+            ]))->map(fn ($id): int => (int) $id)->unique()->all();
+            $ownerSiteNames = Site::query()->whereIn('id', $ownerSiteIds)->pluck('name', 'id');
+            $assignableStaff = $owners->map(function (User $user) use ($ownerSiteNames): array {
+                $role = $user->roles->first()?->name;
+                $sites = $user->canDo('sites.viewAll') ? 'all sites' : collect([
+                    $user->hrEmployeeProfile?->primary_site_id, ...($user->hrEmployeeProfile?->secondary_site_ids ?? []),
+                ])->filter()->map(fn ($id) => $ownerSiteNames[(int) $id] ?? null)->filter()->unique()->implode(', ');
+
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'detail' => collect([$role ? ucfirst(str_replace('_', ' ', $role)) : null, $sites ?: null])->filter()->implode(' · ') ?: null,
+                ];
+            })->all();
         }
 
         $correctiveActionRelations = [
@@ -1463,6 +1662,15 @@ class HsEventController extends Controller
             'corrective_actions' => $correctiveActions->all(),
             'risk_assessments' => $riskAssessments->all(),
             'attachments' => $handoverAttachments->all(),
+            // G3 board M5d: photos, videos and documents on the review's steps (hidden ones stay out; History keeps them).
+            'files' => \App\Models\HsEventFile::query()->where('hs_event_id', $hsEvent->id)->whereNull('hidden_at')->orderBy('created_at')
+                ->get()->map(fn (\App\Models\HsEventFile $file): array => [
+                    'id' => (int) $file->id, 'step' => $file->step, 'kind' => $file->kind, 'name' => $file->original_name,
+                    'size' => (int) $file->size_bytes, 'duration' => $file->duration_seconds, 'description' => $file->description,
+                    'uploaded_by' => $file->uploaded_by_name, 'created_at' => $file->created_at?->toIso8601String(),
+                    'url' => "/health-safety/events/{$hsEvent->id}/files/{$file->id}",
+                    'can_hide' => $canManage && $hsEvent->isOpen(),
+                ])->values()->all(),
             'close_gate' => $closureReadiness->toJourneyGate()->toArray(),
             'close_readiness' => $closureReadiness->toArray(),
             'closure_exceptions' => $closureExceptions,
@@ -1484,6 +1692,8 @@ class HsEventController extends Controller
                 'manage' => $canManage,
                 // Decision 3 + Q2 (G3): choose the first owner, or change the owner with a reason.
                 'change_owner' => $canChangeOwner,
+                // G3 board M5d: add photos, videos and documents to a step.
+                'add_files' => $canManage && $hsEvent->isOpen(),
                 // K1a (B1.5): the real answer (permission, Site, ownership, open), not the permission alone, so a team
                 // lead who doesn't own the review gets no Close the server would refuse.
                 'close' => $this->closures->closeAuthority($currentUser, $hsEvent)['allowed'],
@@ -1712,7 +1922,7 @@ class HsEventController extends Controller
             'verified' => $verifiedCount,
             'closed' => $closedCount,
         ];
-        foreach (['critical_open', 'unassigned'] as $attentionTab) {
+        foreach (['critical_open', 'unassigned', 'failed', 'due_soon', 'closed_month'] as $attentionTab) {
             $attentionQuery = clone $base;
             $this->applyActionTab($attentionQuery, $attentionTab);
             $tabCounts[$attentionTab] = $attentionQuery->count();
@@ -1729,6 +1939,9 @@ class HsEventController extends Controller
                 'overdue' => $tabCounts['overdue'],
                 'critical_open' => $tabCounts['critical_open'],
                 'unassigned' => $tabCounts['unassigned'],
+                'failed' => $tabCounts['failed'],
+                'due_soon' => $tabCounts['due_soon'],
+                'closed_month' => $tabCounts['closed_month'],
                 'monitoring_events' => (int) (clone $base)
                     ->whereHas('hsEvent', fn (Builder $q) => $q->where('status', HsEvent::STATUS_MONITORING))
                     ->distinct('hs_event_id')
@@ -1751,8 +1964,32 @@ class HsEventController extends Controller
             ->unique()
             ->values();
 
+        // G3 board M7: the "Failed check — needs a revised action" panel above the board.
+        $failedQuery = clone $base;
+        $this->applyActionTab($failedQuery, 'failed');
+        $canRevise = $request->user()->canDo('hazards.manage');
+        $failedChecks = $failedQuery->with(['hsEvent:id,reference_number,event_category,site_id', 'hsEvent.site:id,name', 'assignedTo:id,name'])
+            ->orderBy('verified_at')->limit(5)
+            ->get(['id', 'hs_event_id', 'title', 'reference_number', 'priority', 'assigned_to_user_id', 'verified_at'])
+            ->map(fn (HsCorrectiveAction $action): array => [
+                'id' => (int) $action->id,
+                'title' => $action->title,
+                'reference_number' => $action->reference_number,
+                'priority' => $action->priority,
+                'owner' => $action->assignedTo?->name,
+                'review' => $action->hsEvent ? [
+                    'id' => (int) $action->hsEvent->id,
+                    'reference_number' => $action->hsEvent->reference_number,
+                    'label' => \App\Support\HealthSafety\HsLabels::label('review_category', $action->hsEvent->event_category)
+                        .($action->hsEvent->site ? ' — '.$action->hsEvent->site->name : ''),
+                ] : null,
+                'revise_href' => $canRevise && $action->hsEvent
+                    ? "/health-safety/events/{$action->hsEvent->id}?action=ca-add&replaces={$action->id}" : null,
+            ])->values()->all();
+
         return [
             'actions' => $actions->toArray(),
+            'failedChecks' => $failedChecks,
             'tab' => $tab,
             'tabCounts' => $tabCounts,
             'hero' => $hero,
@@ -1870,6 +2107,14 @@ class HsEventController extends Controller
                 ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
             'unassigned' => $query->whereNull('assigned_to_user_id')
                 ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
+            // G3 board M7: the header boxes the columns don't already show.
+            'failed' => $query->whereIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                ->where('effectiveness_confirmed', false)->whereDoesntHave('revisions'),
+            'due_soon' => $query->whereNotIn('status', [HsCorrectiveAction::STATUS_COMPLETED, HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                ->whereNotNull('due_date')
+                ->whereBetween('due_date', [now((string) (config('app.worker_timezone', 'Pacific/Auckland') ?: 'Pacific/Auckland'))->toDateString(), now((string) (config('app.worker_timezone', 'Pacific/Auckland') ?: 'Pacific/Auckland'))->addDays(7)->toDateString()]),
+            'closed_month' => $query->where('status', HsCorrectiveAction::STATUS_CLOSED)
+                ->where('closed_at', '>=', now((string) (config('app.worker_timezone', 'Pacific/Auckland') ?: 'Pacific/Auckland'))->startOfMonth()->utc()),
             default => $query,
         };
     }
@@ -2019,10 +2264,16 @@ class HsEventController extends Controller
         if (! $person->canDo('hazards.manage') || ! $person->canDo('hazards.view')) {
             return false;
         }
+        $source = ltrim((string) $event->getRawOriginal('source_type'), '\\');
+        // Decision 12 (Stephan, 1 Nov 2026): whoever authorised a restraint never owns its safety review (independence) —
+        // not even by taking it on themselves.
+        if ($source === RestraintEvent::class && $event->source_id !== null
+            && (int) RestraintEvent::query()->whereKey((int) $event->source_id)->value('authorised_by') === (int) $person->id) {
+            return false;
+        }
         if ((int) $person->id === (int) $viewer->id) {
             return true;
         }
-        $source = ltrim((string) $event->getRawOriginal('source_type'), '\\');
         $private = in_array($source, [ClientIncident::class, \App\Models\FirstAidRecord::class, RestraintEvent::class, WorkplaceInjury::class], true)
             || ClientIncident::query()->where('hs_event_id', $event->id)->exists();
 

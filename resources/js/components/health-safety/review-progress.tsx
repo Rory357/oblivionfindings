@@ -4,7 +4,7 @@
  * page opens; picking another shows what was added there. The next-step bar comes from the server's `next_step` (the
  * same order as closing needs) and holds the page's only filled button; a viewer who can't do the step is told who does.
  */
-import { CheckCircle2, ChevronDown, ClipboardCheck, ListChecks, PencilLine, Plus, ShieldCheck, UserRoundCheck, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ClipboardCheck, FileDown, ListChecks, Paperclip, PencilLine, Plus, ShieldCheck, UserRoundCheck, XCircle } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import type {
@@ -15,6 +15,7 @@ import type {
     SafetyReviewPane,
 } from '@/components/health-safety/event-detail-dialog';
 import { PendingCorrection } from '@/components/health-safety/review-correction';
+import { filesSummary } from '@/components/health-safety/review-files';
 import { REVIEW_STEP_LABELS, stepActivity, type ReviewActivity, type ReviewStepKey } from '@/components/health-safety/review-history';
 import type { PageHeaderStep } from '@/components/page/page-header-strip';
 import { PaneLink, type RecordProgressNext, type RecordProgressPane } from '@/components/signature/record-progress';
@@ -54,33 +55,47 @@ function stepStates(d: EventDetail): StepState[] {
     const checked = implemented && actions.every((a) => CHECKED.includes(a.status)) && !failedAction && revisedOk;
     const anyRevision = actions.some((a) => a.replaces);
 
+    // G4-6: "Assigned" means passed to Health and safety (automatically for a restraint); a step with nothing to do
+    // (no investigation needed, no actions) is drawn as passed, so the review sits on the step that's really left.
+    const handedOver = ['accepted', 'not_required'].includes(d.handover.status);
+    const investigatedDone = closed || !invNeeded || !!agreed;
+    const nothingToDo = actions.length === 0 && investigatedDone && !(agreed?.recommendation_count ?? 0);
+
     return [
         {
             key: 'assigned',
-            done: !!d.handover.owner || closed,
-            meta: d.handover.owner ? day(d.handover.accepted_at ?? d.reported_at) : 'No owner yet',
+            done: !!d.handover.owner || handedOver || closed,
+            meta: d.handover.owner
+                ? day(d.handover.accepted_at ?? d.reported_at)
+                : d.handover.status === 'not_required'
+                  ? `Automatically${day(d.reported_at) ? ` · ${day(d.reported_at)}` : ''}`
+                  : handedOver
+                    ? 'Taken on'
+                    : 'Waiting to be taken on',
         },
         {
             key: 'investigated',
-            done: closed || (decided && (!invNeeded || !!agreed)),
+            done: investigatedDone,
             meta: agreed?.completed_at
                 ? day(agreed.completed_at)
-                : decided && !invNeeded
-                  ? 'Not needed'
+                : !invNeeded
+                  ? `Not needed${d.severity === 'low' ? ' at Low severity' : ''}`
                   : 'Not yet',
         },
         {
             key: 'implemented',
-            done: closed || implemented,
+            done: closed || implemented || nothingToDo,
             meta: implemented
                 ? day(latest(actions.map((a) => a.completed_at)))
                 : actions.length
                   ? `${doneCount} of ${actions.length} done`
-                  : 'No actions yet',
+                  : nothingToDo
+                    ? 'None'
+                    : 'No actions yet',
         },
         {
             key: 'check',
-            done: closed || checked,
+            done: closed || checked || nothingToDo,
             failed: !!failedAction && !closed,
             meta: failedAction ? (
                 <>
@@ -89,11 +104,17 @@ function stepStates(d: EventDetail): StepState[] {
                 </>
             ) : checked ? (
                 `${day(latest(actions.map((a) => a.verified_at))) ?? ''}${anyRevision ? ' · revised fix worked' : ''}`
+            ) : nothingToDo ? (
+                'Nothing to check'
             ) : (
                 'Not yet'
             ),
         },
-        { key: 'closed', done: closed, meta: closed ? day(d.closed_at) : 'Not yet' },
+        {
+            key: 'closed',
+            done: closed,
+            meta: closed ? day(d.closed_at) : !decided ? 'After the WorkSafe decision' : 'Not yet',
+        },
     ];
 }
 
@@ -135,7 +156,7 @@ export function reviewNextBar(d: EventDetail, h: ReviewStepHandlers): RecordProg
             kicker: 'Closed',
             tone: 'done',
             title: 'Nothing left to do',
-            text: `Closed${d.closed_at ? ` ${formatDate(d.closed_at)}` : ''}.`,
+            text: `Closed${d.closed_at ? ` ${formatDate(d.closed_at)}` : ''}. The final record can be downloaded as a PDF from the header.`,
         };
     }
     const step = d.next_step;
@@ -233,12 +254,48 @@ function actionLine(action: EventCorrectiveAction): string {
         .join(' · ');
 }
 
-/** The picked step's pane. */
+/** The picked step's pane, with the step's own files (board M5d) as its last row. */
 export function reviewStepPane(
     d: EventDetail,
     step: ReviewStepKey,
     activity: ReviewActivity | null,
-    h: ReviewStepHandlers & { onBack?: () => void; onHistory: () => void },
+    h: ReviewStepHandlers & { onBack?: () => void; onHistory: () => void; onAddFiles?: (step: ReviewStepKey) => void; onPdf?: () => void },
+): RecordProgressPane {
+    const pane = stepPaneBase(d, step, activity, h);
+    const files = (d.files ?? []).filter((file) => file.step === step);
+    const canAdd = !!d.can.add_files && !!h.onAddFiles && d.status !== 'closed';
+    if (!files.length && !canAdd) return pane;
+    return {
+        ...pane,
+        items: [
+            ...(pane.items ?? []),
+            {
+                key: 'files',
+                label: 'Files',
+                value: files.length ? (
+                    // eslint-disable-next-line no-restricted-syntax -- a quiet link from the step to its files on the Files tab.
+                    <button type="button" className="sg-pane-link" onClick={() => h.onSection('evidence')}>
+                        {filesSummary(files)}
+                    </button>
+                ) : (
+                    'None yet'
+                ),
+                meta: files.length ? `Added by ${[...new Set(files.map((file) => file.uploaded_by))].join(', ')}` : undefined,
+                action: canAdd ? (
+                    <PaneLink icon={Paperclip} onClick={() => h.onAddFiles?.(step)}>
+                        Add files
+                    </PaneLink>
+                ) : null,
+            },
+        ],
+    };
+}
+
+function stepPaneBase(
+    d: EventDetail,
+    step: ReviewStepKey,
+    activity: ReviewActivity | null,
+    h: ReviewStepHandlers & { onBack?: () => void; onHistory: () => void; onPdf?: () => void },
 ): RecordProgressPane {
     const base = {
         onBack: h.onBack,
@@ -430,6 +487,17 @@ export function reviewStepPane(
                           key: 'before',
                           label: 'Before it could close',
                           value: `All ${d.close_readiness.requirements.length} done.`,
+                      },
+                      // Board M5c: the final record, downloadable from here and the header.
+                      {
+                          key: 'final',
+                          label: 'Final record',
+                          value: 'PDF · the record as it stood when it closed',
+                          action: h.onPdf ? (
+                              <PaneLink icon={FileDown} onClick={h.onPdf}>
+                                  Download PDF
+                              </PaneLink>
+                          ) : null,
                       },
                   ]
                 : d.close_readiness.requirements

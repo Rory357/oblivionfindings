@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { FileDropzone } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -185,6 +186,9 @@ export function ChemicalCommandForm({ action, actorId, detail: providedDetail, s
         {spec.options ? <SelectInput id={`${id}-${spec.key}`} ariaLabel={spec.label} frontline value={String(values[spec.key] ?? '')} placeholder="Choose…" options={spec.options} disabled={command.locked}
             onChange={(value) => setValues((current) => ({ ...current, [spec.key]: value }))} /> : spec.multiline ?
             <Textarea id={`${id}-${spec.key}`} value={String(values[spec.key] ?? '')} disabled={command.locked} onChange={(event) => setValues((current) => ({ ...current, [spec.key]: event.target.value }))} /> :
+            // G4-14: the SDS and stock-check dates use the approved calendar (Cancel and Use date).
+            spec.type === 'date' ? <DatePicker id={`${id}-${spec.key}`} label={spec.label} value={String(values[spec.key] ?? '')} allowClear={!spec.required} disabled={command.locked}
+                invalid={!!command.errors[spec.key]} onChange={(value) => setValues((current) => ({ ...current, [spec.key]: value }))} /> :
             <Input id={`${id}-${spec.key}`} type={spec.type ?? 'text'} className="frontline-tap" value={String(values[spec.key] ?? '')} disabled={command.locked} onChange={(event) => setValues((current) => ({ ...current, [spec.key]: event.target.value }))} />}
     </Field>;
     return <WizardShell open={active} frontline onClose={onCancel} title={title} description="Fill in the chemical’s details from its safety data sheet (SDS)."

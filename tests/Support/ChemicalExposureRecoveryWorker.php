@@ -13,7 +13,9 @@ use Illuminate\Validation\ValidationException;
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 if (count($argv) !== 8) { throw new RuntimeException('Exact recovery worker arguments required.'); }
 [$script, $database, $actorId, $exposureId, $encoded, $ready, $go, $mode] = $argv;
-if (getenv('APP_ENV') !== 'testing' || getenv('DB_DATABASE') !== $database || ! str_starts_with($database, 'oblivion_hs_')
+// Only a disposable test schema: Codex's oblivion_hs_ ones or this repo's per-lane oblivion_findings_codex_test_<run>_<n>.
+if (getenv('APP_ENV') !== 'testing' || getenv('DB_DATABASE') !== $database
+    || preg_match('/^(oblivion_hs_|oblivion_findings_codex_test_(?:[a-z0-9]+_)?\d+$)/', $database) !== 1
     || ! str_contains(strtolower($database), 'test') || ! ctype_digit($actorId) || (int) $actorId < 1
     || ! ctype_digit($exposureId) || (int) $exposureId < 1 || ! in_array($mode, ['start', 'claim'], true)) {
     throw new RuntimeException('Recovery worker requires the exact dedicated H&S testing schema and positive identities.');

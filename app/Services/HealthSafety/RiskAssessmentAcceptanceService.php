@@ -57,8 +57,10 @@ final class RiskAssessmentAcceptanceService
                 $before = $beforeAttachment === null ? null : $this->binding($beforeAttachment, $current, $reads, $context, 'manage');
                 $this->refusePrivateRebind($before, $after);
                 $this->auditBoundary($before, $after);
+                // #13: after an administrator's recorded reset, the chain continues from the reset point.
+                $resetAfter = $this->resetAfter($assessmentId, $reads);
                 $previousIdentity = $reads->query(HsRiskAssessmentAcceptance::query())->where('assessment_id', $assessmentId)
-                    ->orderByDesc('sequence')->first(['id']);
+                    ->where('sequence', '>', $resetAfter)->orderByDesc('sequence')->first(['id']);
                 $previous = $previousIdentity ? $this->verifiedMarker((int) $previousIdentity->id, $assessmentId, $current, $reads, $context, 'manage') : null;
                 if ($previous !== null && ChemicalCommandValues::digest($previous['after_binding']['attachment']) !== ChemicalCommandValues::digest($before['attachment'] ?? null)) {
                     throw new LogicException('Risk acceptance chain omitted or replaced its original source binding.');
@@ -88,12 +90,10 @@ final class RiskAssessmentAcceptanceService
                 if ($audits->count() !== 1 || ChemicalCommandValues::digest($audits[0]->meta) !== ChemicalCommandValues::digest($meta)) {
                     throw new LogicException('Exact risk semantic audit was suppressed, altered or stripped.');
                 }
-                if (($this->hasExposure($before) || $this->hasExposure($after))
-                    && app(ChemicalExposureAuditAccessService::class)->scopeRiskAcceptanceSubjects(AuditLog::query()->whereKey($audits[0]->id))->exists()) {
-                    throw new LogicException('Private risk acceptance remains visible through the unscoped general audit entry.');
-                }
+                // Stephan (2 Nov, "Same rule as job 4"): the audit page shows a person-linked assessment's rows as who
+                // changed what and when only, values hidden for everyone (AuditLogViewService), so no per-viewer guard.
                 $marker = new HsRiskAssessmentAcceptance(['assessment_id' => $assessmentId, 'audit_log_id' => (int) $audits[0]->id,
-                    'actor_id' => (int) $current->id, 'sequence' => $previous === null ? 1 : $previous['sequence'] + 1,
+                    'actor_id' => (int) $current->id, 'sequence' => $previous === null ? $this->nextSequence($assessmentId, $reads) : $previous['sequence'] + 1,
                     'schema_version' => 1, 'action' => $action, 'actor_snapshot' => ['id' => (int) $current->id, 'name' => $current->name], 'correlation_token' => $token,
                     'prior_id' => $previous['id'] ?? null, 'prior_digest' => $previous['acceptance_digest'] ?? null,
                     'before_site_id' => $before['site_id'] ?? null, 'after_site_id' => $after['site_id'],
@@ -122,15 +122,18 @@ final class RiskAssessmentAcceptanceService
             abort_unless($current->canDo('hazards.view'), 403);
             $identity = $this->assessmentIdentity($assessmentId, $reads, false);
             $this->binding($this->attachment($identity), $current, $reads, $context, 'view');
-            $identities = $reads->query(HsRiskAssessmentAcceptance::query())->where('assessment_id', $assessmentId)->orderBy('sequence')->get(['id']);
+            // #13: entries up to an administrator's recorded reset stay in place but are not part of the checked chain.
+            $resetAfter = $this->resetAfter($assessmentId, $reads);
+            $identities = $reads->query(HsRiskAssessmentAcceptance::query())->where('assessment_id', $assessmentId)
+                ->where('sequence', '>', $resetAfter)->orderBy('sequence')->get(['id']);
             $items = []; $seen = []; $previous = null;
             foreach ($identities as $candidate) {
                 $accepted = $this->verifiedMarker((int) $candidate->id, $assessmentId, $current, $reads, $context);
-                if ($accepted['sequence'] !== count($items) + 1 || $accepted['prior_id'] !== ($previous['id'] ?? null)
+                if ($accepted['sequence'] !== $resetAfter + count($items) + 1 || $accepted['prior_id'] !== ($previous['id'] ?? null)
                     || $accepted['prior_digest'] !== ($previous['acceptance_digest'] ?? null)) {
                     throw new LogicException('Risk business history has a missing or substituted retained acceptance.');
                 }
-                $items[] = ['id' => 'audit-'.$accepted['audit_log_id'], 'action' => $accepted['action'],
+                $items[] = ['id' => 'audit-'.$accepted['audit_log_id'], 'sequence' => (int) $accepted['sequence'], 'action' => $accepted['action'],
                     'occurred_at' => $accepted['recorded_at'], 'note' => $accepted['business']['note'],
                     'snapshot' => $accepted['business']['snapshot'], 'actor' => $accepted['actor_snapshot'],
                     'legacy' => false, 'attribution_state' => 'recorded_business'];
@@ -140,7 +143,7 @@ final class RiskAssessmentAcceptanceService
                 ->where('auditable_id', $assessmentId)->whereIn('action', [...self::ACTIONS, 'hsriskassessment.create', 'hsriskassessment.update'])
                 ->whereNotIn('id', $seen)->count();
             return ['items' => $items, 'history_state' => $legacy > 0 || $items === [] ? 'unconfirmed' : 'recorded_business',
-                'history_withheld' => $legacy];
+                'history_withheld' => $legacy, 'reset_after' => $resetAfter];
         });
     }
 
@@ -180,8 +183,10 @@ final class RiskAssessmentAcceptanceService
         if ($type === Site::class) {
             abort_unless(in_array($id, $sites, true), 404); $site = $id;
         } elseif ($type === Client::class) {
+            // Stephan (2 Nov): the history follows "can open this assessment". A client-attached assessment opens (and is
+            // written) on its client's Site, so the seal uses that same rule rather than the separate client-view rule.
             $row = $reads->query(Client::query())->whereIn('site_id', $sites)->whereKey($id)->first(['id', 'site_id']);
-            abort_unless($row && app(ClientPolicy::class)->viewFromCurrentEvidence($current, $row, $reads), 404);
+            abort_unless($row && $row->site_id !== null, 404);
             $site = (int) $row->site_id; $client = (int) $row->id;
         } elseif ($type !== null && ! in_array($type, $eventTypes, true)) {
             abort(404);
@@ -401,7 +406,9 @@ final class RiskAssessmentAcceptanceService
             throw new LogicException('Risk semantic audit was changed after acceptance.');
         }
         if ($marker->prior_id === null) {
-            if ($marker->sequence !== 1 || $marker->prior_digest !== null || $marker->before_business !== null) {
+            // A chain starts at 1, or (#13) right after an administrator's recorded reset, and nowhere else.
+            $start = $this->resetAfter($assessmentId, $reads) + 1;
+            if (($marker->sequence !== 1 && $marker->sequence !== $start) || $marker->prior_digest !== null || $marker->before_business !== null) {
                 throw new LogicException('Risk first prospective acceptance has a fabricated prior milestone.');
             }
         } else {
@@ -465,13 +472,73 @@ final class RiskAssessmentAcceptanceService
         return $extras;
     }
 
+    /** The sequence an administrator's latest recorded reset sits after (0 when there was none). */
+    private function resetAfter(int $assessmentId, CurrentAuthorizationReads $reads): int
+    {
+        if (! \App\Support\SchemaCache::hasTable('hs_risk_assessment_history_resets')) { return 0; }
+
+        return (int) ($reads->query(DB::table('hs_risk_assessment_history_resets'))->where('assessment_id', $assessmentId)->max('after_sequence') ?? 0);
+    }
+
+    /** A chain's first entry (or the first after a reset) continues the numbering, so sequences stay unique. */
+    private function nextSequence(int $assessmentId, CurrentAuthorizationReads $reads): int
+    {
+        return (int) ($reads->query(HsRiskAssessmentAcceptance::query())->where('assessment_id', $assessmentId)->max('sequence') ?? 0) + 1;
+    }
+
+    /**
+     * #13 admin check (artisan health-safety:risk-history): whether the assessment's sealed chain checks out for this
+     * administrator, and where a break is. Never changes anything.
+     *
+     * @return array{state: 'checked'|'unsealed'|'broken', sealed: int, reset_after: int, problem: string|null}
+     */
+    public function chainState(int $assessmentId, User $viewer): array
+    {
+        try {
+            $history = HealthSafetyReadContext::within($viewer, self::PERMISSIONS,
+                fn (HealthSafetyReadContext $context) => $this->history($assessmentId, $viewer, $context));
+
+            return ['state' => $history['items'] === [] ? 'unsealed' : 'checked', 'sealed' => count($history['items']),
+                'reset_after' => (int) $history['reset_after'], 'problem' => null];
+        } catch (LogicException $broken) {
+            return ['state' => 'broken', 'sealed' => 0, 'reset_after' => 0, 'problem' => $broken->getMessage()];
+        }
+    }
+
+    /**
+     * #13 admin reset after a break was investigated: records who, when and why, keeps every earlier entry in place
+     * (unverified), and lets a new sealed chain start after them. Refused when the chain still checks out.
+     */
+    public function resetBrokenChain(int $assessmentId, User $admin, string $reason): array
+    {
+        abort_unless($admin->approved_at !== null && $admin->canDo('hazards.manage') && $admin->canDo('audit.viewAny'), 403);
+        $reason = trim($reason);
+        if ($reason === '') { throw new \InvalidArgumentException('Say why the history is being reset.'); }
+        $state = $this->chainState($assessmentId, $admin);
+        if ($state['state'] !== 'broken') { throw new \InvalidArgumentException('The history checks out, so there is nothing to reset.'); }
+
+        return DB::transaction(function () use ($assessmentId, $admin, $reason, $state): array {
+            $risk = HsRiskAssessment::query()->whereKey($assessmentId)->lockForUpdate()->firstOrFail();
+            $after = (int) (HsRiskAssessmentAcceptance::query()->where('assessment_id', $assessmentId)->max('sequence') ?? 0);
+            $request = Request::create('/'); $request->setUserResolver(fn () => $admin);
+            AuditLogger::logOrFail('risk_assessment.history_reset', $risk, ['after_sequence' => $after, 'reason' => $reason,
+                'problem' => $state['problem'], 'actor_id' => (int) $admin->id], $request);
+            $audit = AuditLog::query()->where('auditable_id', $assessmentId)->where('action', 'risk_assessment.history_reset')
+                ->where('user_id', $admin->id)->orderByDesc('id')->value('id');
+            $id = DB::table('hs_risk_assessment_history_resets')->insertGetId(['assessment_id' => $assessmentId, 'after_sequence' => $after,
+                'reason' => $reason, 'reset_by' => (int) $admin->id, 'audit_log_id' => $audit, 'created_at' => now()]);
+            \Illuminate\Support\Facades\Log::warning('Risk assessment sealed history reset by an administrator', ['assessment_id' => $assessmentId,
+                'reference' => $risk->reference_number, 'after_sequence' => $after, 'reset_by' => (int) $admin->id]);
+
+            return ['id' => (int) $id, 'after_sequence' => $after, 'reference' => (string) $risk->reference_number];
+        });
+    }
+
     private function auditBoundary(?array $before, array $after): void
     {
-        if (! $this->hasExposure($before) && ! $this->hasExposure($after)) { return; }
-        // No fabricated readiness flag. Root must review/mount the separately supplied recognition patch.
-        if (! method_exists(app(ChemicalExposureAuditAccessService::class), 'scopeRiskAcceptanceSubjects')) {
-            throw new LogicException('Private risk acceptance general audit protection is not mounted.');
-        }
+        // Stephan (2 Nov, "Same rule as job 4"): no per-viewer general audit recognition is built. A person-linked
+        // assessment's audit rows show only who changed what and when, values hidden for everyone (AuditLogViewService).
+        return;
     }
 
     /** General audit caller retains its own permission; only private exposure adds the domain gates. */
