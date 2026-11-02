@@ -17,6 +17,17 @@ This file says what "done" means, how each phase is proved, and what Stephan sti
 
 This file replaces `PROGRESS.md` as the record of where S&D stands. `PROGRESS.md` holds Gemini's claims, and the audit shows many of them are untrue.
 
+### Stephan's answers, 1 Nov 2026
+
+Also recorded in the plan (`sdr-plan/pack/decisions.md`).
+
+1. **The 13 new views:** approved ("Approve them"). Built as drawn, in their phases.
+2. **Leftover workspaces:** "Yes, as proposed".
+   - Health kit becomes a Devices › Sensors filter; readings stay in Health & clinical.
+   - Vehicle and asset trackers are owned by Fleet and read-only in S&D.
+   - Groups and command batches follow D8 and the plan's data moves.
+3. **Remove vs Retire:** "Keep its history". Removing takes the device off the lists, but its readings, alerts and settings backups stay on record. Approved pop-up 11 is corrected to match: one action, "Remove device", and no separate "Retire instead".
+
 ## 1. Done means
 
 All of these are true:
@@ -153,12 +164,18 @@ Two steps were dropped at Stephan's request on 30 Oct: reporting from his Ajax a
 - **Sensor relay (D21):** a house's hub relays its sensor readings to the central broker and keeps 24 hours of them if its link drops.
 - **Code-signing check:** restored behind an explicit unsigned-test switch (D1).
 - **Hub syslog/NetFlow and Protect client:** wired in, or deleted.
+- **Faster access checks (MASTER, 31 Oct; can also go as a small follow-up straight after the Phase A merge).**
+  - **The problem:** `SecurityDevicesAccessService::accessibleSiteIds()` asks the database whether `users.site_id` exists every time it runs. That's `Schema::hasColumn`, an `information_schema` query. Every asset check runs it through `accessibleAssets()`.
+  - **What it costs:** the Speed session profiled the sidebar task count for manager 51 on the .com (main `18034cafc`). One count made 91 asset checks × 4 queries = 364 queries, about 120 ms.
+  - **The fix:** answer the column question once per request, or from the migration state. Work out each person's Sites once per request too, with exactly the same answers as now.
+  - **Watch out:** the service isn't bound once per request, so a cache on the object alone won't help. The locked "current evidence" path (`forCurrentEvidence`) must keep reading fresh.
 - **Screens:** Setup › Hubs & networks › Hubs, the Add a hub wizard, and the Hubs and downloads pop-ups.
 - **Permissions:** `securityDevices.hubs.approve` and `securityDevices.savedLogins.manage`, each with its grant migration.
 
 **Tests**
 
 - Pest for hub approval, login scoping and wiping on revoke.
+- Pest for the faster access check: the same Sites and assets as before for each role, with a query count that stays flat as the number of assets grows.
 - Collector tests for routing through the hub.
 - Go tests and the installer build in CI (this PC has no Go).
 - vitest for the hub screens.
@@ -450,12 +467,13 @@ Each item is ticked with the commit that fixed it and how it was proved.
 | Phase | State | Commit | Gate | Stephan's walk | On main / .com |
 | --- | --- | --- | --- | --- | --- |
 | Finish line (this file) | Approved by MASTER, 30 Oct | 8b2cc254d | — | — | — |
-| A · Honest and safe | Built (A1–A8); local gate passed 31 Oct; waiting for Stephan's walk | `61f5e2c22` … `4b0568a13`, merged with main as `3e5675e39` | Pest 100 of 101 (the 1 is main's hub syslog test, same on main); vitest 14/14; lint 0/0; build OK; tsc: 1 H&S test error that main has too | Waiting | — |
-| B · Windows app and hubs | Not started | | | | |
-| C · Core screens | Not started | | | | |
-| D · Alerts | Not started | | | | |
-| E · Safety kit | Not started | | | | |
-| F · Home-Assistant layer | Not started | | | | |
-| G · Network tools | Not started | | | | |
-| H · Access and clock-ins | Not started | | | | |
-| I · Obli fixes things | Not started | | | | |
+| A · Honest and safe | Built (A1–A8); local gate passed 31 Oct; walked 1 Nov by the build session (Stephan short on time) | `61f5e2c22` … `4b0568a13`, merged with main as `3e5675e39`; walk fix `6ddfc1451` | Pest 100 of 101 (the 1 is main's hub syslog test, same on main; its stale dates are fixed in `da6ff873d`); vitest 14/14; lint 0/0; build OK; tsc: 1 H&S test error that main has too | 1, 2, 3, 5, 8, 10 passed; 6 and 7 passed on test stand-ins, not on Stephan's kit; the walk found and fixed real SSH backups (`6ddfc1451`); 4 passed on the .com 1 Nov (MASTER, with Stephan's OK); 10b still needs an outside connection (`END-REVIEW-WALKS.md`) | — |
+| B · Windows app and hubs | Built 1 Nov | `6a9b91939` … `d6419fba4`, `b43c0cd14` | One end gate for B–I, 2 Nov: see the row below | Not walked yet (§6 and the merge request's hardware list) | — |
+| C · Core screens | Built 1–2 Nov (C1–C6: Devices, device pages, Sites, Overview, Setup, Reports, the menu switch) | `dceb60c07` … `6a47d0dca`, `16bfdde2f` | End gate below | Not walked yet | — |
+| D · Alerts | Built 1 Nov | `6de27f768` | End gate below | Not walked yet | — |
+| E · Safety kit | Built 1–2 Nov (cameras, alarms, doors, sensors, trackers, gateways, worker Overview, Connect a service) | `0a84dc288` … `dced8ffee` | End gate below | Not walked yet | — |
+| F · Home-Assistant layer | Built 1–2 Nov (care links, scald watch, bed sensors, house modes, rooms, automations) | `87e5986b3` … `a8c666c56` | End gate below | Not walked yet | — |
+| G · Network tools | Built 2 Nov (terminal, web page, backups and compare, updates, remote support) | `79c24654e` … `11ad2418e` | End gate below | Not walked yet | — |
+| H · Access and clock-ins | Built 2 Nov (UniFi Access through the hub, people and cards, leavers, keep unlocked, lockdown, Access page, clock-ins) | `f90eed9f6` … `5453b237c` | End gate below | Not walked yet | — |
+| I · Obli fixes things | Built 2 Nov (tray windows H–O, server and IT side, network checks) | `5a8ba775d` … `cb500ba16` | End gate below | Not walked yet | — |
+| Finish and end gate (B–I) | Data moves written (dry run by default); D9 done on the .com 1 Nov; main merged at `dfa0e1e74` (c6cb52312) | `16bfdde2f`, `eca13af1a`, gate fixes in the next commit | Pest full run 2 Nov: 25,441 passed, 188 failed. After the fixes, every S&D and Obli file plus the 5 other files this branch touched was re-run: 2,123 passed, 3 failed, and all 3 fail on main too (2 single-tenant cases, EndpointCommandSignerTest). The other non-S&D failures fail on main too (51 in the main baseline, plus ChatBrowserPushTransportTest); BehaviourSupportApprovalPolicyPrivacyTest and TimesheetHeroWeekScopeTest failed once and passed on re-run. vitest 9,109 passed, 13 failed: this branch's 3 fixed, 10 fail on main too. lint 0/0. tsc 0. build OK with an 8 GB heap (the default heap runs out, as on main; CI uses 6 GB) | Not walked yet | Not merged; waiting for MASTER |

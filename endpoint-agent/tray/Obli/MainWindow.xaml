@@ -55,6 +55,9 @@
        <Button x:Name="NewChatButton" Content="New chat" Click="NewChatClick" Margin="0,0,0,8"/>
       </WrapPanel>
      </StackPanel>
+     <TextBlock Text="Ask Obli to fix it" FontWeight="SemiBold" Margin="0,14,0,6"/>
+     <TextBlock Text="Obli checks first and shows its plan. Nothing happens until you say Fix it. Ctrl+Alt+O, anywhere." TextWrapping="Wrap" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,0,0,8"/>
+     <WrapPanel><Button x:Name="AskObliButton" Content="Ask Obli to fix something" Click="AskObliToFix" Margin="0,0,0,8"/></WrapPanel>
      <TextBlock Text="Quick guides" FontWeight="SemiBold" Margin="0,14,0,10"/>
      <WrapPanel><Button Content="Printer" Click="PrinterHelp" Margin="0,0,8,8"/><Button Content="Internet" Click="InternetHelp" Margin="0,0,8,8"/><Button Content="Slow computer" Click="SlowHelp" Margin="0,0,0,8"/></WrapPanel>
      <Border x:Name="GuidePanel" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0" Padding="14,0,0,0" Margin="0,18,0,0" Visibility="Collapsed">

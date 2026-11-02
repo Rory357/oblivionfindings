@@ -188,9 +188,14 @@ final class SiaDc09IntakeService
             'source' => 'sia_dc09',
             'occurred_at' => $eventOccurredAt,
         ];
-        $event = SignalSource::query()->where('slug', 'security_devices')->exists()
+        $hasSignalSource = SignalSource::query()->where('slug', 'security_devices')->exists();
+        $event = $hasSignalSource
             ? DeviceEvent::query()->create($eventAttributes)
             : DeviceEvent::withoutEvents(fn () => DeviceEvent::query()->create($eventAttributes));
+        if (! $hasSignalSource) {
+            // S&D Phase E: Control Room's bridge was off, but the S&D safety alert still opens.
+            app(\App\Domain\SecurityDevices\Alerts\SafetyEventObserver::class)->created($event);
+        }
 
         // Stage critical/warning events onto the runtime monitoring outbox so alert routes fire
         if (in_array($mapped['severity'], ['critical', 'warning'], true)) {

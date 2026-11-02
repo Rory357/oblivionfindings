@@ -1,5 +1,5 @@
 import { SiteTopologyTreeCard } from '@/components/security-devices/site-topology-tree';
-import type { SiteTopologyTree } from '@/pages/security-devices/sites/_types';
+import type { SiteTopologyTree } from '@/components/security-devices/topology-types';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -20,6 +21,37 @@ func (p *Package) CheckFresh(now time.Time) error {
 // VerifyExtracted verifies the complete staged tree before activation or retry.
 // Windows callers additionally hold protected ancestors and check file ACLs.
 func (p *Package) VerifyExtracted(directory string) error {
+	return p.verifyTree(directory, nil)
+}
+
+// VerifyExtractedParts verifies a release folder that holds only some of this package's
+// top-level parts, such as "site" alone (what a hub's self-update unpacks). The check is as
+// strict as VerifyExtracted for those parts: every manifest file under them must be there with
+// its exact size and SHA-256, and nothing else may be in the folder.
+func (p *Package) VerifyExtractedParts(directory string, parts ...string) error {
+	if len(parts) == 0 {
+		return ErrInvalid
+	}
+	wanted := map[string]bool{}
+	for _, part := range parts {
+		if part == "" || strings.Contains(part, "/") {
+			return ErrInvalid
+		}
+		wanted[part] = true
+	}
+	found := false
+	for _, record := range p.manifest.Files {
+		if top, _, _ := strings.Cut(record.Path, "/"); wanted[top] {
+			found = true
+		}
+	}
+	if !found {
+		return ErrInvalid
+	}
+	return p.verifyTree(directory, wanted)
+}
+
+func (p *Package) verifyTree(directory string, parts map[string]bool) error {
 	info, err := os.Lstat(directory)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return ErrInvalid
@@ -32,6 +64,9 @@ func (p *Package) VerifyExtracted(directory string) error {
 	records := make(map[string]File, len(p.manifest.Files))
 	directories := map[string]bool{".": true}
 	for _, record := range p.manifest.Files {
+		if top, _, _ := strings.Cut(record.Path, "/"); parts != nil && !parts[top] {
+			continue
+		}
 		records[record.Path] = record
 		for parent := path.Dir(record.Path); parent != "."; parent = path.Dir(parent) {
 			directories[parent] = true

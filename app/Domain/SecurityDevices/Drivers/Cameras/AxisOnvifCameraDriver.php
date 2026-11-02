@@ -37,7 +37,7 @@ final class AxisOnvifCameraDriver extends AbstractOnvifCameraDriver
                 ['label' => 'ONVIF Profile T', 'url' => 'https://www.onvif.org/profiles/profile-t/'],
             ],
             limitationsNote: 'Built from Axis ONVIF and Profile S/T documentation; create a dedicated ONVIF Media/Operator account in AXIS OS.',
-            setupHref: '/security-devices/discovery',
+            setupHref: '/security-devices/setup/hubs?tab=networks',
         );
     }
 

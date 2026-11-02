@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Data\CollectorEnrollmentResult;
 use App\Domain\Monitoring\Models\CollectorCheckpoint;
 use App\Domain\Monitoring\Models\CollectorEnrollment;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Hubs\Models\SetupCode;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Models\Site;
 use App\Models\User;
@@ -229,6 +230,9 @@ final readonly class CollectorEnrollmentService
                 'consumed_at' => now(),
                 'consumed_collector_id' => $collector->id,
             ])->save();
+            // The installer's setup code is spent too, and keeps no secrets (S&D Phase B).
+            SetupCode::query()->where('collector_enrollment_id', $enrollment->id)->whereNull('consumed_at')
+                ->update(['consumed_at' => now(), 'code_ciphertext' => null, 'profile_ciphertext' => null]);
             AuditLogger::logOrFail('monitoring.collector.enrolment.consumed', $collector, [
                 'actor_id' => (int) $enrollment->issued_by_user_id,
                 'site_id' => (int) $site->id,
@@ -244,9 +248,13 @@ final readonly class CollectorEnrollmentService
         }, 3);
     }
 
+    /**
+     * A null actor means the hub asked for this itself, because it is being uninstalled
+     * (S&D Phase B, "Removing it tells Oblivion"). Only the hub's own authenticated call does that.
+     */
     public function revoke(
         MonitoringCollector $collector,
-        int $actorId,
+        ?int $actorId,
         ?string $reason = null,
     ): MonitoringCollector {
         $reason = $reason === null ? null : trim($reason);
@@ -255,15 +263,22 @@ final readonly class CollectorEnrollmentService
         }
 
         return DB::transaction(function () use ($collector, $actorId, $reason): MonitoringCollector {
-            $actor = User::query()->whereKey($actorId)->whereNotNull('approved_at')->lockForUpdate()->first();
+            $actor = $actorId === null ? null : User::query()->whereKey($actorId)->whereNotNull('approved_at')->lockForUpdate()->first();
             $locked = MonitoringCollector::query()->whereKey($collector->id)->lockForUpdate()->firstOrFail();
-            if ($actor === null) {
+            if ($actorId !== null && $actor === null) {
                 throw new DomainException('Collector revocation actor is unavailable.');
             }
             if ($locked->revoked_at === null) {
-                $locked->forceFill(['revoked_at' => now(), 'status' => 'revoked'])->save();
+                // Destroying the login-store key means the logins the hub kept can't be read
+                // again, even if it was offline when it was removed (S&D Phase B).
+                $locked->forceFill([
+                    'revoked_at' => now(),
+                    'status' => 'revoked',
+                    'vault_key_ciphertext' => null,
+                    'vault_key_rotated_at' => now(),
+                ])->save();
                 AuditLogger::logOrFail('monitoring.collector.revoked', $locked, [
-                    'actor_id' => $actor->id,
+                    ...($actor === null ? ['removed_by' => 'hub_uninstalled'] : ['actor_id' => $actor->id]),
                     'site_id' => (int) $locked->site_id,
                     ...($reason === null ? [] : ['reason' => $reason]),
                 ]);

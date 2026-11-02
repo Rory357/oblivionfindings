@@ -23,6 +23,9 @@ type windowsRepair struct {
 	collectorOrigin            string
 	recordID                   string
 	reviewDigest, reviewExpiry string
+	// siteDir is the hub's live release folder when the hub updated itself after setup; nil
+	// when the hub part still runs from the recorded folder (h.stage).
+	siteDir *securefs.Directory
 }
 
 func RepairServices(ctx context.Context, pack *release.Package, server, collectorOrigin, role string) (RepairReceipt, error) {
@@ -55,7 +58,9 @@ func ReviewServiceRepair(ctx context.Context, pack *release.Package) (RepairRevi
 func openRepairHost(pack *release.Package, server, collectorOrigin, role string, discover bool) (*windowsRepair, Journal, func(), error) {
 	h := &windowsHost{pack: pack}
 	var lock *os.File
+	releaseUpdates := func() {}
 	close := func() {
+		releaseUpdates()
 		if lock != nil {
 			lock.Close()
 		}
@@ -108,7 +113,7 @@ func openRepairHost(pack *release.Package, server, collectorOrigin, role string,
 	if !pack.Supports(role) || server == "" {
 		return fail(errors.New("package and role do not match the installed service"))
 	}
-	j, err := decodeRepairInstallation(data, pack.Manifest(), pack.Digest(), server, role)
+	j, err := decodeInstalledRecord(data, server, role)
 	if err != nil {
 		return fail(err)
 	}
@@ -145,16 +150,49 @@ func openRepairHost(pack *release.Package, server, collectorOrigin, role string,
 		return fail(err)
 	}
 	parent := program
-	for _, name := range []string{"Oblivion", "Agent", "releases", j.Stage} {
+	for _, name := range []string{"Oblivion", "Agent", "releases"} {
 		parent, err = h.existingChild(parent, name, false)
 		if err != nil {
 			return fail(err)
 		}
 	}
-	h.stage = parent
+	h.releases = parent
 	h.manager, err = mgr.Connect()
 	if err != nil {
 		return fail(errors.New("cannot access Windows Service Control Manager"))
+	}
+	// Which signed package each part must match: the computer part, and a hub part that never
+	// updated itself, live in the recorded folder and must be exactly this package. A hub part
+	// that updated itself lives in its own folder and must be this package's version.
+	m := pack.Manifest()
+	live := liveRelease{Stage: j.Stage, Version: j.Version, Revision: j.Revision}
+	if h.profiles.HasCollector() {
+		releaseUpdates, err = holdHubUpdates(h.collector)
+		if err != nil {
+			return fail(err)
+		}
+		if live, err = h.liveCollectorRelease(j); err != nil {
+			return fail(err)
+		}
+	}
+	movedSite := live.Stage != j.Stage
+	if (h.profiles.HasComputer() || !movedSite) && !recordMatchesPackage(j, m, pack.Digest()) {
+		return fail(errors.New("this installer is a different version from the one on this computer; use Update instead of Repair"))
+	}
+	if movedSite && (live.Version != m.Version || live.Revision != m.Revision) {
+		return fail(errors.New("this installer is a different version from the one this hub runs now; use Update instead of Repair"))
+	}
+	var siteDir *securefs.Directory
+	if movedSite {
+		if siteDir, err = h.existingChild(h.releases, live.Stage, false); err != nil {
+			return fail(err)
+		}
+		j.siteStage = live.Stage
+	}
+	if h.profiles.HasComputer() || !movedSite {
+		if h.stage, err = h.existingChild(h.releases, j.Stage, false); err != nil {
+			return fail(err)
+		}
 	}
 	if h.profiles.HasCollector() && collectorOrigin == "" {
 		collectorOrigin = server
@@ -163,7 +201,7 @@ func openRepairHost(pack *release.Package, server, collectorOrigin, role string,
 		return fail(errors.New("computer-only installation has no collector transport"))
 	}
 	okay = true
-	return &windowsRepair{windowsHost: h, collectorOrigin: collectorOrigin}, j, close, nil
+	return &windowsRepair{windowsHost: h, collectorOrigin: collectorOrigin, siteDir: siteDir}, j, close, nil
 }
 func (h *windowsRepair) repairReview(j Journal, expiry string) (RepairReview, error) {
 	var computerBinding, collectorBinding string
@@ -225,18 +263,36 @@ func (h *windowsRepair) ValidateRepair(ctx context.Context, j Journal) error {
 			return e
 		}
 	}
-	if err := h.pack.VerifyExtracted(h.stage.Path()); err != nil {
-		return err
+	// Each folder in use is checked byte for byte against the signed package, with protected
+	// permissions and Authenticode on every program, whichever folder the part lives in.
+	siteDir := h.stage
+	if h.siteDir != nil {
+		siteDir = h.siteDir
+		if err := h.pack.VerifyExtractedParts(h.siteDir.Path(), "site"); err != nil {
+			return err
+		}
+	}
+	if h.stage != nil {
+		if err := h.pack.VerifyExtracted(h.stage.Path()); err != nil {
+			return err
+		}
 	}
 	for _, file := range h.pack.Manifest().Files {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if err := h.stage.CheckRelativeFile(file.Path); err != nil {
+		folder := h.stage
+		if strings.HasPrefix(file.Path, "site/") && h.siteDir != nil {
+			folder = h.siteDir
+		}
+		if folder == nil {
+			continue // a hub-only install that moved: its recorded folder is no longer used
+		}
+		if err := folder.CheckRelativeFile(file.Path); err != nil {
 			return err
 		}
 		if strings.EqualFold(filepath.Ext(file.Path), ".exe") {
-			if err := release.VerifyExecutable(filepath.Join(h.stage.Path(), filepath.FromSlash(file.Path)), j.Architecture); err != nil {
+			if err := release.VerifyExecutable(filepath.Join(folder.Path(), filepath.FromSlash(file.Path)), j.Architecture); err != nil {
 				return err
 			}
 		}
@@ -249,7 +305,7 @@ func (h *windowsRepair) ValidateRepair(ctx context.Context, j Journal) error {
 	if h.profiles.HasCollector() {
 		bounded, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
-		if err := collectorhost.CheckInstalledRepairIdentity(bounded, h.stage, h.collector, j.CollectorUUID, j.CollectorSiteID, h.collectorOrigin); err != nil {
+		if err := collectorhost.CheckInstalledRepairIdentity(bounded, siteDir, h.collector, j.CollectorUUID, j.CollectorSiteID, h.collectorOrigin); err != nil {
 			return err
 		}
 	}
@@ -303,4 +359,16 @@ func (h *windowsRepair) SaveRepair(r RepairReceipt) error {
 		return errors.New("service repair record changed")
 	}
 	return h.journals.WriteAtomic(name, data)
+}
+
+// RepairInstalled is the installer's Repair button ("Oblivion is already on this computer").
+// Choosing Repair is the confirmation; the destination, role and identity all come from the
+// installed record, so nothing new can be supplied. The checks are those of RepairServices.
+func RepairInstalled(ctx context.Context, pack *release.Package) (RepairReceipt, error) {
+	h, j, close, err := openRepairHost(pack, "", "", "", true)
+	if err != nil {
+		return RepairReceipt{}, err
+	}
+	defer close()
+	return RunServiceRepair(ctx, j, h)
 }

@@ -395,7 +395,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Hardware integrations now live in Security & Devices. Microsoft and Google stay in Auth/SSO.
-    Route::redirect('settings/integrations', '/security-devices/integrations', 301)
+    Route::redirect('settings/integrations', '/security-devices/setup/services?tab=connected', 301)
         ->middleware('permission:integrations.view')
         ->name('settings.integrations.index');
 

@@ -24,6 +24,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import EndOfShiftChecklist, {
     type EndOfShiftBlocker,
 } from '@/components/end-of-shift-checklist';
+import { DoorClockinBand, DoorClockinNotice } from '@/components/security-devices/door-clockin-band';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import useLiveRefresh from '@/hooks/use-live-refresh';
@@ -810,6 +811,8 @@ export default function MyDay() {
                     </CardContent>
                 </Card>
             )}
+            {/* S&D Phase H (D15, pg-sdr-19g): a badge near their rostered start suggests the clock-in; they choose. */}
+            {props.door_clockin ? <DoorClockinBand data={props.door_clockin} /> : null}
             {props.active_lone_worker_session ? (
                 <LoneWorkerCheckInCard
                     session={props.active_lone_worker_session}
@@ -1027,6 +1030,7 @@ export default function MyDay() {
                     )}
                 </div>
                 <aside className="flex min-w-0 flex-col gap-5">
+                    {props.door_clockin ? <DoorClockinNotice data={props.door_clockin} /> : null}
                     {props.can_view_medications && (
                         <MedicinesCard
                             rows={visibleMeds}

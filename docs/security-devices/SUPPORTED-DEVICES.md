@@ -114,7 +114,7 @@ Every integration in Security & Devices implements the Home-Assistant-style `Dev
 | **Uniview (UNV)** | `camera.uniview_onvif` | ONVIF Profile S & T (`Media1`, `Media2`, `PTZ`) + WS-UsernameToken / HTTP Digest | Live stream URIs, snapshot, PTZ | **Built from vendor docs** |
 | **Axis Communications** | `camera.axis_onvif` | ONVIF Profile S & T (`Media1`, `Media2`, `PTZ`) + Axis ONVIF account auth | Live stream URIs, snapshot, PTZ | **Built from vendor docs** |
 | **Hanwha Vision (Wisenet)** | `camera.hanwha_onvif` | ONVIF Profile S & T (`Media1`, `Media2`, `PTZ`) + HTTP Digest (`SHA-256`) | Live stream URIs, snapshot, PTZ | **Built from vendor docs** |
-| **Ubiquiti UniFi Protect** | `camera.unifi_protect` | Official UniFi OS Protect Integration API v1 (`https://<nvr>/proxy/protect/integration/v1/*`, `X-API-KEY`) via Site hub (`UniFiProtectLocalClient`) | Camera inventory, high-resolution JPEG snapshot, sanitised `rtsps://` stream URIs (query tokens stripped before persistence) | **Built from vendor docs** |
+| **Ubiquiti UniFi Protect** | `camera.unifi_protect` | Official UniFi OS Protect Integration API v1 (`https://<nvr>/proxy/protect/integration/v1/*`, `X-API-KEY`) from the server (`UniFiProtectLocalCameraClient`); the console must be reachable from the server. The unused hub-side Protect client was removed in Phase B | Camera inventory, high-resolution JPEG snapshot, sanitised `rtsps://` stream URIs (query tokens stripped before persistence) | **Built from vendor docs** |
 
 **Official camera specifications cited:**
 - **ONVIF** — *Profile S Specification*, *Profile T Specification*, *Media Service (`ver10`)*, *Media2 Service (`ver20`)*, and *PTZ Service (`ver20`)* (<https://www.onvif.org/profiles/profile-s/>, <https://www.onvif.org/profiles/profile-t/>, <https://www.onvif.org/specs/srv/media/ONVIF-Media2-Service-Spec.pdf>).
@@ -182,12 +182,14 @@ All SSH configuration backups run through the audited `network.config.backup` co
 
 ---
 
-### 5. Site-Hub Syslog & NetFlow / IPFIX / sFlow Telemetry
+### 5. Site-Hub Syslog & NetFlow / IPFIX / sFlow Telemetry — not built yet
 
-| Driver | Key | Hub UDP Receiver & Central Pipeline | Overlapping Private LAN Safety | Support level |
-| --- | --- | --- | --- | --- |
-| **Site-Hub Syslog Receiver** | `telemetry.hub_syslog` | `HubTelemetryReceiver::spoolSyslogDatagram()` (RFC 5424 & RFC 3164, `<= 8192` bytes) -> encrypted collector spool -> `CollectorIngestService` (`syslog_event`) -> `InboundTelemetryScopeResolver::resolveForCollector()` -> `EventEnvelopeHandler` | Resolves sender IP strictly within the authenticated collector's authorised `site_id` + active `DiscoveryScope` CIDRs, preventing cross-Site collisions when two houses both use `192.168.1.0/24` | **Built from vendor docs** |
-| **Site-Hub NetFlow / IPFIX / sFlow Receiver** | `telemetry.hub_netflow` | `HubTelemetryReceiver::spoolFlowDatagram()` (NetFlow v5, NetFlow v9, IPFIX RFC 7011, sFlow v5, `<= 65507` bytes) -> encrypted collector spool -> `CollectorIngestService` (`flow_datagram`) -> `FlowIntakeService` -> `EventEnvelopeHandler` (`flow.bytes`, `flow.packets`, `flow.count`) | Exporter sequence state (`monitoring_flow_exporter_states`) and device attribution are partitioned by `(site_id, exporter_hash)` via the authenticated collector's Site scope | **Built from vendor docs** |
+Phase B (1 Nov 2026): the hub runs short work cycles and has no network listener, so the hub-side receiver (`HubTelemetryReceiver`) was never called and was removed. Both drivers are **Planned**. The server still accepts `syslog_event` and `flow_datagram` items in a hub upload (`CollectorIngestService` -> `InboundTelemetryScopeResolver::resolveForCollector()` -> `EventEnvelopeHandler`, isolated per Site when two houses both use `192.168.1.0/24`), but no hub sends them today. The central listeners (`monitoring:listen-syslog`, `monitoring:listen-flow`) are separate and unchanged.
+
+| Driver | Key | What exists | Support level |
+| --- | --- | --- | --- |
+| **Site-Hub Syslog Receiver** | `telemetry.hub_syslog` | Server-side ingest of uploaded `syslog_event` items only; no hub receiver | **Planned** (not built yet) |
+| **Site-Hub NetFlow / IPFIX / sFlow Receiver** | `telemetry.hub_netflow_ipfix` | Server-side ingest of uploaded `flow_datagram` items only; no hub receiver | **Planned** (not built yet) |
 
 **Official telemetry specifications cited:**
 - **IETF RFC 5424 & RFC 3164** — *The Syslog Protocol* (<https://datatracker.ietf.org/doc/html/rfc5424>, <https://datatracker.ietf.org/doc/html/rfc3164>).

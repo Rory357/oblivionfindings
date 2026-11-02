@@ -594,8 +594,8 @@ test('the monitoring dashboard links the exact native issue to permitted direct 
     expect(data_get($link, 'it_incident.id'))->toBe($ticket->id)
         ->and(data_get($link, 'it_incident.href'))->toBe('/it/tickets/'.$ticket->id)
         ->and(data_get($link, 'control_room.id'))->toBe($severity === 'high' ? ControlRoomAlert::query()->sole()->id : null);
-    $this->actingAs($viewer)->get('/security-devices/monitoring')->assertOk()->assertInertia(fn ($page) => $page
-        ->where('workspace.monitors.0.correlation.it_incident.id', $ticket->id));
+    // S&D rebuild C6: the monitoring page is rebuilt as Alerts; the link above is what its rows read.
+    $this->actingAs($viewer)->get('/security-devices/monitoring')->assertRedirect('/security-devices/alerts');
 })->with([[false, 'medium'], [false, 'high'], [true, 'medium'], [true, 'high']]);
 
 test('monitoring history retains recovered work but never attributes an older ticket to a later undelivered issue', function () {

@@ -4,9 +4,12 @@ namespace App\Domain\SecurityDevices\Cctv\Http\Controllers;
 
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Cctv\Services\CameraEndpointTrustService;
+use App\Domain\SecurityDevices\Cctv\Services\CameraPrivacy;
+use App\Domain\SecurityDevices\Cctv\Services\HubCameraPictureService;
 use App\Domain\SecurityDevices\Cctv\Services\OnvifCameraProfileClient;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
+use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Services\AuditLogger;
@@ -22,6 +25,7 @@ final class DeviceCameraOnvifController extends Controller
         private readonly SecurityDevicesAccessService $access,
         private readonly OnvifCameraProfileClient $onvif,
         private readonly DeviceDriverRegistry $drivers,
+        private readonly HubCameraPictureService $hubPictures,
     ) {}
 
     public function snapshot(Request $request, Device $device): JsonResponse
@@ -41,6 +45,48 @@ final class DeviceCameraOnvifController extends Controller
             404,
         );
 
+        // S&D Phase E: no picture at all while the camera is inside its privacy hours.
+        if (($private = $this->privacyRefusal($device)) !== null) {
+            AuditLogger::logOrFail('camera.onvif.snapshot', $device, [
+                'actor_id' => (int) $user->id,
+                'device_id' => (int) $device->id,
+                'ok' => false,
+                'reason_code' => CameraPrivacy::REFUSAL,
+            ]);
+
+            return $private;
+        }
+
+        // S&D Phase B: a camera at a Site with a hub is checked through that hub, never from the server.
+        $throughHub = $this->hubPictures->start($user, $device);
+        if ($throughHub !== null) {
+            $pending = $throughHub['state'] === 'pending';
+            AuditLogger::logOrFail('camera.onvif.snapshot', $device, [
+                'actor_id' => (int) $user->id,
+                'device_id' => (int) $device->id,
+                'driver_key' => $this->hubPictures->routeKind($device) === 'onvif' ? 'camera-onvif-through-hub' : 'unifi-protect-through-hub',
+                'ok' => $pending,
+                'reason_code' => $pending ? 'checking_through_hub' : 'hub_unavailable',
+            ]);
+
+            return $pending
+                ? response()->json([
+                    'ok' => false,
+                    'pending' => true,
+                    'reason_code' => 'checking_through_hub',
+                    'message' => $throughHub['message'],
+                    'status_url' => route('security-devices.devices.camera.snapshot.status', ['device' => $device->id, 'command' => $throughHub['command_id']], false),
+                ], 202)->header('Cache-Control', 'no-store')
+                : response()->json([
+                    'ok' => false,
+                    'reason_code' => 'hub_unavailable',
+                    'message' => $throughHub['message'],
+                ], 409)->header('Cache-Control', 'no-store');
+        }
+        if (($notYet = $this->hubPictures->notThroughHubYet($device, 'a picture from this kind of camera')) !== null) {
+            return $this->notThroughHubYet($notYet);
+        }
+
         $driver = $this->drivers->resolveCameraDriver($device);
         $result = $driver !== null
             ? $driver->captureSnapshot($device)
@@ -55,6 +101,47 @@ final class DeviceCameraOnvifController extends Controller
         ]);
 
         return response()->json($this->withTrustPrompt($request, $device, $result))->header('Cache-Control', 'no-store');
+    }
+
+    /** S&D Phase B: the camera card checks back here until the Site hub's picture arrives. */
+    public function snapshotStatus(Request $request, Device $device, DeviceCommandRequest $command): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless(
+            $user
+            && $user->canDo('securityDevices.devices.view')
+            && $user->canDo('securityDevices.cctv.media.view'),
+            403,
+        );
+        $this->access->assertCanViewDevice($user, $device);
+        abort_unless($device->domain === 'security' && $device->category === 'cctv', 404);
+
+        // S&D Phase E: a picture that arrives once privacy hours have begun is thrown away unseen.
+        if (($private = $this->privacyRefusal($device)) !== null) {
+            $this->hubPictures->discard($user, $device, $command);
+
+            return $private;
+        }
+
+        $status = $this->hubPictures->status($user, $device, $command);
+        $payload = match ($status['state']) {
+            'pending' => ['ok' => false, 'pending' => true, 'reason_code' => 'checking_through_hub', 'message' => $status['message'] ?? ''],
+            'done' => [
+                'ok' => true,
+                'reason_code' => 'captured',
+                'data_uri' => $status['data_uri'] ?? null,
+                'captured_at' => $status['captured_at'] ?? null,
+                'source' => $status['source'] ?? null,
+            ],
+            default => [
+                'ok' => false,
+                'reason_code' => 'hub_snapshot_failed',
+                'message' => $status['message'] ?? '',
+                'tls_trust' => $status['tls_trust'] ?? null,
+            ],
+        };
+
+        return response()->json($this->withTrustPrompt($request, $device, $payload))->header('Cache-Control', 'no-store');
     }
 
     public function streams(Request $request, Device $device): JsonResponse
@@ -73,6 +160,9 @@ final class DeviceCameraOnvifController extends Controller
             && $device->status !== DeviceStatus::Decommissioned,
             404,
         );
+        if (($notYet = $this->hubPictures->notThroughHubYet($device, 'checking camera streams')) !== null) {
+            return $this->notThroughHubYet($notYet);
+        }
 
         $driver = $this->drivers->resolveCameraDriver($device);
         $result = $driver !== null
@@ -131,6 +221,9 @@ final class DeviceCameraOnvifController extends Controller
         ]);
 
         $action = (string) $validated['action'];
+        if (($notYet = $this->hubPictures->notThroughHubYet($device, 'moving the camera')) !== null) {
+            return $this->notThroughHubYet($notYet);
+        }
         $driver = $this->drivers->resolveCameraDriver($device);
         $result = $driver !== null
             ? $driver->performPtz($device, $action)
@@ -202,6 +295,29 @@ final class DeviceCameraOnvifController extends Controller
         ];
 
         return $result;
+    }
+
+    /** S&D Phase E: the refusal while a camera is inside its privacy hours, or null outside them. */
+    private function privacyRefusal(Device $device): ?JsonResponse
+    {
+        $until = app(CameraPrivacy::class)->until((int) $device->id);
+
+        return $until === null ? null : response()->json([
+            'ok' => false,
+            'reason_code' => CameraPrivacy::REFUSAL,
+            'message' => 'Privacy hours are on for this camera. No picture is shown until they end.',
+            'privacy_until' => $until->toIso8601String(),
+        ], 409)->header('Cache-Control', 'no-store');
+    }
+
+    /** S&D Phase B: refused at a Site with a hub, because the server never reaches into the house. */
+    private function notThroughHubYet(string $message): JsonResponse
+    {
+        return response()->json([
+            'ok' => false,
+            'reason_code' => 'hub_route_not_built',
+            'message' => $message,
+        ], 409)->header('Cache-Control', 'no-store');
     }
 
     private function siteOf(Device $device): ?int

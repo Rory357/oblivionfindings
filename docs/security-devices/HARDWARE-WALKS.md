@@ -22,3 +22,6 @@ date, the phase walk step it passed, and who walked it. In the same commit, chan
 
 No driver has been walked on real hardware yet (30 Oct 2026). Gemini's earlier claims for UniFi
 Network and Queclink were removed in Phase A because no walk was recorded.
+
+Checks done so far on local test stand-ins (which don't count here), and what is still waiting for
+Stephan's own kit and network, are listed in `END-REVIEW-WALKS.md`.

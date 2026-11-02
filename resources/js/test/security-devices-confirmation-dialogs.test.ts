@@ -6,17 +6,8 @@ function source(path: string): string {
     return readFileSync(resolve(process.cwd(), path), 'utf8');
 }
 
+// S&D rebuild C6 (D8): the device group pages and their confirmations are gone.
 describe('Security & Devices governed confirmations', () => {
-    it('keeps Device Group destructive actions out of browser-native confirms', () => {
-        const groupShow = source(
-            'resources/js/pages/security-devices/device-groups/show.tsx',
-        );
-
-        expect(groupShow).not.toMatch(/\bconfirm\s*\(/);
-        expect(groupShow).toContain('title="Delete device group?"');
-        expect(groupShow).toContain('title="Remove device from group?"');
-    });
-
     it('uses named governed confirmations for every Device Profile destructive action', () => {
         const deviceShow = source(
             'resources/js/pages/security-devices/devices/show.tsx',

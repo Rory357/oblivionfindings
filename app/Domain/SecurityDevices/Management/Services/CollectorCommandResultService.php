@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Management\Services;
 use App\Domain\Monitoring\Exceptions\RuntimePayloadInvalid;
 use App\Domain\Monitoring\Exceptions\RuntimeScopeViolation;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Management\Contracts\CollectorCommandDescriptor;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandReconciliationOutcome;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
@@ -17,17 +18,26 @@ use Illuminate\Support\Facades\DB;
 
 final class CollectorCommandResultService
 {
+    /** Hard ceiling for any attachment, under the hub's 2 MB spool frame. */
+    public const int MAX_ATTACHMENT_ENCODED_BYTES = 1_572_864;
+
     public function __construct(
         private readonly CollectorCommandContract $contracts,
         private readonly DeviceCommandAuditService $audit,
+        private readonly CollectorCommandDescriptorRegistry $descriptors,
     ) {}
 
     /** @param array<string, mixed> $payload */
     public function record(MonitoringCollector $collector, int $sequence, array $payload): void
     {
         $validated = $this->validate($payload);
+        $descriptor = $this->descriptors->for($validated['capability']);
+        if (! $descriptor instanceof CollectorCommandDescriptor) {
+            throw new RuntimeScopeViolation('Collector command result has no declared hub job.');
+        }
+        $attachment = $this->attachment($payload['attachment'] ?? null, $descriptor, $validated['execution_status']);
 
-        DB::transaction(function () use ($collector, $sequence, $validated): void {
+        DB::transaction(function () use ($collector, $sequence, $validated, $descriptor, $attachment): void {
             $request = DeviceCommandRequest::query()
                 ->with('device')
                 ->where('command_uuid', $validated['command_uuid'])
@@ -38,7 +48,9 @@ final class CollectorCommandResultService
                 ->lockForUpdate()
                 ->firstOrFail();
             if ((int) $request->collector_id !== (int) $collector->id
-                || (int) $request->site_id !== (int) $collector->site_id
+                // The hub that covers the Site ran it: its home Site or one it covers over SD-WAN.
+                || ! in_array((int) $request->site_id, $collector->authorisedSiteIds(), true)
+                || (int) $request->site_id !== $validated['site_id']
                 || (int) $request->device_id !== $validated['device_id']
                 || (int) $attempt->device_command_request_id !== (int) $request->id
                 || (int) $attempt->attempt_number !== $validated['attempt_number']
@@ -51,11 +63,13 @@ final class CollectorCommandResultService
                 throw new RuntimeScopeViolation('Collector command result is outside its immutable request scope.');
             }
 
-            $attemptStatus = CommandAttemptStatus::from($validated['execution_status']);
             if ($attempt->status->isTerminal()) {
-                if ($attempt->status !== $attemptStatus
-                    || ($attempt->safe_result_summary ?? []) !== $validated['safe_result']
-                    || $attempt->safe_failure_reason !== $validated['safe_failure_reason']) {
+                if (! $descriptor->sameEvidence(
+                    $attempt,
+                    $validated['execution_status'],
+                    $validated['safe_result'],
+                    $validated['safe_failure_reason'],
+                )) {
                     throw new RuntimePayloadInvalid('Collector command result replay conflicts with immutable evidence.');
                 }
 
@@ -69,10 +83,23 @@ final class CollectorCommandResultService
                 throw new RuntimePayloadInvalid('Collector command lifecycle changed before result ingestion.');
             }
 
+            $outcome = $descriptor->interpret(
+                $request,
+                $collector,
+                $validated['execution_status'],
+                $validated['safe_result'],
+                $validated['provider_request_reference'],
+                $validated['safe_failure_reason'],
+                $validated['reconciliation'],
+                $attachment,
+            );
+            $safeResult = $this->safeMap($outcome->safeResult, 16);
+
+            $attemptStatus = CommandAttemptStatus::from($outcome->executionStatus);
             $attempt->status = $attemptStatus;
-            $attempt->provider_request_reference = $validated['provider_request_reference'];
-            $attempt->safe_result_summary = $validated['safe_result'];
-            $attempt->safe_failure_reason = $validated['safe_failure_reason'];
+            $attempt->provider_request_reference = $outcome->providerReference;
+            $attempt->safe_result_summary = $safeResult;
+            $attempt->safe_failure_reason = $outcome->failure;
             $attempt->evidence_reference = "collector:{$collector->collector_uuid}:sequence:{$sequence}";
             $attempt->accepted_at = $validated['accepted_at'];
             $attempt->started_at = $validated['started_at'];
@@ -87,26 +114,26 @@ final class CollectorCommandResultService
             };
             $request->execution_route = 'collector';
             $request->execution_completed_at = $validated['completed_at'];
-            $request->safe_result_summary = $validated['safe_result'] === []
+            $request->safe_result_summary = $safeResult === []
                 ? null
-                : json_encode($validated['safe_result'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-            $request->safe_failure_reason = $validated['safe_failure_reason'];
+                : json_encode($safeResult, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $request->safe_failure_reason = $outcome->failure;
             $request->save();
             $this->audit->append($request, null, 'collector_execution_'.$attemptStatus->value, [
                 'attempt_number' => $attempt->attempt_number,
                 'collector_id' => (int) $collector->id,
                 'source_sequence' => $sequence,
                 'status' => $request->status->value,
-                'safe_result' => $validated['safe_result'],
+                'safe_result' => $safeResult,
             ]);
 
-            if ($validated['reconciliation'] !== null) {
+            if ($outcome->reconciliation !== null && $attemptStatus !== CommandAttemptStatus::Failed) {
                 $this->recordReconciliation(
                     $request,
                     $attempt,
                     $collector,
                     $sequence,
-                    $validated['reconciliation'],
+                    $outcome->reconciliation,
                 );
             }
         }, 3);
@@ -130,8 +157,9 @@ final class CollectorCommandResultService
             'provider_request_reference', 'safe_failure_reason', 'accepted_at', 'started_at',
             'completed_at', 'reconciliation',
         ];
-        if (array_diff(array_keys($payload), $allowed) !== []
-            || array_diff($allowed, array_keys($payload)) !== []
+        $keys = array_keys($payload);
+        if (array_diff($keys, [...$allowed, 'attachment']) !== []
+            || array_diff($allowed, $keys) !== []
             || ($payload['item_type'] ?? null) !== 'command_result') {
             throw new RuntimePayloadInvalid('Collector command result fields are invalid.');
         }
@@ -154,13 +182,6 @@ final class CollectorCommandResultService
             || ($failure !== null && (! is_string($failure) || trim($failure) === '' || mb_strlen($failure) > 2000))) {
             throw new RuntimePayloadInvalid('Collector command result summary is invalid.');
         }
-        $this->assertTypedUnifiResult(
-            $payload['execution_status'],
-            $safeResult,
-            $providerReference,
-            $failure,
-            $payload['command_uuid'],
-        );
         try {
             $acceptedAt = CarbonImmutable::parse($payload['accepted_at'])->utc();
             $startedAt = CarbonImmutable::parse($payload['started_at'])->utc();
@@ -177,7 +198,7 @@ final class CollectorCommandResultService
             if ($reconciliation !== null) {
                 throw new RuntimePayloadInvalid('A failed pre-execution command cannot claim reconciliation evidence.');
             }
-        } else {
+        } elseif ($reconciliation !== null) {
             $reconciliation = $this->reconciliation($reconciliation);
         }
 
@@ -200,6 +221,35 @@ final class CollectorCommandResultService
         ];
     }
 
+    /**
+     * One attachment, only for jobs that declare one, only on success: gzip, then base64, with the
+     * sha256 and length of the original bytes so a damaged upload is refused.
+     */
+    private function attachment(mixed $value, CollectorCommandDescriptor $descriptor, string $status): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $limit = min(self::MAX_ATTACHMENT_ENCODED_BYTES, $descriptor->maxAttachmentBytes());
+        if ($limit < 1 || $status !== 'succeeded' || ! is_array($value)
+            || array_keys($value) !== ['kind', 'encoding', 'bytes', 'sha256', 'data']
+            || ! is_string($value['kind']) || preg_match('/\A[a-z][a-z0-9_]{0,31}\z/', $value['kind']) !== 1
+            || $value['encoding'] !== 'gzip+base64'
+            || ! is_int($value['bytes']) || $value['bytes'] < 1 || $value['bytes'] > 2_097_152
+            || ! is_string($value['sha256']) || preg_match('/\A[0-9a-f]{64}\z/', $value['sha256']) !== 1
+            || ! is_string($value['data']) || strlen($value['data']) > $limit) {
+            throw new RuntimePayloadInvalid('Collector command attachment is invalid.');
+        }
+        $compressed = base64_decode($value['data'], true);
+        $raw = is_string($compressed) ? @gzdecode($compressed, 2_097_152) : false;
+        if (! is_string($raw) || strlen($raw) !== $value['bytes']
+            || ! hash_equals($value['sha256'], hash('sha256', $raw))) {
+            throw new RuntimePayloadInvalid('Collector command attachment failed its integrity check.');
+        }
+
+        return $raw;
+    }
+
     /** @return array<string, mixed> */
     private function reconciliation(mixed $value): array
     {
@@ -219,9 +269,6 @@ final class CollectorCommandResultService
             }
         } else {
             $observed = $this->safeMap($observed, 16);
-            if (array_keys($observed) !== ['locked'] || ! is_bool($observed['locked'])) {
-                throw new RuntimePayloadInvalid('Collector command observed state is invalid.');
-            }
         }
         $reference = $value['observation_reference'];
         $summary = $value['safe_evidence_summary'];
@@ -235,17 +282,6 @@ final class CollectorCommandResultService
         } catch (\Throwable) {
             throw new RuntimePayloadInvalid('Collector command reconciliation time is invalid.');
         }
-        $allowedSummaries = [
-            'The remote Site collector freshly confirmed that the door relay returned to locked.',
-            'The remote Site collector freshly reported that the door relay remains unlocked.',
-            'The remote Site collector could not freshly confirm the final door state. Do not retry until actual state is known.',
-            'Fresh state is required before any new attempt.',
-        ];
-        if (! in_array(trim($summary), $allowedSummaries, true)
-            || ($value['outcome'] === 'matched' && $observed !== ['locked' => true])
-            || ($value['outcome'] === 'mismatch' && $observed !== ['locked' => false])) {
-            throw new RuntimePayloadInvalid('Collector command reconciliation evidence is not a declared typed outcome.');
-        }
 
         return [
             'outcome' => $value['outcome'],
@@ -256,51 +292,12 @@ final class CollectorCommandResultService
         ];
     }
 
-    /** @param array<string, scalar|null> $safeResult */
-    private function assertTypedUnifiResult(
-        string $status,
-        array $safeResult,
-        ?string $providerReference,
-        ?string $failure,
-        string $commandUuid,
-    ): void {
-        if ($status === 'succeeded') {
-            if (array_keys($safeResult) !== [
-                'provider_state', 'previous_lock_state', 'unlock_duration_seconds',
-            ]
-                || $safeResult['provider_state'] !== 'accepted'
-                || $safeResult['previous_lock_state'] !== 'locked'
-                || ! is_int($safeResult['unlock_duration_seconds'])
-                || $safeResult['unlock_duration_seconds'] < 5
-                || $safeResult['unlock_duration_seconds'] > 60
-                || $providerReference !== 'unifi-access:'.$commandUuid
-                || $failure !== null) {
-                throw new RuntimePayloadInvalid('Collector UniFi success evidence is invalid.');
-            }
-
-            return;
-        }
-        $allowedFailures = [
-            'UniFi Access reports that the mapped door is not bound to an access hub.',
-            'The door was not in the approved locked state immediately before execution.',
-            'UniFi Access rejected the credential or required API permission.',
-            'The mapped UniFi Access door is unavailable.',
-            'UniFi Access rejected the door action in its current state.',
-            'UniFi Access rate-limited the door action.',
-            'UniFi Access did not accept the remote door action.',
-            'The collector did not receive a confirmed final provider response. Actual state was checked before any retry.',
-            'The collector could not complete the approved pre-execution state and credential checks.',
-            'The collector restarted after persisting execution intent without a durable final result. The action was not repeated.',
-        ];
-        if ($safeResult !== [] || $providerReference !== null
-            || ! is_string($failure) || ! in_array(trim($failure), $allowedFailures, true)) {
-            throw new RuntimePayloadInvalid('Collector UniFi failure evidence is invalid.');
-        }
-    }
-
     /** @return array<string, scalar|null> */
     private function safeMap(mixed $value, int $maximum): array
     {
+        if ($value === []) {
+            return [];
+        }
         if (! is_array($value) || array_is_list($value) || count($value) > $maximum) {
             throw new RuntimePayloadInvalid('Collector command safe evidence is invalid.');
         }

@@ -4,13 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Semantic version (e.g. 0.2.0)"
+        description: "Semantic version; empty uses endpoint-agent/VERSION"
         required: false
-        default: "0.2.0"
+        default: ""
       revision:
-        description: "Monotonic release & catalogue revision integer"
+        description: "Monotonic release & catalogue revision; empty uses the run number"
         required: false
-        default: "1"
+        default: ""
+  # The release list expires after 80 days, so main renews it every week (plan v10, "Releases").
+  schedule:
+    - cron: "17 3 * * 1"
   push:
     branches:
       - main
@@ -34,8 +37,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # S&D Phase B: the Linux hub's own runtime, a static PHP with the hub's extensions built in,
+  # so a Raspberry Pi or NUC installs nothing from apt (plan v10, "Linux and Raspberry Pi").
+  linux-runtime:
+    name: Build hub runtime (static PHP, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            spc: spc-linux-x86_64.tar.gz
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            spc: spc-linux-aarch64.tar.gz
+    steps:
+      - name: Build static PHP 8.4 with the hub's extensions
+        env:
+          SPC_VERSION: "2.8.5"
+          SPC_ASSET: ${{ matrix.spc }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # static-php-cli, pinned, checked against the digest GitHub publishes for the asset.
+          WANT=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/crazywhalecc/static-php-cli/releases/tags/${SPC_VERSION}" \
+            | jq -r --arg n "$SPC_ASSET" '.assets[] | select(.name == $n) | .digest' | sed 's/^sha256://')
+          curl -fsSL -o spc.tar.gz "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/${SPC_ASSET}"
+          echo "${WANT}  spc.tar.gz" | sha256sum -c -
+          tar -xzf spc.tar.gz
+          chmod +x spc
+          ./spc doctor --auto-fix
+          EXT="curl,openssl,sodium,sockets,snmp,mbstring,ctype,filter,tokenizer,zlib"
+          ./spc download --with-php=8.4 --for-extensions="$EXT" --prefer-pre-built
+          ./spc build "$EXT" --build-cli
+          mkdir -p out
+          cp buildroot/bin/php out/php
+          ./out/php -r 'foreach (["curl", "openssl", "sodium", "sockets", "snmp", "mbstring"] as $e) { if (! extension_loaded($e)) { fwrite(STDERR, "missing $e\n"); exit(1); } } echo "runtime-ok\n";'
+
+      - name: Upload hub runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: hub-runtime-${{ matrix.arch }}
+          path: out/php
+          if-no-files-found: error
+
   linux-packages:
     name: Build Linux Site Hub (amd64 & arm64)
+    needs: linux-runtime
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -64,15 +114,31 @@ jobs:
           composer test
           composer install --no-dev --classmap-authoritative --no-interaction --prefer-dist
 
+      - name: Download hub runtimes
+        uses: actions/download-artifact@v4
+        with:
+          pattern: hub-runtime-*
+          path: ${{ runner.temp }}/hub-runtime
+
       - name: Cross-compile Linux binaries & package NUC/Pi tarballs
+        env:
+          # D3 self-updates: Linux hubs check each update against the signed release list, so the
+          # launcher carries that list's public key. Only main has it; other builds get none and
+          # their hubs refuse to self-update (nothing installs without a key).
+          RELEASE_LIST_PUBKEY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_RELEASE_PUBLIC_KEY || '' }}
         run: |
           chmod +x scripts/package-linux-site-hub.sh endpoint-agent/packaging/linux/install.sh
+          VERSION="${{ inputs.version }}"
+          [ -n "$VERSION" ] || VERSION="$(tr -d '[:space:]' < endpoint-agent/VERSION)"
+          printf '%s' "$VERSION" > collector/VERSION
           for ARCH in amd64 arm64; do
             OUT_BIN="${RUNNER_TEMP}/linux-bin-${ARCH}"
-            mkdir -p "$OUT_BIN"
+            mkdir -p "$OUT_BIN/runtime"
+            cp "${RUNNER_TEMP}/hub-runtime/hub-runtime-${ARCH}/php" "$OUT_BIN/runtime/php"
+            chmod 0755 "$OUT_BIN/runtime/php"
             (
               cd endpoint-agent
-              CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath -ldflags="-s -w" -o "${OUT_BIN}/oblivion-site-collector" ./cmd/oblivion-site-collector
+              CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath -ldflags="-s -w -X main.version=${VERSION} -X oblivion.local/endpoint-agent/internal/hubupdate.ReleaseListPublicKey=${RELEASE_LIST_PUBKEY}" -o "${OUT_BIN}/oblivion-site-collector" ./cmd/oblivion-site-collector
               CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath -ldflags="-s -w" -o "${OUT_BIN}/oblivion-media" ./cmd/oblivion-media
             )
             ./scripts/package-linux-site-hub.sh "$ARCH" "$OUT_BIN" "${RUNNER_TEMP}/dist/oblivion-site-hub-linux-${ARCH}.tar.gz"
@@ -105,10 +171,32 @@ jobs:
           go-version-file: endpoint-agent/go.mod
           cache-dependency-path: endpoint-agent/go.sum
 
-      - name: Setup .NET 10
+      - name: Setup .NET 10 (Obli tray)
         uses: actions/setup-dotnet@v4
         with:
-          global-json-file: endpoint-agent/installer/global.json
+          global-json-file: endpoint-agent/tray/global.json
+
+      # The one-file Windows installer is built with Inno Setup (plan v10, "How it's built": One
+      # file). Installed per-user into the runner's temp folder from Inno Setup's own GitHub
+      # release, pinned by version and SHA-256, and its publisher signature checked first.
+      - name: Install Inno Setup 6.7.4 (pinned and checked)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe'
+          $want = 'a549929319f9120716677c685535ca4671e4b937b5fdc87e2585f32d8eb30e8c'
+          $setup = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.4.exe'
+          Invoke-WebRequest -Uri $url -OutFile $setup
+          $got = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($got -ne $want) { throw "The Inno Setup download doesn't match its pinned SHA-256 ($got)" }
+          $signature = Get-AuthenticodeSignature -LiteralPath $setup
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*O=Pyrsys B.V.*') { throw 'The Inno Setup download is not signed by its publisher' }
+          $dir = Join-Path $env:RUNNER_TEMP 'inno'
+          $run = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/CURRENTUSER', '/PORTABLE=1', '/NOICONS', '/NORESTART', "/DIR=$dir") -Wait -PassThru
+          if ($run.ExitCode -ne 0) { throw "Inno Setup did not install ($($run.ExitCode))" }
+          $iscc = Join-Path $dir 'ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) { throw 'ISCC.exe is missing after installing Inno Setup' }
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Setup PHP 8.4 (for collector vendor & Windows x64 runtime)
         uses: shivammathur/setup-php@v2
@@ -130,25 +218,37 @@ jobs:
         run: |
           go test ./...
 
-      - name: Build Windows binaries, unsigned Obli.Setup installer, and signed release manifests
+      - name: Build Windows binaries, the one-file installer, and signed release manifests
         shell: pwsh
         # Only a push to main (or a manual run on main) may sign with the real publisher keys. Every
         # other branch, tag and pull request builds with throwaway keys and uploads no signed catalogue,
         # so an unreviewed branch can never produce a release the server would trust
         # (MASTER's condition for pushing S&D build branches, 30 Oct 2026; docs/security-devices/GOAL.md).
         env:
-          INPUT_VERSION: ${{ inputs.version || '0.2.0' }}
-          INPUT_REVISION: ${{ inputs.revision || '1' }}
+          INPUT_VERSION: ${{ inputs.version || '' }}
+          INPUT_REVISION: ${{ inputs.revision || '' }}
+          # D1: unsigned while testing. Builds accept unsigned Windows programs only while no
+          # code-signing certificate is configured; once WINDOWS_CODE_SIGNING_PFX exists, the
+          # restored Authenticode check is enforced and unsigned updates are refused.
+          UNSIGNED_TEST_BUILD: ${{ secrets.WINDOWS_CODE_SIGNING_PFX == '' && 'true' || 'false' }}
           PUBLISHER_PACKAGE_SEED: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_PACKAGE_SIGNING_SEED || '' }}
           PUBLISHER_CATALOGUE_SEED: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_CATALOGUE_SIGNING_SEED || '' }}
           PUBLISHER_PACKAGE_PUBKEY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_PACKAGE_PUBLIC_KEY || '' }}
           PUBLISHER_CATALOGUE_PUBKEY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.ENDPOINT_RELEASE_PUBLIC_KEY || '' }}
+          # Optional: the server a renamed installer falls back to when neither its name nor the
+          # download record says (a plain host name, e.g. oblivionfindings.com). Empty is fine.
+          SETUP_DEFAULT_SERVER: ${{ vars.OBLIVION_SETUP_DEFAULT_SERVER || '' }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.2.0'
+          $version = (Get-Content -Raw endpoint-agent/VERSION).Trim()
           if ($env:INPUT_VERSION) { $version = $env:INPUT_VERSION }
-          $revision = 1
+          if ($version -notmatch '^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$') { throw "Version $version is not x.y.z" }
+          $revision = [int]$env:GITHUB_RUN_NUMBER
           if ($env:INPUT_REVISION) { $revision = [int]$env:INPUT_REVISION }
+          $unsigned = 'true'
+          if ($env:UNSIGNED_TEST_BUILD -eq 'false') { $unsigned = 'false' }
+          $releaseFlags = "-X oblivion.local/endpoint-agent/internal/release.UnsignedTestBuild=$unsigned"
+          Set-Content -LiteralPath collector/VERSION -Value $version -Encoding ascii -NoNewline
           $workRoot = Join-Path $env:RUNNER_TEMP 'oblivion-build'
           $stageCatalogue = Join-Path $env:RUNNER_TEMP 'catalogue-stage'
           New-Item -ItemType Directory -Force -Path $workRoot, $stageCatalogue | Out-Null
@@ -185,32 +285,27 @@ jobs:
           # 2. Build Go binaries for windows/amd64 and windows/arm64 + oblivion-release tool
           Push-Location endpoint-agent
           try {
-            go build -trimpath -o (Join-Path $workRoot 'oblivion-release.exe') ./cmd/oblivion-release
+            # The catalogue tool checks the installer .exe like every Windows program, so it takes the
+            # same D1 switch: unsigned accepted only while no code-signing certificate exists.
+            go build -trimpath -ldflags="$releaseFlags" -o (Join-Path $workRoot 'oblivion-release.exe') ./cmd/oblivion-release
             foreach ($arch in @('amd64', 'arm64')) {
               $env:GOOS = 'windows'
               $env:GOARCH = $arch
               $env:CGO_ENABLED = '0'
               $binDir = Join-Path $workRoot "go-win-$arch"
               New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-              go build -trimpath -ldflags="-s -w -X main.version=$version" -o (Join-Path $binDir 'oblivion-agent.exe') ./cmd/oblivion-agent
-              go build -trimpath -ldflags="-s -w" -o (Join-Path $binDir 'oblivion-collector.exe') ./cmd/oblivion-collector
-              go build -trimpath -ldflags="-s -w" -o (Join-Path $binDir 'oblivion-media.exe') ./cmd/oblivion-media
-              go build -trimpath -ldflags="-s -w -X main.version=$version -X main.publisherPublicKey=$pkgPub" -o (Join-Path $binDir 'oblivion-setup-core.exe') ./cmd/oblivion-setup
+              go build -trimpath -ldflags="-s -w -X main.version=$version $releaseFlags" -o (Join-Path $binDir 'oblivion-agent.exe') ./cmd/oblivion-agent
+              # D3 self-updates: the hub checks each update package with the publisher's package key.
+              go build -trimpath -ldflags="-s -w -X main.version=$version -X oblivion.local/endpoint-agent/internal/hubupdate.PackagePublicKey=$pkgPub $releaseFlags" -o (Join-Path $binDir 'oblivion-collector.exe') ./cmd/oblivion-collector
+              go build -trimpath -ldflags="-s -w $releaseFlags" -o (Join-Path $binDir 'oblivion-media.exe') ./cmd/oblivion-media
+              go build -trimpath -ldflags="-s -w -X main.version=$version -X main.publisherPublicKey=$pkgPub $releaseFlags" -o (Join-Path $binDir 'oblivion-setup-core.exe') ./cmd/oblivion-setup
             }
           } finally {
             Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
             Pop-Location
           }
 
-          # 3. Build unsigned Obli.Setup graphical Windows installers (x64 & arm64) with pinned BackendSha256
-          & ./endpoint-agent/installer/build.ps1 `
-            -OutputRoot $toolsOut `
-            -BackendX64 (Join-Path $workRoot 'go-win-amd64\oblivion-setup-core.exe') `
-            -BackendArm64 (Join-Path $workRoot 'go-win-arm64\oblivion-setup-core.exe')
-
-          Copy-Item (Join-Path $toolsOut 'obli-setup-windows-x64\oblivion-setup.exe') (Join-Path $stageCatalogue 'oblivion-setup-windows-amd64.exe')
-          Copy-Item (Join-Path $toolsOut 'obli-setup-windows-x64\oblivion-setup.exe') (Join-Path $stageCatalogue 'oblivion-site-setup-windows-amd64.exe')
-          Copy-Item (Join-Path $toolsOut 'obli-setup-windows-arm64\oblivion-setup.exe') (Join-Path $stageCatalogue 'oblivion-setup-windows-arm64.exe')
+          # 3. (The one-file installer is built in step 4b, once the signed packages it carries exist.)
 
           # 4. Assemble & sign Windows release archives (OBLIVION-RELEASE-V1)
           $phpExe = (Get-Command php).Source
@@ -227,6 +322,7 @@ jobs:
             Copy-Item (Join-Path $workRoot "go-win-$arch\oblivion-media.exe") (Join-Path $siteStage 'oblivion-media.exe')
             Copy-Item -Recurse collector\bin, collector\src, collector\vendor $siteStage
             Copy-Item collector\composer.json (Join-Path $siteStage 'composer.json')
+            Copy-Item collector\VERSION (Join-Path $siteStage 'VERSION')
             Copy-Item $phpExe (Join-Path $runtimeStage 'php.exe')
             Get-ChildItem -Path $phpDir -Filter '*.dll' -File | ForEach-Object { Copy-Item $_.FullName (Join-Path $runtimeStage $_.Name) }
             foreach ($ext in @('php_curl.dll', 'php_openssl.dll', 'php_sodium.dll', 'php_sockets.dll', 'php_snmp.dll')) {
@@ -295,6 +391,20 @@ jobs:
           Copy-Item (Join-Path $workRoot 'go-win-arm64\oblivion-agent.exe') (Join-Path $arm64Stage 'computer\oblivion-agent.exe')
           Invoke-BuildWindowsZip $arm64Stage 'arm64' @('computer') (Join-Path $stageCatalogue 'oblivion-windows-arm64.zip')
 
+          # 4b. The one-file Windows installer (endpoint-agent/installer/inno): the setup engine and the
+          # signed packages above in one .exe, for hubs, IT's full installs and staff installs alike.
+          # Oblivion names each download for its Site with the server and setup code, so this file is
+          # the same for everyone and stays valid once signed (D1, D2).
+          $innoPayload = Join-Path $workRoot 'inno-payload'
+          New-Item -ItemType Directory -Force -Path $innoPayload | Out-Null
+          Copy-Item (Join-Path $workRoot 'go-win-amd64\oblivion-setup-core.exe') (Join-Path $innoPayload 'oblivion-setup-core-amd64.exe')
+          Copy-Item (Join-Path $stageCatalogue 'oblivion-windows-amd64.zip') (Join-Path $innoPayload 'oblivion-windows-amd64.zip')
+          Copy-Item (Join-Path $workRoot 'go-win-arm64\oblivion-setup-core.exe') (Join-Path $innoPayload 'oblivion-setup-core-arm64.exe')
+          Copy-Item (Join-Path $stageCatalogue 'oblivion-windows-arm64.zip') (Join-Path $innoPayload 'oblivion-windows-arm64.zip')
+          & ./endpoint-agent/installer/inno/build.ps1 -Iscc $env:ISCC -PayloadDir $innoPayload -Version $version `
+            -OutputDir (Join-Path $workRoot 'inno-out') -DefaultServer $env:SETUP_DEFAULT_SERVER
+          Copy-Item (Join-Path $workRoot 'inno-out\oblivion-setup-windows.exe') (Join-Path $stageCatalogue 'oblivion-setup-windows-amd64.exe')
+
           # 5. Assemble & sign OBLIVION-DOWNLOADS-V1 catalogue
           function New-ArtifactEntry([string]$id, [string]$platform, [string]$arch, [string[]]$roles, [string]$filename) {
             $item = Get-Item -LiteralPath (Join-Path $stageCatalogue $filename)
@@ -311,16 +421,15 @@ jobs:
             }
           }
 
+          # One Windows installer (.exe) for every role; the zips stay for hub self-updates (D3).
           $artifacts = @(
             (New-ArtifactEntry 'windows-setup-amd64' 'windows' 'amd64' $combinedAmd64Roles 'oblivion-setup-windows-amd64.exe'),
             (New-ArtifactEntry 'windows-package-amd64' 'windows' 'amd64' $combinedAmd64Roles 'oblivion-windows-amd64.zip'),
-            (New-ArtifactEntry 'windows-setup-arm64' 'windows' 'arm64' @('computer') 'oblivion-setup-windows-arm64.exe'),
             (New-ArtifactEntry 'windows-package-arm64' 'windows' 'arm64' @('computer') 'oblivion-windows-arm64.zip'),
             (New-ArtifactEntry 'linux-site-hub-amd64' 'linux' 'amd64' @('site') 'oblivion-site-hub-linux-amd64.tar.gz'),
             (New-ArtifactEntry 'linux-site-hub-arm64' 'linux' 'arm64' @('site') 'oblivion-site-hub-linux-arm64.tar.gz')
           )
           if ($hasWinPhpRuntime) {
-            $artifacts += (New-ArtifactEntry 'windows-site-setup-amd64' 'windows' 'amd64' @('site') 'oblivion-site-setup-windows-amd64.exe')
             $artifacts += (New-ArtifactEntry 'windows-site-package-amd64' 'windows' 'amd64' @('site') 'oblivion-site-windows-amd64.zip')
           }
 

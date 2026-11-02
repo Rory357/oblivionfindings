@@ -89,7 +89,8 @@ final class InstallationProfile
         $expiry = new DateTimeImmutable($p['expires_at']);
         $errors = DateTimeImmutable::getLastErrors();
         if ((is_array($errors) && ($errors['warning_count'] || $errors['error_count']))
-            || $expiry <= new DateTimeImmutable || $expiry > (new DateTimeImmutable)->modify('+31 minutes')) {
+            // Setup codes live 24 hours (D2); a minute of clock slack on top.
+            || $expiry <= new DateTimeImmutable || $expiry > (new DateTimeImmutable)->modify('+1441 minutes')) {
             throw new RuntimeException('Installation profile has expired or requires review.');
         }
 

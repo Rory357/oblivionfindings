@@ -17,11 +17,13 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\SecurityDevices\Concerns\ReadsRetiredWorkspaceProps;
 use Tests\TestCase;
 
 class HealthcareWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
+    use ReadsRetiredWorkspaceProps;
 
     private User $admin;
 
@@ -69,8 +71,7 @@ class HealthcareWorkspaceTest extends TestCase
         $this->assign($clientDevice, DeviceAssignment::TARGET_CLIENT, $client->id);
         $this->assign($sharedDevice, DeviceAssignment::TARGET_SITE, $site->id, 'shared');
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/healthcare')
+        $this->retiredWorkspace($this->admin, 'healthcare', '')
             ->assertOk()
             ->assertInertia(function ($page) use ($unrelatedDevice): void {
                 $healthcare = $page->toArray()['props']['healthcareWorkspace'];
@@ -152,8 +153,7 @@ class HealthcareWorkspaceTest extends TestCase
 
         $this->assertTrue($this->admin->canDo('clients.viewAny'));
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/healthcare?tab=client-devices')
+        $this->retiredWorkspace($this->admin, 'healthcare', 'tab=client-devices')
             ->assertOk()
             ->assertInertia(function ($page) use ($client, $device, $ticket): void {
                 $props = $page->toArray()['props'];
@@ -270,8 +270,7 @@ class HealthcareWorkspaceTest extends TestCase
         $this->assign($otherDevice, DeviceAssignment::TARGET_CLIENT, $otherClient->id);
         $this->assign($unrelatedDevice, DeviceAssignment::TARGET_CLIENT, $unrelatedClient->id);
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/healthcare?tab=client-devices')
+        $this->retiredWorkspace($viewer, 'healthcare', 'tab=client-devices')
             ->assertOk()
             ->assertInertia(function ($page) use ($assignedDevice): void {
                 $props = $page->toArray()['props'];
@@ -307,8 +306,7 @@ class HealthcareWorkspaceTest extends TestCase
         $device = $this->healthcareDevice('Restricted client device');
         $this->assign($device, DeviceAssignment::TARGET_CLIENT, $client->id);
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/healthcare?tab=client-devices')
+        $this->retiredWorkspace($viewer, 'healthcare', 'tab=client-devices')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $props = $page->toArray()['props'];
@@ -327,8 +325,7 @@ class HealthcareWorkspaceTest extends TestCase
         $this->assertTrue($viewer->canDo('securityDevices.devices.view'));
         $this->assertFalse($viewer->canDo('clinical.monitoring.viewAny'));
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/healthcare')
+        $this->retiredWorkspace($viewer, 'healthcare', '')
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $healthcare = $page->toArray()['props']['healthcareWorkspace'];
@@ -356,8 +353,7 @@ class HealthcareWorkspaceTest extends TestCase
         $this->assertFalse($viewer->canDo('clients.viewAny'));
         $this->assertFalse($viewer->canDo('clients.viewAssigned'));
 
-        $this->actingAs($viewer)
-            ->get('/security-devices/healthcare')
+        $this->retiredWorkspace($viewer, 'healthcare', '')
             ->assertOk()
             ->assertInertia(function ($page) use ($siteDevice): void {
                 $healthcare = $page->toArray()['props']['healthcareWorkspace'];
@@ -399,8 +395,7 @@ class HealthcareWorkspaceTest extends TestCase
         $shared = $this->healthcareDevice('Shared occupancy sensor');
         $this->assign($shared, DeviceAssignment::TARGET_SITE, $site->id, 'shared');
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/healthcare?tab=shared-site-devices')
+        $this->retiredWorkspace($this->admin, 'healthcare', 'tab=shared-site-devices')
             ->assertOk()
             ->assertInertia(function ($page) use ($site, $shared): void {
                 $row = $page->toArray()['props']['healthcareWorkspace']['activeTab']['devices'][0];
@@ -452,8 +447,7 @@ class HealthcareWorkspaceTest extends TestCase
         ]);
 
         foreach ([$permissionDenied, $siteDenied] as $viewer) {
-            $this->actingAs($viewer)
-                ->get('/security-devices/healthcare?tab=shared-site-devices')
+            $this->retiredWorkspace($viewer, 'healthcare', 'tab=shared-site-devices')
                 ->assertOk()
                 ->assertInertia(function ($page) use ($device): void {
                     $row = collect($page->toArray()['props']['healthcareWorkspace']['activeTab']['devices'])
@@ -493,8 +487,7 @@ class HealthcareWorkspaceTest extends TestCase
             ],
         ]);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/healthcare?tab=data-flow')
+        $this->retiredWorkspace($this->admin, 'healthcare', 'tab=data-flow')
             ->assertOk()
             ->assertInertia(function ($page) use ($offline, $failed, $stale, $unsupported, $healthy): void {
                 $devices = collect($page->toArray()['props']['healthcareWorkspace']['activeTab']['devices'])
@@ -545,8 +538,7 @@ class HealthcareWorkspaceTest extends TestCase
             'completed_at' => now()->subYear(),
         ]);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/healthcare?tab=calibration-maintenance')
+        $this->retiredWorkspace($this->admin, 'healthcare', 'tab=calibration-maintenance')
             ->assertOk()
             ->assertInertia(function ($page) use ($device, $overdue): void {
                 $healthcare = $page->toArray()['props']['healthcareWorkspace'];
@@ -614,8 +606,7 @@ class HealthcareWorkspaceTest extends TestCase
         $this->assign($unsupported, DeviceAssignment::TARGET_SITE, $this->site->id);
         $this->assign($healthy, DeviceAssignment::TARGET_SITE, $this->site->id);
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/healthcare?tab=data-flow&flow=unsupported')
+        $this->retiredWorkspace($this->admin, 'healthcare', 'tab=data-flow&flow=unsupported')
             ->assertOk()
             ->assertInertia(function ($page) use ($unsupported): void {
                 $activeTab = $page->toArray()['props']['healthcareWorkspace']['activeTab'];

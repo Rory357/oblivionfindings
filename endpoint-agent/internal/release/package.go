@@ -148,6 +148,23 @@ func Open(filename string, trustedKey ed25519.PublicKey, architecture string, mi
 // It never replaces a file. Every entry is hashed again while being written.
 // On failure the caller owns the incomplete stage; nothing is activated.
 func (p *Package) ExtractNew(directory string) error {
+	return p.extractNew(directory, nil)
+}
+
+// ExtractPartsNew is ExtractNew for some top-level parts only, such as "computer" for Obli
+// installed in one person's profile. Check the result with VerifyExtractedParts.
+func (p *Package) ExtractPartsNew(directory string, parts ...string) error {
+	if len(parts) == 0 {
+		return ErrInvalid
+	}
+	wanted := map[string]bool{}
+	for _, part := range parts {
+		wanted[part] = true
+	}
+	return p.extractNew(directory, wanted)
+}
+
+func (p *Package) extractNew(directory string, parts map[string]bool) error {
 	root, err := os.OpenRoot(directory)
 	if err != nil {
 		return ErrInvalid
@@ -158,6 +175,9 @@ func (p *Package) ExtractNew(directory string) error {
 		return errors.New("release stage must be empty")
 	}
 	for _, record := range p.manifest.Files {
+		if top, _, _ := strings.Cut(record.Path, "/"); parts != nil && !parts[top] {
+			continue
+		}
 		parent := path.Dir(record.Path)
 		if parent != "." {
 			if err = root.MkdirAll(filepath.FromSlash(parent), 0700); err != nil {

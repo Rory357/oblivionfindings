@@ -63,7 +63,7 @@ import {
     ZoomIn,
     ZoomOut,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
     DeviceGovernedQuickAction,
     DeviceNetworkNeighbourItem,
@@ -512,7 +512,47 @@ type SnapshotPayload = {
     source?: string | null;
     /** Phase A, item A5: set when the camera's certificate needs trusting first. */
     tls_trust?: CameraCertificateTrust | null;
+    /** Phase B: the Site hub is taking the picture; check back at status_url. */
+    pending?: boolean;
+    status_url?: string | null;
 };
+
+const HUB_PICTURE_POLL_MS = 2000;
+const HUB_PICTURE_MAX_POLLS = 45;
+
+/** Phase B: check back until the Site hub's picture arrives (about 90 seconds at most). */
+async function waitForHubPicture(
+    statusUrl: string,
+    isMounted: () => boolean,
+): Promise<SnapshotPayload> {
+    for (let poll = 0; poll < HUB_PICTURE_MAX_POLLS; poll += 1) {
+        await new Promise((resolve) =>
+            window.setTimeout(resolve, HUB_PICTURE_POLL_MS),
+        );
+        if (!isMounted()) return { ok: false };
+        try {
+            const response = await axios.get<SnapshotPayload>(statusUrl);
+            if (!response.data.pending) return response.data;
+        } catch (error: unknown) {
+            const data =
+                axios.isAxiosError(error) && error.response?.data
+                    ? (error.response.data as SnapshotPayload)
+                    : null;
+            return {
+                ok: false,
+                message:
+                    data?.message ?? 'The Site hub didn’t send the picture.',
+                tls_trust: data?.tls_trust ?? null,
+            };
+        }
+    }
+
+    return {
+        ok: false,
+        message:
+            'The Site hub didn’t send the picture in time. It may be offline; check the camera again.',
+    };
+}
 
 function CameraProfileOverview({
     typeProfile,
@@ -529,6 +569,15 @@ function CameraProfileOverview({
         message: string;
     } | null>(null);
 
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
+
     const captureSnapshot = async () => {
         if (!typeProfile.snapshotUrl || capturing) return;
         setCapturing(true);
@@ -537,6 +586,13 @@ function CameraProfileOverview({
                 typeProfile.snapshotUrl,
             );
             setSnapshot(response.data);
+            if (response.data.pending && response.data.status_url) {
+                const picture = await waitForHubPicture(
+                    response.data.status_url,
+                    () => mounted.current,
+                );
+                if (mounted.current) setSnapshot(picture);
+            }
         } catch (error: unknown) {
             let message =
                 'Could not capture an ONVIF snapshot from this camera.';
@@ -696,6 +752,11 @@ function CameraProfileOverview({
                             <p className="text-caption rounded-lg bg-muted/30 p-3">
                                 Add an IP address to this camera first to
                                 request an ONVIF snapshot.
+                            </p>
+                        ) : snapshot?.pending ? (
+                            <p className="text-caption flex items-center gap-2 rounded-lg bg-muted/30 p-3">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                {snapshot.message}
                             </p>
                         ) : snapshot?.ok && snapshot.data_uri ? (
                             <div className="space-y-2">

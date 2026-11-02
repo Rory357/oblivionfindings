@@ -460,16 +460,15 @@ class Phase6ComputersAndObliTest extends TestCase
         $this->assertTrue($intuneDriver->matchesDevice($intunePc));
         $this->assertFalse($intuneDriver->matchesDevice($nativePc));
 
+        // S&D rebuild C5: Setup › Services & logins › Supported devices lists both computer drivers.
         $this->actingAs($this->admin)
-            ->get('/security-devices/supported-devices')
+            ->get('/security-devices/setup/services?tab=supported')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('security-devices/supported-devices')
-                ->where('classes', fn ($classes): bool => collect($classes)->contains(
-                    static fn (array $item): bool => $item['key'] === 'computer'
-                        && $item['label'] === 'Computers & endpoints'
-                        && $item['count'] === 2,
-                )));
+                ->component('security-devices/setup/index')
+                ->where('supported.tables.1.rows', fn ($rows): bool => collect($rows)
+                    ->where('kind', 'Computers & endpoints')
+                    ->count() === 2));
 
         // Phase 6.4 invariant: arbitrary script execution stays OFF.
         $this->assertFalse((bool) config('endpoint_management.scripts.release_enabled'));

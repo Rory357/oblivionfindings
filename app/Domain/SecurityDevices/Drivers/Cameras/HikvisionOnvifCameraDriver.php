@@ -38,7 +38,7 @@ final class HikvisionOnvifCameraDriver extends AbstractOnvifCameraDriver
                 ['label' => 'Hikvision Technology Partner Portal', 'url' => 'https://tpp.hikvision.com/'],
             ],
             limitationsNote: 'Built against ONVIF Profile S/T and HTTP Digest specifications; enable ONVIF user authentication on Hikvision firmware 5.5+.',
-            setupHref: '/security-devices/discovery',
+            setupHref: '/security-devices/setup/hubs?tab=networks',
         );
     }
 

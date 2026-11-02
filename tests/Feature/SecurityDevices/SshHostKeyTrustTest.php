@@ -179,7 +179,7 @@ it('sends no login to a device whose key is not trusted, and keeps the key it of
         ->and(ConfigurationSnapshot::query()->count())->toBe(0);
 
     $this->actingAs($manager)
-        ->get("/security-devices/devices/{$this->router->id}")
+        ->get("/security-devices/devices/{$this->router->id}?section=configuration")
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('profile.configuration.sshHostKey.trusted', null)

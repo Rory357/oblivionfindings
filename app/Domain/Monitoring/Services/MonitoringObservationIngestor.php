@@ -10,6 +10,8 @@ use App\Domain\Monitoring\Exceptions\RuntimeScopeViolation;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
+use Carbon\CarbonImmutable;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use Illuminate\Support\Facades\DB;
 
@@ -148,12 +150,22 @@ final class MonitoringObservationIngestor
         $result->observation->refresh();
 
         if (! $result->duplicate && $result->stateChanged) {
-            app(MonitoringAlertNotificationDispatcher::class)->dispatchTransition(
+            $told = app(MonitoringAlertNotificationDispatcher::class)->dispatchTransition(
                 monitor: $monitor,
                 observation: $result->observation,
                 siteId: $siteId,
                 from: $result->from,
                 to: $result->to,
+            );
+            // S&D Phase D: the device's alert (open, worse, behind a failed device, or back).
+            $fresh = $monitor->fresh() ?? $monitor;
+            app(DeviceAlertEngine::class)->onCheck(
+                $fresh,
+                $result->from,
+                $result->to,
+                $fresh->root_cause_monitor_id === null ? null : (int) $fresh->root_cause_monitor_id,
+                CarbonImmutable::now('UTC'),
+                $told,
             );
         }
 

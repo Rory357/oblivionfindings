@@ -31,15 +31,17 @@ func selectedServices(j *Journal) ([]installationService, error) {
 		return nil, err
 	}
 	var specs []installationService
-	appendService := func(name, label, component, executable string) {
-		path := filepath.Join(root, "Oblivion", "Agent", "releases", j.Stage, component, executable)
+	appendService := func(name, label, stage, component, executable string) {
+		path := filepath.Join(root, "Oblivion", "Agent", "releases", stage, component, executable)
 		specs = append(specs, installationService{name: name, label: label, executable: path, command: syscall.EscapeArg(path) + " service", description: label + ". Installation " + j.Attempt})
 	}
 	if j.Role == "computer" || j.Role == "both" {
-		appendService(servicehost.Name, "Oblivion computer support", "computer", "oblivion-agent.exe")
+		appendService(servicehost.Name, "Oblivion computer support", j.Stage, "computer", "oblivion-agent.exe")
 	}
 	if j.Role == "site" || j.Role == "both" {
-		appendService(collectorhost.Name, "Oblivion site monitoring", "site", "oblivion-collector.exe")
+		// A hub that updated itself runs from a newer release folder (hubupdate switches only
+		// this service's program path; the description and account stay as setup made them).
+		appendService(collectorhost.Name, "Oblivion site monitoring", j.collectorStage(), "site", "oblivion-collector.exe")
 	}
 	return specs, nil
 }
@@ -158,7 +160,20 @@ func (h *windowsHost) RegisterService(ctx context.Context, j *Journal) error {
 			return err
 		}
 	}
-	return nil
+	return ensureRelayRule(j)
+}
+
+// ensureRelayRule: a hub's sensor relay (TCP 1883) needs a Windows Firewall rule for the
+// runtime it runs from (collectorhost/firewall_windows.go). Computers get none.
+func ensureRelayRule(j *Journal) error {
+	if j.Role != "site" && j.Role != "both" {
+		return nil
+	}
+	root, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, windows.KF_FLAG_DEFAULT)
+	if err != nil {
+		return err
+	}
+	return collectorhost.EnsureRelayFirewallRule(collectorhost.RelayRuntime(filepath.Join(root, "Oblivion", "Agent", "releases", j.collectorStage())))
 }
 func (h *windowsHost) registerService(ctx context.Context, j *Journal, spec installationService) error {
 	if err := ctx.Err(); err != nil {
@@ -413,6 +428,9 @@ func (h *windowsHost) Rollback(ctx context.Context, j *Journal) error {
 	specs, err := selectedServices(j)
 	if err != nil {
 		return errors.Join(append(problems, err)...)
+	}
+	if j.Role == "site" || j.Role == "both" {
+		collectorhost.RemoveRelayFirewallRule()
 	}
 	// Attempt cleanup independently for both services, even if the other failed.
 	for n := len(specs) - 1; n >= 0; n-- {

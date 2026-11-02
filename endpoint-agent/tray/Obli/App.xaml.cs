@@ -45,6 +45,8 @@ public partial class App:System.Windows.Application
    trayIcon=CreateTrayIcon();
    var menu=new Forms.ContextMenuStrip();
    menu.Items.Add("Open Obli",null,(_,_)=>window.ShowFromTray("help"));
+   // S&D Phase I: Ask Obli to fix something (also Ctrl+Alt+O).
+   menu.Items.Add("Ask Obli to fix something (Ctrl+Alt+O)",null,async(_,_)=>await window.OpenFixAsync());
    menu.Items.Add("My tickets",null,(_,_)=>window.ShowFromTray("tickets"));
    menu.Items.Add("This computer",null,(_,_)=>window.ShowFromTray("device"));
    menu.Items.Add(new Forms.ToolStripSeparator());
@@ -55,6 +57,7 @@ public partial class App:System.Windows.Application
    tray=new Forms.NotifyIcon{Icon=trayIcon,Text="Obli — computer support",ContextMenuStrip=menu,Visible=true};
    tray.DoubleClick+=(_,_)=>window.ShowFromTray();
    window.BeginStatusUpdates();
+   window.RegisterFixHotkey();
    if(args.Args.Length==0)window.ShowFromTray();
   }
   catch(Exception)

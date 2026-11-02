@@ -161,7 +161,7 @@ it('projects endpoint posture and section for canonical computers and omits them
     endpointPostureAgent($server, $this->site, $this->admin);
 
     $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$computer->id}")
+        ->get("/security-devices/devices/{$computer->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(function ($page): void {
             $profile = $page->toArray()['props']['profile'];
@@ -178,12 +178,12 @@ it('projects endpoint posture and section for canonical computers and omits them
         });
 
     $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$server->id}")
+        ->get("/security-devices/devices/{$server->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(fn ($page) => $page->where('profile.endpointPosture.agent.state', 'fresh'));
 
     $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$gateway->id}")
+        ->get("/security-devices/devices/{$gateway->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(function ($page): void {
             $profile = $page->toArray()['props']['profile'];
@@ -205,7 +205,7 @@ it('withholds diagnostic inventory from viewers without endpoint diagnostics per
     ]);
 
     $response = $this->actingAs($integrationViewer)
-        ->get("/security-devices/devices/{$computer->id}")
+        ->get("/security-devices/devices/{$computer->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('profile.endpointPosture.agent.state', 'fresh')
@@ -214,6 +214,25 @@ it('withholds diagnostic inventory from viewers without endpoint diagnostics per
 
     $response->assertDontSee('KAURI-SECRET-HOSTNAME-01');
     $response->assertDontSee('Confidential Diagnostic Tool');
+
+    // S&D rebuild C2: the computer's own page reads the same posture and withholds it too.
+    $this->actingAs($integrationViewer)
+        ->get("/security-devices/devices/{$computer->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('security-devices/devices/device')
+            ->where('overview.restricted', true)
+            ->where('overview.now', null))
+        ->assertDontSee('KAURI-SECRET-HOSTNAME-01')
+        ->assertDontSee('Confidential Diagnostic Tool');
+    $this->actingAs($integrationViewer)
+        ->get("/security-devices/devices/{$computer->id}?tab=health")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('health.restricted', true)
+            ->where('health.available', false))
+        ->assertDontSee('KAURI-SECRET-HOSTNAME-01')
+        ->assertDontSee('Confidential Diagnostic Tool');
 
     // Move the computer to another accessible Site after enrolment -> assignment_drift withholds inventory even for admin.
     $otherSite = Site::factory()->create(['name' => 'Totara House', 'is_active' => true, 'archived' => false]);
@@ -228,7 +247,7 @@ it('withholds diagnostic inventory from viewers without endpoint diagnostics per
     ]);
 
     $driftResponse = $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$computer->id}")
+        ->get("/security-devices/devices/{$computer->id}?section=endpoint")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('profile.endpointPosture.agent.state', 'assignment_drift')
@@ -351,7 +370,7 @@ it('projects Windows service command outcomes and readback on device management 
     ]);
 
     $this->actingAs($this->admin)
-        ->get("/security-devices/devices/{$computer->id}")
+        ->get("/security-devices/devices/{$computer->id}?section=management")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('profile.management.history.0.capability', 'endpoint.service.manage')
@@ -466,21 +485,17 @@ it('governs Microsoft Intune link creation, conflict rejection, UUID replacement
         ->and(DeviceEvent::query()->where('device_id', $computer->id)->where('event_type', 'endpoint_intune_unlinked')->exists())->toBeTrue();
 });
 
-it('surfaces non-diagnostic agent badges in Network & IT and Remote Support without leaking inventory', function () {
+it('surfaces non-diagnostic agent badges on the computer page and Remote Support without leaking inventory', function () {
     $computer = endpointPostureComputer($this->site);
     endpointPostureAgent($computer, $this->site, $this->admin);
 
-    $netResponse = $this->actingAs($this->admin)
+    // S&D rebuild C6: the Network & IT workspace is gone; the computer's own page carries its agent.
+    $this->actingAs($this->admin)
         ->get('/security-devices/network-it')
-        ->assertOk()
-        ->assertInertia(function ($page) use ($computer): void {
-            $devices = collect($page->toArray()['props']['networkItWorkspace']['activeTab']['devices']);
-            $row = $devices->firstWhere('id', $computer->id);
-
-            expect($row)->not->toBeNull()
-                ->and($row['endpointAgent']['state'])->toBe('fresh')
-                ->and($row['endpointAgent']['agentVersion'])->toBe('1.2.0');
-        });
+        ->assertRedirect('/security-devices/devices?tab=network');
+    $netResponse = $this->actingAs($this->admin)
+        ->get('/security-devices/devices/'.$computer->id)
+        ->assertOk();
     $netResponse->assertDontSee('KAURI-SECRET-HOSTNAME-01');
     $netResponse->assertDontSee('Confidential Diagnostic Tool');
 
