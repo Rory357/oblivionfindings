@@ -40,7 +40,7 @@ Ownership of AI-written code is not settled law everywhere. A lawyer should conf
 
 Before an engine merges, the checker:
 
-1. Runs a token-similarity comparison between the new files and the replaced library's source, and reviews every match above a low threshold by hand.
+1. Runs a token-similarity comparison between the new files and the replaced library's source, and reviews every match above a low threshold by hand. [tools/token-similarity.mjs](tools/token-similarity.mjs) does this across PHP, TypeScript and C. Download the outside source to a scratch folder outside the repository, and calibrate the tool with a deliberate port of one outside function (kept outside the repository) and with unrelated Oblivion files.
 2. Confirms the replaced packages are uninstalled, their licence copies removed from `deploy/chat-calling/licenses/`, and `scripts/chat-license-notices.mjs` updated.
 3. Adds a guard so the package can't come back unnoticed (ESLint `no-restricted-imports` for browser packages; a test that reads `composer.json` for PHP packages).
 4. Marks the engine "signed off" in REGISTER.md with the date and the provenance note.
@@ -68,7 +68,7 @@ Copy into `provenance/<engine>.md`.
 |---|---|---|
 | Oblivion Live (live updates, typing, presence, call signalling) and the Oblivion signer | [specs/oblivion-live.md](specs/oblivion-live.md) | Spec written 23 Oct 2026; ready for a builder session |
 | Oblivion push sender | [specs/push-sender.md](specs/push-sender.md) | Built 23 Oct 2026 on `claude/reverent-wu-0bdbe2`, package removed; signed off by the checker 23 Oct 2026, no copied code ([provenance](provenance/push-sender.md#similarity-check)). Manual browser acceptance on the test server still open |
-| Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Spec written 23 Oct 2026; ready for a builder session |
+| Voice-note checker | [specs/voice-checker.md](specs/voice-checker.md) | Built 23 Oct 2026 on `claude/eager-mahavira-c57cd4` ([provenance](provenance/voice-checker.md)). Checked 23 Oct 2026: no copied code. Rechecked the same day: the first four findings were fixed, and two MP4 findings went back to the builder. **Signed off 31 Oct 2026** after a second recheck: both MP4 fixes hold and the tests pass. Real Safari recordings are still to come |
 | Oblivion Calls | to write after Oblivion Live (stage 5) | — |
 | Oblivion Relay (firewall relay for calls) | [specs/oblivion-relay.md](specs/oblivion-relay.md) | Spec written 1 Nov 2026, and updated the same day with the user's answers (instant cut-off over a control channel, fuller logs kept 14 days, running beside nginx on the test server, installed by Stephan, for Chat calls only, with CCTV and remote support deferred). Built 1 Nov 2026 on branch `claude/oblivion-relay-build-ea1d70`; signed off by the checker 1 Nov 2026, no copied code ([provenance](provenance/oblivion-relay.md#similarity-check)). Installing it on the test server and the acceptance checks (spec section 12) are still open |
 

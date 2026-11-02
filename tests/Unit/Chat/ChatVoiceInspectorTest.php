@@ -2,14 +2,21 @@
 
 namespace Tests\Unit\Chat;
 
+use App\Services\Chat\ChatVoiceInspection;
 use App\Services\Chat\ChatVoiceInspector;
 use Illuminate\Config\Repository;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Stringable;
 use Symfony\Component\Process\Process;
+use Tests\Support\ChatVoice\OpusFrames;
+use Tests\Support\ChatVoice\WebmFixtures;
 
 final class ChatVoiceInspectorTest extends TestCase
 {
+    private array $paths = [];
+
     private function audio(string $format = 'matroska,webm', string $codec = 'opus'): array
     {
         return ['format' => ['format_name' => $format], 'streams' => [['index' => 0, 'codec_type' => 'audio', 'codec_name' => $codec]],
@@ -18,7 +25,7 @@ final class ChatVoiceInspectorTest extends TestCase
 
     public static function formats(): array
     {
-        return [['matroska,webm', 'opus', 'audio/webm'], ['ogg', 'opus', 'audio/ogg'], ['ogg', 'vorbis', 'audio/ogg'], ['mov,mp4,m4a,3gp,3g2,mj2', 'aac', 'audio/mp4']];
+        return [['matroska,webm', 'opus', 'audio/webm'], ['ogg', 'opus', 'audio/ogg'], ['mov,mp4,m4a,3gp,3g2,mj2', 'aac', 'audio/mp4']];
     }
 
     #[DataProvider('formats')]
@@ -32,7 +39,7 @@ final class ChatVoiceInspectorTest extends TestCase
 
     public static function invalidCases(): array
     {
-        return array_map(fn ($value) => [$value], ['video', 'extra stream', 'unknown codec', 'unknown format', 'missing duration', 'empty packets', 'foreign packet', 'invalid packet', 'negative duration', 'infinite duration', 'invalid streams']);
+        return array_map(fn ($value) => [$value], ['video', 'extra stream', 'unknown codec', 'Ogg Vorbis', 'unknown format', 'missing duration', 'empty packets', 'foreign packet', 'invalid packet', 'negative duration', 'infinite duration', 'invalid streams']);
     }
 
     #[DataProvider('invalidCases')]
@@ -43,6 +50,8 @@ final class ChatVoiceInspectorTest extends TestCase
             'video' => $data['streams'][0]['codec_type'] = 'video',
             'extra stream' => $data['streams'][] = ['index' => 1, 'codec_type' => 'video', 'codec_name' => 'vp8'],
             'unknown codec' => $data['streams'][0]['codec_name'] = 'unknown',
+            // Refused since 23 October 2026, as the voice checker refuses it.
+            'Ogg Vorbis' => [$data['format']['format_name'], $data['streams'][0]['codec_name']] = ['ogg', 'vorbis'],
             'unknown format' => $data['format']['format_name'] = 'hls',
             'missing duration' => $data['packets'][0]['duration_time'] = 'N/A',
             'empty packets' => $data['packets'] = [],
@@ -72,9 +81,17 @@ final class ChatVoiceInspectorTest extends TestCase
         }
     }
 
-    public function test_missing_service_cannot_claim_an_audio_verdict(): void
+    public function test_checks_voice_notes_without_ffprobe_and_never_claims_a_verdict_for_other_bytes(): void
     {
-        self::assertSame('unavailable', (new ChatVoiceInspector(new Repository))->inspect(__FILE__)->state);
+        $inspector = new ChatVoiceInspector(new Repository);
+        self::assertTrue($inspector->configured());
+        self::assertFalse($inspector->secondOpinionConfigured());
+        $result = $inspector->inspect(__FILE__);
+        self::assertSame(['blocked', null, null, 'voice_file_invalid'], [$result->state, $result->mime, $result->durationMs, $result->errorCode]);
+        $path = $this->temporary(WebmFixtures::file()->bytes);
+        self::assertSame(['ready', 'audio/webm', 5042], [($ready = $inspector->inspect($path))->state, $ready->mime, $ready->durationMs]);
+        // Only a file that cannot be read from disk leaves the result open for a retry.
+        self::assertSame(['unavailable', 'voice_check_failed'], [($missing = $inspector->inspect($path.'.missing'))->state, $missing->errorCode]);
     }
 
     public function test_runs_only_local_bounded_inspection_and_uses_the_returned_packets(): void
@@ -104,10 +121,137 @@ final class ChatVoiceInspectorTest extends TestCase
                 return $this->process;
             }
         };
-        self::assertSame('ready', $inspector->inspect(__FILE__)->state);
+        // 60 ms of audio, matching the faked ffprobe packets: a 20 ms block at 0 and a 40 ms block at 20 ms.
+        $path = $this->temporary(WebmFixtures::file(['style' => 'firefox', 'blocks' => fn ($blocks, $random) => [
+            ['time' => 0, 'frames' => [OpusFrames::single($random)], 'samples' => 960, 'lacing' => 0, 'group' => false, 'track' => 2],
+            ['time' => 20, 'frames' => [OpusFrames::single($random, 2)], 'samples' => 1920, 'lacing' => 0, 'group' => false, 'track' => 2],
+        ]])->bytes);
+        $result = $inspector->inspect($path);
+        self::assertSame(['ready', 'audio/webm', 60], [$result->state, $result->mime, $result->durationMs]);
         self::assertContains('-protocol_whitelist', $inspector->command);
         self::assertSame('file', $inspector->command[array_search('-protocol_whitelist', $inspector->command) + 1]);
-        self::assertSame(__FILE__, $inspector->command[array_key_last($inspector->command)]);
+        self::assertSame($path, $inspector->command[array_key_last($inspector->command)]);
+    }
+
+    public function test_too_much_ffprobe_output_or_a_failing_stop_never_throws_out_of_inspect(): void
+    {
+        $path = $this->temporary(WebmFixtures::file()->bytes);
+        $messages = [];
+        $logger = new class($messages) extends AbstractLogger
+        {
+            public function __construct(private array &$messages) {}
+
+            public function log($level, string|Stringable $message, array $context = []): void
+            {
+                $this->messages[] = [$level, $context];
+            }
+        };
+
+        // ffprobe writes 3 MiB: the output past the limit is dropped and the second opinion refuses the file.
+        $flood = $this->createMock(Process::class);
+        $flood->method('setTimeout')->willReturnSelf();
+        $flood->method('run')->willReturnCallback(function ($callback) {
+            $callback(Process::OUT, str_repeat('{"stream_index":0},', 110_000));
+            $callback(Process::OUT, str_repeat('{"stream_index":0},', 60_000));
+
+            return 0;
+        });
+        $flood->method('isSuccessful')->willReturn(true);
+        $result = $this->probing($flood, $logger)->inspect($path);
+        self::assertSame(['blocked', 'voice_file_invalid'], [$result->state, $result->errorCode]);
+        self::assertCount(1, $messages);
+
+        // The run fails and stopping the process fails too: the file is left to retry, nothing escapes.
+        $broken = $this->createMock(Process::class);
+        $broken->method('setTimeout')->willReturnSelf();
+        $broken->method('run')->willThrowException(new \RuntimeException('timed out'));
+        // Only the clean-up stop fails; the fake's own destructor stops it again later, which must not throw.
+        $stops = 0;
+        $broken->method('stop')->willReturnCallback(function () use (&$stops) {
+            if ($stops++ === 0) {
+                throw new \RuntimeException('cannot stop');
+            }
+
+            return 0;
+        });
+        $result = $this->probing($broken)->inspect($path);
+        self::assertSame(['unavailable', 'voice_check_failed'], [$result->state, $result->errorCode]);
+    }
+
+    /** An inspector whose ffprobe is the given fake process. */
+    private function probing(Process $process, ?AbstractLogger $logger = null): ChatVoiceInspector
+    {
+        return new class(new Repository(['chat' => ['files' => ['voice_probe_binary' => PHP_BINARY]]]), $process, $logger) extends ChatVoiceInspector
+        {
+            public function __construct(Repository $config, private Process $process, ?AbstractLogger $logger)
+            {
+                parent::__construct($config, null, $logger);
+            }
+
+            protected function makeProcess(array $command): Process
+            {
+                return $this->process;
+            }
+        };
+    }
+
+    /** [checker verdict, ffprobe verdict, combined verdict, whether a disagreement is logged]. */
+    public static function opinions(): array
+    {
+        $ready = fn (int $ms, string $mime = 'audio/webm') => new ChatVoiceInspection('ready', $mime, $ms);
+        $blocked = fn (string $code = 'voice_file_invalid') => new ChatVoiceInspection('blocked', errorCode: $code);
+        $unavailable = new ChatVoiceInspection('unavailable', errorCode: 'voice_check_failed');
+
+        return [
+            'agree, longer length kept' => [$ready(5000), $ready(5018), $ready(5018), false],
+            'lengths 21 ms apart' => [$ready(5000), $ready(5021), $blocked(), true],
+            'different formats' => [$ready(5000), $ready(5000, 'audio/ogg'), $blocked(), true],
+            'ffprobe finds it too long' => [$ready(120_490), $blocked('voice_too_long'), $blocked('voice_too_long'), true],
+            'ffprobe refuses it' => [$ready(5000), $blocked(), $blocked(), true],
+            'checker refuses what ffprobe accepts' => [$blocked(), $ready(5000), $blocked(), true],
+            'both refuse' => [$blocked('voice_too_long'), $blocked(), $blocked('voice_too_long'), false],
+            'ffprobe could not run' => [$ready(5000), $unavailable, $unavailable, false],
+        ];
+    }
+
+    #[DataProvider('opinions')]
+    public function test_a_disagreement_with_ffprobe_blocks_the_file_and_is_logged(ChatVoiceInspection $own, ChatVoiceInspection $second, ChatVoiceInspection $expected, bool $logged): void
+    {
+        $messages = [];
+        $logger = new class($messages) extends AbstractLogger
+        {
+            public function __construct(private array &$messages) {}
+
+            public function log($level, string|Stringable $message, array $context = []): void
+            {
+                $this->messages[] = [$level, $context];
+            }
+        };
+        $result = (new ChatVoiceInspector(new Repository, null, $logger))->agree($own, $second);
+        self::assertEquals($expected, $result);
+        self::assertSame($logged, $messages !== []);
+        if ($logged) {
+            self::assertSame('warning', $messages[0][0]);
+            self::assertSame(['checker', 'ffprobe'], array_keys($messages[0][1]));
+            self::assertStringNotContainsString(sys_get_temp_dir(), json_encode($messages));
+        }
+    }
+
+    private function temporary(string $bytes): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'oblivion-voice-');
+        file_put_contents($path, $bytes);
+        $this->paths[] = $path;
+
+        return $path;
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->paths as $path) {
+            @unlink($path);
+        }
+        parent::tearDown();
     }
 
     public function test_stored_voice_bytes_must_match_the_checked_digest(): void
