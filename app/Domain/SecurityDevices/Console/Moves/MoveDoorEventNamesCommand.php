@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Console\Moves;
 
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Models\ControlRoom\Signal;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\TimelineEvent;
 use App\Models\User;
@@ -17,12 +18,19 @@ use Illuminate\Support\Facades\DB;
  * S&D data move "Names on old door events older than 90 days" (D14; plan: "Names older than 90 days
  * are cleared only after your yes and a backup").
  *
- * Today's door events keep the person's name in three places:
+ * Today's door events keep the person's name in four places:
  *  - integration_events: normalized_payload.actor_name, and the name inside normalized_payload.summary
  *    (UniFi Access events, UnifiAdapter::normalizeAccessLogEntry);
  *  - timeline_events of type "unifi_access": meta.user, and the name inside subject and body
  *    (SiteIntegrationController::syncAccessEvents);
- *  - device_events: payload.actor_name (read by the door page).
+ *  - device_events: payload.actor_name (read by the door page);
+ *  - control_room_signals made from those integration events (IntegrationSignalNormaliser):
+ *    payload.actor_name and payload.summary, and normalized_data.description, which copies the summary
+ *    (Stephan, 2 Nov: "Yes, same 90 days").
+ *
+ * The provider's own raw_payload is left out: verified UniFi events don't keep one
+ * (ProviderEventProjector), and older copies hold the name inside the provider's nested structure,
+ * not in the same simple field. The dry run still counts them.
  *
  * The dry run counts the rows older than 90 days that still hold a name. Clearing them cannot be
  * undone, so it needs `--apply --i-have-a-backup`. It removes the name and rewrites the summary
@@ -72,9 +80,8 @@ final class MoveDoorEventNamesCommand extends DataMoveCommand
             $rows[] = [$table, $source['where'], $count];
         }
         $rows[] = ['security_access_events', 'actor_name (the new Access tables)', 'Not touched: cleared by the Access sync itself'];
-        // Copies this command doesn't clear yet (waiting for Stephan's answer on D14's reach): listed so nobody thinks they're gone.
-        $rows[] = ['control_room_signals', 'payload: actor_name (copied from denied or forced door events)', self::countOrNotAvailable('control_room_signals', fn ($query) => $query->where('occurred_at', '<', $cutoff)->whereNotNull('payload->actor_name')).' · not covered yet'];
-        $rows[] = ['integration_events', 'raw_payload (the provider’s own copy)', self::countOrNotAvailable('integration_events', fn ($query) => $query->where('occurred_at', '<', $cutoff)->whereNotNull('raw_payload')).' · not covered yet'];
+        // The provider's own copy isn't cleared (see above): listed so nobody thinks it's gone.
+        $rows[] = ['integration_events', 'raw_payload (the provider’s own copy)', self::countOrNotAvailable('integration_events', fn ($query) => $query->where('occurred_at', '<', $cutoff)->whereNotNull('raw_payload')).' · not covered'];
         $this->section('Rows older than '.self::KEEP_DAYS.' days that still hold a name', ['Table', 'Where the name is', 'Rows'], $rows);
 
         if (! $actor instanceof User) {
@@ -167,6 +174,34 @@ final class MoveDoorEventNamesCommand extends DataMoveCommand
                     ];
                 },
             ],
+            'control_room_signals' => [
+                'where' => 'payload: actor_name and summary; normalized_data: description (copied from door events)',
+                'columns' => ['id', 'site_id', 'signal_type_code', 'occurred_at', 'payload', 'normalized_data'],
+                'fields' => ['actor_name', 'summary', 'description'],
+                'query' => fn (): Builder => Signal::query()
+                    ->where('occurred_at', '<', $cutoff)
+                    ->whereNotNull('payload->actor_name'),
+                'clear' => function (Model $signal): ?array {
+                    $payload = is_array($signal->payload) ? $signal->payload : null;
+                    if ($payload === null || ! array_key_exists('actor_name', $payload)) {
+                        return null;
+                    }
+                    $cleared = self::withoutName($payload);
+                    $changes = ['payload' => json_encode($cleared, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)];
+
+                    // The operator-facing description is the door event's summary, with the name in it.
+                    $context = is_array($signal->normalized_data) ? $signal->normalized_data : null;
+                    $name = is_string($payload['actor_name']) ? trim($payload['actor_name']) : '';
+                    $description = $context['description'] ?? null;
+                    if ($context !== null && is_string($description)
+                        && ($description === ($payload['summary'] ?? null) || ($name !== '' && str_contains($description, $name)))) {
+                        $context['description'] = $cleared['summary'] ?? self::summaryWithoutName($payload['direction'] ?? null, $payload['door_name'] ?? null);
+                        $changes['normalized_data'] = json_encode($context, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+                    }
+
+                    return $changes;
+                },
+            ],
             'device_events' => [
                 'where' => 'payload: actor_name (and summary, if any)',
                 'columns' => ['id', 'device_id', 'occurred_at', 'payload'],
@@ -186,10 +221,6 @@ final class MoveDoorEventNamesCommand extends DataMoveCommand
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
     /** A read-only count for the dry run's "not covered" lines; "Not available" when the table or column isn't there. */
     private static function countOrNotAvailable(string $table, callable $where): string
     {
@@ -200,6 +231,10 @@ final class MoveDoorEventNamesCommand extends DataMoveCommand
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
     private static function withoutName(array $payload): array
     {
         unset($payload['actor_name']);

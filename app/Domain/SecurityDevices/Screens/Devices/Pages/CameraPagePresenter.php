@@ -533,7 +533,7 @@ final class CameraPagePresenter
             'recorder' => $recorder !== null ? $recorder['name'] : null,
             'login' => $this->login($device, $siteId),
             'who' => [
-                ['Live', $holders('securityDevices.cctv.media.view')],
+                ['Live', $holders('securityDevices.cctv.live.watch')],
                 ['Recordings', $holders(CctvRecordingReferences::VIEW)],
             ],
         ];

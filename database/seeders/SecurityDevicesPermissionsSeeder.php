@@ -186,7 +186,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
     }
 
     /**
-     * Each rebuild key goes to every role that holds its "from" key, as the
+     * Each rebuild key goes to every role that holds its "from" key (less its except_roles), as the
      * 2026_11_01 grant migration does on deploy.
      */
     private function grantRebuildKeys(): void
@@ -199,7 +199,13 @@ class SecurityDevicesPermissionsSeeder extends Seeder
 
             Role::query()
                 ->whereHas('permissions', fn ($query) => $query->where('key', $definition['from']))
+                ->whereNotIn('name', $definition['except_roles'] ?? [])
                 ->each(fn (Role $role) => $role->permissions()->syncWithoutDetaching([$permission->id]));
+
+            // A database seeded before a role was excepted gives the key back.
+            Role::query()
+                ->whereIn('name', $definition['except_roles'] ?? [])
+                ->each(fn (Role $role) => $role->permissions()->detach($permission->id));
         }
     }
 

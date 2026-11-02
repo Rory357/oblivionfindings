@@ -36,7 +36,10 @@ use Illuminate\Support\Collection;
  * - alerts are the house's own (safety, readings, batteries and care), shown in full only while the
  *   person is on shift there (the people DeviceAlertEngine tells), otherwise only the ones they were
  *   told about;
- * - the alarm's armed state and zones show only with securityDevices.events.view, as on the alarm page;
+ * - the alarm's armed state and zones show with securityDevices.events.view, as on the alarm page;
+ *   without it, a person sees only armed or disarmed (no times, names, zones or history) and only at a
+ *   Site they work at: their HR profile's Sites or today's rostered shift (Stephan, 2 Nov: "Show at
+ *   their own Site");
  * - devices linked to a person (a resident's bed sensor or tracker) are left out, and so are cameras,
  *   network gear and computers.
  *
@@ -119,7 +122,7 @@ final class WorkerOverviewPresenter
             ->values();
 
         $safety = $this->safety($siteId, $onShift, $toldIds);
-        $kit = $this->kit($viewer, $entries);
+        $kit = $this->kit($viewer, $entries, $this->worksAt($viewer, $siteId, $shift));
         $around = $this->around($entries, $base['can']['open_devices']);
 
         return [
@@ -170,6 +173,29 @@ final class WorkerOverviewPresenter
             'starts_at' => CarbonImmutable::parse($shift->starts_at)->utc()->toIso8601String(),
             'ends_at' => CarbonImmutable::parse($shift->ends_at)->utc()->toIso8601String(),
         ];
+    }
+
+    /**
+     * A Site the person works at: their active HR profile's primary or secondary Site, or the Site of
+     * today's rostered shift.
+     *
+     * @param  array{site_id: int, starts_at: string, ends_at: string}|null  $shift
+     */
+    private function worksAt(User $viewer, int $siteId, ?array $shift): bool
+    {
+        if ($shift !== null && $shift['site_id'] === $siteId) {
+            return true;
+        }
+        $profile = HrEmployeeProfile::query()
+            ->where('user_id', $viewer->id)
+            ->where('is_active', true)
+            ->first(['id', 'primary_site_id', 'secondary_site_ids']);
+        if ($profile === null) {
+            return false;
+        }
+        $ids = array_map('intval', array_filter([$profile->primary_site_id, ...((array) ($profile->secondary_site_ids ?? []))], 'is_numeric'));
+
+        return in_array($siteId, $ids, true);
     }
 
     /** @param  list<int>  $siteIds */
@@ -280,7 +306,7 @@ final class WorkerOverviewPresenter
      * @param  Collection<int, DeviceEntry>  $entries
      * @return array{brand: ?string, reported_at: ?string, items: list<array<string, mixed>>}
      */
-    private function kit(User $viewer, Collection $entries): array
+    private function kit(User $viewer, Collection $entries, bool $worksHere): array
     {
         $canSeeEvents = $viewer->canDo('securityDevices.events.view');
         $brand = null;
@@ -306,7 +332,16 @@ final class WorkerOverviewPresenter
             }
             $item = $this->deviceItem($entry, 'alarm', $entry->model());
             // The alarm page's own reading (armed state, areas, zones), only where it shows them too.
-            $device = $canSeeEvents ? Device::query()->find($entry->id()) : null;
+            $device = $canSeeEvents || $worksHere ? Device::query()->find($entry->id()) : null;
+            if ($device instanceof Device && ! $canSeeEvents) {
+                // Their own house without events.view: armed or disarmed, read-only, and nothing more.
+                $state = $this->alarms->armedStateOnly($device);
+                $item['flag'] = ['tone' => $state['tone'], 'text' => $state['label']];
+                $item['panel'] = ['state' => $state['state'], 'label' => $state['label'], 'tone' => $state['tone'], 'since' => null, 'by' => null];
+                $panels[] = $item;
+
+                continue;
+            }
             if ($device instanceof Device) {
                 $page = $this->alarms->present($viewer, $device, ['tab' => 'overview']);
                 $brand ??= $page['control']['brand'] ?? null;

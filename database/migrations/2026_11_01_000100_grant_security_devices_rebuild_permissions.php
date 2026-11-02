@@ -35,7 +35,14 @@ return new class extends Migration
                 continue;
             }
 
-            $roleIds = DB::table('role_permission')->where('permission_id', $fromId)->pluck('role_id');
+            // Some keys skip roles that hold the `from` key but must not act (alerts.acknowledge skips
+            // auditors). People in those roles don't get the key through a copied allow override either.
+            $exceptRoleIds = DB::table('roles')->whereIn('name', $definition['except_roles'] ?? [])->pluck('id');
+            $exceptUserIds = $exceptRoleIds->isEmpty()
+                ? collect()
+                : DB::table('role_user')->whereIn('role_id', $exceptRoleIds)->pluck('user_id');
+
+            $roleIds = DB::table('role_permission')->where('permission_id', $fromId)->pluck('role_id')->diff($exceptRoleIds);
             $alreadyRoles = DB::table('role_permission')->where('permission_id', $permissionId)->pluck('role_id');
             foreach ($roleIds->diff($alreadyRoles) as $roleId) {
                 DB::table('role_permission')->insert(['role_id' => $roleId, 'permission_id' => $permissionId]);
@@ -45,6 +52,9 @@ return new class extends Migration
             $alreadyUsers = DB::table('permission_user')->where('permission_id', $permissionId)->pluck('user_id');
             foreach ($overrides as $override) {
                 if ($alreadyUsers->contains($override->user_id)) {
+                    continue;
+                }
+                if ((bool) $override->allowed && $exceptUserIds->contains($override->user_id)) {
                     continue;
                 }
                 DB::table('permission_user')->insert([

@@ -201,6 +201,30 @@ final class AlarmPagePresenter
         ));
     }
 
+    /**
+     * Armed or disarmed right now, and nothing else: no times, no names, no zones, no alarm history.
+     * For a support worker's own house on their Overview (Stephan, 2 Nov: "Show at their own Site");
+     * the caller decides the person works at the panel's Site. Read from the same reports as
+     * areasNow(), so only reports from while the panel has been at its current place count.
+     *
+     * @return array{state: string, label: string, tone: string}
+     */
+    public function armedStateOnly(Device $device): array
+    {
+        $areas = $this->areasNow($device);
+        $known = array_values(array_filter($areas, fn (array $area): bool => $area['armed'] !== null));
+        if ($known === []) {
+            return ['state' => 'not_reported', 'label' => 'No state yet', 'tone' => 'neutral'];
+        }
+        $armed = array_values(array_filter($known, fn (array $area): bool => $area['armed'] === true));
+        if ($armed === []) {
+            return ['state' => 'disarmed', 'label' => 'Disarmed', 'tone' => 'neutral'];
+        }
+        $partly = count($armed) < count($areas);
+
+        return ['state' => $partly ? 'partly' : 'armed', 'label' => $partly ? 'Partly armed' : 'Armed', 'tone' => 'info'];
+    }
+
     private function monitors(Device $device): Collection
     {
         return $device->monitors()

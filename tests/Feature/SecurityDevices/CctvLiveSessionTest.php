@@ -360,6 +360,32 @@ final class CctvLiveSessionTest extends TestCase
         $this->actingAs($viewer)->get('/security-devices/devices/'.$this->camera->id.'/live')->assertNotFound();
     }
 
+    public function test_live_viewing_needs_the_live_watch_key_on_the_server_not_only_media_view(): void
+    {
+        $this->source();
+        $started = $this->start();
+        $base = '/security-devices/devices/'.$this->camera->id.'/live';
+        $liveWatch = Permission::query()->where('key', 'securityDevices.cctv.live.watch')->firstOrFail();
+        $this->actor->permissionOverrides()->syncWithoutDetaching([$liveWatch->id => ['allowed' => false]]);
+        $this->actor->unsetRelations();
+        $this->assertTrue($this->actor->fresh()->canDo('securityDevices.cctv.media.view'));
+
+        // A running live view ends, and no new one starts, with media.view alone.
+        $this->getJson($started['session']['status_href'].'?expected_actor_id='.$this->actor->id)->assertNotFound();
+        $this->assertSame('close', $this->work()['operations'][0]['operation']);
+        $this->postJson($base.'-sessions', ['expected_actor_id' => (int) $this->actor->id, 'request_key' => (string) Str::uuid(), 'source_revision' => 1, 'purpose' => 'View the approved reception camera now.'])->assertNotFound();
+
+        // The picture stays; the way into live viewing doesn't.
+        $this->get('/security-devices/devices/'.$this->camera->id.'?section=health')->assertOk()->assertInertia(fn ($page) => $page->where('profile.cctv.live_href', null));
+        $this->get('/security-devices/devices/'.$this->camera->id)->assertOk()->assertInertia(fn ($page) => $page
+            ->where('can.see_picture', true)
+            ->where('can.watch_live', false));
+
+        $this->actor->permissionOverrides()->detach($liveWatch->id);
+        $this->actor->unsetRelations();
+        $this->get('/security-devices/devices/'.$this->camera->id.'?section=health')->assertOk()->assertInertia(fn ($page) => $page->where('profile.cctv.live_href', $base));
+    }
+
     public function test_credential_rotation_and_current_mapping_drift_end_worker_authority(): void
     {
         $this->source();

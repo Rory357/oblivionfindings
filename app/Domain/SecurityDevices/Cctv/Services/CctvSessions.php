@@ -33,7 +33,7 @@ final class CctvSessions
             $source = CctvSource::query()->where('camera_id', $cameraId)->where('enabled', true)->orderByDesc('revision')->lock('for share nowait')->first();
             $ready = false;
             $reason = 'source_unavailable';
-            if ($viewer->canDo('securityDevices.cctv.media.view')) {
+            if ($viewer->canDo('securityDevices.cctv.media.view') && $viewer->canDo('securityDevices.cctv.live.watch')) {
                 try {
                     $actor = app(CctvAuthority::class)->actor((int) $viewer->id);
                     if ($source && ($source->provider === 'hikvision' || $source->stream_state === 'verified')) {

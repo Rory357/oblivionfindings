@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerSecretStore;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Screens\Setup\ConnectServicePresenter;
 use App\Models\Client;
 use App\Models\Integration\IntegrationProviderConnection;
@@ -194,6 +195,48 @@ class WorkerOverviewAndConnectServiceTest extends TestCase
                 ->where('on_shift', false)
                 ->has('safety', 1)
                 ->where('safety.0.title', 'Aurora House staff button: panic button pressed'));
+    }
+
+    public function test_a_support_worker_sees_only_whether_their_own_houses_alarm_is_armed(): void
+    {
+        $worker = $this->supportWorker();
+        $panel = $this->device($this->home, 'Aurora House alarm', 'alarm', 'panel');
+        $panel->forceFill(['config' => ['areas' => ['01' => 'Whole house'], 'zones' => ['001' => 'Laundry window']]])->save();
+        $theirs = $this->device($this->other, 'Kōwhai Lodge alarm', 'alarm', 'panel');
+        foreach ([[$panel, 'alarm_armed', 'Area 01 armed (away) by Mere Tipene.', 30], [$panel, 'zone_open', 'Laundry window open.', 20], [$theirs, 'alarm_disarmed', 'Area 01 disarmed by Hemi Walker.', 10]] as [$device, $type, $summary, $minutes]) {
+            DeviceEvent::query()->create([
+                'device_id' => $device->id, 'event_type' => $type, 'severity' => 'info', 'source' => 'sia_dc09',
+                'payload' => ['partition' => '01', 'zone' => '001', 'summary' => $summary, 'user_name' => str_contains($summary, 'Mere') ? 'Mere Tipene' : 'Hemi Walker'],
+                'occurred_at' => now()->subMinutes($minutes),
+            ]);
+        }
+        $this->assertFalse($worker->canDo('securityDevices.events.view'));
+
+        $response = $this->actingAs($worker)->get('/security-devices');
+
+        $response->assertOk()->assertInertia(fn ($page) => $page
+            ->where('view', 'worker')
+            ->where('site.name', 'Aurora House')
+            ->where('kit.items.0.name', 'Aurora House alarm')
+            ->where('kit.items.0.kind', 'alarm')
+            ->where('kit.items.0.panel.state', 'armed')
+            ->where('kit.items.0.panel.label', 'Armed')
+            ->where('kit.items.0.panel.since', null)
+            ->where('kit.items.0.panel.by', null)
+            ->has('kit.items', 1)
+            ->where('kit.reported_at', null)
+            ->where('meters.0.key', 'alarm')
+            ->where('meters.0.value', 'Armed'));
+        $content = $response->getContent();
+        // Only the state: no who or when, no zones, nothing from another Site.
+        foreach (['Mere Tipene', 'Laundry window', 'Left out', 'Kōwhai Lodge', 'Hemi Walker', 'Disarmed'] as $leak) {
+            $this->assertStringNotContainsString($leak, $content);
+        }
+        $this->actingAs($worker)->get('/security-devices?site='.$this->other->id)->assertNotFound();
+        // The panel's own page still keeps its history to people with events.view.
+        $this->actingAs($worker)->get('/security-devices/devices/'.$panel->id)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('panel.state', 'hidden'));
     }
 
     public function test_connect_a_service_refuses_without_the_services_key(): void

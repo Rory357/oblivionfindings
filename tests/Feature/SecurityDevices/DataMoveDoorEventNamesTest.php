@@ -5,6 +5,7 @@ use App\Domain\SecurityDevices\Access\Models\AccessEvent;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\AuditLog;
+use App\Models\ControlRoom\Signal;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Site;
 use App\Models\TimelineEvent;
@@ -16,6 +17,7 @@ use Illuminate\Support\Str;
  * The dry run only counts. Clearing can't be undone, so it needs --apply --i-have-a-backup; it clears
  * names (and the name inside summaries) on rows older than 90 days only, writes one audit row each
  * without the name, leaves newer rows and the new Access tables alone, and a second run does nothing.
+ * Control Room signals copied from door events are cleared the same way (Stephan, 2 Nov: "Yes, same 90 days").
  */
 
 beforeEach(function (): void {
@@ -41,6 +43,13 @@ beforeEach(function (): void {
         'occurred_at' => now()->subDays($daysAgo),
     ]);
 
+    $this->signal = fn (int $daysAgo) => Signal::query()->create([
+        'signal_type_code' => 'integration_door_forced', 'site_id' => $this->site->id, 'severity_hint' => 'high',
+        'idempotency_key' => 'door-'.Str::uuid(), 'occurred_at' => now()->subDays($daysAgo), 'status' => 'processed',
+        'payload' => ['summary' => 'FORCED: Mereana Synthetica at Front door', 'actor_name' => 'Mereana Synthetica', 'door_name' => 'Front door', 'direction' => 'FORCED'],
+        'normalized_data' => ['provider' => 'unifi', 'title' => 'Door forced open', 'description' => 'FORCED: Mereana Synthetica at Front door', 'site_id' => $this->site->id],
+    ]);
+
     $this->oldIntegration = ($this->integration)(100, 'Mereana Synthetica');
     $this->newIntegration = ($this->integration)(10, 'Mereana Synthetica');
     $this->oldUnnamed = ($this->integration)(100, null);
@@ -48,6 +57,8 @@ beforeEach(function (): void {
     $this->newTimeline = ($this->timeline)(10, 9002);
     $this->oldDeviceEvent = ($this->deviceEvent)(100);
     $this->newDeviceEvent = ($this->deviceEvent)(10);
+    $this->oldSignal = ($this->signal)(100);
+    $this->newSignal = ($this->signal)(10);
 
     // The new Access tables clear their own names; this move never touches them.
     $console = AccessConsole::query()->create(['site_id' => $this->site->id, 'address' => '10.78.0.40', 'port' => 12445, 'state' => 'ok']);
@@ -63,6 +74,7 @@ it('counts names older than 90 days in a dry run and changes nothing', function 
     $this->artisan('security-devices:moves:door-event-names')
         ->expectsOutputToContain('normalized_payload: actor_name and summary')
         ->expectsOutputToContain('Not touched: cleared by the Access sync itself')
+        ->expectsOutputToContain('payload: actor_name and summary; normalized_data: description')
         ->expectsOutputToContain('Clearing can’t be undone')
         ->expectsOutputToContain('Dry run: nothing changed')
         ->assertSuccessful();
@@ -70,6 +82,7 @@ it('counts names older than 90 days in a dry run and changes nothing', function 
     expect($this->oldIntegration->fresh()->normalized_payload['actor_name'])->toBe('Mereana Synthetica')
         ->and($this->oldTimeline->fresh()->meta['user'])->toBe('Mereana Synthetica')
         ->and($this->oldDeviceEvent->fresh()->payload['actor_name'])->toBe('Mereana Synthetica')
+        ->and($this->oldSignal->fresh()->payload['actor_name'])->toBe('Mereana Synthetica')
         ->and(($this->cleared)())->toBe(0);
 });
 
@@ -88,7 +101,7 @@ it('refuses --apply without --i-have-a-backup, and in production without --force
 
 it('clears only names older than 90 days, audits each row without the name, and is idempotent', function (): void {
     $this->artisan('security-devices:moves:door-event-names', ['--apply' => true, '--i-have-a-backup' => true, '--actor' => $this->actor->id])
-        ->expectsOutputToContain('Clearing names on 3 rows now')
+        ->expectsOutputToContain('Clearing names on 4 rows now')
         ->assertSuccessful();
 
     $integration = $this->oldIntegration->fresh()->normalized_payload;
@@ -104,22 +117,32 @@ it('clears only names older than 90 days, audits each row without the name, and 
     expect($this->oldDeviceEvent->fresh()->payload)->not->toHaveKey('actor_name')
         ->and($this->oldDeviceEvent->fresh()->payload['summary'])->not->toContain('Mereana');
 
+    // The Control Room's copy: the name goes from the payload and from the operator-facing description.
+    $signal = $this->oldSignal->fresh();
+    expect($signal->payload)->not->toHaveKey('actor_name')
+        ->and($signal->payload['summary'])->toBe('FORCED at Front door (name cleared after 90 days)')
+        ->and($signal->normalized_data['description'])->toBe('FORCED at Front door (name cleared after 90 days)')
+        ->and($signal->normalized_data['title'])->toBe('Door forced open')
+        ->and(json_encode([$signal->payload, $signal->normalized_data]))->not->toContain('Mereana');
+
     // Newer than 90 days, the unnamed row and the new Access tables: untouched.
     expect($this->newIntegration->fresh()->normalized_payload['actor_name'])->toBe('Mereana Synthetica')
         ->and($this->newTimeline->fresh()->meta['user'])->toBe('Mereana Synthetica')
         ->and($this->newDeviceEvent->fresh()->payload['actor_name'])->toBe('Mereana Synthetica')
         ->and($this->oldUnnamed->fresh()->normalized_payload)->toEqual($this->oldUnnamed->normalized_payload)
-        ->and($this->accessEvent->fresh()->actor_name)->toBe('Mereana Synthetica');
+        ->and($this->accessEvent->fresh()->actor_name)->toBe('Mereana Synthetica')
+        ->and($this->newSignal->fresh()->payload['actor_name'])->toBe('Mereana Synthetica')
+        ->and($this->newSignal->fresh()->normalized_data['description'])->toContain('Mereana Synthetica');
 
     // One audit row per cleared row, recorded against the actor, never carrying the name; no model-level
     // update audit copies the old name either.
     $audits = AuditLog::query()->where('action', 'security_devices.data_move.door_event_names.cleared')->get();
-    expect($audits)->toHaveCount(3)
+    expect($audits)->toHaveCount(4)
         ->and($audits->pluck('user_id')->unique()->all())->toBe([$this->actor->id])
         ->and($audits->contains(fn (AuditLog $log): bool => str_contains(json_encode($log->meta), 'Mereana')))->toBeFalse()
         ->and(AuditLog::query()->whereIn('action', ['timelineevent.update', 'integrationevent.update'])->exists())->toBeFalse();
 
     $this->artisan('security-devices:moves:door-event-names', ['--apply' => true, '--i-have-a-backup' => true, '--actor' => $this->actor->id])
         ->assertSuccessful();
-    expect(($this->cleared)())->toBe(3);
+    expect(($this->cleared)())->toBe(4);
 });

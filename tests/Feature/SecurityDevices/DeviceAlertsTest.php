@@ -13,6 +13,7 @@ use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\SecurityDeviceAlertNotification;
@@ -193,6 +194,33 @@ class DeviceAlertsTest extends TestCase
         // Without the permission: no acting.
         $reader = $this->person(['securityDevices.viewAny', 'securityDevices.events.view']);
         $this->actingAs($reader)->postJson("/security-devices/alerts/{$mine->id}/acknowledge", ['remind' => false])->assertForbidden();
+    }
+
+    public function test_auditors_see_alerts_but_cannot_acknowledge_them_and_coordinators_can(): void
+    {
+        [, $ping] = $this->watched($this->home, 'Aurora House router');
+        $this->goes($ping, MonitorState::Healthy, MonitorState::Failed);
+        $alert = DeviceAlert::query()->sole();
+        $byRole = function (string $role): User {
+            $user = User::factory()->create(['approved_at' => now()]);
+            HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => $this->home->id, 'secondary_site_ids' => [], 'is_active' => true]);
+            $user->roles()->attach(Role::query()->where('name', $role)->firstOrFail());
+
+            return $user->fresh();
+        };
+        $auditor = $byRole('auditor');
+        $coordinator = $byRole('coordinator');
+
+        $this->actingAs($auditor)->get('/security-devices/alerts')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('queue.0.title', 'Aurora House router is offline')
+                ->where('selected.can.acknowledge', false));
+        $this->actingAs($auditor)->postJson("/security-devices/alerts/{$alert->id}/acknowledge", ['remind' => false])->assertForbidden();
+        expect($alert->fresh()->acknowledged_by_user_id)->toBeNull();
+
+        $this->actingAs($coordinator)->postJson("/security-devices/alerts/{$alert->id}/acknowledge", ['remind' => false])->assertOk();
+        expect($alert->fresh()->acknowledged_by_user_id)->toBe($coordinator->id);
     }
 
     public function test_snoozes_end_on_time_and_nobody_acknowledging_for_an_hour_sends_one_reminder(): void

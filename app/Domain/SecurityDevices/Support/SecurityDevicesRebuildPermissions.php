@@ -5,20 +5,22 @@ namespace App\Domain\SecurityDevices\Support;
 /**
  * The S&D rebuild's new permission keys (plan v10, "New permissions and their grant migrations").
  *
- * Each key is given to exactly the roles, and personal overrides, that hold its `from` key, both by
+ * Each key is given to exactly the roles, and personal overrides, that hold its `from` key (less any
+ * `except_roles`, and allow overrides for people in those roles), both by
  * the grant migration on deploy and by SecurityDevicesPermissionsSeeder on a fresh install.
  */
 final class SecurityDevicesRebuildPermissions
 {
     private const SD = ['group' => 'security_devices', 'module' => 'Security & Devices'];
 
-    /** @var array<string, array{from: string, description: string, group: string, module: string}> */
+    /** @var array<string, array{from: string, description: string, group: string, module: string, except_roles?: list<string>}> */
     public const KEYS = [
         'securityDevices.access.lockdown' => ['from' => 'securityDevices.accessControl.manage', 'description' => 'Lock down or evacuate a Site', ...self::SD],
         'attendance.doorClockIns.review' => ['from' => 'timesheets.approve', 'description' => 'See and sort out clock-in gaps from door badges', 'group' => 'timesheets', 'module' => 'Operations'],
         'securityDevices.obli.fixes.manage' => ['from' => 'securityDevices.endpoints.manageActionPolicy', 'description' => 'Turn Obli\'s fixes on and approve one-off fixes', ...self::SD],
         'securityDevices.obli.pictures.view' => ['from' => 'securityDevices.remote.managePolicy', 'description' => 'Open Obli\'s screen pictures, with a reason', ...self::SD],
-        'securityDevices.alerts.acknowledge' => ['from' => 'securityDevices.events.view', 'description' => 'Acknowledge, assign and snooze device alerts', ...self::SD],
+        // Stephan, 2 Nov: "Leave auditors out". Auditors read alerts (events.view) but never act on them.
+        'securityDevices.alerts.acknowledge' => ['from' => 'securityDevices.events.view', 'description' => 'Acknowledge, assign and snooze device alerts', 'except_roles' => ['auditor'], ...self::SD],
         'securityDevices.automations.manage' => ['from' => 'securityDevices.monitoring.manage', 'description' => 'Manage alert rules, automations, house modes and quiet time', ...self::SD],
         'securityDevices.modes.switch' => ['from' => 'securityDevices.devices.update', 'description' => 'Switch a house mode by hand', ...self::SD],
         'securityDevices.cctv.live.watch' => ['from' => 'securityDevices.cctv.media.view', 'description' => 'Watch a camera live, with a reason', ...self::SD],
