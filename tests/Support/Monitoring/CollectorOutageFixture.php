@@ -59,6 +59,8 @@ final class CollectorOutageFixture
             'collector_id' => $uuid,
             'collector_public_key' => base64_encode(sodium_crypto_sign_publickey($pair)),
         ])->assertCreated();
+        // An admin approves the new hub before it may do any work (S&D Phase B).
+        MonitoringCollector::query()->where('collector_uuid', $uuid)->update(['approved_at' => now()]);
 
         return [
             'site' => $site,

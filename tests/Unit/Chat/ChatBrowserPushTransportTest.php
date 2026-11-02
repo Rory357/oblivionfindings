@@ -4,73 +4,59 @@ namespace Tests\Unit\Chat;
 
 use App\Models\UserPushSubscription;
 use App\Services\Chat\ChatBrowserPushTransport;
-use GuzzleHttp\Exception\ConnectException;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Middleware;
-use GuzzleHttp\Psr7\Request;
-use GuzzleHttp\Psr7\Response;
+use App\Services\Push\VapidKeys;
+use App\Services\Push\WebPushSender;
 use Illuminate\Config\Repository;
-use Minishlink\WebPush\VAPID;
-use Minishlink\WebPush\WebPush;
+use Illuminate\Http\Client\Factory;
+use Illuminate\Http\Client\Request;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
+/** On Windows run with OPENSSL_CONF set to Herd's php84/extras/ssl/openssl.cnf. */
 class ChatBrowserPushTransportTest extends TestCase
 {
     private Repository $config;
 
+    /** @var list<array{request: Request, options: array<string, mixed>}> */
     private array $history = [];
 
     protected function setUp(): void
     {
-        $keys = VAPID::createVapidKeys();
+        $keys = VapidKeys::generate();
         $this->config = new Repository(['chat' => ['notifications' => ['push_hosts' => ['push.example.test']]], 'services' => ['webpush' => [
-            'subject' => 'mailto:test@example.test', 'public_key' => $keys['publicKey'], 'private_key' => $keys['privateKey'],
+            'subject' => 'mailto:test@example.test', 'public_key' => $keys->publicKey, 'private_key' => $keys->privateKey,
         ]]]);
     }
 
     private function subscription(): UserPushSubscription
     {
-        $keys = VAPID::createVapidKeys();
-
         return new UserPushSubscription(['provider' => 'webpush', 'enabled' => true, 'token' => 'https://push.example.test/subscription/secret',
-            'keys' => ['p256dh' => $keys['publicKey'], 'auth' => rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=')]]);
+            'keys' => ['p256dh' => VapidKeys::generate()->publicKey, 'auth' => rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=')]]);
     }
 
     private function transport(mixed $response): ChatBrowserPushTransport
     {
-        $handler = HandlerStack::create(new MockHandler([$response]));
-        $handler->push(Middleware::history($this->history));
-        $client = new WebPush(['VAPID' => [
-            'subject' => $this->config->get('services.webpush.subject'), 'publicKey' => $this->config->get('services.webpush.public_key'),
-            'privateKey' => $this->config->get('services.webpush.private_key'),
-        ]], [], 10, ['handler' => $handler, 'allow_redirects' => false], new NullLogger);
+        $http = new Factory;
+        $http->fake(function (Request $request, array $options) use ($response) {
+            $this->history[] = ['request' => $request, 'options' => $options];
 
-        return new class($this->config, $client) extends ChatBrowserPushTransport
-        {
-            public function __construct(Repository $config, private WebPush $client)
-            {
-                parent::__construct($config);
-            }
+            return $response;
+        });
 
-            protected function createClient(): WebPush
-            {
-                return $this->client;
-            }
-        };
+        return new ChatBrowserPushTransport($this->config, new WebPushSender($this->config, $http));
     }
 
-    public function test_encrypts_with_the_installed_library_and_keeps_the_provider_queue_and_topic_bounded(): void
+    public function test_encrypts_with_oblivions_sender_and_keeps_the_provider_queue_and_topic_bounded(): void
     {
         $payload = ['title' => 'New Chat message', 'body' => 'Open Chat to view the message.', 'data' => ['notification_id' => 'private-stable-id']];
-        self::assertSame('accepted', $this->transport(new Response(201))->send($this->subscription(), $payload));
+        self::assertSame('accepted', $this->transport(Factory::response('', 201))->send($this->subscription(), $payload));
         self::assertCount(1, $this->history);
-        $request = $this->history[0]['request'];
+        $request = $this->history[0]['request']->toPsrRequest();
         self::assertSame('aes128gcm', $request->getHeaderLine('Content-Encoding'));
         self::assertSame('60', $request->getHeaderLine('TTL'));
+        self::assertSame('normal', $request->getHeaderLine('Urgency'));
         self::assertSame(substr(hash('sha256', 'private-stable-id'), 0, 32), $request->getHeaderLine('Topic'));
+        self::assertStringStartsWith('vapid t=', $request->getHeaderLine('Authorization'));
         self::assertStringNotContainsString('Open Chat', (string) $request->getBody());
         self::assertFalse($this->history[0]['options']['allow_redirects']);
     }
@@ -84,14 +70,14 @@ class ChatBrowserPushTransportTest extends TestCase
     #[DataProvider('outcomes')]
     public function test_classifies_provider_results_without_exposing_the_response(int $status, string $expected): void
     {
-        self::assertSame($expected, $this->transport(new Response($status, ['Location' => 'https://private.example.test'], 'Private provider detail'))
+        self::assertSame($expected, $this->transport(Factory::response('Private provider detail', $status, ['Location' => 'https://private.example.test']))
             ->send($this->subscription(), ['data' => ['notification_id' => 'one']]));
         self::assertCount(1, $this->history);
     }
 
     public function test_handles_an_uncertain_network_result_as_retry_without_retaining_its_reason(): void
     {
-        $transport = $this->transport(new ConnectException('Private endpoint and keys', new Request('POST', 'https://push.example.test/secret')));
+        $transport = $this->transport(Factory::failedConnection('Private endpoint and keys'));
         self::assertSame('retry', $transport->send($this->subscription(), []));
     }
 
@@ -108,15 +94,18 @@ class ChatBrowserPushTransportTest extends TestCase
     {
         $subscription = $this->subscription();
         $subscription->token = $url;
-        self::assertSame('rejected', $this->transport(new Response(201))->send($subscription, []));
+        self::assertSame('rejected', $this->transport(Factory::response('', 201))->send($subscription, []));
         self::assertCount(0, $this->history);
     }
 
     public function test_missing_configuration_invalid_keys_and_native_tokens_never_send(): void
     {
-        $transport = $this->transport(new Response(201));
+        $transport = $this->transport(Factory::response('', 201));
         $subscription = $this->subscription();
         $subscription->keys = ['p256dh' => 'invalid', 'auth' => 'invalid'];
+        self::assertSame('rejected', $transport->send($subscription, []));
+        $subscription = $this->subscription();
+        $subscription->keys = ['p256dh' => ['not', 'a', 'string'], 'auth' => 'invalid'];
         self::assertSame('rejected', $transport->send($subscription, []));
         $subscription = $this->subscription();
         $subscription->provider = 'expo';

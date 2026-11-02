@@ -1,4 +1,8 @@
 import LeafletMap from '@/components/leaflet-map';
+import {
+    CameraCertificateNotice,
+    type CameraCertificateTrust,
+} from '@/components/security-devices/camera-certificate-notice';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -59,7 +63,7 @@ import {
     ZoomIn,
     ZoomOut,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
     DeviceGovernedQuickAction,
     DeviceNetworkNeighbourItem,
@@ -506,7 +510,49 @@ type SnapshotPayload = {
     data_uri?: string | null;
     captured_at?: string | null;
     source?: string | null;
+    /** Phase A, item A5: set when the camera's certificate needs trusting first. */
+    tls_trust?: CameraCertificateTrust | null;
+    /** Phase B: the Site hub is taking the picture; check back at status_url. */
+    pending?: boolean;
+    status_url?: string | null;
 };
+
+const HUB_PICTURE_POLL_MS = 2000;
+const HUB_PICTURE_MAX_POLLS = 45;
+
+/** Phase B: check back until the Site hub's picture arrives (about 90 seconds at most). */
+async function waitForHubPicture(
+    statusUrl: string,
+    isMounted: () => boolean,
+): Promise<SnapshotPayload> {
+    for (let poll = 0; poll < HUB_PICTURE_MAX_POLLS; poll += 1) {
+        await new Promise((resolve) =>
+            window.setTimeout(resolve, HUB_PICTURE_POLL_MS),
+        );
+        if (!isMounted()) return { ok: false };
+        try {
+            const response = await axios.get<SnapshotPayload>(statusUrl);
+            if (!response.data.pending) return response.data;
+        } catch (error: unknown) {
+            const data =
+                axios.isAxiosError(error) && error.response?.data
+                    ? (error.response.data as SnapshotPayload)
+                    : null;
+            return {
+                ok: false,
+                message:
+                    data?.message ?? 'The Site hub didn’t send the picture.',
+                tls_trust: data?.tls_trust ?? null,
+            };
+        }
+    }
+
+    return {
+        ok: false,
+        message:
+            'The Site hub didn’t send the picture in time. It may be offline; check the camera again.',
+    };
+}
 
 function CameraProfileOverview({
     typeProfile,
@@ -523,6 +569,15 @@ function CameraProfileOverview({
         message: string;
     } | null>(null);
 
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
+
     const captureSnapshot = async () => {
         if (!typeProfile.snapshotUrl || capturing) return;
         setCapturing(true);
@@ -531,14 +586,23 @@ function CameraProfileOverview({
                 typeProfile.snapshotUrl,
             );
             setSnapshot(response.data);
+            if (response.data.pending && response.data.status_url) {
+                const picture = await waitForHubPicture(
+                    response.data.status_url,
+                    () => mounted.current,
+                );
+                if (mounted.current) setSnapshot(picture);
+            }
         } catch (error: unknown) {
             let message =
                 'Could not capture an ONVIF snapshot from this camera.';
+            let tlsTrust: CameraCertificateTrust | null = null;
             if (axios.isAxiosError(error) && error.response?.data) {
-                const data = error.response.data as { message?: string };
+                const data = error.response.data as SnapshotPayload;
                 if (data.message) message = data.message;
+                tlsTrust = data.tls_trust ?? null;
             }
-            setSnapshot({ ok: false, message });
+            setSnapshot({ ok: false, message, tls_trust: tlsTrust });
         } finally {
             setCapturing(false);
         }
@@ -689,6 +753,11 @@ function CameraProfileOverview({
                                 Add an IP address to this camera first to
                                 request an ONVIF snapshot.
                             </p>
+                        ) : snapshot?.pending ? (
+                            <p className="text-caption flex items-center gap-2 rounded-lg bg-muted/30 p-3">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                {snapshot.message}
+                            </p>
                         ) : snapshot?.ok && snapshot.data_uri ? (
                             <div className="space-y-2">
                                 <img
@@ -702,6 +771,15 @@ function CameraProfileOverview({
                                     {snapshot.source ?? 'ONVIF Media'}
                                 </p>
                             </div>
+                        ) : snapshot &&
+                          !snapshot.ok &&
+                          snapshot.tls_trust?.offered ? (
+                            <CameraCertificateNotice
+                                trust={snapshot.tls_trust}
+                                onTrusted={(message) =>
+                                    setSnapshot({ ok: false, message })
+                                }
+                            />
                         ) : snapshot && !snapshot.ok ? (
                             <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm">
                                 <p className="font-medium text-foreground">
@@ -891,6 +969,14 @@ function AlarmPanelProfileOverview({
         typeProfile.panelState === 'not_reported'
             ? 'No state reported yet'
             : humanise(typeProfile.panelState);
+    // Only actions the server offers get a button. A panel with neither is view only (Phase A, A1).
+    const controllable = Boolean(
+        typeProfile.armAction || typeProfile.disarmAction,
+    );
+    const unavailableAction = [
+        typeProfile.disarmAction,
+        typeProfile.armAction,
+    ].find((action) => action && !action.available);
 
     return (
         <div
@@ -903,12 +989,14 @@ function AlarmPanelProfileOverview({
                         <div className="space-y-1">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Siren className="h-4 w-4" />
-                                Alarm panel state &amp; controls
+                                {controllable
+                                    ? 'Alarm panel state & controls'
+                                    : 'Alarm panel state'}
                             </CardTitle>
                             <CardDescription>
-                                Arming and disarming always require permission,
-                                confirmation, an operational reason, and an
-                                audit record.
+                                {controllable
+                                    ? 'Arming and disarming always require permission, confirmation, an operational reason, and an audit record.'
+                                    : 'The state this panel last reported to Oblivion.'}
                             </CardDescription>
                         </div>
                         <StatusBadge
@@ -932,50 +1020,73 @@ function AlarmPanelProfileOverview({
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={!typeProfile.armAction?.available}
-                            onClick={() =>
-                                typeProfile.armAction &&
-                                openActionDialog(typeProfile.armAction)
-                            }
+                    {!controllable && (
+                        <div
+                            data-testid="alarm-panel-view-only"
+                            className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/30 p-3 text-sm"
                         >
-                            <Lock className="mr-1.5 h-3.5 w-3.5" />
-                            Arm alarm
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            disabled={!typeProfile.disarmAction?.available}
-                            onClick={() =>
-                                typeProfile.disarmAction &&
-                                openActionDialog(typeProfile.disarmAction)
-                            }
-                        >
-                            <Unlock className="mr-1.5 h-3.5 w-3.5" />
-                            Disarm alarm
-                        </Button>
-                        {profile.management.visible && (
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onOpenSection('management')}
-                            >
-                                Open Management
-                            </Button>
-                        )}
-                    </div>
+                            <StatusBadge variant="neutral">
+                                View only
+                            </StatusBadge>
+                            <span className="text-caption">
+                                Oblivion can’t arm or disarm this panel. Use the
+                                keypad or the maker’s app.
+                            </span>
+                        </div>
+                    )}
 
-                    {(!typeProfile.armAction?.available ||
-                        !typeProfile.disarmAction?.available) && (
+                    {(controllable || profile.management.visible) && (
+                        <div className="flex flex-wrap gap-2">
+                            {typeProfile.armAction && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!typeProfile.armAction.available}
+                                    onClick={() =>
+                                        typeProfile.armAction &&
+                                        openActionDialog(typeProfile.armAction)
+                                    }
+                                >
+                                    <Lock className="mr-1.5 h-3.5 w-3.5" />
+                                    Arm alarm
+                                </Button>
+                            )}
+                            {typeProfile.disarmAction && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={
+                                        !typeProfile.disarmAction.available
+                                    }
+                                    onClick={() =>
+                                        typeProfile.disarmAction &&
+                                        openActionDialog(
+                                            typeProfile.disarmAction,
+                                        )
+                                    }
+                                >
+                                    <Unlock className="mr-1.5 h-3.5 w-3.5" />
+                                    Disarm alarm
+                                </Button>
+                            )}
+                            {profile.management.visible && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onOpenSection('management')}
+                                >
+                                    Open Management
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
+                    {unavailableAction && (
                         <p className="text-caption rounded-lg bg-muted/30 p-3">
-                            {typeProfile.disarmAction?.reason ??
-                                typeProfile.armAction?.reason ??
+                            {unavailableAction.reason ||
                                 'Alarm control requires security control permission, recent panel state, and an active alarm adapter.'}
                         </p>
                     )}

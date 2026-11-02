@@ -19,6 +19,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
 use LogicException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -71,7 +72,7 @@ class HsRiskAssessmentService
         ]);
         if (! $assessment->saveOrFail() || ! $assessment->exists) { throw new LogicException('Risk assessment creation was not persisted.'); }
         if ($source) { abort_unless((clone $source)->exists(), 403); }
-        $this->audit('risk_assessment.created', $assessment, $current);
+        $this->audit('risk_assessment.created', $assessment, $current, null, [], $context);
         if ($source) { abort_unless((clone $source)->exists(), 403); }
         return $assessment;
     }
@@ -95,6 +96,7 @@ class HsRiskAssessmentService
     {
         return $this->command($assessment, $actor, function ($locked, $current, $reads, $readContext, $sourceProof) use ($data): HsRiskAssessment {
             $this->requireStatus($locked, [HsRiskAssessment::STATUS_DRAFT], 'Only draft assessments can be edited.');
+            $beforeAttachment = self::attachmentTuple($locked);
             $bindingTreatment = $locked->hs_event_id !== null && $reads->query(HsEvent::query())
                 ->whereKey($locked->hs_event_id)->whereIn('source_type', array_unique([FirstAidRecord::class, (new FirstAidRecord)->getMorphClass(),
                     \App\Models\RestraintEvent::class, (new \App\Models\RestraintEvent)->getMorphClass(),
@@ -133,7 +135,7 @@ class HsRiskAssessmentService
                 $sourceProof->whereExists((clone $newSource)->selectRaw('1')->toBase());
             }
             $this->persistRisk($locked, [...$this->draftFields($data), 'updated_by' => $current?->id], $reads, $readContext, $sourceProof);
-            $this->audit('risk_assessment.draft_updated', $locked, $current);
+            $this->audit('risk_assessment.draft_updated', $locked, $current, null, [], $readContext, $beforeAttachment);
 
             return $locked;
         }, $context);
@@ -152,7 +154,7 @@ class HsRiskAssessmentService
                     ?? ($locked->review_frequency_days ? now(\App\Support\Incidents\IncidentOccurrencePeriod::timezone())->addDays($locked->review_frequency_days)->toDateString() : null),
                 'updated_by' => $current?->id,
             ], $reads, $readContext, $sourceProof);
-            $this->audit('risk_assessment.status_changed', $locked, $current, $approval['approver_note'] ?? null, ['from' => 'draft', 'to' => 'active']);
+            $this->audit('risk_assessment.status_changed', $locked, $current, $approval['approver_note'] ?? null, ['from' => 'draft', 'to' => 'active'], $readContext, self::attachmentTuple($locked));
 
             return $locked;
         }, $context);
@@ -163,7 +165,7 @@ class HsRiskAssessmentService
         return $this->command($assessment, $actor, function ($locked, $current, $reads, $readContext, $sourceProof): HsRiskAssessment {
             $this->requireStatus($locked, [HsRiskAssessment::STATUS_ACTIVE], 'Only active assessments can be marked for review.');
             $this->persistRisk($locked, ['status' => HsRiskAssessment::STATUS_UNDER_REVIEW, 'updated_by' => $current?->id], $reads, $readContext, $sourceProof);
-            $this->audit('risk_assessment.status_changed', $locked, $current, null, ['from' => 'active', 'to' => 'under_review']);
+            $this->audit('risk_assessment.status_changed', $locked, $current, null, ['from' => 'active', 'to' => 'under_review'], $readContext, self::attachmentTuple($locked));
 
             return $locked;
         }, $context);
@@ -184,7 +186,7 @@ class HsRiskAssessmentService
                 'risk_acceptable' => $acceptabilitySubmitted ? $acceptable : $locked->risk_acceptable,
                 'last_review_note' => $note ?? $locked->last_review_note, 'updated_by' => $current?->id,
             ], $reads, $readContext, $sourceProof);
-            $this->audit('risk_assessment.residual_recorded', $locked, $current, $note);
+            $this->audit('risk_assessment.residual_recorded', $locked, $current, $note, [], $readContext, self::attachmentTuple($locked));
 
             return $locked;
         }, $context);
@@ -217,7 +219,7 @@ class HsRiskAssessmentService
             $this->audit('risk_assessment.review_completed', $locked, $current, $data['review_note'], [
                 'from' => 'under_review', 'to' => 'active', 'reviewed_at' => now()->toISOString(),
                 'approved_by_user_id' => $locked->approved_by_user_id, 'approved_at' => $locked->approved_at->toISOString(),
-            ]);
+            ], $readContext, self::attachmentTuple($locked));
 
             return $locked;
         }, $context);
@@ -244,7 +246,7 @@ class HsRiskAssessmentService
             $new = $this->create(['review_frequency_days' => $locked->review_frequency_days, ...$newData, ...$retained], $current, $readContext);
             $previous = $locked->status;
             $this->persistRisk($locked, ['status' => HsRiskAssessment::STATUS_SUPERSEDED, 'superseded_by_id' => $new->id, 'updated_by' => $current?->id], $reads, $readContext, $sourceProof);
-            $this->audit('risk_assessment.status_changed', $locked, $current, null, ['from' => $previous, 'to' => 'superseded', 'successor_id' => $new->id]);
+            $this->audit('risk_assessment.status_changed', $locked, $current, null, ['from' => $previous, 'to' => 'superseded', 'successor_id' => $new->id], $readContext, self::attachmentTuple($locked));
 
             return $new;
         }, $context);
@@ -256,7 +258,7 @@ class HsRiskAssessmentService
             $this->requireMutable($locked);
             $previous = $locked->status;
             $this->persistRisk($locked, ['status' => HsRiskAssessment::STATUS_ARCHIVED, 'updated_by' => $current?->id], $reads, $readContext, $sourceProof);
-            $this->audit('risk_assessment.status_changed', $locked, $current, null, ['from' => $previous, 'to' => 'archived']);
+            $this->audit('risk_assessment.status_changed', $locked, $current, null, ['from' => $previous, 'to' => 'archived'], $readContext, self::attachmentTuple($locked));
 
             return $locked;
         }, $context);
@@ -337,8 +339,30 @@ class HsRiskAssessmentService
         $this->requireStatus($assessment, [HsRiskAssessment::STATUS_DRAFT, HsRiskAssessment::STATUS_ACTIVE, HsRiskAssessment::STATUS_UNDER_REVIEW], 'This assessment is finished. Its recorded details and evidence cannot be changed.');
     }
 
-    public function audit(string $action, HsRiskAssessment $assessment, ?User $actor, ?string $note = null, array $meta = []): void
+    /**
+     * #13 (Stephan, "Build for all RAs", boards 13-1 to 13-3 approved 2 Nov): a change made by a person inside the
+     * command's H&S read context is sealed — RiskAssessmentAcceptanceService writes its audit row and a marker chained
+     * to the one before, in the same save. If the chain doesn't check out the save is refused with a plain message and
+     * the break is logged; an administrator investigates and, if needed, resets it (health-safety:risk-history).
+     * Programmatic changes with no person keep the plain audit row, shown as an older, unsealed entry.
+     *
+     * @param  array{hs_event_id: int|null, assessable_type: string|null, assessable_id: int|null}|null  $beforeAttachment
+     */
+    public function audit(string $action, HsRiskAssessment $assessment, ?User $actor, ?string $note = null, array $meta = [],
+        ?HealthSafetyReadContext $context = null, ?array $beforeAttachment = null): void
     {
+        if ($actor !== null && $context !== null) {
+            try {
+                app(RiskAssessmentAcceptanceService::class)->record((int) $assessment->getKey(), $actor, $context, $action,
+                    $action === 'risk_assessment.created' ? null : ($beforeAttachment ?? self::attachmentTuple($assessment)), $note, $meta);
+            } catch (LogicException $broken) {
+                Log::error('Risk assessment sealed history refused a change', ['assessment_id' => (int) $assessment->getKey(),
+                    'reference' => $assessment->reference_number, 'action' => $action, 'actor_id' => (int) $actor->id, 'problem' => $broken->getMessage()]);
+                abort(409, 'This assessment’s change history needs checking, so it can’t be changed right now. It has been logged for your administrator.');
+            }
+
+            return;
+        }
         $snapshot = $assessment->only(self::SNAPSHOT_FIELDS);
         $snapshot['review_due_at'] = $assessment->review_due_at?->toDateString();
         $auditRequest = clone request();
@@ -397,6 +421,14 @@ class HsRiskAssessmentService
             abort_unless($this->sites->canBypass($actor, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS), 403);
         }
         return $context->reconsumeIncidentPredicate($proof, clone $proof);
+    }
+
+    /** The assessment's attachment as the sealing service records it. */
+    public static function attachmentTuple(HsRiskAssessment $risk): array
+    {
+        return ['hs_event_id' => $risk->getOriginal('hs_event_id') === null ? null : (int) $risk->getOriginal('hs_event_id'),
+            'assessable_type' => $risk->getOriginal('assessable_type'),
+            'assessable_id' => $risk->getOriginal('assessable_id') === null ? null : (int) $risk->getOriginal('assessable_id')];
     }
 
     private function draftFields(array $data): array

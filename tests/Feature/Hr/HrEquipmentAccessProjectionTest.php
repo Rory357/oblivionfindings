@@ -432,7 +432,7 @@ test('canonical staff Device and HR equipment handoffs reauthorise in both direc
     ]);
 
     $this->actingAs($this->viewer)
-        ->get("/security-devices/devices/{$device->id}")
+        ->get("/security-devices/devices/{$device->id}?section=assignments")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('profile.header.location.type', 'staff')
@@ -448,7 +448,7 @@ test('canonical staff Device and HR equipment handoffs reauthorise in both direc
     $this->viewer->unsetRelation('permissionOverrides');
 
     $this->actingAs($this->viewer->fresh())
-        ->get("/security-devices/devices/{$device->id}")
+        ->get("/security-devices/devices/{$device->id}?section=assignments")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('profile.header.location.type', 'staff')

@@ -2,6 +2,9 @@
 
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\CollectorMediaController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\HikvisionDiscoveryController;
+use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubLinuxSetupController;
+use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubRuntimeController;
+use App\Domain\SecurityDevices\Hubs\Http\Controllers\HubSetupRedeemController;
 use App\Http\Controllers\Api\Monitoring\CollectorEnrollmentController;
 use App\Http\Controllers\Api\Monitoring\CollectorRecoverableEnrollmentController;
 use App\Http\Controllers\Api\Monitoring\CollectorSyncController;
@@ -17,8 +20,30 @@ Route::prefix('monitoring/collectors')->name('api.monitoring.collectors.')->grou
         Route::post('media/discovery/results', [HikvisionDiscoveryController::class, 'results'])->name('media.discovery.results');
         Route::post('media/work', [CollectorMediaController::class, 'work'])->name('media.work');
         Route::post('media/results', [CollectorMediaController::class, 'results'])->name('media.results');
+        // S&D Phase G (D5): the hub's terminal poll (lines typed out, what the device sent back in).
+        Route::post('terminal/work', [\App\Domain\SecurityDevices\Terminal\Http\TerminalCollectorController::class, 'work'])->name('terminal.work');
+        // S&D Phase G (pop-up 61): the hub's device web page poll (page requests out, answers in).
+        Route::post('web/work', [\App\Domain\SecurityDevices\WebPages\Http\WebPageController::class, 'hubWork'])->name('web.work');
+        // S&D Phase H (H1): the hub's UniFi Access changes poll (signed changes out, what it did in).
+        Route::post('access/work', [\App\Domain\SecurityDevices\Access\Http\AccessJobsCollectorController::class, 'work'])->name('access.work');
+        // S&D Phase I (pop-up 97): the hub's network checks poll (signed read-only checks out, what it found in).
+        Route::post('network-checks/work', [\App\Domain\SecurityDevices\NetworkChecks\Http\NetworkCheckCollectorController::class, 'work'])->name('network-checks.work');
         Route::post('configuration', [CollectorSyncController::class, 'configuration'])->name('configuration');
         Route::post('observations', [CollectorSyncController::class, 'observations'])->name('observations');
         Route::post('heartbeat', [CollectorSyncController::class, 'heartbeat'])->name('heartbeat');
+        // S&D Phase B: the login-store key, update reports and update downloads.
+        Route::post('vault-key', [HubRuntimeController::class, 'vaultKey'])->name('vault-key');
+        Route::post('update/report', [HubRuntimeController::class, 'updateReport'])->name('update-report');
+        Route::post('update/download', [HubRuntimeController::class, 'updateDownload'])->name('update-download');
+        // Uninstalling a hub tells Oblivion, which stops trusting it (windows tab, E).
+        Route::post('deregister', [HubRuntimeController::class, 'deregister'])->name('deregister');
     });
+
+    // The installer redeems the 8-character code from its file name for its setup profile.
+    // No sign-in exists yet, so it's throttled hard; the hub still waits for approval after.
+    Route::post('setup/redeem', HubSetupRedeemController::class)
+        ->middleware('throttle:10,1')->name('setup.redeem');
+    // The Pi/Linux one-liner downloads its package with the same code.
+    Route::post('setup/package', [HubLinuxSetupController::class, 'package'])
+        ->middleware('throttle:10,1')->name('setup.package');
 });

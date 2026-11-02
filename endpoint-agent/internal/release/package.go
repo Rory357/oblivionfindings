@@ -148,6 +148,23 @@ func Open(filename string, trustedKey ed25519.PublicKey, architecture string, mi
 // It never replaces a file. Every entry is hashed again while being written.
 // On failure the caller owns the incomplete stage; nothing is activated.
 func (p *Package) ExtractNew(directory string) error {
+	return p.extractNew(directory, nil)
+}
+
+// ExtractPartsNew is ExtractNew for some top-level parts only, such as "computer" for Obli
+// installed in one person's profile. Check the result with VerifyExtractedParts.
+func (p *Package) ExtractPartsNew(directory string, parts ...string) error {
+	if len(parts) == 0 {
+		return ErrInvalid
+	}
+	wanted := map[string]bool{}
+	for _, part := range parts {
+		wanted[part] = true
+	}
+	return p.extractNew(directory, wanted)
+}
+
+func (p *Package) extractNew(directory string, parts map[string]bool) error {
 	root, err := os.OpenRoot(directory)
 	if err != nil {
 		return ErrInvalid
@@ -158,6 +175,9 @@ func (p *Package) ExtractNew(directory string) error {
 		return errors.New("release stage must be empty")
 	}
 	for _, record := range p.manifest.Files {
+		if top, _, _ := strings.Cut(record.Path, "/"); parts != nil && !parts[top] {
+			continue
+		}
 		parent := path.Dir(record.Path)
 		if parent != "." {
 			if err = root.MkdirAll(filepath.FromSlash(parent), 0700); err != nil {
@@ -383,5 +403,7 @@ func (p *Package) ExtractTo(target ProtectedTarget) error {
 // All transitive DLLs, source, vendor and licence files must also be inventoried.
 func SiteRuntimeFiles() []string {
 	return []string{"site/oblivion-collector.exe", "site/oblivion-media.exe", "site/runtime/php.exe", "site/bin/oblivion-collector", "site/vendor/autoload.php",
-		"site/runtime/cacert.pem", "site/runtime/ext/php_curl.dll", "site/runtime/ext/php_openssl.dll", "site/runtime/ext/php_sodium.dll", "site/runtime/ext/php_sockets.dll"}
+		"site/runtime/cacert.pem", "site/runtime/ext/php_curl.dll", "site/runtime/ext/php_openssl.dll", "site/runtime/ext/php_sodium.dll", "site/runtime/ext/php_sockets.dll",
+		// Phase A, item A7: SNMP checks on hubs (docs/security-devices/GOAL.md).
+		"site/runtime/ext/php_snmp.dll"}
 }

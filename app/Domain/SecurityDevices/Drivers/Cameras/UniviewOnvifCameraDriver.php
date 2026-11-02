@@ -38,7 +38,7 @@ final class UniviewOnvifCameraDriver extends AbstractOnvifCameraDriver
                 ['label' => 'Uniview Official Support', 'url' => 'https://global.uniview.com/Support/'],
             ],
             limitationsNote: 'Built against ONVIF Profile S/T specifications; ensure camera clock is NTP-synchronised for WS-UsernameToken authentication.',
-            setupHref: '/security-devices/discovery',
+            setupHref: '/security-devices/setup/hubs?tab=networks',
         );
     }
 

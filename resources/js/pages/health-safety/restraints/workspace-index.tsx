@@ -9,6 +9,8 @@
  * current source revision and its review — stays exactly as the records say it.
  */
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { type SharedData } from '@/types';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import {
     RecordIdentity,
@@ -83,6 +85,8 @@ import {
 type EventRow = {
     id: number;
     reference: string;
+    /** Decision 15: the record's own plain title, the same as on its record and its safety review. */
+    title?: string;
     client: { id: number; name: string };
     site: { id: number; name: string } | null;
     restraint_type: string;
@@ -173,6 +177,7 @@ export default function RestraintWorkspaceIndex({
     can,
 }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const origin = restraintReturn(url);
     const [search, setSearch] = useState(filters.q ?? '');
     useEffect(() => setSearch(filters.q ?? ''), [filters.q]);
@@ -241,8 +246,7 @@ export default function RestraintWorkspaceIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
+                ...safetyHubCrumbs('care', safetyCan),
                 { title: 'Restraints', href: RESTRAINT_REGISTER },
             ]}
         >
@@ -495,11 +499,11 @@ function EventTable({
     const columns: RecordTableColumn<EventRow>[] = [
         {
             key: 'person',
-            label: 'Person',
+            label: 'Restraint',
             className: 'min-w-[14rem]',
             cell: (row) => (
                 <RecordIdentity
-                    title={row.client.name}
+                    title={row.title ?? row.client.name}
                     sub={[hsLabel('restraint_type', row.restraint_type), row.site?.name ?? 'Site not recorded', row.reference].join(' · ')}
                 />
             ),
@@ -570,7 +574,7 @@ function EventTable({
             rowKey={(row) => row.id}
             onOpen={onOpen}
             actionsFor={menuFor}
-            menuTitle={(row) => `${row.client.name} · ${row.reference}`}
+            menuTitle={(row) => `${row.title ?? row.client.name} · ${row.reference}`}
             menuIcon={ShieldAlert}
             empty={EMPTY}
             footer={footer}

@@ -229,7 +229,7 @@ describe('Incident response request recovery and confirmation', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
             fireEvent.click(
                 within(screen.getByRole('alertdialog')).getByRole('button', {
-                    name: 'Cancel',
+                    name: 'Keep editing',
                 }),
             );
             expect(onClose).not.toHaveBeenCalled();
@@ -373,7 +373,7 @@ describe('Incident response request recovery and confirmation', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
         fireEvent.click(
             within(screen.getByRole('alertdialog')).getByRole('button', {
-                name: 'Cancel',
+                name: 'Keep editing',
             }),
         );
         expect(onClose).not.toHaveBeenCalled();

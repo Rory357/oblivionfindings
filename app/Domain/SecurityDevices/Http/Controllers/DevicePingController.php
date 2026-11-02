@@ -9,6 +9,7 @@ use App\Domain\Monitoring\Exceptions\EgressDenied;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\CidrMatcher;
 use App\Domain\Monitoring\Services\EgressPolicy;
+use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Http\JsonResponse;
@@ -26,6 +27,7 @@ final class DevicePingController extends Controller
         private readonly CidrMatcher $cidrMatcher,
         private readonly EgressPolicy $egressPolicy,
         private readonly IcmpTransport $icmpTransport,
+        private readonly CoveringHubResolver $hubs,
     ) {}
 
     public function __invoke(Request $request, Device $device): JsonResponse
@@ -120,11 +122,22 @@ final class DevicePingController extends Controller
             ]);
         }
 
+        // S&D Phase B: this one-off ping always runs from the server. When a hub covers the
+        // Site we say so, rather than pretend the hub pinged (hub one-off pings aren't built yet).
+        $hubLabel = null;
         try {
             $siteId = $this->siteResolver->resolve((int) $device->id);
+            $hub = $this->hubs->forSite($siteId);
+            if ($hub !== null) {
+                $hubLabel = in_array((int) $hub->site_id, $this->access->accessibleSiteIds($user), true)
+                    ? CoveringHubResolver::label($hub)
+                    : 'the Site hub';
+            }
         } catch (UnexpectedValueException) {
             $siteId = 1;
         }
+        $path = ['checked_from' => 'server', 'covering_hub' => $hubLabel];
+        $note = $hubLabel === null ? '' : " Checked from the server, not from {$hubLabel}.";
 
         try {
             $authorized = $this->egressPolicy->authoriseDiscovery(
@@ -141,8 +154,9 @@ final class DevicePingController extends Controller
                 'latency_ms' => null,
                 'latency_label' => null,
                 'reason_code' => 'address_blocked',
-                'message' => 'That IP address is reserved or private to the server and cannot be pinged.',
+                'message' => 'That IP address is reserved or private to the server and cannot be pinged.'.$note,
                 'checked_at' => $checkedAt,
+                ...$path,
             ]);
         }
 
@@ -160,8 +174,9 @@ final class DevicePingController extends Controller
                 'latency_ms' => $latencyMs,
                 'latency_label' => $latencyLabel,
                 'reason_code' => 'reply',
-                'message' => "Replied in {$latencyLabel}.",
+                'message' => "Replied in {$latencyLabel}.".$note,
                 'checked_at' => $checkedAt,
+                ...$path,
             ]);
         }
 
@@ -179,8 +194,9 @@ final class DevicePingController extends Controller
             'latency_ms' => null,
             'latency_label' => null,
             'reason_code' => $result->reasonCode,
-            'message' => $message,
+            'message' => $message.$note,
             'checked_at' => $checkedAt,
+            ...$path,
         ]);
     }
 }

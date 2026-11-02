@@ -71,3 +71,37 @@ describe('Report something', () => {
         expect(onWorkflow).toHaveBeenCalledWith('safeguarding');
     });
 });
+
+// Board G4-2 (Stephan, 1 Nov): the one chooser everywhere, with an incident already chosen.
+describe('Report something — board G4-2', () => {
+    it('starts on "A person was hurt, or nearly hurt", says to call 111 first and groups by what happened', () => {
+        page.can = {
+            incidents: { create: true },
+            safeguarding: { create: true },
+            injuries: { report: true },
+            restraints: { report: true },
+        };
+        render(<ReportLauncher open onClose={() => {}} onWorkflow={() => {}} />);
+        expect(screen.getByText('Choose what happened — we’ll open the right form')).toBeInTheDocument();
+        expect(screen.getByText('Someone in danger? Call 111 first, then report.')).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: /A person was hurt, or nearly hurt/ })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('radiogroup', { name: 'Something happened to a person' })).toBeInTheDocument();
+        expect(screen.getByRole('radiogroup', { name: 'Worried about someone' })).toBeInTheDocument();
+        expect(screen.getAllByRole('radio')).toHaveLength(4);
+        expect(screen.getByRole('button', { name: 'Report incident' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('radio', { name: /staff member was hurt at work/ }));
+        expect(screen.getByRole('button', { name: 'Report a workplace injury' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('radio', { name: /movement or freedom was limited/ }));
+        expect(screen.getByRole('button', { name: 'Record a restraint' })).toBeInTheDocument();
+    });
+
+    it('offers an administrator all eight choices', () => {
+        const all = launcherWorkflows({
+            incidents: { create: true },
+            safeguarding: { create: true },
+            hazards: { view: true, create: true, manage: true },
+            restraints: { create: true },
+        } as Parameters<typeof launcherWorkflows>[0]);
+        expect(all).toHaveLength(8);
+    });
+});

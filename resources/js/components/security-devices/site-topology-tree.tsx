@@ -13,7 +13,7 @@ import { deviceCategoryIcon } from '@/pages/security-devices/devices/device-prof
 import type {
     SiteTopologyTree,
     SiteTopologyTreeNode,
-} from '@/pages/security-devices/sites/_types';
+} from '@/components/security-devices/topology-types';
 import { Link } from '@inertiajs/react';
 import {
     ChevronDown,

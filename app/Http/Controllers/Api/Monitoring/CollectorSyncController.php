@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\CollectorConfigurationService;
 use App\Domain\Monitoring\Services\CollectorHealthService;
 use App\Domain\Monitoring\Services\CollectorIngestService;
+use App\Domain\SecurityDevices\Hubs\Services\HubUpdatePolicy;
 use App\Http\Controllers\Controller;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -44,7 +45,7 @@ final class CollectorSyncController extends Controller
         return response()->json($acknowledgement);
     }
 
-    public function heartbeat(Request $request, CollectorHealthService $health): JsonResponse
+    public function heartbeat(Request $request, CollectorHealthService $health, HubUpdatePolicy $updates): JsonResponse
     {
         $status = $request->input('status');
         if (! is_array($status)) {
@@ -60,6 +61,9 @@ final class CollectorSyncController extends Controller
             'status' => $collector->status,
             'acknowledged_source_sequence' => (int) $collector->acknowledged_source_sequence,
             'gap_count' => (int) $collector->gap_count,
+            // S&D Phase B: whether an admin has approved this hub, and what it should update to.
+            'approval' => $collector->approved_at === null ? 'waiting' : 'approved',
+            'update' => $updates->instructionFor($collector),
         ]);
     }
 

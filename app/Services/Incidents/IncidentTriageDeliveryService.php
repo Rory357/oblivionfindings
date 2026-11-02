@@ -196,8 +196,20 @@ final class IncidentTriageDeliveryService
     {
         $attempted = 0; $confirmed = 0; $failed = 0;
         foreach (IncidentTriageDelivery::query()->whereIn('status', ['pending', 'failed'])->where('due_at', '<=', now())->orderBy('due_at')->limit(max(1, min(100, $limit)))->pluck('id') as $id) {
-            try { $confirmed += $this->deliver($id)['confirmed'] ? 1 : 0; } catch (Throwable) { $failed++; } $attempted++;
+            try { $confirmed += $this->deliver($id)['confirmed'] ? 1 : 0; } catch (Throwable $error) {
+                $failed++;
+                IncidentRoutingValues::logFailure('triage.deliver', $error, ['delivery_id' => (string) $id, ...$this->failureIds((string) $id)]);
+            }
+            $attempted++;
         }
         return ['attempted' => $attempted, 'confirmed' => $confirmed, 'failed' => $failed];
+    }
+
+    /** Intent and incident ids for a failed delivery's log line; nulls when the chain itself is missing. */
+    private function failureIds(string $id): array
+    {
+        $row = rescue(fn () => DB::table('incident_triage_deliveries as d')->leftJoin('incident_routing_decisions as r', 'r.id', '=', 'd.decision_id')
+            ->leftJoin('incident_routing_intents as i', 'i.id', '=', 'r.intent_id')->where('d.id', $id)->first(['r.intent_id', 'i.incident_id']), null, false);
+        return ['intent_id' => $row?->intent_id === null ? null : (int) $row->intent_id, 'incident_id' => $row?->incident_id === null ? null : (int) $row->incident_id];
     }
 }

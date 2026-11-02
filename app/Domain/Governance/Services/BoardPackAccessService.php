@@ -13,6 +13,10 @@ use App\Models\User;
 use App\Services\Chat\ChatMessageDelivery;
 use App\Services\ControlRoom\BroadcastRecipientReadContext;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
+use App\Services\HealthSafety\ChemicalExposureNotificationAccessService;
+use App\Services\HealthSafety\HealthSafetyInboxReads;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\WorkerParticipationNotificationReadService;
 use App\Services\Medication\Alerts\MedicationNotificationVisibility;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -219,30 +223,42 @@ final class BoardPackAccessService
      * no implicit opt-in: generic read/acknowledge writes pass nothing and never see
      * typed broadcast notices, even inside an active reader response.
      *
-     * The third argument is reserved for the H&S read context of the H&S rebuild
-     * (not on main yet); on main it must be null.
+     * The two private H&S families show only while their sources prove them:
+     * exposure follow-up notices (#16) inside the H&S read context passed as the
+     * third argument, and worker participation meeting notices (#14) through the
+     * participation reader. HealthSafetyInboxReads opens the context for a viewer
+     * who has either; without it, every private exposure notice stays hidden.
      *
      * @return MorphMany<DatabaseNotification, User>
      */
     public function visibleNotificationQuery(
         User $viewer,
         bool $unreadOnly = false,
-        mixed $healthSafetyContext = null,
+        ?HealthSafetyReadContext $healthSafetyContext = null,
         ?BroadcastRecipientReadContext $broadcastContext = null,
     ): MorphMany {
-        if ($healthSafetyContext !== null) {
-            throw new \LogicException('The H&S read context is not available on this branch.');
+        $query = $unreadOnly
+            ? $viewer->unreadNotifications()
+            : $viewer->notifications();
+
+        // Participation meeting notices: the reader's own evidence is prepared before any other family's metadata read.
+        // A viewer with no participation notice skips the preparation (it opens an H&S read) and only hides the marker.
+        $participation = app(WorkerParticipationNotificationReadService::class);
+        // A viewer this request's doorway already found without any private notice skips the check (a notice written
+        // since is still hidden by the marker below).
+        $participationPrepared = $healthSafetyContext !== null
+            || (! HealthSafetyInboxReads::knownWithoutPrivate($viewer) && HealthSafetyInboxReads::hasParticipationNotices($viewer));
+        if ($participationPrepared) {
+            $participation->prepare($query, $viewer, $healthSafetyContext);
         }
 
         $visiblePacks = $this->visibleQuery($viewer);
+        // The same rule, with its EXISTS subqueries selecting 1 instead of * (notification SQL selects no unneeded columns).
+        self::existsSelectOne($visiblePacks->getQuery());
         $visiblePackIds = (clone $visiblePacks)
             ->select($visiblePacks->getModel()->qualifyColumn('id'));
         $visibleMeetingIds = (clone $visiblePacks)
             ->select($visiblePacks->getModel()->qualifyColumn('governance_meeting_id'));
-
-        $query = $unreadOnly
-            ? $viewer->unreadNotifications()
-            : $viewer->notifications();
 
         if ($broadcastContext === null) {
             $query = app(BroadcastRecipientReadService::class)->exclude($query, $viewer);
@@ -265,8 +281,28 @@ final class BoardPackAccessService
                 });
         });
 
+        // Private exposure follow-ups: hidden unless the H&S context proves each one for this viewer now.
+        $query = app(ChemicalExposureNotificationAccessService::class)->scope($query, $viewer, $healthSafetyContext);
+
+        $query = $participationPrepared
+            ? $participation->scope($query, $viewer, $healthSafetyContext)
+            : $participation->excludePrivate($query);
+
         // The broadcast context intersects last, after every other family's filter.
         return $broadcastContext ? $broadcastContext->scope($query) : $query;
+    }
+
+    /** Make every (NOT) EXISTS subquery select 1 rather than *: identical results, no columns read. */
+    private static function existsSelectOne(\Illuminate\Database\Query\Builder $query): void
+    {
+        foreach ($query->wheres ?? [] as $where) {
+            $sub = $where['query'] ?? null;
+            if (! $sub instanceof \Illuminate\Database\Query\Builder) { continue; }
+            if (in_array($where['type'] ?? null, ['Exists', 'NotExists'], true) && ($sub->columns === null || $sub->columns === ['*'])) {
+                $sub->columns = [new \Illuminate\Database\Query\Expression('1')];
+            }
+            self::existsSelectOne($sub);
+        }
     }
 
     public function scopeAuditVisibility(Builder $query, ?User $viewer): Builder

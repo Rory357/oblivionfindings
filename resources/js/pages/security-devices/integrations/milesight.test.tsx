@@ -215,7 +215,7 @@ describe('Milesight shared integration workspace', () => {
         // The hub crumb uses the sidebar's name for it.
         expect(
             screen.getByRole('link', { name: 'Integrations' }),
-        ).toHaveAttribute('href', '/security-devices/integrations');
+        ).toHaveAttribute('href', '/security-devices/setup/services?tab=connected');
         expect(
             screen.getByRole('heading', {
                 level: 1,

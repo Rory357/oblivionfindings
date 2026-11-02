@@ -26,11 +26,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Tests\Feature\SecurityDevices\Concerns\ReadsRetiredWorkspaceProps;
 use Tests\TestCase;
 
 class AccessControlWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+    use ReadsRetiredWorkspaceProps;
 
     private User $admin;
 
@@ -102,8 +104,7 @@ class AccessControlWorkflowTest extends TestCase
             'unifi:credential/taylor-001',
         );
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($this->admin, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.accessControl.restricted', false)
@@ -324,8 +325,7 @@ class AccessControlWorkflowTest extends TestCase
             'unifi:credential/lifecycle-2',
         );
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($this->admin, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.accessControl.summary.activeCredentials', 1)
@@ -430,8 +430,7 @@ class AccessControlWorkflowTest extends TestCase
         ]);
         $this->accessDeviceAt($site, 'Visible reader');
 
-        $this->actingAs($worker)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($worker, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.inventoryTotal', 1)
@@ -677,8 +676,7 @@ class AccessControlWorkflowTest extends TestCase
             'assigned_at' => now(),
         ]);
 
-        $this->actingAs($manager)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($manager, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.accessControl.summary.activeCredentials', 0)
@@ -690,8 +688,7 @@ class AccessControlWorkflowTest extends TestCase
 
         // Even a role that can see both Sites must not project the moved reader as
         // provider-confirmed coverage for the credential's original Site.
-        $this->actingAs($this->admin)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($this->admin, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.accessControl.summary.activeCredentials', 0)
@@ -848,8 +845,7 @@ class AccessControlWorkflowTest extends TestCase
             'provider_reconciliation_status' => AccessControlCredential::RECONCILIATION_REQUIRED,
             'provider_confirmed' => false,
         ]);
-        $this->actingAs($this->admin)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($this->admin, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.accessControl.summary.activeCredentials', 0)
@@ -889,8 +885,7 @@ class AccessControlWorkflowTest extends TestCase
             DB::statement('SET FOREIGN_KEY_CHECKS=1');
         }
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($this->admin, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.accessControl.summary.activeCredentials', 0)
@@ -1021,8 +1016,7 @@ class AccessControlWorkflowTest extends TestCase
             }
         }
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($this->admin, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.accessControl.schedules.0.providerReconciliation.label', 'Provider reconciliation required')
@@ -1156,8 +1150,7 @@ class AccessControlWorkflowTest extends TestCase
             'auditable_type' => AccessControlCredential::class,
             'auditable_id' => $credential->id,
         ]);
-        $this->actingAs($this->admin)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($this->admin, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.accessControl.history.0.action', 'Provider confirmed credential access'));
@@ -1196,8 +1189,7 @@ class AccessControlWorkflowTest extends TestCase
             'The retained legacy pivot must not remain an application-writable Device relationship.',
         );
 
-        $this->actingAs($this->admin)
-            ->get('/security-devices/security?tab=access-control')
+        $this->retiredWorkspace($this->admin, 'security', 'tab=access-control')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('securityWorkspace.activeTab.accessControl.summary.activeCredentials', 1)

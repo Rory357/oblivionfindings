@@ -456,7 +456,8 @@ it('exposes setup only for enabled computer administrators in the real device pa
     $this->endpointDevice->update(['name' => 'Reception PC', 'device_uid' => 'RECEPTION-01']);
     $this->endpointSite->update(['name' => 'Main office']);
     $this->endpointOperator->update(['name' => 'Development reviewer']);
-    $path = '/security-devices/devices/'.$this->endpointDevice->id;
+    // S&D rebuild C2: "Install Obli" still lives on the old profile (?section=) until Phase I's screen replaces it.
+    $path = '/security-devices/devices/'.$this->endpointDevice->id.'?section=endpoint';
     $response = $this->actingAs($this->endpointOperator)->get($path)->assertOk()
         ->assertInertia(fn ($page) => $page->component('security-devices/devices/show')
             ->where('endpoint_setup.actor_id', $this->endpointOperator->id));

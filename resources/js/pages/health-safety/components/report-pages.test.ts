@@ -18,7 +18,7 @@ describe('reportPageFor', () => {
             '/health-safety/first-aid/report?return_to=%2Fhealth-safety',
         );
         expect(reportPageFor('substance')).toBe('/health-safety/substances/create');
-        expect(reportPageFor('exposure')).toBe('/health-safety/substances?tab=active');
+        expect(reportPageFor('exposure')).toBe('/health-safety/substances?tab=active&record=exposure');
         expect(reportPageFor('safeguarding')).toBe('/safeguarding/create');
     });
 

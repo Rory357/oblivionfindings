@@ -26,7 +26,7 @@ it('keeps the new monitoring delivery boundary single tenant', function () {
 
     expect($runtimeEnvelope->hasProperty('tenantId'))->toBeFalse();
     expect($runtimeFiles)
-        ->toContain($root.'/app/Domain/SecurityDevices/Http/Controllers/MonitoringOperationsController.php')
+        ->toContain($root.'/app/Domain/SecurityDevices/Http/Controllers/MonitoringRuntimeHealthController.php')
         ->toContain($root.'/config/monitoring.php')
         ->toContain($root.'/tests/Feature/Safeguarding/SafeguardingMonitoringTest.php');
 

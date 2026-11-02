@@ -1,17 +1,15 @@
+/**
+ * Devices (S&D rebuild drawings pg-sdr-2, 2a, 2b, 2c, 2d): every device the viewer may see, by
+ * kind. Cards put problems first with each device's reading and last 24 hours; List is rows for
+ * going through many at once. The Cards | List choice is remembered for each person.
+ */
 import {
-    EmptyValue,
-    EntityCardGrid,
-    EntityChip,
     EntityContextMenu,
-    EntityTable,
-    ListCaption,
     useEntityContextMenu,
-    type EntityTableColumn,
     type MenuItem,
 } from '@/components/lists';
 import {
     PageHeader,
-    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -20,627 +18,683 @@ import {
     PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
-    PageHeaderViewToggle,
+    PageLayout,
 } from '@/components/page';
+import { PopupConfirm, PopupSelectionBar } from '@/components/popup';
 import {
-    AddDeviceDialog,
-    useAddDeviceDialogState,
-} from '@/components/security-devices/add-device-dialog';
+    AddDeviceChooser,
+    deviceMenu,
+    DeviceFormPopup,
+    MoveDevices,
+    PingViewer,
+    RetireDevice,
+    useDeviceFormOptions,
+    WatchDevice,
+    type DeviceAction,
+    type PopupDevice,
+} from '@/components/security-devices/device-popups';
+import { QuietTime } from '@/components/security-devices/alert-popups';
+import {
+    BulkActionConfirm,
+    BulkActionsMenu,
+    bulkResultLines,
+    takeBulkResume,
+    type BulkAction,
+    type BulkOptions,
+    type BulkResult,
+} from '@/components/security-devices/bulk-action-popups';
+import { ConnectService } from '@/components/security-devices/connect-service-popup';
+import { iconForKind } from '@/components/security-devices/device-kind-icon';
+import { FirmwareUpdatePopup, type FirmwareUpdate } from '@/components/security-devices/firmware-update-popup';
+import { ScanNetwork, ScanningViewer } from '@/components/security-devices/scan-popups';
+import { QuietLine } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
-import { Head, router, usePage } from '@inertiajs/react';
+import { timedText } from '@/lib/security-devices/device-time';
 import {
-    Activity,
-    AlertTriangle,
-    Cctv,
+    devicesTabLabel,
+    type DevicesTab,
+} from '@/lib/security-devices/device-words';
+import { Head, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
+import {
+    BatteryMedium,
+    BellPlus,
     Cpu,
     Download,
-    Eye,
+    ExternalLink,
+    HardDriveDownload,
     LayoutGrid,
     List,
-    MonitorOff,
+    ListChecks,
+    MoveRight,
     Plus,
-    Shield,
+    Radar,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import {
-    DeviceCard,
-    deviceCategoryLabel,
-    deviceMonitoringLabel,
-    deviceMonitoringVariant,
-    formatTimeSince,
-    type DeviceListItem,
-    type FilterOption,
-    type Paginated,
-} from './shared';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { toast } from 'sonner';
+import { CameraWall } from './_camera-wall';
+import { DeviceCard } from './_device-card';
+import { DEFAULT_LIST_COLUMNS, DevicesList, LIST_COLUMNS } from './_devices-list';
+import { BlockHead, ColumnsMenu, ListPager, useColumns, ViewSwitch } from './_parts';
+import type { DevicesIndexProps } from './_types';
+import { BatteriesView, UPDATE_COLUMNS, UpdatesView } from './_upkeep';
 
-type SavedView = { key: string; label: string; count: number };
-export type DevicesIndexProps = {
-    devices: Paginated<DeviceListItem>;
-    stats: {
-        total: number;
-        active: number;
-        offline: number;
-        attention: number;
-    };
-    savedViews: SavedView[];
-    filters: Record<string, string>;
-    filterOptions: {
-        domains: FilterOption[];
-        categories?: FilterOption[];
-        statuses: FilterOption[];
-        healthStatuses: FilterOption[];
-        providers: string[];
-    };
-    can: { create: boolean; export: boolean; bulk_select: boolean };
-    exportHref: string;
-    scopeLabel?: string | null;
-};
+export type { DevicesIndexProps } from './_types';
 
-export default function DevicesIndex(props: DevicesIndexProps) {
-    const [listView, setListView] = useState<'cards' | 'table'>('cards');
-    const actorId =
-        usePage<{ auth: { user: { id: number } | null } }>().props.auth.user
-            ?.id ?? 0;
-    // Route/authority changes clear selected records and open registration drafts before paint.
-    const identity = JSON.stringify([
-        actorId,
-        props.can,
-        props.scopeLabel,
-        props.filters,
-        props.devices.meta.current_page,
-        props.devices.data.map((device) => device.id),
-    ]);
-    return (
-        <DeviceInventory
-            key={identity}
-            {...props}
-            listView={listView}
-            setListView={setListView}
-        />
-    );
+const BASE = '/security-devices/devices';
+const PREFERENCE = 'security-devices.devices.view';
+const CARDS_PER_GROUP = 8;
+
+type Popup =
+    | { kind: 'chooser' }
+    | { kind: 'add' }
+    | { kind: 'scan' }
+    | { kind: 'scanning'; runId: number }
+    | { kind: 'edit'; device: PopupDevice }
+    | { kind: 'ping'; device: PopupDevice }
+    | { kind: 'watch'; device: PopupDevice }
+    | { kind: 'remove'; device: PopupDevice }
+    | { kind: 'move'; devices: PopupDevice[] }
+    | { kind: 'watch-many'; devices: PopupDevice[] }
+    | { kind: 'connect' }
+    // S&D rebuild C6: a governed action on the ticked devices (the bulk bar's one confirm).
+    | { kind: 'bulk'; action: BulkAction; stepUpCurrent: boolean; ticked: number[] }
+    | null;
+
+function useNow(): Date {
+    const [now, setNow] = useState(() => new Date());
+    useEffect(() => {
+        const timer = window.setInterval(() => setNow(new Date()), 60_000);
+        return () => window.clearInterval(timer);
+    }, []);
+    return now;
 }
 
-function DeviceInventory({
-    devices,
-    stats,
-    savedViews,
-    filters,
-    filterOptions,
-    can,
-    exportHref,
-    scopeLabel,
-    listView,
-    setListView,
-}: DevicesIndexProps & {
-    listView: 'cards' | 'table';
-    setListView: (view: 'cards' | 'table') => void;
-}) {
-    const [search, setSearch] = useState(filters.search ?? '');
-    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+export default function DevicesIndex(props: DevicesIndexProps) {
+    const { tab, layout, upkeep, filters, tabs, meters, can } = props;
+    const now = useNow();
+    const [search, setSearch] = useState(filters.q);
+    const [popup, setPopup] = useState<Popup>(props.openDialog === 'add' ? { kind: 'chooser' } : null);
+    const [selecting, setSelecting] = useState(false);
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+    const [watchingMany, setWatchingMany] = useState(false);
+    const searchTimer = useRef<number | null>(null);
+    const menu = useEntityContextMenu<PopupDevice>();
+    const { form, load } = useDeviceFormOptions();
+    const columns = useColumns('sd.devices.list.columns', LIST_COLUMNS, DEFAULT_LIST_COLUMNS);
+    // S&D Phase G (2d): Upkeep › Updates opens pop-up 62; Quiet time is pop-up 44 for the listed devices.
+    const updateColumns = useColumns('sd.devices.updates.columns', UPDATE_COLUMNS, UPDATE_COLUMNS.map((column) => column.key));
+    const updateMenu = useEntityContextMenu<FirmwareUpdate>();
+    const [update, setUpdate] = useState<FirmwareUpdate | null>(null);
+    const [quietOpen, setQuietOpen] = useState(false);
+    const actorId = (usePage().props as { auth?: { user?: { id?: number } } }).auth?.user?.id;
+    const updateActions = (row: FirmwareUpdate): MenuItem[] => [
+        { label: 'See the update', icon: HardDriveDownload, onClick: () => setUpdate(row) },
+        { label: 'Open device', icon: Cpu, onClick: () => router.visit(row.href) },
+        { label: row.install.label, icon: ExternalLink, onClick: () => window.open(row.install.href, '_blank', 'noopener,noreferrer') },
+    ];
 
-    const addDeviceDialog = useAddDeviceDialogState();
-    const contextMenu = useEntityContextMenu<DeviceListItem>();
-    const canSelect = can.bulk_select && can.export;
-    const pageIds = devices.data.map((device) => device.id);
-    const allPageSelected =
-        pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
-    const somePageSelected = pageIds.some((id) => selectedIds.has(id));
-    const currentView = filters.view || 'all';
-    const hasActiveFilters = Object.entries(filters).some(
-        ([key, value]) =>
-            !['view', 'page', 'site_id'].includes(key) &&
-            Boolean(value) &&
-            value !== 'all',
-    );
-    const applyFilters = (changes: Record<string, string>) => {
-        setSelectedIds(new Set());
-        contextMenu.close();
-        router.get(
-            '/security-devices/devices',
-            { ...filters, ...changes, page: '1' },
-            { preserveState: true },
-        );
+    // A new view clears what was ticked.
+    const group = filters.group ?? 'all';
+    const viewKey = `${tab}|${layout}|${filters.site}|${filters.status}|${group}|${filters.q}`;
+    useEffect(() => {
+        setSelected(new Set());
+        setSelecting(false);
+    }, [viewKey]);
+
+    const params = (changes: Record<string, string | number | undefined>) => {
+        const next: Record<string, string | number | undefined> = {
+            tab: tab === 'all' ? undefined : tab,
+            site: filters.site === 'all' ? undefined : filters.site,
+            status: filters.status === 'all' ? undefined : filters.status,
+            group: group === 'all' ? undefined : group,
+            q: filters.q || undefined,
+            upkeep: tab === 'upkeep' && upkeep === 'updates' ? 'updates' : undefined,
+            ...changes,
+        };
+        return Object.fromEntries(Object.entries(next).filter(([, value]) => value !== undefined && value !== '' && value !== 'all'));
     };
-    const selectMeterView = (changes: Record<string, string>) => {
-        setSelectedIds(new Set());
-        setSearch('');
-        contextMenu.close();
-        router.get(
-            '/security-devices/devices',
+    const go = (changes: Record<string, string | number | undefined>) => {
+        menu.close();
+        router.get(BASE, params({ page: undefined, ...changes }), { preserveState: true, preserveScroll: true });
+    };
+
+    const updateSearch = (value: string) => {
+        setSearch(value);
+        if (searchTimer.current) window.clearTimeout(searchTimer.current);
+        searchTimer.current = window.setTimeout(() => go({ q: value.trim() || undefined }), 350);
+    };
+
+    const switchLayout = (next: 'cards' | 'list') => {
+        if (next === layout) return;
+        router.put(
+            `/settings/ui-preferences/${PREFERENCE}`,
+            { value: [next] },
             {
-                ...(filters.site_id ? { site_id: filters.site_id } : {}),
-                ...changes,
-                page: '1',
+                preserveState: true,
+                preserveScroll: true,
+                only: [],
+                onFinish: () => router.get(BASE, params({}), { preserveState: true, preserveScroll: true }),
             },
-            { preserveState: true },
         );
     };
-    const clearFilters = () => {
-        setSelectedIds(new Set());
-        setSearch('');
-        contextMenu.close();
-        // A chosen Site is the current inventory scope, not a removable search filter.
-        router.get(
-            '/security-devices/devices',
-            filters.site_id ? { site_id: filters.site_id, view: 'all' } : {},
-            { preserveState: true },
-        );
+
+    const open = (next: Popup) => {
+        menu.close();
+        if (next && ['add', 'scan', 'edit', 'watch', 'move', 'watch-many'].includes(next.kind)) load();
+        setPopup(next);
     };
-    const toggleDevice = (id: number, checked: boolean) =>
-        setSelectedIds((current) => {
+    const close = () => setPopup(null);
+
+    const act = (action: DeviceAction, device: PopupDevice) => {
+        if (action === 'ping') open({ kind: 'ping', device });
+        if (action === 'edit') open({ kind: 'edit', device });
+        if (action === 'watch') open({ kind: 'watch', device });
+        if (action === 'move') open({ kind: 'move', devices: [device] });
+        if (action === 'remove') open({ kind: 'remove', device });
+    };
+    const actionsFor = (device: PopupDevice): MenuItem[] => deviceMenu(device, can, act);
+    const contextMenu = (event: MouseEvent, device: PopupDevice) => menu.open(event, device);
+
+    const toggle = (id: number, on: boolean) =>
+        setSelected((current) => {
             const next = new Set(current);
-            if (checked) next.add(id);
+            if (on) next.add(id);
             else next.delete(id);
             return next;
         });
-    const togglePage = (checked: boolean) =>
-        setSelectedIds(checked ? new Set(pageIds) : new Set());
-    const selectedExportHref = useMemo(() => {
-        const [path, query = ''] = exportHref.split('?');
-        const params = new URLSearchParams(query);
-        params.set(
-            'ids',
-            Array.from(selectedIds)
-                .sort((a, b) => a - b)
-                .join(','),
-        );
-        return `${path}?${params}`;
-    }, [exportHref, selectedIds]);
-    const actionsFor = (device: DeviceListItem): MenuItem[] => [
-        {
-            label: 'Open device',
-            icon: Eye,
-            onClick: () =>
-                router.visit(`/security-devices/devices/${device.id}`),
-        },
-        ...(canSelect
-            ? [
-                  {
-                      label: selectedIds.has(device.id)
-                          ? 'Deselect device'
-                          : 'Select device',
-                      icon: List,
-                      onClick: () =>
-                          toggleDevice(device.id, !selectedIds.has(device.id)),
-                  },
-              ]
-            : []),
-    ];
-    const columns: EntityTableColumn<DeviceListItem>[] = [
-        {
-            key: 'status',
-            label: 'Status',
-            width: '110px',
-            cell: (device) => <StatusBadge status={device.status} />,
-        },
-        {
-            key: 'health',
-            label: 'Health',
-            width: '130px',
-            cell: (device) => (
-                <StatusBadge
-                    status={device.health_status}
-                    label={
-                        device.health_status === 'not_monitored'
-                            ? 'Not monitored'
-                            : undefined
-                    }
-                />
-            ),
-        },
-        {
-            key: 'type',
-            label: 'Equipment',
-            width: '1fr',
-            cell: (device) => (
-                <EntityChip>{deviceCategoryLabel(device.category)}</EntityChip>
-            ),
-        },
-        {
-            key: 'monitoring',
-            label: 'Monitoring',
-            width: '140px',
-            cell: (device) =>
-                device.monitoring_state ? (
-                    <StatusBadge
-                        variant={deviceMonitoringVariant(
-                            device.monitoring_state,
-                        )}
-                        status={device.monitoring_state}
-                        label={deviceMonitoringLabel(device.monitoring_state)}
-                    />
-                ) : (
-                    <EmptyValue />
-                ),
-        },
-        {
-            key: 'assignment',
-            label: 'Assigned to',
-            width: '1fr',
-            cell: (device) => device.assigned_to || <EmptyValue />,
-        },
-        {
-            key: 'seen',
-            label: 'Last seen',
-            width: '130px',
-            cell: (device) => (
-                <span
-                    title={
-                        device.last_seen_at
-                            ? formatDateTime(device.last_seen_at)
-                            : undefined
-                    }
-                >
-                    {formatTimeSince(device.last_seen_at)}
-                </span>
-            ),
-        },
-    ];
-    const filter = (key: string, label: string, options: FilterOption[]) => (
-        <PageHeaderFilterSelect
-            key={key}
-            label={label}
-            value={filters[key] || 'all'}
-            onChange={(value) => applyFilters({ [key]: value })}
+
+    const visibleDevices: PopupDevice[] = useMemo(() => {
+        if (props.list) return props.list.rows;
+        if (props.cards) return props.cards.groups.flatMap((group) => group.items);
+        return [];
+    }, [props.list, props.cards]);
+    const selectedDevices = visibleDevices.filter((device) => selected.has(device.id));
+    const canSelect = (can.watch || can.move || !!can.commands) && (props.cards !== null || props.list !== null);
+    const tickedIds = useMemo(() => [...selected], [selected]);
+
+    // Back from "Confirm it’s you": the same devices ticked and the same action's confirm open.
+    const resumed = useRef(false);
+    useEffect(() => {
+        if (resumed.current) return;
+        resumed.current = true;
+        const resume = takeBulkResume();
+        if (!resume || !can.commands) return;
+        setSelecting(true);
+        setSelected(new Set(resume.ids));
+        if (!resume.action) return;
+        axios
+            .get<BulkOptions>('/security-devices/devices/bulk-actions', { params: { ids: resume.ids }, headers: { Accept: 'application/json' } })
+            .then(({ data }) => {
+                const action = data.actions.find((candidate) => candidate.key === resume.action);
+                if (action) setPopup({ kind: 'bulk', action, stepUpCurrent: data.step_up_current, ticked: resume.ids });
+            })
+            .catch(() => toast.warning('Couldn’t reopen the action. Choose it again from Run action.'));
+    }, [can.commands]);
+
+    const finishBulk = (result: BulkResult) => {
+        close();
+        setSelected(new Set());
+        const lines = bulkResultLines(result);
+        if (lines.done) toast.success(lines.done);
+        if (lines.warning) toast.warning(lines.warning);
+        router.reload();
+    };
+
+    const watchMany = async (devices: PopupDevice[]) => {
+        setWatchingMany(true);
+        let started = 0;
+        const skipped: string[] = [];
+        for (const device of devices) {
+            if (!device.address || !device.site_id) {
+                skipped.push(device.name);
+                continue;
+            }
+            try {
+                await axios.post(`${BASE}/${device.id}/offline-alert`, { enabled: true }, { headers: { Accept: 'application/json' } });
+                started += 1;
+            } catch {
+                skipped.push(device.name);
+            }
+        }
+        setWatchingMany(false);
+        close();
+        setSelected(new Set());
+        if (started > 0) toast.success(`Watching ${started} ${started === 1 ? 'device' : 'devices'}.`);
+        if (skipped.length > 0) toast.warning(`Not watched: ${skipped.join(', ')}. Each needs a Site and an address.`);
+        router.reload();
+    };
+
+    const tabTitle = tab === 'all' ? 'All devices' : devicesTabLabel[tab];
+    const layoutSwitch = (
+        <ViewSwitch<'cards' | 'list'>
+            label="Show devices as"
+            value={layout}
+            onChange={switchLayout}
             options={[
-                { value: 'all', label: `All ${label.toLowerCase()}` },
-                ...options.filter((option) => option.value !== 'all'),
+                { value: 'cards', label: 'Cards', icon: LayoutGrid },
+                { value: 'list', label: 'List', icon: List },
             ]}
         />
     );
+    const selectButton = canSelect ? (
+        <Button type="button" variant="outline" size="sm" aria-pressed={selecting} onClick={() => {
+            setSelecting((current) => !current);
+            setSelected(new Set());
+        }}>
+            {selecting ? 'Done' : 'Select'}
+        </Button>
+    ) : null;
+
+    const header = (
+        <PageHeader
+            icon={Cpu}
+            title="Devices"
+            subline="Everything Oblivion watches at your Sites, by kind"
+            actions={
+                <>
+                    <PageHeaderSearch value={search} onChange={updateSearch} placeholder="Search devices" />
+                    {can.export ? (
+                        // pg-sdr-18b: today's Reports CSVs live here now (the device list and the upkeep log).
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <PageHeaderGlassButton icon={Download}>Export</PageHeaderGlassButton>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                    <a href="/security-devices/exports/devices.csv" download>
+                                        Device list (CSV)
+                                    </a>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <a href="/security-devices/exports/upkeep.csv" download>
+                                        Upkeep log (CSV)
+                                    </a>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
+                    {can.scan ? (
+                        <PageHeaderGlassButton icon={Radar} onClick={() => open({ kind: 'scan' })}>
+                            Scan network
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {can.add || can.scan || can.connect ? (
+                        <PageHeaderPrimaryButton icon={Plus} onClick={() => open({ kind: 'chooser' })}>
+                            Add device
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock label="Online" tone="success" onClick={() => go({ status: 'online', tab: undefined })} ariaLabel="Show online devices">
+                        <PageHeaderMeterBig>{meters.online.count}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>{timedText(meters.online.caption, now)}</PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock label="Offline" tone={meters.offline.count > 0 ? 'critical' : 'brand'} onClick={() => go({ status: 'offline', tab: undefined })} ariaLabel="Show offline devices">
+                        <PageHeaderMeterBig>{meters.offline.count}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>{timedText(meters.offline.caption, now)}</PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock label="Can’t check" onClick={() => go({ status: 'cant_check', tab: undefined })} ariaLabel="Show devices that can’t be checked">
+                        <PageHeaderMeterBig>{meters.cant_check.count}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>{timedText(meters.cant_check.caption, now)}</PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock label="Batteries low" tone={meters.batteries_low.count > 0 ? 'warning' : 'brand'} onClick={() => go({ tab: 'upkeep', upkeep: undefined, status: undefined })} ariaLabel="Show batteries">
+                        <PageHeaderMeterBig>{meters.batteries_low.count}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>{timedText(meters.batteries_low.caption, now)}</PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect label="All Sites" value={filters.site} options={props.sites} onChange={(value) => go({ site: value })} />
+                    <PageHeaderFilterSelect label="Any status" value={filters.status} options={props.statuses} onChange={(value) => go({ status: value })} />
+                    {props.groups && props.groups.length > 0 ? (
+                        <PageHeaderFilterSelect label="Any group" value={group} options={props.groups} onChange={(value) => go({ group: value })} />
+                    ) : null}
+                </>
+            }
+            rail={
+                <PageHeaderRail<DevicesTab>
+                    ariaLabel="Kinds of device"
+                    items={tabs.map((item) => ({
+                        key: item.key,
+                        label: devicesTabLabel[item.key],
+                        count: item.count ?? undefined,
+                    }))}
+                    value={tab}
+                    onSelect={(key) => go({ tab: key === 'all' ? undefined : key, upkeep: undefined })}
+                />
+            }
+        />
+    );
+
+    let body: ReactNode = null;
+    if (props.batteries || props.updates) {
+        const upkeepSwitch = (
+            <ViewSwitch<'batteries' | 'updates'>
+                label="Upkeep view"
+                value={upkeep}
+                onChange={(value) => go({ tab: 'upkeep', upkeep: value === 'updates' ? 'updates' : undefined })}
+                options={[
+                    { value: 'batteries', label: 'Batteries', icon: BatteryMedium },
+                    { value: 'updates', label: 'Updates', icon: HardDriveDownload },
+                ]}
+            />
+        );
+        body = props.batteries ? (
+            <BatteriesView
+                data={props.batteries}
+                now={now}
+                head={<BlockHead title="Batteries" sub="Lowest first · from each device’s latest report" right={upkeepSwitch} />}
+                actionsFor={(row) => actionsFor({ id: row.id, name: row.name, sub: row.model, kind: row.kind })}
+                onContextMenu={(event, row) => contextMenu(event, { id: row.id, name: row.name, sub: row.model, kind: row.kind })}
+                onPage={(page) => go({ tab: 'upkeep', page })}
+            />
+        ) : props.updates ? (
+            <UpdatesView
+                data={props.updates}
+                shown={updateColumns.shown}
+                now={now}
+                onOpen={(row) => setUpdate(row)}
+                actionsFor={updateActions}
+                onContextMenu={(event, row) => updateMenu.open(event, row)}
+                head={
+                    <BlockHead
+                        title="Updates ready"
+                        sub="Newer software from the maker · Oblivion shows them, you update in the maker’s app"
+                        right={
+                            <>
+                                {upkeepSwitch}
+                                <ColumnsMenu all={UPDATE_COLUMNS} shown={updateColumns.shown} onToggle={updateColumns.toggle} />
+                                {props.updates.can.quiet_time && props.updates.rows.some((row) => row.site_id !== null) ? (
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setQuietOpen(true)}>
+                                        Quiet time
+                                    </Button>
+                                ) : null}
+                            </>
+                        }
+                    />
+                }
+            />
+        ) : null;
+    } else if (props.cameras) {
+        body = (
+            <CameraWall
+                items={props.cameras.items}
+                cantCheck={props.cameras.cant_check}
+                now={now}
+                head={<BlockHead title="Cameras" sub="Each camera and how it’s doing · open one to watch live" right={layoutSwitch} />}
+            />
+        );
+    } else if (props.list) {
+        body = (
+            <section className="overflow-hidden rounded-[14px] border border-border bg-card shadow-sm">
+                <div className="border-b border-border px-4 py-3.5">
+                    <BlockHead
+                        title={tabTitle}
+                        sub="Problems first, then by name"
+                        right={
+                            <>
+                                {layoutSwitch}
+                                <ColumnsMenu all={LIST_COLUMNS} shown={columns.shown} onToggle={columns.toggle} />
+                                {selectButton}
+                            </>
+                        }
+                    />
+                </div>
+                {props.list.rows.length === 0 ? (
+                    <p className="text-subtle px-4 py-6">
+                        {filters.q || filters.status !== 'all' || group !== 'all' ? 'No devices match. Try another search, status or group.' : 'No devices here yet.'}
+                    </p>
+                ) : (
+                    <DevicesList
+                        rows={props.list.rows}
+                        shown={columns.shown}
+                        actionsFor={actionsFor}
+                        onOpen={(row) => router.visit(row.href)}
+                        onContextMenu={contextMenu}
+                        selectable={selecting}
+                        selected={selected}
+                        onToggle={(row, on) => toggle(row.id, on)}
+                        now={now}
+                    />
+                )}
+                <ListPager meta={props.list.meta} noun="devices" onPage={(page) => go({ page })} />
+            </section>
+        );
+    } else if (props.cards) {
+        const { groups, not_watched: notWatched } = props.cards;
+        const nothing = groups.every((group) => group.count === 0);
+        body = (
+            <div className="flex flex-col gap-5">
+                <BlockHead title={tabTitle} sub="Problems first · each card shows its last 24 hours" right={<>{layoutSwitch}{selectButton}</>} />
+                {nothing && notWatched.count === 0 ? (
+                    <QuietLine
+                        text={filters.q || filters.status !== 'all' || group !== 'all' ? 'No devices match. Try another search, status or group.' : 'No devices here yet.'}
+                        action={can.add || can.scan ? { label: 'Add device', onClick: () => open({ kind: 'chooser' }) } : null}
+                    />
+                ) : null}
+                {groups
+                    .filter((group) => group.count > 0)
+                    .map((group) => {
+                        const showAll = expanded[group.key] ?? false;
+                        const items = showAll ? group.items : group.items.slice(0, CARDS_PER_GROUP);
+                        return (
+                            <section key={group.key} aria-label={group.title} className="flex flex-col gap-3">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                    <span
+                                        aria-hidden="true"
+                                        className={group.key === 'attention' ? 'size-2.5 rounded-full bg-status-critical' : 'size-2.5 rounded-full bg-status-success'}
+                                    />
+                                    <h3 className="text-sm font-[650]">{group.title}</h3>
+                                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums">{group.count}</span>
+                                    {group.sub ? <span className="text-subtle">{group.sub}</span> : null}
+                                    {group.items.length > CARDS_PER_GROUP ? (
+                                        <Button
+                                            type="button"
+                                            variant="link"
+                                            className="ml-auto h-auto p-0"
+                                            onClick={() => setExpanded((current) => ({ ...current, [group.key]: !showAll }))}
+                                        >
+                                            {showAll ? 'Show fewer' : `Show all ${group.count}`}
+                                        </Button>
+                                    ) : null}
+                                </div>
+                                <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))]">
+                                    {items.map((device) => (
+                                        <DeviceCard
+                                            key={device.id}
+                                            device={device}
+                                            actions={actionsFor(device)}
+                                            onOpen={() => router.visit(device.href)}
+                                            onContextMenu={(event) => contextMenu(event, device)}
+                                            selectable={selecting}
+                                            selected={selected.has(device.id)}
+                                            onToggle={(on) => toggle(device.id, on)}
+                                            now={now}
+                                        />
+                                    ))}
+                                </div>
+                                {showAll && group.truncated ? (
+                                    <p className="text-subtle">
+                                        Showing the first {group.items.length}.{' '}
+                                        <Button type="button" variant="link" className="h-auto p-0" onClick={() => switchLayout('list')}>
+                                            See them all in the list
+                                        </Button>
+                                    </p>
+                                ) : null}
+                            </section>
+                        );
+                    })}
+                {notWatched.count > 0 ? (
+                    <QuietLine
+                        text={
+                            <>
+                                <b className="font-semibold">{notWatched.count} not watched:</b> {notWatched.names.join(', ')}
+                                {notWatched.count > notWatched.names.length ? ` and ${notWatched.count - notWatched.names.length} more` : ''} · no
+                                alerts for {notWatched.count === 1 ? 'it' : 'them'}
+                            </>
+                        }
+                        action={{
+                            label: 'Show',
+                            onClick: () =>
+                                router.put(
+                                    `/settings/ui-preferences/${PREFERENCE}`,
+                                    { value: ['list'] },
+                                    { only: [], preserveState: true, onFinish: () => go({ status: 'not_watched' }) },
+                                ),
+                        }}
+                    />
+                ) : null}
+            </div>
+        );
+    }
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Security & Devices', href: '/security-devices' },
-                { title: 'All devices', href: '/security-devices/devices' },
+                { title: 'Security & devices', href: '/security-devices' },
+                { title: 'Devices', href: BASE },
             ]}
         >
-            <Head title="All devices - Security & Devices" />
-            <div className="space-y-5">
-                <PageHeader
-                    icon={Cctv}
-                    title="All devices"
-                    subline={
-                        scopeLabel
-                            ? `${scopeLabel} · equipment and monitoring`
-                            : 'Equipment, assignment and monitoring'
-                    }
-                    mobileSummary={`${devices.meta.total} matching devices`}
-                    actions={
-                        <>
-                            <PageHeaderSearch
-                                value={search}
-                                onChange={setSearch}
-                                placeholder="Search devices…"
-                                ariaLabel="Search devices"
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter')
-                                        applyFilters({ search });
-                                }}
-                            />
-                            {can.export ? (
-                                <PageHeaderGlassButton asChild>
-                                    <a
-                                        href={exportHref}
-                                        title="Export the full inventory available to your account"
-                                    >
-                                        <Download className="size-4" />
-                                        Export inventory
-                                    </a>
-                                </PageHeaderGlassButton>
+            <Head title="Devices" />
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {selecting ? (
+                        <PopupSelectionBar count={selected.size} noun="device" onClear={() => setSelected(new Set())}>
+                            {can.watch ? (
+                                <Button type="button" variant="outline" onClick={() => open({ kind: 'watch-many', devices: selectedDevices })}>
+                                    <BellPlus className="size-4" />
+                                    Watch them
+                                </Button>
                             ) : null}
-                            {can.create ? (
-                                <PageHeaderPrimaryButton
-                                    onClick={addDeviceDialog.openDialog}
-                                >
-                                    <Plus className="size-4" />
-                                    Register device
-                                </PageHeaderPrimaryButton>
+                            {can.move ? (
+                                <Button type="button" variant="outline" onClick={() => open({ kind: 'move', devices: selectedDevices })}>
+                                    <MoveRight className="size-4" />
+                                    Move to Site
+                                </Button>
                             ) : null}
-                        </>
-                    }
-                    meters={
-                        <>
-                            <PageHeaderMeterBlock
-                                label="Devices"
-                                onClick={() => selectMeterView({ view: 'all' })}
-                            >
-                                <PageHeaderMeterBig>
-                                    {stats.total}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Inventory in your scope
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Active"
-                                tone="success"
-                                onClick={() =>
-                                    selectMeterView({
-                                        view: 'all',
-                                        status: 'active',
-                                    })
-                                }
-                            >
-                                <PageHeaderMeterBig>
-                                    {stats.active}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Active equipment
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Offline"
-                                tone={stats.offline > 0 ? 'critical' : 'brand'}
-                                onClick={() =>
-                                    selectMeterView({ view: 'offline' })
-                                }
-                            >
-                                <PageHeaderMeterBig>
-                                    {stats.offline}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Review lost contact
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Needs attention"
-                                tone={stats.attention > 0 ? 'warning' : 'brand'}
-                                onClick={() =>
-                                    selectMeterView({ view: 'needs_attention' })
-                                }
-                            >
-                                <PageHeaderMeterBig>
-                                    {stats.attention}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Review current findings
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                        </>
-                    }
-                    filters={
-                        <>
-                            {filter('domain', 'Domains', filterOptions.domains)}
-                            {filterOptions.categories &&
-                            filterOptions.categories.length > 0
-                                ? filter(
-                                      'category',
-                                      'Types',
-                                      filterOptions.categories,
-                                  )
-                                : null}
-                            {filter(
-                                'status',
-                                'Statuses',
-                                filterOptions.statuses,
-                            )}
-                            {filter(
-                                'health',
-                                'Health states',
-                                filterOptions.healthStatuses,
-                            )}
-                            {filterOptions.providers.length > 0
-                                ? filter(
-                                      'provider',
-                                      'Providers',
-                                      filterOptions.providers.map(
-                                          (provider) => ({
-                                              value: provider,
-                                              label: provider,
-                                          }),
-                                      ),
-                                  )
-                                : null}
-                            {filter('assigned', 'Assignments', [
-                                { value: 'yes', label: 'Assigned' },
-                                { value: 'no', label: 'Unassigned' },
-                            ])}
-                            {hasActiveFilters || currentView !== 'all' ? (
-                                <PageHeaderFilterButton onClick={clearFilters}>
-                                    Clear filters
-                                </PageHeaderFilterButton>
-                            ) : null}
-                            <PageHeaderViewToggle
-                                value={listView}
-                                onChange={setListView}
-                                options={[
-                                    {
-                                        value: 'cards',
-                                        label: 'Cards',
-                                        icon: LayoutGrid,
-                                    },
-                                    {
-                                        value: 'table',
-                                        label: 'Table',
-                                        icon: List,
-                                    },
-                                ]}
-                            />
-                        </>
-                    }
-                    rail={
-                        <PageHeaderRail
-                            items={savedViews
-                                .filter(
-                                    (view) =>
-                                        view.count > 0 ||
-                                        view.key === 'all' ||
-                                        view.key === currentView,
-                                )
-                                .map((view) => ({
-                                    ...view,
-                                    icon:
-                                        view.key === 'offline'
-                                            ? MonitorOff
-                                            : view.key === 'needs_attention'
-                                              ? AlertTriangle
-                                              : Activity,
-                                }))}
-                            value={currentView}
-                            onSelect={(view) => applyFilters({ view })}
-                            ariaLabel="Saved device views"
-                        />
-                    }
-                />
-                <ListCaption
-                    title={
-                        savedViews.find((view) => view.key === currentView)
-                            ?.label ?? 'Devices'
-                    }
-                    caption={`${devices.data.length} of ${devices.meta.total} shown`}
-                    right={
-                        canSelect && devices.data.length > 0 ? (
-                            <>
-                                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                                    <Checkbox
-                                        aria-label="Select this page"
-                                        checked={
-                                            allPageSelected
-                                                ? true
-                                                : somePageSelected
-                                                  ? 'indeterminate'
-                                                  : false
-                                        }
-                                        onCheckedChange={(checked) =>
-                                            togglePage(checked === true)
-                                        }
-                                    />
-                                    Select this page
-                                </label>
-                                <span
-                                    className="text-caption"
-                                    aria-live="polite"
-                                >
-                                    {selectedIds.size} selected
-                                </span>
-                                {selectedIds.size > 0 ? (
-                                    <Button asChild size="sm">
-                                        <a href={selectedExportHref}>
-                                            <Download className="size-4" />
-                                            Export selected
-                                        </a>
-                                    </Button>
-                                ) : (
-                                    <Button size="sm" disabled>
-                                        <Download className="size-4" />
-                                        Export selected
-                                    </Button>
-                                )}
-                            </>
-                        ) : undefined
-                    }
-                />
-                {devices.data.length > 0 ? (
-                    listView === 'cards' ? (
-                        <EntityCardGrid>
-                            {devices.data.map((device) => (
-                                <DeviceCard
-                                    key={device.id}
-                                    device={device}
-                                    selection={
-                                        canSelect
-                                            ? {
-                                                  checked: selectedIds.has(
-                                                      device.id,
-                                                  ),
-                                                  label: `Select ${device.name}`,
-                                                  onToggle: (checked) =>
-                                                      toggleDevice(
-                                                          device.id,
-                                                          checked,
-                                                      ),
-                                              }
-                                            : undefined
+                            {can.commands && selected.size >= 2 ? (
+                                <BulkActionsMenu
+                                    ids={tickedIds}
+                                    onChoose={(action: BulkAction, options: BulkOptions) =>
+                                        open({ kind: 'bulk', action, stepUpCurrent: options.step_up_current, ticked: tickedIds })
                                     }
-                                    actions={actionsFor(device)}
                                 />
-                            ))}
-                        </EntityCardGrid>
-                    ) : (
-                        <EntityTable
-                            rows={devices.data}
-                            rowKey={(device) => device.id}
-                            identityLabel="Device"
-                            identityWidth="2fr"
-                            identity={(device) => ({
-                                icon: Cpu,
-                                name: device.name,
-                                subline: device.device_uid,
-                            })}
-                            columns={columns}
-                            onOpen={(device) =>
-                                router.visit(
-                                    `/security-devices/devices/${device.id}`,
-                                )
-                            }
-                            actionsFor={actionsFor}
-                            hrefFor={(device) =>
-                                `/security-devices/devices/${device.id}`
-                            }
-                            selection={
-                                canSelect
-                                    ? {
-                                          keys: selectedIds,
-                                          onToggle: (device, checked) =>
-                                              toggleDevice(device.id, checked),
-                                          labelFor: (device) =>
-                                              `Select ${device.name}`,
-                                      }
-                                    : undefined
-                            }
-                            onRowContextMenu={contextMenu.open}
-                        />
-                    )
-                ) : hasActiveFilters || currentView !== 'all' ? (
-                    <EmptySearch
-                        onClear={clearFilters}
-                        searchTerm={filters.search}
-                    />
-                ) : (
-                    <EmptyList
-                        icon={Shield}
-                        itemName="device"
-                        onCreate={
-                            can.create ? addDeviceDialog.openDialog : undefined
-                        }
-                        createLabel={can.create ? 'Register device' : undefined}
-                    />
-                )}
-                <LaravelPagination
-                    links={devices.links}
-                    lastPage={devices.meta.last_page}
+                            ) : null}
+                            {can.export && selectedDevices.length > 0 ? (
+                                <Button variant="outline" asChild>
+                                    <a href={`/security-devices/exports/devices.csv?ids=${selectedDevices.map((device) => device.id).join(',')}`} download>
+                                        <Download className="size-4" />
+                                        Export
+                                    </a>
+                                </Button>
+                            ) : null}
+                        </PopupSelectionBar>
+                    ) : null}
+                    {body}
+                </div>
+            </PageLayout>
+
+            {menu.ctx ? (
+                <EntityContextMenu
+                    x={menu.ctx.x}
+                    y={menu.ctx.y}
+                    icon={iconForKind(menu.ctx.record.kind ?? 'other')}
+                    title={menu.ctx.record.name}
+                    items={actionsFor(menu.ctx.record)}
+                    onClose={menu.close}
                 />
-                {contextMenu.ctx ? (
-                    <EntityContextMenu
-                        x={contextMenu.ctx.x}
-                        y={contextMenu.ctx.y}
-                        title={contextMenu.ctx.record.name}
-                        icon={Cpu}
-                        items={actionsFor(contextMenu.ctx.record)}
-                        onClose={contextMenu.close}
-                    />
-                ) : null}
-                {can.create ? (
-                    <AddDeviceDialog
-                        open={addDeviceDialog.open}
-                        onClose={addDeviceDialog.closeDialog}
-                        prefillDomain={
-                            filters.domain && filters.domain !== 'all'
-                                ? filters.domain
-                                : ''
-                        }
-                    />
-                ) : null}
-            </div>
+            ) : null}
+
+            {updateMenu.ctx ? (
+                <EntityContextMenu
+                    x={updateMenu.ctx.x}
+                    y={updateMenu.ctx.y}
+                    icon={iconForKind(updateMenu.ctx.record.kind)}
+                    title={updateMenu.ctx.record.name}
+                    items={updateActions(updateMenu.ctx.record)}
+                    onClose={updateMenu.close}
+                />
+            ) : null}
+            <FirmwareUpdatePopup open={update !== null} update={update} onClose={() => setUpdate(null)} now={now} />
+            {props.updates?.can.quiet_time ? (
+                <QuietTime
+                    open={quietOpen}
+                    devices={props.updates.rows
+                        .filter((row) => row.site_id !== null)
+                        .map((row) => ({ id: row.id, name: row.name, site_id: row.site_id as number, site: row.where ?? '', kind: row.kind, domain: row.domain }))}
+                    devicesFailed={false}
+                    loadDevices={() => undefined}
+                    actorId={actorId}
+                    onClose={() => {
+                        setQuietOpen(false);
+                        router.reload({ only: ['updates'] });
+                    }}
+                />
+            ) : null}
+
+            <AddDeviceChooser
+                open={popup?.kind === 'chooser'}
+                can={can}
+                onClose={close}
+                onChoose={(choice) => open(choice === 'scan' ? { kind: 'scan' } : { kind: 'add' })}
+                onConnect={() => open({ kind: 'connect' })}
+            />
+            {can.connect ? <ConnectService open={popup?.kind === 'connect'} onClose={close} onChanged={() => router.reload({ except: ['deviceForm'] })} /> : null}
+            <DeviceFormPopup open={popup?.kind === 'add'} mode="add" form={form} canAssign={can.assign} onClose={close} />
+            <DeviceFormPopup
+                open={popup?.kind === 'edit'}
+                mode="edit"
+                deviceId={popup?.kind === 'edit' ? popup.device.id : null}
+                context={popup?.kind === 'edit' ? popup.device : null}
+                form={form}
+                canAssign={can.assign}
+                onClose={close}
+            />
+            <ScanNetwork
+                open={popup?.kind === 'scan'}
+                form={form}
+                initialSiteId={filters.site === 'all' ? null : Number(filters.site)}
+                onClose={close}
+                onStarted={(runId) => setPopup({ kind: 'scanning', runId })}
+            />
+            <ScanningViewer open={popup?.kind === 'scanning'} runId={popup?.kind === 'scanning' ? popup.runId : null} canStop={can.scan} onClose={close} />
+            <PingViewer open={popup?.kind === 'ping'} device={popup?.kind === 'ping' ? popup.device : null} onClose={close} />
+            <WatchDevice open={popup?.kind === 'watch'} device={popup?.kind === 'watch' ? popup.device : null} form={form} onClose={close} />
+            <RetireDevice open={popup?.kind === 'remove'} device={popup?.kind === 'remove' ? popup.device : null} onClose={close} />
+            <MoveDevices open={popup?.kind === 'move'} devices={popup?.kind === 'move' ? popup.devices : []} form={form} onClose={close} />
+            {can.commands ? (
+                <BulkActionConfirm
+                    open={popup?.kind === 'bulk'}
+                    action={popup?.kind === 'bulk' ? popup.action : null}
+                    ticked={popup?.kind === 'bulk' ? popup.ticked : []}
+                    stepUpCurrent={popup?.kind === 'bulk' ? popup.stepUpCurrent : false}
+                    onClose={close}
+                    onDone={finishBulk}
+                />
+            ) : null}
+            <PopupConfirm
+                open={popup?.kind === 'watch-many'}
+                onClose={close}
+                onConfirm={() => popup?.kind === 'watch-many' && watchMany(popup.devices)}
+                icon={ListChecks}
+                title={`Watch ${popup?.kind === 'watch-many' ? popup.devices.length : 0} devices?`}
+                description={
+                    form
+                        ? `We’ll check each one is online ${form.watch.every.toLowerCase()} and alert after ${form.watch.after}. Devices without a Site or an address are skipped.`
+                        : 'We’ll check each one is online with the standard offline check. Devices without a Site or an address are skipped.'
+                }
+                confirmLabel="Start watching"
+                processing={watchingMany}
+                processingLabel="Starting…"
+            />
         </AppLayout>
     );
 }

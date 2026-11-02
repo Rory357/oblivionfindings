@@ -18,7 +18,7 @@ class RestraintEvent extends Model
 
     public const REFERENCE_PREFIX = 'RST';
 
-    public const LEGACY_FACTUAL_FIELDS = ['started_at', 'ended_at', 'duration_minutes', 'restraint_type', 'severity', 'trigger_description', 'de_escalation_attempted', 'restraint_description', 'staff_involved', 'person_response', 'post_incident_support', 'injury_occurred', 'injury_details', 'within_support_plan', 'deviation_reason', 'authorised_by', 'behaviour_support_plan_id', 'related_incident_id'];
+    public const LEGACY_FACTUAL_FIELDS = ['started_at', 'ended_at', 'duration_minutes', 'restraint_type', 'summary', 'severity', 'trigger_description', 'de_escalation_attempted', 'restraint_description', 'staff_involved', 'person_response', 'post_incident_support', 'injury_occurred', 'injury_details', 'within_support_plan', 'deviation_reason', 'authorised_by', 'behaviour_support_plan_id', 'related_incident_id'];
 
     protected $fillable = [
         'lock_version', 'source_revision', 'source_schema_version', 'creation_key', 'creation_fingerprint',
@@ -34,6 +34,7 @@ class RestraintEvent extends Model
         'ended_at',
         'duration_minutes',
         'restraint_type',
+        'summary',
         'severity',
         'trigger_description',
         'de_escalation_attempted',

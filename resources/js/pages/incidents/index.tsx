@@ -11,6 +11,13 @@ import {
     SafetyWorkspaceRail,
 } from '@/components/health-safety/workspace-header';
 import {
+    FRONTLINE_VIEWS,
+    FrontlineIncidentTable,
+    FrontlineNumbers,
+    type FrontlineCounts,
+    type FrontlineIncidentRow,
+} from '@/components/incidents/frontline-incidents';
+import {
     IncidentDetailDialog,
     incidentWorksafe,
     type IncidentDetail,
@@ -133,6 +140,7 @@ export type IncidentRow = {
         site: string | null;
     } | null;
     reporter: { name: string } | null;
+    reported_by_me?: boolean;
 };
 
 export type FollowupRow = {
@@ -176,6 +184,8 @@ type Props = {
     filters: Filters;
     tab: string;
     tabCounts: Record<string, number>;
+    /** G4-4: set only for frontline readers (assigned clients only): her four status words. */
+    frontline?: FrontlineCounts | null;
     rows: Paginated<IncidentRow | FollowupRow>;
     rowsKind: 'incidents' | 'followups';
     hero: {
@@ -269,7 +279,7 @@ export default function IncidentsIndex(props: Props) {
             <AppLayout
                 breadcrumbs={[
                     { title: 'Home', href: '/dashboard' },
-                    { title: 'Health & safety', href: '/health-safety' },
+                    { title: 'Health and safety', href: '/health-safety' },
                     { title: 'Incidents', href: '/incidents' },
                 ]}
             >
@@ -316,6 +326,7 @@ function CurrentActorIncidentsIndex({
     filters,
     tab,
     tabCounts,
+    frontline,
     rows,
     rowsKind,
     hero,
@@ -485,7 +496,10 @@ function CurrentActorIncidentsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                // G4-4: plain text for someone who can't open the Overview.
+                frontline
+                    ? { title: 'Health and safety' }
+                    : { title: 'Health and safety', href: '/health-safety' },
                 { title: 'Incidents', href: '/incidents' },
             ]}
         >
@@ -496,7 +510,11 @@ function CurrentActorIncidentsIndex({
                         title="Incidents"
                         icon={ShieldAlert}
                         wrapTitle
-                        subline="Report incidents and follow them through until they’re closed"
+                        subline={
+                            frontline
+                                ? 'Incidents for the people you support'
+                                : 'Report incidents and follow them through until they’re closed'
+                        }
                         actions={
                             <>
                                 <SafetyRegisterSearch
@@ -505,7 +523,7 @@ function CurrentActorIncidentsIndex({
                                     onSearch={(q) => go({ q })}
                                     placeholder="Search incidents"
                                 />
-                                {can.templatesManage && (
+                                {!frontline && can.templatesManage && (
                                     <PageHeaderGlassButton
                                         onClick={() =>
                                             router.visit('/incidents/templates')
@@ -514,7 +532,7 @@ function CurrentActorIncidentsIndex({
                                         Templates
                                     </PageHeaderGlassButton>
                                 )}
-                                {(can.create || can.reportSafeguarding) && (
+                                {!frontline && (can.create || can.reportSafeguarding) && (
                                     <ReportLauncher
                                         open={launcherOpen}
                                         onOpenChange={setLauncherOpen}
@@ -531,6 +549,9 @@ function CurrentActorIncidentsIndex({
                             </>
                         }
                         strip={
+                            frontline ? (
+                                <FrontlineNumbers counts={frontline} tab={tab} onTab={setTab} />
+                            ) : (
                             <PageHeaderNumbers>
                                 <PageHeaderNumber
                                     label="Reported · 30 days"
@@ -584,8 +605,29 @@ function CurrentActorIncidentsIndex({
                                     />
                                 ) : null}
                             </PageHeaderNumbers>
+                            )
                         }
                         filters={
+                            frontline ? (
+                                <>
+                                    {sites?.length ? (
+                                        <EntityFilter
+                                            label="Site"
+                                            allLabel="All my sites"
+                                            items={sites}
+                                            value={filters.site_id}
+                                            onChange={(id) => go({ site_id: id })}
+                                            onDark
+                                        />
+                                    ) : null}
+                                    <SafetyDateFilter from={filters.from} to={filters.to} onChange={go} />
+                                    {hasFilters && (
+                                        <PageHeaderFilterButton icon={X} onClick={clearFilters}>
+                                            Clear filters
+                                        </PageHeaderFilterButton>
+                                    )}
+                                </>
+                            ) : (
                             <>
                                 {sites?.length ? (
                                     <EntityFilter
@@ -635,6 +677,7 @@ function CurrentActorIncidentsIndex({
                                     </PageHeaderFilterButton>
                                 )}
                             </>
+                            )
                         }
                         rail={
                             <SafetyWorkspaceRail
@@ -646,9 +689,9 @@ function CurrentActorIncidentsIndex({
                 }
                 tabs={
                     <TierTwoTabs
-                        tabs={views}
-                        activeTab={activeView}
-                        onTab={selectView}
+                        tabs={frontline ? FRONTLINE_VIEWS : views}
+                        activeTab={frontline ? tab : activeView}
+                        onTab={frontline ? setTab : selectView}
                         testIdPrefix="incident-register"
                         ariaLabel="Incident views"
                         panelId="incident-register-panel"
@@ -666,7 +709,14 @@ function CurrentActorIncidentsIndex({
                     }
                     className="grid min-w-0 gap-5"
                 >
-                    {needsOwnerView ? (
+                    {frontline ? (
+                        <FrontlineIncidentTable
+                            rows={incidentRows as FrontlineIncidentRow[]}
+                            onOpen={openDetail}
+                            finishHref={(id) => incidentWorkspaceHref(id, registerUrl)}
+                            footer={pager}
+                        />
+                    ) : needsOwnerView ? (
                         <NeedsOwnerQueue
                             rows={incidentRows}
                             detail={detail}

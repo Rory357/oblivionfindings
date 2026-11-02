@@ -65,6 +65,13 @@ final class CctvCollectorBroker
 
                     continue;
                 }
+                // S&D Phase E: the hub closes a live view once the camera's privacy hours begin.
+                if (app(CameraPrivacy::class)->active((int) $session->camera_id)) {
+                    app(CctvSessions::class)->end($session, 'revoked', CameraPrivacy::REFUSAL);
+                    $operations[] = $this->close($session);
+
+                    continue;
+                }
                 if (! $cap['available'] || config('cctv.enabled') !== true || ($session->provider === 'hikvision' && ($cap['hikvision_profile'] ?? null) !== HikvisionSourcePolicy::PROFILE)) {
                     app(CctvSessions::class)->end($session, 'failed', 'worker_unavailable');
                     $operations[] = $this->close($session);

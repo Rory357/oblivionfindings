@@ -16,7 +16,6 @@ final class ChemicalExposureRecoveryConcurrencyTest extends ChemicalExposureReco
     protected bool $physicalCommits = true;
     public function test_same_uuid_same_actor_root_replay_converges_one_case_review_receipt(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Legacy exposure association recovery (ChemicalExposureAssociationRecoveryService, ChemicalExposureRecoveryEvidenceService) has no route or caller, so nobody can run a recovery review or attach its basis today. The two race workers stop before the barrier (the worker hides its diagnostics by design; inferred to be the unmounted recovery path).', 'Mount legacy exposure association recovery with its routes (with the decision on unconfirmed legacy exposures).'));
         $root = $this->legacy(); $v = $this->reviewInput();
         $results = $this->race([[$this->manager->id, $root->id, $v], [$this->manager->id, $root->id, $v]], 'start');
         $this->assertSame(['accepted', 'accepted'], array_column($results, 'status')); $this->assertSame($results[0]['receipt'], $results[1]['receipt']);
@@ -25,7 +24,6 @@ final class ChemicalExposureRecoveryConcurrencyTest extends ChemicalExposureReco
     }
     public function test_different_uuid_same_original_row_lock_serializes_one_first_review_and_stale_loser(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Legacy exposure association recovery (ChemicalExposureAssociationRecoveryService, ChemicalExposureRecoveryEvidenceService) has no route or caller, so nobody can run a recovery review or attach its basis today. The two race workers stop before the barrier (the worker hides its diagnostics by design; inferred to be the unmounted recovery path).', 'Mount legacy exposure association recovery with its routes (with the decision on unconfirmed legacy exposures).'));
         $root = $this->legacy(); $other = $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view']);
         $results = $this->race([[$this->manager->id, $root->id, $this->reviewInput()], [$other->id, $root->id, $this->reviewInput()]], 'start');
         $this->assertSame(['accepted', 'rejected'], collect($results)->pluck('status')->sort()->values()->all());
@@ -34,7 +32,6 @@ final class ChemicalExposureRecoveryConcurrencyTest extends ChemicalExposureReco
     }
     public function test_real_absent_global_uuid_different_actor_root_first_claim_arbitrates_single_case_without_absent_key_lock(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Legacy exposure association recovery (ChemicalExposureAssociationRecoveryService, ChemicalExposureRecoveryEvidenceService) has no route or caller, so nobody can run a recovery review or attach its basis today. The two race workers stop before the barrier (the worker hides its diagnostics by design; inferred to be the unmounted recovery path).', 'Mount legacy exposure association recovery with its routes (with the decision on unconfirmed legacy exposures).'));
         $first = $this->legacy(); $second = $this->legacy(); $other = $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view']);
         $key = (string) Str::uuid(); $v = $this->reviewInput([], 0, $key);
         $this->assertFalse(ChemicalCommandIntent::where('idempotency_key', $key)->exists());
@@ -49,7 +46,8 @@ final class ChemicalExposureRecoveryConcurrencyTest extends ChemicalExposureReco
         $this->assertSame(0, DB::transactionLevel()); $this->assertSame('mysql', DB::connection()->getDriverName());
         // Child processes write to this database: only ever a disposable test database (this repo's per-process
         // test database or Codex's oblivion_hs_ ones), never a real one.
-        $this->assertMatchesRegularExpression('/^(oblivion_hs_|oblivion_findings_codex_test_\d+$)/', DB::connection()->getDatabaseName());
+        // Parallel lanes name theirs oblivion_findings_codex_test_<run>_<n>.
+        $this->assertMatchesRegularExpression('/^(oblivion_hs_|oblivion_findings_codex_test_(?:[a-z0-9]+_)?\d+$)/', DB::connection()->getDatabaseName());
         $prefix = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-chemical-recovery-race-'.Str::uuid(); $go = $prefix.'-go'; $processes = []; $signals = [];
         try {
             foreach ($jobs as $index => [$actor, $source, $values]) {

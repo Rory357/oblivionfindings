@@ -202,11 +202,30 @@ class SiteHazardController extends Controller
             self::SITE_BYPASS_PERMISSIONS,
         );
 
+        // G4-14 (board approved 1 Nov 2026): the one lead block — open hazards with no owner or past their due date
+        // (oldest due date first), then open ones nobody has started — and what was closed in the last 30 days.
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $needsSomeone = fn (Builder $q) => $q->whereIn('status', ['open', 'in_progress'])
+            ->where(fn (Builder $w) => $w->whereNull('assigned_to_user_id')->orWhere('due_date', '<', $today));
+        $leadRows = $needsSomeone($base())->with(['site:id,name,type', 'assignedTo:id,name', 'reportedBy:id,name'])
+            ->orderByRaw('due_date IS NULL')->orderBy('due_date')->orderBy('id')->limit(4)->get()
+            ->concat($base()->where('status', 'open')->whereNotNull('assigned_to_user_id')
+                ->where(fn (Builder $w) => $w->whereNull('due_date')->orWhere('due_date', '>=', $today))
+                ->with(['site:id,name,type', 'assignedTo:id,name', 'reportedBy:id,name'])->orderBy('created_at')->orderBy('id')->limit(4)->get())
+            ->take(4)->map(fn (SiteHazard $h) => $this->buildRow($h))->values()->all();
+        $register = [
+            'lead' => $leadRows,
+            'lead_total' => $needsSomeone($base())->count() + $base()->where('status', 'open')->whereNotNull('assigned_to_user_id')
+                ->where(fn (Builder $w) => $w->whereNull('due_date')->orWhere('due_date', '>=', $today))->count(),
+            'closed_30d' => $base()->where('status', 'closed')->where('closed_at', '>=', now()->subDays(30))->count(),
+        ];
+
         return [
             'hazards' => $hazards,
             'tab' => $tab,
             'tabCounts' => $tabCounts,
             'hero' => $hero,
+            'register_summary' => $register,
             'filters' => $request->only([
                 'q', 'site_id', 'site_type', 'severity', 'risk_rating',
                 'assignee_id', 'due_state', 'tab', 'from', 'to',

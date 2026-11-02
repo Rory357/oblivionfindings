@@ -1,12 +1,24 @@
 /**
- * Emergency drills (approved H&S drawings pg-hsn-65, 65b — Stephan 23 Oct
- * 2026): one header with four filter chips, the drill views as a tier-two
- * strip, the planning form above the register when scheduling, then every
- * drill by name with where it is up to as the record's stages (scheduled,
- * run, completed, findings resolved) and the follow-up tally.
+ * Emergency drills (board G4-12, approved by Stephan 1 Nov 2026): the G2 header — four boxes, then one line with the
+ * Risks and prevention pages, the site filter, the period and Find — and the drill views as tier-two tabs (the bar
+ * stays under the picked tab, decision 8). Then one lead block ("Needs doing now": overdue planned drills and overdue
+ * things to fix, most overdue first, only the first button filled), the quiet rows beside it, and every drill with
+ * "Where it's up to" as the shared stage cell (a status chip and who does it). "Plan a drill" is the kit's 720 pop-up
+ * with the approved calendar and clock pickers.
  */
 import { DrillPlanningForm } from '@/components/health-safety/drills/drill-planning-form';
 import type { DrillPickers } from '@/components/health-safety/drills/types';
+import {
+    LeadBlock,
+    QuietRows,
+    RegisterBlocks,
+    RegisterBoxes,
+    RegisterMoreFilters,
+    RegisterRailLine,
+    overdueNote,
+    shortDay,
+    type LeadRow,
+} from '@/components/health-safety/register-kit';
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import {
     RecordIdentity,
@@ -27,8 +39,7 @@ import {
     TierTwoTabs,
     type GroupedProfileNavTab,
 } from '@/components/page/grouped-profile-nav';
-import { Ring, StageDots, Surface, Tally } from '@/components/signature/blocks';
-import { Button } from '@/components/ui/button';
+import { Ring } from '@/components/signature/blocks';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
@@ -36,37 +47,54 @@ import {
     useSafetyWorkspaceDrafts,
 } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatTime, toDateInput } from '@/lib/datetime';
+import { formatDate, toDateInput } from '@/lib/datetime';
 import {
     DRILL_REGISTER,
     drillHref,
     drillReturn,
 } from '@/lib/health-safety/drill-navigation';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import {
     DRILL_TYPE_OPTIONS,
-    drillStage,
+    drillWhereUpTo,
     outcomeMeta,
+    typeMeta,
     type DrillFilters,
     type DrillHero,
     type DrillRow,
 } from '@/pages/health-safety/drills/shared';
+import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    AlarmClock,
-    CalendarClock,
+    AlertTriangle,
+    BarChart3,
+    CalendarDays,
     CheckCircle2,
-    ClipboardList,
+    Clock,
     Copy,
     Eye,
+    FileText,
+    Home,
     LayoutList,
-    Play,
     Plus,
+    RefreshCw,
     Siren,
     X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Row = DrillRow & { attended_count: number; href: string };
+
+/** G4-12: the header counts and the lead block for the selected Site, whatever the period or view. */
+export type DrillLeadRow =
+    | { kind: 'drill'; id: number; title: string; site: string | null; site_id: number | null; due: string | null; last_run_at: string | null }
+    | { kind: 'finding'; id: number; drill_id: number; title: string | null; site: string | null; drill_type: string | null; drill_on: string | null; owner: string | null; due: string | null };
+export type DrillRegisterSummary = {
+    boxes: { things_to_fix_overdue: number; evacuation_reviews_due: number; drills_run_90d: number; sites_drilled_90d: number };
+    lead: DrillLeadRow[];
+    more_overdue: { count: number; sites: string[] };
+};
+
 type Props = {
     drills: {
         data: Row[];
@@ -83,6 +111,7 @@ type Props = {
     pickers: DrillPickers;
     can: { manage: boolean; schedule: boolean };
     exports: { register_href: string };
+    register_summary?: DrillRegisterSummary;
 };
 
 const VIEWS: {
@@ -91,16 +120,56 @@ const VIEWS: {
     icon: GroupedProfileNavTab['icon'];
 }[] = [
     { key: 'all', label: 'All', icon: LayoutList },
-    { key: 'scheduled', label: 'Scheduled', icon: CalendarClock },
-    { key: 'overdue', label: 'Overdue', icon: AlarmClock },
-    { key: 'in_progress', label: 'In progress', icon: Play },
+    { key: 'scheduled', label: 'Planned', icon: CalendarDays },
+    { key: 'overdue', label: 'Overdue', icon: Clock },
+    { key: 'in_progress', label: 'In progress', icon: RefreshCw },
     { key: 'completed', label: 'Completed', icon: CheckCircle2 },
-    { key: 'findings', label: 'Findings open', icon: ClipboardList },
+    { key: 'findings', label: 'Things to fix', icon: AlertTriangle },
 ];
 
-/** "Thu 22 Oct 2026" — the drill's day, on the worker's NZ calendar. */
+const PERIODS = [
+    { value: '30d', label: 'last 30 days' },
+    { value: 'quarter', label: 'last 90 days' },
+    { value: '6mo', label: 'last 6 months' },
+    { value: 'all', label: 'any time' },
+];
+
+/** "Thu 12 Nov" — a drill's day on the worker's NZ calendar ("Due 14 Jul" while it's overdue). */
 function drillDay(iso: string): string {
-    return `${formatDate(iso)} ${toDateInput(iso).slice(0, 4)}`;
+    const day = toDateInput(iso);
+    const weekday = new Date(`${day}T00:00:00Z`).toLocaleDateString('en-NZ', { weekday: 'short', timeZone: 'UTC' });
+    return `${weekday} ${formatDate(iso)}`;
+}
+
+/** The lead block's rows (G4-12): overdue planned drills and overdue things to fix, oldest due date first. */
+export function drillLeadRows(
+    rows: DrillLeadRow[],
+    options: { canPlan: boolean; returnTo: string; onPlan: (siteId: number | null) => void },
+): LeadRow[] {
+    return rows.map((row): LeadRow => {
+        if (row.kind === 'finding') {
+            const title = row.title ?? 'Thing to fix';
+            const drill = row.drill_type ? typeMeta(row.drill_type === 'fire' ? 'fire_evacuation' : row.drill_type).label.toLowerCase() : null;
+            return {
+                key: `finding-${row.id}`,
+                when: row.due ? { day: shortDay(row.due), note: overdueNote(row.due) } : null,
+                title,
+                sub: [row.site, drill ? `from the ${drill} drill${row.drill_on ? ` on ${shortDay(row.drill_on)}` : ''}` : null, row.owner ? `owner ${row.owner}` : 'No owner yet']
+                    .filter(Boolean).join(' · '),
+                chip: { label: 'Thing to fix overdue', tone: 'critical' },
+                action: { label: 'Open', href: drillHref(row.drill_id, { section: 'findings', returnTo: options.returnTo }), ariaLabel: `Open: ${title}` },
+            };
+        }
+        return {
+            key: `drill-${row.id}`,
+            when: row.due ? { day: shortDay(row.due), note: overdueNote(row.due) } : null,
+            title: row.title,
+            sub: [row.site, row.last_run_at ? `not run since ${shortDay(toDateInput(row.last_run_at))}` : 'no drill run yet'].filter(Boolean).join(' · '),
+            chip: { label: 'Overdue', tone: 'critical' },
+            action: options.canPlan ? { label: 'Plan a drill', onClick: () => options.onPlan(row.site_id), ariaLabel: `Plan a drill: ${row.title}` } : null,
+            who: options.canPlan ? null : 'Health and safety plan it',
+        };
+    });
 }
 
 export default function DrillsIndex({
@@ -108,26 +177,21 @@ export default function DrillsIndex({
     filters,
     tab,
     tabCounts,
-    hero,
     pickers,
     can,
     exports,
+    register_summary: summary,
 }: Props) {
     const { url } = usePage();
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const returnTo = drillReturn(url);
     const drafts = useSafetyWorkspaceDrafts();
-    const creationPanel = useRef<HTMLDivElement>(null);
     const [search, setSearch] = useState(filters.q ?? '');
+    const [planSite, setPlanSite] = useState<number | null>(null);
     const [creating, setCreating] = useState(
         new URLSearchParams(url.split('?')[1]).get('schedule') === '1' &&
             can.schedule,
     );
-    useEffect(() => {
-        if (creating) {
-            creationPanel.current?.focus();
-            creationPanel.current?.scrollIntoView({ block: 'nearest' });
-        }
-    }, [creating]);
     useEffect(() => setSearch(filters.q ?? ''), [filters.q]);
     useEffect(
         () =>
@@ -149,7 +213,13 @@ export default function DrillsIndex({
             preserveScroll: true,
             replace: true,
         });
-    const openCreation = () =>
+    // Header and quiet-row links keep the Site only, as the header counts do.
+    const siteLink = (next: Record<string, string> = {}) => {
+        const query = new URLSearchParams(next);
+        if (filters.site_id) query.set('site_id', String(filters.site_id));
+        return DRILL_REGISTER + (query.size ? `?${query}` : '');
+    };
+    const openCreation = (siteId: number | null = null) =>
         drafts.request(() =>
             router.replace({
                 url:
@@ -158,18 +228,19 @@ export default function DrillsIndex({
                     'schedule=1',
                 preserveState: true,
                 preserveScroll: true,
-                onSuccess: () => setCreating(true),
+                onSuccess: () => {
+                    setPlanSite(siteId);
+                    setCreating(true);
+                },
             }),
         );
     const closeCreation = () =>
-        drafts.request(() =>
-            router.replace({
-                url: returnTo,
-                preserveState: true,
-                preserveScroll: true,
-                onSuccess: () => setCreating(false),
-            }),
-        );
+        router.replace({
+            url: returnTo,
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => setCreating(false),
+        });
     const views: GroupedProfileNavTab[] = VIEWS.map((view) => ({
         key: view.key,
         label: view.label,
@@ -190,8 +261,8 @@ export default function DrillsIndex({
         compactMenu([
             { label: 'Open drill', icon: Eye, onClick: () => open(row) },
             {
-                label: 'Open findings',
-                icon: ClipboardList,
+                label: 'Open things to fix',
+                icon: AlertTriangle,
                 onClick: () => open(row, 'findings'),
             },
             { separator: true },
@@ -239,35 +310,23 @@ export default function DrillsIndex({
             label: 'Date',
             nowrap: true,
             cell: (row) =>
-                row.scheduled_at ? (
-                    <RecordIdentity
-                        title={drillDay(row.scheduled_at)}
-                        sub={formatTime(row.scheduled_at)}
-                    />
-                ) : (
-                    <span className="text-muted-foreground">Not recorded</span>
-                ),
+                row.scheduled_at
+                    ? row.status === 'overdue'
+                        ? `Due ${formatDate(row.scheduled_at)}`
+                        : drillDay(row.scheduled_at)
+                    : <span className="text-muted-foreground">Not recorded</span>,
         },
         {
             key: 'stage',
             label: 'Where it’s up to',
             nowrap: true,
             cell: (row) => {
-                const stage = drillStage({
-                    status: row.status,
-                    findings_open: row.findings_open,
-                    finding_overdue: row.flags.finding_overdue,
-                });
-                return stage ? (
-                    <StageDots
-                        stage={stage.stage}
-                        of={4}
-                        label={stage.label}
-                        note={stage.note}
-                        tone={stage.tone}
-                    />
-                ) : (
-                    <StatusBadge variant="neutral">Cancelled</StatusBadge>
+                const stage = drillWhereUpTo(row, (iso) => shortDay(toDateInput(iso)));
+                return (
+                    <span className="inline-grid justify-items-start gap-1">
+                        <StatusBadge variant={stage.tone}>{stage.label}</StatusBadge>
+                        {stage.who ? <span className="text-caption">{stage.who}</span> : null}
+                    </span>
                 );
             },
         },
@@ -290,38 +349,29 @@ export default function DrillsIndex({
             key: 'attendance',
             label: 'Attendance',
             nowrap: true,
-            cell: (row) => (
-                <RecordIdentity
-                    title={`${row.attended_count} confirmed`}
-                    sub={`${row.participants_count} assigned`}
-                />
-            ),
+            cell: (row) =>
+                row.raw_status === 'completed' || row.attended_count > 0
+                    ? `${row.attended_count} confirmed`
+                    : <span className="text-muted-foreground">—</span>,
         },
         {
             key: 'findings',
-            label: 'Findings',
+            label: 'Things to fix',
             nowrap: true,
             cell: (row) => (
                 <Link
                     href={drillHref(row.id, { section: 'findings', returnTo })}
                     onClick={(event) => event.stopPropagation()}
-                    aria-label={`${row.findings_open} open findings for ${row.reference}${row.flags.finding_overdue ? ', overdue work' : ''}`}
+                    aria-label={`${row.findings_open} things to fix for ${row.reference}${row.flags.finding_overdue ? ', overdue' : ''}`}
                     className="rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                     {row.findings_open > 0 ? (
-                        <StatusBadge
-                            variant={
-                                row.flags.finding_overdue
-                                    ? 'critical'
-                                    : 'warning'
-                            }
-                        >
-                            {row.findings_open} open
-                            {row.flags.finding_overdue ? ' · overdue work' : ''}
+                        <StatusBadge variant={row.flags.finding_overdue ? 'critical' : 'warning'}>
+                            {row.flags.finding_overdue ? `${row.findings_open} · overdue` : `${row.findings_open} open`}
                         </StatusBadge>
                     ) : (
                         <span className="text-foreground underline-offset-4 hover:underline">
-                            0 open
+                            None
                         </span>
                     )}
                 </Link>
@@ -332,7 +382,9 @@ export default function DrillsIndex({
     const pager = (
         <>
             <p className="text-subtle">
-                Showing {drills.data.length} of {drills.total}
+                {drills.total
+                    ? `Showing ${drills.from ?? 1}–${drills.to ?? drills.data.length} of ${drills.total}`
+                    : 'Showing 0 of 0'}
             </p>
             {drills.last_page > 1 ? (
                 <LaravelPagination
@@ -343,12 +395,17 @@ export default function DrillsIndex({
             ) : null}
         </>
     );
+    const lead = summary
+        ? drillLeadRows(summary.lead, { canPlan: can.schedule, returnTo, onPlan: (siteId) => openCreation(siteId) })
+        : [];
+    const more = summary?.more_overdue;
+    const period = PERIODS.find((item) => item.value === filters.period) ?? PERIODS[2];
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                ...safetyHubCrumbs('prevention', safetyCan),
                 { title: 'Emergency drills', href: DRILL_REGISTER },
             ]}
         >
@@ -360,7 +417,7 @@ export default function DrillsIndex({
                             wrapTitle
                             icon={Siren}
                             title="Emergency drills"
-                            subline="Plan drills, record what happened and follow through on findings"
+                            subline="Plan drills, record how they went and fix what they find"
                             actions={
                                 <>
                                     <PageHeaderSearch
@@ -383,117 +440,84 @@ export default function DrillsIndex({
                                     {can.schedule && (
                                         <PageHeaderPrimaryButton
                                             icon={Plus}
-                                            onClick={openCreation}
+                                            onClick={() => openCreation()}
                                         >
-                                            Schedule drill
+                                            Plan a drill
                                         </PageHeaderPrimaryButton>
                                     )}
                                 </>
                             }
-                            filters={
-                                <>
-                                    <PageHeaderFilterSelect
-                                        label="All sites"
-                                        allValue=""
-                                        value={
-                                            filters.site_id
-                                                ? String(filters.site_id)
-                                                : ''
-                                        }
-                                        onChange={(value) =>
-                                            go({
-                                                site_id: value
-                                                    ? Number(value)
-                                                    : null,
-                                            })
-                                        }
-                                        options={[
-                                            { value: '', label: 'All sites' },
-                                            ...pickers.sites.map((site) => ({
-                                                value: String(site.id),
-                                                label: site.name,
-                                            })),
+                            strip={
+                                summary ? (
+                                    <RegisterBoxes
+                                        boxes={[
+                                            { key: 'things_to_fix_overdue', label: 'Things to fix overdue', value: summary.boxes.things_to_fix_overdue, alert: true, icon: Clock, href: siteLink({ tab: 'findings', period: 'all' }) },
+                                            { key: 'evacuation_reviews_due', label: 'Evacuation-scheme reviews due', value: summary.boxes.evacuation_reviews_due, icon: FileText, href: siteLink() },
+                                            { key: 'drills_run_90d', label: 'Drills run · last 90 days', value: summary.boxes.drills_run_90d, icon: CheckCircle2, href: siteLink({ tab: 'completed', period: 'quarter' }) },
+                                            { key: 'sites_drilled_90d', label: 'Sites with a drill · last 90 days', value: summary.boxes.sites_drilled_90d, icon: Home, href: siteLink({ tab: 'completed', period: 'quarter' }) },
                                         ]}
                                     />
-                                    <PageHeaderFilterSelect
-                                        label="6 months"
-                                        allValue="6mo"
-                                        value={filters.period}
-                                        onChange={(value) =>
-                                            go({ period: value })
-                                        }
-                                        options={[
-                                            { value: '30d', label: '30 days' },
-                                            {
-                                                value: 'quarter',
-                                                label: 'Quarter',
-                                            },
-                                            { value: '6mo', label: '6 months' },
-                                            {
-                                                value: 'all',
-                                                label: 'All dates',
-                                            },
-                                        ]}
-                                    />
-                                    <PageHeaderFilterSelect
-                                        label="All drill types"
-                                        allValue=""
-                                        value={filters.drill_type ?? ''}
-                                        onChange={(value) =>
-                                            go({ drill_type: value || null })
-                                        }
-                                        options={[
-                                            {
-                                                value: '',
-                                                label: 'All drill types',
-                                            },
-                                            ...DRILL_TYPE_OPTIONS,
-                                        ]}
-                                    />
-                                    <PageHeaderFilterSelect
-                                        label="All outcomes"
-                                        allValue=""
-                                        value={filters.outcome ?? ''}
-                                        onChange={(value) =>
-                                            go({ outcome: value || null })
-                                        }
-                                        options={[
-                                            {
-                                                value: '',
-                                                label: 'All outcomes',
-                                            },
-                                            ...pickers.outcomes.map(
-                                                (value) => ({
-                                                    value,
-                                                    label:
-                                                        outcomeMeta(value)
-                                                            ?.label ?? value,
-                                                }),
-                                            ),
-                                        ]}
-                                    />
-                                    {filtered && (
-                                        <PageHeaderFilterButton
-                                            icon={X}
-                                            onClick={() =>
-                                                go({
-                                                    q: null,
-                                                    site_id: null,
-                                                    drill_type: null,
-                                                    outcome: null,
-                                                    period: '6mo',
-                                                })
-                                            }
-                                        >
-                                            Clear filters
-                                        </PageHeaderFilterButton>
-                                    )}
-                                </>
+                                ) : undefined
                             }
                             rail={
-                                <SafetyWorkspaceRail
-                                    hub="prevention"
-                                    current="drills"
+                                <RegisterRailLine
+                                    rail={<SafetyWorkspaceRail hub="prevention" current="drills" />}
+                                    filters={
+                                        <>
+                                            <PageHeaderFilterSelect
+                                                label={`All sites · ${pickers.sites.length}`}
+                                                allValue=""
+                                                value={filters.site_id ? String(filters.site_id) : ''}
+                                                onChange={(value) => go({ site_id: value ? Number(value) : null })}
+                                                options={[
+                                                    { value: '', label: 'All sites' },
+                                                    ...pickers.sites.map((site) => ({ value: String(site.id), label: site.name })),
+                                                ]}
+                                            />
+                                            <PageHeaderFilterSelect
+                                                icon={CalendarDays}
+                                                label={`Period: ${period.label}`}
+                                                allValue="6mo"
+                                                value={filters.period}
+                                                onChange={(value) => go({ period: value })}
+                                                options={PERIODS.map((item) => ({ value: item.value, label: `Period: ${item.label}` }))}
+                                            />
+                                            <RegisterMoreFilters
+                                                groups={[
+                                                    {
+                                                        key: 'type',
+                                                        label: 'Drill type',
+                                                        value: filters.drill_type ?? '',
+                                                        allValue: '',
+                                                        options: [{ value: '', label: 'All drill types' }, ...DRILL_TYPE_OPTIONS],
+                                                        onChange: (value) => go({ drill_type: value || null }),
+                                                    },
+                                                    {
+                                                        key: 'outcome',
+                                                        label: 'Outcome',
+                                                        value: filters.outcome ?? '',
+                                                        allValue: '',
+                                                        options: [
+                                                            { value: '', label: 'All outcomes' },
+                                                            ...pickers.outcomes.map((value) => ({ value, label: outcomeMeta(value)?.label ?? value })),
+                                                        ],
+                                                        onChange: (value) => go({ outcome: value || null }),
+                                                    },
+                                                ]}
+                                                onClear={() => go({ drill_type: null, outcome: null })}
+                                            />
+                                            {filtered && (
+                                                <PageHeaderFilterButton
+                                                    icon={X}
+                                                    onClick={() =>
+                                                        go({ q: null, site_id: null, drill_type: null, outcome: null, period: '6mo' })
+                                                    }
+                                                >
+                                                    Clear filters
+                                                </PageHeaderFilterButton>
+                                            )}
+                                        </>
+                                    }
                                 />
                             }
                         />
@@ -522,39 +546,34 @@ export default function DrillsIndex({
                         }
                         className="grid min-w-0 gap-5"
                     >
-                        {creating && can.schedule && (
-                            <Surface aria-label="Schedule drill">
-                                <div
-                                    ref={creationPanel}
-                                    tabIndex={-1}
-                                    className="p-[18px] outline-none"
-                                >
-                                    <DrillPlanningForm
-                                        detail={null}
-                                        pickers={pickers}
-                                        mode="create"
-                                        returnTo={returnTo}
-                                        onSaved={() => setCreating(false)}
-                                        onCancel={closeCreation}
+                        {summary ? (
+                            <RegisterBlocks
+                                lead={
+                                    <LeadBlock
+                                        rows={lead}
+                                        empty="No drills or things to fix are overdue."
+                                        more={
+                                            more && more.count > 0
+                                                ? {
+                                                      text: `${more.count} more ${more.count === 1 ? 'drill is' : 'drills are'} overdue${more.sites.length ? ` (${more.sites.join(', ')})` : ''}`,
+                                                      action: { label: 'See all', href: siteLink({ tab: 'overdue', period: 'all' }) },
+                                                  }
+                                                : null
+                                        }
                                     />
-                                </div>
-                            </Surface>
-                        )}
+                                }
+                                side={
+                                    <QuietRows
+                                        rows={[
+                                            { key: 'trends', icon: BarChart3, title: 'Drill trends', sub: 'Drills run and how they went, by site', href: '/health-safety/analytics' },
+                                        ]}
+                                    />
+                                }
+                            />
+                        ) : null}
                         <RecordTable
                             title="Drills"
-                            sub={
-                                (drills.total
-                                    ? `Showing ${drills.from ?? 1}–${drills.to ?? drills.data.length} of ${drills.total}`
-                                    : 'No drills match these filters') +
-                                ' · Summary counts cover the selected Sites and period, before search, type and outcome filters.'
-                            }
-                            actions={
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href="/health-safety/analytics">
-                                        Drill trends
-                                    </Link>
-                                </Button>
-                            }
+                            sub="Newest first"
                             ariaLabel="Drills table"
                             rows={drills.data}
                             rowKey={(row) => row.id}
@@ -571,43 +590,20 @@ export default function DrillsIndex({
                                 </p>
                             }
                         />
-                        <Tally
-                            title="Drills due and follow-up"
-                            sub="Drill recency and recorded outcomes remain separate"
-                            items={[
-                                {
-                                    value: hero.attention.sites_overdue,
-                                    label: 'Sites overdue for a drill',
-                                    tone:
-                                        hero.attention.sites_overdue > 0
-                                            ? 'critical'
-                                            : undefined,
-                                },
-                                {
-                                    value: hero.attention.findings_open,
-                                    label: 'Open findings',
-                                    href: `${DRILL_REGISTER}?${new URLSearchParams({ ...(params({ tab: 'findings' }) as Record<string, string>) })}`,
-                                },
-                                {
-                                    value: hero.attention.findings_overdue,
-                                    label: 'Overdue findings',
-                                    tone:
-                                        hero.attention.findings_overdue > 0
-                                            ? 'critical'
-                                            : undefined,
-                                },
-                                {
-                                    value: hero.badges.fenz_reviews_due,
-                                    label: 'Evacuation-scheme reviews due',
-                                    tone:
-                                        hero.badges.fenz_reviews_due > 0
-                                            ? 'warning'
-                                            : undefined,
-                                },
-                            ]}
-                        />
                     </div>
                 </PageLayout>
+                {creating && can.schedule && (
+                    <DrillPlanningForm
+                        popup
+                        detail={null}
+                        pickers={pickers}
+                        mode="create"
+                        returnTo={returnTo}
+                        initialSiteId={planSite ?? filters.site_id ?? null}
+                        onSaved={() => setCreating(false)}
+                        onCancel={closeCreation}
+                    />
+                )}
                 {drafts.confirmation}
             </SafetyFormDraftContext.Provider>
         </AppLayout>

@@ -286,19 +286,21 @@ class QueclinkPresetTest extends TestCase
         $this->assertSame(DeviceConfigurationProfile::STATUS_ACTIVE, $profile->fresh()->status);
     }
 
-    public function test_bulk_apply_preset_hands_off_to_governed_bulk_management(): void
+    public function test_bulk_apply_preset_to_several_trackers_is_refused_until_the_devices_bulk_bar_can_review_it(): void
     {
+        // S&D rebuild C6: the old Tracking workspace's bulk review is gone; nothing is queued.
         $devices = collect(range(1, 3))->map(fn (int $i) => $this->pairedGl30('86796306991690'.$i));
         $preset = QueclinkPreset::where('slug', 'resident-safety')->firstOrFail();
 
         $this->actingAs($this->admin)
+            ->from('/security-devices/integrations/queclink')
             ->post('/security-devices/integrations/queclink/bulk', [
                 'device_ids' => $devices->pluck('id')->all(),
                 'action' => 'apply_preset',
                 'preset_id' => $preset->id,
             ])
-            ->assertRedirectContains('/security-devices/tracking')
-            ->assertRedirectContains('bulk_action=configuration.apply');
+            ->assertRedirect('/security-devices/integrations/queclink')
+            ->assertSessionHasErrors('device_ids');
 
         $this->assertSame(0, QueclinkPendingCommand::query()->count());
     }

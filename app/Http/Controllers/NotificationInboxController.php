@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\User;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
+use App\Services\HealthSafety\HealthSafetyInboxReads;
+use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\Medication\Alerts\MedicationAlertAttendance;
 use App\Support\ControlRoom\BroadcastRecipientReadHttp;
 use Illuminate\Http\Request;
@@ -32,11 +34,15 @@ class NotificationInboxController extends Controller
             return back()->with('info', 'Staff messages are marked as read separately.');
         }
 
-        $n = $this->boardPackAccess
-            ->visibleNotificationQuery($user)
-            ->where('id', $notification)
-            ->firstOrFail();
+        $inbox = app(HealthSafetyInboxReads::class);
+        // Prove the notice is visible to the viewer now, then mark only that row of their own.
+        $n = $inbox->ownNotice($user, $inbox->within($user, fn (?HealthSafetyReadContext $context): string => (string) $this->boardPackAccess
+            ->visibleNotificationQuery($user, healthSafetyContext: $context)
+            ->where('notifications.id', $notification)
+            ->firstOrFail(['notifications.id'])->id));
         $n->markAsRead();
+        // A private follow-up notice: the read flag is all that changes; the follow-up stays open.
+        $inbox->confirmRead($n, $user);
         // Opening a medication alert can attend it (P11 B2 chunk 3).
         $this->attend($n, $user, MedicationAlertAttendance::OPENED);
 
@@ -53,9 +59,11 @@ class NotificationInboxController extends Controller
             return $response;
         }
 
-        $this->boardPackAccess
-            ->visibleNotificationQuery($user, unreadOnly: true)
-            ->update(['read_at' => now()]);
+        // Only notices the viewer can see right now; a hidden private notice stays unread.
+        $inbox = app(HealthSafetyInboxReads::class);
+        $inbox->markOwnRead($user, $inbox->within($user, fn (?HealthSafetyReadContext $context): array => $this->boardPackAccess
+            ->visibleNotificationQuery($user, unreadOnly: true, healthSafetyContext: $context)
+            ->pluck('notifications.id')->map(fn ($id) => (string) $id)->all()));
 
         return back()->with('success', 'Other notifications marked as read. Staff messages have a separate read action.');
     }
@@ -69,17 +77,17 @@ class NotificationInboxController extends Controller
             return $response;
         }
 
-        $n = $this->boardPackAccess
-            ->visibleNotificationQuery($user)
-            ->where('id', $notification)
-            ->firstOrFail();
+        // Prove the notice is visible to the viewer now, then acknowledge only that row of their own.
+        $inbox = app(HealthSafetyInboxReads::class);
+        $n = $inbox->ownNotice($user, $inbox->within($user, fn (?HealthSafetyReadContext $context): string => (string) $this->boardPackAccess
+            ->visibleNotificationQuery($user, healthSafetyContext: $context)
+            ->where('notifications.id', $notification)
+            ->firstOrFail(['notifications.id'])->id));
 
         // Only acknowledge if this notification requests acknowledgement.
-        $ackRequired = (bool) data_get($n->data, 'ack_required', false);
-        if (! $ackRequired) {
+        if (! (bool) data_get($n->data, 'ack_required', false)) {
             return back()->with('info', 'No acknowledgement required for this notification.');
         }
-
         if (is_null($n->acknowledged_at)) {
             $n->forceFill(['acknowledged_at' => now()])->save();
         }

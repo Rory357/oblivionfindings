@@ -29,20 +29,35 @@ var version = "0.1.0-dev"
 var publisherPublicKey = ""
 
 type options struct {
-	command, archive, bootstrap, collectorBootstrap, confirmedServer, confirmedCollector, role, reviewDigest, reviewExpires string
-	controlStdin                                                                                                            bool
-	confirmRepair                                                                                                           bool
+	command, archive, bootstrap, collectorBootstrap, confirmedServer, confirmedCollector, role, reviewDigest, reviewExpires, proxy string
+	controlStdin                                                                                                                   bool
+	confirmRepair                                                                                                                  bool
+	progress                                                                                                                       bool
 }
 
 func parseOptions(args []string) (options, error) {
 	var out options
-	if len(args) == 0 || (args[0] != "verify" && args[0] != "review" && args[0] != "install" && args[0] != "repair-services" && args[0] != "review-repair") {
-		return out, errors.New("use: oblivion-setup verify --package <release.zip> | review --package <release.zip> --role computer|site|both [--bootstrap <computer-profile.json>] [--collector-bootstrap <site-profile.json>] | install --package <release.zip> --bootstrap <profile.json> --confirm-server <https-origin> [--collector-bootstrap <site-profile.json>] [--confirm-collector-server <https-origin>] --role computer|site|both | review-repair --package <same-release.zip> | repair-services --package <same-release.zip> --role computer|site|both --confirm-server <https-origin> [--confirm-collector-server <https-origin>] --confirm-service-repair | version")
+	commands := map[string]bool{"verify": true, "review": true, "install": true, "repair-services": true, "review-repair": true, "update": true, "install-user": true, "repair": true}
+	if len(args) == 0 || !commands[args[0]] {
+		return out, errors.New("use: oblivion-setup verify --package <release.zip> | review --package <release.zip> --role computer|site|both [--bootstrap <computer-profile.json>] [--collector-bootstrap <site-profile.json>] | install --package <release.zip> --bootstrap <profile.json> --confirm-server <https-origin> [--collector-bootstrap <site-profile.json>] [--confirm-collector-server <https-origin>] --role computer|site|both [--progress] [--proxy host:port] | install-user --package <release.zip> --bootstrap <computer-profile.json> --confirm-server <https-origin> [--progress] [--proxy host:port] | update --package <newer-release.zip> [--progress] | repair --package <same-release.zip> | review-repair --package <same-release.zip> | repair-services --package <same-release.zip> --role computer|site|both --confirm-server <https-origin> [--confirm-collector-server <https-origin>] --confirm-service-repair | remove | remove-user | status --out <file.ini> | network-check --out <file.ini> | redeem --out <folder> (--installer <path> | --server <host> --code <code>) | version")
 	}
 	out.command = args[0]
 	flags := flag.NewFlagSet(out.command, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	flags.StringVar(&out.archive, "package", "", "publisher-signed release archive")
+	if out.command == "install" || out.command == "install-user" || out.command == "update" {
+		// For the installer's screen: one "progress: <step> started|done|failed" line per step.
+		flags.BoolVar(&out.progress, "progress", false, "print each step as it starts and finishes")
+	}
+	if out.command == "install" || out.command == "install-user" {
+		flags.StringVar(&out.proxy, "proxy", "", "proxy for the computer's enrolment, when Windows' setting doesn't work")
+	}
+	if out.command == "install-user" {
+		// Obli for this person only: the computer profile, its server, nothing else.
+		flags.StringVar(&out.bootstrap, "bootstrap", "", "deployment-issued computer installation profile")
+		flags.StringVar(&out.confirmedServer, "confirm-server", "", "exact intended HTTPS server")
+		out.role = "computer"
+	}
 	if out.command == "install" || out.command == "review" {
 		flags.StringVar(&out.bootstrap, "bootstrap", "", "deployment-issued computer installation profile")
 		flags.StringVar(&out.collectorBootstrap, "collector-bootstrap", "", "deployment-issued Site installation profile")
@@ -65,6 +80,9 @@ func parseOptions(args []string) (options, error) {
 	}
 	if flags.Parse(args[1:]) != nil || flags.NArg() != 0 || out.archive == "" {
 		return out, errors.New("invalid setup arguments; publisher trust cannot be overridden")
+	}
+	if out.command == "install-user" && (out.bootstrap == "" || out.confirmedServer == "") {
+		return out, errors.New("installing Obli for this person requires the computer profile and its server")
 	}
 	if out.command == "repair-services" && (!out.confirmRepair || out.confirmedServer == "" || (out.role != "computer" && out.role != "site" && out.role != "both") || out.role == "computer" && out.confirmedCollector != "") {
 		return out, errors.New("service repair requires explicit role, installed destination and service-repair confirmation")
@@ -106,6 +124,10 @@ func main() {
 	defer cancel()
 	if err := runContext(ctx, os.Args[1:], os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		var coded exitError
+		if errors.As(err, &coded) {
+			os.Exit(coded.code)
+		}
 		os.Exit(1)
 	}
 }
@@ -117,9 +139,18 @@ func runContext(ctx context.Context, args []string, output io.Writer) error {
 		_, err := fmt.Fprintln(output, version)
 		return err
 	}
+	// The installer's own steps that need no release package (lifecycle.go).
+	if len(args) > 0 {
+		if handler, ok := lifecycleCommands[args[0]]; ok {
+			return handler(ctx, args[1:], output)
+		}
+	}
 	opt, err := parseOptions(args)
 	if err != nil {
 		return err
+	}
+	if opt.command == "install" || opt.command == "install-user" {
+		useProxyForEnrolment(opt.proxy)
 	}
 	if opt.controlStdin {
 		controlled, cancel := context.WithTimeout(ctx, 15*time.Minute)
@@ -165,12 +196,39 @@ func runContext(ctx context.Context, args []string, output io.Writer) error {
 		}
 		return json.NewEncoder(output).Encode(receipt)
 	}
+	if opt.command == "repair" {
+		bounded, cancel := context.WithTimeout(ctx, 15*time.Minute)
+		defer cancel()
+		receipt, repairErr := repairInstalledOnPlatform(bounded, pack)
+		if repairErr != nil {
+			return repairErr
+		}
+		return json.NewEncoder(output).Encode(receipt)
+	}
+	if opt.command == "update" {
+		bounded, cancel := context.WithTimeout(ctx, 15*time.Minute)
+		defer cancel()
+		journal, updateErr := updateOnPlatform(bounded, pack, progressPrinter(opt.progress, output))
+		if updateErr != nil {
+			return updateErr
+		}
+		return json.NewEncoder(output).Encode(journal)
+	}
 	profiles, err := readProfiles(opt)
 	if err != nil {
 		return err
 	}
 	if !pack.Supports(opt.role) {
 		return errors.New("release does not contain the requested installation role")
+	}
+	if opt.command == "install-user" {
+		bounded, cancel := context.WithTimeout(ctx, 15*time.Minute)
+		defer cancel()
+		record, installErr := installUserOnPlatform(bounded, pack, *profiles.Computer, opt.confirmedServer, progressPrinter(opt.progress, output))
+		if installErr != nil {
+			return installErr
+		}
+		return json.NewEncoder(output).Encode(record)
 	}
 	review, err := installationReview(pack, profiles)
 	if err != nil {
@@ -185,7 +243,7 @@ func runContext(ctx context.Context, args []string, output io.Writer) error {
 	if err = ctx.Err(); err != nil {
 		return errors.New("installation was cancelled before starting")
 	}
-	if !opt.controlStdin {
+	if !opt.controlStdin && !opt.progress {
 		// Show only reviewed destination labels; never echo enrolment or API secrets.
 		if _, err = fmt.Fprintf(output, "Installing %s at %s\n", opt.role, profiles.ServerURL()); err != nil {
 			return err
@@ -201,7 +259,7 @@ func runContext(ctx context.Context, args []string, output io.Writer) error {
 			}
 		}
 	}
-	journal, err := installOnPlatform(ctx, pack, profiles, opt.confirmedServer, opt.confirmedCollector)
+	journal, err := installOnPlatform(ctx, pack, profiles, opt.confirmedServer, opt.confirmedCollector, progressPrinter(opt.progress, output))
 	if err != nil {
 		return err
 	}

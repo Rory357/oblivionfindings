@@ -14,8 +14,8 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * Exposure managers' inspect-and-retry workspace (job 3, mounted under /deliveries). Inspecting accepted outbox work never
- * dispatches a destination; a retry runs Codex's delivery as the manager. Follow-up notices stay off (Stephan), so a
- * follow-up delivery is shown but never sent from here.
+ * dispatches a destination; a retry runs Codex's delivery as the manager. Follow-up notices (#16, on since 2 Nov) retry
+ * through the follow-up destination the same way.
  */
 final class ChemicalExposureDeliveryWorkspaceService
 {
@@ -87,7 +87,8 @@ final class ChemicalExposureDeliveryWorkspaceService
         if (DB::transactionLevel() !== 0) { throw new LogicException('Exposure destination must start after recovery preflight commits.'); }
         // Concrete services only. No supplied callback or delivered boolean can impersonate a destination.
         if ($before['kind'] === 'health_safety') { $this->healthSafety->deliver($viewer, $deliveryId, $exposureId); }
-        else { throw new LogicException('Only Health and Safety deliveries can be retried while follow-up notices are off.'); }
+        // #16: a follow-up's notice is retried through its own destination, as this manager.
+        else { $this->followup->deliverForViewer($viewer, $deliveryId, $exposureId); }
         if (DB::transactionLevel() !== 0) { throw new LogicException('Exposure destination did not complete its physical transaction.'); }
         // A lost/uncertain response is reconciled by a NEW read proof, never by the consumer's returned delivered flag.
         return ['retry_requested_by' => (int) $viewer->id, 'inspection' => $this->detail($viewer, $exposureId, $deliveryId)];
@@ -139,6 +140,13 @@ final class ChemicalExposureDeliveryWorkspaceService
         } catch (LogicException) { $reads->assertActive(); return false; }
         catch (ModelNotFoundException) { return false; }
         catch (HttpExceptionInterface $denial) { if (! in_array($denial->getStatusCode(), [403,404], true)) { throw $denial; } return false; }
+        // The identity check refuses a changed identity as a source validation error: not stable, so "needs checking".
+        catch (\Illuminate\Validation\ValidationException $changed) {
+            if (array_keys($changed->errors()) !== ['source']) { throw $changed; }
+            $reads->assertActive();
+
+            return false;
+        }
     }
 
     private function unchangedRawRoot(SubstanceExposureRecord $root, CurrentAuthorizationReads $reads): bool
@@ -172,19 +180,18 @@ final class ChemicalExposureDeliveryWorkspaceService
         $destination = $stale ? $this->destination('superseded', 'source_advanced') : $this->confirmation($row, $current, $context);
         if (! $this->stableRoot($root, $proof, $current, $reads, $sites)) { return $this->repair($id); }
         $manage = $current->canDo('hazards.manage');
-        $noticesOff = $row->kind === 'followup';
         return ['id' => $id, 'kind' => $row->kind, 'attempt_state' => $row->state, 'currency' => $stale ? 'superseded' : 'current',
             'source_revision' => (int) $row->membership['source_revision'], 'attempts' => (int) $row->attempts,
             'acceptance_integrity' => 'recorded', 'destination' => $destination, 'automatic' => $this->automatic($row),
-            'can' => ['retry' => $manage && ! $stale && ! $noticesOff && $destination['can_deliver']],
-            'blocked_reason' => ! $manage ? 'current_manage_required' : ($stale ? 'source_advanced'
-                : ($noticesOff ? 'followup_notices_off' : $destination['blocked_reason']))];
+            'can' => ['retry' => $manage && ! $stale && $destination['can_deliver']],
+            'blocked_reason' => ! $manage ? 'current_manage_required' : ($stale ? 'source_advanced' : $destination['blocked_reason'])];
     }
 
     /** The automatic delivery's own record: how many attempts failed, why (a code, never a message), and what happens next. */
     private function automatic(ChemicalExposureSourceDelivery $row): array
     {
-        $pending = $row->kind === 'health_safety' && $row->state === 'pending';
+        // #16: follow-up notices are automatic too, with the same retry record.
+        $pending = in_array($row->kind, ['health_safety', 'followup'], true) && $row->state === 'pending';
         return ['failed_attempts' => (int) $row->failed_attempts, 'failure' => $pending ? $row->failure_code : null,
             'needs_manager' => $pending && (bool) $row->needs_manager,
             'next_attempt_at' => $pending && ! $row->needs_manager ? $row->next_attempt_at?->toIso8601String() : null,
@@ -216,6 +223,8 @@ final class ChemicalExposureDeliveryWorkspaceService
             return $this->destination('restricted', 'destination_authority_unavailable');
         } catch (ModelNotFoundException) { return $this->destination('unavailable', 'destination_source_unavailable'); }
         catch (LogicException) { $context->assertActive(); return $this->destination('repair_required', 'destination_proof_unavailable'); }
+        // #16: a follow-up notice's own check refuses a changed source identity this way; it is withheld the same.
+        catch (\Illuminate\Validation\ValidationException) { $context->assertActive(); return $this->destination('repair_required', 'destination_proof_unavailable'); }
     }
 
     private function hasExpectedRoot(object $service, string $kind): bool

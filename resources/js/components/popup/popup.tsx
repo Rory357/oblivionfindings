@@ -546,6 +546,8 @@ export type PopupFormProps = {
     cancelLabel?: string;
     /** Left of Cancel, e.g. a ghost "Remove" in an edit form. */
     footerStart?: ReactNode;
+    /** A second way out between Cancel and the main button (as PopupConfirm), e.g. "Clock in now instead". */
+    secondary?: ReactNode;
     /** Ask "Discard this draft?" before closing. */
     dirty?: boolean;
     /** Names the draft in the discard guard; defaults to the title. */
@@ -573,6 +575,7 @@ export function PopupForm({
     onSubmit,
     cancelLabel = 'Cancel',
     footerStart,
+    secondary,
     dirty,
     draftName,
     onCloseAutoFocus,
@@ -628,6 +631,7 @@ export function PopupForm({
                         >
                             {cancelLabel}
                         </Button>
+                        {secondary}
                         <Button
                             type="submit"
                             variant={destructive ? 'destructive' : 'default'}
@@ -683,6 +687,10 @@ export type PopupConfirmProps = {
     error?: string;
     /** Extra fields, e.g. a reason. */
     children?: ReactNode;
+    /** A second way out between Cancel and the main button, e.g. "Retire instead". */
+    secondary?: ReactNode;
+    /** Left of Cancel, e.g. a ghost "Remove it" on an approval. */
+    footerStart?: ReactNode;
     onCloseAutoFocus?: AutoFocusHandler;
     testId?: string;
 };
@@ -711,6 +719,8 @@ export function PopupConfirm({
     confirmDisabled,
     error,
     children,
+    secondary,
+    footerStart,
     onCloseAutoFocus,
     testId,
 }: PopupConfirmProps) {
@@ -765,7 +775,7 @@ export function PopupConfirm({
                     ) : null}
                     {children}
                 </div>
-                <PopupFooter>
+                <PopupFooter start={footerStart}>
                     {variant === 'alert' ? null : (
                         <Button
                             type="button"
@@ -776,6 +786,7 @@ export function PopupConfirm({
                             {cancelLabel}
                         </Button>
                     )}
+                    {secondary}
                     <Button
                         type="submit"
                         variant={danger ? 'destructive' : 'default'}
@@ -810,6 +821,7 @@ export function PopupViewer({
     facts,
     children,
     action,
+    footerStart,
     closeLabel = 'Close',
     onCloseAutoFocus,
     testId,
@@ -826,6 +838,8 @@ export function PopupViewer({
     children?: ReactNode;
     /** One optional action after Close, e.g. "Open full record". */
     action?: ReactNode;
+    /** Left of Close, e.g. a ghost "Open recorder" (as PopupForm's footerStart). */
+    footerStart?: ReactNode;
     closeLabel?: string;
     onCloseAutoFocus?: AutoFocusHandler;
     testId?: string;
@@ -852,7 +866,7 @@ export function PopupViewer({
                 {facts?.length ? <PopupFacts rows={facts} /> : null}
                 {children}
             </div>
-            <PopupFooter>
+            <PopupFooter start={footerStart}>
                 <Button type="button" variant="outline" onClick={onClose}>
                     {closeLabel}
                 </Button>

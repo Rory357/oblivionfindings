@@ -2,6 +2,7 @@ import type { NavItem } from '@/types';
 import {
     Activity,
     Cpu,
+    KeyRound,
     LayoutDashboard,
     MapPinned,
     Settings,
@@ -19,6 +20,12 @@ export interface SecurityDevicesPermissions {
     monitoringManage?: boolean;
     reportsView?: boolean;
     commandsAdmin?: boolean;
+    alertsAcknowledge?: boolean;
+    automationsManage?: boolean;
+    /** S&D Phase H: the Access menu entry (pg-sdr-19). */
+    accessControlView?: boolean;
+    /** S&D rebuild C6: whether Setup opens for this person (SetupPresenter::canOpen). */
+    setupOpen?: boolean;
 }
 
 export interface SecurityDevicesNavigationItem extends NavItem {
@@ -50,21 +57,12 @@ export function securityDevicesDomainHref(domain: string): string {
     return '/security-devices/devices';
 }
 
-const legacyWorkspaceLabels: Record<string, string> = {
-    'network-it': 'Network & IT',
-    'it-infrastructure': 'Network & IT',
-    security: 'Security',
-    alarms: 'Security',
-    cctv: 'Security',
-    'access-control': 'Security',
-    healthcare: 'Healthcare',
-    'smart-iot-healthcare': 'Healthcare',
-    tracking: 'Tracking',
-    'tracking-devices': 'Tracking',
-    'facilities-iot': 'Facilities & IoT',
-    facilities: 'Facilities & IoT',
-};
-
+/**
+ * The six-entry menu (S&D rebuild plan v11: Overview · Devices · Sites · Access · Alerts · Setup).
+ * C6, the menu switch: every old page now redirects into one of these, so no entry points at an
+ * old page except Setup for IT admins who reach only the Obli downloads (kept until pop-up 23 and
+ * the Hubs list have a place).
+ */
 const navigationGroups: SecurityDevicesNavigationGroup[] = [
     {
         label: 'Security & Devices',
@@ -80,22 +78,8 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                 title: 'Devices',
                 href: '/security-devices/devices',
                 hubHrefs: ['/security-devices/devices'],
-                aliases: [
-                    '/security-devices/network-it',
-                    '/security-devices/it-infrastructure',
-                    '/security-devices/security',
-                    '/security-devices/alarms',
-                    '/security-devices/cctv',
-                    '/security-devices/access-control',
-                    '/security-devices/healthcare',
-                    '/security-devices/smart-iot-healthcare',
-                    '/security-devices/tracking',
-                    '/security-devices/tracking-devices',
-                    '/security-devices/facilities-iot',
-                    '/security-devices/facilities',
-                    '/security-devices/device-groups',
-                    '/security-devices/command-batches',
-                ],
+                // Found devices (a scan's results) belongs to Devices.
+                aliases: ['/security-devices/scans'],
                 icon: Cpu,
                 visible: (can) => Boolean(can.devicesView),
             },
@@ -107,86 +91,50 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                 visible: (can) => Boolean(can.devicesView),
             },
             {
-                title: 'Alerts & upkeep',
-                href: '/security-devices/monitoring',
-                hubHrefs: [
-                    '/security-devices/monitoring',
-                    '/security-devices/maintenance',
-                ],
-                resolveHref: (can) =>
-                    can.eventsView
-                        ? '/security-devices/monitoring'
-                        : '/security-devices/maintenance',
-                aliases: [
-                    '/security-devices/monitoring',
-                    '/security-devices/alerts-events',
-                    '/security-devices/maintenance',
-                    '/security-devices/maintenance-health',
-                    '/security-devices/runtime-health',
-                ],
+                // S&D Phase H (pg-sdr-19): doors, people, visitors, schedules and the door log.
+                title: 'Access',
+                href: '/security-devices/access',
+                hubHrefs: ['/security-devices/access'],
+                icon: KeyRound,
+                visible: (can) => Boolean(can.viewAny && can.accessControlView),
+            },
+            {
+                // Only for people who can open Alerts (AlertsPresenter::canOpen). Upkeep (batteries and
+                // updates) is Devices › Upkeep, so the old maintenance-only landing is gone.
+                title: 'Alerts',
+                href: '/security-devices/alerts',
+                hubHrefs: ['/security-devices/alerts'],
                 icon: Activity,
-                visible: (can) =>
-                    Boolean(
-                        can.eventsView ||
-                        can.maintenanceView ||
-                        can.maintenanceManage,
-                    ),
+                visible: (can) => Boolean(can.eventsView || can.alertsAcknowledge),
             },
             {
                 title: 'Setup',
-                href: '/security-devices/discovery',
-                hubHrefs: [
-                    '/security-devices/discovery',
-                    '/security-devices/agent-downloads',
-                    '/security-devices/settings',
-                ],
-                resolveHref: (can) => {
-                    if (can.integrationsView) {
-                        return '/security-devices/discovery';
-                    }
-
-                    if (can.commandsAdmin || can.integrationsManage) {
-                        return '/security-devices/agent-downloads';
-                    }
-
-                    return '/security-devices/settings';
-                },
-                aliases: [
-                    '/security-devices/discovery',
-                    '/security-devices/integrations',
-                    '/security-devices/supported-devices',
-                    '/security-devices/agent-downloads',
-                    '/security-devices/settings',
-                    '/security-devices/reports',
-                ],
+                href: '/security-devices/setup',
+                hubHrefs: ['/security-devices/setup', '/security-devices/agent-downloads'],
+                resolveHref: (can) =>
+                    setupOpens(can) ? '/security-devices/setup' : '/security-devices/agent-downloads',
+                // Each connected service's own page opens from Setup › Connected services.
+                aliases: ['/security-devices/integrations', '/security-devices/agent-downloads'],
                 icon: Settings,
-                visible: (can) =>
-                    Boolean(
-                        can.integrationsView ||
-                        can.integrationsManage ||
-                        can.commandsAdmin ||
-                        can.groupsManage ||
-                        can.reportsView ||
-                        can.monitoringManage,
-                    ),
+                visible: (can) => setupOpens(can) || Boolean(can.commandsAdmin),
             },
         ],
     },
 ];
 
-export function securityDevicesWorkspaceLabel(
-    slug: string,
-): string | undefined {
-    if (slug in legacyWorkspaceLabels) {
-        return legacyWorkspaceLabels[slug];
+/** SetupPresenter::canOpen, shared by the server; the fallback covers callers that don't send it. */
+function setupOpens(can: SecurityDevicesPermissions): boolean {
+    if (typeof can.setupOpen === 'boolean') {
+        return can.setupOpen;
     }
 
-    const href = `/security-devices/${slug}`;
-    const item = navigationGroups
-        .flatMap((group) => group.items)
-        .find((entry) => entry.href === href || entry.aliases?.includes(href));
-
-    return item?.title;
+    return Boolean(
+        can.integrationsView ||
+        can.integrationsManage ||
+        can.monitoringManage ||
+        can.automationsManage ||
+        can.reportsView,
+    );
 }
 
 export function buildSecurityDevicesNavigationGroups(

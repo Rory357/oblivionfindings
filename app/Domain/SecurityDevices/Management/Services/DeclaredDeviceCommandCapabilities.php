@@ -2,6 +2,9 @@
 
 namespace App\Domain\SecurityDevices\Management\Services;
 
+use App\Domain\SecurityDevices\Access\AccessConsoles;
+use App\Domain\SecurityDevices\Access\Models\AccessConsole;
+use App\Domain\SecurityDevices\Access\Models\AccessDoor;
 use App\Domain\SecurityDevices\Drivers\Contracts\AlarmPanelDriver;
 use App\Domain\SecurityDevices\Drivers\Contracts\NetworkConfigBackupDriver;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
@@ -15,6 +18,19 @@ use Illuminate\Support\Collection;
 
 final class DeclaredDeviceCommandCapabilities
 {
+    /** Port actions with no real vendor driver behind them yet (see the reject list in forDevice()). */
+    public const array UNBUILT_PORT_ACTIONS = [
+        'network.port.enable',
+        'network.port.disable',
+        'network.port.bounce',
+    ];
+
+    /** S&D Phase H: door actions a UniFi Access door takes through the Site's hub. */
+    public const array UNIFI_ACCESS_DOOR_ACTIONS = ['access.door.keep_unlocked', 'access.door.keep_unlocked_end'];
+
+    /** S&D Phase H: UniFi Access's Site-wide emergency modes, on the console's device. */
+    public const array UNIFI_ACCESS_SITE_ACTIONS = ['access.site.lockdown', 'access.site.evacuate', 'access.site.emergency_end'];
+
     /** @return Collection<int, string> */
     public function forDevice(Device $device): Collection
     {
@@ -44,12 +60,28 @@ final class DeclaredDeviceCommandCapabilities
         }
 
         // Gate driver-backed & endpoint-backed capabilities on real verified authorities/drivers.
+        // A device record may list any capability in its saved settings, so these are never taken
+        // from the record; each is added back below only when real code can carry it out.
         $declared = $declared->reject(fn (string $key): bool => in_array($key, [
             'network.config.backup',
+            // The camera picture check runs only from the camera's own card, through the Site hub
+            // (see supports()); it is never a listed action.
+            CameraSnapshotCollectorDescriptor::CAPABILITY,
             'endpoint.service.manage',
             'endpoint.computer.restart',
             'endpoint.software.install',
             'endpoint.script.run',
+            // Arm and disarm only with a real alarm driver (added back below). Report-only panels
+            // such as Ajax are view only (Phase A, docs/security-devices/GOAL.md).
+            'alarm.arm',
+            'alarm.disarm',
+            // Port on/off/restart: NetworkDeviceCommandAdapter calls a made-up controller path that
+            // no switch or controller has, so it is never offered until a real driver is built and
+            // walked (Phase G).
+            ...self::UNBUILT_PORT_ACTIONS,
+            // S&D Phase H: only from a real UniFi Access link (added back below).
+            ...self::UNIFI_ACCESS_DOOR_ACTIONS,
+            ...self::UNIFI_ACCESS_SITE_ACTIONS,
         ], true));
 
         $driverRegistry = app(DeviceDriverRegistry::class);
@@ -60,6 +92,14 @@ final class DeclaredDeviceCommandCapabilities
         if ($this->hasDirectAlarmApiTarget($device)
             && $driverRegistry->resolveAlarmDriver($device) instanceof AlarmPanelDriver) {
             $declared->push('alarm.arm', 'alarm.disarm');
+        }
+        // S&D Phase H: keep unlocked on a door UniFi Access knows; lockdown and evacuation on the
+        // Site's UniFi Access console. Both run only through the Site's hub.
+        if (AccessConsoles::doorFor($device) instanceof AccessDoor) {
+            $declared->push(...self::UNIFI_ACCESS_DOOR_ACTIONS);
+        }
+        if (AccessConsoles::consoleFor($device) instanceof AccessConsole) {
+            $declared->push(...self::UNIFI_ACCESS_SITE_ACTIONS);
         }
         if (app(EndpointScriptAuthority::class)->supports($device)) {
             $declared->push('endpoint.script.run');
@@ -81,6 +121,11 @@ final class DeclaredDeviceCommandCapabilities
 
     public function supports(Device $device, string $capability): bool
     {
+        if ($capability === CameraSnapshotCollectorDescriptor::CAPABILITY) {
+            // S&D Phase B: a UniFi Protect camera at a Site a hub covers. Not listed with the other actions.
+            return app(CameraSnapshotCollectorDescriptor::class)->eligible($device);
+        }
+
         return $this->forDevice($device)->containsStrict($capability);
     }
 

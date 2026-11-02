@@ -237,7 +237,7 @@ it('records care sought independently from unchanged treatment and preserves an 
     io.request.mockRejectedValue(new Error('Lost response'));
     render(<ExposureCommandForm action="correct" actorId={7} detail={detail()} active onCancel={vi.fn()} onDone={vi.fn()} />);
     await choose('Medical attention sought', 'Yes'); await choose('Incident reported', 'Unknown');
-    expect(screen.getByRole('combobox', { name: 'Recorded treatment' })).toHaveTextContent('none');
+    expect(screen.getByRole('combobox', { name: 'Recorded treatment' })).toHaveTextContent('None');
     fireEvent.change(screen.getByRole('textbox', { name: /^Reason for this correction/ }), { target: { value: 'Record answers independently' } });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Review submission' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Review submission' }));
