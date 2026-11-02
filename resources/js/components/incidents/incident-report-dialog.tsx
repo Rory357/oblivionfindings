@@ -867,7 +867,9 @@ export function IncidentReportDialog({
                                             !d.description.trim()
                                         }
                                     >
-                                        Submit incident
+                                        {isNearMiss
+                                            ? 'Submit near miss'
+                                            : 'Submit incident'}
                                     </Button>
                                 </>
                             )}
