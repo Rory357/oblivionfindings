@@ -9,6 +9,7 @@ use App\Models\HsAttachment;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Services\HealthSafety\HsEventAccessService;
+use App\Services\HealthSafety\HsIncidentStoryReadService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,7 +42,9 @@ class HsCorrectiveActionEvidenceController extends Controller
                 $action,
                 &$path,
             ): void {
-                $event = $this->resolveEvent($request, $event);
+                // Answer 23: a story reader may add files to their own action.
+                $event = app(HsIncidentStoryReadService::class)->eventForOwnedAction($request->user(), $event, $action, false)
+                    ?? $this->resolveEvent($request, $event);
                 $action = $this->lockAction($event, $action);
                 $this->authorizeParticipant($request, $action);
                 $this->assertEvidenceMutable($action);
@@ -99,7 +102,9 @@ class HsCorrectiveActionEvidenceController extends Controller
         HsCorrectiveAction $action,
         HsAttachment $attachment,
     ): StreamedResponse {
-        $event = $this->resolveEvent($request, $event);
+        // Answer 23: a story reader may open the files on their own action.
+        $event = app(HsIncidentStoryReadService::class)->eventForOwnedAction($request->user(), $event, $action, false)
+            ?? $this->resolveEvent($request, $event);
         abort_unless((int) $action->hs_event_id === (int) $event->id, 404);
         $this->authorizeParticipant($request, $action);
         $this->assertAttachmentBelongsTo($action, $attachment);

@@ -18,6 +18,7 @@ use App\Domain\SecurityDevices\Credentials\Services\CredentialReferenceManager;
 use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultLeaseIssuer;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionContext;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Presenters\SettingsAuditPresenter;
 use App\Logging\ConfigureSensitiveDataRedaction;
 use App\Models\Permission;
 use App\Models\Role;
@@ -368,26 +369,26 @@ it('projects only safe credential metadata for the administrators exact Site sco
     );
     $scopedAdmin = credentialContractScopedAdmin($allowedSite);
 
-    $this->actingAs($scopedAdmin)
-        ->get('/security-devices/settings')
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('security-devices/settings')
-            ->where('credentialReferences.visible', true)
-            ->where('credentialReferences.driver_state', 'configured')
-            ->has('credentialReferences.sites', 1)
-            ->where('credentialReferences.sites.0.id', $allowedSite->id)
-            ->has('credentialReferences.rows', 0));
+    // S&D rebuild C6: the old Settings & audit page redirects to Setup; its credential projection
+    // (SettingsAuditPresenter) is checked straight from the presenter, as the page received it.
+    $project = fn (User $viewer): array => json_decode(json_encode(
+        app(SettingsAuditPresenter::class)->present($viewer)['credentialReferences'],
+        JSON_THROW_ON_ERROR,
+    ), true, flags: JSON_THROW_ON_ERROR);
 
-    $this->actingAs($admin)
-        ->get('/security-devices/settings')
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->has('credentialReferences.rows', 1)
-            ->where('credentialReferences.rows.0.site_name', 'Hidden Credential Site')
-            ->where('credentialReferences.rows.0.reference_key', 'vault:network/'.$hiddenSite->id.'/core-switch')
-            ->missing('credentialReferences.rows.0.secret_manager_reference')
-            ->missing('credentialReferences.rows.0.secret_manager_reference_hash'));
+    $scoped = $project($scopedAdmin);
+    expect($scoped['visible'])->toBeTrue()
+        ->and($scoped['driver_state'])->toBe('configured')
+        ->and($scoped['sites'])->toHaveCount(1)
+        ->and($scoped['sites'][0]['id'])->toBe($allowedSite->id)
+        ->and($scoped['rows'])->toHaveCount(0);
+
+    $all = $project($admin);
+    expect($all['rows'])->toHaveCount(1)
+        ->and($all['rows'][0]['site_name'])->toBe('Hidden Credential Site')
+        ->and($all['rows'][0]['reference_key'])->toBe('vault:network/'.$hiddenSite->id.'/core-switch')
+        ->and($all['rows'][0])->not->toHaveKey('secret_manager_reference')
+        ->and($all['rows'][0])->not->toHaveKey('secret_manager_reference_hash');
 });
 
 it('provides register test rotate and revoke routes without accepting credential material', function () {

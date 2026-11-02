@@ -12,7 +12,10 @@ use App\Models\WorkCapacityAssessment;
 use App\Models\WorkplaceInjury;
 use App\Models\WorkplaceInjuryAttachment;
 use App\Models\WorkplaceInjurySourceVersion;
+use App\Models\HsEvent;
 use App\Services\CurrentAuthorizationReads;
+use App\Support\HealthSafety\HsRecordTitle;
+use App\Support\HealthSafety\LinkedSafetyReviewSummary;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -60,7 +63,18 @@ final class InjuryWorkspaceService
             $open = $row->status !== 'closed';
             $site = $reads->query(Site::query())->whereKey($row->site_id)->first(['id', 'name']);
             $connections = $this->connections->inContext($row, $current, $reads, $sites);
+            $worker = is_array($factual['worker'] ?? null) ? ($factual['worker']['name'] ?? null) : null;
             $detail = [...$factual, 'source_integrity' => $sourceIntegrity, 'injury_type_label' => self::TYPE_LABELS[$row->injury_type] ?? $row->injury_type,
+                // Decision 15: the same plain title as its safety review and every list.
+                'title' => HsRecordTitle::injury($row->injury_type, $row->body_part_affected, $worker, $site?->name),
+                'injury_words' => HsRecordTitle::injuryWords($row->injury_type, $row->body_part_affected),
+                'reported_by' => $row->created_by ? ($this->currentIdentity((int) $row->created_by, $reads)['name'] ?? null) : null,
+                // The safety review card (G4-8), only when this viewer can open the review (decision 6: otherwise nothing).
+                'safety_review' => $connections['health_safety']['access'] === 'readable' && $connections['health_safety']['id']
+                    && ($review = $reads->query(HsEvent::query())->find($connections['health_safety']['id']))
+                    ? LinkedSafetyReviewSummary::make($review, $reads) : null,
+                // Decision 10: the coordinating team lead sees duty restrictions only (null for everyone else).
+                'duty_restrictions' => $verified && ! $medical ? $this->dutyRestrictions($row, $current, $reads) : null,
                 'site' => $site ? ['id' => (int) $site->id, 'name' => $site->name] : null,
                 'immediate_treatment' => null, 'medical_treatment_type' => null, 'medical_treatment_label' => null,
                 'acc_claim_number' => null, 'notes' => null, 'related_incident' => $connections['incident']['access'] === 'readable'
@@ -116,6 +130,46 @@ final class InjuryWorkspaceService
             }
             return $detail;
         });
+    }
+
+    /**
+     * Decision 10 (Stephan, 1 Nov 2026, G4-8): a team lead coordinating someone's return to work sees their duty
+     * restrictions — what they can and can't do at work, the hours, from and until when, and who set them — and nothing
+     * medical: no reason, treatment, clearance, notes, workplace changes, fitness checks, claim number or files.
+     * Needs injuries.dutyRestrictions.view AND being this injury's coordinator AND the injury read already proved.
+     * Duties whose recorded history doesn't match are left out rather than guessed.
+     */
+    private function dutyRestrictions(WorkplaceInjury $row, User $current, CurrentAuthorizationReads $reads): ?array
+    {
+        if (! $current->canDo(InjuryAccessService::DUTY_RESTRICTIONS) || $row->coordinator_user_id === null
+            || (int) $row->coordinator_user_id !== (int) $current->id) {
+            return null;
+        }
+        $plans = $reads->query(ReturnToWorkPlan::query())->where('workplace_injury_id', $row->id)
+            ->where('worker_id', $row->user_id)->pluck('id')->all();
+        $items = [];
+        $duties = $plans === [] ? collect() : $reads->query(ModifiedDuty::query())->whereIn('return_to_work_plan_id', $plans)
+            ->where('user_id', $row->user_id)->orderByDesc('start_date')->orderByDesc('id')->limit(20)->get();
+        foreach ($duties as $duty) {
+            try {
+                $version = $this->access->currentVersionForSource($row, $duty, $reads);
+            } catch (\LogicException) {
+                continue;
+            }
+            $honest = (int) $duty->source_schema_version === 0 ? $version === null
+                : (int) $duty->source_schema_version === 1 && data_get($duty->worker_snapshot, 'id') === (int) $row->user_id && $version !== null;
+            if (! $honest) {
+                continue;
+            }
+            $items[] = ['id' => (int) $duty->id, 'status' => $duty->status,
+                'start_date' => $duty->start_date?->toDateString(), 'end_date' => $duty->end_date?->toDateString(),
+                'duties' => $duty->modified_duties_description, 'restrictions' => $duty->restrictions,
+                'hours_per_day' => $duty->hours_per_day === null ? null : (float) $duty->hours_per_day,
+                'set_by' => $this->identity($duty->recorder_snapshot)['name'] ?? null,
+                'set_at' => $duty->created_at?->toIso8601String()];
+        }
+
+        return ['items' => $items];
     }
 
     /** Capture-only entry has its own permission boundary and never needs register read access. */

@@ -147,8 +147,9 @@ afterEach(() => {
     state.reports = true;
 });
 
-it('uses the shared header and exact filtered attention views without the old ribbon or global assurance badges', () => {
+it('uses the G2 header boxes and the drawn status views, without the old ribbon, board links or global assurance badges (G4-14)', () => {
     const props = data();
+    props.tabCounts.active = 4;
     const { container } = render(
         <HazardRegister baseUrl="/compliance/hazards" data={props} />,
     );
@@ -168,34 +169,26 @@ it('uses the shared header and exact filtered attention views without the old ri
     expect(
         headerQueries.queryByRole('button', { name: 'Log hazard' }),
     ).not.toBeInTheDocument();
-    fireEvent.click(
-        headerQueries.getByRole('button', { name: 'View due in 7 days' }),
-    );
-    expect(state.get).toHaveBeenLastCalledWith(
-        '/compliance/hazards',
-        { ...props.filters, tab: 'due_soon' },
-        expect.anything(),
-    );
-    fireEvent.click(
-        headerQueries.getByRole('button', { name: 'View needs an owner' }),
-    );
-    expect(state.get).toHaveBeenLastCalledWith(
-        '/compliance/hazards',
-        { ...props.filters, tab: 'unassigned' },
-        expect.anything(),
-    );
-    // Only the two drawn numbers sit in the header; the rest are views.
+    // Four boxes, each a link to its view with the current filters; every one says "No trend yet".
+    const box = (name: RegExp) =>
+        new URL(headerQueries.getByRole('link', { name }).getAttribute('href')!, 'https://app.example');
+    expect(box(/^No owner yet: 1\. No trend yet/).searchParams.get('tab')).toBe('unassigned');
+    expect(box(/^Past due date: 1\. No trend yet/).searchParams.get('tab')).toBe('overdue');
+    expect(box(/^Due in the next 7 days: 2\. No trend yet/).searchParams.get('tab')).toBe('due_soon');
+    const open = box(/^Open hazards: 4\. No trend yet/);
+    expect(open.searchParams.get('tab')).toBe('active');
+    expect(open.searchParams.get('site_id')).toBe('1');
     expect(
-        headerQueries.queryByRole('button', { name: 'View open' }),
+        headerQueries.queryByRole('button', { name: 'Board reports' }),
     ).not.toBeInTheDocument();
     const views = within(screen.getByRole('tablist', { name: 'Hazard views' }));
     expect(
         views.getAllByRole('tab').map((tab) => tab.textContent),
-    ).toEqual(['All8', 'Open', 'Overdue1', 'Critical1', 'Closed & mitigated4']);
-    fireEvent.click(views.getByRole('tab', { name: /Overdue/ }));
+    ).toEqual(['All8', 'Not started2', 'In progress2', 'Ready to close3', 'Closed1']);
+    fireEvent.click(views.getByRole('tab', { name: /In progress/ }));
     expect(state.get).toHaveBeenLastCalledWith(
         '/compliance/hazards',
-        { ...props.filters, tab: 'overdue' },
+        { ...props.filters, tab: 'in_progress' },
         expect.anything(),
     );
     expect(
@@ -205,22 +198,43 @@ it('uses the shared header and exact filtered attention views without the old ri
 
 it('keeps a chosen view outside the drawn strip visible as its own tab', () => {
     const props = data();
-    props.tab = 'mitigated';
+    props.tab = 'unassigned';
     render(<HazardRegister baseUrl="/compliance/hazards" data={props} />);
     const views = within(screen.getByRole('tablist', { name: 'Hazard views' }));
     expect(
-        views.getByRole('tab', { name: /Awaiting closure/, selected: true }),
+        views.getByRole('tab', { name: /No owner yet/, selected: true }),
     ).toBeInTheDocument();
     expect(
-        screen.getByRole('tabpanel', { name: 'Awaiting closure' }),
+        screen.getByRole('tabpanel', { name: 'Hazards with no owner yet' }),
     ).toBeInTheDocument();
 });
 
-it('retains Site and period in exports and uses readable Site-scoped report pages with report permission', () => {
+it('leads with no owner and past due date first, offers only the step the person may take, and keeps closed hazards quiet (G4-14)', () => {
+    const props = data();
+    const noOwner = { ...row(), id: 5, assigned_to_id: null, assigned_to_name: null, hazard_type: null as unknown as string, hazard_label: 'Wobbly bathroom rail', due_date: '2026-10-28', flags: { ...row().flags, overdue: true, unassigned: true } };
+    const started = { ...row(), id: 6, hazard_type: null as unknown as string, hazard_label: 'Loose handrail on the back steps', due_date: null, flags: { ...row().flags, due_soon: false } };
+    props.register_summary = { lead: [noOwner, started], lead_total: 2, closed_30d: 3 };
+    props.can = { manage: true, assign: true, close: false, create: false };
+    const view = render(<HazardRegister baseUrl="/compliance/hazards" data={props} />);
+    const lead = screen.getByRole('region', { name: 'Needs doing now' });
+    expect(lead).toHaveTextContent('Wobbly bathroom rail — Kauri House');
+    expect(lead).toHaveTextContent('No owner yet · Past due date');
+    fireEvent.click(screen.getByRole('button', { name: 'Choose owner: Wobbly bathroom rail — Kauri House' }));
+    expect(state.visit).toHaveBeenLastCalledWith(expect.stringContaining('/hazards/5'));
+    expect(state.visit.mock.calls.at(-1)?.[0]).toContain('assign');
+    expect(screen.getByRole('button', { name: 'Start: Loose handrail on the back steps — Kauri House' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Closed · controls in place/ })).toHaveTextContent('3');
+    view.unmount();
+    render(<HazardRegister baseUrl="/compliance/hazards" data={{ ...props, can: { manage: false, assign: false, close: false, create: false } }} />);
+    expect(screen.queryByRole('button', { name: /^Choose owner/ })).not.toBeInTheDocument();
+    expect(screen.getByText('A manager chooses the owner')).toBeInTheDocument();
+});
+
+it('retains Site and period in exports on a Site register', () => {
     const props = data();
     props.tab = 'due_soon';
     props.filters.tab = 'due_soon';
-    const { container, rerender } = render(
+    const { container } = render(
         <HazardRegister
             baseUrl="/sites/1/hazards"
             scopedSite={{ id: 1, name: 'Kauri House', type: 'house' }}
@@ -238,22 +252,8 @@ it('retains Site and period in exports and uses readable Site-scoped report page
     expect(target.searchParams.get('tab')).toBe('due_soon');
     expect(target.searchParams.get('q')).toBe('Needle');
     expect(target.searchParams.get('from')).toBe('2026-10-01');
-    fireEvent.click(header.getByRole('button', { name: 'Board reports' }));
-    fireEvent.click(screen.getByRole('button', { name: 'WorkSafe notifications' }));
-    expect(state.visit).toHaveBeenLastCalledWith(
-        '/health-safety/reports?view=notifications&site_id=1',
-    );
-    state.reports = false;
-    rerender(
-        <HazardRegister
-            baseUrl="/sites/1/hazards"
-            scopedSite={{ id: 1, name: 'Kauri House', type: 'house' }}
-            data={props}
-        />,
-    );
-    expect(
-        header.queryByRole('button', { name: 'Board reports' }),
-    ).not.toBeInTheDocument();
+    // G4-14: the board-report links are gone from every register.
+    expect(header.queryByRole('button', { name: 'Board reports' })).not.toBeInTheDocument();
 });
 
 it('shows owner, due date and flags in the table, with one action list on the kebab and right-click, and no automatic notification decision', () => {

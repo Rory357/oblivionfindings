@@ -101,3 +101,59 @@ func TestReleaseAcceptsRuntimeCasingButRejectsAmbiguousDirectories(t *testing.T)
 		t.Fatal("ambiguous directory casing accepted")
 	}
 }
+
+// A hub that updated itself runs from a folder holding only site/. Repair checks that folder
+// against the site part of a full package, just as strictly.
+func TestExtractedPartsVerifyOnlyTheNamedPartExactly(t *testing.T) {
+	m, c, k := fixture(t)
+	pack, err := openFixture(t, archiveFixture(t, manifestBytes(t, m), c, k, nil), k)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pack.Close()
+	siteOnly := func(t *testing.T) string {
+		dir := t.TempDir()
+		if err := pack.ExtractNew(dir); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.RemoveAll(filepath.Join(dir, "computer")); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+	dir := siteOnly(t)
+	if err := pack.VerifyExtractedParts(dir, "site"); err != nil {
+		t.Fatal("exact site folder rejected", err)
+	}
+	if pack.VerifyExtracted(dir) == nil {
+		t.Fatal("a site-only folder passed the full check")
+	}
+	if pack.VerifyExtractedParts(dir, "computer") == nil || pack.VerifyExtractedParts(dir) == nil || pack.VerifyExtractedParts(dir, "missing") == nil || pack.VerifyExtractedParts(dir, "site/bin") == nil {
+		t.Fatal("wrong or empty part list accepted")
+	}
+	for name, alter := range map[string]func(string) error{
+		"tampered": func(d string) error {
+			data := append([]byte{}, c["site/bin/oblivion-collector"]...)
+			data[0] ^= 1
+			return os.WriteFile(filepath.Join(d, "site", "bin", "oblivion-collector"), data, 0600)
+		},
+		"missing":       func(d string) error { return os.Remove(filepath.Join(d, "site", "vendor", "autoload.php")) },
+		"extra in site": func(d string) error { return os.WriteFile(filepath.Join(d, "site", "extra.dll"), []byte("x"), 0600) },
+		"other part present": func(d string) error {
+			if err := os.Mkdir(filepath.Join(d, "computer"), 0700); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(d, "computer", "obli.exe"), c["computer/obli.exe"], 0600)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			d := siteOnly(t)
+			if err := alter(d); err != nil {
+				t.Fatal(err)
+			}
+			if pack.VerifyExtractedParts(d, "site") == nil {
+				t.Fatal("changed site folder accepted")
+			}
+		})
+	}
+}

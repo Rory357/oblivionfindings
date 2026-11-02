@@ -325,17 +325,25 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
         $hidden = $this->assignedDevice($hiddenSite, ['name' => 'Secret switch']);
 
         $this->actingAs($viewer)
-            ->get('/security-devices/devices')
+            ->get('/security-devices/devices?layout=list')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('devices.meta.total', 1)
-                ->where('stats.total', 1)
-                ->where('devices.data.0.id', $allowed->id));
+                ->where('list.meta.total', 1)
+                ->where('tabs.0.key', 'all')
+                ->where('tabs.0.count', 1)
+                ->where('list.rows.0.id', $allowed->id));
 
         $this->actingAs($viewer)
-            ->get('/security-devices/devices?search=Secret')
+            ->get('/security-devices/devices?layout=list&search=Secret')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('devices.meta.total', 0));
+            ->assertInertia(fn ($page) => $page->where('list.meta.total', 0));
+
+        // The new export (Devices › Export) keeps the same boundary.
+        $newExport = $this->actingAs($viewer)->get('/security-devices/exports/devices.csv');
+        $newExport->assertOk();
+        $newCsv = $newExport->streamedContent();
+        $this->assertStringContainsString('Visible switch', $newCsv);
+        $this->assertStringNotContainsString('Secret switch', $newCsv);
 
         $this->actingAs($viewer)
             ->get("/security-devices/devices/{$hidden->id}")

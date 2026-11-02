@@ -3,8 +3,11 @@
 namespace App\Services\Incidents;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /** Closed organisational routing intent, not a source-access or ownership grant. */
 final class IncidentRoutingValues
@@ -12,6 +15,17 @@ final class IncidentRoutingValues
     public static function digest(mixed $value): string
     {
         return hash('sha256', json_encode(self::canonical($value), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Log a scheduled routing/triage failure with ids and the refusal only, never incident content.
+     * A database error logs the driver message without the SQL or its bindings.
+     */
+    public static function logFailure(string $stage, Throwable $error, array $ids): void
+    {
+        $message = $error instanceof QueryException && $error->getPrevious() ? $error->getPrevious()->getMessage() : $error->getMessage();
+        Log::warning('Incident routing failure.', ['stage' => $stage, ...$ids,
+            'reason' => class_basename($error).': '.Str::limit(trim($message), 300)]);
     }
 
     private static function canonical(mixed $value): mixed

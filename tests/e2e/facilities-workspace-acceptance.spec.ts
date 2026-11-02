@@ -7,6 +7,12 @@ import {
     loginAsStaff,
 } from './helpers';
 
+// S&D rebuild C6 retired the Facilities & IoT workspace: facility sensors are on
+// Devices › Sensors and each sensor's own page, automations on Alerts › Rules &
+// automations. Those screens are covered by DevicesMenuPresenterTest,
+// SensorTrackerPagesTest, AutomationsTest and the pages' vitest files. What
+// stays here is the privacy promise: raw provider evidence never renders.
+
 async function expectNoPageOverflow(page: Page) {
     const layout = await page.evaluate(() => {
         const client = document.documentElement.clientWidth;
@@ -38,136 +44,88 @@ async function expectNoPageOverflow(page: Page) {
     ).toBeLessThanOrEqual(layout.client);
 }
 
-test.describe('Facilities & IoT specialist workspace', () => {
+async function expectPrivatePage(page: Page, route: string, rawSentinel: string) {
+    await expect(page.getByText(rawSentinel)).toHaveCount(0);
+    const source = await (await page.request.get(route)).text();
+    expect(source, `${route} source`).not.toContain(rawSentinel);
+    await expectNoPageOverflow(page);
+}
+
+test.describe('Facility sensors on Security & Devices', () => {
     let fixture: ReturnType<typeof seedFacilitiesWorkspaceReadinessFixtures>;
 
     test.beforeAll(() => {
         fixture = seedFacilitiesWorkspaceReadinessFixtures();
     });
 
-    test('native facility evidence remains clear, private, responsive and read-only', async ({
+    test('native facility evidence stays private and responsive on the new pages', async ({
         page,
     }) => {
         test.setTimeout(180_000);
         const errors = collectConsoleErrors(page);
 
         await loginAsStaff(page);
-        await page.goto('/security-devices/facilities-iot');
 
-        await expect(
-            page.getByRole('heading', {
-                name: 'Facilities & IoT',
-                level: 1,
-            }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole('heading', {
-                name: 'Facilities operations at a glance',
-                level: 2,
-            }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole('heading', {
-                name: 'Technical facilities evidence, not building control',
-                level: 2,
-            }),
-        ).toBeVisible();
-        await expect(page.getByText(fixture.siteName).first()).toBeVisible();
-        await expect(page.getByText('4 facility devices')).toBeVisible();
-        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
-        await expectNoPageOverflow(page);
+        for (const name of [
+            fixture.environmentName,
+            fixture.buildingName,
+            fixture.utilityName,
+            fixture.automationName,
+        ]) {
+            await test.step(name, async () => {
+                const listRoute = `/security-devices/devices?tab=sensors&q=${encodeURIComponent(name)}`;
+                await page.goto(listRoute);
+                await expect(
+                    page.getByRole('heading', {
+                        name: 'Devices',
+                        level: 1,
+                        exact: true,
+                    }),
+                ).toBeVisible();
+                const link = page
+                    .locator('a[href^="/security-devices/devices/"]', {
+                        hasText: name,
+                    })
+                    .first();
+                await expect(link).toBeVisible();
+                await expectPrivatePage(page, listRoute, fixture.rawSentinel);
 
-        const tabs = page.getByRole('navigation', {
-            name: 'Facilities & IoT workspace tabs',
-        });
+                const href = await link.getAttribute('href');
+                expect(href).toMatch(/^\/security-devices\/devices\/\d+$/);
+                await page.goto(href as string);
+                await expect(
+                    page.getByRole('heading', {
+                        name,
+                        level: 1,
+                        exact: true,
+                    }),
+                ).toBeVisible();
+                await expectPrivatePage(
+                    page,
+                    href as string,
+                    fixture.rawSentinel,
+                );
+            });
+        }
 
-        await tabs
-            .getByRole('link', { name: 'Environment', exact: true })
-            .click();
-        await expect(
-            page.getByRole('heading', {
-                name: 'Environmental sensor evidence',
-                level: 2,
-            }),
-        ).toBeVisible();
-        const environment = page.getByRole('article', {
-            name: fixture.environmentName,
-        });
-        await expect(environment).toContainText('3.2 C');
-        await expect(environment).toContainText('Fresh');
-        await expect(environment).toContainText(fixture.thresholdLabel);
-        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
-        await expectNoPageOverflow(page);
-
-        await tabs
-            .getByRole('link', { name: 'Building systems', exact: true })
-            .click();
-        const building = page.getByRole('article', {
-            name: fixture.buildingName,
-        });
-        await expect(building).toContainText('1 open maintenance item');
-        await expect(
-            building.getByRole('link', { name: 'Open maintenance' }),
-        ).toBeVisible();
-        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
-        await expectNoPageOverflow(page);
-
-        await tabs
-            .getByRole('link', { name: 'Utilities', exact: true })
-            .click();
-        const utility = page.getByRole('article', {
-            name: fixture.utilityName,
-        });
-        await expect(utility).toContainText('74.5 percent');
-        await expect(utility).toContainText(fixture.integrationName);
-        await expect(utility).toContainText('Last sync: Success');
-        await expect(utility).toContainText('Utility Metering');
-        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
-        await expectNoPageOverflow(page);
-
-        await tabs
-            .getByRole('link', { name: 'Automations', exact: true })
-            .click();
-        const automation = page.getByRole('article', {
-            name: fixture.automationName,
-        });
-        await expect(automation).toContainText(fixture.automationEvidenceName);
-        await expect(automation).toContainText('Last execution: Success');
-        await expect(
-            page.getByText(
-                'Automation controls remain read-only until governed command workflows are available.',
-                { exact: true },
-            ),
-        ).toBeVisible();
-        await expect(
-            automation.getByRole('button', {
-                name: /run|start|stop|enable|disable|switch|control/i,
-            }),
-        ).toHaveCount(0);
-        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
-        await expectNoPageOverflow(page);
-
-        await tabs.getByRole('link', { name: 'History', exact: true }).click();
-        await expect(
-            page.getByRole('heading', {
-                name: 'Facility history',
-                level: 2,
-            }),
-        ).toBeVisible();
-        const eventHistory = page
-            .getByRole('heading', { name: 'Device events', level: 3 })
-            .locator('..');
-        await expect(
-            eventHistory.getByText(fixture.thresholdLabel, { exact: true }),
-        ).toBeVisible();
-        await expect(
-            page.getByText(fixture.environmentMonitorName),
-        ).toBeVisible();
-        await expect(
-            page.getByRole('link', { name: 'Export events' }),
-        ).toHaveAttribute('href', /domain=facilities/);
-        await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
-        await expectNoPageOverflow(page);
+        for (const [route, heading] of [
+            ['/security-devices/alerts', 'Alerts'],
+            ['/security-devices/alerts?tab=rules', 'Alerts'],
+            ['/security-devices/setup/services?tab=connected', 'Setup'],
+            ['/security-devices/setup/history', 'Setup'],
+        ] as const) {
+            await test.step(route, async () => {
+                await page.goto(route);
+                await expect(
+                    page.getByRole('heading', {
+                        name: heading,
+                        level: 1,
+                        exact: true,
+                    }),
+                ).toBeVisible();
+                await expectPrivatePage(page, route, fixture.rawSentinel);
+            });
+        }
 
         expectNoConsoleErrors(errors);
     });

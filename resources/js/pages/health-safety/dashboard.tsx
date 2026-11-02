@@ -14,6 +14,7 @@ import { SkeletonCard, SkeletonStats } from '@/components/ui/skeleton-card';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { hsLabel, hsVariant } from '@/lib/health-safety/hs-labels';
 import AppLayout from '@/layouts/app-layout';
+import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState, type ReactNode } from 'react';
 
@@ -47,6 +48,7 @@ import { ReportIncidentDialog } from './components/report-incident-dialog';
 import { ReportLauncher } from './components/report-launcher';
 import { reportPageFor } from './components/report-pages';
 import { RoleStart } from './components/role-start';
+import { CloseAnywayWorklist } from './components/close-anyway-worklist';
 import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { completedAgo, HsWorklists, type WorklistsPayload } from './components/worklists';
 import type { ParticipationCoverage } from './participation-source-state';
@@ -117,6 +119,8 @@ type Props = {
     incident_stages?: IncidentStagesData | null;
     /** G2: which four header boxes this person gets (the boxes themselves load as `header_boxes`). */
     header_box_set?: HeaderBoxes['set'];
+    /** Board M11: this person decides close-anyway requests, so the Overview leads with the ones waiting. */
+    close_anyway_decider?: boolean;
     /** G2: incident charts need incident read; otherwise the chart row is the hazard version. */
     header_chart_kind?: 'incidents' | 'hazards';
 
@@ -195,10 +199,12 @@ export default function HealthSafetyDashboard({
     worklists,
     incident_stages = null,
     header_box_set,
+    close_anyway_decider = false,
     header_chart_kind,
 }: Props) {
     // A tab can be opened from a link (?tab=leading); unknown values fall back to the overview.
     const pageUrl = usePage().url;
+    const viewerName = usePage<SharedData>().props.auth?.user?.name ?? null;
     const [tab, setTab] = useState<string>(() => {
         const requested = new URLSearchParams(pageUrl.split('?')[1] ?? '').get('tab');
         return requested && ['overview', 'leading', 'lagging', 'compliance'].includes(requested) ? requested : 'overview';
@@ -425,6 +431,7 @@ export default function HealthSafetyDashboard({
                         // side column. The person's own numbers sit in the header.
                         <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                             <div className="grid min-w-0 gap-5">
+                                <CloseAnywayWorklist enabled={close_anyway_decider} viewerName={viewerName} />
                                 <DeferredPanel<WorkValues & { queue: OverviewQueueData }>
                                     data={[...WORK_KEYS, 'queue']}
                                     label="Your queue"

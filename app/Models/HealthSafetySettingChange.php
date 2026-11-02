@@ -13,6 +13,9 @@ final class HealthSafetySettingChange extends Model
 
     protected $guarded = [];
 
+    /** recorded_at is datetime(6); routing and independence settings digest it to the microsecond. */
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     protected function casts(): array
     {
         return [

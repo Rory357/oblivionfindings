@@ -10,8 +10,9 @@ use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * Q4 (Stephan, 31 Oct): provider managers take on and act on H&S items at their sites, H&S items only, with no restraint
- * access. The seeder and the grant migration agree: hazards.manage, no restraint keys, no all-Sites key.
+ * Q4 (Stephan, 31 Oct): provider managers take on and act on H&S items at their sites, H&S items only. The seeder and the
+ * grant migration agree: hazards.manage, no all-Sites key, and no restraint key copied from hazards.* — their only
+ * restraint key is restraints.view, granted on its own by Q21 (Stephan, 2 Nov 2026: "Yes, their Sites").
  */
 class ProviderManagerHazardsManageGrantTest extends TestCase
 {
@@ -26,7 +27,7 @@ class ProviderManagerHazardsManageGrantTest extends TestCase
 
         $this->assertContains('hazards.view', $keys);
         $this->assertContains('hazards.manage', $keys);
-        $this->assertSame([], array_values(array_filter($keys, fn (string $key) => str_starts_with($key, 'restraints.'))), 'No restraint keys.');
+        $this->assertSame(['restraints.view'], array_values(array_filter($keys, fn (string $key) => str_starts_with($key, 'restraints.'))), 'Only restraints.view (Q21).');
         $this->assertNotContains('healthSafety.viewAllSites', $keys, 'Their own Sites only.');
         // The copy rule still serves every other role that holds hazards.manage.
         $this->assertContains('restraints.manage', $this->keys('team_lead'));
@@ -47,7 +48,7 @@ class ProviderManagerHazardsManageGrantTest extends TestCase
 
         $this->assertSame(1, DB::table('role_permission')->where('role_id', $role->id)->where('permission_id', $manage->id)->count());
         $this->assertEqualsCanonicalizing([...$before, 'hazards.manage'], $this->keys('provider_manager'));
-        $this->assertSame([], array_values(array_filter($this->keys('provider_manager'), fn (string $key) => str_starts_with($key, 'restraints.'))));
+        $this->assertSame(['restraints.view'], array_values(array_filter($this->keys('provider_manager'), fn (string $key) => str_starts_with($key, 'restraints.'))), 'Q4 adds no restraint key; restraints.view is Q21\'s.');
         $this->assertSame($others, $this->otherRoles(), 'No other role changes.');
 
         $migration->down();

@@ -29,7 +29,7 @@ final class CctvAuthority
             abort_if($actor->role === $role || $actor->hasRole($role), 404, 'unavailable');
         }
         abort_if(SecurityPolicy::forceTwoFactor() && ! $actor->two_factor_confirmed_at, 404, 'unavailable');
-        abort_unless($actor->canDo('securityDevices.viewAny') && ($manage ? $actor->canDo('securityDevices.integrations.manage') && $actor->canDo('securityDevices.devices.update') : ($viewOnly || $actor->canDo('securityDevices.cctv.media.view'))), 404, 'unavailable');
+        abort_unless($actor->canDo('securityDevices.viewAny') && ($manage ? $actor->canDo('securityDevices.integrations.manage') && $actor->canDo('securityDevices.devices.update') : ($viewOnly || ($actor->canDo('securityDevices.cctv.media.view') && $actor->canDo('securityDevices.cctv.live.watch')))), 404, 'unavailable');
 
         return $actor;
     }

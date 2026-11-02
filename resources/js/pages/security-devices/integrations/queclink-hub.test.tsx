@@ -259,7 +259,7 @@ describe('Queclink shared page and record views', () => {
             within(
                 screen.getByRole('navigation', { name: 'Breadcrumbs' }),
             ).getByRole('link', { name: 'Integrations' }),
-        ).toHaveAttribute('href', '/security-devices/integrations');
+        ).toHaveAttribute('href', '/security-devices/setup/services?tab=connected');
         expect(
             screen.getByText('30 of 32 matching trackers paired'),
         ).toBeVisible();

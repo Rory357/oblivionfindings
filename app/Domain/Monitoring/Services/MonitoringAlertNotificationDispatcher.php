@@ -17,25 +17,31 @@ final class MonitoringAlertNotificationDispatcher
         private readonly EffectiveMonitoringPolicyResolver $policies,
     ) {}
 
+    /**
+     * Tell the people the alert route names. Returns who was told and how, for the alert timeline
+     * (S&D Phase D), or null when nobody was.
+     *
+     * @return array{names: list<string>, channels: list<string>}|null
+     */
     public function dispatchTransition(
         Monitor $monitor,
         MonitorObservation $observation,
         int $siteId,
         MonitorState $from,
         MonitorState $to,
-    ): void {
+    ): ?array {
         $monitor->loadMissing('device');
         $device = $monitor->device;
         if ($device === null || (string) $device->domain !== 'it_infrastructure') {
-            return;
+            return null;
         }
 
         if ($to === MonitorState::Suppressed || $to === $from) {
-            return;
+            return null;
         }
 
         if (! in_array($to, [MonitorState::Degraded, MonitorState::Failed], true)) {
-            return;
+            return null;
         }
 
         $route = $this->policies->resolveAlertRoute($device, $monitor, $siteId);
@@ -50,14 +56,18 @@ final class MonitoringAlertNotificationDispatcher
         if ($notifyEmail) {
             $channels[] = 'mail';
         }
-
-        if ($channels === []) {
-            return;
+        if ($isCritical && (bool) ($route['critical_notify_push'] ?? false)) {
+            $channels[] = 'push';
         }
 
-        $recipients = $this->policies->resolveItRecipients($siteId, $route['recipient_role']);
+        if ($channels === []) {
+            return null;
+        }
+
+        // S&D 13d: the IT person on call (Rostering) is told first; the rest hear at the one-hour reminder.
+        $recipients = app(\App\Domain\SecurityDevices\Alerts\ItOnCall::class)->first($this->policies->resolveItRecipients($siteId, $route['recipient_role']));
         if ($recipients->isEmpty()) {
-            return;
+            return null;
         }
 
         $severity = $isCritical ? 'critical' : 'warning';
@@ -88,6 +98,8 @@ final class MonitoringAlertNotificationDispatcher
                     'alert_route_id' => $route['rule_id'],
                 ],
             ));
+
+            return ['names' => $recipients->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all(), 'channels' => $channels];
         } catch (Throwable $exception) {
             Log::warning('Technical monitoring alert notification could not be dispatched', [
                 'monitor_id' => $monitor->id,
@@ -96,6 +108,8 @@ final class MonitoringAlertNotificationDispatcher
                 'state' => $to->value,
                 'error' => $exception->getMessage(),
             ]);
+
+            return null;
         }
     }
 }

@@ -168,7 +168,7 @@ const base = '/security-devices/integrations/milesight';
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/dashboard' },
     { title: 'Security & Devices', href: '/security-devices' },
-    { title: 'Integrations', href: '/security-devices/integrations' },
+    { title: 'Integrations', href: '/security-devices/setup/services?tab=connected' },
     { title: 'Milesight', href: base },
 ];
 const views = [

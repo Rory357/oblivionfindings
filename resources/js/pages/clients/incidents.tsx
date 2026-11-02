@@ -44,6 +44,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 type Props = {
     client: {
@@ -572,6 +573,15 @@ export default function ClientIncidents({
                                                     onClick={() =>
                                                         router.post(
                                                             `/incidents/${i.id}/submit`,
+                                                            {},
+                                                            {
+                                                                preserveScroll: true,
+                                                                onError: (errors) =>
+                                                                    toast.error(
+                                                                        Object.values(errors)[0] ??
+                                                                            'This report couldn’t be submitted just now.',
+                                                                    ),
+                                                            },
                                                         )
                                                     }
                                                 >

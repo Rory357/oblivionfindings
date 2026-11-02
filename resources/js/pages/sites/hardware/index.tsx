@@ -615,7 +615,7 @@ export function SiteHardwareSurface({
                         </div>
                         <div className="flex flex-wrap gap-2 sm:ml-auto">
                             <Button asChild size="sm" variant="outline">
-                                <a href="/security-devices/integrations">
+                                <a href="/security-devices/setup/services?tab=connected">
                                     <ExternalLink className="mr-1 h-3.5 w-3.5" />
                                     APIs &amp; Integrations
                                 </a>

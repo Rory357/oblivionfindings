@@ -18,7 +18,7 @@ import {
 } from './types';
 
 export const PRESERVATION_NOTICE =
-    'Preservation holds override scheduled disposal only for their authorised scope. While a hold is active, senders cannot edit or remove messages in that conversation. Retention is not configured, and Chat does not export conversations.';
+    'Preservation holds override scheduled disposal only for their authorised scope. While a hold is active, senders cannot edit or remove messages in that conversation. Retention is not configured. Exports are made by an investigator from an active case view: a watermarked PDF of the granted conversations only, with every export logged.';
 
 /** Mockup M22 "Exports and preservation": case, reason, reviewed authority, then a logged hold. */
 export function PreservationHolds({

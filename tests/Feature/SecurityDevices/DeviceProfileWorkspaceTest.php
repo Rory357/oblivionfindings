@@ -155,7 +155,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         $controlRoomAlert = $this->createControlRoomAlert($device, $site);
 
         $response = $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}");
+            ->get("/security-devices/devices/{$device->id}?section=health");
 
         $response->assertOk()->assertInertia(function ($page) use ($controlRoomAlert, $site, $ticket, $sentinel): void {
             $props = $page->toArray()['props'];
@@ -216,7 +216,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}")
+            ->get("/security-devices/devices/{$device->id}?section=health")
             ->assertOk()
             ->assertInertia(function ($page) use ($vehicle): void {
                 $location = $page->toArray()['props']['profile']['header']['location'];
@@ -263,7 +263,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         $this->assertFalse($viewer->canDo('fleet.viewAny'));
 
         $this->actingAs($viewer)
-            ->get("/security-devices/devices/{$device->id}")
+            ->get("/security-devices/devices/{$device->id}?section=health")
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $location = $page->toArray()['props']['profile']['header']['location'];
@@ -292,7 +292,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}")
+            ->get("/security-devices/devices/{$device->id}?section=health")
             ->assertOk()
             ->assertInertia(function ($page) use ($asset): void {
                 $link = $page->toArray()['props']['assetLinks'][0];
@@ -347,7 +347,7 @@ class DeviceProfileWorkspaceTest extends TestCase
             [$tracking, 'location'],
         ] as [$device, $tab]) {
             $this->actingAs($this->admin)
-                ->get("/security-devices/devices/{$device->id}")
+                ->get("/security-devices/devices/{$device->id}?section=health")
                 ->assertOk()
                 ->assertInertia(function ($page) use ($client, $tab): void {
                     $location = $page->toArray()['props']['profile']['header']['location'];
@@ -376,7 +376,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         $this->assertFalse($itManager->canDo('clients.viewAssigned'));
 
         $denied = $this->actingAs($itManager)
-            ->get("/security-devices/devices/{$healthcare->id}");
+            ->get("/security-devices/devices/{$healthcare->id}?section=health");
 
         $denied->assertNotFound();
         $this->assertStringNotContainsString('Mere Rangi', $denied->getContent());
@@ -407,7 +407,7 @@ class DeviceProfileWorkspaceTest extends TestCase
 
         $response = $this->actingAs($this->admin)
             ->withSession(['auth.password_confirmed_at' => now()->timestamp])
-            ->get("/security-devices/devices/{$device->id}");
+            ->get("/security-devices/devices/{$device->id}?section=health");
 
         $response->assertOk()->assertInertia(function ($page): void {
             $props = $page->toArray()['props'];
@@ -459,9 +459,9 @@ class DeviceProfileWorkspaceTest extends TestCase
         ]);
 
         $configuredResponse = $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$configured->id}");
+            ->get("/security-devices/devices/{$configured->id}?section=health");
         $unknownResponse = $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$unknown->id}");
+            ->get("/security-devices/devices/{$unknown->id}?section=health");
 
         $configuredResponse->assertOk()->assertInertia(function ($page): void {
             $capabilities = $page->toArray()['props']['profile']['capabilities'];
@@ -509,7 +509,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}");
+            ->get("/security-devices/devices/{$device->id}?section=health");
 
         $response->assertOk()->assertInertia(function ($page) use ($observedAt): void {
             $header = $page->toArray()['props']['profile']['header'];
@@ -555,7 +555,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}")
+            ->get("/security-devices/devices/{$device->id}?section=health")
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $header = $page->toArray()['props']['profile']['header'];
@@ -582,7 +582,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}")
+            ->get("/security-devices/devices/{$device->id}?section=health")
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $header = $page->toArray()['props']['profile']['header'];
@@ -615,7 +615,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         $this->createControlRoomAlert($device, $site);
 
         $this->actingAs($viewer)
-            ->get("/security-devices/devices/{$device->id}")
+            ->get("/security-devices/devices/{$device->id}?section=health")
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $props = $page->toArray()['props']['profile'];
@@ -662,7 +662,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         $this->createControlRoomAlert($device, $unrelatedSite);
 
         $this->actingAs($viewer)
-            ->get("/security-devices/devices/{$device->id}")
+            ->get("/security-devices/devices/{$device->id}?section=health")
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $alert = $page->toArray()['props']['profile']['controlRoomAlerts'][0];
@@ -695,7 +695,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}");
+            ->get("/security-devices/devices/{$device->id}?section=health");
 
         $response->assertOk()->assertInertia(function ($page): void {
             $monitors = $page->toArray()['props']['profile']['monitors'];
@@ -769,7 +769,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         $this->createControlRoomAlert($device, $site);
 
         $response = $this->actingAs($this->worker)
-            ->get("/security-devices/devices/{$device->id}");
+            ->get("/security-devices/devices/{$device->id}?section=health");
 
         $response->assertOk()->assertInertia(function ($page): void {
             $props = $page->toArray()['props'];
@@ -831,7 +831,7 @@ class DeviceProfileWorkspaceTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->worker)
-            ->get("/security-devices/devices/{$device->id}");
+            ->get("/security-devices/devices/{$device->id}?section=health");
 
         $response->assertOk()->assertInertia(function ($page): void {
             $props = $page->toArray()['props']['profile'];

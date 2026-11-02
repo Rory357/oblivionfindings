@@ -48,7 +48,7 @@ func TestBootstrapRejectsAmbiguousExpiredAndUnboundedProfiles(t *testing.T) {
 		"old version":     func(p *Bootstrap) { p.Version = 2 },
 		"Linux":           func(p *Bootstrap) { p.Platform = "linux" },
 		"expired":         func(p *Bootstrap) { p.ExpiresAt = time.Now().Add(-time.Second).Format(time.RFC3339Nano) },
-		"too long":        func(p *Bootstrap) { p.ExpiresAt = time.Now().Add(time.Hour).Format(time.RFC3339Nano) },
+		"too long":        func(p *Bootstrap) { p.ExpiresAt = time.Now().Add(25 * time.Hour).Format(time.RFC3339Nano) }, // setup codes live 24 hours (D2)
 		"bad expiry":      func(p *Bootstrap) { p.ExpiresAt = "tomorrow" },
 		"http":            func(p *Bootstrap) { p.ServerURL = "http://care.example.nz" },
 		"path":            func(p *Bootstrap) { p.ServerURL += "/other" },

@@ -67,7 +67,7 @@ final class ChemicalCommandValues
             self::invalid($field, 'Use a real YYYY-MM-DD calendar date.');
         }
         if ($actual && $value > now('Pacific/Auckland')->toDateString()) {
-            self::invalid($field, 'A completed fact cannot be dated in the future.');
+            self::invalid($field, 'This date is in the future. Enter the day it actually happened.');
         }
 
         return $value;
@@ -91,7 +91,7 @@ final class ChemicalCommandValues
         }
         $instant = Carbon::parse($value)->utc();
         if ($actual && $instant->gt(now())) {
-            self::invalid($field, 'An actual fact cannot be recorded in the future.');
+            self::invalid($field, 'This is in the future. Enter when it actually happened.');
         }
 
         return $instant->format('Y-m-d H:i:s.u');

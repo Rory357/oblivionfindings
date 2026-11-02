@@ -244,6 +244,20 @@ class SafeWorkProcedureLifecycleWorkspaceTest extends TestCase
         $this->assertSame('draft', $record->fresh()->status);
     }
 
+    public function test_an_every_site_procedure_says_why_a_one_site_owner_is_refused(): void
+    {
+        // E2E (2 Nov 2026): the owner list is built before "Applies to" is chosen; the refusal now says why.
+        $this->grant($this->writer, 'healthSafety.viewAllSites');
+        $owner = $this->worker($this->site);
+        $this->grant($owner, 'procedures.manage');
+        $data = [...$this->content(), 'applicable_sites' => [], 'owner_id' => $owner->id];
+
+        $this->post('/health-safety/procedures', $data)->assertSessionHasErrors([
+            'owner_id' => 'This procedure applies to every Site, so its owner must work across all Sites. Choose another owner, or limit “Applies to” to their Sites.',
+        ]);
+        $this->assertNull(SafeWorkProcedure::where('reference_number', $data['reference_number'])->first());
+    }
+
     public function test_owner_must_be_named_current_document_manager_without_hs_owner_inference(): void
     {
         $other = $this->worker($this->site);

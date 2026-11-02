@@ -22,6 +22,15 @@ final readonly class EnvelopeVerifier
         $this->publicKey = $decoded;
     }
 
+    /** S&D Phase G: whether these exact bytes carry the server's signature (a terminal "open"). */
+    public function verifyDetached(string $bytes, mixed $signatureBase64): bool
+    {
+        $signature = is_string($signatureBase64) ? base64_decode($signatureBase64, true) : false;
+
+        return is_string($signature) && strlen($signature) === SODIUM_CRYPTO_SIGN_BYTES
+            && sodium_crypto_sign_verify_detached($signature, $bytes, $this->publicKey);
+    }
+
     /** @return array<string, mixed> */
     public function verify(string $envelope): array
     {

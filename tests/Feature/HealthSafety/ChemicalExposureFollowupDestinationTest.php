@@ -41,14 +41,16 @@ final class ChemicalExposureFollowupDestinationTest extends ChemicalExposureComm
 
     public function test_assignment_is_pending_until_actual_inbox_persistence_and_confirmation_is_database_only(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned();
         $this->assertSame('pending', $row->state); $this->assertSame(0, DatabaseNotification::count());
         $this->assertSame('unconfirmed', $this->destination()->confirmationForViewer($this->manager, $row->id)['destination_confirmation']);
         $result = $this->destination()->deliverForViewer($this->manager, $row->id);
         $this->assertSame('inbox_present', $result['destination_confirmation']); $this->assertSame('not_attempted', $result['external_delivery']);
         $n = $this->notification(); $this->assertSame($receiver->id, (int) $n->notifiable_id);
-        $this->assertSame(['kind' => 'private_followup', 'title' => 'Assigned follow-up', 'body' => null, 'url' => null, 'delivery_id' => $row->id], $n->data);
+        // MySQL's json column hands the keys back in its own order; the values and keys are compared exactly.
+        $expected = ['kind' => 'private_followup', 'title' => 'Assigned follow-up', 'body' => null, 'url' => null, 'delivery_id' => $row->id];
+        $actual = $n->data; ksort($expected); ksort($actual);
+        $this->assertSame($expected, $actual);
         $serialized = json_encode($n->data, JSON_THROW_ON_ERROR);
         foreach (['PRIVATE', 'worker_id', 'client_id', 'site_id', 'path', 'instruction', 'symptoms', 'idempotency_key'] as $private) { $this->assertStringNotContainsString($private, $serialized); }
         $this->assertSame(2, $root->fresh()->source_revision);

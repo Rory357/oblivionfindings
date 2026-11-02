@@ -52,3 +52,32 @@ func TestSelectedServicesPreserveSeparateFixedIdentities(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// After a hub updates itself, only the hub service moves to the live release folder; Obli's
+// service and the recorded attempt stay as setup made them, so ownership is still checked.
+func TestHubServiceFollowsTheLiveReleaseFolderOnly(t *testing.T) {
+	j := newJournal()
+	j.Role = "both"
+	live := "r-41-" + strings.Repeat("c", 32)
+	j.siteStage = live
+	specs, err := selectedServices(&j)
+	if err != nil || len(specs) != 2 {
+		t.Fatal(err)
+	}
+	if !strings.Contains(specs[0].command, j.Stage) || strings.Contains(specs[0].command, live) {
+		t.Fatal("Obli's service moved with the hub")
+	}
+	if !strings.Contains(specs[1].command, live) || strings.Contains(specs[1].command, j.Stage) {
+		t.Fatal("the hub service doesn't use the live folder")
+	}
+	if !strings.HasSuffix(specs[1].description, j.Attempt) {
+		t.Fatal("the hub service lost its installation attempt")
+	}
+	recorded := j
+	recorded.siteStage = ""
+	before, _ := selectedServices(&recorded)
+	movedConfig := mgr.Config{BinaryPathName: specs[1].command, Description: specs[1].description, ServiceType: windows.SERVICE_WIN32_OWN_PROCESS, ServiceStartName: "LocalSystem", SidType: windows.SERVICE_SID_TYPE_UNRESTRICTED}
+	if ownsServiceSpecConfig(movedConfig, before[1]) || !ownsServiceSpecConfig(movedConfig, specs[1]) {
+		t.Fatal("a moved hub service must match the live folder and nothing else")
+	}
+}

@@ -36,12 +36,39 @@ class SecurityDevicesAccessService
 
     private ?int $currentDeviceId = null;
 
+    /**
+     * Each viewer's Sites, worked out once per service object. The object is
+     * request-scoped, so a new request or queue job reads them again. The
+     * locked current-evidence copy never reads or fills this.
+     *
+     * @var array<string, list<int>>
+     */
+    private array $accessibleSiteIdsCache = [];
+
+    /**
+     * The request the cache belongs to. A new request object (the next HTTP
+     * request, even inside one test) starts an empty cache.
+     *
+     * @var \WeakReference<object>|null
+     */
+    private ?\WeakReference $cacheRequest = null;
+
+    /**
+     * Whether `users.site_id` exists, per connection and database. The schema
+     * only changes on deploy, which restarts every PHP process.
+     *
+     * @var array<string, bool>
+     */
+    private static array $usersSitePointerColumn = [];
+
     public function forCurrentEvidence(CurrentAuthorizationReads $reads, int $deviceId): self
     {
         $reads->assertActive();
         $current = clone $this;
         $current->currentReads = $reads;
         $current->currentDeviceId = $deviceId;
+        $current->accessibleSiteIdsCache = [];
+        $current->cacheRequest = null;
 
         return $current;
     }
@@ -76,6 +103,26 @@ class SecurityDevicesAccessService
     /** @return list<int> */
     public function accessibleSiteIds(User $user): array
     {
+        if ($this->currentReads) {
+            return $this->resolveAccessibleSiteIds($user);
+        }
+
+        $request = app()->bound('request') ? app('request') : null;
+        if ($request !== null && $this->cacheRequest?->get() !== $request) {
+            $this->accessibleSiteIdsCache = [];
+            $this->cacheRequest = \WeakReference::create($request);
+        }
+
+        // Keyed by the viewer object as well as its id, like UserSiteAccessService:
+        // a freshly loaded User (for example after a role change) reads again.
+        $key = ($user->getKey() ?? 'unsaved').'|'.spl_object_id($user);
+
+        return $this->accessibleSiteIdsCache[$key] ??= $this->resolveAccessibleSiteIds($user);
+    }
+
+    /** @return list<int> */
+    private function resolveAccessibleSiteIds(User $user): array
+    {
         if ($this->canViewAllSites($user)) {
             return $this->operationalSites()->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
         }
@@ -98,7 +145,7 @@ class SecurityDevicesAccessService
 
         // Historic schemas may carry a direct pointer. It is accepted only as
         // a Site identifier; Site remains the canonical authorization record.
-        if (Schema::hasColumn('users', 'site_id')) {
+        if ($this->usersHaveSitePointer()) {
             $ids->push($this->current(User::query())->whereKey($user->getKey())->value('site_id'));
         }
 
@@ -117,6 +164,14 @@ class SecurityDevicesAccessService
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
+    }
+
+    private function usersHaveSitePointer(): bool
+    {
+        $connection = User::query()->getConnection();
+        $key = $connection->getName().'|'.$connection->getDatabaseName();
+
+        return self::$usersSitePointerColumn[$key] ??= Schema::connection($connection->getName())->hasColumn('users', 'site_id');
     }
 
     public function canViewAllSites(User $user): bool

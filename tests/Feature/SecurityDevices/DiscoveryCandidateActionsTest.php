@@ -68,20 +68,22 @@ class DiscoveryCandidateActionsTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($this->admin)
+        // S&D rebuild C6: Discovery & collectors is gone; a scan's candidates show on Found devices.
+        $this->actingAs($this->admin)
             ->get('/security-devices/discovery?tab=candidates')
+            ->assertRedirect('/security-devices/setup/hubs?tab=networks');
+
+        $response = $this->actingAs($this->admin)
+            ->get('/security-devices/scans/'.$run->id)
             ->assertOk();
 
         $json = json_encode($response->viewData('page')['props']);
         $this->assertStringNotContainsString('super-secret-community-string', (string) $json);
 
-        $candidatePayload = $response->viewData('page')['props']['workspace']['candidates'][0];
-        $this->assertSame('lobby-cam-01.local', $candidatePayload['hostname']);
-        $this->assertSame('172.16.0.50', $candidatePayload['ip_address']);
-        $this->assertSame('AA:BB:CC:11:22:33', $candidatePayload['mac_address']);
-        $this->assertNotNull($candidatePayload['actions']['adopt_url']);
-        $this->assertNotNull($candidatePayload['actions']['same_as_url']);
-        $this->assertNotNull($candidatePayload['actions']['ignore_url']);
+        $candidatePayload = $response->viewData('page')['props']['rows'][0];
+        $this->assertStringContainsString('lobby-cam-01.local', (string) $candidatePayload['sub']);
+        $this->assertSame('172.16.0.50', $candidatePayload['address']);
+        $this->assertTrue($candidatePayload['actionable']);
     }
 
     public function test_adopt_same_as_ignore_and_adopt_all_workflow(): void

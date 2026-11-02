@@ -42,7 +42,7 @@ func TestCollectorProfileRejectsAmbiguousOrInvalidMaterial(t *testing.T) {
 	}
 	mutations := map[string]func(*Bootstrap){
 		"expired":    func(b *Bootstrap) { b.ExpiresAt = time.Now().Add(-time.Minute).Format(time.RFC3339) },
-		"long grant": func(b *Bootstrap) { b.ExpiresAt = time.Now().Add(time.Hour).Format(time.RFC3339) },
+		"long grant": func(b *Bootstrap) { b.ExpiresAt = time.Now().Add(25 * time.Hour).Format(time.RFC3339) }, // setup codes live 24 hours (D2)
 		"linux":      func(b *Bootstrap) { b.Platform = "linux" },
 		"token":      func(b *Bootstrap) { b.Token = "raw-secret" },
 		"uuid":       func(b *Bootstrap) { b.CollectorUUID = strings.ToUpper(b.CollectorUUID) + "x" },

@@ -13,7 +13,7 @@
  * (app.css `.eh-*`), never the brand.
  */
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Check, MousePointerClick, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -216,6 +216,98 @@ export function PageHeaderStages({
                         </span>
                     </li>
                 ))}
+            </ol>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Round status steps — the step picker                               */
+/* ------------------------------------------------------------------ */
+
+export interface PageHeaderStep {
+    key: string;
+    label: string;
+    /** Under the label: a date, "Not yet", "1 of 2 done". */
+    meta?: ReactNode;
+    /** `failed`: a check said it didn't work (the record is on this step). */
+    state: 'done' | 'now' | 'failed' | 'todo';
+}
+
+/**
+ * A record's round status steps (H&S G3/G4 boards, approved by Stephan 2026-11-01, decision 26). With `onSelect` they
+ * are the step picker: the step the record is on is picked when the page opens, and picking another shows what was
+ * added there in the Progress card under the header. The next step never lives here (it is the card's fixed bar).
+ */
+export function PageHeaderSteps({
+    steps,
+    selected,
+    onSelect,
+    hint = 'Pick a step to see what was added there',
+    ariaLabel = 'Progress',
+}: {
+    steps: PageHeaderStep[];
+    selected?: string | null;
+    onSelect?: (key: string) => void;
+    hint?: string | null;
+    ariaLabel?: string;
+}) {
+    if (!steps.length) return null;
+    const current = steps.find((s) => s.state === 'now' || s.state === 'failed');
+    return (
+        <div className="eh-rsteps-wrap">
+            {onSelect && hint ? (
+                <p className="eh-rsteps-hint">
+                    <MousePointerClick aria-hidden="true" />
+                    {hint}
+                </p>
+            ) : null}
+            <ol
+                className="eh-rsteps"
+                aria-label={current ? `${ariaLabel}: ${current.label}` : ariaLabel}
+                style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+            >
+                {steps.map((s) => {
+                    const picked = selected === s.key;
+                    const inner = (
+                        <>
+                            <b>{s.label}</b>
+                            {s.meta ? <span>{s.meta}</span> : null}
+                            <span className="sr-only">
+                                {s.state === 'done'
+                                    ? ' (done)'
+                                    : s.state === 'failed'
+                                      ? ' (current: a check didn’t work)'
+                                      : s.state === 'now'
+                                        ? ' (current)'
+                                        : ' (not started)'}
+                            </span>
+                        </>
+                    );
+                    return (
+                        <li
+                            key={s.key}
+                            aria-current={s.state === 'now' || s.state === 'failed' ? 'step' : undefined}
+                            className={cn('eh-rstep', `eh-rstep--${s.state}`, picked && 'eh-rstep--picked')}
+                        >
+                            <span className="eh-rstep-dot" aria-hidden="true">
+                                {s.state === 'done' ? <Check /> : s.state === 'failed' ? <X /> : s.state === 'now' ? <i /> : null}
+                            </span>
+                            {onSelect ? (
+                                <button
+                                    type="button"
+                                    className="eh-rstep-label"
+                                    aria-pressed={picked}
+                                    onClick={() => onSelect(s.key)}
+                                >
+                                    {inner}
+                                </button>
+                            ) : (
+                                <span className="eh-rstep-label">{inner}</span>
+                            )}
+                        </li>
+                    );
+                })}
             </ol>
         </div>
     );

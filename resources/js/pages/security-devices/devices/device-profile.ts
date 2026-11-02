@@ -1,6 +1,7 @@
 import type { CctvNavigation } from '@/components/security-devices/cctv-navigation-actions';
 import type { NativeMonitorManagement } from '@/components/security-devices/native-monitor-dialogs';
 import type { ControlRoomAlertAccess } from '@/components/security-devices/permission-destinations';
+import type { SshHostKeyState } from '@/components/security-devices/ssh-host-key-notice';
 import type { RestartRequest } from '@/pages/it/remote-support/restart-request-state';
 import type { SoftwareRequest } from '@/pages/it/remote-support/software-request-state';
 
@@ -503,6 +504,8 @@ export type DeviceProfile = {
     configuration: {
         canViewSnapshots?: boolean;
         backupActionHref?: string | null;
+        /** Phase A, item A6: the trusted SSH key and any key waiting to be checked. */
+        sshHostKey?: SshHostKeyState | null;
         latestSnapshot?: DeviceConfigurationSnapshot | null;
         snapshotHistory?: DeviceConfigurationSnapshot[];
         snapshotHistoryTruncated?: boolean;

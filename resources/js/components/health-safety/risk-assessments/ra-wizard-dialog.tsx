@@ -4,6 +4,7 @@
  * colour is a semantic design token. One component drives all seven workflows: the
  * multi-step New/Edit/Supersede and the single-step Approve/Mark-for-review/Record-
  * residual/Archive (each a one-step WizardShell so the chrome stays identical). */
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -998,13 +999,12 @@ export function RaWizardDialog({
                             />
                         </div>
                         <Field label="Next review due" hint="(optional)">
-                            <Input
-                                type="date"
+                            <DatePicker
+                                id="ra-wizard-review-due"
+                                label="Next review due"
                                 value={data.review_due_at}
-                                onChange={(e) =>
-                                    setData('review_due_at', e.target.value)
-                                }
-                                className="w-60"
+                                allowClear
+                                onChange={(value) => setData('review_due_at', value)}
                             />
                         </Field>
                         <InfoCard icon={Info}>

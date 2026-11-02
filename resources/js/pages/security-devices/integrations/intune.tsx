@@ -285,7 +285,7 @@ export default function IntuneIntegrationPage(props: IntuneIntegrationProps) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Home', href: '/dashboard' },
         { title: 'Security & Devices', href: '/security-devices' },
-        { title: 'Integrations', href: '/security-devices/integrations' },
+        { title: 'Integrations', href: '/security-devices/setup/services?tab=connected' },
         {
             title: 'Microsoft Intune',
             href: '/security-devices/integrations/intune',

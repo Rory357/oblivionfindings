@@ -85,6 +85,8 @@ import {
 type EventRow = {
     id: number;
     reference: string;
+    /** Decision 15: the record's own plain title, the same as on its record and its safety review. */
+    title?: string;
     client: { id: number; name: string };
     site: { id: number; name: string } | null;
     restraint_type: string;
@@ -497,11 +499,11 @@ function EventTable({
     const columns: RecordTableColumn<EventRow>[] = [
         {
             key: 'person',
-            label: 'Person',
+            label: 'Restraint',
             className: 'min-w-[14rem]',
             cell: (row) => (
                 <RecordIdentity
-                    title={row.client.name}
+                    title={row.title ?? row.client.name}
                     sub={[hsLabel('restraint_type', row.restraint_type), row.site?.name ?? 'Site not recorded', row.reference].join(' · ')}
                 />
             ),
@@ -572,7 +574,7 @@ function EventTable({
             rowKey={(row) => row.id}
             onOpen={onOpen}
             actionsFor={menuFor}
-            menuTitle={(row) => `${row.client.name} · ${row.reference}`}
+            menuTitle={(row) => `${row.title ?? row.client.name} · ${row.reference}`}
             menuIcon={ShieldAlert}
             empty={EMPTY}
             footer={footer}

@@ -261,7 +261,8 @@ it('never leaks encrypted-database secrets to the browser, session flash, logs, 
 
         // 6. Verify browser/Inertia responses never contain either sentinel.
         foreach ([
-            '/security-devices/settings',
+            // S&D rebuild C6: Settings & audit is now Setup; saved logins live under Services & logins.
+            '/security-devices/setup/services?tab=logins',
             '/security-devices/devices',
             "/security-devices/devices/{$device->id}",
         ] as $url) {

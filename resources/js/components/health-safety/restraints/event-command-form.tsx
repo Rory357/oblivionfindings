@@ -18,6 +18,9 @@ import {
     type RestraintWorkspace,
 } from '@/lib/health-safety/restraint-navigation';
 import { useMemo } from 'react';
+
+/** The restraint summary's limit (the server's max:120). */
+const RESTRAINT_SUMMARY_MAX = 120;
 import { SourceCommandStatus } from './command-status';
 import {
     EMPTY_RESTRAINT_PICKERS,
@@ -34,8 +37,10 @@ export const EVENT_COMMAND_LABELS: Record<
 > = {
     create: 'Record a restraint',
     correct: 'Correct what was recorded',
-    review: 'Record review',
-    'assign-review': 'Choose who reviews this',
+    // G4-5 (Stephan, 1 Nov 2026): "restraint review" is always the restraint's own step; "safety review" is only the
+    // Health and safety record.
+    review: 'Record restraint review',
+    'assign-review': 'Choose restraint review owner',
     'link-incident': 'Link an incident',
     'unlink-incident': 'Unlink the incident',
     'add-observation': 'Record a check',
@@ -44,11 +49,11 @@ export const EVENT_COMMAND_LABELS: Record<
     'correct-debrief': 'Correct debrief',
     'add-followup': 'Add follow-up',
     'reassign-followup': 'Change follow-up owner',
-    'complete-followup': 'Record follow-up outcome',
+    'complete-followup': 'Record outcome',
     'correct-followup': 'Correct follow-up outcome',
     'cancel-followup': 'Cancel follow-up',
-    'add-evidence': 'Add evidence',
-    'remove-evidence': 'Remove evidence',
+    'add-evidence': 'Add file',
+    'remove-evidence': 'Remove file',
 };
 /** The save button names what it does (never a bare "Save and confirm"). */
 const SAVE_LABELS: Record<RestraintEventCommand | 'create', string> = {
@@ -234,6 +239,7 @@ export function RestraintEventCommandForm({
             client_id: String(prescope?.clientId ?? ''),
             site_id: String(prescope?.siteId ?? ''),
             restraint_type: d?.restraint_type ?? '',
+            summary: d?.summary ?? '',
             severity: d?.severity ?? '',
             started_at: toDatetimeLocal(d?.started_at),
             started_offset: d?.started_at ? workerTimeOffset(d.started_at) : '',
@@ -594,6 +600,7 @@ export function RestraintEventCommandForm({
                       }
                     : { reason: v.reason }),
                 restraint_type: v.restraint_type,
+                summary: v.summary.trim() || null,
                 severity: v.severity,
                 started_at: instant('started_at', 'started_offset'),
                 ended_at: instant('ended_at', 'ended_offset'),
@@ -624,6 +631,8 @@ export function RestraintEventCommandForm({
                 changed.authorised_by = v.authorised_by
                     ? Number(v.authorised_by)
                     : null;
+            if (facts.summary !== (d.summary ?? null))
+                changed.summary = facts.summary;
             for (const key of [
                 'restraint_type',
                 'severity',
@@ -818,6 +827,21 @@ export function RestraintEventCommandForm({
                         <>
                             {command === 'create' &&
                                 person('client_id', 'Person', pickers.clients)}
+                            <Field
+                                label="What happened, in a few words"
+                                hint={`One short line for the title, like “Held arm to stop a fall”. Up to ${RESTRAINT_SUMMARY_MAX} characters.`}
+                                required={command === 'create'}
+                                error={form.errors.summary}
+                            >
+                                <Input
+                                    value={form.data.summary}
+                                    maxLength={RESTRAINT_SUMMARY_MAX}
+                                    required={command === 'create'}
+                                    onChange={(event) =>
+                                        change('summary', event.target.value)
+                                    }
+                                />
+                            </Field>
                             {select(
                                 'restraint_type',
                                 'Restraint type',

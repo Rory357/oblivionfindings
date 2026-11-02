@@ -30,6 +30,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { AddRepresentativeWizard } from '@/components/worker-participation/add-representative-wizard';
 import { ConsultationDetailDialog } from '@/components/worker-participation/consultation-detail-dialog';
@@ -76,6 +77,14 @@ import {
 } from './participation-header';
 import { ParticipationViewerBoundary } from './participation-viewer-boundary';
 import {
+    REPRESENTATIVES_TITLE,
+    RepresentativesElsewhere,
+    RepresentativesHeader,
+    RepresentativesTable,
+    representativeViews,
+    type RepresentativesSummary,
+} from './representatives-page';
+import {
     ConsultationTable,
     MeetingLogs,
     RepresentativeCards,
@@ -89,6 +98,9 @@ type Paginated<T> = {
     data: T[];
     links: { url: string | null; label: string; active: boolean }[];
     last_page: number;
+    total?: number;
+    from?: number | null;
+    to?: number | null;
 };
 type Filters = ParticipationFilters;
 
@@ -99,6 +111,8 @@ type Props = {
     tabCounts: Record<string, number>;
     rows: Paginated<RepRow | MeetingRow | ConsultationRow>;
     hero: ParticipationHero;
+    /** G4-13: the representatives page's own numbers. */
+    representatives_summary?: RepresentativesSummary;
     detail: {
         kind: 'representative' | 'meeting' | 'consultation';
         data: any;
@@ -140,6 +154,7 @@ function ParticipationWorkspace({
     tabCounts,
     rows,
     hero,
+    representatives_summary: repSummary,
     detail,
     can,
     sites,
@@ -457,7 +472,7 @@ function ParticipationWorkspace({
                 },
                 {
                     icon: <Calendar className="h-3.5 w-3.5" />,
-                    label: 'Schedule meeting',
+                    label: 'Plan a meeting',
                     onClick: () => setWizard('meeting'),
                 },
                 {
@@ -481,17 +496,27 @@ function ParticipationWorkspace({
     const pager =
         rows.last_page > 1 ? <LaravelPagination links={rows.links} /> : null;
     const exportHref = `${BASE}/export${filters.site_id ? `?site_id=${filters.site_id}` : ''}`;
+    // G4-13: the representatives page shows only More and Add representative; "Plan a meeting" moves to Committees.
+    const repsPage = tab === 'representatives' && repSummary !== undefined;
     const pageActions = can.manage ? (
         <>
-            <PageHeaderGlassButton onClick={() => setWizard('meeting')}>
-                Schedule meeting
-            </PageHeaderGlassButton>
+            {!repsPage && (
+                <PageHeaderGlassButton onClick={() => setWizard('meeting')}>
+                    Plan a meeting
+                </PageHeaderGlassButton>
+            )}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <PageHeaderGlassButton
-                        icon={MoreHorizontal}
-                        aria-label="More participation actions"
-                    />
+                    {repsPage ? (
+                        <PageHeaderGlassButton icon={MoreHorizontal} aria-label="More participation actions">
+                            More
+                        </PageHeaderGlassButton>
+                    ) : (
+                        <PageHeaderGlassButton
+                            icon={MoreHorizontal}
+                            aria-label="More participation actions"
+                        />
+                    )}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuItem onSelect={() => setWizard('consultation')}>
@@ -510,53 +535,98 @@ function ParticipationWorkspace({
         </>
     ) : null;
 
+    const participationRail = (
+        <SafetyWorkspaceRail
+            hub="participation"
+            current={tab}
+            counts={repsPage ? undefined : tabCounts}
+            // The three views share this page: switching keeps the Site, period and search.
+            onSelect={(id) => {
+                router.get(
+                    BASE,
+                    { ...filters, tab: id, status: null, focus: null },
+                    { preserveState: true, preserveScroll: true },
+                );
+                return true;
+            }}
+        />
+    );
+    const repViews = repsPage ? representativeViews(rows.total ?? tabCounts.representatives, repSummary) : [];
+    const pageTitle = repsPage ? REPRESENTATIVES_TITLE : 'Worker participation';
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 ...safetyHubCrumbs('participation', safetyCan),
-                { title: 'Worker participation', href: BASE },
+                { title: pageTitle, href: repsPage ? `${BASE}?tab=representatives` : BASE },
             ]}
         >
-            <Head title="Worker participation" />
+            <Head title={pageTitle} />
             <PageLayout
                 hero={
                     <div onContextMenu={openHeroCtx}>
-                        <ParticipationHeader
-                            filters={filters}
-                            hero={hero}
-                            sites={sites}
-                            periods={PERIOD}
-                            statuses={STATUS_OPTS[tab]}
-                            onFilters={go}
-                            onClear={clearFilters}
-                            actions={pageActions}
-                            rail={
-                                <SafetyWorkspaceRail
-                                    hub="participation"
-                                    current={tab}
-                                    counts={tabCounts}
-                                    // The three views share this page: switching keeps the Site, period and search.
-                                    onSelect={(id) => {
-                                        router.get(
-                                            BASE,
-                                            { ...filters, tab: id, status: null, focus: null },
-                                            { preserveState: true, preserveScroll: true },
-                                        );
-                                        return true;
-                                    }}
-                                />
-                            }
-                        />
+                        {repsPage ? (
+                            <RepresentativesHeader
+                                filters={filters}
+                                hero={hero}
+                                summary={repSummary}
+                                sites={sites}
+                                actions={pageActions}
+                                onFilters={go}
+                                onClear={clearFilters}
+                                rail={participationRail}
+                            />
+                        ) : (
+                            <ParticipationHeader
+                                filters={filters}
+                                hero={hero}
+                                sites={sites}
+                                periods={PERIOD}
+                                statuses={STATUS_OPTS[tab]}
+                                onFilters={go}
+                                onClear={clearFilters}
+                                actions={pageActions}
+                                rail={participationRail}
+                            />
+                        )}
                     </div>
+                }
+                tabs={
+                    repsPage ? (
+                        <TierTwoTabs
+                            tabs={repViews}
+                            activeTab={repViews.find((view) => view.status === (filters.status === 'active' || filters.status === 'former' ? filters.status : null))?.key ?? 'all'}
+                            onTab={(key) => go({ status: repViews.find((view) => view.key === key)?.status ?? null, focus: null })}
+                            testIdPrefix="representatives"
+                            ariaLabel="Representative views"
+                            panelId="participation-panel"
+                            // Views carry no href, so the strip renders its own buttons.
+                            renderLink={() => null}
+                        />
+                    ) : undefined
                 }
             >
                 <div
+                    id="participation-panel"
                     role="tabpanel"
-                    aria-label={TAB_LABELS[tab] ?? 'Participation records'}
+                    aria-label={repsPage ? REPRESENTATIVES_TITLE : (TAB_LABELS[tab] ?? 'Participation records')}
                     className="grid min-w-0 gap-5"
                 >
-                    {tab === 'representatives' ? (
+                    {repsPage ? (
+                        <>
+                            <RepresentativesTable
+                                rows={rows.data as RepRow[]}
+                                total={rows.total ?? rows.data.length}
+                                from={rows.from ?? null}
+                                to={rows.to ?? null}
+                                actionsFor={actionsFor}
+                                onOpen={(id) => openDetail('representative', id)}
+                                footer={pager}
+                            />
+                            <RepresentativesElsewhere filters={filters} hero={hero} />
+                        </>
+                    ) : tab === 'representatives' ? (
                         <>
                             <RepresentativeCards
                                 rows={rows.data as RepRow[]}

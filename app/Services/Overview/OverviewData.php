@@ -1046,7 +1046,7 @@ final class OverviewData
         if ($this->user->canDo('securityDevices.maintenance.view')) {
             $maintenanceQuery = DeviceMaintenanceRecord::query()->whereIn('device_id', $devices->pluck('id'))->upcoming(30);
             $maintenance = (clone $maintenanceQuery)->orderBy('scheduled_for')->limit(6)->get();
-            $rows = $maintenance->map(fn ($record) => ['label' => 'Device maintenance · '.Str::headline($record->type), 'date' => $record->scheduled_for->toDateString(), 'status' => 'Scheduled', 'href' => '/security-devices/maintenance'])->all();
+            $rows = $maintenance->map(fn ($record) => ['label' => 'Device maintenance · '.Str::headline($record->type), 'date' => $record->scheduled_for->toDateString(), 'status' => 'Scheduled', 'href' => '/security-devices/devices/'.$record->device_id])->all();
             $this->blocks['agenda']['rows'] = collect([...$this->blocks['agenda']['rows'], ...$rows])->sortBy('date')->take(6)->values()->all();
             $this->blocks['agenda']['total'] += $maintenanceQuery->count();
             $this->blocks['agenda']['subtitle'] = 'Scheduled changes and device maintenance · next 30 days';

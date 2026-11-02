@@ -1425,7 +1425,7 @@ function DeviceShowBody({
                                 <div className="space-y-5">
                                     <Button variant="outline" size="sm" asChild>
                                         <Link
-                                            href={`/security-devices/monitoring?device_id=${device.id}`}
+                                            href={`/security-devices/alerts?q=${encodeURIComponent(device.name)}`}
                                         >
                                             View all events
                                         </Link>

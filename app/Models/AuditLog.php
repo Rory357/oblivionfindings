@@ -51,6 +51,53 @@ class AuditLog extends Model
         });
     }
 
+    /**
+     * Safety review evidence (Stephan, answer 20, 1 Nov 2026: corrections and the activity log are kept at least 10
+     * years). Rows about a safety review, its actions, investigations, close decisions and their history, or any
+     * "healthSafety." action.
+     */
+    public const HEALTH_SAFETY_EVIDENCE_TYPES = [
+        \App\Models\HsEvent::class,
+        \App\Models\HsCorrectiveAction::class,
+        \App\Models\HsCorrectiveActionOwnerChange::class,
+        \App\Models\HsEventOwnerChange::class,
+        \App\Models\HsInvestigation::class,
+        \App\Models\HsInvestigationCorrection::class,
+        \App\Models\HsRecommendationDisposition::class,
+        \App\Models\HsClosureException::class,
+        \App\Models\HsClosureExceptionDecision::class,
+    ];
+
+    public const HEALTH_SAFETY_MIN_RETENTION_YEARS = 10;
+
+    public function scopeHealthSafetyEvidence(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $hs) => $hs
+            ->whereIn('auditable_type', self::healthSafetyEvidenceTypes())
+            ->orWhere('action', 'like', 'healthSafety.%'));
+    }
+
+    public function scopeWithoutHealthSafetyEvidence(Builder $query): Builder
+    {
+        return $query
+            ->where(fn (Builder $type) => $type->whereNull('auditable_type')->orWhereNotIn('auditable_type', self::healthSafetyEvidenceTypes()))
+            ->where(fn (Builder $action) => $action->whereNull('action')->orWhere('action', 'not like', 'healthSafety.%'));
+    }
+
+    /** Class names plus their morph aliases, so either stored form matches. @return list<string> */
+    private static function healthSafetyEvidenceTypes(): array
+    {
+        $types = [];
+        foreach (self::HEALTH_SAFETY_EVIDENCE_TYPES as $class) {
+            $types[] = $class;
+            if (class_exists($class)) {
+                $types[] = (new $class)->getMorphClass();
+            }
+        }
+
+        return array_values(array_unique($types));
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

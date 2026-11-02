@@ -320,8 +320,8 @@ describe('Agent downloads shared release records', () => {
             screen.getByRole('link', { name: 'Open device register' }),
         ).toHaveAttribute('href', '/security-devices/devices');
         expect(
-            screen.getByRole('link', { name: 'Open site collectors' }),
-        ).toHaveAttribute('href', '/security-devices/discovery?tab=collectors');
+            screen.getByRole('link', { name: 'Open hubs & networks' }),
+        ).toHaveAttribute('href', '/security-devices/setup/hubs?tab=networks');
         fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
         expect(mocks.reload).toHaveBeenCalledWith({
             only: [
@@ -340,7 +340,7 @@ describe('Agent downloads shared release records', () => {
             screen.queryByRole('link', { name: 'Open device register' }),
         ).not.toBeInTheDocument();
         expect(
-            screen.queryByRole('link', { name: 'Open site collectors' }),
+            screen.queryByRole('link', { name: 'Open hubs & networks' }),
         ).not.toBeInTheDocument();
         expect(screen.getAllByRole('article')).toHaveLength(3);
     });

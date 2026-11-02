@@ -392,7 +392,9 @@ export function CameraLiveWorkspace({
                                     <p className="text-sm text-muted-foreground">
                                         {live.reason_code === 'restricted'
                                             ? 'You do not have permission to view this camera. Contact your administrator if you need access.'
-                                            : 'An authorised administrator needs to check this camera’s source and Site collector before live viewing is available.'}
+                                            : live.reason_code === 'privacy_hours'
+                                              ? 'Privacy hours are on for this camera. No picture is shown until they end.'
+                                              : 'An authorised administrator needs to check this camera’s source and Site collector before live viewing is available.'}
                                     </p>
                                 )}
                                 {live.setup_href ===

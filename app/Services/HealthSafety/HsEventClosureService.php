@@ -249,6 +249,30 @@ final class HsEventClosureService
             HsClosureReadiness::EXCEPTIONAL,
         );
 
+        // Q11 (G3): a check that said an action didn't work blocks closing until a revised action replacing it has
+        // been done and checked as working (or its own failed check is itself replaced, and so on). Hard: no
+        // close-anyway category covers it.
+        $unresolvedFailures = HsCorrectiveAction::unresolvedFailedReferences((int) $event->id);
+        $requirements[] = $this->requirement(
+            'revised_actions',
+            $unresolvedFailures === [],
+            $unresolvedFailures === []
+                ? 'Every action whose check said it didn\'t work has a revised action that worked'
+                : 'Add a revised action for '.implode(', ', $unresolvedFailures).' (its check said it didn\'t work), then do it and check it worked.',
+            "/health-safety/events/{$event->id}?section=actions",
+            HsClosureReadiness::HARD,
+        );
+
+        // Decision 3 (G3): a safety review needs an owner before it can close. Hard: no close-anyway category covers it.
+        $hasOwner = $event->owner_user_id !== null;
+        $requirements[] = $this->requirement(
+            'has_owner',
+            $hasOwner,
+            $hasOwner ? 'The safety review has an owner' : 'Choose an owner for this safety review before closing it.',
+            "/health-safety/events/{$event->id}?action=choose-owner",
+            HsClosureReadiness::HARD,
+        );
+
         return new HsClosureReadiness((int) $event->id, $event->site_id ? (int) $event->site_id : null, $requirements);
     }
 
@@ -353,6 +377,8 @@ final class HsEventClosureService
                 'scope' => $scope,
                 'provenance_hash' => $hash,
             ]);
+            // Board M11 (K6): until now nobody was told a request was waiting. Tell everyone who may decide it.
+            DB::afterCommit(fn () => $this->tellApprovers($locked->fresh(), $exception->fresh(), $lockedActor));
 
             return $exception->fresh(['requester:id,name', 'latestDecision.decidedBy:id,name']);
         }, 3);
@@ -731,6 +757,43 @@ final class HsEventClosureService
         }
 
         return ['allowed' => true, 'reason' => null];
+    }
+
+    /**
+     * The people who may decide this request right now (decideAuthority for each holder of the approve key): never the
+     * person who asked. Board M11: they are told, it is on their worklist and in All Tasks.
+     *
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    public function approversFor(HsEvent $event, HsClosureException $exception): \Illuminate\Support\Collection
+    {
+        $key = 'healthSafety.closureExceptions.approve';
+
+        return User::query()
+            ->whereNotNull('approved_at')
+            ->whereKeyNot((int) $exception->requested_by_user_id)
+            ->where(fn ($query) => $query
+                ->whereHas('roles.permissions', fn ($permission) => $permission->where('key', $key))
+                ->orWhereHas('permissionOverrides', fn ($permission) => $permission->where('key', $key)->where('permission_user.allowed', true)))
+            ->with(['roles.permissions', 'permissionOverrides'])
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (User $person): bool => $this->decideAuthority($person, $event, $exception, false)['allowed'])
+            ->values();
+    }
+
+    private function tellApprovers(HsEvent $event, HsClosureException $exception, User $asker): void
+    {
+        foreach ($this->approversFor($event, $exception) as $approver) {
+            $approver->notify(new \App\Notifications\AppEventNotification([
+                'title' => 'A “close anyway” request is waiting',
+                'message' => $asker->name.' asked to close '.$event->reference_number.' with one item still open. It needs your decision.',
+                'type' => 'hs_closure_exception_requested',
+                'hs_event_id' => $event->id,
+                'closure_exception_id' => $exception->id,
+                'url' => '/health-safety/events/'.$event->id,
+            ]));
+        }
     }
 
     /** K1a: may this viewer revoke this approval? revokeException()'s checks (approve permission, Site, a current approval). */
