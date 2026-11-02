@@ -24,6 +24,30 @@ import {
     type InvestigationGrant,
 } from './types';
 
+/** Matches ChatInvestigations::MAX_CONVERSATIONS. */
+export const MAX_CASE_CONVERSATIONS = 20;
+
+/** Grants made together share a case batch; a grant made on its own is its own case. */
+export function groupByCase(grants: InvestigationGrant[]) {
+    const cases = new Map<
+        string,
+        { key: string; caseReference: string; grants: InvestigationGrant[] }
+    >();
+    for (const grant of grants) {
+        const key = grant.case_batch ?? `grant-${grant.id}`;
+        const group = cases.get(key) ?? {
+            key,
+            caseReference: grant.case_reference,
+            grants: [],
+        };
+        group.grants.push(grant);
+        cases.set(key, group);
+    }
+    for (const group of cases.values())
+        group.grants.sort((a, b) => a.id - b.id);
+    return [...cases.values()];
+}
+
 export const INVESTIGATION_NOTICE =
     'Restricted investigator role · Each access requires a case and reason and is logged. Global settings access alone does not authorise private chat inspection.';
 
@@ -46,12 +70,16 @@ export function InvestigationAccess({
 }) {
     const [caseReference, setCaseReference] = useState('');
     const [reason, setReason] = useState('');
-    const [conversation, setConversation] =
-        useState<InvestigableConversation | null>(null);
+    const [conversations, setConversations] = useState<
+        InvestigableConversation[]
+    >([]);
     const [duration, setDuration] = useState('24');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const [opened, setOpened] = useState<string | null>(null);
+    const [opened, setOpened] = useState<{
+        url: string;
+        count: number;
+    } | null>(null);
     const [grants, setGrants] = useState(initialGrants);
     useEffect(() => {
         if (!investigator || !autoload) return;
@@ -93,26 +121,26 @@ export function InvestigationAccess({
     const ready =
         caseReference.trim() !== '' &&
         reason.trim().length >= 10 &&
-        conversation !== null;
+        conversations.length > 0;
 
     async function submit() {
-        if (!ready || saving || !conversation) return;
+        if (!ready || saving) return;
         setSaving(true);
         setError('');
         try {
             const result = await governanceRequest<{
-                grant_id: number;
+                grant_ids: number[];
                 url: string;
             }>(actorId, `${INVESTIGATION_API}/grants`, {
                 method: 'POST',
                 body: JSON.stringify({
-                    conversation_id: conversation.id,
+                    conversation_ids: conversations.map((item) => item.id),
                     case_reference: caseReference.trim(),
                     reason: reason.trim(),
                     duration_hours: Number(duration),
                 }),
             });
-            setOpened(result.url);
+            setOpened({ url: result.url, count: result.grant_ids.length });
             const overview = await governanceRequest<{
                 grants: InvestigationGrant[];
             }>(actorId, `${INVESTIGATION_API}/overview`);
@@ -140,7 +168,7 @@ export function InvestigationAccess({
         }
     }
 
-    const active = grants.filter((grant) => grant.active);
+    const activeCases = groupByCase(grants.filter((grant) => grant.active));
 
     return (
         <div className="grid gap-4">
@@ -174,8 +202,10 @@ export function InvestigationAccess({
             </div>
             <ConversationFinder
                 actorId={actorId}
-                selected={conversation}
-                onSelect={setConversation}
+                multiple
+                max={MAX_CASE_CONVERSATIONS}
+                selection={conversations}
+                onSelectionChange={setConversations}
                 disabled={saving}
             />
             <div className="grid gap-2">
@@ -209,11 +239,16 @@ export function InvestigationAccess({
                     <CheckCircle2 />
                     <AlertDescription>
                         <span>
-                            Case access logged. The case scope is read-only;
-                            Chat does not export conversations.
+                            Case access logged for {opened.count}{' '}
+                            {opened.count === 1
+                                ? 'conversation'
+                                : 'conversations'}
+                            . The case scope is read-only. While access is
+                            active you can export a watermarked PDF; every
+                            export is logged.
                         </span>
                         <a
-                            href={opened}
+                            href={opened.url}
                             className="font-medium underline underline-offset-4"
                         >
                             Open the read-only case view
@@ -229,7 +264,7 @@ export function InvestigationAccess({
                     {saving ? 'Logging…' : 'Log and open authorised scope'}
                 </Button>
             </div>
-            {active.length > 0 && (
+            {activeCases.length > 0 && (
                 <section
                     aria-labelledby="investigation-active"
                     className="grid gap-2"
@@ -241,45 +276,76 @@ export function InvestigationAccess({
                         Your active case access
                     </h3>
                     <ul className="grid gap-2">
-                        {active.map((grant) => (
+                        {activeCases.map((group) => (
                             <li
-                                key={grant.id}
-                                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 p-3 text-sm"
+                                key={group.key}
+                                className="grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm"
                             >
-                                <div className="min-w-0">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
                                     <p className="font-medium">
-                                        {grant.case_reference}
+                                        {group.caseReference}
                                     </p>
-                                    <p className="break-words text-muted-foreground">
-                                        {grant.conversation
-                                            ? conversationLabel(
-                                                  grant.conversation,
-                                              )
-                                            : 'Conversation unavailable'}
-                                    </p>
-                                    <p className="text-caption">
-                                        Ends {formatDateTime(grant.expires_at)}
-                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <StatusBadge variant="info">
+                                            Read-only
+                                        </StatusBadge>
+                                        <span className="text-caption">
+                                            {group.grants.length}{' '}
+                                            {group.grants.length === 1
+                                                ? 'conversation'
+                                                : 'conversations'}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <StatusBadge variant="info">
-                                        Read-only
-                                    </StatusBadge>
-                                    <Button asChild variant="outline" size="sm">
-                                        <a
-                                            href={`/settings/chat/investigations/${grant.id}`}
+                                <ul
+                                    aria-label={`Conversations for case ${group.caseReference}`}
+                                    className="grid gap-2"
+                                >
+                                    {group.grants.map((grant) => (
+                                        <li
+                                            key={grant.id}
+                                            className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-card p-2"
                                         >
-                                            Open
-                                        </a>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => void end(grant)}
-                                    >
-                                        End access
-                                    </Button>
-                                </div>
+                                            <div className="min-w-0">
+                                                <p className="break-words">
+                                                    {grant.conversation
+                                                        ? conversationLabel(
+                                                              grant.conversation,
+                                                          )
+                                                        : 'Conversation unavailable'}
+                                                </p>
+                                                <p className="text-caption">
+                                                    Ends{' '}
+                                                    {formatDateTime(
+                                                        grant.expires_at,
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    asChild
+                                                    variant="outline"
+                                                    size="sm"
+                                                >
+                                                    <a
+                                                        href={`/settings/chat/investigations/${grant.id}`}
+                                                    >
+                                                        Open
+                                                    </a>
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        void end(grant)
+                                                    }
+                                                >
+                                                    End access
+                                                </Button>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
                             </li>
                         ))}
                     </ul>

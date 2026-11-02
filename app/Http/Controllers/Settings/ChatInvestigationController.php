@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Services\Chat\ChatInvestigationExport;
 use App\Services\Chat\ChatInvestigations;
 use App\Services\Chat\ChatPreservation;
 use Illuminate\Http\Request;
@@ -14,7 +15,11 @@ use Illuminate\Http\Request;
  */
 final class ChatInvestigationController extends Controller
 {
-    public function __construct(private readonly ChatInvestigations $investigations, private readonly ChatPreservation $preservation) {}
+    public function __construct(
+        private readonly ChatInvestigations $investigations,
+        private readonly ChatPreservation $preservation,
+        private readonly ChatInvestigationExport $export,
+    ) {}
 
     public function index(Request $request)
     {
@@ -51,15 +56,25 @@ final class ChatInvestigationController extends Controller
     public function store(Request $request)
     {
         $this->investigations->authorizeInvestigator($request->user());
+        // One conversation, or several granted together under one case.
         $data = $request->validate([
-            'conversation_id' => ['required', 'integer', 'exists:ops_conversations,id'],
+            'conversation_id' => ['required_without:conversation_ids', 'integer', 'exists:ops_conversations,id'],
+            'conversation_ids' => ['required_without:conversation_id', 'array', 'min:1', 'max:'.ChatInvestigations::MAX_CONVERSATIONS],
+            'conversation_ids.*' => ['integer', 'distinct', 'exists:ops_conversations,id'],
             'case_reference' => ['required', 'string', 'max:100'],
             'reason' => ['required', 'string', 'min:10', 'max:2000'],
             'duration_hours' => ['required', 'integer', 'in:'.implode(',', ChatInvestigations::DURATIONS)],
-        ], ['reason.min' => 'Describe the reason for access in at least 10 characters.']);
-        $id = $this->investigations->grant($request->user(), $data, $request->ip());
+        ], [
+            'reason.min' => 'Describe the reason for access in at least 10 characters.',
+            'conversation_ids.max' => 'Choose at most '.ChatInvestigations::MAX_CONVERSATIONS.' conversations for one case.',
+        ]);
+        $result = $this->investigations->grant($request->user(), $data, $request->ip());
+        $first = $result['grant_ids'][0];
 
-        return $this->json(['grant_id' => $id, 'url' => route('settings.chat.investigations.show', $id)], 201);
+        return $this->json([
+            'grant_id' => $first, 'grant_ids' => $result['grant_ids'], 'case_batch' => $result['case_batch'],
+            'url' => route('settings.chat.investigations.show', $first),
+        ], 201);
     }
 
     public function show(Request $request, int $grant)
@@ -75,6 +90,23 @@ final class ChatInvestigationController extends Controller
         $data = $request->validate(['before' => ['required', 'integer', 'min:1']]);
 
         return $this->json($this->investigations->open($request->user(), $grant, (int) $data['before'], $request->ip()));
+    }
+
+    /** A watermarked PDF of the granted conversation, or of every active conversation in the case. Logged with its hash. */
+    public function export(Request $request, int $grant)
+    {
+        $this->investigations->authorizeInvestigator($request->user());
+        $data = $request->validate(['scope' => ['required', 'in:conversation,case']]);
+        $export = $this->export->export($request->user(), $grant, $data['scope'], $request->ip());
+
+        return response($export['content'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$export['filename'].'"',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-Export-Sha256' => $export['sha256'],
+            'X-Export-Reference' => $export['export_id'],
+        ]);
     }
 
     public function end(Request $request, int $grant)
