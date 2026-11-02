@@ -28,6 +28,8 @@ use App\Services\ControlRoom\BroadcastRecipientReadContext;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\GuidedRoundService;
 use App\Services\HandoverWorkerNotes;
+use App\Services\HealthSafety\HealthSafetyInboxReads;
+use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\HealthSafety\FirstAidService;
 use App\Services\HealthSafety\FirstAidSourceProjectionService;
 use App\Services\HealthSafety\LoneWorkerSessionAccessService;
@@ -38,6 +40,7 @@ use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\MyDay\MyReportsReadService;
 use App\Services\MyDay\ShiftTaskHelpService;
 use App\Services\MyDay\ShiftTaskWorkService;
 use App\Services\ShiftHandoverService;
@@ -148,7 +151,7 @@ class MyTasksController extends Controller
         $timesheets = $this->getTimesheets($user);
 
         // 5. Incidents
-        $incidents = $this->getIncidents($userId, $queryNow);
+        $incidents = $this->getIncidents($user, $queryNow);
 
         // 6. Tasks (CR alerts + followups + notes - existing aggregation)
         $tasks = $this->getCrTasks($user);
@@ -241,6 +244,10 @@ class MyTasksController extends Controller
             // (Stephan, 30 Oct). Being the injured worker is the read rule.
             'own_open_injuries' => \App\Models\WorkplaceInjury::query()->where('user_id', $user->id)
                 ->whereNotIn('status', ['recovered', 'closed'])->count(),
+            // G4-1 (Stephan, 1 Nov): "What you reported" — the person's own last 5 reports, status only — and
+            // "Your workplace injury" — their own open injury's duties, next review and coordinator.
+            'my_reports' => $this->myReports($user),
+            'own_injury' => $this->ownInjury($user),
             'first_aid_confirmation' => app(FirstAidService::class)->confirmationForViewer($user, $request->session()->get('first_aid_confirmation')),
             // Worker-facing "My PPE" card — the worker's own active allocations that
             // still need acknowledgement or an RPE fit-test. Empty unless action is
@@ -1415,15 +1422,47 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getIncidents(int $userId, Carbon $now): array
+    /** @return list<array<string, mixed>> */
+    private function myReports(User $user): array
     {
         try {
-            return ClientIncident::where('reported_by', $userId)
+            return app(MyReportsReadService::class)->recent($user);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->unavailableSections[] = 'What you reported';
+
+            return [];
+        }
+    }
+
+    private function ownInjury(User $user): ?array
+    {
+        try {
+            return app(MyReportsReadService::class)->openInjury($user);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->unavailableSections[] = 'Your workplace injury';
+
+            return null;
+        }
+    }
+
+    private function getIncidents(User $user, Carbon $now): array
+    {
+        try {
+            $gate = Gate::forUser($user);
+
+            return ClientIncident::where('reported_by', $user->id)
                 ->whereNotIn('status', ['closed'])
                 ->where('occurred_at', '>=', $now->copy()->subDays(14))
-                ->with('client:id,first_name,last_name')
+                ->with('client')
                 ->orderByDesc('occurred_at')
                 ->get()
+                // Privacy: an open report about someone the worker no longer supports leaves this list. Its title and
+                // notes can name that person, and the follow-up is no longer theirs. "What you reported" still lists
+                // it as "a person you no longer support".
+                ->filter(fn (ClientIncident $incident) => $incident->client === null || $gate->allows('view', $incident->client))
+                ->values()
                 ->map(function (ClientIncident $incident) {
                     $clientName = $incident->client
                         ? trim($incident->client->first_name.' '.$incident->client->last_name)
@@ -1697,38 +1736,48 @@ class MyTasksController extends Controller
 
     private function getUnreadNotificationCount(User $user, BroadcastRecipientReadContext $broadcastContext): int
     {
-        $visible = $this->boardPackAccess
-            ->visibleNotificationQuery($user, true, null, $broadcastContext)
-            ->reorder();
+        // Private exposure follow-up notices count only inside their H&S context (#16), same as the header bell.
+        return app(HealthSafetyInboxReads::class)->within($user, function (?HealthSafetyReadContext $hs) use ($user, $broadcastContext): int {
+            $visible = $this->boardPackAccess
+                ->visibleNotificationQuery($user, true, $hs, $broadcastContext)
+                ->reorder();
 
-        // One count over the same visible set (the header bell counts the same
-        // way) — never page through every unread row just to count it.
-        $count = (clone $visible)->count();
+            // One count over the same visible set (the header bell counts the same
+            // way) — never page through every unread row just to count it.
+            $count = (clone $visible)->count();
 
-        // Counted typed rows also reveal their existence, including rows beyond the five previews.
-        // Register each with the same final proof, then discard the projected message body. Only an
-        // admitted staff-message notice can be typed in this set; ordinary rows project to nothing.
-        (clone $visible)
-            ->where('notifications.type', BroadcastRecipientNotice::class)
-            ->get()
-            ->each(fn (DatabaseNotification $notification) => $broadcastContext->project($notification));
+            // Counted typed rows also reveal their existence, including rows beyond the five previews.
+            // Register each with the same final proof, then discard the projected message body. Only an
+            // admitted staff-message notice can be typed in this set; ordinary rows project to nothing.
+            (clone $visible)
+                ->where('notifications.type', BroadcastRecipientNotice::class)
+                ->get()
+                ->each(fn (DatabaseNotification $notification) => $broadcastContext->project($notification));
 
-        return $count;
+            return $count;
+        });
     }
 
     private function getDigestNotifications(User $user, BroadcastRecipientReadContext $broadcastContext): array
     {
+        $inbox = app(HealthSafetyInboxReads::class);
+
+        return $inbox->within($user, fn (?HealthSafetyReadContext $hs): array => $this->digestNotificationRows($user, $broadcastContext, $inbox, $hs));
+    }
+
+    private function digestNotificationRows(User $user, BroadcastRecipientReadContext $broadcastContext, HealthSafetyInboxReads $inbox, ?HealthSafetyReadContext $hs): array
+    {
         $workerNow = Carbon::now($this->workerTimezone());
 
         return $this->boardPackAccess
-            ->visibleNotificationQuery($user, true, null, $broadcastContext)
+            ->visibleNotificationQuery($user, true, $hs, $broadcastContext)
             ->latest()
             ->limit(5)
             ->get()
-            ->map(function ($notification) use ($workerNow, $broadcastContext) {
+            ->map(function ($notification) use ($workerNow, $broadcastContext, $inbox, $user, $hs) {
                 $broadcast = $broadcastContext->project($notification);
                 $data = $broadcast === null
-                    ? (is_array($notification->data) ? $notification->data : [])
+                    ? $inbox->data($notification, $user, $hs)
                     : $broadcast['data'];
                 $createdAt = $broadcast === null
                     ? $this->digestNotificationCreatedAt($notification)

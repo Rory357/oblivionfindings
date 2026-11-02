@@ -59,7 +59,12 @@ export function WeeklyHoursChart({
                 </Badge>
             </div>
 
-            <ResponsiveContainer width="100%" height={140}>
+            {/* A starting size lets the server render (SSR) without measuring -1 × -1; the browser re-measures. */}
+            <ResponsiveContainer
+                width="100%"
+                height={140}
+                initialDimension={{ width: 600, height: 140 }}
+            >
                 <BarChart
                     data={chartData}
                     margin={{ top: 0, right: 0, bottom: 0, left: -24 }}

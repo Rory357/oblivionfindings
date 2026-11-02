@@ -232,6 +232,8 @@ export interface ChemicalIndex {
     exposure_access: 'restricted';
     /** Exposure numbers for anyone who sees the list (Stephan, 26 Oct), at the Sites shown; counts only. */
     exposure_summary?: { exposures: number; awaiting_outcome: number; worksafe_awaiting: number; period_days: number; exposures_href: string | null };
+    /** G4-14: SDS reviews overdue and the lead block (active chemicals, overdue SDS reviews first). Null when a source needs repair. */
+    register_summary?: { sds_overdue: number | null; lead: Array<{ id: number; name: string | null; sds_state: 'expired' | 'missing' }>; lead_total: number | null };
     sites: ChemicalSiteOption[];
     can: ChemicalCan;
     detail: null;

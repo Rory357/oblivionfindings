@@ -277,6 +277,12 @@ class RiskAssessmentPresenter
                 $reviewReasons[] = 'Record whether residual risk is acceptable.';
             }
 
+            // #13: the sealed change history is checked every time the page is read. A chain that doesn't check out hides
+            // the history and the change buttons (the server refuses changes) and is logged for an administrator.
+            $seal = self::sealedHistory($ra, $viewer, $context);
+            $broken = $seal['state'] === 'broken';
+            $canManage = $canManage && ! $broken;
+
             return array_merge(self::row($ra, $viewer, $context, $original), [
                 'existing_controls' => $ra->existing_controls,
                 'additional_controls' => $ra->additional_controls,
@@ -308,7 +314,8 @@ class RiskAssessmentPresenter
                     'remove_evidence' => $canManage && $mutable,
                 ],
                 'connections' => $connections,
-                'history' => self::history($ra, $original, $context),
+                'history' => $broken ? [] : self::history($ra, $original, $context, $seal),
+                'history_integrity' => ['state' => $seal['state'], 'sealed_count' => $seal['count'], 'sealed_since' => $seal['since']],
                 'review_completion_gate' => ['eligible' => $reviewReasons === [], 'reasons' => $reviewReasons],
                 'form' => self::formPrefill($ra),
             ]);
@@ -477,7 +484,36 @@ class RiskAssessmentPresenter
     }
 
     /** Business history only: no request metadata, storage paths, or inferred actors. */
-    private static function history(HsRiskAssessment $assessment, Builder $original, HealthSafetyReadContext $context): array
+    /**
+     * #13: the assessment's sealed chain for this viewer: 'checked' (every sealed change is chained to the one before),
+     * 'unsealed' (nothing sealed yet), 'unavailable' (this viewer can't prove the attachment's own source), or 'broken'.
+     *
+     * @return array{state: string, count: int, since: string|null, sealed: array<string, array{sequence: int, snapshot: array}>}
+     */
+    private static function sealedHistory(HsRiskAssessment $ra, User $viewer, HealthSafetyReadContext $context): array
+    {
+        try {
+            $history = app(\App\Services\HealthSafety\RiskAssessmentAcceptanceService::class)->history((int) $ra->getKey(), $viewer, $context);
+        } catch (\LogicException $broken) {
+            \Illuminate\Support\Facades\Log::error('Risk assessment sealed history does not check out', ['assessment_id' => (int) $ra->getKey(),
+                'reference' => $ra->reference_number, 'viewer_id' => (int) $viewer->id, 'problem' => $broken->getMessage()]);
+
+            return ['state' => 'broken', 'count' => 0, 'since' => null, 'sealed' => []];
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $denied) {
+            if (! in_array($denied->getStatusCode(), [403, 404], true)) { throw $denied; }
+
+            return ['state' => 'unavailable', 'count' => 0, 'since' => null, 'sealed' => []];
+        }
+        $sealed = [];
+        foreach ($history['items'] as $item) {
+            $sealed[(string) $item['id']] = ['sequence' => (int) $item['sequence'], 'snapshot' => is_array($item['snapshot']) ? $item['snapshot'] : []];
+        }
+
+        return ['state' => $sealed === [] ? 'unsealed' : 'checked', 'count' => count($sealed),
+            'since' => $history['items'][0]['occurred_at'] ?? null, 'sealed' => $sealed];
+    }
+
+    private static function history(HsRiskAssessment $assessment, Builder $original, HealthSafetyReadContext $context, array $seal = ['sealed' => []]): array
     {
         $query = AuditLog::query()->whereIn('auditable_type', array_unique([HsRiskAssessment::class, $assessment->getMorphClass()]))
             ->where('auditable_id', $assessment->id)
@@ -490,7 +526,7 @@ class RiskAssessmentPresenter
         $semanticCreation = $logs->contains('action', 'risk_assessment.created');
 
         return $logs->reject(fn (AuditLog $log) => $semanticCreation && $log->action === 'hsriskassessment.create')
-            ->map(function (AuditLog $log): array {
+            ->map(function (AuditLog $log) use ($seal): array {
                 $meta = $log->meta ?? [];
                 $legacy = str_starts_with($log->action, 'hsriskassessment.');
                 $raw = $legacy ? ($meta['after'] ?? []) : ($meta['snapshot'] ?? []);
@@ -516,7 +552,27 @@ class RiskAssessmentPresenter
                         ->map(fn ($name) => basename(str_replace('\\', '/', $name)))->values()->all();
                 }
 
-                return ['id' => 'audit-'.$log->id, 'action' => $log->action, 'title' => $title,
+                $id = 'audit-'.$log->id;
+                $sealedEntry = $seal['sealed'][$id] ?? null;
+                $changes = [];
+                if ($sealedEntry !== null) {
+                    // The sealed snapshot itself, and what it changed against the sealed change before it.
+                    $names = $snapshot['names'] ?? null;
+                    $snapshot = self::historySnapshot($sealedEntry['snapshot']);
+                    if ($names !== null) { $snapshot['names'] = $names; }
+                    $previous = null;
+                    foreach ($seal['sealed'] as $other) {
+                        if ($other['sequence'] === $sealedEntry['sequence'] - 1) { $previous = self::historySnapshot($other['snapshot']); }
+                    }
+                    if ($previous !== null) {
+                        foreach (self::historySnapshot($sealedEntry['snapshot']) as $field => $value) {
+                            if (($previous[$field] ?? null) !== $value) { $changes[] = ['field' => $field, 'before' => $previous[$field] ?? null, 'after' => $value]; }
+                        }
+                    }
+                }
+
+                return ['id' => $id, 'action' => $log->action, 'title' => $title,
+                    'sealed' => $sealedEntry === null ? null : ['change' => $sealedEntry['sequence'], 'changes' => $changes],
                     'actor' => $log->user ? ['id' => $log->user->id, 'name' => $log->user->name] : null,
                     'occurred_at' => $log->created_at?->toIso8601String(),
                     'note' => is_string($note) ? $note : null, 'snapshot' => $snapshot, 'legacy' => $legacy];
@@ -537,6 +593,8 @@ class RiskAssessmentPresenter
     {
         return array_values(array_unique([...FirstAidAccessService::PERMISSIONS, ...RestraintAccessService::PERMISSIONS,
             ...InjuryAccessService::PERMISSIONS, ...SafeWorkProcedureAccessService::PERMISSIONS, ...EmergencyDrillAccessService::PERMISSIONS, ...\App\Services\ControlRoom\ControlRoomGovernanceReadService::PERMISSIONS,
+            // #13: the sealed history's own source checks (it prepares, never grants).
+            ...\App\Services\HealthSafety\RiskAssessmentAcceptanceService::PERMISSIONS,
             'governance.view', 'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view']));
     }
 

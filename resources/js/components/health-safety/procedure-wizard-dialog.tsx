@@ -3,6 +3,7 @@
  * Review & save) → success pane. Posts in-place (preserveScroll/State) so the register refreshes
  * without navigating. Edit mode pre-fills from detail.form and requires a change_summary.
  * Semantic tokens only. NZ-only, web-only. */
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -835,15 +836,13 @@ export function ProcedureWizardDialog({
                                 label="Next review date"
                                 error={fieldError('review_date')}
                             >
-                                <Input
-                                    type="date"
+                                <DatePicker
+                                    id="procedure-wizard-review-date"
+                                    label="Next review date"
                                     value={d.review_date ?? ''}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'review_date',
-                                            e.target.value,
-                                        )
-                                    }
+                                    allowClear
+                                    invalid={!!fieldError('review_date')}
+                                    onChange={(value) => form.setData('review_date', value)}
                                 />
                             </Field>
                             <Field label="Review cadence">

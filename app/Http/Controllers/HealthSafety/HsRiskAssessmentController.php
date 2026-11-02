@@ -10,6 +10,7 @@ use App\Http\Requests\HealthSafety\StoreHsRiskAssessmentRequest;
 use App\Http\Requests\HealthSafety\SupersedeHsRiskAssessmentRequest;
 use App\Http\Requests\HealthSafety\UpdateHsRiskAssessmentRequest;
 use App\Http\Requests\HealthSafety\UpdateResidualRiskRequest;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\HsEvent;
 use App\Models\HsRiskAssessment;
@@ -132,6 +133,7 @@ class HsRiskAssessmentController extends Controller
             'assessments' => $assessments,
             'tabCounts' => $tabCounts,
             'hero' => $hero,
+            'register_summary' => $this->registerSummary($base, $proven, $request->user(), $context),
             'detail' => null,
             'pickers' => RiskAssessmentPresenter::pickerRowsInContext($request->user(),
                 $this->siteAccess->accessibleSiteIds($request->user(), $this->bypassPermissions()), $context),
@@ -315,7 +317,7 @@ class HsRiskAssessmentController extends Controller
 
         $storedPath = null;
         try {
-            $this->service->command($assessment, $request->user(), function (HsRiskAssessment $locked, User $actor) use ($request, $data, &$storedPath): void {
+            $this->service->command($assessment, $request->user(), function (HsRiskAssessment $locked, User $actor, $reads, HealthSafetyReadContext $context) use ($request, $data, &$storedPath): void {
                 $this->service->requireMutable($locked);
                 $file = $request->file('file');
                 $storedPath = $file->store('hs_risk_assessment_attachments', 'private');
@@ -328,7 +330,7 @@ class HsRiskAssessmentController extends Controller
                     'kind' => $data['kind'] ?? null, 'notes' => $data['notes'] ?? null, 'alt_text' => $data['alt_text'] ?? null,
                 ]);
                 if (! $attachment->exists) { throw new \LogicException('Risk evidence creation was not persisted.'); }
-                $this->service->audit('risk_assessment.evidence_added', $locked, $actor, null, ['names' => [$attachment->original_name], 'attachment_id' => $attachment->id]);
+                $this->service->audit('risk_assessment.evidence_added', $locked, $actor, null, ['names' => [$attachment->original_name], 'attachment_id' => $attachment->id], $context, HsRiskAssessmentService::attachmentTuple($locked));
             });
         } catch (Throwable $error) {
             if (is_string($storedPath) && $storedPath !== '') {
@@ -378,7 +380,7 @@ class HsRiskAssessmentController extends Controller
                 $current = RiskAssessmentPresenter::guardChildQuery(HsRiskAssessmentAttachment::query()->whereKey($attachment->id), 'hs_risk_assessment_attachments.hs_risk_assessment_id', $parent, $context)->lockForUpdate()->firstOrFail();
                 $disk = $current->disk ?: 'private';
                 $path = $current->path;
-                $this->service->audit('risk_assessment.evidence_removed', $locked, $actor, null, ['names' => [$current->original_name], 'attachment_id' => $current->id]);
+                $this->service->audit('risk_assessment.evidence_removed', $locked, $actor, null, ['names' => [$current->original_name], 'attachment_id' => $current->id], $context, HsRiskAssessmentService::attachmentTuple($locked));
                 $this->service->deleteAttachment($current, $parent, $context);
                 DB::afterCommit(function () use ($disk, $path): void {
                     try {
@@ -549,6 +551,52 @@ class HsRiskAssessmentController extends Controller
     }
 
     /** @param  callable():Builder  $base */
+    /**
+     * G4-14 (board approved 1 Nov 2026): the header's other two counts and the one lead block, over the same proven
+     * register set and filters as the counts: reviews due in the next 30 days, assessments reviewed in the last 30 days
+     * (from the review audit), then "Needs doing now" — overdue reviews (oldest first), drafts waiting to be approved,
+     * and reviews due in the next 7 days.
+     */
+    private function registerSummary(callable $base, array $proven, User $viewer, HealthSafetyReadContext $context): array
+    {
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland') ?: 'UTC')->toDateString();
+        $in7 = now(config('app.worker_timezone', 'Pacific/Auckland') ?: 'UTC')->addDays(7)->toDateString();
+        $in30 = now(config('app.worker_timezone', 'Pacific/Auckland') ?: 'UTC')->addDays(30)->toDateString();
+        $inForce = [HsRiskAssessment::STATUS_ACTIVE, HsRiskAssessment::STATUS_UNDER_REVIEW];
+        $lead = function (callable $where, string $kind) use ($base, $proven, $viewer, $context): array {
+            $query = $base();
+            $where($query);
+
+            return $query->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])->withCount('attachments')
+                ->tap(fn (Builder $q) => RiskAssessmentPresenter::bindProvenEagerLoads($q, $proven, $context))
+                ->orderBy('review_due_at')->orderBy('id')->limit(5)->get()
+                ->map(fn (HsRiskAssessment $ra) => ['kind' => $kind, 'review_due_at' => $ra->review_due_at?->toDateString(),
+                    'row' => RiskAssessmentPresenter::registerRow($ra, $viewer, $context, $base())])->all();
+        };
+        $rows = [
+            ...$lead(fn (Builder $q) => $q->overdueForReview(), 'review_overdue'),
+            ...$lead(fn (Builder $q) => $q->where('status', HsRiskAssessment::STATUS_DRAFT), 'draft'),
+            ...$lead(fn (Builder $q) => $q->whereIn('status', $inForce)->whereNotNull('review_due_at')
+                ->whereDate('review_due_at', '>=', $today)->whereDate('review_due_at', '<=', $in7), 'review_soon'),
+        ];
+        $reviewed = AuditLog::query()->where('action', 'risk_assessment.review_completed')
+            ->where('auditable_type', (new HsRiskAssessment)->getMorphClass())
+            ->whereIn('auditable_id', $base()->select('hs_risk_assessments.id'))
+            ->where('created_at', '>=', now()->subDays(30))->distinct()->count('auditable_id');
+
+        return [
+            'boxes' => [
+                'reviews_overdue' => (clone $base())->overdueForReview()->count(),
+                'reviews_due_30d' => (clone $base())->whereIn('status', $inForce)->whereNotNull('review_due_at')
+                    ->whereDate('review_due_at', '>=', $today)->whereDate('review_due_at', '<=', $in30)->count(),
+                'awaiting_approval' => (clone $base())->where('status', HsRiskAssessment::STATUS_DRAFT)->count(),
+                'reviewed_30d' => $reviewed,
+            ],
+            'lead' => array_slice($rows, 0, 4),
+            'lead_total' => count($rows),
+        ];
+    }
+
     private function buildHero(callable $base): array
     {
         $active = (clone $base())->active()->count();

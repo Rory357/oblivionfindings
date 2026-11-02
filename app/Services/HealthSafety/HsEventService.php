@@ -144,6 +144,16 @@ class HsEventService
                 $responseSource,
             ): HsEvent {
                 $responseSource?->assertCurrent();
+                // #255: a soft-deleted event can still hold this source's key. It stays deleted and is never restored;
+                // its key is retired (audited below with the new event's id) so the source gets a fresh event.
+                $retiredHolder = HsEvent::onlyTrashed()->where('idempotency_key', $idempotencyKey)->lockForUpdate()->first();
+                if ($retiredHolder !== null) {
+                    $retired = DB::table('hs_events')->where('id', $retiredHolder->id)->whereNotNull('deleted_at')
+                        ->where('idempotency_key', $idempotencyKey)->update(['idempotency_key' => self::retiredIdempotencyKey($retiredHolder->id, $idempotencyKey)]);
+                    if ($retired !== 1) {
+                        throw new \RuntimeException('The deleted H&S event holding this source could not be retired.');
+                    }
+                }
                 $event = HsEvent::create([
                     'reference_number' => HsEvent::generateReferenceNumber(),
                     'source_type' => get_class($source),
@@ -180,6 +190,17 @@ class HsEventService
                 ]);
 
                 $responseSource?->registerCreatedEvent($event);
+
+                if ($retiredHolder !== null) {
+                    AuditLogger::logOrFail('healthSafety.event.idempotencyKeyRetired', $retiredHolder, [
+                        'actor_id' => is_numeric($data['created_by'] ?? null) ? (int) $data['created_by'] : auth()->id(),
+                        'reason' => 'The source was recorded again while its earlier H&S event was deleted; the deleted event stays deleted.',
+                        'retired_event_id' => (int) $retiredHolder->id,
+                        'retired_event_reference' => $retiredHolder->reference_number,
+                        'new_event_id' => (int) $event->id,
+                        'new_event_reference' => $event->reference_number,
+                    ]);
+                }
 
                 if ($hasCompleteDecision) {
                     AuditLogger::logOrFail(
@@ -221,6 +242,12 @@ class HsEventService
 
             return null;
         }
+    }
+
+    /** #255: a retired key stays unique, fits the 64-character column and can never equal a live source key. */
+    public static function retiredIdempotencyKey(int $eventId, string $key): string
+    {
+        return hash('sha256', "retired:{$eventId}:{$key}");
     }
 
     /**

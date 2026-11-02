@@ -70,24 +70,17 @@ function daysAhead(day: string | null): number | null {
     const days = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
     return Number.isFinite(days) ? days : null;
 }
-/** A date that needs someone: the date in its status badge, a short note under it. */
-const dueDate = (day: string, variant: StatusVariant, note: string) => (
-    <span className="inline-grid justify-items-start gap-0.5">
-        <StatusBadge variant={variant}>{formatDateOnly(day)}</StatusBadge>
-        <span className="text-caption text-muted-foreground">{note}</span>
-    </span>
-);
-/** Expired (server) reads red; in date but within the Expiring view's 60 days reads amber. */
-function expiryCell(row: InventoryDisplayRow): ReactNode {
-    if (!row.expiry_date) return none;
-    if (row.currency?.expiry_state === 'expired') return dueDate(row.expiry_date, 'critical', 'Expired');
+/** G4-11: a row's problems in one chip — overdue inspection, past expiry and poor condition read red together; expiring within the Expiring view's 60 days reads amber. */
+export function ppeAttention(row: Pick<InventoryDisplayRow, 'expiry_date' | 'condition' | 'status' | 'currency'>): { label: string; tone: StatusVariant } | null {
+    if (row.status === 'condemned' || row.status === 'disposed') return null;
+    const problems = [row.currency?.inspection_state === 'overdue' ? 'Inspection overdue' : null, row.currency?.expiry_state === 'expired' ? 'Past expiry date' : null,
+        row.condition === 'poor' ? 'Poor condition' : null].filter((item): item is string => item !== null);
+    if (problems.length) return { label: problems.join(' · '), tone: 'critical' };
     const ahead = daysAhead(row.expiry_date);
-    if (ahead !== null && ahead <= 60) return dueDate(row.expiry_date, 'warning', 'Expires soon');
-    return formatDateOnly(row.expiry_date);
+    return row.expiry_date && ahead !== null && ahead <= 60 ? { label: `Expires soon · ${formatDateOnly(row.expiry_date).replace(/\s\d{4}$/, '')}`, tone: 'warning' } : null;
 }
 function inspectionCell(row: InventoryDisplayRow): ReactNode {
-    if (!row.next_inspection_due) return none;
-    if (row.currency?.inspection_state === 'overdue') return dueDate(row.next_inspection_due, 'critical', 'Overdue');
+    if (!row.next_inspection_due) return <span className="text-muted-foreground">Not needed</span>;
     return formatDateOnly(row.next_inspection_due);
 }
 const icon = (category: string | null | undefined) => {
@@ -95,7 +88,7 @@ const icon = (category: string | null | undefined) => {
     return <Icon aria-hidden="true" className="size-4" />;
 };
 
-/** Equipment (pg-hsn-120): one row per inventory record. */
+/** Equipment (G4-11): one row per inventory record, problems first, each row's problems in one chip. */
 export function PpeInventoryTable({ rows, total, returnTo, footer }: { rows: InventoryDisplayRow[]; total: number; returnTo: string; footer: ReactNode }) {
     const href = (row: InventoryDisplayRow, section?: PpeSection) => ppeHref('inventory', row.id, { returnTo, section });
     const name = (row: InventoryDisplayRow) => damaged(row) ? `Equipment record needs fixing · Ref ${row.id}` : row.ppe_type?.name ?? `Equipment · Ref ${row.id}`;
@@ -107,24 +100,24 @@ export function PpeInventoryTable({ rows, total, returnTo, footer }: { rows: Inv
     const columns: RecordTableColumn<InventoryDisplayRow>[] = [
         { key: 'item', label: 'Item', className: 'min-w-[15rem]', cell: (row) => <div className="grid gap-1">
             <RecordIdentity leading={icon(damaged(row) ? null : row.ppe_type?.category)} title={name(row)}
-                sub={damaged(row) ? HIDDEN_SUB : [row.brand, row.model, row.serial_number].filter(Boolean).join(' · ') || 'No identifying details recorded'} />
+                sub={damaged(row) ? HIDDEN_SUB : [row.serial_number, row.brand, row.model].filter(Boolean).join(' · ') || 'No identifying details recorded'} />
             {repair(row) ? <span className="pl-10">{repair(row)}</span> : null}</div> },
-        { key: 'site', label: 'Site and storage', nowrap: true, cell: (row) => fact(row, () => <RecordIdentity title={row.site?.name ?? 'Site not available'} sub={row.location ?? 'Storage not recorded'} />) },
+        { key: 'site', label: 'Site and storage', nowrap: true, cell: (row) => fact(row, () => [row.site?.name ?? 'Site not available', row.location ?? 'storage not recorded'].join(' · ')) },
         { key: 'status', label: 'Status', nowrap: true, cell: (row) => fact(row, () => <StatusBadge variant={tone(row.status)}>{serviceLabel(row.status)}</StatusBadge>) },
-        { key: 'quantity', label: 'Quantity', nowrap: true, cell: (row) => fact(row, () => row.quantity ?? 'Not recorded') },
+        { key: 'quantity', label: 'Qty', nowrap: true, cell: (row) => fact(row, () => row.quantity ?? 'Not recorded') },
         { key: 'condition', label: 'Condition', nowrap: true, cell: (row) => fact(row, () => condLabel(row.condition)) },
-        { key: 'expiry', label: 'Expiry', nowrap: true, cell: (row) => fact(row, () => expiryCell(row)) },
         { key: 'inspection', label: 'Next inspection', nowrap: true, cell: (row) => fact(row, () => inspectionCell(row)) },
+        { key: 'attention', label: 'Needs attention', cell: (row) => fact(row, () => { const chip = ppeAttention(row); return chip ? <StatusBadge variant={chip.tone}>{chip.label}</StatusBadge> : none; }) },
     ];
-    return <RecordTable title="Equipment" sub={`Showing ${rows.length} of ${total} · right-click a row for who’s had it, inspections, files or history`}
+    return <RecordTable title="Equipment" sub="Problems first"
         ariaLabel="Matching equipment records" columns={columns} rows={rows} rowKey={(row) => row.id} onOpen={(row) => router.get(href(row))}
         actionsFor={actions} menuTitle={name} menuIcon={Package} empty={EMPTY} footer={footer} />;
 }
 
-/** Equipment issued (pg-hsn-120b): open issues, oldest acknowledgement gaps visible. */
+/** Equipment handed out (pg-hsn-120b): open issues, oldest acknowledgement gaps visible. */
 export function PpeAllocationTable({ rows, total, returnTo, footer }: { rows: AllocationDisplayRow[]; total: number; returnTo: string; footer: ReactNode }) {
     const href = (row: AllocationDisplayRow, section?: PpeSection) => ppeHref('allocations', row.id, { returnTo, section });
-    const name = (row: AllocationDisplayRow) => damaged(row) ? `Issue record needs fixing · Ref ${row.id}` : row.ppe_type?.name ?? `Issued PPE · Ref ${row.id}`;
+    const name = (row: AllocationDisplayRow) => damaged(row) ? `Hand-out record needs fixing · Ref ${row.id}` : row.ppe_type?.name ?? `Handed-out gear · Ref ${row.id}`;
     const actions = (row: AllocationDisplayRow): MenuItem[] => [{ label: 'Open', icon: UserRound, onClick: () => router.get(href(row)) },
         ...(!damaged(row) ? [{ label: 'Fit test and training', icon: ClipboardCheck, onClick: () => router.get(href(row, 'fit-training')) },
             { label: 'Files', icon: FileText, onClick: () => router.get(href(row, 'evidence')) }, { label: 'History', icon: History, onClick: () => router.get(href(row, 'history')) }] : [])];
@@ -145,12 +138,12 @@ export function PpeAllocationTable({ rows, total, returnTo, footer }: { rows: Al
             {repair(row) ? <span className="pl-10">{repair(row)}</span> : null}</div> },
         { key: 'worker', label: 'Worker', nowrap: true, cell: (row) => fact(row, () => row.user?.name ? <RecordPerson name={row.user.name} /> : <span className="text-muted-foreground">Worker not available</span>) },
         { key: 'site', label: 'Site', nowrap: true, cell: (row) => fact(row, () => row.inventory_item?.site?.name ?? 'Site not available') },
-        { key: 'issued', label: 'Issued', nowrap: true, cell: (row) => fact(row, () => row.allocated_at ? <RecordIdentity title={formatDateOnly(toDateInput(row.allocated_at))} sub={formatTime(row.allocated_at)} /> : 'Not recorded') },
+        { key: 'issued', label: 'Handed out', nowrap: true, cell: (row) => fact(row, () => row.allocated_at ? <RecordIdentity title={formatDateOnly(toDateInput(row.allocated_at))} sub={formatTime(row.allocated_at)} /> : 'Not recorded') },
         { key: 'ack', label: 'Received', nowrap: true, cell: (row) => fact(row, () => <StatusBadge variant={row.acknowledged ? 'success' : 'warning'}>{row.acknowledged ? 'Yes' : 'Not yet confirmed'}</StatusBadge>) },
         { key: 'fit', label: 'Fit test · training', cell: (row) => fact(row, () => fitTraining(row)) },
     ];
-    return <RecordTable title="Equipment issued" sub={`Showing ${rows.length} of ${total} · check fit before use · right-click a row for fit test, training, files or history`}
-        ariaLabel="Matching issued equipment" columns={columns} rows={rows} rowKey={(row) => row.id} onOpen={(row) => router.get(href(row))}
+    return <RecordTable title="Equipment handed out" sub={`Showing ${rows.length} of ${total} · check fit before use · right-click a row for fit test, training, files or history`}
+        ariaLabel="Matching equipment handed out" columns={columns} rows={rows} rowKey={(row) => row.id} onOpen={(row) => router.get(href(row))}
         actionsFor={actions} menuTitle={name} menuIcon={UserRound} empty={EMPTY} footer={footer} />;
 }
 

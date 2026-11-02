@@ -2,9 +2,12 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Models\HsEvent;
 use App\Models\RestraintEvent;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\HealthSafety\HsRecordTitle;
+use App\Support\HealthSafety\LinkedSafetyReviewSummary;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
@@ -13,7 +16,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /** Explicit source DTOs; no query, authority, directory record or private command metadata escapes. */
 class RestraintSourceProjectionService
 {
-    private const EVENT_FIELDS = ['id', 'reference_number', 'client_id', 'site_id', 'lock_version', 'source_revision', 'started_at', 'ended_at', 'duration_minutes', 'restraint_type', 'severity', 'trigger_description', 'de_escalation_attempted', 'restraint_description', 'person_response', 'post_incident_support', 'injury_occurred', 'injury_details', 'within_support_plan', 'deviation_reason', 'reviewed_at', 'review_notes', 'lessons_learned', 'review_due_at', 'review_assignment_revision', 'reviewed_source_revision', 'created_at', 'updated_at'];
+    private const EVENT_FIELDS = ['id', 'reference_number', 'client_id', 'site_id', 'lock_version', 'source_revision', 'started_at', 'ended_at', 'duration_minutes', 'restraint_type', 'summary', 'severity', 'trigger_description', 'de_escalation_attempted', 'restraint_description', 'person_response', 'post_incident_support', 'injury_occurred', 'injury_details', 'within_support_plan', 'deviation_reason', 'reviewed_at', 'review_notes', 'lessons_learned', 'review_due_at', 'review_assignment_revision', 'reviewed_source_revision', 'created_at', 'updated_at'];
 
     private const FACT_FIELDS = ['kind', 'reviewed_at', 'review_notes', 'lessons_learned', 'severity', 'post_incident_support', 'reason', 'due_at', 'assignment_revision', 'observed_at', 'condition', 'response', 'next_check_at', 'status', 'occurred_at', 'actual_participants', 'person_voice', 'communication_support', 'advocacy_support', 'cultural_preferences', 'contact_outcome', 'learning', 'outcome', 'notes', 'completed_at', 'prior_values'];
 
@@ -57,6 +60,8 @@ class RestraintSourceProjectionService
             $site = $row->site_id === null ? null : $reads->query(Site::query())->findOrFail($row->site_id);
             $facts['client'] = ['id' => (int) $client->id, 'name' => trim($client->first_name.' '.$client->last_name)];
             $facts['site'] = $site ? ['id' => (int) $site->id, 'name' => $site->name] : null;
+            // Decision 15: the same plain title as its safety review and every list.
+            $facts['title'] = HsRecordTitle::restraint($facts['client']['name'], $site?->name, $row->summary);
             $facts['needs_review'] = $row->needsReview();
             $facts['source_provenance'] = $row->source_schema_version === 1 ? 'recorded' : 'legacy_uncertainty';
             $facts['plan_authorization'] = ['state' => $row->plan_authorization_state ?? 'legacy_unknown', 'explanation' => $row->plan_authorization_snapshot['explanation'] ?? null];
@@ -88,7 +93,10 @@ class RestraintSourceProjectionService
             })->all();
             $facts['deliveries'] = $row->deliveries()->orderBy('created_at')->get()->map(fn ($d) => $this->attributes($d, ['purpose', 'status', 'failure_code', 'attempts', 'next_attempt_at', 'delivered_at', 'created_at']))->all();
 
-            return ['event' => $facts, 'connections' => $links, 'can' => ['review' => $current->canDo('restraints.review') || $current->canDo('restraints.manage'), 'manage' => $current->canDo('restraints.manage'), 'capture' => $current->canDo('restraints.create') || $current->canDo('restraints.manage')]];
+            // The safety review card (G4-5), only when this viewer can open the review (decision 6: otherwise nothing).
+            $review = $links['health_safety'] ? $reads->query(HsEvent::query())->find($links['health_safety']['id']) : null;
+
+            return ['event' => $facts, 'connections' => $links, 'safety_review' => $review ? LinkedSafetyReviewSummary::make($review, $reads) : null, 'can' => ['review' => $current->canDo('restraints.review') || $current->canDo('restraints.manage'), 'manage' => $current->canDo('restraints.manage'), 'capture' => $current->canDo('restraints.create') || $current->canDo('restraints.manage')]];
         });
     }
 

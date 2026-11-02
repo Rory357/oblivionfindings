@@ -8,6 +8,7 @@ use App\Models\HsCommitteeMeeting;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\WorkerParticipationMeetingEvent;
 use App\Notifications\HealthSafety\CommitteeMeetingScheduled;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -77,7 +78,8 @@ final class WorkerParticipationSchedulingWorkflowTest extends TestCase
         $this->assertSame([$this->actor->id], $meeting->attendeeUsers()->pluck('users.id')->all());
         $this->assertArrayNotHasKey('scheduled_timezone', $meeting->getAttributes());
         $this->assertArrayNotHasKey('scheduled_offset', $meeting->getAttributes());
-        Notification::assertSentTo($this->actor, CommitteeMeetingScheduled::class);
+        $this->assertTrue(WorkerParticipationMeetingEvent::query()->where('meeting_id', $meeting->id)->where('purpose', 'scheduled')->exists(), 'The meeting notice is staged in the save (#14).');
+        Notification::assertNotSentTo($this->actor, CommitteeMeetingScheduled::class);
     }
 
     public static function invalidCreates(): array
@@ -145,8 +147,8 @@ final class WorkerParticipationSchedulingWorkflowTest extends TestCase
         $this->putJson('/health-safety/worker-participation/meetings/'.$meeting->id,
             ['scheduled_at' => '2026-01-15T13:45', 'scheduled_timezone' => 'Pacific/Auckland'])->assertRedirect();
         $this->assertSame('2026-01-15 00:45:00', $meeting->fresh()->getRawOriginal('scheduled_at'));
-        Notification::assertSentTo($this->actor, CommitteeMeetingScheduled::class,
-            fn ($notice) => $notice->meeting->id === $meeting->id && $notice->meeting->scheduled_at->utc()->format('Y-m-d H:i:s') === '2026-01-15 00:45:00');
+        $this->assertTrue(WorkerParticipationMeetingEvent::query()->where('meeting_id', $meeting->id)->where('purpose', 'rescheduled')->exists(), 'The meeting notice is staged in the save (#14).');
+        Notification::assertNotSentTo($this->actor, CommitteeMeetingScheduled::class);
     }
 
     public function test_same_marked_instant_does_not_send_reschedule_notification(): void

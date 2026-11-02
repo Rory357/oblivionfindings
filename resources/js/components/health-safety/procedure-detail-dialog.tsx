@@ -4,6 +4,7 @@
  * record-review / archive / restore) take over the body and post in-place. The Documents
  * section is the controlled-document library, reusing the shared AttachmentUploader.
  * Built on the Add-client modal chrome (WizardShell). Semantic tokens only. NZ-only, web-only. */
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
@@ -1197,12 +1198,12 @@ function ActionPane({
                             : undefined
                     }
                 >
-                    <Input
-                        type="date"
+                    <DatePicker
+                        id="procedure-detail-review-date"
+                        label="Next review date"
                         value={form.data.review_date}
-                        onChange={(e) =>
-                            form.setData('review_date', e.target.value)
-                        }
+                        allowClear={!reviewRequired}
+                        onChange={(value) => form.setData('review_date', value)}
                     />
                 </Field>
             ) : null}

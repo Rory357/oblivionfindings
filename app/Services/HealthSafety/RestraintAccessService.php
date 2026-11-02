@@ -30,7 +30,10 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /** Current operation authority and exact confidential source tuples, never a tenant boundary. */
 final class RestraintAccessService
 {
-    public const PERMISSIONS = ['hazards.view', 'restraints.view', 'restraints.create', 'restraints.report', 'restraints.review', 'restraints.manage', 'restraints.approve', 'respite.stays.manage', 'respite.viewAny', 'healthSafety.viewAllSites', 'clients.viewAny', 'clients.viewAssigned', 'clinical.accessAllSites', 'sites.viewAll', 'sites.view', 'incidents.viewAny', 'incidents.viewAssigned', 'incidents.update', 'incidents.create', 'incidents.submit', 'hr.cases.view', 'medications.controlled.view', 'controlRoom.viewAny', 'controlRoom.alerts.view', 'controlRoom.tasks.view'];
+    /** Decision 4 (Stephan, 1 Nov 2026): own a restraint follow-up (e.g. tell the family/whānau) and record its outcome — never the restraint. */
+    public const OWN_FOLLOWUPS = 'restraints.followups.own';
+
+    public const PERMISSIONS = ['hazards.view', 'restraints.view', 'restraints.create', 'restraints.report', 'restraints.review', 'restraints.manage', 'restraints.approve', self::OWN_FOLLOWUPS, 'respite.stays.manage', 'respite.viewAny', 'healthSafety.viewAllSites', 'clients.viewAny', 'clients.viewAssigned', 'clinical.accessAllSites', 'sites.viewAll', 'sites.view', 'incidents.viewAny', 'incidents.viewAssigned', 'incidents.update', 'incidents.create', 'incidents.submit', 'hr.cases.view', 'medications.controlled.view', 'controlRoom.viewAny', 'controlRoom.alerts.view', 'controlRoom.tasks.view'];
 
     public function __construct(private readonly UserSiteAccessService $sites, private readonly AuthorizationEvidenceLockService $authorization, private readonly HrCurrentStaffService $staff, private readonly ClientPolicy $clients, private readonly RespiteStayScope $stays, private readonly IncidentAccessService $incidents) {}
 
@@ -63,7 +66,11 @@ final class RestraintAccessService
             'respite_capture' => $current->canDo('respite.stays.manage'),
             'approve' => $current->canDo('restraints.approve'),
             'manage', 'edit', 'update', 'activate', 'submit_review', 'archive', 'remove_evidence' => $current->canDo('restraints.manage'),
-            'complete_followup' => $current->canDo('restraints.view') || $current->canDo('restraints.review') || $current->canDo('restraints.manage'),
+            // Decision 4: restraints.followups.own adds owning and finishing a follow-up only. Completion still needs the
+            // follow-up to be assigned to this person (RestraintService) and current Site and client access (assertEvent).
+            'complete_followup' => $current->canDo('restraints.view') || $current->canDo('restraints.review') || $current->canDo('restraints.manage') || $current->canDo(self::OWN_FOLLOWUPS),
+            // The "Your follow-ups" list: only the follow-ups this person owns (RestraintOwnFollowupService), never the record.
+            'own_followups' => $current->canDo(self::OWN_FOLLOWUPS),
             default => false,
         };
         abort_unless($allowed, 403);
@@ -339,6 +346,13 @@ final class RestraintAccessService
             $source instanceof Client
                 ? $this->assertClient($source, $person, $reads, $this->sites->accessibleSiteIds($person, [], $reads), 'review')
                 : $this->assertEvent($source, $person, $reads, $this->sites->accessibleSiteIds($person, [], $reads), 'review');
+        }
+        // Who a follow-up can be given to (the same test RestraintService::recipient() saves with): current staff at the
+        // restraint's Site who could record its outcome there — including a support worker with restraints.followups.own
+        // (decision 4), never someone without that Site or that person.
+        if ($operation === 'followup_recipient') {
+            abort_unless($source instanceof RestraintEvent, 403);
+            $this->assertEvent($source, $person, $reads, $this->sites->accessibleSiteIds($person, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, $reads), 'complete_followup');
         }
 
         return $person;

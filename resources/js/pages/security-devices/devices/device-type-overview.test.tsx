@@ -25,11 +25,7 @@ vi.mock('@inertiajs/react', () => ({
 }));
 
 vi.mock('@/components/leaflet-map', () => ({
-    default: ({
-        center,
-    }: {
-        center: { lat: number; lng: number };
-    }) => (
+    default: ({ center }: { center: { lat: number; lng: number } }) => (
         <div data-testid="mock-leaflet-map">
             Map {center.lat},{center.lng}
         </div>
@@ -150,12 +146,43 @@ function baseProfile(overrides: Partial<DeviceProfile>): DeviceProfile {
             },
         },
         capabilities: {
-            registry: { supported: true, allowed: true, available: true, state: 'available' },
-            assignment: { supported: true, allowed: true, available: true, state: 'available' },
-            monitoring: { supported: true, allowed: true, available: true, state: 'available' },
-            maintenance: { supported: true, allowed: true, available: true, state: 'available' },
-            documents: { supported: true, allowed: true, available: true, state: 'available' },
-            control: { supported: true, allowed: true, available: true, state: 'available', reason: 'Audited.' },
+            registry: {
+                supported: true,
+                allowed: true,
+                available: true,
+                state: 'available',
+            },
+            assignment: {
+                supported: true,
+                allowed: true,
+                available: true,
+                state: 'available',
+            },
+            monitoring: {
+                supported: true,
+                allowed: true,
+                available: true,
+                state: 'available',
+            },
+            maintenance: {
+                supported: true,
+                allowed: true,
+                available: true,
+                state: 'available',
+            },
+            documents: {
+                supported: true,
+                allowed: true,
+                available: true,
+                state: 'available',
+            },
+            control: {
+                supported: true,
+                allowed: true,
+                available: true,
+                state: 'available',
+                reason: 'Audited.',
+            },
         },
         ...overrides,
     };
@@ -171,7 +198,8 @@ describe('DeviceTypeOverview & DeviceHistorySection', () => {
                 imeiMasked: '8679•••••••6998',
                 position: {
                     state: 'consent_required',
-                    message: 'Active resident location consent is required before coordinates can be shown.',
+                    message:
+                        'Active resident location consent is required before coordinates can be shown.',
                     latitude: null,
                     longitude: null,
                     accuracy_m: null,
@@ -196,9 +224,7 @@ describe('DeviceTypeOverview & DeviceHistorySection', () => {
             />,
         );
 
-        expect(
-            screen.getByTestId('tracker-position-gated'),
-        ).toHaveTextContent(
+        expect(screen.getByTestId('tracker-position-gated')).toHaveTextContent(
             'Active resident location consent is required before coordinates can be shown.',
         );
         expect(
@@ -224,7 +250,8 @@ describe('DeviceTypeOverview & DeviceHistorySection', () => {
                     battery_pct: 91,
                     occurred_at: '2026-10-28T04:00:00Z',
                     address: null,
-                    map_url: 'https://www.openstreetmap.org/?mlat=-36.84846&mlon=174.76333',
+                    map_url:
+                        'https://www.openstreetmap.org/?mlat=-36.84846&mlon=174.76333',
                 },
             },
         });
@@ -298,18 +325,49 @@ describe('DeviceTypeOverview & DeviceHistorySection', () => {
         const confirmBtn = submitButtons[submitButtons.length - 1]!;
         expect(confirmBtn).toBeDisabled();
 
-        fireEvent.change(
-            screen.getByLabelText(/Operational reason/i),
-            { target: { value: 'Authorised maintenance contractor arrival.' } },
-        );
+        fireEvent.change(screen.getByLabelText(/Operational reason/i), {
+            target: { value: 'Authorised maintenance contractor arrival.' },
+        });
         fireEvent.click(screen.getByRole('checkbox'));
         expect(confirmBtn).toBeDisabled();
 
-        fireEvent.change(
-            screen.getByLabelText(/to confirm disarm/i),
-            { target: { value: 'Nikau Main Panel' } },
-        );
+        fireEvent.change(screen.getByLabelText(/to confirm disarm/i), {
+            target: { value: 'Nikau Main Panel' },
+        });
         expect(confirmBtn).not.toBeDisabled();
+    });
+
+    it('shows a panel Oblivion cannot control as view only, with no arm or disarm button', () => {
+        const viewOnlyProfile = baseProfile({
+            profileLayout: 'alarm_panel',
+            typeProfile: {
+                kind: 'alarm_panel',
+                panelState: 'triggered',
+                panelStateAt: '2026-10-29T11:20:00Z',
+                zones: [],
+                commandStoreUrl: '/security-devices/devices/2/commands',
+                armAction: null,
+                disarmAction: null,
+            },
+        });
+
+        render(
+            <DeviceTypeOverview
+                profile={viewOnlyProfile}
+                deviceId={2}
+                deviceName="Kauri Front Alarm Panel"
+                canSetupAgent={false}
+                onOpenSection={() => undefined}
+            />,
+        );
+
+        expect(screen.getByTestId('alarm-panel-view-only')).toHaveTextContent(
+            'View only',
+        );
+        expect(
+            screen.queryByRole('button', { name: /arm alarm/i }),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText('Alarm panel state & controls')).toBeNull();
     });
 
     it('renders chronological history timeline and filters by entry kind', () => {

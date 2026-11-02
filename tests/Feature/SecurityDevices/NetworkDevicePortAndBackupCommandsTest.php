@@ -310,99 +310,39 @@ afterEach(function (): void {
     $this->travelBack();
 });
 
-it('keeps standard access port restarts Ready while elevating uplink and security-linked ports to independent approval', function (): void {
+// Phase A (docs/security-devices/GOAL.md): the port actions called a made-up controller path, so
+// they are never offered, even when a device record lists them. The approval rules for uplink and
+// camera ports stay in DeviceCommandRequestService for the real driver in Phase G, which brings
+// back their tests against a walked vendor API.
+it('never offers port on/off/restart, even when a device record lists them', function (): void {
+    $fixture = createNetworkCommandSwitch();
+    $store = new NetworkFixtureSnapshotStore;
+    $http = installNetworkCommandAdapterFixture([], $store);
+
+    $requester = createNetworkCommandActor($fixture['site']);
+    $declared = app(DeclaredDeviceCommandCapabilities::class);
+
+    foreach (DeclaredDeviceCommandCapabilities::UNBUILT_PORT_ACTIONS as $capability) {
+        expect($declared->supports($fixture['switch'], $capability))->toBeFalse();
+
+        expect(fn () => app(DeviceCommandRequestService::class)->request($fixture['switch'], $requester, new CommandRequestInput(
+            capability: $capability,
+            parameters: ['interface' => 'Gi1/0/12'],
+            reason: 'Restart jammed office printer PoE interface.',
+            idempotencyKey: 'unbuilt-'.$capability,
+            impactAcknowledged: true,
+        )))->toThrow(Exception::class, 'This device does not declare support for that management action.');
+    }
+
+    expect($http->calls)->toBe([]);
+});
+
+it('keeps a controller-only configuration backup unavailable without a direct SSH target', function (): void {
     $fixture = createNetworkCommandSwitch();
     $store = new NetworkFixtureSnapshotStore;
     installNetworkCommandAdapterFixture([], $store);
 
     $requester = createNetworkCommandActor($fixture['site']);
-    $service = app(DeviceCommandRequestService::class);
-
-    $accessPortRequest = $service->request($fixture['switch'], $requester, new CommandRequestInput(
-        capability: 'network.port.bounce',
-        parameters: ['interface' => 'Gi1/0/12'],
-        reason: 'Restart jammed office printer PoE interface.',
-        idempotencyKey: 'bounce-access-port-1',
-        impactAcknowledged: true,
-    ));
-
-    $uplinkPortRequest = $service->request($fixture['switch'], $requester, new CommandRequestInput(
-        capability: 'network.port.bounce',
-        parameters: ['interface' => 'Gi1/0/48'],
-        reason: 'Recover negotiated link speed on core uplink port.',
-        idempotencyKey: 'bounce-uplink-port-1',
-        impactAcknowledged: true,
-    ));
-
-    $cameraPortRequest = $service->request($fixture['switch'], $requester, new CommandRequestInput(
-        capability: 'network.port.bounce',
-        parameters: ['interface' => 'Gi1/0/24'],
-        reason: 'Power-cycle PoE feed for unresponsive entry camera.',
-        idempotencyKey: 'bounce-camera-port-1',
-        impactAcknowledged: true,
-    ));
-
-    expect($accessPortRequest->status)->toBe(CommandStatus::Ready)
-        ->and($uplinkPortRequest->status)->toBe(CommandStatus::AwaitingApproval)
-        ->and($cameraPortRequest->status)->toBe(CommandStatus::AwaitingApproval);
-});
-
-it('dispatches and reconciles network port bounce and secret-redacted configuration backup commands end to end', function (): void {
-    $fixture = createNetworkCommandSwitch();
-    $store = new NetworkFixtureSnapshotStore;
-
-    $http = installNetworkCommandAdapterFixture([
-        // 1. POST port bounce on Gi1/0/48
-        new CommandHttpResponse(200, json_encode([
-            'status' => 'accepted',
-        ], JSON_THROW_ON_ERROR)),
-        // 2. GET port readback on Gi1/0/48
-        new CommandHttpResponse(200, json_encode([
-            'data' => [
-                'interface' => 'Gi1/0/48',
-                'admin_status' => 'up',
-                'bounced' => true,
-            ],
-        ], JSON_THROW_ON_ERROR)),
-        // 3. GET configuration backup
-        new CommandHttpResponse(200, json_encode([
-            'data' => [
-                'hostname' => 'harbour-core-sw01',
-                'firmware_version' => '16.11.02',
-                'running_config_lines' => [
-                    'hostname harbour-core-sw01',
-                    'enable secret 5 $1$xyz$RAW-CONTROLLER-ENABLE-SECRET',
-                    'snmp-server community RAW-SNMP-COMMUNITY RO',
-                    'vlan 10 name Management',
-                ],
-            ],
-        ], JSON_THROW_ON_ERROR)),
-    ], $store);
-
-    $requester = createNetworkCommandActor($fixture['site']);
-    $approver = createNetworkCommandActor($fixture['site']);
-
-    $bounceCommand = app(DeviceCommandRequestService::class)->request($fixture['switch'], $requester, new CommandRequestInput(
-        capability: 'network.port.bounce',
-        parameters: ['interface' => 'Gi1/0/48'],
-        reason: 'Bounce uplink port during approved maintenance verification.',
-        idempotencyKey: 'dispatch-uplink-bounce-1',
-        impactAcknowledged: true,
-    ));
-    expect($bounceCommand->status)->toBe(CommandStatus::AwaitingApproval);
-
-    app(DeviceCommandApprovalService::class)->decide($bounceCommand, $approver, new CommandDecisionInput(
-        decision: CommandApprovalDecision::Approved,
-        comment: 'Confirmed out-of-band management path is healthy.',
-    ));
-
-    app(GovernedCommandDispatchService::class)->dispatch($bounceCommand->fresh(), $requester);
-    $reconciledBounce = app(DeviceCommandReconciliationService::class)->reconcile($bounceCommand->fresh(), $requester);
-
-    expect($reconciledBounce->outcome)->toBe(CommandReconciliationOutcome::Matched)
-        ->and($bounceCommand->fresh()->status)->toBe(CommandStatus::Reconciled)
-        ->and($http->calls[0]['method'])->toBe('POST')
-        ->and($http->calls[0]['target']->path)->toContain('/interfaces/Gi1%2F0%2F48/bounce');
 
     expect(app(DeclaredDeviceCommandCapabilities::class)->supports($fixture['switch'], 'network.config.backup'))->toBeFalse();
 

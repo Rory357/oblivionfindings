@@ -91,6 +91,25 @@ vi.mock('@inertiajs/react', async () => {
     };
 });
 
+// The approved clock picker, as a plain labelled box (its own tests cover the clock).
+vi.mock('@/components/fleet-assets/maintenance/time-picker', () => ({
+    TimePicker: ({
+        label,
+        value,
+        onChange,
+    }: {
+        label: string;
+        value: string;
+        onChange: (value: string) => void;
+    }) => (
+        <input
+            aria-label={label}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+        />
+    ),
+}));
+
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
 }));
@@ -98,6 +117,7 @@ vi.mock('@/layouts/app-layout', () => ({
 import { ReportIncidentDialog } from '../../pages/health-safety/components/report-incident-dialog';
 import { ReportLauncher } from '../../pages/health-safety/components/report-launcher';
 import IncidentReportPage from '../../pages/incidents/report';
+import { emptyImmediateResponse } from './immediate-response';
 import {
     IncidentReportDialog,
     type IncidentReportDefaults,
@@ -311,6 +331,7 @@ describe('IncidentReportDialog truthful incident intent', () => {
                         worksafe_notification_status: '',
                         site_preserved: false,
                         followups: [],
+                        immediate_response: emptyImmediateResponse(),
                         stay: true,
                     },
                 },
@@ -503,7 +524,7 @@ describe('IncidentReportDialog truthful incident intent', () => {
             screen.getByRole('button', { name: 'Submit incident' }),
         );
         expect(
-            screen.getByRole('heading', { name: 'Incident submitted' }),
+            screen.getByRole('heading', { name: 'Sent — thanks' }),
         ).toBeInTheDocument();
 
         await act(async () => {
@@ -682,9 +703,7 @@ describe('IncidentReportDialog truthful incident intent', () => {
             incident_reference: 'INC-2026-0042',
             hs_reference: 'HS-2026-0017',
         };
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Submit incident' }),
-        );
+        fireEvent.click(screen.getByRole('button', { name: 'Send it now' }));
         expect(postedPayload(1).report_request_uuid).toBe(draftUuid);
 
         fireEvent.click(screen.getByRole('button', { name: 'Report another' }));
@@ -707,19 +726,17 @@ describe('IncidentReportDialog truthful incident intent', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
         const draftUuid = postedPayload(0).report_request_uuid;
         expect(
-            screen.getByRole('heading', { name: 'Draft saved' }),
+            screen.getByRole('heading', { name: 'Draft saved — not sent yet' }),
         ).toBeInTheDocument();
 
         inertia.nextResult = null;
         inertia.nextError = {
             shift_id: 'The selected shift does not match this incident.',
         };
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Submit incident' }),
-        );
+        fireEvent.click(screen.getByRole('button', { name: 'Send it now' }));
 
         expect(
-            screen.queryByRole('heading', { name: 'Draft saved' }),
+            screen.queryByRole('heading', { name: 'Draft saved — not sent yet' }),
         ).not.toBeInTheDocument();
         expect(
             screen.getByRole('heading', { name: 'Type & people' }),
@@ -1054,7 +1071,7 @@ describe('IncidentReportDialog truthful incident intent', () => {
         );
 
         expect(
-            screen.getByRole('button', { name: /Report an incident/i }),
+            screen.getByRole('button', { name: 'Report incident' }),
         ).toBeInTheDocument();
         expect(
             screen.queryByText(/Report incident \/ near-miss/i),
@@ -1184,16 +1201,20 @@ describe('IncidentReportDialog truthful incident intent', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
         expect(
-            screen.getByRole('heading', { name: 'Draft saved' }),
+            screen.getByRole('heading', { name: 'Draft saved — not sent yet' }),
         ).toBeInTheDocument();
-        expect(screen.getByText('INC-2026-0042')).toBeInTheDocument();
+        // A draft has no reference yet (references are given when it's sent).
+        expect(screen.queryByText(/INC-2026-0042/)).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Nobody follows it up until you send it.'),
+        ).toBeInTheDocument();
         expect(
             screen.queryByText(/Awaiting H&S acceptance/i),
         ).not.toBeInTheDocument();
         expect(screen.queryByText('INC-42')).not.toBeInTheDocument();
     });
 
-    it('shows official references and icon plus text for the submitted H&S handover state', () => {
+    it('says plainly where a sent incident went and who follows it up there', () => {
         inertia.nextResult = {
             result: 'submitted',
             incident_reference: 'INC-2026-0042',
@@ -1209,14 +1230,173 @@ describe('IncidentReportDialog truthful incident intent', () => {
         );
 
         expect(
-            screen.getByRole('heading', { name: 'Incident submitted' }),
+            screen.getByRole('heading', { name: 'Sent — thanks' }),
         ).toBeInTheDocument();
-        expect(screen.getByText('INC-2026-0042')).toBeInTheDocument();
-        expect(screen.getByText('HS-2026-0017')).toBeInTheDocument();
-        const status = screen.getByText('Awaiting H&S acceptance');
-        expect(status).toBeInTheDocument();
-        expect(status.parentElement?.querySelector('svg')).not.toBeNull();
+        const pane = screen.getByRole('dialog', { name: 'Sent — thanks' });
+        expect(pane).toHaveAttribute('data-popup-size', 'sm');
+        expect(pane).toHaveTextContent(
+            'Your incident has gone to the managers at Kauri House. One of them will take it on and follow it up.',
+        );
+        expect(screen.getByText('Incident INC-2026-0042')).toBeInTheDocument();
         expect(screen.queryByText('INC-42')).not.toBeInTheDocument();
+        expect(
+            within(pane).getByRole('button', { name: 'Report another' }),
+        ).toBeInTheDocument();
+        expect(
+            within(pane).getByRole('button', { name: 'Done' }),
+        ).toBeInTheDocument();
+    });
+});
+
+describe('IncidentReportDialog — "Straight away" (decision 18)', () => {
+    it('asks quick timed ticks and sends the ticked ones with their times', () => {
+        renderDialog();
+        openStep(/Straight away/);
+
+        expect(
+            screen.getByText(
+                'Tick what was done and when. Leave it unticked if it didn’t happen.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Aroha Ngata · Kauri House · 12 Jul 2026, 9:15 am'),
+        ).toBeInTheDocument();
+        expect(screen.getAllByText('Not yet')).toHaveLength(5);
+
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'Checked the person and made them safe',
+            }),
+        );
+        const time = screen.getByLabelText(
+            'Checked the person and made them safe — time',
+        );
+        // A tick starts at the time it was ticked; the clock picker changes it.
+        expect((time as HTMLInputElement).value).toMatch(/^\d{2}:\d{2}$/);
+        fireEvent.change(time, { target: { value: '09:20' } });
+        fireEvent.change(
+            screen.getByLabelText(
+                'Family/whānau told — who, or when they’ll be told',
+            ),
+            { target: { value: 'Hemi will ring tomorrow morning' } },
+        );
+        fireEvent.change(screen.getByLabelText('Anything else you did?'), {
+            target: { value: 'Moved the rug out of the lounge.' },
+        });
+
+        openReviewStep();
+        expect(screen.getByText('9:20 am')).toBeInTheDocument();
+        expect(
+            screen.getByText('Not yet · Hemi will ring tomorrow morning'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+
+        expect(postedPayload().immediate_response).toEqual([
+            { key: 'made_safe', done: true, time: '09:20', detail: null },
+            {
+                key: 'family_told',
+                done: false,
+                time: null,
+                detail: 'Hemi will ring tomorrow morning',
+            },
+        ]);
+        expect(postedPayload().immediate_action_taken).toBe(
+            'Moved the rug out of the lounge.',
+        );
+    });
+
+    it('needs each tick’s time, and a high incident’s words, before moving on', () => {
+        renderDialog('incidents', {
+            defaults: { ...defaults, severity: 'high' },
+        });
+        openStep(/Straight away/);
+
+        expect(
+            screen.getByLabelText(/What you did straight away/),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Next' }),
+        ).toBeDisabled();
+        fireEvent.change(screen.getByLabelText(/What you did straight away/), {
+            target: { value: 'Checked Aroha and called the nurse.' },
+        });
+        expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+
+        fireEvent.click(screen.getByRole('checkbox', { name: 'First aid given' }));
+        fireEvent.change(screen.getByLabelText('First aid given — time'), {
+            target: { value: '' },
+        });
+        expect(
+            screen.getByText('Choose the time it was done.'),
+        ).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    });
+
+    it('names the step before the check “Next: check and send”', () => {
+        renderDialog();
+        openStep(/Follow-ups/);
+        expect(
+            screen.getByRole('button', { name: 'Next: check and send' }),
+        ).toBeInTheDocument();
+    });
+
+    it('does not ask a near miss for the ticks', () => {
+        render(
+            <IncidentReportDialog
+                open
+                mode="near_miss"
+                clients={clients}
+                sites={sites}
+                staff={[]}
+                defaults={defaults}
+                onClose={() => {}}
+            />,
+        );
+        expect(
+            screen
+                .getAllByRole('button')
+                .some((button) => /Straight away/.test(button.textContent ?? '')),
+        ).toBe(false);
+        openReviewStep();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+        expect(postedPayload().immediate_response).toEqual([]);
+    });
+
+    it('shows a draft pane that offers to send it now and goes back where it started', () => {
+        const onClose = vi.fn();
+        inertia.nextResult = {
+            result: 'draft',
+            incident_reference: 'INC-2026-0042',
+        };
+        render(
+            <IncidentReportDialog
+                open
+                mode="incident"
+                clients={clients}
+                sites={sites}
+                staff={[]}
+                defaults={defaults}
+                doneLabel="Back to My Day"
+                onClose={onClose}
+            />,
+        );
+        openReviewStep();
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+        expect(
+            screen.getByText(
+                'Finish it any time from My Day, under “What you reported”.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Send it now' }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Back to My Day' }));
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 });
 
@@ -1250,7 +1430,7 @@ describe('IncidentReportPage — standalone page for reporters without register 
         );
 
         expect(
-            screen.getByRole('heading', { name: 'Incident submitted' }),
+            screen.getByRole('heading', { name: 'Sent — thanks' }),
         ).toBeInTheDocument();
         expect(
             screen.queryByRole('button', { name: 'Open incident' }),

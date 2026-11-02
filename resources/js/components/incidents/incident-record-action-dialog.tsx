@@ -5,17 +5,12 @@ import {
     type IncidentDetail,
     type LifecycleAction,
 } from '@/components/incidents/incident-detail-dialog';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { PopupContext, PopupHeader } from '@/components/popup';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { WizardShell } from '@/components/wizard/shell';
 import { useSettingsLeaveConfirmation } from '@/hooks/use-settings-leave-confirmation';
 import type { PendingVisit } from '@inertiajs/core';
-import { Pencil } from 'lucide-react';
+import { ClipboardList, Pencil, type LucideIcon } from 'lucide-react';
 import { cloneElement, useCallback, useState } from 'react';
 
 /** Only the selected command is modal; the incident remains a permanent page. */
@@ -88,24 +83,37 @@ export function IncidentRecordActionDialog({
                         if (!open) requestClose();
                     }}
                 >
-                    <DialogContent className="frontline-dialog max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-                        <DialogHeader>
-                            <DialogTitle>
-                                {ACTION_META[action].title}
-                            </DialogTitle>
-                            <DialogDescription>
-                                {reference} · Your incident page stays open
-                                behind this action.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <ActionPane
-                            d={detail}
-                            action={action}
-                            onDone={onClose}
-                            onCancel={requestClose}
-                            onDraftStateChange={setDraft}
-                            confirmCurrentIncident
+                    <DialogContent
+                        showCloseButton={false}
+                        data-popup-size="md"
+                        className="frontline-dialog flex max-h-[88vh] flex-col gap-0 overflow-hidden rounded-[18px] border border-border bg-card p-0 text-card-foreground shadow-2xl sm:max-w-none"
+                        style={{
+                            width: 'min(92vw, 720px)',
+                            maxWidth: 'min(92vw, 720px)',
+                        }}
+                    >
+                        <PopupHeader
+                            icon={ACTION_META[action].icon as LucideIcon}
+                            title={ACTION_META[action].title}
+                            description={ACTION_META[action].blurb}
+                            onClose={requestClose}
+                            closeDisabled={draft.busy}
                         />
+                        <div className="scrollbar-pretty grid min-h-0 flex-1 content-start gap-3.5 overflow-y-auto px-[22px] pt-1 pb-[18px]">
+                            <PopupContext
+                                title={reference}
+                                icon={ClipboardList}
+                            />
+                            <ActionPane
+                                d={detail}
+                                action={action}
+                                onDone={onClose}
+                                onCancel={requestClose}
+                                onDraftStateChange={setDraft}
+                                confirmCurrentIncident
+                                hideHead
+                            />
+                        </div>
                     </DialogContent>
                 </Dialog>
             )}
