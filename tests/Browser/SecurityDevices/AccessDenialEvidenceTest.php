@@ -159,34 +159,20 @@ test('device privacy denials stay complete and non-revealing on desktop', functi
                     'document.documentElement.scrollWidth <= document.documentElement.clientWidth',
                     true,
                 )
-                ->visit('/security-devices/device-groups')
-                ->waitForText($group->name, 40)
-                ->assertSee('1 device')
+                // S&D rebuild C6: the old group pages are retired; a group is a filter on Devices
+                // (`?group=`), and the old group links redirect there. The group's private member stays hidden.
+                ->visit("/security-devices/device-groups/{$group->id}")
+                ->assertPathIs('/security-devices/devices')
+                ->assertQueryStringHas('group', (string) $group->id)
+                ->waitForText($visibleMember->name, 40)
                 ->assertSourceMissing($privateMember->name)
                 ->assertSourceMissing($privateCandidate->name)
                 ->assertScript(
                     'document.documentElement.scrollWidth <= document.documentElement.clientWidth',
                     true,
                 )
-                ->visit("/security-devices/device-groups/{$group->id}")
-                ->waitForText('Members (1)', 40)
-                ->assertSee($visibleMember->name)
-                ->assertSourceMissing($privateMember->name)
-                ->assertSourceMissing($privateCandidate->name)
-                ->press('Add Device')
-                ->waitForText('Add Device to Group', 20)
-                ->click('[role="dialog"] button[role="combobox"]')
-                ->waitForText($visibleCandidate->name, 20)
-                ->assertDontSee($privateCandidate->name)
-                ->assertScript(
-                    'document.documentElement.scrollWidth <= document.documentElement.clientWidth',
-                    true,
-                );
-
-            $browser->script('document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));');
-            $browser->press('Cancel')
-                ->visit('/security-devices/devices?search='.rawurlencode('Private Client'))
-                ->waitForText('No results found', 40)
+                ->visit('/security-devices/devices?q='.rawurlencode('Private Client'))
+                ->waitForText('No devices match. Try another search, status or group.', 40)
                 ->assertSourceMissing($privateMember->name)
                 ->assertSourceMissing($privateCandidate->name)
                 ->assertScript(

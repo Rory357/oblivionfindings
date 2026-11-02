@@ -18,7 +18,8 @@ test.describe('Security & Devices governed command batches', () => {
         fixture = seedSecurityDevicesMutatingFixtures();
     });
 
-    test('confirms identity, then decides, dispatches, and exports a governed batch', async ({
+    // fixme: S&D rebuild C6 retired the Security workspace's bulk management tab and the batch page (it redirects to Devices); reviewing, deciding, queueing and exporting a batch have no new screen yet, so this approval journey can't run until they do (DeviceCommandBatchTest, DevicesBulkBarTest and bulk-action-popups.test.tsx cover the routes and the bulk bar meanwhile).
+    test.fixme('confirms identity, then decides, dispatches, and exports a governed batch', async ({
         page,
     }) => {
         test.setTimeout(360_000);

@@ -9,6 +9,7 @@ export function seedTrackingWorkspaceReadinessFixtures() {
         activeDeviceId: number;
         withdrawnClientName: string;
         withdrawnDeviceName: string;
+        withdrawnDeviceId: number;
         vehicleName: string;
         vehicleDeviceName: string;
         assetName: string;
@@ -228,6 +229,7 @@ echo json_encode([
     'activeDeviceId' => $activeDevice->id,
     'withdrawnClientName' => $withdrawnClient->preferred_name,
     'withdrawnDeviceName' => $withdrawnDevice->name,
+    'withdrawnDeviceId' => $withdrawnDevice->id,
     'vehicleName' => $vehicle->name,
     'vehicleDeviceName' => $vehicleDevice->name,
     'assetName' => $asset->name,
