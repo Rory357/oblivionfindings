@@ -32,19 +32,18 @@ final class DscPowerSeriesNeoDriver implements DeviceDriver
             name: 'PowerSeries Neo (TL280)',
             deviceClass: DriverDeviceClass::AlarmPanel,
             supportLevel: DriverSupportLevel::Planned,
-            transportSummary: 'SIA DC-09 IP (available now) · DSC Neo Integration Protocol v2 (planned)',
+            transportSummary: 'Alarm reports (SIA DC-09) to Oblivion’s alarm receiver · no direct control',
             models: ['HS2016', 'HS2032', 'HS2064', 'HS2128', 'TL280E'],
             capabilities: [
                 DriverCapability::AlarmEventsSiaDc09,
                 DriverCapability::AlarmZoneStatus,
-                DriverCapability::AlarmArm,
-                DriverCapability::AlarmDisarm,
             ],
-            summary: 'Live IP event reporting works today via TL280 SIA DC-09 reporting. Direct TL280 integration protocol arming & disarming is planned pending Johnson Controls Connected Partner certification.',
+            summary: 'A PowerSeries Neo panel with a TL280 module can send its alarm reports to Oblivion’s alarm receiver. View only: Oblivion can’t arm or disarm it. Not tested on real hardware.',
             officialDocs: [
                 ['label' => 'DSC Security Products', 'url' => 'https://www.dsc.com/'],
             ],
             limitationsNote: 'PowerSeries Neo encrypts keypad bus traffic (unlike legacy PowerSeries PC1864) and requires Johnson Controls Connected Partner Programme integration keys for direct control.',
+            viewOnly: true,
         );
     }
 

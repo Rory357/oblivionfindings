@@ -12,6 +12,8 @@ final readonly class DriverMetadata
      * @param  list<string>  $models
      * @param  list<DriverCapability>  $capabilities
      * @param  list<array{label: string, url: string}>  $officialDocs
+     * @param  bool  $viewOnly  True when Oblivion can only read this kind of device (for example an
+     *                          alarm panel that only sends reports) and must never offer controls for it.
      */
     public function __construct(
         public string $key,
@@ -27,6 +29,7 @@ final readonly class DriverMetadata
         public ?string $limitationsNote = null,
         public ?string $hardwareEvidence = null,
         public ?string $setupHref = null,
+        public bool $viewOnly = false,
     ) {}
 
     /**
@@ -58,6 +61,7 @@ final readonly class DriverMetadata
             'hardware_evidence' => $this->hardwareEvidence,
             'official_docs' => $this->officialDocs,
             'setup_href' => $this->setupHref,
+            'view_only' => $this->viewOnly,
         ];
     }
 }

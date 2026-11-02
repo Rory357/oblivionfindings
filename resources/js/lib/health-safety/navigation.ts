@@ -213,6 +213,8 @@ export function safetyReviewHref(
             params.set('corrective_action', String(pane.actionId));
         if ('recommendationIndex' in pane)
             params.set('recommendation', String(pane.recommendationIndex));
+        if (pane.kind === 'ca_add' && pane.replacesActionId)
+            params.set('replaces', String(pane.replacesActionId));
     }
     const returnTo = safetyReviewReturn(options.returnTo);
     if (returnTo !== '/health-safety/events') params.set('return_to', returnTo);
@@ -233,8 +235,11 @@ export function safetyReviewPaneFromUrl(url: string): SafetyReviewPane | null {
     const actionId = positiveId('corrective_action');
     if (action === 'inv-start' || action === 'investigation')
         return { kind: 'inv_start' };
-    if (action === 'ca-add' || action === 'add-action')
-        return { kind: 'ca_add' };
+    if (action === 'ca-add' || action === 'add-action') {
+        // Q11 (G3): a revised action keeps the failed action it replaces (an id only; the page checks it).
+        const replacesActionId = positiveId('replaces');
+        return replacesActionId ? { kind: 'ca_add', replacesActionId } : { kind: 'ca_add' };
+    }
     if (
         investigationId &&
         ['inv-findings', 'inv-complete', 'inv-return'].includes(action ?? '')

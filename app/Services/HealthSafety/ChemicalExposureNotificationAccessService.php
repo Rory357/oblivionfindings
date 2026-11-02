@@ -125,7 +125,21 @@ final class ChemicalExposureNotificationAccessService
                     });
                 }
             });
-        // No default private whitelist. Supplied relations cannot execute after the current callback expires.
+        // No default private whitelist. Supplied relations cannot execute after the current callback expires: Laravel
+        // runs a query's before-query callbacks only once, so the context check is also compiled into the SQL itself.
+        if ($context !== null) {
+            $query->whereRaw(new class($context) extends \Illuminate\Database\Query\Expression {
+                public function __construct(private readonly HealthSafetyReadContext $context) { parent::__construct('1 = 1'); }
+
+                public function getValue(\Illuminate\Database\Grammar $grammar)
+                {
+                    $this->context->assertActive();
+
+                    return parent::getValue($grammar);
+                }
+            });
+        }
+
         return $query;
     }
 

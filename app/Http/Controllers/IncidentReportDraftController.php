@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\Incidents\IncidentReportDraftService;
+use App\Support\Incidents\ImmediateResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -63,6 +64,7 @@ class IncidentReportDraftController extends Controller
             'form.potential_consequence' => ['nullable', 'string', 'max:5000'],
             'form.hazard' => ['nullable', 'string', 'max:5000'],
             'form.immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+            ...ImmediateResponse::rules('form.immediate_response', recoveryCopy: true),
             'form.witnesses' => ['nullable', 'string', 'max:5000'],
             'form.harm_or_injury' => ['nullable', 'string', 'max:2000'],
             'form.consequence' => ['nullable', 'string', 'max:5000'],

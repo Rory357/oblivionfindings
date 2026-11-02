@@ -18,6 +18,7 @@ use App\Services\Tasks\Providers\CdLossReportProvider;
 use App\Services\HealthSafety\ChemicalExposureDeliveryProblems;
 use App\Services\Tasks\Providers\ChemicalExposureDeliveryProvider;
 use App\Services\Tasks\Providers\ChemicalExposureFollowupProvider;
+use App\Services\Tasks\Providers\HsClosureExceptionProvider;
 use App\Services\Tasks\Providers\HsEventReviewFlagProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
 use App\Services\Tasks\Providers\ControlRoomAlertProvider;
@@ -70,7 +71,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(48);
+    expect($providers)->toHaveCount(49);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -122,6 +123,7 @@ it('registers every task source behind exactly one authorization boundary', func
         ChemicalExposureFollowupProvider::class => 'chemical_exposure_followup',
         ChemicalExposureDeliveryProvider::class => 'chemical_exposure_delivery',
         HsEventReviewFlagProvider::class => 'hs_event_review',
+        HsClosureExceptionProvider::class => 'hs_closure_exception',
     ]);
 
     // Owning-domain adapters retain the same Site/person boundary; their

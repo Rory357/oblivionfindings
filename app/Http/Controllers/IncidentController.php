@@ -8,6 +8,7 @@ use App\Http\Requests\HealthSafety\StoreHsCorrectiveActionRequest;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\ClientIncidentNote;
 use App\Models\ControlRoom\EvidenceItem;
 use App\Models\HsEvent;
 use App\Models\IncidentFollowup;
@@ -38,6 +39,7 @@ use App\Services\Incidents\IncidentResponseEscalationService;
 use App\Services\Medication\MedicationErrorSummary;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
+use App\Support\Incidents\ImmediateResponse;
 use App\Support\Incidents\IncidentOccurrencePeriod;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 use App\Support\Inertia\SharedDeferredReload;
@@ -326,6 +328,25 @@ class IncidentController extends Controller
                 ->map(fn ($e) => ['at' => $e->created_at?->toIso8601String()]))
             ->sortBy('at')->values()->all();
 
+        // Answer 20 / board M14: dated notes beside the reporter's words, for everyone who can open the incident.
+        // Adding one follows the note endpoint's own rule (incidents.approve + this view + not a draft).
+        $reportNotes = ClientIncidentNote::query()
+            ->where('client_incident_id', $incident->id)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get(['id', 'field', 'note', 'author_name', 'created_at'])
+            ->map(fn (ClientIncidentNote $note): array => [
+                'id' => $note->id,
+                'field' => $note->field,
+                'note' => $note->note,
+                'author_name' => $note->author_name,
+                'created_at' => $note->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+        $canAddNote = $user->canDo('incidents.approve')
+            && ! in_array($incident->status, [null, '', 'draft'], true);
+
         return [
             'id' => $incident->id,
             'ref' => $incident->reference_number,
@@ -338,6 +359,8 @@ class IncidentController extends Controller
             'occurred_at' => $incident->occurred_at,
             'description' => $incident->description,
             'immediate_action_taken' => $incident->immediate_action_taken,
+            // Decision 18: the reporter's timed ticks, shown under "Done straight away" on the incident page.
+            'immediate_response' => array_values((array) ($incident->immediate_response ?? [])),
             'witnesses' => $incident->witnesses,
             'is_notifiable' => $journeyRepairRequired || ($hsEvent && ! $canOpenHsEvent)
                 ? null
@@ -473,7 +496,13 @@ class IncidentController extends Controller
             // First-aid treatments escalated to / linked with this incident — reciprocal
             // of the first-aid register's incident link (FirstAidRecord.related_incident_id).
             'first_aid_records' => $firstAidRecords,
+            'notes' => $reportNotes,
             'can' => [
+                'add_note' => $canAddNote,
+                // Board M5c note + answer 21: a closed incident's PDF is for whole-record viewers only (the incident
+                // register's managers and the incident's owner), never someone who sees only their own reports.
+                'download_pdf' => $incident->status === 'closed'
+                    && ($user->canDo('incidents.viewAny') || (int) $incident->incident_owner_user_id === (int) $user->id),
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),
                 'review' => $user->can('review', $incident),
@@ -670,6 +699,7 @@ class IncidentController extends Controller
             'description' => ['nullable', 'string'],
             'requires_followup' => ['sometimes', 'boolean'],
             'immediate_action_taken' => [
+                // A serious report keeps its written immediate action; the timed ticks (decision 18) add to it.
                 Rule::requiredIf(fn () => $request->input('intent') === 'submit'
                     && (
                         $request->input('severity') === 'high'
@@ -680,6 +710,7 @@ class IncidentController extends Controller
                 'string',
                 'max:5000',
             ],
+            ...ImmediateResponse::rules(),
             'witnesses' => ['nullable', 'string'],
             'harm_or_injury' => ['nullable', 'string', 'max:2000'],
             'consequence' => ['nullable', 'string', 'max:2000'],
@@ -761,6 +792,8 @@ class IncidentController extends Controller
         $storedSeverity = ($data['reported_severity'] ?? null) === HsEvent::SEVERITY_CRITICAL
             ? 'high'
             : $data['severity'];
+        $occurredAt = WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now()->toImmutable();
+        $immediateResponse = ImmediateResponse::normalise($data['immediate_response'] ?? null, $occurredAt);
 
         $attributes = [
             'report_request_uuid' => $data['report_request_uuid'] ?? null,
@@ -774,12 +807,13 @@ class IncidentController extends Controller
             'status' => $isSubmit ? 'submitted' : 'draft',
             'submitted_at' => $isSubmit ? now() : null,
             'source' => 'manual',
-            'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
+            'occurred_at' => $occurredAt,
             'description' => $data['description'] ?? null,
             'requires_followup' => (bool) ($data['requires_followup'] ?? false) || ! empty($data['followups']),
             'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)
                 ? trim((string) $data['immediate_action_taken'])
                 : null,
+            'immediate_response' => $immediateResponse,
             'witnesses' => $data['witnesses'] ?? null,
             'title' => $data['type'].' incident',
             'metadata' => $metadata,
@@ -801,7 +835,10 @@ class IncidentController extends Controller
                 : null,
         ];
 
-        [$incident, $journey, $created, $submittedNow] = DB::transaction(
+        // #255: only a draft saved before this request survives a failed submit.
+        $draftAlreadySaved = ! empty($data['incident_id']) || (! empty($data['report_request_uuid'])
+            && ClientIncident::query()->where('report_request_uuid', $data['report_request_uuid'])->exists());
+        [$incident, $journey, $created, $submittedNow] = $this->withPlainSubmitFailure(fn () => DB::transaction(
             function () use ($actor, $attributes, $client, $data, $isSubmit, $journeys, $shift, $siteId): array {
                 $created = false;
                 $submittedNow = false;
@@ -931,7 +968,7 @@ class IncidentController extends Controller
                 return [$incident->fresh(), $journey, $created, $submittedNow];
             },
             3,
-        );
+        ), $isSubmit, keepsDraft: $draftAlreadySaved);
 
         if ($submittedNow) {
             $this->notifyIncidentSubmitted($request, $incident);
@@ -1079,6 +1116,36 @@ class IncidentController extends Controller
      *
      * @param  array<string, mixed>  $input
      */
+    /**
+     * #255: a submit that fails after its own retries rolls back to the draft and says so in plain words on the form,
+     * never a 500. Access refusals, validation and missing records keep their own responses.
+     *
+     * @template T
+     * @param  callable(): T  $submit
+     * @return T
+     */
+    private function withPlainSubmitFailure(callable $submit, bool $isSubmit = true, bool $keepsDraft = true): mixed
+    {
+        try {
+            return $submit();
+        } catch (\Throwable $error) {
+            if (! $isSubmit || $error instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
+                || $error instanceof ValidationException || $error instanceof \Illuminate\Auth\Access\AuthorizationException
+                || $error instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                throw $error;
+            }
+            \Illuminate\Support\Facades\Log::error('Incident submit failed and was rolled back', [
+                'reason' => class_basename($error).': '.mb_substr($error->getMessage(), 0, 300),
+            ]);
+            throw ValidationException::withMessages([
+                'incident' => ($keepsDraft
+                    ? 'This report couldn’t be submitted just now, so it is still saved as a draft. '
+                    : 'This report couldn’t be submitted just now. ')
+                    .'Please try again. If it keeps happening, tell your administrator.',
+            ]);
+        }
+    }
+
     private function recordMissingImmediateActionForSubmission(
         ClientIncident $incident,
         array $input = [],
@@ -1112,6 +1179,10 @@ class IncidentController extends Controller
             'result' => $incident->status === 'draft' ? 'draft' : 'submitted',
             'incident_reference' => (string) $incident->reference_number,
             'incident_url' => route('incidents.show', $incident),
+            // G4-3: the success pane says which Site's managers it went to (the reporter chose or was given it).
+            'site_name' => $incident->site_id
+                ? Site::query()->whereKey($incident->site_id)->value('name')
+                : null,
         ];
 
         if (! $journey?->hsEvent) {
@@ -1258,6 +1329,21 @@ class IncidentController extends Controller
         $response->headers->set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         return $response;
+    }
+
+    /**
+     * Board M5c note: a closed incident's final record as a PDF, built from the same admitted page payload as show().
+     */
+    public function pdf(Request $request, string $incident)
+    {
+        $id = $this->incidentRecordIdentity($incident);
+        $props = app(\App\Services\Incidents\IncidentEvidenceWindowPolicySettings::class)->withLockedPolicy(fn () =>
+            $this->register->show($request, $id,
+                fn (Request $current, int $id, CurrentAuthorizationReads $reads): ?array => $this->buildIncidentDetail($current, $id, $reads)));
+        $detail = $props['detail'];
+        abort_unless(($detail['can']['download_pdf'] ?? false) === true, 403);
+
+        return app(\App\Services\Incidents\IncidentPdfService::class)->download($id, $detail, $request->user());
     }
 
     /** Bound raw route identities before integer conversion or private model hydration. */
@@ -1411,7 +1497,7 @@ class IncidentController extends Controller
         $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
         $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
 
-        [$incident, $journey, $submittedNow] = DB::transaction(
+        [$incident, $journey, $submittedNow] = $this->withPlainSubmitFailure(fn () => DB::transaction(
             function () use ($actor, $incident, $journeys, $siteAccess, $siteBypassPermissions, $submission): array {
                 $locked = ClientIncident::query()
                     ->whereKey($incident->id)
@@ -1458,7 +1544,7 @@ class IncidentController extends Controller
                 return [$journey->incident, $journey, true];
             },
             3,
-        );
+        ));
 
         if ($submittedNow) {
             $this->notifyIncidentSubmitted($request, $incident);
@@ -1722,8 +1808,12 @@ class IncidentController extends Controller
         // Audit guardrail: attachments are only mutable while the incident is in draft.
         abort_unless($incident->status === 'draft', 403);
 
+        // The same file types as a safety review's files (HsEventFile::MIMES): photos, videos, PDFs and Word files.
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:10240'],
+            'file' => ['required', 'file', 'mimes:'.implode(',', array_merge(...array_values(\App\Models\HsEventFile::MIMES))), 'max:10240'],
+        ], [
+            'file.mimes' => 'Add photos, videos, PDFs or Word files.',
+            'file.max' => 'Files can be up to 10 MB.',
         ]);
 
         $file = $request->file('file');

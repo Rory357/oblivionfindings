@@ -1,4 +1,5 @@
 import { actualEventInstant } from '@/components/clinical/actual-event-time-field';
+import { PopupForm } from '@/components/popup';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -6,11 +7,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Field, SelectInput } from '@/components/wizard/primitives';
 import { toDatetimeLocal, workerTimeOffset } from '@/lib/datetime';
 import { DRILL_REGISTER } from '@/lib/health-safety/drill-navigation';
+import { cn } from '@/lib/utils';
 import { typeMeta } from '@/pages/health-safety/drills/shared';
+import { Siren } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { DrillCommandFooter, useDrillCommandForm } from './drill-command-form';
 import { DrillTimeField } from './drill-time-field';
 import type { DrillPickers, DrillWorkspaceDetail } from './types';
+
+/** G4-12: the three drill types drawn as tiles; the rest open from "More types…". */
+const TILE_TYPES = ['fire_evacuation', 'earthquake', 'lockdown'] as const;
 
 export function DrillPlanningForm({
     detail,
@@ -19,6 +25,8 @@ export function DrillPlanningForm({
     returnTo,
     onSaved,
     onCancel,
+    popup = false,
+    initialSiteId = null,
 }: {
     detail: DrillWorkspaceDetail | null;
     pickers: DrillPickers;
@@ -26,11 +34,15 @@ export function DrillPlanningForm({
     returnTo: string;
     onSaved: () => void;
     onCancel: () => void;
+    /** G4-12: show the form as the kit's pop-up (the register's "Plan a drill"). */
+    popup?: boolean;
+    /** G4-12: a lead row's "Plan a drill" starts at that row's Site. */
+    initialSiteId?: number | null;
 }) {
     const edit = mode === 'edit';
     const { form, guards, save, failure, setFailure } = useDrillCommandForm(
         {
-            site_id: detail?.site ? String(detail.site.id) : '',
+            site_id: detail?.site ? String(detail.site.id) : initialSiteId ? String(initialSiteId) : '',
             title: detail?.title ?? '',
             drill_type:
                 detail?.drill_type === 'fire'
@@ -58,6 +70,7 @@ export function DrillPlanningForm({
     );
     const [staff, setStaff] = useState(detail ? pickers.staff : []);
     const [wardenSearch, setWardenSearch] = useState('');
+    const [moreTypes, setMoreTypes] = useState(false);
     const [loading, setLoading] = useState(false);
     const [staffError, setStaffError] = useState<string | null>(null);
     const pending = useRef<AbortController | null>(null);
@@ -90,12 +103,12 @@ export function DrillPlanningForm({
             );
             if (!response.ok)
                 throw new Error(
-                    'Staff options could not be loaded for this Site. Try again before scheduling.',
+                    'Staff options could not be loaded for this Site. Try again before planning.',
                 );
             const options = (await response.json()) as DrillPickers;
             if (!Array.isArray(options.staff))
                 throw new Error(
-                    'Staff options could not be confirmed. Try again before scheduling.',
+                    'Staff options could not be confirmed. Try again before planning.',
                 );
             if (!request.signal.aborted) setStaff(options.staff);
         } catch (error) {
@@ -109,25 +122,27 @@ export function DrillPlanningForm({
             if (!request.signal.aborted) setLoading(false);
         }
     };
+    // A lead row's "Plan a drill" opens at its Site: load that Site's staff once.
+    const firstSite = useRef(!detail && initialSiteId ? String(initialSiteId) : '');
+    useEffect(() => {
+        if (firstSite.current) void loadSite(firstSite.current);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once, for the Site the form opened with
+    }, []);
     const allowed =
         mode === 'create' ||
         (edit ? detail?.can.edit : detail?.can.schedule_next);
     const label = edit
         ? 'Save planning changes'
         : mode === 'schedule-next'
-          ? 'Schedule next drill'
-          : 'Schedule drill';
+          ? 'Plan the next drill'
+          : 'Plan a drill';
     if (!allowed)
         return (
             <p role="alert">
                 This drill no longer allows this planning change.
             </p>
         );
-    return (
-        <form
-            className="space-y-5"
-            onSubmit={(event) => {
-                event.preventDefault();
+    const submit = () => {
                 if (loading || staffError || form.processing) return;
                 const instant = actualEventInstant(
                     form.data.scheduled_at,
@@ -135,7 +150,7 @@ export function DrillPlanningForm({
                 );
                 if (!instant) {
                     setFailure(
-                        'Choose a valid New Zealand schedule time and its clock occurrence if requested.',
+                        'Choose the date and time the drill is planned for. When the clocks change that night, also choose which one.',
                     );
                     return;
                 }
@@ -172,15 +187,17 @@ export function DrillPlanningForm({
                         ? DRILL_REGISTER
                         : `${DRILL_REGISTER}/${detail!.id}${edit ? '' : '/schedule-next'}`,
                 );
-            }}
-        >
-            <h2 className="text-section-title">
-                {edit ? 'Edit drill planning' : label}
-            </h2>
+    };
+    const types = pickers.drill_types.filter((value) => value !== 'fire');
+    const tileTypes = moreTypes
+        ? types
+        : types.filter((value) => (TILE_TYPES as readonly string[]).includes(value) || value === form.data.drill_type);
+    const fields = (
+        <>
             {mode === 'schedule-next' && (
                 <p className="text-subtle">
-                    This creates a new scheduled drill at the same Site and
-                    keeps this drill’s results and findings.
+                    This plans a new drill at the same Site and keeps this
+                    drill’s results and things to fix.
                 </p>
             )}
             {detail ? (
@@ -212,22 +229,52 @@ export function DrillPlanningForm({
                     }
                 />
             </Field>
-            <Field label="Drill type" required>
-                <SelectInput
-                    frontline
-                    value={form.data.drill_type}
-                    placeholder="Choose a drill type"
-                    onChange={(value) => form.setData('drill_type', value)}
-                    options={pickers.drill_types
-                        .filter((value) => value !== 'fire')
-                        .map((value) => ({
-                            value,
-                            label: typeMeta(value).label,
-                        }))}
-                />
-            </Field>
+            {/* G4-12: drill type is a tile picker; "More types…" is a text button, not a type. */}
+            <fieldset className="space-y-2">
+                <legend className="mb-2 text-sm font-medium">
+                    Drill type <span className="text-status-critical">*</span>
+                </legend>
+                <div role="radiogroup" aria-label="Drill type" className="flex flex-wrap items-center gap-2">
+                    {tileTypes.map((value) => {
+                        const meta = typeMeta(value);
+                        const Icon = meta.icon;
+                        const picked = form.data.drill_type === value;
+                        return (
+                            // eslint-disable-next-line no-restricted-syntax -- a tile-picker choice (DESIGN.md tile pickers), not a form button.
+                            <button
+                                key={value}
+                                type="button"
+                                role="radio"
+                                aria-checked={picked}
+                                onClick={() => form.setData('drill_type', value)}
+                                className={cn(
+                                    'frontline-tap inline-flex items-center gap-2 rounded-lg border px-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                    picked
+                                        ? 'border-primary bg-accent text-primary'
+                                        : 'border-border bg-card text-foreground hover:bg-muted',
+                                )}
+                            >
+                                <Icon className="size-4" aria-hidden="true" />
+                                {meta.label}
+                            </button>
+                        );
+                    })}
+                    {!moreTypes && types.length > tileTypes.length && (
+                        <Button
+                            type="button"
+                            variant="link"
+                            className="frontline-tap px-1"
+                            onClick={() => setMoreTypes(true)}
+                        >
+                            More types…
+                        </Button>
+                    )}
+                </div>
+            </fieldset>
             <DrillTimeField
-                label="Scheduled for"
+                pickers
+                required
+                label="Planned for"
                 value={form.data.scheduled_at}
                 offset={form.data.time_offset}
                 onChange={(value, offset) =>
@@ -238,7 +285,7 @@ export function DrillPlanningForm({
                     }))
                 }
             />
-            <Field label="Scenario">
+            <Field label="What happens in the drill">
                 <Textarea
                     rows={4}
                     maxLength={5000}
@@ -432,6 +479,42 @@ export function DrillPlanningForm({
                     }
                 />
             </Field>
+        </>
+    );
+    // G4-12: from the register, "Plan a drill" is the kit's 720 pop-up; on a drill's page it stays in place.
+    if (popup)
+        return (
+            <PopupForm
+                open
+                onClose={onCancel}
+                size="md"
+                icon={Siren}
+                title={label}
+                description="The drill, when it runs and who takes part"
+                error={failure ?? (Object.keys(form.errors).length ? Object.values(form.errors).join(' ') : undefined)}
+                submitLabel={label}
+                processingLabel="Saving…"
+                processing={form.processing}
+                submitDisabled={loading || !!staffError}
+                onSubmit={submit}
+                dirty={form.isDirty}
+                draftName="this drill plan"
+            >
+                <div className="space-y-5">{fields}</div>
+            </PopupForm>
+        );
+    return (
+        <form
+            className="space-y-5"
+            onSubmit={(event) => {
+                event.preventDefault();
+                submit();
+            }}
+        >
+            <h2 className="text-section-title">
+                {edit ? 'Edit drill planning' : label}
+            </h2>
+            {fields}
             <DrillCommandFooter
                 label={label}
                 processing={form.processing}

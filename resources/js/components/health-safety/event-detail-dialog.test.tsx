@@ -603,10 +603,10 @@ describe('Permanent safety review workspace', () => {
                 returnHref="/health-safety/events"
             />,
         );
-        // All five checks still count …
-        expect(
-            screen.getByRole('heading', { name: 'To close: 1 of 5 done' }),
-        ).toBeInTheDocument();
+        // All five checks still count (G3: closure readiness is one line that opens its list) …
+        const readiness = screen.getByRole('button', { name: /Closure readiness/ });
+        expect(readiness).toHaveTextContent('4 things left · 1 done');
+        fireEvent.click(readiness);
         // … but the three that depend on the decision show as one plain line.
         expect(
             screen.getByRole('link', {
@@ -633,7 +633,7 @@ describe('Permanent safety review workspace', () => {
                 name: 'Incident — Kauri House',
             }),
         ).toBeInTheDocument();
-        expect(screen.getByText(/HS-2026-0017 · Kauri House/)).toBeInTheDocument();
+        expect(screen.getByText(/Safety review HS-2026-0017 ·.*Kauri House/)).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /Back/ })).toHaveAttribute(
             'href',
             '/health-safety/events?site_id=3',
@@ -641,12 +641,13 @@ describe('Permanent safety review workspace', () => {
         expect(
             screen.getByRole('tabpanel', { name: 'Overview' }),
         ).toBeInTheDocument();
-        expect(
-            screen.getByRole('heading', { name: 'Owner' }),
-        ).toBeInTheDocument();
-        expect(
-            screen.getByRole('heading', { name: 'To close: 3 of 5 done' }),
-        ).toBeInTheDocument();
+        // G3 board M5: the round steps are the step picker; the step the review is on is picked.
+        const steps = screen.getByRole('list', { name: /Safety review steps/ });
+        expect(within(steps).getByRole('button', { name: /Assigned/ })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('region', { name: 'Progress' })).toHaveTextContent('Owner');
+        const readiness = screen.getByRole('button', { name: /Closure readiness/ });
+        expect(readiness).toHaveTextContent('2 things left · 3 done');
+        fireEvent.click(readiness);
         // Every closure blocker keeps its server wording and its direct link.
         expect(
             screen.getByRole('link', {
@@ -661,29 +662,31 @@ describe('Permanent safety review workspace', () => {
         expect(inertia.post).not.toHaveBeenCalled();
     });
 
-    it('offers each event action once in the record header and opens its pane without posting', () => {
+    it('offers the next step once, in the Progress card, and opens its pane without posting', () => {
         const onPaneChange = vi.fn();
         render(
             <EventRecordWorkspace
-                detail={eventDetail()}
+                detail={eventDetail({
+                    next_step: {
+                        key: 'take_on',
+                        label: 'Take it on',
+                        can: true,
+                        who: 'Someone who manages health and safety at Kauri House takes it on.',
+                    },
+                } as EventDetailOverrides)}
                 onPaneChange={onPaneChange}
             />,
         );
-        // Accept handover is the one primary; the signed decision update stays reachable under More.
-        expect(
-            screen.getAllByRole('button', { name: 'Accept handover' }),
-        ).toHaveLength(1);
-        expect(
-            screen.getByRole('button', { name: 'Close safety review' }),
-        ).toBeInTheDocument();
+        // G3 board M5: the next-step bar holds the page's only filled button; everything else is under More.
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getAllByRole('button', { name: 'Take it on' })).toHaveLength(1);
+        expect(screen.queryByRole('button', { name: 'Accept handover' })).not.toBeInTheDocument();
         expect(
             screen.getByRole('button', {
                 name: 'More safety review actions',
             }),
         ).toBeInTheDocument();
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Accept handover' }),
-        );
+        fireEvent.click(within(progress).getByRole('button', { name: 'Take it on' }));
         expect(
             screen.getByRole('textbox', { name: /Acceptance notes/ }),
         ).toBeInTheDocument();
@@ -724,10 +727,10 @@ describe('Permanent safety review workspace', () => {
                 } as EventDetailOverrides))}
             />,
         );
-        expect(
-            screen.getByRole('heading', { name: 'Next step' }),
-        ).toBeInTheDocument();
-        // B1.4: the step and who does it, said once; no read-only fallback text.
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getByText('Next step')).toBeInTheDocument();
+        expect(within(progress).getByText('Record the WorkSafe decision')).toBeInTheDocument();
+        // B1.4: the step and who does it, said once; no read-only fallback text and no button.
         expect(
             screen.getAllByText(/Moana Rangi, the owner, or anyone who manages health and safety at Kauri House records it./),
         ).toHaveLength(1);
@@ -856,7 +859,7 @@ describe('Permanent safety review workspace', () => {
             screen.getByRole('textbox', { name: /Acceptance notes/ }),
             { target: { value: 'A draft for the incoming reviewer.' } },
         );
-        fireEvent.click(screen.getByRole('tab', { name: 'Handover' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Investigation' }));
         expect(onSectionChange).not.toHaveBeenCalled();
         fireEvent.click(
             within(screen.getByRole('alertdialog')).getByRole('button', {
@@ -1237,7 +1240,7 @@ describe('EventDetailDialog closure governance', () => {
     it('lists every blocker in plain language and does not offer an unauthorised override', () => {
         renderDialog();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
 
         expect(
             screen.getByRole('link', {
@@ -1256,7 +1259,7 @@ describe('EventDetailDialog closure governance', () => {
             screen.queryByRole('textbox', { name: /Override reason/ }),
         ).not.toBeInTheDocument();
         expect(
-            screen.getByRole('button', { name: 'Close event' }),
+            screen.getByRole('button', { name: 'Close safety review' }),
         ).toBeDisabled();
     });
 
@@ -1311,12 +1314,12 @@ describe('EventDetailDialog closure governance', () => {
             } as EventDetailOverrides),
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
         fireEvent.change(
             screen.getByRole('textbox', { name: /Closure summary/ }),
             { target: { value: 'Closed under the formal exception process.' } },
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
 
         expect(inertia.post).toHaveBeenCalledWith(
             '/health-safety/events/17/close',
@@ -1375,13 +1378,13 @@ describe('EventDetailDialog closure governance', () => {
         );
 
         expect(
-            screen.queryByRole('button', { name: 'Close event' }),
+            screen.queryByRole('button', { name: 'Close safety review' }),
         ).not.toBeInTheDocument();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Review closure exception' }),
+            screen.getByRole('button', { name: 'Review a close-anyway request' }),
         );
         expect(
-            screen.getByRole('heading', { name: 'Review closure exception' }),
+            screen.getByRole('heading', { name: 'Review a close-anyway request' }),
         ).toBeInTheDocument();
         fireEvent.change(
             screen.getByRole('textbox', {
@@ -1467,13 +1470,13 @@ describe('EventDetailDialog WorkSafe governance', () => {
         );
 
         expect(
-            screen.queryByRole('button', { name: 'Close event' }),
+            screen.queryByRole('button', { name: 'Close safety review' }),
         ).not.toBeInTheDocument();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Review closure exception' }),
+            screen.getByRole('button', { name: 'Review a close-anyway request' }),
         );
         expect(
-            screen.getByRole('heading', { name: 'Review closure exception' }),
+            screen.getByRole('heading', { name: 'Review a close-anyway request' }),
         ).toBeInTheDocument();
         expect(
             screen.getByText(/You asked for this, so someone else decides it./),
@@ -1770,7 +1773,7 @@ describe('EventDetailDialog WorkSafe governance', () => {
             }),
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
 
         expect(
             screen.getByRole('link', {
@@ -1805,7 +1808,7 @@ describe('EventDetailDialog WorkSafe governance', () => {
         });
         const { unmount } = renderDialog(pending);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close safety review' }));
         expect(
             screen.getByRole('link', {
                 name: 'Record the WorkSafe notification before closing this event.',
@@ -2647,7 +2650,7 @@ describe('K1a: who can close (B1.5)', () => {
             screen.getAllByText(/Only Jordan Peri, the owner/),
         ).toHaveLength(1);
         expect(
-            screen.queryByRole('button', { name: 'Close event' }),
+            screen.queryByRole('button', { name: 'Close safety review' }),
         ).not.toBeInTheDocument();
     });
 });
@@ -2657,3 +2660,209 @@ function withoutNextAction(detail: EventDetail): EventDetail {
     detail.handover_summary = { ...detail.handover_summary, next_action: null };
     return detail;
 }
+
+/** A checked action whose check said it didn't work (G3 board M5). */
+function failedAction(
+    overrides: Partial<EventDetail['corrective_actions'][number]> = {},
+): EventDetail['corrective_actions'][number] {
+    return {
+        id: 141,
+        reference_number: 'CA-2026-0141',
+        title: 'Fit grips under every lounge rug',
+        action_type: 'corrective',
+        priority: 'medium',
+        status: 'verified',
+        assigned_to_name: 'Moana Rangi',
+        owner: { id: 8, name: 'Moana Rangi' },
+        due_date: '2026-07-21',
+        is_overdue: false,
+        completed_at: '2026-07-20T02:00:00Z',
+        completed_by_user_id: 8,
+        completed_by_name: 'Moana Rangi',
+        can_verify: false,
+        verified_at: '2026-07-21T02:00:00Z',
+        verified_by_name: 'Tama Lewis',
+        effectiveness_confirmed: false,
+        check_notes: 'The rug still slides at the lounge doorway.',
+        needs_revision: true,
+        replaces: null,
+        hs_investigation_id: null,
+        recommendation_index: null,
+        recommendation: null,
+        source: { type: 'standalone' },
+        source_task: null,
+        evidence: {
+            can_upload: false,
+            completion_notes: null,
+            legacy_paths: [],
+            completed_by: null,
+            completed_at: null,
+            load_state: 'loaded',
+            attachments: [],
+        },
+        rework: { latest_reason: null },
+        history: [],
+        ...overrides,
+    };
+}
+
+describe('G3 safety review page: the ways through rules 1 and 2', () => {
+    const owned = {
+        status: 'accepted',
+        owner: { id: 8, name: 'Moana Rangi' },
+        accepted_by: { id: 9, name: 'Tama Lewis' },
+        accepted_at: '2026-07-14T02:15:00Z',
+        notes: null,
+        can_accept: false,
+    };
+    const ownerless = { ...owned, status: 'not_required', owner: null, accepted_by: null, accepted_at: null };
+
+    it('rule 1: "Choose the owner" opens the owner pop-up and posts the first owner without a reason', () => {
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    handover: ownerless,
+                    can: { change_owner: true },
+                    assignable_staff: [{ id: 8, name: 'Moana Rangi' }],
+                    next_step: {
+                        key: 'choose_owner',
+                        label: 'Choose the owner',
+                        can: true,
+                        who: 'Someone who manages health and safety at Kauri House chooses the owner.',
+                    },
+                } as EventDetailOverrides)}
+            />,
+        );
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getAllByText('Choose the owner').length).toBeGreaterThan(0);
+        fireEvent.click(within(progress).getAllByRole('button', { name: 'Choose owner' })[0]);
+        const dialog = screen.getByRole('dialog', { name: 'Choose the owner' });
+        // Board M8: one list of the people who can own it; "Note for the history" is optional for a first owner.
+        fireEvent.click(within(dialog).getByRole('radio', { name: /Moana Rangi/ }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Choose owner' }));
+        expect(inertia.post).toHaveBeenCalledWith('/health-safety/events/17/owner', {
+            owner_user_id: '8',
+            reason: '',
+        });
+    });
+
+    it('rule 1: a viewer who cannot choose is told who does, with no button', () => {
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    handover: ownerless,
+                    can: { manage: false, change_owner: false, close: false },
+                    next_step: {
+                        key: 'choose_owner',
+                        label: 'Choose the owner',
+                        can: false,
+                        who: 'Someone who manages health and safety at Kauri House chooses the owner.',
+                    },
+                } as EventDetailOverrides)}
+            />,
+        );
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getByText(/at Kauri House chooses the owner\./)).toBeInTheDocument();
+        expect(within(progress).queryByRole('button', { name: 'Choose owner' })).not.toBeInTheDocument();
+    });
+
+    it('rule 2: a failed check leads to "Add revised action", which posts the action it replaces', () => {
+        const onPaneChange = vi.fn();
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    handover: owned,
+                    worksafe: { decision_signed: true, notifiable: false },
+                    corrective_actions: [failedAction()],
+                    assignable_staff: [{ id: 8, name: 'Moana Rangi' }],
+                    next_step: {
+                        key: 'revised_action',
+                        label: 'Add a revised action for “Fit grips under every lounge rug”',
+                        can: true,
+                        who: '',
+                        action_id: 141,
+                    },
+                } as EventDetailOverrides)}
+                onPaneChange={onPaneChange}
+            />,
+        );
+        // The header shows where it is up to: the check step failed, and the chip says what is needed.
+        expect(screen.getAllByText('Revised action needed').length).toBeGreaterThan(0);
+        const steps = screen.getByRole('list', { name: /Safety review steps/ });
+        expect(within(steps).getByRole('button', { name: /Check it worked/ })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getAllByText(/The rug still slides at the lounge doorway\./).length).toBeGreaterThan(0);
+
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        fireEvent.click(within(progress).getAllByRole('button', { name: /Add revised action/ })[0]);
+        expect(onPaneChange).toHaveBeenCalledWith({ kind: 'ca_add', replacesActionId: 141 }, 'overview');
+        // Board M8: the Add action pop-up, naming the failed action and its check result.
+        const dialog = screen.getByRole('dialog', { name: 'Add a revised action' });
+        expect(within(dialog).getByText(/Replaces CA-2026-0141/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/Check result: The rug still slides/)).toBeInTheDocument();
+        fireEvent.change(within(dialog).getByLabelText(/What needs to happen/), {
+            target: { value: 'Replace the lounge rug with a non-slip rug' },
+        });
+        fireEvent.click(within(dialog).getByRole('combobox', { name: 'Choose the owner' }));
+        fireEvent.click(screen.getByRole('option', { name: 'Moana Rangi' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: /^Due date/ }));
+        const days = screen.getAllByRole('button').filter((button) => /\b20\d\d$/.test(button.getAttribute('aria-label') ?? ''));
+        fireEvent.click(days[days.length - 1]);
+        fireEvent.click(screen.getByRole('button', { name: 'Use date' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Add action' }));
+        expect(inertia.post).toHaveBeenCalledWith(
+            '/health-safety/events/17/corrective-actions',
+            expect.objectContaining({
+                title: 'Replace the lounge rug with a non-slip rug',
+                replaces_action_id: 141,
+            }),
+        );
+    });
+
+    it('picking a done step shows what was added there, with Edit only where a correction is allowed', () => {
+        const base = eventDetail();
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    handover: owned,
+                    worksafe: { decision_signed: true, notifiable: false },
+                    investigations: [
+                        {
+                            ...(base.investigations[0] ?? {}),
+                            id: 5,
+                            reference_number: 'INV-2026-0005',
+                            investigation_type: 'standard',
+                            methodology: null,
+                            lead_investigator_name: 'Moana Rangi',
+                            started_at: '2026-07-14T02:00:00Z',
+                            target_completion_date: null,
+                            is_overdue: false,
+                            has_findings: true,
+                            has_recommendations: false,
+                            recommendation_count: 0,
+                            immediate_causes: null,
+                            root_causes: null,
+                            contributing_factors: null,
+                            recommendations: null,
+                            lessons_learned: null,
+                            status: 'completed',
+                            completed_at: '2026-07-16T02:00:00Z',
+                            findings_summary: 'The rug edge lifts at the lounge doorway.',
+                            submitted_by_name: 'Moana Rangi',
+                            approved_by_name: 'Demo Admin',
+                            can_propose_correction: true,
+                            correction: null,
+                        },
+                    ],
+                    corrective_actions: [failedAction()],
+                } as EventDetailOverrides)}
+            />,
+        );
+        const steps = screen.getByRole('list', { name: /Safety review steps/ });
+        fireEvent.click(within(steps).getByRole('button', { name: /Investigated/ }));
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getByText('The rug edge lifts at the lounge doorway.')).toBeInTheDocument();
+        expect(within(progress).getByRole('button', { name: /Back to the current step/ })).toBeInTheDocument();
+        fireEvent.click(within(progress).getAllByRole('button', { name: 'Edit' })[0]);
+        expect(screen.getByRole('dialog', { name: 'Correct the findings' })).toBeInTheDocument();
+    });
+});

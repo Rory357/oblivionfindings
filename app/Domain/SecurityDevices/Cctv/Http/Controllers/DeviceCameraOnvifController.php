@@ -2,6 +2,8 @@
 
 namespace App\Domain\SecurityDevices\Cctv\Http\Controllers;
 
+use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\SecurityDevices\Cctv\Services\CameraEndpointTrustService;
 use App\Domain\SecurityDevices\Cctv\Services\OnvifCameraProfileClient;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
@@ -12,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Validation\Rule;
+use UnexpectedValueException;
 
 final class DeviceCameraOnvifController extends Controller
 {
@@ -51,7 +54,7 @@ final class DeviceCameraOnvifController extends Controller
             'reason_code' => $result['reason_code'],
         ]);
 
-        return response()->json($result)->header('Cache-Control', 'no-store');
+        return response()->json($this->withTrustPrompt($request, $device, $result))->header('Cache-Control', 'no-store');
     }
 
     public function streams(Request $request, Device $device): JsonResponse
@@ -84,7 +87,7 @@ final class DeviceCameraOnvifController extends Controller
             'reason_code' => $result['reason_code'],
         ]);
 
-        return response()->json($result)->header('Cache-Control', 'no-store');
+        return response()->json($this->withTrustPrompt($request, $device, $result))->header('Cache-Control', 'no-store');
     }
 
     public function ptz(Request $request, Device $device): JsonResponse
@@ -142,6 +145,73 @@ final class DeviceCameraOnvifController extends Controller
             'reason_code' => $result['reason_code'],
         ]);
 
-        return response()->json($result)->header('Cache-Control', 'no-store');
+        return response()->json($this->withTrustPrompt($request, $device, $result))->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * "Trust this camera" (Phase A, item A5). Only a certificate the camera's address actually offered,
+     * at the camera's own Site, can be trusted; replacing a trusted one needs an IT admin.
+     */
+    public function trustCertificate(Request $request, Device $device, CameraEndpointTrustService $trust): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user !== null, 403);
+        $this->access->assertCanViewDevice($user, $device);
+        abort_unless($device->domain === 'security' && $device->category === 'cctv', 404);
+
+        $validated = $request->validate([
+            'host' => ['required', 'ip'],
+            'port' => ['required', 'integer', 'between:1,65535'],
+            'fingerprint' => ['required', 'string', 'max:100', 'regex:/\A[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){31}\z/'],
+        ]);
+
+        $siteId = $this->siteOf($device);
+        abort_unless($siteId !== null, 404);
+
+        $record = $trust->trust($user, $siteId, (string) $validated['host'], (int) $validated['port'], (string) $validated['fingerprint']);
+
+        return response()->json([
+            'trusted_fingerprint' => $record->trusted_fingerprint,
+            'message' => 'Camera trusted. Try again to use it.',
+        ]);
+    }
+
+    /**
+     * Add what the "Trust this camera?" pop-up needs when a camera was refused for an untrusted or
+     * changed certificate.
+     *
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function withTrustPrompt(Request $request, Device $device, array $result): array
+    {
+        $target = $result['tls_trust'] ?? null;
+        if (! is_array($target) || ! isset($target['site_id'], $target['host'], $target['port']) || $request->user() === null) {
+            unset($result['tls_trust']);
+
+            return $result;
+        }
+
+        $trust = app(CameraEndpointTrustService::class);
+        $presented = $trust->present($request->user(), $trust->record((int) $target['site_id'], (string) $target['host'], (int) $target['port']));
+        $result['tls_trust'] = $presented === null ? null : [
+            ...$presented,
+            'host' => (string) $target['host'],
+            'port' => (int) $target['port'],
+            'trust_url' => route('security-devices.devices.camera.certificate.trust', ['device' => $device->id], false),
+        ];
+
+        return $result;
+    }
+
+    private function siteOf(Device $device): ?int
+    {
+        try {
+            $siteId = app(CanonicalDeviceSiteResolver::class)->resolve((int) $device->id);
+        } catch (UnexpectedValueException) {
+            return null;
+        }
+
+        return $siteId > 0 ? $siteId : null;
     }
 }

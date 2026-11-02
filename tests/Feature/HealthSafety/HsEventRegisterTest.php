@@ -309,6 +309,8 @@ class HsEventRegisterTest extends TestCase
 
         $notified = HsEvent::factory()->worksafeNotifiable($actor)->create([
             'site_id' => $site->id,
+            // Decision 3 (G3): a review needs an owner to close.
+            'owner_user_id' => $actor->id,
             'handover_status' => HsEvent::HANDOVER_ACCEPTED,
             'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
             'worksafe_notified_at' => now(),

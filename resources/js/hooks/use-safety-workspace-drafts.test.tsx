@@ -73,8 +73,24 @@ it('keeps the current command URL when a clean-page inbox request finishes after
     expect(listeners.size).toBe(0);
 });
 
+it('treats the header refresh after an evidence upload (task count + inbox) like an inbox refresh', () => {
+    render(<Workspace />);
+    const visit = {
+        method: 'get',
+        url: new URL(window.location.href),
+        async: true,
+        only: ['taskNav', 'inbox'],
+        reset: [],
+        preserveState: true,
+        preserveUrl: false,
+    } as unknown as PendingVisit;
+    listeners.forEach((callback) => callback({ detail: { visit } }));
+    expect(visit.preserveUrl).toBe(true);
+});
+
 it.each([
     { only: ['detail'] },
+    { only: ['taskNav', 'detail'] },
     { only: ['inbox', 'detail'] },
     { reset: ['detail'] },
     { preserveState: false },

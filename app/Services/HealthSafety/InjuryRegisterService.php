@@ -389,6 +389,9 @@ final class InjuryRegisterService
         $integrity = $medical ? ($entry['integrity'] ?? array_fill_keys(['rtw_count', 'capacity_count', 'attachment_count'], 'repair_required'))
             : array_fill_keys(['rtw_count', 'capacity_count', 'attachment_count'], 'restricted');
         return [...$fact, 'source_integrity' => $sourceIntegrity, 'injury_type_label' => self::TYPES[$fact['injury_type']] ?? $fact['injury_type'],
+            // Decision 15: the record's own plain title, the same as on its record page and its safety review.
+            'title' => \App\Support\HealthSafety\HsRecordTitle::injury($fact['injury_type'], $fact['body_part_affected'] ?? null,
+                $fact['worker']['name'] ?? null, $siteNames[$fact['site_id']] ?? null),
             'site' => ['id' => $fact['site_id'], 'name' => $siteNames[$fact['site_id']] ?? null],
             'acc_claim_number' => $fact['acc_claim_number'] ?? null,
             'medical_treatment_type' => $fact['medical_treatment_type'] ?? null,

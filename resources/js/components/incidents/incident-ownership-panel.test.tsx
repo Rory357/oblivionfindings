@@ -311,7 +311,7 @@ describe('Incident ownership controls', () => {
         fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
         fireEvent.click(
             within(screen.getByRole('alertdialog')).getByRole('button', {
-                name: 'Cancel',
+                name: 'Keep editing',
             }),
         );
         expect(

@@ -334,6 +334,11 @@ class RestraintSourceDeliveryService
                     return;
                 }
                 $url = count($eligible) === 1 ? '/health-safety/restraints/events/'.$eligible[0]['event_id'].'?section='.($eligible[0]['kind'] === 'review' ? 'review' : 'followups') : '/tasks?domain=health_safety';
+                // Decision 4: someone who owns follow-ups but can't open restraints (a support worker) is sent to their
+                // own follow-ups, never to the restraint record (which would refuse them).
+                if (! $current->canDo('restraints.view') && $current->canDo(RestraintAccessService::OWN_FOLLOWUPS)) {
+                    $url = '/health-safety/restraints/my-followups';
+                }
                 $notification = new AppEventNotification(['kind' => $intent->purpose, 'event_key' => $key, 'title' => $intent->purpose === 'due_reminder' ? 'Restraint follow-up work needs attention' : 'Restraint follow-up work assigned', 'body' => 'Open your current authorised work.', 'url' => $url, 'work_due' => count($eligible)]);
                 $notification->id = $intent->id;
                 if (! $reads->query(DB::table('notifications'))->where('id', $intent->id)->exists()) {

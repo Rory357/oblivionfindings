@@ -53,10 +53,10 @@ it('does not open a never-authorised command from a URL and retains safe record 
     expect(io.replace).toHaveBeenCalledWith({ url: '/health-safety/injuries/9?section=overview&return_to=%2Ftasks%3Fassigned%3Dme', preserveState: true, preserveScroll: true });
 });
 
-it('offers one clear assign-owner header action when no accountable person is recorded', () => {
+it('offers one clear choose-coordinator action when no coordinator is recorded (G4-8: one role name)', () => {
     io.url = '/health-safety/injuries/9'; const d = record();
     render(<InjuryShow detail={{ ...d, coordination: { ...d.coordination, coordinator: null, attribution_state: 'unassigned' }, can: { ...d.can, assign: true } }} />);
-    expect(screen.getAllByRole('button', { name: 'Assign owner' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Choose coordinator' })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Change incident owner' })).not.toBeInTheDocument();
 });
 

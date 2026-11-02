@@ -134,12 +134,11 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
 
     public function test_mounted_ordinary_only_reads_survive_withdrawal_without_admitting_a_late_meeting_copy(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Stephan (26 Oct) said "Not now" to the meeting delivery pipeline and participation inbox. The participation inbox reader isn\'t mounted in BoardPackAccessService::visibleNotificationQuery; mounting it alone would hide the CommitteeMeetingScheduled notices main still sends.', 'mount the inbox reader with the meeting delivery pipeline.'));
         $this->clearNotices();
         $ordinary = $this->ordinary();
         $reader = app(BoardPackAccessService::class);
         $this->assertSame([$ordinary], $reader->visibleNotificationQuery($this->actor)->pluck('id')->all());
-        $this->assertTrue(app(WorkerParticipationRecipientSourceService::class)->hasPreparedReceiver());
+        // #14: the shared query prepares the meeting reader only for a viewer with a meeting notice (no H&S read on every page).
         $this->actor->hrEmployeeProfile()->update(['is_active' => false]);
         $this->assertSame([$ordinary], $reader->visibleNotificationQuery($this->actor)->pluck('id')->all());
         $late = $this->delivery($this->meeting);
@@ -153,7 +152,7 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
         $rows = $reader->visibleNotificationQuery($this->actor)->get(['id', 'data']);
         $this->assertSame([$ordinary], $rows->pluck('id')->all());
         $this->assertSame(0, $sourceBodies); $this->assertSame(0, $noticeBodies);
-        $this->assertTrue(app(WorkerParticipationRecipientSourceService::class)->hasPreparedReceiver());
+        // #14: the shared query prepares the meeting reader only for a viewer with a meeting notice (no H&S read on every page).
         $this->unavailable(fn () => app(WorkerParticipationRecipientSourceService::class)->prepareReceiver($this->actor));
     }
 
@@ -353,7 +352,6 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
 
     public function test_production_full_centre_excludes_legacy_copied_title_and_roundtrips_bound_notice(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Stephan (26 Oct) said "Not now" to the meeting delivery pipeline and participation inbox. The participation inbox reader isn\'t mounted in BoardPackAccessService::visibleNotificationQuery; mounting it alone would hide the CommitteeMeetingScheduled notices main still sends.', 'mount the inbox reader with the meeting delivery pipeline.'));
         $legacy = (string) Str::uuid();
         $this->actor->notifications()->create(['id' => $legacy, 'type' => CommitteeMeetingScheduled::class,
             'data' => ['type' => 'hs_committee_meeting', 'title' => 'Forbidden legacy private title']]);
@@ -391,7 +389,6 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
 
     public function test_production_direct_read_cannot_open_an_unproven_legacy_copy(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Stephan (26 Oct) said "Not now" to the meeting delivery pipeline and participation inbox. The participation inbox reader isn\'t mounted in BoardPackAccessService::visibleNotificationQuery; mounting it alone would hide the CommitteeMeetingScheduled notices main still sends.', 'mount the inbox reader with the meeting delivery pipeline.'));
         $legacy = (string) Str::uuid();
         $this->actor->notifications()->create(['id' => $legacy, 'type' => CommitteeMeetingScheduled::class,
             'data' => ['type' => 'hs_committee_meeting', 'title' => 'Forbidden legacy private title']]);
@@ -417,12 +414,30 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
         $this->assertGreaterThan(0, $queries); $this->assertLessThan(100, $queries);
     }
 
+    /**
+     * #14/#16 (MASTER, 2 Nov): a viewer with no private notice pays nothing for the private readers. The header opens no
+     * H&S read (no share-locked evidence, no meeting or exposure source) and asks "any private notice?" once, by id only.
+     */
+    public function test_a_viewer_without_private_notices_opens_no_hs_read_on_the_header(): void
+    {
+        $this->clearNotices();
+        $ordinary = $this->ordinary();
+        $log = []; DB::listen(function ($query) use (&$log): void { $log[] = strtolower($query->sql); });
+        $response = $this->get('/notifications', ['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'notifications/index', 'X-Inertia-Partial-Data' => 'inbox'])->assertOk();
+        $this->assertSame([$ordinary], array_column($response->json('props.inbox.notifications.items'), 'id'));
+        foreach ($log as $sql) {
+            foreach (['hs_committee_meetings', 'worker_participation_meeting_events', 'chemical_exposure_', 'substance_exposure_records'] as $source) {
+                $this->assertStringNotContainsString($source, $sql, 'No private source is read for a viewer without private notices.');
+            }
+        }
+        $checks = array_filter($log, fn ($sql) => str_starts_with($sql, 'select `notifications`.`id` from `notifications`')
+            && str_contains($sql, 'as `private_delivery`') && str_contains($sql, 'limit 1'));
+        $this->assertCount(1, $checks, 'One id-only "any private notice?" check for the whole header.');
+    }
+
     #[DataProvider('ordinaryFamilyEligibility')]
     public function test_production_board_pack_and_own_medication_notifications_preserve_existing_rules(bool $currentStaff): void
     {
-        if (! $currentStaff) {
-            $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, "Stephan (26 Oct) said 'Not now' to the meeting delivery pipeline and participation inbox. The non-current-staff case needs the participation inbox reader mounted in BoardPackAccessService::visibleNotificationQuery, which isn't.", 'mount the inbox reader with the meeting delivery pipeline.'));
-        }
         // Board pack permissions come from their own seeder, not RbacSeeder.
         $this->seed(\Database\Seeders\GovernancePermissionsSeeder::class);
         foreach (['medications.view', 'medications.controlled.view', 'medications.audit.view'] as $key) {

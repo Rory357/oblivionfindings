@@ -13,6 +13,10 @@ import { useState, type PropsWithChildren, type ReactNode } from 'react';
 
 import { AppSidebar } from '@/components/app-sidebar';
 import { ChatLauncher } from '@/components/chat/chat-launcher';
+import {
+    ReportSomethingDialog,
+    useCanReportSomething,
+} from '@/components/report-something';
 import { MessageSquareText } from 'lucide-react';
 import PullToRefresh from '@/components/pull-to-refresh';
 import {
@@ -20,6 +24,7 @@ import {
     type StaffBottomNavItem,
 } from '@/components/staff-bottom-nav';
 import { StaffHeader } from '@/components/staff-header';
+import { Button } from '@/components/ui/button';
 import {
     Sheet,
     SheetContent,
@@ -107,12 +112,6 @@ const MORE_LINKS: MoreLink[] = [
         icon: Bell,
     },
     {
-        label: 'Report incident',
-        description: 'Start a new incident or review recent ones',
-        href: '/incidents',
-        icon: ClipboardList,
-    },
-    {
         label: 'Settings & profile',
         description: 'Profile, password, and notification settings',
         href: '/settings/profile',
@@ -164,6 +163,9 @@ export default function StaffPageShell({
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
     const isDesktopLg = useIsDesktopLg();
     const [moreOpen, setMoreOpen] = useState(false);
+    // S4 (board G4-2): the More sheet's report link opens the same "Report something" chooser as the top bar.
+    const canReport = useCanReportSomething();
+    const [reportOpen, setReportOpen] = useState(false);
     const showBuiltInMoreSheet = !onMore;
     const handleMore = onMore ?? (() => setMoreOpen(true));
 
@@ -257,9 +259,38 @@ export default function StaffPageShell({
                                     </Link>
                                 );
                             })}
+                            {canReport ? (
+                                <Button
+                                    unstyled
+                                    type="button"
+                                    onClick={() => {
+                                        setMoreOpen(false);
+                                        setReportOpen(true);
+                                    }}
+                                    className="frontline-focus flex items-center gap-3 rounded-2xl border border-border/80 bg-card px-4 py-3 text-left transition-colors hover:bg-accent"
+                                >
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted text-foreground">
+                                        <ClipboardList className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-sm font-semibold">
+                                            Report something
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Opens the chooser
+                                        </div>
+                                    </div>
+                                </Button>
+                            ) : null}
                         </div>
                     </SheetContent>
                 </Sheet>
+            ) : null}
+            {canReport ? (
+                <ReportSomethingDialog
+                    open={reportOpen}
+                    onClose={() => setReportOpen(false)}
+                />
             ) : null}
         </div>
     );
