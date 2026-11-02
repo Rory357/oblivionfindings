@@ -80,7 +80,7 @@ final class RestraintCommandValues
         }
         $instant = Carbon::parse($value)->utc();
         if ($actual && $instant->gt(now())) {
-            throw ValidationException::withMessages([$field => 'An actual fact cannot be recorded in the future.']);
+            throw ValidationException::withMessages([$field => 'This is in the future. Enter when it actually happened.']);
         }
 
         return $instant->format('Y-m-d H:i:s.u');
