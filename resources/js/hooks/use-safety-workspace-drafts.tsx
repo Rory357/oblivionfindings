@@ -16,8 +16,11 @@ type Draft = { dirty: boolean; busy: boolean; uncertain?: boolean };
 type Register = (id: string, state: Draft | null) => void;
 export const SafetyFormDraftContext = createContext<Register | null>(null);
 
-/** Deferred inbox refreshes cannot replace this record or its in-memory forms. All other
- * GETs still need leave protection, including detail reloads and section links. */
+/** Header props a background refresh may reload without touching the record or its forms. */
+const HEADER_REFRESH_PROPS = ['inbox', 'taskNav'];
+
+/** Deferred header refreshes (the inbox and the task count, e.g. after an evidence upload) cannot replace this record
+ * or its in-memory forms. All other GETs still need leave protection, including detail reloads and section links. */
 function isPreservedInboxRefresh(visit: PendingVisit): boolean {
     if (
         typeof window === 'undefined' ||
@@ -25,8 +28,8 @@ function isPreservedInboxRefresh(visit: PendingVisit): boolean {
         !visit.async ||
         visit.preserveState !== true ||
         visit.reset.length ||
-        visit.only.length !== 1 ||
-        visit.only[0] !== 'inbox'
+        visit.only.length === 0 ||
+        !visit.only.every((prop) => HEADER_REFRESH_PROPS.includes(prop))
     )
         return false;
     const target = new URL(visit.url, window.location.href);

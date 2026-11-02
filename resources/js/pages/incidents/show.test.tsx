@@ -993,16 +993,17 @@ describe('Permanent incident workspace', () => {
             },
         );
         fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+        // The pop-up kit's discard guard ("Discard this draft?" · Keep editing · Discard draft).
         fireEvent.click(
             within(screen.getByRole('alertdialog')).getByRole('button', {
-                name: 'Cancel',
+                name: 'Keep editing',
             }),
         );
-        expect(within(dialog).getByRole('textbox')).toHaveValue(
+        expect(within(screen.getByRole('dialog')).getByRole('textbox')).toHaveValue(
             'Please coordinate additional support at the house.',
         );
         fireEvent.click(
-            within(dialog).getByRole('button', { name: 'Request response' }),
+            within(screen.getByRole('dialog')).getByRole('button', { name: 'Request response' }),
         );
         expect(state.post).toHaveBeenCalledWith(
             '/control-room/incidents/create-alert',
