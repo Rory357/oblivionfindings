@@ -129,7 +129,7 @@ final class UniFiProtectLocalCameraClient
                     'ok' => false,
                     'reason_code' => $resp['status'] === 0 ? 'unreachable' : 'snapshot_fetch_failed',
                     'message' => $resp['status'] === 0
-                        ? 'Could not reach the UniFi Protect console directly. If the console is on a private Site LAN, run the Site hub.'
+                        ? 'Could not reach the UniFi Protect console from the server. Protect snapshots need the console to be reachable from the server; the Site hub cannot fetch them yet.'
                         : 'The UniFi Protect console did not return a camera snapshot.',
                     'data_uri' => null,
                     'captured_at' => $capturedAt,
@@ -307,9 +307,13 @@ final class UniFiProtectLocalCameraClient
     }
 
     /**
-     * @return array{ok: bool, reason_code: string, message: string, ip?: string, site_id?: int, base_url?: string}
+     * The console's approved address. With `$checkCertificate` false (S&D Phase B, the hub route) the
+     * server skips its own TLS check: the server can't reach the house, and the hub enforces the
+     * trusted pin itself before it sends the API key.
+     *
+     * @return array{ok: bool, reason_code: string, message: string, ip?: string, port?: int, site_id?: int, base_url?: string}
      */
-    private function authoriseConsoleEndpoint(Device $device): array
+    public function authoriseConsoleEndpoint(Device $device, bool $checkCertificate = true): array
     {
         try {
             $siteId = $this->siteResolver->resolve((int) $device->id);
@@ -381,7 +385,9 @@ final class UniFiProtectLocalCameraClient
 
         // Phase A, item A5: the API key goes only to a console whose certificate is publicly valid or
         // has been trusted ("Trust this camera?"); later requests accept only the trusted key.
-        $gate = app(CameraEndpointTrustService::class)->gate($siteId, $canonicalIp, $port);
+        $gate = $checkCertificate
+            ? app(CameraEndpointTrustService::class)->gate($siteId, $canonicalIp, $port)
+            : ['ok' => true, 'pin' => null];
         if (! $gate['ok']) {
             return [
                 'ok' => false,
@@ -399,6 +405,7 @@ final class UniFiProtectLocalCameraClient
             'reason_code' => 'authorised',
             'message' => 'UniFi Protect endpoint authorised.',
             'ip' => $canonicalIp,
+            'port' => $port,
             'site_id' => $siteId,
             'base_url' => $baseUrl,
             'tls_pin' => $gate['pin'],
@@ -507,7 +514,23 @@ final class UniFiProtectLocalCameraClient
         return array_values(array_unique($approved));
     }
 
-    private function acquireProtectCredential(int $siteId): ?CredentialLease
+    /** Whether the Site has a usable saved Protect login, without taking a lease. */
+    public function hasProtectCredential(int $siteId): bool
+    {
+        return CredentialReference::query()
+            ->where('site_id', $siteId)
+            ->whereIn('provider', ['unifi_protect', 'unifi'])
+            ->whereIn('purpose', ['device_management', 'monitoring'])
+            ->where('status', CredentialReferenceStatus::Active->value)
+            ->whereNotIn('rotation_status', [
+                CredentialRotationStatus::Overdue->value,
+                CredentialRotationStatus::Failed->value,
+            ])
+            ->exists();
+    }
+
+    /** The Site's Protect API key lease (also sealed to the Site hub for the hub route). */
+    public function acquireProtectCredential(int $siteId): ?CredentialLease
     {
         $reference = CredentialReference::query()
             ->where('site_id', $siteId)

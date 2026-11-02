@@ -877,6 +877,14 @@ class HandleInertiaRequests extends Middleware
                 'reportsView' => $user->canDo('securityDevices.reports.view'),
                 'commandsAdmin' => $user->canDo('securityDevices.commands.admin'),
                 'commandsApprove' => $user->canDo('securityDevices.commands.approve'),
+                // S&D rebuild Phase D: the Alerts menu entry and Setup › Alerts & checks.
+                'alertsAcknowledge' => $user->canDo('securityDevices.alerts.acknowledge'),
+                'automationsManage' => $user->canDo('securityDevices.automations.manage'),
+                // S&D Phase H: the Access menu entry (pg-sdr-19).
+                'accessControlView' => $user->canDo('securityDevices.accessControl.view'),
+                // S&D rebuild C6: the Setup menu entry shows exactly when Setup opens.
+                'setupOpen' => $user->canDo('securityDevices.viewAny')
+                    && \App\Domain\SecurityDevices\Screens\Setup\SetupPresenter::canOpen($user),
             ],
 
             'calendar' => [

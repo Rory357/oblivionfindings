@@ -42,7 +42,7 @@ export function CameraCertificateNotice({
 
     const changed = offered.changed;
 
-    const confirm = async () => {
+    const trustCertificate = async () => {
         if (processing) return;
         setProcessing(true);
         setError(undefined);
@@ -129,7 +129,7 @@ export function CameraCertificateNotice({
             <PopupConfirm
                 open={confirming}
                 onClose={() => setConfirming(false)}
-                onConfirm={() => void confirm()}
+                onConfirm={() => void trustCertificate()}
                 variant={changed ? 'warning' : 'plain'}
                 icon={ShieldCheck}
                 title={

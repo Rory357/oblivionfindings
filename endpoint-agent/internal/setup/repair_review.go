@@ -56,7 +56,8 @@ func repairReviewFor(j Journal, m release.Manifest, computer, collectorOrigin, c
 		Journal                           Journal
 		Review                            RepairReview
 		ComputerBinding, CollectorBinding string
-	}{j, r, computerBinding, collectorBinding})
+		SiteStage                         string // the hub's live release folder, after a self-update
+	}{j, r, computerBinding, collectorBinding, j.collectorStage()})
 	if err != nil {
 		return zero, err
 	}

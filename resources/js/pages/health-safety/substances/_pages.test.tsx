@@ -53,6 +53,18 @@ it('opens permanent chemical records with exact filtered Back and source-backed 
     expect(current.searchParams.get('tab')).toBe('active'); expect(current.searchParams.get('sds_state')).toBe('current'); expect(current.searchParams.get('site_id')).toBe('3');
     expect(current.searchParams.has('q')).toBe(false); expect(screen.queryByRole('button', { name: 'Board reports' })).not.toBeInTheDocument();
 });
+it('opened from Report something, choosing a chemical opens its exposure form and the mode survives a search (E2E, 2 Nov)', () => {
+    io.url = '/health-safety/substances?tab=active&record=exposure';
+    render(<ChemicalRegister {...index()} />);
+    expect(screen.getByText('Choose the chemical it was. Its “Record an exposure” form opens next.')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Recorded chemical'));
+    const href = new URL(io.get.mock.calls[0][0] as string, 'https://example.invalid');
+    expect(href.pathname).toBe('/health-safety/chemical-exposures/capture');
+    expect(href.searchParams.get('substance_id')).toBe('9');
+    expect(href.searchParams.get('return_to')).not.toContain('record=');
+    const current = new URL(screen.getByRole('link', { name: /^Current SDS: 0/ }).getAttribute('href')!, 'https://example.invalid');
+    expect(current.searchParams.get('record')).toBe('exposure');
+});
 it('withholds repair identities and keeps unknown header measures separate from zero or exposure counts', () => {
     const props = index(); props.source_integrity = 'repair_required'; props.rows.data[0] = { ...props.rows.data[0], source_integrity: 'repair_required', name: 'STALE-CHEMICAL-NAME', common_name: 'STALE-COMMON-NAME', storage_count: null };
     props.hero.live.active = null; props.hero.live.controlled = null; props.hero.live.sds_current = null; props.hero.attention.sds_expiring = null; props.hero.attention.sds_missing = null;

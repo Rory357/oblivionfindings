@@ -38,7 +38,7 @@ final class OnvifProfileCameraDriver extends AbstractOnvifCameraDriver
                 ['label' => 'ONVIF Device & Media WSDLs', 'url' => 'https://www.onvif.org/ch10/20/'],
             ],
             limitationsNote: 'TP-Link Tapo cameras keep ONVIF port 2020 and RTSP port 554 closed until a Camera Account is enabled in the Tapo app (LAN discovery on 172.16.0.78 verified over HTTPS/8800 and MAC OUI).',
-            setupHref: '/security-devices/discovery',
+            setupHref: '/security-devices/setup/hubs?tab=networks',
         );
     }
 

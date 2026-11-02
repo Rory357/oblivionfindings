@@ -16,6 +16,7 @@ use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
 use App\Domain\Monitoring\Protocols\Flow\FlowIntakeService;
 use App\Domain\Monitoring\Protocols\Syslog\SyslogIntakeService;
+use App\Domain\SecurityDevices\Iot\Relay\Services\SensorRelayIntakeService;
 use App\Domain\SecurityDevices\Management\Services\CollectorCommandResultService;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -162,6 +163,65 @@ final readonly class CollectorIngestService
         }
         if ($itemType === 'command_result') {
             $this->commands->record($collector, $sequence, $payload);
+
+            return;
+        }
+        if ($itemType === 'sensor_reading') {
+            // S&D Phase B (D21): a reading the Site hub relayed from a sensor gateway.
+            app(SensorRelayIntakeService::class)->record($collector, $payload);
+
+            return;
+        }
+        if ($itemType === 'broker_exposure_check') {
+            // S&D Phase E (D21): the hub's daily check that Oblivion's public address refuses MQTT.
+            $ports = [];
+            foreach (['1883', '8883'] as $port) {
+                $value = is_array($payload['ports'] ?? null) ? ($payload['ports'][$port] ?? null) : null;
+                $ports[$port] = $value === 'answered' ? 'answered' : 'refused';
+            }
+            try {
+                $at = CarbonImmutable::parse((string) ($payload['checked_at'] ?? 'now'))->utc();
+            } catch (\Throwable) {
+                $at = CarbonImmutable::now('UTC');
+            }
+            $passed = ! in_array('answered', $ports, true);
+            \App\Domain\SecurityDevices\Iot\Relay\Models\BrokerExposureCheck::query()->create([
+                'collector_id' => $collector->id,
+                'host' => is_string($payload['host'] ?? null) ? mb_substr($payload['host'], 0, 253) : '',
+                'ports' => $ports,
+                'passed' => $passed,
+                'checked_at' => $at,
+            ]);
+            app(\App\Domain\SecurityDevices\Alerts\DeviceAlertEngine::class)->onBrokerExposure($collector, array_keys(array_filter($ports, fn (string $result): bool => $result === 'answered')), $at);
+
+            return;
+        }
+        if ($itemType === 'unifi_access_snapshot') {
+            // S&D Phase H: what a Site's UniFi Access console holds, read by its hub.
+            app(\App\Domain\SecurityDevices\Access\UnifiAccessSync::class)->ingest($collector, $payload);
+
+            return;
+        }
+        if ($itemType === 'relay_certificate_request') {
+            // S&D Phase E (E5): the hub's own relay key, sent as a certificate request only. A request
+            // that isn't the hub's or names an address outside its Sites is ignored; the hub asks again.
+            app(\App\Domain\SecurityDevices\Iot\Relay\Services\SensorsCertificateAuthority::class)->issue(
+                $collector,
+                is_string($payload['csr_pem'] ?? null) ? $payload['csr_pem'] : '',
+                is_array($payload['ip_addresses'] ?? null) ? array_values($payload['ip_addresses']) : [],
+            );
+
+            return;
+        }
+        if ($itemType === 'relay_login_failures') {
+            // S&D Phase E: 5 wrong sensor logins in 10 minutes at the hub's relay alert IT.
+            $address = is_string($payload['address'] ?? null) ? mb_substr($payload['address'], 0, 64) : 'an unknown address';
+            try {
+                $at = CarbonImmutable::parse((string) ($payload['received_at'] ?? 'now'))->utc();
+            } catch (\Throwable) {
+                $at = CarbonImmutable::now('UTC');
+            }
+            app(\App\Domain\SecurityDevices\Alerts\DeviceAlertEngine::class)->onRelayLoginFailures($collector, $address, max(1, (int) ($payload['count'] ?? 5)), $at);
 
             return;
         }

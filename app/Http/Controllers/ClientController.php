@@ -3463,7 +3463,7 @@ class ClientController extends Controller
                 'fleet_dashboard_url' => '/fleet-assets/resident-tracking?focus='.$client->id,
                 'history_url' => "/fleet-assets/resident-tracking/history/{$client->id}",
                 'tracking_workspace_url' => $canonicalDeviceAvailable
-                    ? '/security-devices/tracking?tab=personal-safety'
+                    ? '/security-devices/devices?tab=trackers'
                     : null,
                 'tracking_workspace_access' => [
                     'state' => $canonicalDeviceAvailable ? 'available' : 'restricted',

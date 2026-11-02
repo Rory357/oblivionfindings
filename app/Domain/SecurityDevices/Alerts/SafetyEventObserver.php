@@ -1,0 +1,56 @@
+<?php
+
+namespace App\Domain\SecurityDevices\Alerts;
+
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
+use Carbon\CarbonImmutable;
+
+/**
+ * Safety events from a device become an alert in Security & devices › Alerts and a notice to the
+ * staff on shift at that house (S&D Phase E). Control Room's own DeviceEventObserver keeps sending
+ * the same events to Control Room straight away; nothing here delays or replaces that.
+ */
+final class SafetyEventObserver
+{
+    public function __construct(private readonly DeviceAlertEngine $alerts) {}
+
+    public function created(DeviceEvent $event): void
+    {
+        $type = strtolower(trim((string) $event->event_type));
+        if ($type === 'management_command_reconciled' && $event->device_id !== null) {
+            // S&D Phase H: the hub confirmed a lockdown, evacuation or its end: tell Control Room and staff.
+            $mode = \App\Domain\SecurityDevices\Access\AccessEmergency::CAPABILITY_MODES[(string) data_get($event->payload, 'capability')] ?? null;
+            $console = $mode !== null ? \App\Domain\SecurityDevices\Access\AccessConsoles::consoleFor(Device::query()->find($event->device_id) ?? new Device) : null;
+            if ($console !== null) {
+                app(\App\Domain\SecurityDevices\Access\AccessEmergency::class)->changed($console, $mode, 'oblivion');
+            }
+
+            return;
+        }
+        if ($type === 'door_opened' && $event->device_id !== null) {
+            // S&D Phase F: a door contact linked to someone's wandering plan tells staff at night.
+            $door = Device::query()->find($event->device_id);
+            $at = $event->occurred_at !== null ? CarbonImmutable::parse($event->occurred_at)->setTimezone('UTC') : CarbonImmutable::now('UTC');
+            if ($door instanceof Device && $at->gte(CarbonImmutable::now('UTC')->subMinutes(30))) {
+                app(\App\Domain\SecurityDevices\Care\CareRules::class)->onDoorOpened($door, $at);
+                app(\App\Domain\SecurityDevices\Automations\AutomationEngine::class)->onDoorOpened($door, $at); // S&D Phase F: house automations
+            }
+
+            return;
+        }
+        if (! array_key_exists($type, DeviceAlertEngine::SAFETY_EVENTS) || $event->device_id === null) {
+            return;
+        }
+        $device = Device::query()->find($event->device_id);
+        if (! $device instanceof Device) {
+            return;
+        }
+        $at = $event->occurred_at !== null ? CarbonImmutable::parse($event->occurred_at)->setTimezone('UTC') : CarbonImmutable::now('UTC');
+        // A replayed or late report (more than a day old) is history, not a new alert.
+        if ($at->lt(CarbonImmutable::now('UTC')->subDay())) {
+            return;
+        }
+        $this->alerts->onSafetyEvent($device, $type, $at);
+    }
+}

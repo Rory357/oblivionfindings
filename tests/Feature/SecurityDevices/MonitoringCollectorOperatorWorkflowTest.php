@@ -65,16 +65,13 @@ final class MonitoringCollectorOperatorWorkflowTest extends TestCase
         $this->assertSame('new_collector', $audit->meta['purpose']);
         $this->assertStringNotContainsString($token, json_encode($audit->meta, JSON_THROW_ON_ERROR));
 
-        $page = $this->actingAs($operator)->get('/security-devices/discovery?tab=collectors');
-        $page->assertOk()->assertInertia(function ($page) use ($allowedSite): void {
-            $management = $page->toArray()['props']['workspace']['collector_management'];
-
-            $this->assertTrue($management['can_manage']);
-            $this->assertSame(
-                [$allowedSite->id],
-                collect($management['sites'])->pluck('id')->all(),
-            );
-        });
+        // S&D rebuild C6: Discovery & collectors is gone; hubs are added and managed from Setup › Hubs
+        // & networks and the Sites pages (pop-ups 12–14). Neither the token nor the hidden Site shows there.
+        $this->actingAs($operator)
+            ->get('/security-devices/discovery?tab=collectors')
+            ->assertRedirect('/security-devices/setup/hubs?tab=networks');
+        $page = $this->actingAs($operator)->get('/security-devices/setup/hubs?tab=networks');
+        $page->assertOk()->assertInertia(fn ($page) => $page->where('can.add_hub', true));
         $page
             ->assertDontSee($token, false)
             ->assertDontSee($hiddenSite->name, false);

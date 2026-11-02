@@ -653,7 +653,8 @@ it('denies every authenticated endpoint after revocation and permits governed re
         ['collector_id' => $record['collector']->collector_uuid, 'status' => collectorHeartbeatPayload()],
         $record,
         'revoked-heartbeat-nonce',
-    )->assertUnauthorized()->assertExactJson(['message' => 'Collector authentication failed.']);
+    // A removed hub that proves who it is is told so, to wipe its saved logins (S&D Phase B).
+    )->assertStatus(410)->assertJson(['state' => 'removed']);
 
     $bypassPair = sodium_crypto_sign_keypair();
     $this->withToken($staleGeneralEnrollment->plainToken)->postJson('/api/monitoring/collectors/enrol', [
@@ -734,6 +735,8 @@ function enrolledCollectorRecord(TestCase $test): array
         'collector_id' => $uuid,
         'collector_public_key' => base64_encode(sodium_crypto_sign_publickey($pair)),
     ])->assertCreated();
+    // An admin approves the new hub before it may do any work (S&D Phase B).
+    MonitoringCollector::query()->where('collector_uuid', $uuid)->update(['approved_at' => now()]);
 
     $record = [
         'site' => $site,

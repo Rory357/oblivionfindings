@@ -13,6 +13,9 @@ final readonly class HttpsCentralApi implements CentralApi
 
     private string $baseUrl;
 
+    /** Holds the last heartbeat reply (the class is readonly; this object isn't). */
+    private \stdClass $memo;
+
     public function __construct(
         string $baseUrl,
         private string $tlsPublicKeyPin,
@@ -23,6 +26,8 @@ final readonly class HttpsCentralApi implements CentralApi
         private ?Closure $testTransport = null,
         private ?string $caBundleFile = null,
     ) {
+        $this->memo = new \stdClass;
+        $this->memo->lastHeartbeat = null;
         $parts = parse_url($baseUrl);
         if (! is_array($parts)
             || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
@@ -129,10 +134,64 @@ final readonly class HttpsCentralApi implements CentralApi
 
     public function heartbeat(string $collectorId, array $status): void
     {
-        $this->request('POST', '/api/monitoring/collectors/heartbeat', [
+        $this->memo->lastHeartbeat = $this->request('POST', '/api/monitoring/collectors/heartbeat', [
             'collector_id' => $collectorId,
             'status' => $status,
         ]);
+    }
+
+    /** The last heartbeat reply: approval state and update instructions (S&D Phase B). */
+    public function lastHeartbeat(): ?array
+    {
+        return is_array($this->memo->lastHeartbeat) ? $this->memo->lastHeartbeat : null;
+    }
+
+    /** The login-store key, sealed to this hub's own key. 409 while waiting for approval; 410 once removed. */
+    public function vaultKey(string $collectorId): string
+    {
+        $response = $this->request('POST', '/api/monitoring/collectors/vault-key', ['collector_id' => $collectorId]);
+        $sealed = $response['sealed_key'] ?? null;
+        if (! is_string($sealed) || $sealed === '' || strlen($sealed) > 512) {
+            throw new CentralApiFailure('Central login-store key response is invalid.');
+        }
+
+        return $sealed;
+    }
+
+    /** @param array<string, mixed> $report */
+    public function updateReport(string $collectorId, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/update/report', ['collector_id' => $collectorId, 'report' => $report]);
+    }
+
+    /**
+     * The hub is being uninstalled: ask Oblivion to remove it, so it stops trusting this hub
+     * (S&D Phase B, windows tab E). Signed and over mTLS like every other hub call.
+     *
+     * @return array<string, mixed>
+     */
+    public function deregister(string $collectorId): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/deregister', ['collector_id' => $collectorId]);
+    }
+
+    /**
+     * Streams the release file this hub was told to install (S&D Phase B, D3), signed and over
+     * mTLS like every other hub call. Each chunk goes to $sink, which returns false to stop.
+     *
+     * @param  Closure(string): bool  $sink
+     */
+    public function downloadUpdate(string $collectorId, string $artifactId, string $sha256, Closure $sink): void
+    {
+        $path = '/api/monitoring/collectors/update/download';
+        $body = json_encode(['collector_id' => $collectorId, 'artifact_id' => $artifactId, 'sha256' => $sha256], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $result = $this->send('POST', $path, $body, $this->requestHeaders('POST', $path, $body), true, $sink);
+        if (! $result['transport_ok'] || $result['status'] !== 200) {
+            throw new CentralApiFailure(
+                'Central HTTPS download failed with a bounded transport outcome: '.($result['status'] ?: 'unavailable').'.',
+                $result['transport_ok'] ? (int) $result['status'] : 0,
+            );
+        }
     }
 
     /** @return array{schema: string, state: string, collector_reference_sha256: string, signing_key_reference_sha256: string, identity_generation_reference_sha256: string, expected_identity_state: string, pinned_https_contract: string, initial_response: string, replay_attempt: string, samples: int, observed_from_utc: string, observed_until_utc: string} */
@@ -206,6 +265,51 @@ final readonly class HttpsCentralApi implements CentralApi
         return $this->request('POST', '/api/monitoring/collectors/media/results', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'results' => $results]);
     }
 
+    /**
+     * S&D Phase G (D5): the terminal poll. What the hub's terminals sent back goes in; lines to
+     * type, terminals to open (signed) and to close come back.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    public function terminalWork(string $collectorId, string $requestKey, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/terminal/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
+    }
+
+    /**
+     * S&D Phase G (pop-up 61): the device web page poll. Answers go in; page requests come back.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    public function webWork(string $collectorId, string $requestKey, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/web/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
+    }
+
+    /**
+     * S&D Phase H (H1): the UniFi Access changes poll. What the hub did goes in; signed changes come back.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    public function accessWork(string $collectorId, string $requestKey, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/access/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
+    }
+
+    /**
+     * S&D Phase I (pop-up 97): Obli's network checks poll. What the hub found goes in; signed read-only checks come back.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    public function networkCheckWork(string $collectorId, string $requestKey, array $report): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/network-checks/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'report' => $report]);
+    }
+
     public function discoveryWork(string $collectorId, string $requestKey, array $capability): array
     {
         return $this->request('POST', '/api/monitoring/collectors/media/discovery/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'capability' => $capability]);
@@ -237,7 +341,10 @@ final readonly class HttpsCentralApi implements CentralApi
             $result = $this->send($method, $path, $body, $headers, true);
         }
         if (! $result['transport_ok'] || $result['status'] < 200 || $result['status'] >= 300) {
-            throw new CentralApiFailure('Central HTTPS request failed with a bounded transport outcome: '.($result['status'] ?: 'unavailable').'.');
+            throw new CentralApiFailure(
+                'Central HTTPS request failed with a bounded transport outcome: '.($result['status'] ?: 'unavailable').'.',
+                $result['transport_ok'] ? (int) $result['status'] : 0,
+            );
         }
 
         try {
@@ -281,8 +388,15 @@ final readonly class HttpsCentralApi implements CentralApi
         return $headers;
     }
 
-    /** @param list<string> $headers @return array{transport_ok: bool, status: int, body: string, transient_failure?: bool} */
-    private function send(string $method, string $path, string $body, array $headers, bool $useMtls): array
+    /**
+     * With a $sink (update downloads), a 200 reply's body goes to the sink instead of memory,
+     * with longer time limits; any other reply is kept as a small error body.
+     *
+     * @param  list<string>  $headers
+     * @param  null|Closure(string): bool  $sink
+     * @return array{transport_ok: bool, status: int, body: string, transient_failure?: bool}
+     */
+    private function send(string $method, string $path, string $body, array $headers, bool $useMtls, ?Closure $sink = null): array
     {
         if ($this->testTransport !== null) {
             $result = ($this->testTransport)($method, $path, $body, $headers, $useMtls);
@@ -291,6 +405,14 @@ final readonly class HttpsCentralApi implements CentralApi
                 || ! is_string($result['body'] ?? null)
                 || (array_key_exists('transient_failure', $result) && ! is_bool($result['transient_failure']))) {
                 throw new CentralApiFailure('Collector test transport returned an invalid bounded outcome.');
+            }
+            if ($sink !== null && $result['transport_ok'] && $result['status'] === 200) {
+                foreach (str_split($result['body'], 65536) as $chunk) {
+                    if (! $sink($chunk)) {
+                        return ['transport_ok' => false, 'status' => 200, 'body' => ''];
+                    }
+                }
+                $result['body'] = '';
             }
 
             return $result;
@@ -309,13 +431,16 @@ final readonly class HttpsCentralApi implements CentralApi
             CURLOPT_HEADER => false,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_MAXREDIRS => 0,
-            CURLOPT_CONNECTTIMEOUT => str_contains($path, '/collectors/media/') ? 3 : 5,
-            CURLOPT_TIMEOUT => str_contains($path, '/collectors/media/') ? 3 : 15,
+            CURLOPT_CONNECTTIMEOUT => str_contains($path, '/collectors/media/') ? 3 : ($sink !== null ? 10 : 5),
+            CURLOPT_TIMEOUT => str_contains($path, '/collectors/media/') ? 3 : ($sink !== null ? 2400 : 15),
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_PINNEDPUBLICKEY => $this->tlsPublicKeyPin,
             CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
-            CURLOPT_WRITEFUNCTION => function ($curl, string $chunk) use (&$response): int {
+            CURLOPT_WRITEFUNCTION => function ($curl, string $chunk) use (&$response, $sink): int {
+                if ($sink !== null && curl_getinfo($curl, CURLINFO_RESPONSE_CODE) === 200) {
+                    return $sink($chunk) ? strlen($chunk) : 0;
+                }
                 if (strlen($response) + strlen($chunk) > self::MAX_RESPONSE_BYTES) {
                     return 0;
                 }
@@ -326,6 +451,11 @@ final readonly class HttpsCentralApi implements CentralApi
         ];
         if ($this->caBundleFile !== null) {
             $options[CURLOPT_CAINFO] = $this->caBundleFile;
+        }
+        if ($sink !== null) {
+            // A stalled download gives up rather than holding the hub for the whole time limit.
+            $options[CURLOPT_LOW_SPEED_LIMIT] = 1024;
+            $options[CURLOPT_LOW_SPEED_TIME] = 120;
         }
         if ($useMtls) {
             $options[CURLOPT_SSLCERT] = $this->clientCertificateFile;

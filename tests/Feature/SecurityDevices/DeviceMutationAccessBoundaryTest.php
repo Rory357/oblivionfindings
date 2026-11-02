@@ -161,7 +161,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         ]);
 
         $this->actingAs($this->manager)
-            ->get("/security-devices/devices/{$this->allowedDevice->id}")
+            ->get("/security-devices/devices/{$this->allowedDevice->id}?section=assignments")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('assignmentTargets.clients', fn ($targets): bool => collect($targets)->doesntContain('id', $sameSiteClient->id))
@@ -274,7 +274,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         $showHref = "/security-devices/devices/{$this->allowedDevice->id}";
 
         $this->actingAs($this->manager)
-            ->get($showHref)
+            ->get($showHref.'?section=assignments')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('assignmentTargets.clients', fn ($targets): bool => collect($targets)->contains('id', $client->id))
@@ -321,7 +321,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         $access = app(SecurityDevicesAccessService::class);
 
         $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$this->allowedDevice->id}")
+            ->get("/security-devices/devices/{$this->allowedDevice->id}?section=assignments")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('assignmentTargets.vehicles', fn ($targets): bool => collect($targets)->contains('id', $vehicle->id)));
@@ -500,7 +500,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             $this->assertDatabaseHas('device_relationships', ['id' => $relationship->id]);
         }
         $this->actingAs($this->manager)
-            ->get("/security-devices/devices/{$this->allowedDevice->id}")
+            ->get("/security-devices/devices/{$this->allowedDevice->id}?section=topology")
             ->assertInertia(fn ($page) => $page
                 ->where('relationships.children', [])
                 ->where('relationshipHistory.children.0.id', $relationship->id)
@@ -627,7 +627,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             'updated_at' => now(),
         ]);
         $this->actingAs($this->manager)
-            ->get("/security-devices/devices/{$this->allowedDevice->id}")
+            ->get("/security-devices/devices/{$this->allowedDevice->id}?section=topology")
             ->assertInertia(fn ($page) => $page
                 ->where('relationships.parents', [])
                 ->where('relationships.children', [])
@@ -706,7 +706,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             ->assertNotFound();
         $this->assertSame(0, $this->allowedDevice->fresh()->documents()->count());
         $this->actingAs($this->manager)
-            ->get("/security-devices/devices/{$this->allowedDevice->id}")
+            ->get("/security-devices/devices/{$this->allowedDevice->id}?section=documents")
             ->assertInertia(fn ($page) => $page
                 ->where('documents', [])
                 ->where('documentHistory.0.id', $document->id)

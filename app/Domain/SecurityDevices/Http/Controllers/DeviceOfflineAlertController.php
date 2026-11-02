@@ -9,11 +9,13 @@ use App\Domain\Monitoring\Discovery\Services\DiscoveryScopeValidator;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Exceptions\EgressDenied;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\CidrMatcher;
 use App\Domain\Monitoring\Services\EgressPolicy;
 use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
+use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Site;
@@ -40,6 +42,7 @@ final class DeviceOfflineAlertController extends Controller
         private readonly DnsResolver $dnsResolver,
         private readonly CidrMatcher $cidrMatcher,
         private readonly EgressPolicy $egressPolicy,
+        private readonly CoveringHubResolver $hubs,
     ) {}
 
     public function __invoke(Request $request, Device $device): RedirectResponse|JsonResponse
@@ -54,9 +57,9 @@ final class DeviceOfflineAlertController extends Controller
         $enabled = (bool) $validated['enabled'];
 
         if (! $enabled) {
+            // Off means off, whether the server or a hub was doing the checking.
             $monitors = Monitor::query()
                 ->where('device_id', $device->id)
-                ->whereNull('collector_id')
                 ->where('kind', MonitorKind::Icmp->value)
                 ->where('affects_availability', true)
                 ->where('is_enabled', true)
@@ -78,6 +81,30 @@ final class DeviceOfflineAlertController extends Controller
             return back()->with('success', 'Offline alerts turned off for this device.');
         }
 
+        ['monitor' => $monitor, 'checked_by' => $checkedBy] = $this->enable($user, $device);
+        $message = "Offline alerts turned on for this device. {$checkedBy['label']}.";
+
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return response()->json([
+                'enabled' => true,
+                'monitor_id' => $monitor->id,
+                'checked_by' => $checkedBy,
+                'message' => $message,
+            ]);
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Turn on offline alerts for one device: check its Site and address, put the check on the hub
+     * that covers the Site (or the server when none does) and save the ping check. Also used when
+     * found devices are added (S&D Phase D, "Watch devices as soon as they're added").
+     *
+     * @return array{monitor: Monitor, checked_by: array{mode: string, hub_id: int|null, label: string}}
+     */
+    public function enable(User $user, Device $device): array
+    {
         try {
             $siteId = $this->siteResolver->resolve((int) $device->id);
         } catch (UnexpectedValueException) {
@@ -116,6 +143,24 @@ final class DeviceOfflineAlertController extends Controller
             ]);
         }
 
+        // S&D Phase B: a hub that covers the Site does the checking; the server only when none does.
+        $hub = $this->hubs->forSite($siteId);
+        if ($hub !== null) {
+            $this->prepareHubCoverage($user, $site, $hub, $probeTarget);
+            $checkedBy = ['mode' => 'hub', 'hub_id' => (int) $hub->id, 'label' => 'Checked by '.CoveringHubResolver::label($hub)];
+        } else {
+            $this->prepareServerCoverage($user, $site, $probeTarget);
+            $checkedBy = ['mode' => 'server', 'hub_id' => null, 'label' => 'Checked from the server'];
+        }
+
+        $monitor = $this->saveMonitor($user, $device, $rawTarget, $siteId, $hub);
+
+        return ['monitor' => $monitor, 'checked_by' => $checkedBy];
+    }
+
+    /** The server pings the device itself: the address must pass the server's egress rules. */
+    private function prepareServerCoverage(User $user, Site $site, ProbeTarget $probeTarget): void
+    {
         $canonicalAddresses = $this->resolveAddresses($probeTarget->host);
         if ($canonicalAddresses === []) {
             throw ValidationException::withMessages([
@@ -130,7 +175,7 @@ final class DeviceOfflineAlertController extends Controller
 
         try {
             $authorized = $this->egressPolicy->authoriseDiscovery(
-                siteId: $siteId,
+                siteId: (int) $site->id,
                 approvedCidrs: $hostCidrs,
                 allowedPorts: [443],
                 target: $probeTarget,
@@ -142,24 +187,75 @@ final class DeviceOfflineAlertController extends Controller
         }
 
         $this->ensureHostScopeCoverage($user, $site, $authorized->addresses);
+    }
+
+    /** The hub pings a literal address on its own network, inside a scan area it may use. */
+    private function prepareHubCoverage(User $user, Site $site, MonitoringCollector $hub, ProbeTarget $probeTarget): void
+    {
+        $label = CoveringHubResolver::label($hub);
+        if (filter_var($probeTarget->host, FILTER_VALIDATE_IP) === false) {
+            throw ValidationException::withMessages([
+                'offline_alert' => "Save this device's IP address, not a hostname, so {$label} can check it.",
+            ]);
+        }
+
+        // Giving a hub a check needs access to the hub's own Site, as on the Checks page.
+        if (! in_array((int) $hub->site_id, $this->access->accessibleSiteIds($user), true)) {
+            throw ValidationException::withMessages([
+                'offline_alert' => "{$label} checks this Site. Ask someone who can see that hub's Site to turn on offline alerts.",
+            ]);
+        }
+
+        // Same reserved-address rule NativeMonitoringDefinitionService applies to hub checks.
+        try {
+            $address = $this->cidrMatcher->canonicalAddress($probeTarget->host);
+            $denied = collect((array) config('monitoring.egress.deny_cidrs', []))->contains(
+                fn (mixed $cidr): bool => is_string($cidr) && $cidr !== '' && $this->cidrMatcher->contains($cidr, $address),
+            );
+        } catch (Throwable) {
+            $denied = true;
+        }
+        if ($denied) {
+            throw ValidationException::withMessages([
+                'offline_alert' => 'That IP address is reserved and cannot be monitored.',
+            ]);
+        }
+
+        $this->ensureHostScopeCoverage($user, $site, [$address], $hub);
+    }
+
+    /**
+     * Turn on (or move) the device's ping check: on the covering hub, or on the server when
+     * no hub covers the Site.
+     */
+    private function saveMonitor(User $user, Device $device, string $rawTarget, int $siteId, ?MonitoringCollector $hub): Monitor
+    {
         $profile = $this->resolveDefaultAvailabilityProfile();
+        $onSamePath = fn (Monitor $monitor): bool => $hub === null
+            ? $monitor->collector_id === null
+            : (int) $monitor->collector_id === (int) $hub->id;
 
         $existing = Monitor::query()
             ->where('device_id', $device->id)
-            ->whereNull('collector_id')
             ->where('kind', MonitorKind::Icmp->value)
-            ->orderByDesc('is_enabled')
-            ->orderByDesc('affects_availability')
             ->orderBy('id')
+            ->get()
+            ->sortBy(fn (Monitor $monitor): array => [
+                $onSamePath($monitor) ? 0 : 1,
+                $monitor->is_enabled ? 0 : 1,
+                $monitor->affects_availability ? 0 : 1,
+                (int) $monitor->id,
+            ])
             ->first();
 
         if ($existing) {
-            $monitor = DB::transaction(function () use ($user, $existing, $profile, $rawTarget, $siteId): Monitor {
+            return DB::transaction(function () use ($user, $existing, $profile, $rawTarget, $siteId, $hub): Monitor {
                 $updated = $this->definitions->updateMonitor($user, $existing, [
                     'profile_id' => $existing->profile_id ?: $profile->id,
                     'name' => $existing->name ?: 'Offline check (ping)',
                     'target' => $rawTarget,
                     'affects_availability' => true,
+                    'collector_id' => $hub?->id,
                 ]);
 
                 if (! $updated->is_enabled) {
@@ -183,25 +279,16 @@ final class DeviceOfflineAlertController extends Controller
 
                 return $updated;
             }, 3);
-        } else {
-            $monitor = $this->definitions->createMonitor($user, $device, [
-                'profile_id' => $profile->id,
-                'kind' => MonitorKind::Icmp->value,
-                'name' => 'Offline check (ping)',
-                'target' => $rawTarget,
-                'affects_availability' => true,
-            ]);
         }
 
-        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
-            return response()->json([
-                'enabled' => true,
-                'monitor_id' => $monitor->id,
-                'message' => 'Offline alerts turned on for this device.',
-            ]);
-        }
-
-        return back()->with('success', 'Offline alerts turned on for this device.');
+        return $this->definitions->createMonitor($user, $device, [
+            'profile_id' => $profile->id,
+            'kind' => MonitorKind::Icmp->value,
+            'name' => 'Offline check (ping)',
+            'target' => $rawTarget,
+            'affects_availability' => true,
+            'collector_id' => $hub?->id,
+        ]);
     }
 
     /** @return list<string> */
@@ -234,18 +321,25 @@ final class DeviceOfflineAlertController extends Controller
         return array_values(array_unique($canonical));
     }
 
-    /** @param list<string> $addresses */
-    private function ensureHostScopeCoverage(User $actor, Site $site, array $addresses): void
+    /**
+     * Make sure a scan area on the Site allows pinging these addresses. For a hub check that
+     * is a server scan area or one of that hub's own; otherwise a server scan area.
+     *
+     * @param  list<string>  $addresses
+     */
+    private function ensureHostScopeCoverage(User $actor, Site $site, array $addresses, ?MonitoringCollector $hub = null): void
     {
-        $activeCentralScopes = DiscoveryScope::query()
+        $activeScopes = DiscoveryScope::query()
             ->where('site_id', $site->id)
-            ->whereNull('collector_id')
+            ->where(fn ($query) => $hub === null
+                ? $query->whereNull('collector_id')
+                : $query->whereNull('collector_id')->orWhere('collector_id', $hub->id))
             ->where('status', 'active')
             ->get();
 
         $uncoveredAddresses = array_values(array_filter(
             $addresses,
-            fn (string $address): bool => ! $activeCentralScopes->contains(
+            fn (string $address): bool => ! $activeScopes->contains(
                 fn (DiscoveryScope $scope): bool => $this->scopeCoversIcmpAddress($scope, $address),
             ),
         ));
@@ -259,15 +353,20 @@ final class DeviceOfflineAlertController extends Controller
             $uncoveredAddresses,
         );
 
+        $hostScopeName = $hub === null ? self::HOST_SCOPE_NAME : self::HOST_SCOPE_NAME." (hub {$hub->id})";
         $hostScope = DiscoveryScope::query()
             ->withTrashed()
             ->where('site_id', $site->id)
-            ->whereNull('collector_id')
-            ->where('name', self::HOST_SCOPE_NAME)
+            ->when(
+                $hub === null,
+                fn ($query) => $query->whereNull('collector_id'),
+                fn ($query) => $query->where('collector_id', $hub->id),
+            )
+            ->where('name', $hostScopeName)
             ->first();
 
         if ($hostScope) {
-            DB::transaction(function () use ($actor, $hostScope, $newCidrs): void {
+            DB::transaction(function () use ($actor, $hostScope, $newCidrs, $hub): void {
                 $locked = DiscoveryScope::query()
                     ->withTrashed()
                     ->whereKey($hostScope->id)
@@ -312,7 +411,8 @@ final class DeviceOfflineAlertController extends Controller
                 AuditLogger::logOrFail('monitoring.discovery.scope.updated', $locked, [
                     'actor_id' => (int) $actor->id,
                     'site_id' => (int) $locked->site_id,
-                    'collection_mode' => 'central_direct',
+                    'collection_mode' => $hub === null ? 'central_direct' : 'remote_collector',
+                    ...($hub === null ? [] : ['collector_id' => (int) $hub->id]),
                     'reason' => 'offline_alert_host_coverage',
                 ]);
             }, 3);
@@ -320,12 +420,13 @@ final class DeviceOfflineAlertController extends Controller
             return;
         }
 
-        $scopeName = self::HOST_SCOPE_NAME;
+        $scopeName = $hostScopeName;
         if (DiscoveryScope::query()->withTrashed()->where('site_id', $site->id)->where('name', $scopeName)->exists()) {
-            $scopeName = self::HOST_SCOPE_NAME.' (direct)';
+            $scopeName = $hostScopeName.($hub === null ? ' (direct)' : ' (offline checks)');
         }
 
         $this->definitions->createScope($actor, $site, [
+            'collector_id' => $hub?->id,
             'name' => $scopeName,
             'cidrs' => array_slice(array_values(array_unique($newCidrs)), 0, 64),
             'seed_hosts' => [],

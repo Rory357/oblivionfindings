@@ -359,7 +359,7 @@ function firstError(errors: Record<string, string | undefined>): string {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/dashboard' },
     { title: 'Security & Devices', href: '/security-devices' },
-    { title: 'Integrations', href: '/security-devices/integrations' },
+    { title: 'Integrations', href: '/security-devices/setup/services?tab=connected' },
     { title: 'Queclink', href: '/security-devices/integrations/queclink' },
 ];
 

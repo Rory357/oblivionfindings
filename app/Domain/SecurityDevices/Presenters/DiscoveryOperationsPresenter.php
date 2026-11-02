@@ -189,7 +189,9 @@ class DiscoveryOperationsPresenter
                 'port_bounds' => count($scope->port_bounds ?? []),
                 'max_targets_per_run' => (int) $scope->max_targets_per_run,
                 'packets_per_second' => (int) $scope->packets_per_second,
-                'schedule' => $scope->schedule_cron,
+                // Phase B daily hub scan; null shows "Not scheduled".
+                'schedule' => $scope->daily_scan_at === null ? null : "Every day at {$scope->daily_scan_at} (NZ time)",
+                'daily_scan_at' => $scope->daily_scan_at,
                 'actions' => [
                     'can_manage' => $canManageThisScope,
                     'update_url' => $canManageThisScope && $scope->status === 'active'

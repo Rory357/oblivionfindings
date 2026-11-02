@@ -7,7 +7,7 @@
  * The safe-use and wellbeing-access line and the source-repair note keep the code's wording; identifiable exposures
  * are never counted here.
  */
-import { CHEMICAL_EXPOSURES } from '@/lib/health-safety/chemical-exposure-navigation';
+import { CHEMICAL_EXPOSURES, exposureCaptureHref } from '@/lib/health-safety/chemical-exposure-navigation';
 import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
 import { RecordIdentity, RecordTable, type RecordTableColumn } from '@/components/incidents/record-table';
 import type { MenuItem } from '@/components/lists';
@@ -47,7 +47,10 @@ const SAFE_USE = 'Recorded checks help people work safely; they don’t prove a 
 
 export default function ChemicalRegister(props: ChemicalIndexProps) {
     const { filters, rows, hero, sites, can, tabCounts } = props;
-    const safetyCan = usePage<SharedData>().props.auth.can;
+    const page = usePage<SharedData>();
+    const safetyCan = page.props.auth.can;
+    // Opened from "Report something → A chemical got on or into someone": choosing a chemical records its exposure.
+    const recordingExposure = new URL(page.url, 'http://local').searchParams.get('record') === 'exposure';
     const exposures = props.exposure_summary;
     const summary = props.register_summary;
     const [search, setSearch] = useState(filters.q);
@@ -57,9 +60,11 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
         return chemicalReturn(`${CHEMICAL_REGISTER}${query.size ? `?${query}` : ''}`);
     };
     const returnTo = filtered({ ...filters, page: rows.current_page });
-    const go = (patch: Record<string, string | number | null>) => router.get(filtered({ ...filters, ...patch }), {}, { preserveState: true, preserveScroll: true });
-    const scopeHref = (tab: ChemicalTab, patch: Record<string, string | number> = {}) => filtered({ tab, site_id: filters.site_id, ...patch });
-    const recordHref = (row: ChemicalRegisterRow) => chemicalHref(row.id, { returnTo });
+    // Searching, changing view or page keeps the "choose the chemical" mode (the Back link never carries it).
+    const keep = (href: string) => recordingExposure ? `${href}${href.includes('?') ? '&' : '?'}record=exposure` : href;
+    const go = (patch: Record<string, string | number | null>) => router.get(keep(filtered({ ...filters, ...patch })), {}, { preserveState: true, preserveScroll: true });
+    const scopeHref = (tab: ChemicalTab, patch: Record<string, string | number> = {}) => keep(filtered({ tab, site_id: filters.site_id, ...patch }));
+    const recordHref = (row: ChemicalRegisterRow) => recordingExposure ? exposureCaptureHref(row.id, returnTo) : chemicalHref(row.id, { returnTo });
     const createHref = `${CHEMICAL_REGISTER}/create?return_to=${encodeURIComponent(returnTo)}`;
     const damaged = (row: ChemicalRegisterRow) => row.source_integrity === 'repair_required';
     const actions = (row: ChemicalRegisterRow): MenuItem[] => [{ label: damaged(row) ? 'Review chemical source' : 'Open chemical record', icon: Eye, onClick: () => router.get(recordHref(row)) }];
@@ -74,9 +79,9 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
         { key: 'storage', label: 'Storage locations', nowrap: true, cell: (row) => row.storage_count ?? <span className="text-muted-foreground">Not available</span> },
     ];
     const pages = [rows.current_page - 1, rows.current_page, rows.current_page + 1].filter((page) => page > 0 && page <= rows.last_page);
-    const links = [{ url: rows.current_page > 1 ? filtered({ ...filters, page: rows.current_page - 1 }) : null, label: '&laquo; Previous', active: false },
-        ...pages.map((page) => ({ url: filtered({ ...filters, page }), label: String(page), active: page === rows.current_page })),
-        { url: rows.current_page < rows.last_page ? filtered({ ...filters, page: rows.current_page + 1 }) : null, label: 'Next &raquo;', active: false }];
+    const links = [{ url: rows.current_page > 1 ? keep(filtered({ ...filters, page: rows.current_page - 1 })) : null, label: '&laquo; Previous', active: false },
+        ...pages.map((page) => ({ url: keep(filtered({ ...filters, page })), label: String(page), active: page === rows.current_page })),
+        { url: rows.current_page < rows.last_page ? keep(filtered({ ...filters, page: rows.current_page + 1 })) : null, label: 'Next &raquo;', active: false }];
     const from = rows.data.length ? (rows.current_page - 1) * rows.per_page + 1 : 0; const to = from ? from + rows.data.length - 1 : 0;
     const narrowed = Boolean(filters.q || filters.site_id || filters.physical_form || filters.status || filters.controlled || filters.sds_state);
     const footer: ReactNode = <>
@@ -129,6 +134,7 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
                 // Views carry no href, so the strip renders its own buttons.
                 renderLink={() => null} />}>
             <div id="chemical-register-panel" role="tabpanel" aria-label={TABLE_TITLE[filters.tab] ?? 'Chemicals'} className="grid min-w-0 gap-5">
+                {recordingExposure && <div role="status"><Note>Choose the chemical it was. Its “Record an exposure” form opens next.</Note></div>}
                 {props.source_integrity === 'repair_required' && <div role="status"><Note tone="warning">Some source history needs review. Those records remain visible with their details and changes withheld. A missing measure is unconfirmed.</Note></div>}
                 {summary ? <RegisterBlocks
                     lead={<LeadBlock sub="SDS reviews overdue first" rows={lead} empty={summary.lead_total === null ? 'These counts can’t be confirmed until the damaged records are fixed.' : 'No SDS reviews are overdue and every active chemical has a current sheet.'}

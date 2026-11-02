@@ -477,6 +477,11 @@ export interface PlaceCardItem {
     flag?: ReactNode;
     facts?: { tone: SgTone; text: ReactNode }[];
     href?: string;
+    /** The card's menu: a kebab in its corner, and the same items on right-click (DESIGN.md entity rows). */
+    menu?: MenuItem[];
+    onContextMenu?: (event: MouseEvent<HTMLElement>) => void;
+    /** Stable identity when two places could share a name. */
+    id?: string | number;
 }
 
 /** Places (or options, registers) as cards: name, one flag, facts read by their rings. */
@@ -508,7 +513,7 @@ export function PlaceCards({ title, sub, action, cols = 3, items, lines = false 
                         </>
                     );
                     return (
-                        <li key={p.name} className="sg-surface sg-place">
+                        <li key={p.id ?? p.name} className={cn('sg-surface sg-place', p.menu?.length && 'relative pr-10')} onContextMenu={p.onContextMenu}>
                             {p.href ? (
                                 <Link href={p.href} className="grid gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     {body}
@@ -516,6 +521,9 @@ export function PlaceCards({ title, sub, action, cols = 3, items, lines = false 
                             ) : (
                                 body
                             )}
+                            {p.menu?.length ? (
+                                <EntityKebab actions={p.menu} label={`Actions for ${p.name}`} className="absolute top-3 right-2" />
+                            ) : null}
                         </li>
                     );
                 })}

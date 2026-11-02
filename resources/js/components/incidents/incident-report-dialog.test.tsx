@@ -1361,7 +1361,7 @@ describe('IncidentReportDialog — "Straight away" (decision 18)', () => {
         ).toBe(false);
         openReviewStep();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Submit incident' }),
+            screen.getByRole('button', { name: 'Submit near miss' }),
         );
         expect(postedPayload().immediate_response).toEqual([]);
     });

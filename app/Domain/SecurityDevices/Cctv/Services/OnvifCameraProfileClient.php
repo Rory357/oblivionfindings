@@ -968,7 +968,31 @@ final class OnvifCameraProfileClient
      *     ptz_path?: string
      * }
      */
-    private function authoriseCameraEndpoint(Device $device): array
+    /**
+     * S&D Phase E (R5): the camera's ONVIF address for the Site hub. The same address, Site scope and
+     * port checks as the server's own path; the hub reads the certificate itself, so it is not
+     * checked here.
+     *
+     * @return array<string, mixed>
+     */
+    public function authoriseHubEndpoint(Device $device): array
+    {
+        return $this->authoriseCameraEndpoint($device, checkCertificate: false);
+    }
+
+    /** S&D Phase E (R5): whether the Site has a saved camera login for this camera. */
+    public function hasCameraCredential(Device $device, int $siteId): bool
+    {
+        return $this->credentialReference($device, $siteId) !== null;
+    }
+
+    /** S&D Phase E (R5): the camera login lease, sealed to the Site hub for the hub route. */
+    public function acquireCameraCredentialForHub(Device $device, int $siteId): ?CredentialLease
+    {
+        return $this->acquireOptionalCredential($device, $siteId);
+    }
+
+    private function authoriseCameraEndpoint(Device $device, bool $checkCertificate = true): array
     {
         $rawIp = trim((string) ($device->ip_address ?? ''));
         if ($rawIp === '') {
@@ -1044,7 +1068,7 @@ final class OnvifCameraProfileClient
         // Phase A, item A5: an https camera gets no password until its certificate is publicly valid
         // or someone has trusted it ("Trust this camera?"); later requests accept only the trusted key.
         $tlsPin = null;
-        if ($scheme === 'https') {
+        if ($scheme === 'https' && $checkCertificate) {
             $gate = app(CameraEndpointTrustService::class)->gate($siteId, $canonicalIp, $port);
             if (! $gate['ok']) {
                 return [
@@ -1083,6 +1107,8 @@ final class OnvifCameraProfileClient
             'reason_code' => 'authorised',
             'message' => 'Camera ONVIF endpoint authorised.',
             'ip' => $canonicalIp,
+            'port' => $port,
+            'scheme' => $scheme,
             'site_id' => $siteId,
             'base_url' => $baseUrl,
             'device_path' => $devicePath,
@@ -1208,29 +1234,7 @@ final class OnvifCameraProfileClient
 
     private function acquireOptionalCredential(Device $device, int $siteId): ?CredentialLease
     {
-        $providers = array_values(array_unique(array_filter([
-            strtolower(trim((string) $device->provider)),
-            strtolower(trim((string) $device->manufacturer)),
-            'onvif',
-            'hikvision',
-            'dahua',
-            'uniview',
-            'axis',
-            'hanwha',
-        ])));
-
-        $reference = CredentialReference::query()
-            ->where('site_id', $siteId)
-            ->whereIn('provider', $providers)
-            ->whereIn('purpose', ['device_management', 'monitoring'])
-            ->where('status', CredentialReferenceStatus::Active->value)
-            ->whereNotIn('rotation_status', [
-                CredentialRotationStatus::Overdue->value,
-                CredentialRotationStatus::Failed->value,
-            ])
-            ->orderByDesc('id')
-            ->first();
-
+        $reference = $this->credentialReference($device, $siteId);
         if (! $reference) {
             return null;
         }
@@ -1245,6 +1249,32 @@ final class OnvifCameraProfileClient
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function credentialReference(Device $device, int $siteId): ?CredentialReference
+    {
+        $providers = array_values(array_unique(array_filter([
+            strtolower(trim((string) $device->provider)),
+            strtolower(trim((string) $device->manufacturer)),
+            'onvif',
+            'hikvision',
+            'dahua',
+            'uniview',
+            'axis',
+            'hanwha',
+        ])));
+
+        return CredentialReference::query()
+            ->where('site_id', $siteId)
+            ->whereIn('provider', $providers)
+            ->whereIn('purpose', ['device_management', 'monitoring'])
+            ->where('status', CredentialReferenceStatus::Active->value)
+            ->whereNotIn('rotation_status', [
+                CredentialRotationStatus::Overdue->value,
+                CredentialRotationStatus::Failed->value,
+            ])
+            ->orderByDesc('id')
+            ->first();
     }
 
     /**

@@ -101,6 +101,8 @@ class UnifiOperationalBridgeService
                     'model_long' => $payload['model'] ?? $payload['model_long_name'] ?? null,
                     'product_line' => $productLine !== '' ? $productLine : null,
                     'firmware_status' => $payload['firmwareStatus'] ?? null,
+                    // S&D Phase G (pg-sdr-2d): the version UniFi says is ready ("updateAvailable"), if any.
+                    'firmware_update_version' => is_scalar($payload['updateAvailable'] ?? null) ? (string) $payload['updateAvailable'] : null,
                     'uptime' => $payload['uptime'] ?? null,
                     'experience_score' => $payload['satisfaction'] ?? null,
                     'host_id' => $payload['_resolved_host_id'] ?? null,
@@ -615,11 +617,20 @@ class UnifiOperationalBridgeService
     {
         $lower = strtolower($typeOrModel);
 
+        // S&D rebuild (MASTER, 2 Nov): models the sync didn't know were filed as facilities and showed
+        // as Sensors. UniFi Express (UX, UX7), Dream Router/Wall and the older Security Gateway are
+        // gateways; the older US-/USL/USM switch codes are switches.
         return match (true) {
             str_starts_with($lower, 'udm'),
-            str_starts_with($lower, 'uxg'),
+            str_starts_with($lower, 'udr'),
+            str_starts_with($lower, 'udw'),
+            str_starts_with($lower, 'ux'),
+            str_starts_with($lower, 'usg'),
             str_starts_with($lower, 'ucg') => LocationHardware::CATEGORY_GATEWAY,
-            str_starts_with($lower, 'usw') => LocationHardware::CATEGORY_SWITCH,
+            str_starts_with($lower, 'usw'),
+            str_starts_with($lower, 'us-'),
+            str_starts_with($lower, 'usl'),
+            str_starts_with($lower, 'usm') => LocationHardware::CATEGORY_SWITCH,
             str_starts_with($lower, 'uap'),
             str_starts_with($lower, 'u6'),
             str_starts_with($lower, 'u7') => LocationHardware::CATEGORY_AP,

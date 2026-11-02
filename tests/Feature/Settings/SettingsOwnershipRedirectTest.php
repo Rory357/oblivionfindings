@@ -32,7 +32,7 @@ class SettingsOwnershipRedirectTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/settings/integrations')
             ->assertStatus(301)
-            ->assertRedirect('/security-devices/integrations');
+            ->assertRedirect('/security-devices/setup/services?tab=connected');
     }
 
     public function test_settings_users_redirects_to_system_users(): void

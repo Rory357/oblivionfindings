@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\Monitoring\Discovery\Models\DiscoveryCandidate;
 use App\Domain\Monitoring\Discovery\Services\DiscoveryCandidateService;
+use App\Domain\SecurityDevices\Alerts\WatchNewDevices;
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Models\Device;
@@ -64,15 +65,20 @@ final class DiscoveryCandidateReviewController extends Controller
             ]);
         }
 
+        // S&D Phase D: watched for going offline as soon as it's added (Setup › Alerts & checks › Checks).
+        $watched = app(WatchNewDevices::class)->watch($user, [$device]) === 1;
+        $message = "Added {$device->name} to Devices.".($watched ? ' It’s watched for going offline.' : '');
+
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return response()->json([
                 'device_id' => $device->id,
                 'name' => $device->name,
-                'message' => "Added {$device->name} to Devices.",
+                'watched' => $watched,
+                'message' => $message,
             ]);
         }
 
-        return back()->with('success', "Added {$device->name} to Devices.");
+        return back()->with('success', $message);
     }
 
     public function sameAs(Request $request, DiscoveryCandidate $candidate): RedirectResponse|JsonResponse
@@ -162,13 +168,16 @@ final class DiscoveryCandidateReviewController extends Controller
         }
 
         $count = $adopted->count();
+        $watched = $count === 0 ? 0 : app(WatchNewDevices::class)->watch($user, $adopted);
         $message = $count === 0
             ? 'No unreviewed candidates were waiting to be added.'
-            : "Added {$count} ".($count === 1 ? 'device' : 'devices').' to Devices.';
+            : "Added {$count} ".($count === 1 ? 'device' : 'devices').' to Devices.'
+                .($watched > 0 ? " {$watched} ".($watched === 1 ? 'is' : 'are').' watched for going offline.' : '');
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return response()->json([
                 'adopted_count' => $count,
+                'watched_count' => $watched,
                 'device_ids' => $adopted->pluck('id')->values()->all(),
                 'message' => $message,
             ]);

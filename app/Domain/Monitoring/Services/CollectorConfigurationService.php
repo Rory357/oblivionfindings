@@ -9,10 +9,12 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
+use App\Domain\SecurityDevices\Hubs\Exceptions\HubAwaitingApproval;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
-use App\Domain\SecurityDevices\Management\Services\UnifiAccessCollectorCommandDescriptor;
+use App\Domain\SecurityDevices\Iot\Relay\Models\SensorGatewayLogin;
+use App\Domain\SecurityDevices\Management\Services\CollectorCommandDescriptorRegistry;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +27,7 @@ final readonly class CollectorConfigurationService
         private CredentialLeaseProvider $credentials,
         private CollectorCredentialLeaseSealer $credentialSealer,
         private DiscoveryRunner $discovery,
-        private UnifiAccessCollectorCommandDescriptor $collectorCommands,
+        private CollectorCommandDescriptorRegistry $collectorCommands,
     ) {}
 
     public function signedEnvelope(MonitoringCollector $collector, int $afterSequence): string
@@ -39,6 +41,10 @@ final readonly class CollectorConfigurationService
             if ($locked->revoked_at !== null || $locked->status === 'revoked'
                 || ! is_string($locked->public_key) || ! is_string($locked->client_certificate_fingerprint)) {
                 throw new DomainException('Collector is unavailable.');
+            }
+            if ($locked->approved_at === null) {
+                // No work and no sealed logins until an admin approves the hub.
+                throw new HubAwaitingApproval;
             }
             if ($afterSequence > (int) $locked->configuration_sequence) {
                 throw new DomainException('Collector configuration checkpoint is ahead of central state.');
@@ -159,12 +165,15 @@ final readonly class CollectorConfigurationService
                     $request = $attempt->request;
                     if ($request === null
                         || $request->expires_at?->isPast()
-                        || (int) $request->site_id !== (int) $locked->site_id
+                        // The hub that covers the Site runs it: its home Site or one it covers over SD-WAN.
+                        || ! in_array((int) $request->site_id, $locked->authorisedSiteIds(), true)
                         || (int) $request->collector_id !== (int) $locked->id) {
                         return;
                     }
                     try {
-                        $command = $this->collectorCommands->build($request, $attempt, $locked);
+                        $descriptor = $this->collectorCommands->for((string) $request->capability)
+                            ?? throw new RuntimeException('No hub job is declared for this capability.');
+                        $command = $descriptor->build($request, $attempt, $locked);
                     } catch (\Throwable) {
                         return;
                     }
@@ -178,8 +187,81 @@ final readonly class CollectorConfigurationService
                     $commands[] = $command;
                 });
 
-            if ($checks === [] && $discoveryRuns === [] && $commands === []) {
+            // S&D Phase B (D21): the sensor gateways whose readings this hub relays. Hashes only.
+            // Phase E (D22): the relay is unencrypted MQTT on the house network, so it runs only when
+            // Setup allows unencrypted MQTT (off by default, flagged when on), and never for a Site
+            // whose address range another Site also uses.
+            $relaySettings = app(\App\Domain\SecurityDevices\Setup\SecurityDevicesSettings::class);
+            $relaySites = $relaySettings->bool(\App\Domain\SecurityDevices\Setup\SecurityDevicesSettings::MQTT_PLAIN)
+                ? array_values(array_diff($locked->authorisedSiteIds(), \App\Domain\SecurityDevices\Iot\Relay\Services\SensorRelaySites::clashing()))
+                : [];
+            $relayLogins = $relaySites === [] ? [] : SensorGatewayLogin::query()
+                ->active()
+                ->whereIn('site_id', $relaySites)
+                ->orderBy('id')
+                ->limit(256)
+                ->get(['username', 'password_hash', 'site_id', 'topic_prefix'])
+                ->map(fn (SensorGatewayLogin $login): array => [
+                    'username' => (string) $login->username,
+                    'password_hash' => (string) $login->password_hash,
+                    'site_id' => (int) $login->site_id,
+                    'topic_prefix' => (string) $login->topic_prefix,
+                ])
+                ->values()
+                ->all();
+
+            // Phase E (E5): the encrypted relay (TLS on 8883), for hubs that run it and hold a relay
+            // certificate from the sensors authority. Encrypted is the default, so it needs no switch.
+            $tlsRelay = null;
+            $sensorsAuthority = app(\App\Domain\SecurityDevices\Iot\Relay\Services\SensorsCertificateAuthority::class);
+            $relayCertificate = \App\Domain\SecurityDevices\Management\Services\HubJobTypes::runs($locked, \App\Domain\SecurityDevices\Iot\Relay\Services\SensorsCertificateAuthority::HUB_FEATURE)
+                ? $sensorsAuthority->currentFor($locked)
+                : null;
+            if ($relayCertificate !== null) {
+                $tlsLogins = SensorGatewayLogin::query()
+                    ->active()
+                    ->whereIn('site_id', $locked->authorisedSiteIds())
+                    ->orderBy('id')
+                    ->limit(256)
+                    ->get(['username', 'password_hash', 'site_id', 'topic_prefix'])
+                    ->map(fn (SensorGatewayLogin $login): array => [
+                        'username' => (string) $login->username,
+                        'password_hash' => (string) $login->password_hash,
+                        'site_id' => (int) $login->site_id,
+                        'topic_prefix' => (string) $login->topic_prefix,
+                    ])
+                    ->values()
+                    ->all();
+                if ($tlsLogins !== []) {
+                    $tlsRelay = [
+                        'listen_port' => 8883,
+                        'max_payload_bytes' => 65_536,
+                        'logins' => $tlsLogins,
+                        'certificate' => (string) $relayCertificate->certificate_pem,
+                        'ca_certificate' => $sensorsAuthority->certificate(),
+                    ];
+                }
+            }
+
+            // S&D Phase H: UniFi Access consoles this hub keeps in step (read only; hubs that run it only).
+            $unifiAccess = app(\App\Domain\SecurityDevices\Access\UnifiAccessSync::class)->hubSection($locked);
+
+            if ($checks === [] && $discoveryRuns === [] && $commands === [] && $relayLogins === [] && $tlsRelay === null && $unifiAccess === null) {
                 throw new DomainException('Collector has no executable work in its approved Site scope.');
+            }
+            if ($relayLogins !== []) {
+                // The hub runs its relay only when the signed scope says so.
+                $protocols[] = 'sensor_relay';
+            }
+            if ($tlsRelay !== null) {
+                $protocols[] = 'sensor_relay_tls';
+            }
+            if ($unifiAccess !== null) {
+                $protocols[] = 'unifi_access';
+            }
+            // S&D Phase I (pop-up 97): read-only network checks, only for hubs that run them.
+            if (\App\Domain\SecurityDevices\Management\Services\HubJobTypes::runs($locked, \App\Domain\SecurityDevices\NetworkChecks\NetworkChecks::HUB_FEATURE)) {
+                $protocols[] = 'network_checks';
             }
             $maximumChecks = max(1, min(10_000, (int) config(
                 'monitoring.collector.max_checks_per_configuration',
@@ -219,6 +301,21 @@ final readonly class CollectorConfigurationService
             }
             if ($commands !== []) {
                 $payload['commands'] = $commands;
+            }
+            if ($relayLogins !== []) {
+                $payload['sensor_relay'] = [
+                    'listen_port' => 1883,
+                    'max_payload_bytes' => 65_536,
+                    'logins' => $relayLogins,
+                ];
+            }
+            if ($tlsRelay !== null) {
+                // A new section: older hubs ignore it, and only hubs that run it are sent it.
+                $payload['sensor_relay_tls'] = $tlsRelay;
+            }
+            if ($unifiAccess !== null) {
+                // A new section: older hubs ignore it, and only hubs that run it are sent it.
+                $payload['unifi_access'] = $unifiAccess;
             }
             $json = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
             $secret = $this->signingSecretKey();

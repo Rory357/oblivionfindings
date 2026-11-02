@@ -1905,15 +1905,19 @@ class DeviceProfilePresenter
         ?int $canonicalSiteId,
     ): array {
         $canManage = $viewer->canDo('securityDevices.monitoring.manage');
+        // The ping check runs on the server, or on a hub that is approved and not removed (S&D Phase B).
         $activeMonitor = $device->relationLoaded('monitors')
-            ? $monitors->first(fn (Monitor $monitor): bool => $monitor->collector_id === null
+            ? $monitors->first(fn (Monitor $monitor): bool => ($monitor->collector_id === null
+                    || ($monitor->collector?->isApprovedForWork() ?? false))
                 && ($monitor->kind?->value ?? (string) $monitor->kind) === MonitorKind::Icmp->value
                 && (bool) $monitor->affects_availability
                 && (bool) $monitor->is_enabled)
             : ($canManage
                 ? Monitor::query()
                     ->where('device_id', $device->id)
-                    ->whereNull('collector_id')
+                    ->where(fn ($query) => $query
+                        ->whereNull('collector_id')
+                        ->orWhereHas('collector', fn ($hub) => $hub->whereNotNull('approved_at')->whereNull('revoked_at')))
                     ->where('kind', MonitorKind::Icmp->value)
                     ->where('affects_availability', true)
                     ->where('is_enabled', true)
