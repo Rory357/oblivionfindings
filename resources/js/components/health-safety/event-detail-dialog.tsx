@@ -1613,7 +1613,14 @@ function reviewHeaderActions(
                 ? `Closure blocked: ${blockers.map((requirement) => requirement.label).join(' ')}`
                 : undefined,
         });
-    else if (canReviewClosureExceptions)
+    else if (
+        canReviewClosureExceptions &&
+        d.closure_exceptions.some(
+            (exception) =>
+                exception.status === 'pending' &&
+                (exception.can_decide ?? true),
+        )
+    )
         items.push({
             key: 'exception',
             label: 'Review a close-anyway request',
@@ -1701,8 +1708,8 @@ function SafetyReviewPage({
     const activity = useReviewActivity(d.id, true, d);
     const viewer = (usePage().props as { auth?: { user?: { id?: number; name?: string } } }).auth?.user;
     const viewerName = viewer?.name ?? null;
-    // Board M8: adding an action, telling WorkSafe and an ordinary close open as kit pop-ups over the page; every
-    // other step (and a close that still needs "close anyway") keeps its pane.
+    // Board M8: adding an action, telling WorkSafe, recording the WorkSafe decision and closing open as kit pop-ups
+    // over the page — one close UI whether opened from the Progress button, More, or an ?action=close link.
     // An approved, current "close anyway" that covers every item left (the same test as the close pane).
     const nowMs = Date.now();
     const exceptionalLeft = d.close_readiness.exceptional_blockers;
@@ -1717,13 +1724,12 @@ function SafetyReviewPage({
                   exceptionalLeft.every((blocker) => exception.scope.includes(blocker.key)),
           )
         : undefined;
-    const closeReady = d.can.close && d.close_readiness.hard_blockers.length === 0 && (exceptionalLeft.length === 0 || !!authorising);
     const dialogPane =
         pane &&
         (pane.kind === 'ca_add' ||
             pane.kind === 'worksafe_notify' ||
             pane.kind === 'worksafe_decision' ||
-            (pane.kind === 'close' && closeReady))
+            pane.kind === 'close')
             ? pane
             : null;
     // M12: one request covers one item, so "Ask to close anyway" is offered only when exactly one is left.
@@ -2054,20 +2060,26 @@ function SafetyReviewPage({
             <AskCloseAnywayDialog open={askOpen} onClose={() => setAskOpen(false)} onDone={() => setAskOpen(false)} d={d} />
             {pendingException?.can_decide ? (
                 <DecideCloseAnywayDialog
-                    open={deciding}
-                    onClose={() => setDeciding(false)}
+                    open={deciding || (dialogPane?.kind === 'close' && !d.can.close)}
+                    onClose={() => {
+                        setDeciding(false);
+                        if (dialogPane?.kind === 'close' && !d.can.close) onPane(null);
+                    }}
                     d={d}
                     exception={pendingException}
                     viewerName={viewerName}
                 />
             ) : null}
             <CloseReviewDialog
-                open={dialogPane?.kind === 'close'}
+                open={dialogPane?.kind === 'close' && (d.can.close || !pendingException?.can_decide)}
                 onClose={() => onPane(null)}
                 onDone={onPaneDone}
                 d={d}
+                reviewTitle={safetyReviewTitle(d)}
                 exceptionId={authorising?.id ?? null}
+                exceptionReviewAt={authorising?.review_at ?? null}
                 incidentCloser={d.source?.type === 'ClientIncident' ? `a manager at ${d.site?.name ?? 'the site'}` : null}
+                onAskCloseAnyway={canAskCloseAnyway ? () => setAskOpen(true) : null}
             />
             {correcting ? (
                 <CorrectFindingsDialog

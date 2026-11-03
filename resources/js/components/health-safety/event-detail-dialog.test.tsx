@@ -2930,4 +2930,99 @@ describe('G3 safety review page: the ways through rules 1 and 2', () => {
             }),
         ).toBeInTheDocument();
     });
+
+    it('opens the single 480 close pop-up from both ?action=close links and the Progress button, ready or blocked (P8)', () => {
+        const blockedDetail = eventDetail({
+            handover: owned,
+            worksafe: { decision_signed: true, notifiable: false },
+            close_gate: {
+                allowed: false,
+                requirements: [
+                    {
+                        key: 'worksafe_decision',
+                        complete: true,
+                        label: 'WorkSafe decision recorded',
+                        href: '/health-safety/events/17?action=worksafe-decision',
+                    },
+                    {
+                        key: 'hs_investigation',
+                        complete: false,
+                        label: 'Complete the required investigation before closing this event.',
+                        href: '/health-safety/events/17?action=investigation',
+                    },
+                ],
+            },
+            next_step: {
+                key: 'close',
+                label: 'Close the safety review',
+                can: true,
+                who: '',
+            },
+            can: {
+                manage: true,
+                close: true,
+                request_closure_exception: true,
+                approve_closure_exception: false,
+                manage_corrective_action_lifecycle: true,
+                verify_corrective_actions: true,
+            },
+        } as EventDetailOverrides);
+
+        // 1. Arriving via an ?action=close link while blocked opens the 480 pop-up kit, never an inline panel.
+        const { unmount } = render(
+            <EventRecordWorkspace detail={blockedDetail} initialAction="close" />,
+        );
+        expect(screen.queryByRole('region', { name: 'Current safety review action' })).not.toBeInTheDocument();
+        const blockedPopup = screen.getByTestId('close-review-dialog');
+        expect(blockedPopup).toHaveAttribute('data-popup-size', 'sm');
+        expect(within(blockedPopup).getByText('Close this safety review')).toBeInTheDocument();
+        expect(
+            within(blockedPopup).getByRole('link', {
+                name: 'Complete the required investigation before closing this event.',
+            }),
+        ).toHaveAttribute('href', '/health-safety/events/17?action=investigation');
+        expect(within(blockedPopup).getByText(/Finish what’s open or get “close anyway” approved\./)).toBeInTheDocument();
+        expect(within(blockedPopup).getByRole('button', { name: 'Close safety review' })).toBeDisabled();
+        expect(within(blockedPopup).getByRole('button', { name: 'Ask to close anyway…' })).toBeInTheDocument();
+        unmount();
+
+        // 2. Clicking the Progress next-step button opens the exact same 480 pop-up kit and posts closure when ready.
+        const readyDetail = eventDetail({
+            handover: owned,
+            worksafe: { decision_signed: true, notifiable: false },
+            close_gate: {
+                allowed: true,
+                requirements: [
+                    {
+                        key: 'worksafe_decision',
+                        complete: true,
+                        label: 'WorkSafe decision recorded',
+                        href: '/health-safety/events/17?action=worksafe-decision',
+                    },
+                ],
+            },
+            next_step: {
+                key: 'close',
+                label: 'Close the safety review',
+                can: true,
+                who: '',
+            },
+        } as EventDetailOverrides);
+
+        render(<EventRecordWorkspace detail={readyDetail} />);
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        fireEvent.click(within(progress).getByRole('button', { name: 'Close safety review' }));
+
+        expect(screen.queryByRole('region', { name: 'Current safety review action' })).not.toBeInTheDocument();
+        const readyPopup = screen.getByTestId('close-review-dialog');
+        expect(readyPopup).toHaveAttribute('data-popup-size', 'sm');
+        fireEvent.change(within(readyPopup).getByLabelText(/What did we learn\?/), {
+            target: { value: 'Non-slip backing fitted on all lounge rugs.' },
+        });
+        fireEvent.click(within(readyPopup).getByRole('button', { name: 'Close safety review' }));
+        expect(inertia.post).toHaveBeenCalledWith('/health-safety/events/17/close', {
+            closure_summary: 'Non-slip backing fitted on all lounge rugs.',
+            exception_id: '',
+        });
+    });
 });
