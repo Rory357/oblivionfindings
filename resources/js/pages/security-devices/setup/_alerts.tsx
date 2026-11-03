@@ -121,7 +121,7 @@ function QuietHoursGroup({ draft }: { draft: SettingsDraft }) {
                 control={
                     canEditTimes ? (
                         <div className="flex flex-wrap items-center gap-2">
-                            <div className="w-36">
+                            <div className="w-44">
                                 <TimePicker
                                     id="setting-quiet-hours-start"
                                     label="Quiet hours start"
@@ -131,7 +131,7 @@ function QuietHoursGroup({ draft }: { draft: SettingsDraft }) {
                                 />
                             </div>
                             <span className="text-sm text-muted-foreground">until</span>
-                            <div className="w-36">
+                            <div className="w-44">
                                 <TimePicker
                                     id="setting-quiet-hours-end"
                                     label="Quiet hours end"
