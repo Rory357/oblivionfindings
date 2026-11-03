@@ -82,7 +82,6 @@ final class PpeCommandConcurrencyTest extends PpeCommandTestCase
         $token = (string) Str::uuid(); $go = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-ppe-go-'.$token;
         $ready = []; $processes = [];
         try {
-            $connection->beginTransaction(); PpeInventory::whereKey($item->id)->lockForUpdate()->firstOrFail();
             foreach ($jobs as $index => $job) {
                 $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-ppe-ready-'.$token.'-'.$index; $ready[] = $path;
                 $config = $connection->getConfig();
@@ -94,14 +93,33 @@ final class PpeCommandConcurrencyTest extends PpeCommandTestCase
                         'DB_PASSWORD' => $config['password'], 'CACHE_STORE' => 'array', 'QUEUE_CONNECTION' => 'sync', 'SESSION_DRIVER' => 'array']);
                 $process->setTimeout(60); $process->start(); $processes[] = $process;
             }
-            $deadline = microtime(true) + 30;
+            $deadline = microtime(true) + 45;
             while (count(array_filter($ready, 'is_file')) !== count($ready)) {
-                foreach ($processes as $process) { if (! $process->isRunning()) { throw new RuntimeException('PPE worker exited before the ready barrier.'); } }
+                foreach ($processes as $process) { if (! $process->isRunning()) { throw new RuntimeException('PPE worker exited before the ready barrier: '.$process->getErrorOutput()); } }
                 if (microtime(true) >= $deadline) { throw new RuntimeException('PPE ready barrier timed out.'); }
                 usleep(10000);
             }
-            touch($go); usleep(250000);
-            foreach ($processes as $process) { $this->assertTrue($process->isRunning(), 'PPE command bypassed its held root lock.'); }
+            $connection->beginTransaction();
+            PpeInventory::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            $holder = (int) $connection->selectOne('SELECT CONNECTION_ID() AS id')->id;
+            touch($go);
+            $deadline = microtime(true) + 30;
+            while (true) {
+                foreach ($processes as $process) { $this->assertTrue($process->isRunning(), 'PPE command bypassed its held root lock: '.$process->getErrorOutput()); }
+                $waiting = (int) $connection->selectOne("SELECT COUNT(DISTINCT rt.PROCESSLIST_ID) AS c
+                    FROM performance_schema.data_lock_waits w
+                    JOIN performance_schema.threads rt ON rt.THREAD_ID = w.REQUESTING_THREAD_ID
+                    JOIN performance_schema.threads bt ON bt.THREAD_ID = w.BLOCKING_THREAD_ID
+                    JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID
+                    WHERE l.OBJECT_SCHEMA = DATABASE() AND l.OBJECT_NAME = 'ppe_inventory' AND bt.PROCESSLIST_ID = ?", [$holder])->c;
+                if ($waiting === count($jobs)) {
+                    break;
+                }
+                if (microtime(true) >= $deadline) {
+                    throw new RuntimeException('PPE workers did not converge on the held ppe_inventory lock.');
+                }
+                usleep(10000);
+            }
             $connection->commit(); $results = [];
             foreach ($processes as $process) {
                 $process->wait(); $this->assertTrue($process->isSuccessful(), $process->getErrorOutput());
@@ -154,17 +172,32 @@ final class PpeCommandConcurrencyTest extends PpeCommandTestCase
                         'DB_PASSWORD' => $config['password'], 'CACHE_STORE' => 'array', 'QUEUE_CONNECTION' => 'sync', 'SESSION_DRIVER' => 'array']);
                 $process->setTimeout(70); $process->start(); $processes[] = $process;
             }
-            $deadline = microtime(true) + 30;
+            $deadline = microtime(true) + 45;
             while (count(array_filter($ready, 'is_file')) !== 2) {
                 foreach ($processes as $process) { if (! $process->isRunning()) { throw new RuntimeException('First-claim worker exited before readiness: '.$process->getErrorOutput()); } }
                 if (microtime(true) >= $deadline) { throw new RuntimeException('First-claim ready barrier timed out.'); } usleep(10000);
             }
-            touch($go); $deadline = microtime(true) + 30;
+            touch($go); $deadline = microtime(true) + 45;
             while (count(array_filter($claimed, 'is_file')) === 0) {
                 foreach ($processes as $process) { if (! $process->isRunning()) { throw new RuntimeException('First-claim worker exited before unique insertion: '.$process->getErrorOutput()); } }
                 if (microtime(true) >= $deadline) { throw new RuntimeException('First unique claim timed out.'); } usleep(10000);
             }
-            usleep(250000);
+            $deadline = microtime(true) + 30;
+            while (true) {
+                foreach ($processes as $process) { $this->assertTrue($process->isRunning(), 'Both genuinely concurrent intents must remain pending at the first-claim barrier: '.$process->getErrorOutput()); }
+                $waiting = (int) $connection->selectOne("SELECT COUNT(DISTINCT rt.PROCESSLIST_ID) AS c
+                    FROM performance_schema.data_lock_waits w
+                    JOIN performance_schema.threads rt ON rt.THREAD_ID = w.REQUESTING_THREAD_ID
+                    JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID
+                    WHERE l.OBJECT_SCHEMA = DATABASE() AND l.OBJECT_NAME = 'ppe_command_intent_claims'")->c;
+                if ($waiting >= 1) {
+                    break;
+                }
+                if (microtime(true) >= $deadline) {
+                    throw new RuntimeException('Second PPE intent worker did not reach the ppe_command_intent_claims unique lock wait.');
+                }
+                usleep(10000);
+            }
             $this->assertSame(1, count(array_filter($claimed, 'is_file')), 'Only the unique insert winner reaches the held pre-receipt barrier.');
             foreach ($processes as $process) { $this->assertTrue($process->isRunning(), 'Both genuinely concurrent intents must remain pending at the first-claim barrier.'); }
             $this->assertSame(0, PpeCommandReceipt::where('idempotency_key', $key)->count());

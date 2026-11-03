@@ -15,6 +15,7 @@ use App\Services\HealthSafety\HsRiskAssessmentService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class HsLegacyStorageCompatibilityTest extends TestCase
@@ -58,12 +59,14 @@ class HsLegacyStorageCompatibilityTest extends TestCase
         $this->assertLegacyStorageIsWriteOnly($replacement, $legacyColumn);
 
         $actor = User::factory()->create(['approved_at' => now()]);
-        $permission = Permission::query()->create([
-            'key' => 'hazards.manage',
-            'description' => 'Manage health and safety hazards',
-            'group' => 'Health & Safety',
-            'module' => 'health_safety',
-        ]);
+        $permission = Permission::query()->firstOrCreate(
+            ['key' => 'hazards.manage'],
+            [
+                'description' => 'Manage health and safety hazards',
+                'group' => 'Health & Safety',
+                'module' => 'health_safety',
+            ],
+        );
         $actor->permissionOverrides()->sync([$permission->id => ['allowed' => true]]);
         HrEmployeeProfile::factory()->create([
             'user_id' => $actor->id,
@@ -84,7 +87,7 @@ class HsLegacyStorageCompatibilityTest extends TestCase
     {
         $legacyColumn = 'organization'.'_id';
         $concern = SafeguardingConcern::factory()->create([
-            'reference_number' => 'SG-LEGACY-STORAGE-COMPATIBILITY',
+            'reference_number' => 'SG-LEGACY-'.Str::upper(Str::random(10)),
         ]);
 
         $this->assertNotContains($legacyColumn, $concern->getFillable());

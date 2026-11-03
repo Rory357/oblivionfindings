@@ -148,8 +148,6 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
         $go = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-restraint-go-'.$token;
         $ready = $attempt = $processes = [];
         try {
-            $connection->beginTransaction();
-            RestraintEvent::whereKey($event->id)->lockForUpdate()->firstOrFail();
             foreach ($payloads as $index => $payload) {
                 $ready[] = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-restraint-ready-'.$token.'-'.$index;
                 $attempt[] = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-restraint-attempt-'.$token.'-'.$index;
@@ -174,6 +172,8 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
             $connectionIds = array_column($workers, 'connection_id');
             $this->assertCount(2, array_unique($connectionIds));
             $this->assertNotContains((int) $connection->selectOne('SELECT CONNECTION_ID() AS id')->id, $connectionIds);
+            $connection->beginTransaction();
+            RestraintEvent::whereKey($event->id)->lockForUpdate()->firstOrFail();
             touch($go);
             $this->waitForFiles($attempt, $processes);
             $this->waitForSourceLocks($connectionIds, $processes);
@@ -211,7 +211,7 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
 
     private function waitForFiles(array $paths, array $processes): void
     {
-        $deadline = microtime(true) + 30;
+        $deadline = microtime(true) + 60;
         while (count(array_filter($paths, 'is_file')) !== count($paths)) {
             $this->assertWorkersAlive($processes);
             if (microtime(true) >= $deadline) {
@@ -234,7 +234,7 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
             JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID
             WHERE l.OBJECT_SCHEMA = DATABASE() AND l.OBJECT_NAME = 'restraint_events' AND l.LOCK_MODE LIKE 'X%'
                 AND bt.PROCESSLIST_ID = ? AND rt.PROCESSLIST_ID IN (?, ?)", [$holder, ...$connectionIds]), 'waiter'));
-        $deadline = microtime(true) + 30;
+        $deadline = microtime(true) + 45;
         do {
             $this->assertWorkersAlive($processes);
             $waiters = DB::select("SELECT trx_mysql_thread_id, trx_state, trx_query FROM information_schema.innodb_trx
