@@ -16,8 +16,18 @@ import { EthernetPort, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { MainSide, plural } from './_device-page-parts';
 import type { PortsTab, SwitchPort } from './_device-page-types';
+import { ColumnsMenu, useColumns, type ColumnChoice } from './_parts';
 
 const NA = <span className="text-muted-foreground">Not available</span>;
+
+const PORT_COLUMNS: ColumnChoice[] = [
+    { key: 'port', label: 'Port', fixed: true },
+    { key: 'plugged_in', label: 'Plugged in', fixed: true },
+    { key: 'speed', label: 'Speed' },
+    { key: 'poe', label: 'Power (PoE)' },
+    { key: 'errors', label: 'Errors' },
+    { key: 'changed', label: 'Last change' },
+];
 
 function joinPorts(ports: number[]): string {
     if (ports.length <= 1) return ports.map(String).join('');
@@ -37,6 +47,12 @@ function portName(port: SwitchPort): string {
 
 export function PortsTabView({ ports, noun, now }: { ports: PortsTab; noun: string; now: Date }) {
     const [showFree, setShowFree] = useState(false);
+    const columns = useColumns(
+        'sd.device.ports.columns',
+        PORT_COLUMNS,
+        PORT_COLUMNS.map((column) => column.key),
+    );
+    const showCol = (key: string) => columns.shown.includes(key);
     const menu = useEntityContextMenu<SwitchPort>();
     const { tally, source } = ports;
     const rows = showFree ? ports.rows : ports.rows.filter((port) => !port.free);
@@ -83,11 +99,14 @@ export function PortsTabView({ ports, noun, now }: { ports: PortsTab; noun: stri
                         <Surface title="Ports" sub="Problems and changes first · click a row to open the device · ⋮ or right-click for its menu">
                             <div className="flex flex-wrap items-center justify-between gap-2 px-[18px] pt-2">
                                 <span className="text-subtle">{plural(ports.total, 'port', 'ports')} known</span>
-                                {freeCount > 0 ? (
-                                    <Button type="button" variant="outline" size="sm" aria-pressed={showFree} onClick={() => setShowFree((current) => !current)}>
-                                        {showFree ? 'Hide free ports' : `Show free ports (${freeCount})`}
-                                    </Button>
-                                ) : null}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {freeCount > 0 ? (
+                                        <Button type="button" variant="outline" size="sm" aria-pressed={showFree} onClick={() => setShowFree((current) => !current)}>
+                                            {showFree ? 'Hide free ports' : `Show free ports (${freeCount})`}
+                                        </Button>
+                                    ) : null}
+                                    <ColumnsMenu all={PORT_COLUMNS} shown={columns.shown} onToggle={columns.toggle} />
+                                </div>
                             </div>
                             <div className="mt-3 overflow-x-auto">
                                 <Table>
@@ -95,10 +114,10 @@ export function PortsTabView({ ports, noun, now }: { ports: PortsTab; noun: stri
                                         <TableRow>
                                             <TableHead className="w-16">Port</TableHead>
                                             <TableHead>Plugged in</TableHead>
-                                            <TableHead>Speed</TableHead>
-                                            <TableHead>Power (PoE)</TableHead>
-                                            <TableHead>Errors</TableHead>
-                                            <TableHead>Last change</TableHead>
+                                            {showCol('speed') ? <TableHead>Speed</TableHead> : null}
+                                            {showCol('poe') ? <TableHead>Power (PoE)</TableHead> : null}
+                                            {showCol('errors') ? <TableHead>Errors</TableHead> : null}
+                                            {showCol('changed') ? <TableHead>Last change</TableHead> : null}
                                             <TableHead className="w-10">
                                                 <span className="sr-only">Actions</span>
                                             </TableHead>
@@ -129,39 +148,43 @@ export function PortsTabView({ ports, noun, now }: { ports: PortsTab; noun: stri
                                                             </span>
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell className="whitespace-nowrap">{port.speed ?? (port.up === false ? '—' : NA)}</TableCell>
-                                                    <TableCell className="whitespace-nowrap">{port.poe_w !== null ? (port.poe_w > 0 ? watts(port.poe_w) : '—') : NA}</TableCell>
-                                                    <TableCell>
-                                                        {port.errors !== null ? (
-                                                            port.errors > 0 ? (
-                                                                <span className="grid justify-items-start gap-0.5">
-                                                                    <StatusBadge variant="warning" size="sm">
-                                                                        {port.errors.toLocaleString('en-NZ')} in {source.error_hours} h
-                                                                    </StatusBadge>
-                                                                    <small className="text-caption">Cable or plug may be damaged</small>
+                                                    {showCol('speed') ? <TableCell className="whitespace-nowrap">{port.speed ?? (port.up === false ? '—' : NA)}</TableCell> : null}
+                                                    {showCol('poe') ? <TableCell className="whitespace-nowrap">{port.poe_w !== null ? (port.poe_w > 0 ? watts(port.poe_w) : '—') : NA}</TableCell> : null}
+                                                    {showCol('errors') ? (
+                                                        <TableCell>
+                                                            {port.errors !== null ? (
+                                                                port.errors > 0 ? (
+                                                                    <span className="grid justify-items-start gap-0.5">
+                                                                        <StatusBadge variant="warning" size="sm">
+                                                                            {port.errors.toLocaleString('en-NZ')} in {source.error_hours} h
+                                                                        </StatusBadge>
+                                                                        <small className="text-caption">Cable or plug may be damaged</small>
+                                                                    </span>
+                                                                ) : (
+                                                                    'None'
+                                                                )
+                                                            ) : port.errors_total !== null ? (
+                                                                <span className="grid gap-0.5">
+                                                                    <span>{port.errors_total === 0 ? 'None' : port.errors_total.toLocaleString('en-NZ')}</span>
+                                                                    <small className="text-caption">Since the switch started</small>
                                                                 </span>
                                                             ) : (
-                                                                'None'
-                                                            )
-                                                        ) : port.errors_total !== null ? (
-                                                            <span className="grid gap-0.5">
-                                                                <span>{port.errors_total === 0 ? 'None' : port.errors_total.toLocaleString('en-NZ')}</span>
-                                                                <small className="text-caption">Since the switch started</small>
-                                                            </span>
-                                                        ) : (
-                                                            NA
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {port.changed_at ? (
-                                                            <span className="grid gap-0.5">
-                                                                <span className="whitespace-nowrap">{seenTime(port.changed_at, now)}</span>
-                                                                {port.change ? <small className="text-caption">{port.change}</small> : null}
-                                                            </span>
-                                                        ) : (
-                                                            NA
-                                                        )}
-                                                    </TableCell>
+                                                                NA
+                                                            )}
+                                                        </TableCell>
+                                                    ) : null}
+                                                    {showCol('changed') ? (
+                                                        <TableCell>
+                                                            {port.changed_at ? (
+                                                                <span className="grid gap-0.5">
+                                                                    <span className="whitespace-nowrap">{seenTime(port.changed_at, now)}</span>
+                                                                    {port.change ? <small className="text-caption">{port.change}</small> : null}
+                                                                </span>
+                                                            ) : (
+                                                                NA
+                                                            )}
+                                                        </TableCell>
+                                                    ) : null}
                                                     <TableCell onClick={(event) => event.stopPropagation()}>
                                                         {items.length ? <EntityKebab actions={items} label={`Actions for port ${port.port}`} /> : null}
                                                     </TableCell>

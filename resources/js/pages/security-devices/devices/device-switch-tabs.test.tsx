@@ -125,7 +125,10 @@ const settings: SettingsTab = {
     edit: { domain: 'it_infrastructure', category: 'network', subcategory: 'switch' },
 };
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.removeItem('sd.device.ports.columns');
+});
 afterEach(cleanup);
 
 describe('Switch · Ports tab (pg-sdr-3d)', () => {
@@ -152,6 +155,24 @@ describe('Switch · Ports tab (pg-sdr-3d)', () => {
         expect(screen.getByText(/Oblivion doesn’t do this, or restart the switch/)).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /power|restart|turn (on|off)/i })).not.toBeInTheDocument();
         expect(screen.getByText('Port 4 · Synthetic back yard camera')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+    });
+
+    it('hides optional port columns chosen off in Columns while keeping Port and Plugged in', () => {
+        render(<DevicePage {...pageFixture({ tab: 'ports', tabs: TABS, ports })} />);
+        expect(within(screen.getByRole('table')).getByText('Power (PoE)')).toBeInTheDocument();
+        expect(within(screen.getByRole('table')).getByText('Speed')).toBeInTheDocument();
+
+        window.localStorage.setItem('sd.device.ports.columns', JSON.stringify(['port', 'plugged_in', 'errors', 'changed']));
+        cleanup();
+
+        render(<DevicePage {...pageFixture({ tab: 'ports', tabs: TABS, ports })} />);
+        const table = screen.getByRole('table');
+        expect(within(table).getByText('Port')).toBeInTheDocument();
+        expect(within(table).getByText('Plugged in')).toBeInTheDocument();
+        expect(within(table).getByText('Errors')).toBeInTheDocument();
+        expect(within(table).queryByText('Power (PoE)')).not.toBeInTheDocument();
+        expect(within(table).queryByText('Speed')).not.toBeInTheDocument();
     });
 });
 
