@@ -7,6 +7,8 @@ use App\Domain\SecurityDevices\Iot\Relay\Models\SensorGatewayLogin;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Screens\Setup\SetupBroker;
 use App\Domain\SecurityDevices\Screens\Setup\SetupPresenter;
+use App\Domain\SecurityDevices\Screens\Sites\AlertWords;
+use App\Domain\SecurityDevices\Screens\Sites\SiteStream;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -101,7 +103,7 @@ final class SensorGatewayOverview
             'gateway' => [
                 'route' => $route,
                 'quiet' => $this->quiet($device, count($sensors)),
-                'recent' => $viewer->canDo('securityDevices.events.view') ? $this->recent($device, $ids, $route) : null,
+                'recent' => $viewer->canDo('securityDevices.events.view') ? $this->recent($viewer, $device, $ids, $route) : null,
             ],
         ];
     }
@@ -168,23 +170,32 @@ final class SensorGatewayOverview
      * @param  array<string, mixed>  $route
      * @return list<array<string, mixed>>
      */
-    private function recent(Device $device, array $sensorIds, array $route): array
+    private function recent(User $viewer, Device $device, array $sensorIds, array $route): array
     {
         $now = CarbonImmutable::now();
-        $alerts = DeviceAlert::query()
-            ->whereIn('device_id', [(int) $device->id, ...$sensorIds])
-            ->where('opened_at', '>=', $now->subDays(90))
-            ->latest('opened_at')
-            ->limit(6)
-            ->get(['id', 'title', 'severity', 'state', 'opened_at', 'closed_at'])
-            ->map(fn (DeviceAlert $alert): array => [
+        $siteIds = $this->access->accessibleSiteIds($viewer);
+        $alertModels = $siteIds === []
+            ? collect()
+            : DeviceAlert::query()
+                ->whereIn('device_id', [(int) $device->id, ...$sensorIds])
+                ->whereIn('site_id', $siteIds)
+                ->where('opened_at', '>=', $now->subDays(90))
+                ->latest('opened_at')
+                ->limit(6)
+                ->get(['id', 'device_id', 'site_id', 'kind', 'title', 'severity', 'state', 'opened_at', 'closed_at']);
+        $carePeople = SiteStream::carePeople($viewer, $alertModels);
+        $alerts = $alertModels->map(function (DeviceAlert $alert) use ($carePeople, $now): array {
+            $words = new AlertWords($alert, $carePeople[(int) $alert->id] ?? false);
+
+            return [
                 'key' => 'alert-'.$alert->id,
                 'at' => $alert->opened_at?->toIso8601String(),
                 'tone' => $alert->isActive() ? ($alert->severity === 'critical' ? 'critical' : 'warning') : 'success',
-                'title' => (string) $alert->title,
+                'title' => $words->title(),
                 'sub' => $alert->isActive() ? 'Still open' : 'Lasted '.\App\Domain\SecurityDevices\Alerts\DeviceAlertEngine::duration($alert->opened_at, $alert->closed_at ?? $now),
                 'href' => '/security-devices/alerts?alert='.$alert->id,
-            ]);
+            ];
+        });
         $logins = collect($route['logins'])->map(fn (array $login): array => [
             'key' => 'login-'.$login['id'],
             'at' => $login['made_at'],
