@@ -38,7 +38,7 @@ final class HsReviewTitle
         $site = self::clean($site);
         $person = in_array($category, self::WORKER_KINDS, true) ? ($staff ?? $client) : ($client ?? $staff);
 
-        $words = $sourceReadable ? self::clean($sourceWords) : null;
+        $words = $sourceReadable ? self::sentence($sourceWords) : null;
         if ($words !== null) {
             return $person !== null ? "{$words} — {$person}" : $words;
         }
@@ -48,6 +48,18 @@ final class HsReviewTitle
         $who = $person ?? $site;
 
         return $who !== null ? "{$kind} — {$who}" : $kind;
+    }
+
+    /** Sentence-case display for stored source titles (e.g. "injury incident" / "near_miss incident") without altering names. */
+    public static function sentence(?string $value): ?string
+    {
+        $cleaned = self::clean($value);
+        if ($cleaned === null) {
+            return null;
+        }
+        $readable = preg_replace('/(?<=\p{L})_(?=\p{L})/u', ' ', $cleaned) ?? $cleaned;
+
+        return mb_strtoupper(mb_substr($readable, 0, 1)).mb_substr($readable, 1);
     }
 
     private static function clean(?string $value): ?string

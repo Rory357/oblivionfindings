@@ -1389,7 +1389,15 @@ export function safetyReviewTitle(
     d: Pick<EventDetail, 'event_category' | 'client' | 'staff' | 'site'> &
         Partial<Pick<EventDetail, 'title'>>,
 ): string {
-    if (d.title) return d.title;
+    if (d.title) {
+        const trimmed = d.title.trim();
+        if (trimmed) {
+            const [head, ...rest] = trimmed.split(' — ');
+            const readable = head.replace(/(\p{L})_(\p{L})/gu, '$1 $2');
+            const sentence = readable.charAt(0).toUpperCase() + readable.slice(1);
+            return [sentence, ...rest].join(' — ');
+        }
+    }
     const category =
         EVENT_CATEGORY_LABELS[d.event_category] ?? titleCase(d.event_category);
     const worker = ['injury', 'exposure'].includes(d.event_category);

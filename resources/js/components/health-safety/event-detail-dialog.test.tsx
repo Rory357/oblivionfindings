@@ -2903,4 +2903,22 @@ describe('G3 safety review page: the ways through rules 1 and 2', () => {
         const readOnlyPanel = screen.getByRole('tabpanel', { name: 'Actions' });
         expect(within(readOnlyPanel).queryByRole('button', { name: 'Add revised action' })).not.toBeInTheDocument();
     });
+
+    it('renders safety review titles in sentence case without altering person or Site names (P14)', () => {
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    title: 'injury incident — Amelia Wilson',
+                    handover: owned,
+                    worksafe: { decision_signed: true, notifiable: false },
+                } as EventDetailOverrides)}
+            />,
+        );
+        expect(
+            screen.getByRole('heading', {
+                level: 1,
+                name: 'Injury incident — Amelia Wilson',
+            }),
+        ).toBeInTheDocument();
+    });
 });

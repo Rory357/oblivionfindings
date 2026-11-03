@@ -14,6 +14,8 @@ class HsReviewTitleTest extends TestCase
     {
         return [
             'incident, reader' => [['incident', true, 'Fall in the shower', 'Amelia Wilson', 'Hemi Walker', 'Harbour Respite'], 'Fall in the shower — Amelia Wilson'],
+            'incident with lower-case stored type title, reader' => [['incident', true, 'injury incident', 'Amelia Wilson', 'Hemi Walker', 'Harbour Respite'], 'Injury incident — Amelia Wilson'],
+            'near miss with snake_case stored type title, reader' => [['near_miss', true, 'near_miss incident', 'Tane Wineera', null, 'Kauri House'], 'Near miss incident — Tane Wineera'],
             'incident, H&S viewer who cannot read it' => [['incident', false, 'Fall in the shower', 'Amelia Wilson', 'Hemi Walker', 'Harbour Respite'], 'Incident — Amelia Wilson'],
             'near miss, cannot read' => [['near_miss', false, null, 'Tane Wineera', null, 'Kauri House'], 'Near miss — Tane Wineera'],
             'reader, but the source has no words' => [['incident', true, '  ', 'Liam Davis', null, 'Kauri House'], 'Incident — Liam Davis'],
