@@ -328,26 +328,35 @@ export type QuietTimes = {
 };
 
 /** Alerts › On call (13d), from OnCallPresenter. */
+export type OnCallDay = {
+    label: string;
+    state: 'done' | 'now' | 'upcoming' | 'off';
+};
+
+export type OnCallHandoverNote = {
+    from: string;
+    to: string | null;
+    at: string;
+    still_open: string | null;
+    coming_up: string | null;
+    good_to_know: string | null;
+};
+
 export type OnCall = {
     now: { name: string; first_name: string; until: string } | null;
     people: {
         id: number;
         name: string;
         role: string | null;
-        when: 'now' | 'next' | 'before';
+        when: 'now' | 'next' | 'before' | 'backup';
         from: string;
         to: string;
+        days?: OnCallDay[] | null;
     }[];
     /** The IT role chosen in Setup › Alerts & checks; null = IT for each Site. */
     role: string | null;
-    handover: {
-        from: string;
-        to: string | null;
-        at: string;
-        still_open: string | null;
-        coming_up: string | null;
-        good_to_know: string | null;
-    } | null;
+    handover: OnCallHandoverNote | null;
+    handover_count?: number;
     waiting: {
         id: number;
         at: string;
@@ -367,4 +376,16 @@ export type OnCall = {
         push: boolean;
     }[];
     can: { rostering: boolean; handover: boolean; setup: boolean };
+};
+
+export type OnCallHandoversProps = {
+    rows: (OnCallHandoverNote & { id: number })[];
+    meta: {
+        total: number;
+        page: number;
+        last_page: number;
+        from: number;
+        to: number;
+    };
+    q: string;
 };

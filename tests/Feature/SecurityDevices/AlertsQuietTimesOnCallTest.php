@@ -59,10 +59,10 @@ class AlertsQuietTimesOnCallTest extends TestCase
     }
 
     /** @param  list<string>|null  $keys */
-    private function person(string $name, ?array $keys = null): User
+    private function person(string $name, ?array $keys = null, ?Site $site = null): User
     {
         $user = User::factory()->create(['name' => $name, 'approved_at' => now()]);
-        HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => $this->home->id, 'secondary_site_ids' => [], 'is_active' => true]);
+        HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => ($site ?? $this->home)->id, 'secondary_site_ids' => [], 'is_active' => true]);
         foreach ($keys ?? ['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'securityDevices.alerts.acknowledge', 'securityDevices.monitoring.manage'] as $key) {
             $user->permissionOverrides()->attach(Permission::query()->where('key', $key)->firstOrFail()->id, ['allowed' => true]);
         }
@@ -203,5 +203,97 @@ class AlertsQuietTimesOnCallTest extends TestCase
         $this->actingAs($reader)->postJson('/security-devices/alerts/on-call/handover', ['still_open' => 'Not mine to write'])->assertForbidden();
         $this->actingAs($reader)->get('/security-devices/alerts?tab=oncall')
             ->assertInertia(fn ($page) => $page->where('on_call.handover', null)->where('on_call.can.handover', false));
+    }
+
+    public function test_on_call_shows_the_week_day_strip_and_backup_person_from_overlapping_rostering_shifts(): void
+    {
+        // Thu 5 Nov 2026, 1:00 pm NZDT (UTC+13).
+        CarbonImmutable::setTestNow('2026-11-05T00:00:00Z');
+        try {
+            $sam = $this->person('Sam Tuilagi');
+            $ana = $this->person('Ana Ruha');
+
+            // Jordan covers Mon 2 Nov 9:00 am NZDT → Mon 9 Nov 9:00 am NZDT.
+            $this->onCallShift($this->jordan, CarbonImmutable::parse('2026-11-01T20:00:00Z'), CarbonImmutable::parse('2026-11-08T20:00:00Z'));
+            // Sam covers next week.
+            $this->onCallShift($sam, CarbonImmutable::parse('2026-11-08T20:00:00Z'), CarbonImmutable::parse('2026-11-15T20:00:00Z'));
+            // Ana has an overlapping secondary on-call shift covering right now (backup).
+            $this->onCallShift($ana, CarbonImmutable::parse('2026-11-02T20:00:00Z'), CarbonImmutable::parse('2026-11-08T20:00:00Z'));
+
+            $this->actingAs($this->jordan)->get('/security-devices/alerts?tab=oncall')
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->has('on_call.people', 3)
+                    ->where('on_call.people.0.name', 'Jordan Peri')
+                    ->where('on_call.people.0.when', 'now')
+                    ->where('on_call.people.0.days', [
+                        ['label' => 'Mon', 'state' => 'done'],
+                        ['label' => 'Tue', 'state' => 'done'],
+                        ['label' => 'Wed', 'state' => 'done'],
+                        ['label' => 'Thu', 'state' => 'now'],
+                        ['label' => 'Fri', 'state' => 'upcoming'],
+                        ['label' => 'Sat', 'state' => 'upcoming'],
+                        ['label' => 'Sun', 'state' => 'upcoming'],
+                    ])
+                    ->where('on_call.people.1.name', 'Sam Tuilagi')
+                    ->where('on_call.people.1.when', 'next')
+                    ->where('on_call.people.1.days', null)
+                    ->where('on_call.people.2.name', 'Ana Ruha')
+                    ->where('on_call.people.2.when', 'backup')
+                    ->where('on_call.people.2.days', null));
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
+    }
+
+    public function test_all_handovers_page_lists_notes_newest_first_enforces_permissions_and_scopes_sites(): void
+    {
+        $sam = $this->person('Sam Tuilagi');
+        $otherFrom = $this->person('Pat Wiremu', null, $this->other);
+        $otherTo = $this->person('Tane Kahu', null, $this->other);
+
+        OnCallHandover::query()->create([
+            'from_user_id' => $sam->id,
+            'to_user_id' => $this->jordan->id,
+            'still_open' => 'Kauri House router dropped briefly on Monday.',
+            'good_to_know' => 'Spare patch lead is in the comms cupboard.',
+        ]);
+        OnCallHandover::query()->create([
+            'from_user_id' => $this->jordan->id,
+            'to_user_id' => $sam->id,
+            'coming_up' => 'Firewall maintenance Saturday 6:00 am.',
+        ]);
+        OnCallHandover::query()->create([
+            'from_user_id' => $otherFrom->id,
+            'to_user_id' => $otherTo->id,
+            'still_open' => 'Kōwhai Lodge secret handover note.',
+        ]);
+
+        $response = $this->actingAs($this->jordan)->get('/security-devices/alerts/on-call/handovers');
+        $response->assertOk()->assertInertia(fn ($page) => $page
+            ->component('security-devices/alerts/handovers')
+            ->has('rows', 2)
+            ->where('rows.0.from', 'Jordan Peri')
+            ->where('rows.0.to', 'Sam Tuilagi')
+            ->where('rows.0.coming_up', 'Firewall maintenance Saturday 6:00 am.')
+            ->where('rows.1.from', 'Sam Tuilagi')
+            ->where('rows.1.still_open', 'Kauri House router dropped briefly on Monday.')
+            ->where('meta.total', 2));
+        $this->assertStringNotContainsString('Kōwhai Lodge secret handover note', (string) $response->getContent());
+
+        // Search narrows to matching notes.
+        $this->actingAs($this->jordan)->get('/security-devices/alerts/on-call/handovers?q=patch+lead')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('rows', 1)
+                ->where('rows.0.from', 'Sam Tuilagi'));
+
+        // Auditors without alerts.acknowledge cannot open All handovers, matching the On call tab.
+        $auditor = $this->person('Ana Auditor', ['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view']);
+        $this->actingAs($auditor)->get('/security-devices/alerts/on-call/handovers')->assertForbidden();
+
+        // Someone without Alerts access cannot open All handovers even with acknowledge override.
+        $noView = $this->person('No View', ['securityDevices.viewAny']);
+        $this->actingAs($noView)->get('/security-devices/alerts/on-call/handovers')->assertForbidden();
     }
 }

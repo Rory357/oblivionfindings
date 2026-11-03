@@ -38,6 +38,7 @@ const WHEN_WORDS: Record<OnCall['people'][number]['when'], string> = {
     now: 'on call now',
     next: 'on call next',
     before: 'was on call',
+    backup: 'backup',
 };
 
 const onOff = (on: boolean) =>
@@ -124,13 +125,25 @@ export function OnCallTab({ data, now }: { data: OnCall; now: Date }) {
                             id: person.id,
                             name: person.name,
                             sub: `${person.role ? `${person.role} · ` : ''}${WHEN_WORDS[person.when]}`,
-                            presence: person.when === 'now' ? 'on' : undefined,
-                            foot: (
-                                <>
-                                    <b>{formatDate(person.from)}</b> to{' '}
-                                    {formatDateTime(person.to)}
-                                </>
-                            ),
+                            presence:
+                                person.when === 'now' ||
+                                person.when === 'backup'
+                                    ? 'on'
+                                    : undefined,
+                            days: person.days ?? undefined,
+                            foot:
+                                person.when === 'backup' ? (
+                                    <>
+                                        <b>Told after an hour</b> if nobody
+                                        acknowledges · until{' '}
+                                        {formatDateTime(person.to)}
+                                    </>
+                                ) : (
+                                    <>
+                                        <b>{formatDate(person.from)}</b> to{' '}
+                                        {formatDateTime(person.to)}
+                                    </>
+                                ),
                         }))}
                     />
                 ) : (
@@ -144,6 +157,10 @@ export function OnCallTab({ data, now }: { data: OnCall; now: Date }) {
                         <Story
                             title="Handover notes"
                             sub={`From ${note.from}${note.to ? ` to ${note.to}` : ''} · ${formatDateTime(note.at)}`}
+                            action={{
+                                label: 'All handovers',
+                                href: '/security-devices/alerts/on-call/handovers',
+                            }}
                             paras={paras}
                         />
                     ) : (
