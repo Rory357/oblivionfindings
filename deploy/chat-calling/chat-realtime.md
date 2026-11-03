@@ -16,7 +16,7 @@ The files alongside this document are examples, not installed configuration. No 
 2. Set `LIVE_ALLOWED_ORIGINS` (and the app's `CHAT_LIVE_ALLOWED_ORIGINS`) to the exact browser origins, such as `https://care.example.org`. An empty list refuses every browser. Set `LIVE_APP_URL` to the app's own address so presence reports reach it.
 3. Install the service from `oblivion-live.service.example` and start it. Check its log for `gateway.started`.
 4. Include `oblivion-live-nginx.conf.example` in the application's HTTPS server block, run `nginx -t`, then reload. It forwards only `/chat-live` with the WebSocket upgrade headers and a 75-second read timeout.
-5. With `CHAT_SHARED_EXPERIENCE` on, set `CHAT_LIVE_ENABLED=true` and reload the app configuration. Keep the queue worker running: conversation and unread events are published from queued jobs.
+5. With `CHAT_SHARED_EXPERIENCE` on, set `CHAT_LIVE_ENABLED=true` and reload the app configuration. Conversation and unread events are published straight after the request, command or queued job that made the change, not through the queue, so they never wait for an idle worker. The queue worker still sends Chat's other notifications.
 6. Settings › Chat › Service health › Realtime connection should pass, showing the number of nodes and open connections. The check is a signed read; it publishes nothing.
 
 The content security policy allows only the page's own `wss://` origin, and only while shared Chat and Oblivion Live are both on.
@@ -39,7 +39,7 @@ Run another gateway and list every node's internal address in `CHAT_LIVE_INTERNA
 
 ## Verification and limits
 
-On 23 October 2026: 68 gateway tests including a seeded frame fuzz test; 5,000 idle signed-in connections on one node used 97 MB (`node live/tools/idle-connections.mjs`). The end-to-end results are in the [provenance note](../../docs/chat-experience/clean-room/provenance/oblivion-live.md). These checks ran on a development machine with a local proxy (`live/tools/dev-proxy.mjs`); they do not certify the production nginx, TLS, origins or capacity, which need checking on the real host before activation.
+On 23 October 2026: 68 gateway tests including a seeded frame fuzz test; 5,000 idle signed-in connections on one node used 97 MB (`node live/tools/idle-connections.mjs`). On 3 November 2026 the two-browser test passed on Oblivion Live with the latest `main`: the other tab was told 0.13–0.25 s after a send, and polling took over 11.5 s after the gateway stopped. The end-to-end results are in the [provenance note](../../docs/chat-experience/clean-room/provenance/oblivion-live.md). These checks ran on a development machine with a local proxy (`live/tools/dev-proxy.mjs`); they do not certify the production nginx, TLS, origins or capacity, which need checking on the real host before activation.
 
 ## Rollback
 
