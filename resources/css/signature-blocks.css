@@ -771,30 +771,33 @@
 .sg-mc > em {
     font-size: calc(11rem / 14);
     font-style: normal;
-    opacity: 0.5;
 }
 .sg-mc > b {
     font-size: calc(16rem / 14);
     font-weight: 700;
 }
 .sg-mc--low {
-    background: var(--status-success-bg);
+    --sg-mc-bg: var(--status-success-bg);
+    background: var(--sg-mc-bg);
     color: var(--status-success-foreground);
 }
 .sg-mc--medium {
-    background: var(--status-warning-bg);
+    --sg-mc-bg: var(--status-warning-bg);
+    background: var(--sg-mc-bg);
     color: var(--status-warning-foreground);
 }
 .sg-mc--high {
-    background: color-mix(in oklab, var(--status-warning-bg), var(--status-critical-bg));
+    --sg-mc-bg: color-mix(in oklab, var(--status-warning-bg), var(--status-critical-bg));
+    background: var(--sg-mc-bg);
     color: var(--status-critical-foreground);
 }
 .sg-mc--extreme {
-    background: var(--status-critical-bg);
+    --sg-mc-bg: var(--status-critical-bg);
+    background: var(--sg-mc-bg);
     color: var(--status-critical-foreground);
 }
 .sg-mx .sg-mc:not(.sg-mc--has) {
-    opacity: 0.5;
+    background: color-mix(in oklab, var(--sg-mc-bg) 50%, var(--card));
 }
 .sg-mc--has {
     box-shadow: inset 0 0 0 1.5px color-mix(in oklab, currentColor 45%, transparent);
@@ -1594,8 +1597,8 @@ a.sg-li:focus-visible {
     align-items: center;
     gap: 8px 16px;
     padding: 14px 18px;
-    background: var(--accent);
-    color: var(--accent-foreground);
+    background: var(--status-info-bg);
+    color: var(--status-info-foreground);
 }
 .sg-next-k {
     flex: none;
@@ -1603,7 +1606,7 @@ a.sg-li:focus-visible {
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: var(--primary);
+    color: var(--primary-text);
 }
 .sg-next-tx {
     display: grid;
@@ -1618,7 +1621,7 @@ a.sg-li:focus-visible {
 }
 .sg-next-tx > span {
     font-size: calc(13rem / 14);
-    color: var(--muted-foreground);
+    color: color-mix(in oklab, var(--foreground) 72%, var(--muted-foreground));
 }
 .sg-next-act {
     margin-left: auto;
@@ -1696,6 +1699,12 @@ a.sg-li:focus-visible {
     margin: 0;
     min-width: 0;
     white-space: pre-line;
+}
+.sg-pane-items dd:only-of-type {
+    grid-column: 2 / -1;
+}
+.sg-pane-items dd.sg-pane-act {
+    white-space: nowrap;
 }
 .sg-pane-items dd small {
     display: block;

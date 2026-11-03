@@ -860,8 +860,9 @@ export function FocusDonut({
                 aria-hidden="true"
             >
                 <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 240, height: 225 }}>
-                    <PieChart>
+                    <PieChart accessibilityLayer={false}>
                         <Pie
+                            rootTabIndex={-1}
                             data={segments}
                             dataKey="value"
                             nameKey="label"

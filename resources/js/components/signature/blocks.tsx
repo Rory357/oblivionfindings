@@ -706,7 +706,7 @@ export function RiskMap({
                 </span>
                 <div className="sg-mx" role="table" aria-label="Risk map: likelihood by consequence">
                     {rows.map((l, r) => (
-                        <Fragment key={l}>
+                        <div key={l} role="row" className="contents">
                             <span className="sg-ml" role="rowheader">
                                 {l}
                             </span>
@@ -726,14 +726,16 @@ export function RiskMap({
                                     </span>
                                 );
                             })}
-                        </Fragment>
+                        </div>
                     ))}
-                    <span />
-                    {cols.map((c) => (
-                        <span key={c} className="sg-mcl" role="columnheader">
-                            {c}
-                        </span>
-                    ))}
+                    <div role="row" className="contents">
+                        <span role="cell" />
+                        {cols.map((c) => (
+                            <span key={c} className="sg-mcl" role="columnheader">
+                                {c}
+                            </span>
+                        ))}
+                    </div>
                 </div>
                 <span className="sg-matrix-x" aria-hidden="true">
                     Consequence

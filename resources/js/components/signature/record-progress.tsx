@@ -112,7 +112,7 @@ function ProgressPane({ pane }: { pane: RecordProgressPane }) {
                                 {item.value}
                                 {item.meta ? <small>{item.meta}</small> : null}
                             </dd>
-                            <span>{item.action ?? null}</span>
+                            {item.action ? <dd className="sg-pane-act">{item.action}</dd> : null}
                         </div>
                     ))}
                 </dl>

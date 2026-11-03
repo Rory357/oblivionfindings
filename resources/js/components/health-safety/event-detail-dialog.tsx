@@ -1859,14 +1859,12 @@ function SafetyReviewPage({
                                     <div>
                                         <dt>What happened</dt>
                                         <dd>{story}</dd>
-                                        <span />
                                     </div>
                                 ) : null}
                                 {straightAway ? (
                                     <div>
                                         <dt>What we did straight away</dt>
                                         <dd>{straightAway}</dd>
-                                        <span />
                                     </div>
                                 ) : null}
                             </dl>
