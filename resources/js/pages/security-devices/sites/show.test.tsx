@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import axios from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SiteShow, { type SitePageProps } from './show';
 import type { SiteDeviceListRow } from './_types';
@@ -249,9 +250,55 @@ describe('Site page', () => {
         expect(screen.getByLabelText('What')).toBeInTheDocument();
         expect(screen.getByText('What the logbook keeps')).toBeInTheDocument();
         expect(screen.queryByRole('tablist', { name: /what/i })).not.toBeInTheDocument();
-        // Empty sections aren't drawn; there's no export to stub.
+        // Empty sections aren't drawn; Export the logbook asks for a reason (12i).
         expect(screen.queryByText('Overnight and early morning')).not.toBeInTheDocument();
-        expect(screen.queryByText(/export/i)).not.toBeInTheDocument();
+        expect(screen.getByText('Export the logbook')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Export…' })).toBeInTheDocument();
+    });
+
+    it('exports the logbook only with a reason, sending the Site, date and format (12i)', async () => {
+        const postSpy = vi.spyOn(axios, 'post').mockResolvedValue({
+            data: new Blob(['%PDF-1.4'], { type: 'application/pdf' }),
+            headers: { 'content-disposition': 'attachment; filename="security-devices-logbook-synthetic-house-2026-10-29.pdf"' },
+        });
+        render(
+            <SiteShow
+                {...fixture({
+                    tab: 'logbook',
+                    overview: null,
+                    tabs: { devices: 3, alerts: true, logbook: true },
+                    logbook: {
+                        day: '2026-10-29',
+                        today: true,
+                        what: 'alerts',
+                        sections: [
+                            { key: 'day', title: 'This morning', items: [] },
+                            { key: 'night', title: 'Overnight and early morning', items: [] },
+                            { key: 'before', title: 'Yesterday · Wed 28 Oct', items: [] },
+                        ],
+                    },
+                })}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Export…' }));
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
+        expect(screen.getByText('Give a short reason for exporting the logbook.')).toBeInTheDocument();
+        expect(postSpy).not.toHaveBeenCalled();
+
+        fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Shift handover review' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
+
+        await waitFor(() => {
+            expect(postSpy).toHaveBeenCalledWith(
+                '/security-devices/sites/4/logbook/export',
+                { format: 'pdf', from: '2026-10-29', to: '2026-10-29', what: 'alerts', reason: 'Shift handover review' },
+                { responseType: 'blob' },
+            );
+        });
+        postSpy.mockRestore();
     });
 
     it('lists the links found beside the map, with the configured Can’t check line (12j)', () => {

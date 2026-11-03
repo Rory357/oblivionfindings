@@ -562,6 +562,11 @@ Route::middleware([
         ->whereNumber('site')
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.sites.show');
+    // S&D 12i: export a day or date range of the Site's logbook as PDF or CSV, with a required audited reason.
+    Route::post('/sites/{site}/logbook/export', [SitesController::class, 'exportLogbook'])
+        ->whereNumber('site')
+        ->middleware(['permission:securityDevices.devices.view', 'throttle:20,1'])
+        ->name('security-devices.sites.logbook.export');
     // S&D Phase F (pg-sdr-12c, pop-ups 42 and 43): a Site's house modes. Safe actions only; another Site's mode is 404.
     Route::post('/sites/{site}/modes', [\App\Domain\SecurityDevices\Screens\Http\SiteModesController::class, 'store'])
         ->whereNumber('site')

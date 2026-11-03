@@ -8,6 +8,10 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Topology\Data\TopologyEvidence;
 use App\Domain\Monitoring\Topology\Services\TopologySnapshotBuilder;
+use App\Domain\SecurityDevices\Access\Models\AccessConsole;
+use App\Domain\SecurityDevices\Access\Models\AccessDoor;
+use App\Domain\SecurityDevices\Access\Models\AccessEvent;
+use App\Domain\SecurityDevices\Access\Models\AccessPerson;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlertEvent;
 use App\Domain\SecurityDevices\Care\Models\DevicePersonLink;
@@ -16,6 +20,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Modes\Models\HouseModeEvent;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Site;
@@ -341,5 +346,126 @@ class SitePageTabsTest extends TestCase
         $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab=network')
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('network.links.can.change', true)->where('network.tree.mapped_count', 2));
+    }
+
+    public function test_logbook_export_requires_events_view_and_a_reason_and_audits_the_person_and_reason(): void
+    {
+        $switch = $this->device($this->home, ['name' => '=HYPERLINK("http://example.test")', 'subcategory' => 'switch']);
+        $this->alert($switch, $this->home);
+        HouseModeEvent::query()->create([
+            'site_id' => $this->home->id, 'kind' => HouseModeEvent::KIND_SWITCH, 'state' => HouseModeEvent::STATE_DONE,
+            'source' => 'schedule', 'title' => 'Night → Day', 'lines' => [], 'at' => CarbonImmutable::parse('2026-10-27 19:00:00', 'UTC'),
+        ]);
+        $otherDevice = $this->device($this->other, ['name' => 'Kōwhai Lodge router']);
+        $this->alert($otherDevice, $this->other);
+
+        $url = '/security-devices/sites/'.$this->home->id.'/logbook/export';
+
+        // Without events.view: forbidden.
+        $this->actingAs($this->viewer)->postJson($url, [
+            'format' => 'csv', 'from' => '2026-10-28', 'to' => '2026-10-29', 'reason' => 'Incident review',
+        ])->assertForbidden();
+
+        $this->grant('securityDevices.events.view');
+
+        // Another Site: 404 direct-object denial.
+        $this->actingAs($this->viewer)->postJson('/security-devices/sites/'.$this->other->id.'/logbook/export', [
+            'format' => 'csv', 'from' => '2026-10-28', 'to' => '2026-10-29', 'reason' => 'Incident review',
+        ])->assertNotFound();
+
+        // Missing or blank reason: 422, nothing audited.
+        $this->actingAs($this->viewer)->postJson($url, [
+            'format' => 'csv', 'from' => '2026-10-29', 'reason' => '  ',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['reason']);
+        $this->assertSame(0, AuditLog::query()->where('action', 'security_devices.logbook.exported')->count());
+
+        // Date range CSV export: neutralises spreadsheet formulas, keeps out other Sites, and writes the audit log.
+        $csvResponse = $this->actingAs($this->viewer)->post($url, [
+            'format' => 'csv',
+            'from' => '2026-10-28',
+            'to' => '2026-10-29',
+            'what' => 'everything',
+            'reason' => 'Board incident review for Aurora House',
+        ]);
+        $csvResponse->assertOk()->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $csv = $csvResponse->streamedContent();
+        $this->assertStringContainsString("'=HYPERLINK", $csv);
+        $this->assertStringContainsString('House mode Night → Day', $csv);
+        $this->assertStringNotContainsString('Kōwhai Lodge router', $csv);
+
+        $audit = AuditLog::query()->where('action', 'security_devices.logbook.exported')->latest('id')->first();
+        $this->assertNotNull($audit);
+        $this->assertSame($this->viewer->id, (int) $audit->user_id);
+        $this->assertSame($this->viewer->name, $audit->meta['actor_name'] ?? null);
+        $this->assertSame('Board incident review for Aurora House', $audit->meta['reason'] ?? null);
+        $this->assertSame('csv', $audit->meta['format'] ?? null);
+        $this->assertSame('2026-10-28', $audit->meta['from'] ?? null);
+        $this->assertSame('2026-10-29', $audit->meta['to'] ?? null);
+
+        // Single-day PDF export: renders valid PDF and audits pdf format.
+        $pdfResponse = $this->actingAs($this->viewer)->post($url, [
+            'format' => 'pdf',
+            'from' => '2026-10-29',
+            'what' => 'alerts',
+            'reason' => 'Shift handover copy',
+        ]);
+        $pdfResponse->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', (string) $pdfResponse->getContent());
+        $this->assertSame(2, AuditLog::query()->where('action', 'security_devices.logbook.exported')->count());
+    }
+
+    public function test_logbook_export_applies_resident_and_door_name_privacy_rules(): void
+    {
+        $this->grant('securityDevices.events.view', 'securityDevices.accessControl.view');
+        $client = Client::factory()->create(['site_id' => $this->home->id, 'first_name' => 'Hemi', 'last_name' => 'Walker', 'preferred_name' => null]);
+        $bedSensor = $this->device($this->home, ['name' => 'Room 3 bed sensor']);
+        $doorSensor = $this->device($this->home, ['name' => 'Room 3 door sensor']);
+        DevicePersonLink::query()->create([
+            'device_id' => $bedSensor->id, 'client_id' => $client->id, 'site_id' => $this->home->id, 'purpose' => 'falls',
+            'rule' => ['minutes' => 10, 'from' => '22:00', 'to' => '06:00'], 'linked_at' => now()->subDays(5),
+        ]);
+        DevicePersonLink::query()->create([
+            'device_id' => $doorSensor->id, 'client_id' => $client->id, 'site_id' => $this->home->id, 'purpose' => 'wandering',
+            'rule' => ['from' => '22:00', 'to' => '06:00'], 'linked_at' => now()->subDays(5),
+        ]);
+        $bedAlert = $this->alert($bedSensor, $this->home, [
+            'kind' => 'care_out_of_bed', 'severity' => 'critical', 'title' => 'Hemi out of bed for over 10 minutes',
+        ]);
+        DeviceAlertEvent::query()->where('alert_id', $bedAlert->id)->update(['text' => 'Hemi out of bed since 11:20 am', 'detail' => 'From Hemi’s falls plan.']);
+        $doorAlert = $this->alert($doorSensor, $this->home, [
+            'kind' => 'care_door_night', 'severity' => 'critical', 'title' => 'Hemi’s door opened at night',
+        ]);
+        DeviceAlertEvent::query()->where('alert_id', $doorAlert->id)->update(['text' => 'Hemi’s door opened', 'detail' => 'From Hemi’s wandering plan.']);
+
+        $console = AccessConsole::query()->create(['site_id' => $this->home->id, 'address' => '10.82.0.40', 'port' => 12445, 'state' => 'ok', 'last_synced_at' => now(), 'events_until' => now()]);
+        $frontDoor = AccessDoor::query()->create(['console_id' => $console->id, 'external_id' => 'door-front', 'name' => 'Front door', 'lock_state' => 'locked', 'door_state' => 'closed', 'hub_bound' => true, 'readers' => [], 'seen_at' => now()]);
+        $residentFob = AccessPerson::query()->create(['console_id' => $console->id, 'external_id' => 'user-rewa', 'status' => 'active', 'seen_at' => now(), 'first_name' => 'Rewa', 'last_name' => 'Resident', 'kind' => 'resident', 'client_id' => $client->id, 'match_state' => 'matched', 'policy_ids' => []]);
+        AccessEvent::query()->create(['console_id' => $console->id, 'event_key' => hash('sha256', 'res-denied'), 'door_id' => $frontDoor->id, 'person_id' => $residentFob->id, 'kind' => 'denied', 'method' => 'nfc', 'actor_name' => 'Rewa Resident', 'occurred_at' => now()->subMinutes(15)]);
+
+        $url = '/security-devices/sites/'.$this->home->id.'/logbook/export';
+
+        // Viewer without client access sees "a person", never the resident's name, and door-fob residents are never named.
+        $csv = $this->actingAs($this->viewer)->post($url, [
+            'format' => 'csv', 'from' => '2026-10-29', 'reason' => 'Checking overnight care alerts',
+        ])->assertOk()->streamedContent();
+        $this->assertStringContainsString('A person out of bed for over 10 minutes', $csv);
+        $this->assertStringContainsString('A person’s door opened at night', $csv);
+        $this->assertStringNotContainsString('Hemi', $csv);
+        $this->assertStringNotContainsString('Walker', $csv);
+        $this->assertStringNotContainsString('Rewa', $csv);
+
+        $exporter = app(\App\Domain\SecurityDevices\Screens\Sites\SiteLogbookExport::class);
+        $range = $exporter->parseRange('2026-10-29', '2026-10-29', CarbonImmutable::now('UTC'));
+        $lines = $exporter->lines($this->viewer, $this->home, $range['start'], $range['end'], 'everything');
+        $html = $exporter->html($this->home, $range, 'everything', 'Checking overnight care alerts', $lines, $this->viewer, CarbonImmutable::now('UTC'));
+        $this->assertStringNotContainsString('Hemi', $html);
+        $this->assertStringContainsString('Checking overnight care alerts', $html);
+
+        // Once granted client access, the viewer gets the resident's name as on the screen.
+        $this->grant('clients.viewAny');
+        $allowedCsv = $this->actingAs($this->viewer)->post($url, [
+            'format' => 'csv', 'from' => '2026-10-29', 'reason' => 'Clinical lead review',
+        ])->assertOk()->streamedContent();
+        $this->assertStringContainsString('Hemi out of bed for over 10 minutes', $allowedCsv);
     }
 }
