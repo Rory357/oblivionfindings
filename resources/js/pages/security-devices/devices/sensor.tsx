@@ -220,16 +220,16 @@ function SensorLimitsPopup({
     return (
         <PopupForm
             open={open}
-            onOpenChange={(next) => {
-                if (!next && !busy) onClose();
-            }}
+            onClose={onClose}
             size="md"
             icon={SlidersHorizontal}
             title="Edit alert limits"
-            subtitle={`Alert thresholds for ${deviceName}`}
+            description={`Alert thresholds for ${deviceName}`}
             error={error}
-            busy={busy}
-            onSubmit={submit}
+            processing={busy}
+            onSubmit={() => {
+                void submit();
+            }}
             submitLabel="Save limits"
         >
             <PopupCallout tone="info">

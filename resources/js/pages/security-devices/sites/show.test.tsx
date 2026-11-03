@@ -402,7 +402,7 @@ describe('Site page', () => {
     it('lets device editors place unplaced radio devices on the map by hand and take manual links off (12j)', () => {
         vi.mocked(router.post).mockImplementationOnce((_url, _data, options) => {
             options?.onSuccess?.({} as never);
-            options?.onFinish?.();
+            options?.onFinish?.({} as never);
         });
 
         render(
