@@ -739,12 +739,13 @@ Route::middleware([
         ])
         ->name('security-devices.devices.settings.update');
 
-    // S&D Phase F: link a sensor to a person's care (pop-up 65, consent checked) and the scald watch.
+    // S&D Phase F + E6: link a sensor to a person's care (pop-up 65, consent checked), scald watch, and per-sensor alert limits.
     Route::prefix('/devices/{device}')->whereNumber('device')->middleware('throttle:30,1')->group(function (): void {
         Route::get('/care-link/options', [CareLinkController::class, 'options'])->name('security-devices.devices.care-link.options');
         Route::post('/care-link', [CareLinkController::class, 'store'])->name('security-devices.devices.care-link.store');
         Route::delete('/care-link', [CareLinkController::class, 'destroy'])->name('security-devices.devices.care-link.destroy');
         Route::put('/scald-watch', [CareLinkController::class, 'scaldWatch'])->name('security-devices.devices.scald-watch');
+        Route::put('/alert-limits', [CareLinkController::class, 'alertLimits'])->name('security-devices.devices.alert-limits');
     });
 
     // ── S&D rebuild C6: the old pages send people to the six-entry menu ──

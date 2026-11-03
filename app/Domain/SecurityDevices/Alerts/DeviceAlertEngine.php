@@ -188,16 +188,24 @@ final class DeviceAlertEngine
         }
     }
 
-    /** A battery level arrived: below 20% opens a warning (its notice goes in the 6:00 am summary), a new battery (30% or more) closes it. */
+    /** A battery level arrived: below the sensor's low-battery rule (default 20%) opens a warning (6:00 am summary); a fresh battery closes it. */
     public function onBattery(Device $device, int $percent, CarbonImmutable $at): void
     {
         try {
-            if ($percent < self::BATTERY_LOW) {
+            $rule = \App\Domain\SecurityDevices\Iot\Readings\SensorAlertRules::batteryRule($device);
+            if (! $rule['enabled']) {
+                $this->closeKind($device, 'battery', $at, fn (): string => 'Battery alert rule turned off');
+
+                return;
+            }
+            $low = $rule['below'];
+            $ok = min(100, max(self::BATTERY_OK, $low + 10));
+            if ($percent < $low) {
                 $this->open($device, null, 'battery', 'warning', (string) $device->name.": battery {$percent}%", $at, "Battery {$percent}%", 'Change it soon so it keeps working', null, '6:00 am summary');
 
                 return;
             }
-            if ($percent >= self::BATTERY_OK) {
+            if ($percent >= $ok) {
                 $this->closeKind($device, 'battery', $at, fn (): string => "Battery back to {$percent}%");
             }
         } catch (Throwable $exception) {

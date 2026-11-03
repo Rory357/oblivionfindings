@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
 use App\Domain\SecurityDevices\Alerts\SafetyEventObserver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
+use App\Domain\SecurityDevices\Iot\Readings\SensorAlertRules;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\SignalSource;
@@ -20,16 +21,6 @@ use Illuminate\Support\Facades\DB;
  */
 final class MqttSensorIntakeService
 {
-    /**
-     * When a reading is out of its usual range (S&D Phase E): at or over `warning_at` / `critical_at`,
-     * or under `below` / over `above`. The sensor page draws these same numbers as its alert lines.
-     */
-    public const array READING_LIMITS = [
-        'co2' => ['warning_at' => 1000, 'critical_at' => 1500],
-        'temperature' => ['below' => 12, 'above' => 32],
-        'humidity' => ['below' => 25, 'above' => 75],
-    ];
-
     public function __construct(
         private readonly CanonicalDeviceSiteResolver $sites,
         private readonly MonitoringOutboxPublisher $outbox,
@@ -131,7 +122,7 @@ final class MqttSensorIntakeService
                     'label' => $spec['label'],
                     'value' => $num,
                     'unit' => $spec['unit'],
-                    'state' => $this->evaluateReadingState($key, $num),
+                    'state' => SensorAlertRules::evaluate($device, $key, $num),
                     'observed_at' => $at->toISOString(),
                 ];
             }
@@ -161,11 +152,11 @@ final class MqttSensorIntakeService
         $readingChanges = [];
         $eventsCreated = DB::transaction(function () use (
             &$readingChanges,
+            &$newReadings,
             $device,
             $siteId,
             $sourceProtocol,
             $channelRef,
-            $newReadings,
             $battery,
             $eventsToCreate,
             $at,
@@ -176,8 +167,12 @@ final class MqttSensorIntakeService
             $observed = is_array($meta['observed'] ?? null) ? $meta['observed'] : [];
             $existingReadings = is_array($observed['sensor_readings'] ?? null) ? $observed['sensor_readings'] : [];
 
-            // S&D Phase E: a reading that changes state opens or closes its alert once this commit lands.
+            // S&D Phase E + E6: evaluate each reading against the locked device's stored sensor limits.
             foreach ($newReadings as $key => $reading) {
+                if ($key !== 'occupancy') {
+                    $reading['state'] = SensorAlertRules::evaluate($locked, (string) $key, (float) $reading['value']);
+                    $newReadings[$key] = $reading;
+                }
                 $before = is_array($existingReadings[$key] ?? null) ? (string) ($existingReadings[$key]['state'] ?? 'healthy') : 'healthy';
                 if ($before !== $reading['state']) {
                     $readingChanges[$key] = $reading;
@@ -261,12 +256,13 @@ final class MqttSensorIntakeService
             [...array_map(fn (array $reading): float => (float) $reading['value'], $newReadings), ...($battery !== null ? ['battery' => $battery] : [])],
             $at,
         );
+        $fresh = $device->fresh() ?? $device;
         $alerts = app(DeviceAlertEngine::class);
         foreach ($readingChanges as $key => $reading) {
-            $alerts->onReading($device, (string) $key, (string) $reading['label'], (string) $reading['state'], (float) $reading['value'], (string) $reading['unit'], $at);
+            $alerts->onReading($fresh, (string) $key, (string) $reading['label'], (string) $reading['state'], (float) $reading['value'], (string) $reading['unit'], $at);
         }
         if ($battery !== null) {
-            $alerts->onBattery($device, $battery, $at);
+            $alerts->onBattery($fresh, $battery, $at);
         }
 
         return [
@@ -345,23 +341,6 @@ final class MqttSensorIntakeService
         return null;
     }
 
-    private function evaluateReadingState(string $metric, float $value): string
-    {
-        $limits = self::READING_LIMITS[$metric] ?? [];
-
-        return match (true) {
-            isset($limits['critical_at']) && $value >= $limits['critical_at'] => 'critical',
-            isset($limits['warning_at']) && $value >= $limits['warning_at'] => 'warning',
-            isset($limits['below']) && $value < $limits['below'] => 'warning',
-            isset($limits['above']) && $value > $limits['above'] => 'warning',
-            default => 'healthy',
-        };
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return list<array{event_type: string, severity: string, payload: array<string, scalar|null>}>
-     */
     /**
      * In bed (true), out of bed (false), or null when the message says nothing about a bed. Reads
      * `in_bed`, `bed_status` and `occupancy` (occupied / vacant), as bed sensors send them.
