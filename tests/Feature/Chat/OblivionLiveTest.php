@@ -196,6 +196,8 @@ it('reaches the relative, member staff and care-team cover exactly as allows() d
 });
 
 it('names what changed: edits, reactions, calls and list-level changes', function () {
+    // The call below changes models outside a request: run each wake-up as soon as it is deferred.
+    $this->withoutDefer();
     $site = Site::factory()->create();
     [$sender, $recipient] = [liveStaff($site), liveStaff($site)];
     $conversation = liveDirect($sender, $recipient);

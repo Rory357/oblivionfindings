@@ -49,17 +49,26 @@ final class ChatRealtime
         if (! $this->configured()) {
             return;
         }
-        $kinds = array_values(array_unique((array) $kinds));
-        $dispatch = function () use ($conversationId, $onlyUserId, $kinds, $callId, $inbox): void {
+        $this->wakeSoon(new WakeChatClients($conversationId, $onlyUserId, array_values(array_unique((array) $kinds)), $callId, $inbox));
+    }
+
+    /**
+     * Run a wake-up straight after the response, command or queued job that made the change, once
+     * its transaction commits. Not through the queue: an idle worker sleeps between checks, which
+     * put other tabs up to 3 seconds behind the spec's one second.
+     */
+    private function wakeSoon(WakeChatClients|PublishChatUnread $job): void
+    {
+        $run = fn () => defer(function () use ($job): void {
             try {
-                Bus::dispatch(new WakeChatClients($conversationId, $onlyUserId, $kinds, $callId, $inbox));
+                Bus::dispatchSync($job);
             } catch (\Throwable $error) {
                 // The committed message/change cursor is authoritative. A failed wake-up
                 // must not turn a committed mutation into a misleading write failure.
                 report($error);
             }
-        };
-        DB::transactionLevel() ? DB::afterCommit($dispatch) : $dispatch();
+        }, always: true);
+        DB::transactionLevel() ? DB::afterCommit($run) : $run();
     }
 
     /** @param  array<int, string>  $kinds */
@@ -136,14 +145,7 @@ final class ChatRealtime
         if ($ids === [] || ! $this->usesLive()) {
             return;
         }
-        $dispatch = function () use ($ids): void {
-            try {
-                Bus::dispatch(new PublishChatUnread($ids));
-            } catch (\Throwable $error) {
-                report($error);
-            }
-        };
-        DB::transactionLevel() ? DB::afterCommit($dispatch) : $dispatch();
+        $this->wakeSoon(new PublishChatUnread($ids));
     }
 
     /**
