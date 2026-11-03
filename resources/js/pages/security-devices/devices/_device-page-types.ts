@@ -69,6 +69,13 @@ export type HistoryTab = {
     lines: LogbookLine[];
 };
 
+export type StaffChoice = {
+    id: number;
+    name: string;
+    sub: string;
+    label: string;
+};
+
 /** S&D v13 (pg-sdr-3f): the device's Settings tab. */
 export type SettingsTab = {
     noun: string;
@@ -89,10 +96,20 @@ export type SettingsTab = {
         stop_ids: number[];
         other_checks: number;
         backup: { every: string | null } | null;
+        tell_it_update_ready?: boolean;
         relied_on: boolean;
         dependents: number;
     };
-    about: { model: string; added_at: string | null; added_by: string | null; from_scan: boolean };
+    about: {
+        model: string;
+        added_at: string | null;
+        added_by: string | null;
+        from_scan: boolean;
+        looked_after_by?: { id: number; label: string } | null;
+    };
+    staff_options?: StaffChoice[];
+    /** Null for anyone who may not use the terminal (non-IT-admins). */
+    ssh?: { user: string | null } | null;
     it: [string, string][];
     edit: { domain: string; category: string; subcategory: string | null } | null;
 };

@@ -729,6 +729,16 @@ Route::middleware([
         ->middleware(['permission:securityDevices.savedLogins.manage', 'throttle:10,1'])
         ->name('security-devices.devices.saved-login.update');
 
+    // S&D v13 (pg-sdr-3f): per-device Settings extras (update notice, looked-after-by person, IT-admin SSH user).
+    Route::patch('/devices/{device}/settings', [\App\Domain\SecurityDevices\Screens\Http\DevicePageController::class, 'updateSettings'])
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.devices.update|securityDevices.monitoring.manage|securityDevices.terminal.use',
+            'throttle:20,1',
+        ])
+        ->name('security-devices.devices.settings.update');
+
     // S&D Phase F: link a sensor to a person's care (pop-up 65, consent checked) and the scald watch.
     Route::prefix('/devices/{device}')->whereNumber('device')->middleware('throttle:30,1')->group(function (): void {
         Route::get('/care-link/options', [CareLinkController::class, 'options'])->name('security-devices.devices.care-link.options');

@@ -717,7 +717,36 @@ final class DeviceAlertEngine
                 })
                 ->values();
 
-            if ($heldAlerts->isEmpty() && $hubUpdates->isEmpty()) {
+            $deviceUpdates = Device::query()
+                ->operational()
+                ->whereIn('provider', ['unifi', 'ubiquiti'])
+                ->orderBy('name')
+                ->orderBy('id')
+                ->get()
+                ->map(function (Device $device): ?array {
+                    $meta = is_array($device->meta) ? $device->meta : [];
+                    if (($meta['tell_it_update_ready'] ?? true) === false) {
+                        return null;
+                    }
+                    $update = \App\Domain\SecurityDevices\Screens\Devices\DeviceUpdates::available($device);
+                    if ($update === null) {
+                        return null;
+                    }
+                    $marker = $update['next'] ?? 'ready';
+                    if (($meta['update_ready_notified_version'] ?? null) === $marker) {
+                        return null;
+                    }
+                    $siteId = $this->siteId($device);
+                    if ($siteId === null) {
+                        return null;
+                    }
+
+                    return ['device' => $device, 'site_id' => $siteId, 'next' => $update['next'], 'marker' => $marker];
+                })
+                ->filter()
+                ->values();
+
+            if ($heldAlerts->isEmpty() && $hubUpdates->isEmpty() && $deviceUpdates->isEmpty()) {
                 return 0;
             }
 
@@ -799,6 +828,25 @@ final class DeviceAlertEngine
                         $perUser[$person->id]['lines'][] = $line;
                     }
                 }
+            }
+
+            foreach ($deviceUpdates as $item) {
+                /** @var Device $updateDevice */
+                $updateDevice = $item['device'];
+                $siteId = (int) $item['site_id'];
+                $line = $item['next'] !== null
+                    ? "{$updateDevice->name}: software update {$item['next']} ready"
+                    : "{$updateDevice->name}: software update ready";
+                $summaryItems[] = ['site_id' => $siteId, 'label' => $line];
+                foreach ($recipientsFor($siteId, $defaultRole) as $person) {
+                    $perUser[$person->id] ??= ['user' => $person, 'lines' => [], 'alert_ids' => []];
+                    if (! in_array($line, $perUser[$person->id]['lines'], true)) {
+                        $perUser[$person->id]['lines'][] = $line;
+                    }
+                }
+                $meta = is_array($updateDevice->meta) ? $updateDevice->meta : [];
+                $meta['update_ready_notified_version'] = $item['marker'];
+                $updateDevice->forceFill(['meta' => $meta])->saveQuietly();
             }
 
             SecurityDeviceSetting::query()->updateOrCreate(

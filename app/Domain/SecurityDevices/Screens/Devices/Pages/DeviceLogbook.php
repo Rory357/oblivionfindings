@@ -119,6 +119,9 @@ final class DeviceLogbook
         if ($wanted('settings') && $siteId !== null && $network) {
             $lines = $lines->concat($this->backupLines($viewer, $device, $siteId, $since));
         }
+        if ($wanted('settings') && $network) {
+            $lines = $lines->concat($this->settingsExtras($device, $since, 'settings'));
+        }
         if ($wanted('quiet')) {
             $lines = $lines->concat($this->quietTimes($device, DeviceCustody::siteIds($windows), $since));
         }
@@ -128,10 +131,12 @@ final class DeviceLogbook
         if ($wanted('moves')) {
             $lines = $lines->concat($this->moves($device, $since))
                 ->concat($this->edits($device, $since))
+                ->concat($this->settingsExtras($device, $since, 'moves'))
                 ->concat($this->removal($device));
         }
         if ($wanted('terminal')) {
-            $lines = $lines->concat($this->terminal($device, $since));
+            $lines = $lines->concat($this->terminal($device, $since))
+                ->concat($this->settingsExtras($device, $since, 'terminal'));
         }
 
         return $lines
@@ -589,5 +594,77 @@ final class DeviceLogbook
                 ['tab' => 'terminal'],
             );
         })->values();
+    }
+
+    /**
+     * Per-device Settings extras (pg-sdr-3f): each field keeps its own tab's permission boundary
+     * ("settings" needs events.view, "moves" is device custody, and "terminal" is IT admins only).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function settingsExtras(Device $device, CarbonImmutable $since, string $bucket): Collection
+    {
+        $audits = AuditLog::query()
+            ->where('auditable_type', $device->getMorphClass())
+            ->where('auditable_id', $device->id)
+            ->where('action', 'security_devices.device.settings_updated')
+            ->whereNotNull('user_id')
+            ->where('created_at', '>=', $since)
+            ->latest('created_at')
+            ->limit(self::PER_SOURCE)
+            ->get(['id', 'user_id', 'meta', 'created_at']);
+        $this->rememberNames($audits->pluck('user_id')->filter()->map(fn (mixed $id): int => (int) $id)->all());
+
+        $out = collect();
+        foreach ($audits as $audit) {
+            $fields = array_values(array_filter((array) data_get($audit->meta, 'fields', []), 'is_string'));
+            $who = $this->name((int) $audit->user_id);
+            $at = self::at($audit->created_at);
+            if ($at === null || $fields === []) {
+                continue;
+            }
+            if ($bucket === 'settings' && in_array('tell_it_update_ready', $fields, true)) {
+                $to = data_get($audit->meta, 'after.is_enabled');
+                $title = is_bool($to)
+                    ? ($to ? 'Update notices turned on' : 'Update notices turned off')
+                    : 'Update notices changed';
+                $detail = is_bool($to)
+                    ? ($to ? 'in the 6:00 am summary' : 'left out of the 6:00 am summary')
+                    : null;
+                $out->push($this->line(
+                    'setting-update-ready-'.$audit->id,
+                    'settings',
+                    $at,
+                    'info',
+                    $title,
+                    implode(' · ', array_filter([$who, $detail])) ?: null,
+                    $who,
+                ));
+            }
+            if ($bucket === 'moves' && in_array('looked_after_by_user_id', $fields, true)) {
+                $out->push($this->line(
+                    'setting-looked-after-'.$audit->id,
+                    'moves',
+                    $at,
+                    'info',
+                    'Looked after by changed',
+                    $who,
+                    $who,
+                ));
+            }
+            if ($bucket === 'terminal' && in_array('ssh_user', $fields, true)) {
+                $out->push($this->line(
+                    'setting-ssh-user-'.$audit->id,
+                    'terminal',
+                    $at,
+                    'info',
+                    'SSH user changed',
+                    $who,
+                    $who,
+                ));
+            }
+        }
+
+        return $out->values();
     }
 }
