@@ -38,6 +38,8 @@ final class ChatSettingsController extends Controller
             'callingReady' => $this->callingReady(),
             // Settings access alone never authorises private chat inspection.
             'chatInvestigator' => app(\App\Services\Chat\ChatInvestigations::class)->isInvestigator($request->user()),
+            // The calling settings (relay and voice-call server) are for administrators only.
+            'chatCallingManager' => $request->user()->canDo('chat.calling.manage'),
         ]);
     }
 

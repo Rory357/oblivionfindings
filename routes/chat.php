@@ -25,6 +25,7 @@ use App\Http\Controllers\Chat\ChatSendAttemptController;
 use App\Http\Controllers\Chat\ChatUploadController;
 use App\Http\Controllers\Chat\ChatUrgentContactController;
 use App\Http\Controllers\Settings\ChatAdministrationController;
+use App\Http\Controllers\Settings\ChatCallingSettingsController;
 use App\Http\Controllers\Settings\ChatInvestigationController;
 use App\Http\Controllers\Settings\ChatSettingsController;
 use App\Http\Middleware\EnsureChatActor;
@@ -37,6 +38,9 @@ Route::middleware(['auth'])->group(function (): void {
     Route::post('/settings/chat/service-health', [ChatSettingsController::class, 'serviceHealth'])->middleware('throttle:6,1,chat-health:')->middleware(EnsureChatActor::class)->name('settings.chat.service-health');
     Route::post('/settings/chat/calling-health', [ChatSettingsController::class, 'callingHealth'])->middleware('throttle:6,1,chat-health:')->middleware(EnsureChatActor::class)->name('settings.chat.calling-health');
     Route::put('/settings/chat', [ChatSettingsController::class, 'update'])->middleware('throttle:20,1,chat-settings:')->middleware(EnsureChatActor::class)->name('settings.chat.update');
+    // Calling settings: the relay and voice-call server, kept here instead of .env (administrators, password on save).
+    Route::get('/settings/chat/calling', [ChatCallingSettingsController::class, 'show'])->middleware(EnsureChatActor::class)->name('settings.chat.calling');
+    Route::put('/settings/chat/calling', [ChatCallingSettingsController::class, 'update'])->middleware('throttle:10,1,chat-calling-settings:')->middleware(EnsureChatActor::class)->name('settings.chat.calling.update');
     // Settings audit, offboarding and client relationships (settings administrators; never private content).
     Route::prefix('settings/chat/administration')->name('settings.chat.administration.')->middleware([EnsureChatActor::class, 'throttle:60,1,chat-administration:'])->group(function (): void {
         Route::get('/audit', [ChatAdministrationController::class, 'audit'])->name('audit');
