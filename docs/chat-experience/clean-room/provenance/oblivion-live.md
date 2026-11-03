@@ -194,7 +194,30 @@ On this branch with the Chat base and main `0a66dafe2` merged in (`8720d117e`). 
   1. **Committed notices file.** `public/legal/chat-third-party-notices.txt` was last generated on 22 October, and still lists pusher-js 8.6.0, tweetnacl and the two @stablelib parts. `prebuild` regenerates it on every build, so a built site is correct, but the committed copy is not. Regenerating it after `npm ci` is already on this note's list of things still to do.
   2. **Gateway import rule.** The `live/` pattern allows every relative path, so an import such as `../node_modules/…` passes. As an import rule, it also cannot see `require()` through `createRequire`. Nothing in `live/` does either today. A `node:test` guard like the relay's (`relay/test/allocation-log.test.mjs`) would close both gaps. This was not tried here, because this worktree has no `node_modules`.
   3. **PHP guard.** It names the two packages spec 12 lists. ratchet/rfc6455 and the ReactPHP parts only ever came in through Reverb, so a direct require of one of them would pass. Adding them is optional.
-- **Still open, and not the checker's to close:** the two-browser end-to-end test and the other end-to-end checks in spec section 11, and the production build.
+- **Still open, and not the checker's to close:** the two-browser end-to-end test and the other end-to-end checks in spec section 11, and the production build. The end-to-end checks have since passed; see the [delta check](#delta-check-3-november-2026).
+
+### Delta check, 3 November 2026
+
+**Clean: no copied code.** By the same checker session, on `a08af6c55` (branch `claude/oblivion-live-removal-wip`), which sits on top of the signed-off `c2df73fdb`.
+
+- **What changed since the sign-off:**
+  - `eb8ec05ae` merges `main` at `a9615729f` (Chat calling settings). It changes none of the 47 compared files, nor the Composer or npm manifests and lock files.
+  - `77f410d03` regenerates `public/legal/chat-third-party-notices.txt`. It removes exactly four entries: pusher-js 8.6.0, tweetnacl 1.0.3, and the two @stablelib parts bundled in pusher-js. It rewords the header line to name livekit-client only, and leaves every livekit-client entry unchanged. This closes note 1 for the builder above.
+  - `a08af6c55` changes `ChatRealtime.php`. A private `wakeSoon()` now runs `WakeChatClients` and `PublishChatUnread` with `Bus::dispatchSync` inside Laravel's `defer(…, always: true)`, once the transaction commits, instead of putting them on the queue. `SharedChatTest.php` and `OblivionLiveTest.php` add `withoutDefer()` where models change outside a request, and one test now invokes Laravel's `DeferredCallbackCollection` to check that the wake-up waits for the response.
+- **Where it comes from:** Laravel's own API (`defer()`, `Bus::dispatchSync`, `DB::afterCommit` and the testing helpers), which is platform. Reverb uses none of them; its only near-match is the name of its own `dispatchSynchronously` method.
+- **Compared:** the new `ChatRealtime.php`, `SharedChatTest.php` and `OblivionLiveTest.php`, with the repository tool and the same thresholds. The outside source was laravel/reverb 1.12.0, pusher/pusher-php-server 7.3.0, ratchet/rfc6455 0.4.1 and react/socket, stream and event-loop, fetched again into the scratchpad at the same commits and deleted afterwards.
+  - `ChatRealtime.php`: 2.7 % structure and 3.6–4.4 % literal, longest runs 15 and 9 tokens. The file before the change scores the same; the main check reviewed it.
+  - Inside the changed lines, the only runs are the `queueConversation` signature with its early return, and a `try … catch (\Throwable $error)` block. The comment in that block has been in the file since 21 October (`faeb9435c`).
+  - Tests: 0.2–4.4 % structure and 0.1–2.4 % literal.
+  - Unrelated Oblivion PHP files against the same sources: 0.2–2.0 % structure and 0–2.2 % literal.
+- **End-to-end checks (spec section 11):** run by the builder session on 3 November 2026, on Oblivion Live with the latest `main`. The checker did not re-run them, and did not re-run Pest, because this worktree has no `vendor/`. All are within the spec:
+  - the other tab updated 0.13–0.25 s after a send (spec: under 1 s);
+  - typing showed in 0.37 s;
+  - with the gateway stopped, polling took over within 11.5 s (spec: within 15 s);
+  - both tabs reconnected after the gateway restarted;
+  - 5,000 idle connections used 99 MB (spec: under 500 MB).
+
+  The run also found the queue delay that `a08af6c55` removes: an idle worker checks the queue every 3 seconds, which added up to 3 s to each wake-up.
 
 ## Open questions
 
