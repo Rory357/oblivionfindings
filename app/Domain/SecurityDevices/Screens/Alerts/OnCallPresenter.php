@@ -7,6 +7,8 @@ use App\Domain\SecurityDevices\Alerts\ItOnCall;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlertEvent;
 use App\Domain\SecurityDevices\Alerts\Models\OnCallHandover;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Domain\SecurityDevices\Setup\Models\SecurityDeviceSetting;
 use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Models\Role;
 use App\Models\Shift;
@@ -28,13 +30,14 @@ final class OnCallPresenter
     public function __construct(
         private readonly ItOnCall $onCall,
         private readonly SecurityDevicesSettings $settings,
+        private readonly SecurityDevicesAccessService $access,
     ) {}
 
     /**
      * @param  Builder<DeviceAlert>  $alerts  the viewer's alerts (their Sites' devices)
      * @return array<string, mixed>
      */
-    public function present(User $viewer, Builder $alerts, CarbonImmutable $now): array
+    public function present(User $viewer, Builder $alerts, CarbonImmutable $now, ?int $siteFilter = null): array
     {
         $shifts = $this->onCall->shifts($now->subDays(7), $now->addDays(14));
         $current = $shifts->first(fn (Shift $shift): bool => $shift->starts_at <= $now && $shift->ends_at > $now);
@@ -68,6 +71,7 @@ final class OnCallPresenter
             'role' => $roleName === null ? null : (string) (Role::query()->where('name', $roleName)->value('label') ?: $roleName),
             'handover' => $readsNotes ? $this->handover() : null,
             'waiting' => $this->waiting($alerts),
+            'summary' => $this->summary($viewer, $now, $siteFilter),
             'delivery' => $this->delivery(),
             'can' => [
                 'rostering' => $viewer->canDo('rostering.viewAny'),
@@ -127,6 +131,12 @@ final class OnCallPresenter
             ->orderBy('at')
             ->get(['alert_id', 'at'])
             ->groupBy('alert_id');
+        $held = $open->isEmpty() ? [] : DeviceAlertEvent::query()
+            ->whereIn('alert_id', $open->pluck('id'))
+            ->where('kind', 'held')
+            ->pluck('alert_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
 
         return $open->map(fn (DeviceAlert $alert): array => [
             'id' => (int) $alert->id,
@@ -135,7 +145,45 @@ final class OnCallPresenter
             'title' => (string) $alert->title,
             'told_at' => ($at = $told->get($alert->id)?->first()?->at) === null ? null : CarbonImmutable::parse($at)->utc()->toIso8601String(),
             'reminded_at' => $alert->reminded_at === null ? null : CarbonImmutable::parse($alert->reminded_at)->utc()->toIso8601String(),
+            'held' => in_array((int) $alert->id, $held, true),
         ])->values()->all();
+    }
+
+    /** @return array{at: string, text: string}|null */
+    private function summary(User $viewer, CarbonImmutable $now, ?int $siteFilter): ?array
+    {
+        if (! Schema::hasTable('security_device_settings')) {
+            return null;
+        }
+        $last = SecurityDeviceSetting::query()->where('key', DeviceAlertEngine::SUMMARY_LAST)->value('value');
+        if (! is_array($last) || ! is_string($last['day'] ?? null) || ! is_string($last['at'] ?? null) || ! is_array($last['items'] ?? null)) {
+            return null;
+        }
+        $zone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        if ($last['day'] !== $now->setTimezone($zone)->format('Y-m-d')) {
+            return null;
+        }
+        $accessible = $this->access->accessibleSiteIds($viewer);
+        $allowedSites = $siteFilter !== null
+            ? (in_array($siteFilter, $accessible, true) ? [$siteFilter] : [])
+            : $accessible;
+        $labels = collect($last['items'])
+            ->filter(fn (mixed $item): bool => is_array($item)
+                && is_numeric($item['site_id'] ?? null)
+                && in_array((int) $item['site_id'], $allowedSites, true)
+                && is_string($item['label'] ?? null)
+                && trim($item['label']) !== '')
+            ->map(fn (array $item): string => (string) $item['label'])
+            ->values()
+            ->all();
+        if ($labels === []) {
+            return null;
+        }
+        $text = count($labels) <= 3
+            ? implode(' · ', $labels)
+            : implode(' · ', array_slice($labels, 0, 3)).' · and '.(count($labels) - 3).' more';
+
+        return ['at' => $last['at'], 'text' => $text];
     }
 
     /** The same switches as Setup › Alerts & checks. Text messages need a provider first (D13). @return list<array<string, mixed>> */
@@ -149,6 +197,12 @@ final class OnCallPresenter
                 'when' => 'A device or hub stops answering',
                 'sub' => 'Or a check fails · everyone in the IT role is reminded after an hour if nobody acknowledges',
                 'app' => $on(SecurityDevicesSettings::DEVICES_APP), 'email' => $on(SecurityDevicesSettings::DEVICES_EMAIL), 'push' => $on(SecurityDevicesSettings::DEVICES_PUSH),
+            ],
+            [
+                'key' => 'summary',
+                'when' => 'Daily summary',
+                'sub' => 'Low batteries, overnight alerts and hub updates, at 6:00 am',
+                'app' => $on(SecurityDevicesSettings::SUMMARY_APP), 'email' => $on(SecurityDevicesSettings::SUMMARY_EMAIL), 'push' => $on(SecurityDevicesSettings::SUMMARY_PUSH),
             ],
             [
                 'key' => 'logins',

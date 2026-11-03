@@ -131,7 +131,7 @@ final class AlertsPresenter
             'per_week' => $tab === 'rules' ? $this->perWeek($base, $now) : null,
             // S&D round 3: Quiet times (13c) from the maintenance windows, On call (13d) from Rostering.
             'quiet_times' => $tab === 'quiet' ? $this->quietTimes->present($viewer, $siteFilter, $now) : null,
-            'on_call' => $tab === 'oncall' ? $this->onCall->present($viewer, $base, $now) : null,
+            'on_call' => $tab === 'oncall' ? $this->onCall->present($viewer, $base, $now, $siteFilter) : null,
             'can' => [
                 'acknowledge' => $viewer->canDo('securityDevices.alerts.acknowledge'),
                 'quiet_time' => $viewer->canDo('securityDevices.monitoring.manage'),
@@ -198,8 +198,12 @@ final class AlertsPresenter
     private function lastTold(DeviceAlert $alert): ?string
     {
         $told = DeviceAlertEvent::query()->where('alert_id', $alert->id)->where('kind', 'told')->latest('id')->value('text');
+        if (is_string($told)) {
+            return $told;
+        }
+        $held = DeviceAlertEvent::query()->where('alert_id', $alert->id)->where('kind', 'held')->exists();
 
-        return is_string($told) ? $told : null;
+        return $held ? 'Waiting for the 6:00 am summary' : null;
     }
 
     /** @return array<string, mixed>|null */

@@ -355,7 +355,9 @@ export type OnCall = {
         title: string;
         told_at: string | null;
         reminded_at: string | null;
+        held?: boolean;
     }[];
+    summary?: { at: string; text: string } | null;
     delivery: {
         key: string;
         when: string;

@@ -44,6 +44,15 @@ export const SETTING_WORDS: Record<string, { label: string; hint: string; loosen
     'alerts.safety.roster': { label: 'Use the roster to find who is on shift', hint: 'From Rostering and clock-ins, at the moment it happens; off, or nobody on shift: everyone at that Site who can acknowledge alerts' },
     'alerts.safety.email': { label: 'Safety alerts: email', hint: '', loosens: 'Staff on shift would no longer get safety alerts by email.' },
     'alerts.safety.push': { label: 'Safety alerts: push', hint: '', loosens: 'Staff on shift would no longer get safety alerts on their phone.' },
+    'alerts.summary.app': { label: 'Daily summary: app', hint: '' },
+    'alerts.summary.email': { label: 'Daily summary: email', hint: '' },
+    'alerts.summary.push': { label: 'Daily summary: push', hint: '' },
+    'alerts.quiet_hours.on': {
+        label: 'Hold device alerts overnight',
+        hint: 'Safety alerts, care rules, emergencies and internet-exposure checks never wait',
+    },
+    'alerts.quiet_hours.start': { label: 'Quiet hours start', hint: '' },
+    'alerts.quiet_hours.end': { label: 'Quiet hours end', hint: '' },
     'mqtt.allow_unencrypted': {
         label: 'Allow unencrypted MQTT through a Site’s hub',
         hint: 'Port 1883, only from the house network to its hub. Never from the internet. Refused at Sites whose address range another Site uses',
@@ -120,13 +129,21 @@ function ChangedBadge({ draft, keys }: { draft: SettingsDraft; keys: string[] })
     ) : null;
 }
 
-function labelWithBadge(label: ReactNode, draft: SettingsDraft, keys: string[]) {
+export function labelWithBadge(label: ReactNode, draft: SettingsDraft, keys: string[]) {
     return (
         <span className="inline-flex flex-wrap items-center gap-2">
             {label}
             <ChangedBadge draft={draft} keys={keys} />
         </span>
     );
+}
+
+export function formatClock(value: string | null | undefined): string {
+    if (!value || !/^\d{2}:\d{2}$/.test(value)) return value ?? '—';
+    const [hour, minute] = value.split(':').map(Number);
+    const twelve = hour % 12 || 12;
+    const suffix = hour >= 12 ? 'pm' : 'am';
+    return `${twelve}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
 /** One titled group of On/Off rows. */
@@ -266,6 +283,7 @@ export function ChannelGroup({
 function valueWords(key: string, value: Value, draft: SettingsDraft): string {
     const row = draft.settings?.[key];
     if (row?.type === 'role') return row.options.find((option) => option.value === value)?.label ?? 'IT for that Site';
+    if (row?.type === 'time') return formatClock(typeof value === 'string' ? value : null);
     return value ? 'On' : 'Off';
 }
 

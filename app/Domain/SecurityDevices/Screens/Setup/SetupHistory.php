@@ -219,6 +219,12 @@ final class SetupHistory
             SecurityDevicesSettings::SAFETY_EMAIL => "Turned {$state} safety alerts by email",
             SecurityDevicesSettings::SAFETY_PUSH => "Turned {$state} safety alerts by push",
             SecurityDevicesSettings::SAFETY_ROSTER => "Turned {$state} using the roster for safety alerts",
+            SecurityDevicesSettings::SUMMARY_APP => "Turned {$state} app notices for the 6:00 am summary",
+            SecurityDevicesSettings::SUMMARY_EMAIL => "Turned {$state} emails for the 6:00 am summary",
+            SecurityDevicesSettings::SUMMARY_PUSH => "Turned {$state} push notices for the 6:00 am summary",
+            SecurityDevicesSettings::QUIET_HOURS_ON => "Turned {$state} holding device alerts during quiet hours",
+            SecurityDevicesSettings::QUIET_HOURS_START => 'Changed quiet hours to start at '.self::clockWords($meta['to'] ?? null),
+            SecurityDevicesSettings::QUIET_HOURS_END => 'Changed quiet hours to end at '.self::clockWords($meta['to'] ?? null),
             SecurityDevicesSettings::WATCH_ON_ADD => "Turned {$state} watching devices as soon as they’re added",
             SecurityDevicesSettings::WATCH_PHONES => "Turned {$state} watching phones and tablets",
             // pg-sdr-18b: Overview › Reports, the monthly email (MonthlyReportEmail).
@@ -247,5 +253,15 @@ final class SetupHistory
             ['Camera viewing log', 'With the reason, as long as your audit policy says'],
             ['Readings and graphs', "Every reading for {$raw} days, then daily summaries for ".intdiv($daily, 365).' years'],
         ];
+    }
+
+    private static function clockWords(mixed $value): string
+    {
+        if (! is_string($value) || preg_match('/\A([01]\d|2[0-3]):[0-5]\d\z/', $value) !== 1) {
+            return 'a new time';
+        }
+        $parsed = \Carbon\CarbonImmutable::createFromFormat('H:i', $value);
+
+        return $parsed === false ? $value : strtolower($parsed->format('g:i a'));
     }
 }

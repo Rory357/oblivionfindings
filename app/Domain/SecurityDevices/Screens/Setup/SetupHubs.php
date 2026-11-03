@@ -201,6 +201,7 @@ final class SetupHubs
             ['tone' => 'info', 'text' => '**Test first** hubs get a new version first (Edit hub)', 'at' => null],
             ['tone' => 'info', 'text' => 'A new version that can’t check in within '.HubUpdatePolicy::ROLLBACK_AFTER_MINUTES.' minutes is swapped back by the hub itself, which tries again the next night', 'at' => null],
             ['tone' => 'info', 'text' => 'The other hubs take it **a day after it comes out, and only once a test-first hub has it working**. If the test hub’s update fails, they keep their version. With no test-first hub, they wait the day', 'at' => null],
+            ['tone' => 'info', 'text' => 'What updated or went back overnight is included in the **6:00 am summary**', 'at' => null],
             ['tone' => 'warning', 'text' => '**Hold updates** stops every hub updating until you let it go', 'at' => null],
         ];
     }
