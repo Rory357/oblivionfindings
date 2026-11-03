@@ -46,6 +46,7 @@ use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Notifications\Events\NotificationSending;
+use Illuminate\Support\Defer\DeferredCallbackCollection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -1439,6 +1440,8 @@ it('publishes content-free live events only to currently authorised recipients',
 
 it('wakes call participants on state changes without broadcasting polling heartbeats', function () {
     enableSharedChatRealtime();
+    // Model events outside a request: run each wake-up as soon as it is deferred.
+    $this->withoutDefer();
     Bus::fake([WakeChatClients::class]);
     $site = Site::factory()->create();
     [$sender, $recipient] = [sharedChatStaff($site), sharedChatStaff($site)];
@@ -1456,7 +1459,7 @@ it('wakes call participants on state changes without broadcasting polling heartb
     Bus::assertDispatched(WakeChatClients::class, fn ($job) => $job->conversationId === $conversation->id);
 });
 
-it('queues live hints only after commit and tolerates unavailable dispatch after a committed write', function () {
+it('sends live hints after commit once the response is done, never queued, and tolerates an unavailable dispatcher', function () {
     enableSharedChatRealtime();
     Bus::fake([WakeChatClients::class]);
     $site = Site::factory()->create();
@@ -1466,7 +1469,11 @@ it('queues live hints only after commit and tolerates unavailable dispatch after
         app(ChatRealtime::class)->queueConversation($conversation->id);
         Bus::assertNotDispatched(WakeChatClients::class);
     });
-    Bus::assertDispatchedTimes(WakeChatClients::class, 1);
+    // Committed, but the wake-up waits for the response (or command or job) to finish.
+    Bus::assertNotDispatched(WakeChatClients::class);
+    app(DeferredCallbackCollection::class)->invoke();
+    Bus::assertDispatchedSyncTimes(WakeChatClients::class, 1);
+    expect(Bus::dispatched(WakeChatClients::class))->toBeEmpty();
     try {
         DB::transaction(function () use ($conversation) {
             app(ChatRealtime::class)->queueConversation($conversation->id);
@@ -1474,8 +1481,9 @@ it('queues live hints only after commit and tolerates unavailable dispatch after
         });
     } catch (RuntimeException) {
     }
+    app(DeferredCallbackCollection::class)->invoke();
     Bus::assertDispatchedTimes(WakeChatClients::class, 1);
-    Bus::swap(Mockery::mock(Dispatcher::class)->shouldReceive('dispatch')->andThrow(new RuntimeException('Unavailable queue'))->getMock());
+    Bus::swap(Mockery::mock(Dispatcher::class)->shouldReceive('dispatch', 'dispatchSync')->andThrow(new RuntimeException('Unavailable dispatcher'))->getMock());
     $this->actingAs($sender)->withHeader('X-Chat-Actor', (string) $sender->id)->postJson(route('chat.send', $conversation), ['mutation_id' => (string) Str::uuid(), 'content' => 'Durable when live transport is down'])->assertCreated();
     expect(DB::table('chat_message_changes')->count())->toBe(1);
 });
