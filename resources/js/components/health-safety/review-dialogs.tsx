@@ -10,6 +10,7 @@ import { useEffect, useId, useMemo, useState } from 'react';
 
 import type { EventCorrectiveAction, EventDetail } from '@/components/health-safety/event-detail-dialog';
 import { HazardStaffPicker } from '@/components/health-safety/hazard-staff-picker';
+import { collapsePendingWorksafeRequirements } from '@/components/health-safety/review-progress';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
 import { PopupCallout, PopupField, PopupForm } from '@/components/popup';
@@ -479,8 +480,15 @@ export function CloseReviewDialog({
     const requirements = d.close_readiness.requirements;
     const hard = requirements.filter((r) => r.classification === 'hard');
     const soft = requirements.filter((r) => r.classification === 'exceptional');
+    const inlineRequirementLabel = (label: string): string => {
+        const trimmed = label.replace(/\.$/, '');
+        if (/^(WorkSafe|H&S|Control Room|Site\b)/.test(trimmed)) return trimmed;
+        return trimmed ? trimmed[0].toLowerCase() + trimmed.slice(1) : trimmed;
+    };
     const line = (items: typeof requirements) =>
-        `${items.filter((r) => r.complete).length} of ${items.length} done (${items.map((r) => r.label.replace(/\.$/, '').toLowerCase()).join(', ')})`;
+        `${items.filter((r) => r.complete).length} of ${items.length} done (${collapsePendingWorksafeRequirements(items)
+            .map((r) => inlineRequirementLabel(r.label))
+            .join(', ')})`;
 
     return (
         <PopupForm
@@ -816,7 +824,11 @@ export function DecideCloseAnywayDialog({
                 </div>
                 <div>
                     <dt className="font-semibold">Can’t be skipped {hard.every((r) => r.complete) ? '— all done' : '— not all done'}</dt>
-                    <dd className="text-muted-foreground">{hard.map((r) => r.label).join(' · ')}</dd>
+                    <dd className="text-muted-foreground">
+                        {collapsePendingWorksafeRequirements(hard)
+                            .map((r) => r.label)
+                            .join(' · ')}
+                    </dd>
                 </div>
                 <div>
                     <dt className="font-semibold">Why {asker} asked</dt>

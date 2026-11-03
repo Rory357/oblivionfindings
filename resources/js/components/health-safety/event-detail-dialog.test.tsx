@@ -607,13 +607,22 @@ describe('Permanent safety review workspace', () => {
         const readiness = screen.getByRole('button', { name: /Closure readiness/ });
         expect(readiness).toHaveTextContent('4 things left · 1 done');
         fireEvent.click(readiness);
-        // … but the three that depend on the decision show as one plain line.
+        // … but the three that depend on the decision show as one plain line naming what it blocks.
+        const expectedLine =
+            'Record the WorkSafe decision first — it blocks WorkSafe notification, acknowledgement and Site preservation.';
         expect(
             screen.getByRole('link', {
-                name: 'Record the WorkSafe decision first. The other WorkSafe steps depend on it.',
+                name: expectedLine,
             }),
         ).toHaveAttribute('href', '/health-safety/events/17?action=worksafe-decision');
         expect(screen.queryByText(/before confirming/)).toBeNull();
+
+        // Picking the Closed step in the header strip also collapses the four WorkSafe lines into one.
+        const steps = screen.getByRole('list', { name: /Safety review steps/ });
+        fireEvent.click(within(steps).getByRole('button', { name: /Closed/ }));
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getByText(expectedLine)).toBeInTheDocument();
+        expect(within(progress).queryByText(/before confirming/)).toBeNull();
     });
 
     it('renders a real record page with linked summaries and section navigation', () => {
