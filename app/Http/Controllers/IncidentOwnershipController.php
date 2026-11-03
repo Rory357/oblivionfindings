@@ -24,6 +24,7 @@ class IncidentOwnershipController extends Controller
     public function store(Request $request, ClientIncident $incident, IncidentOwnershipService $owners)
     {
         $this->authorize('view', $incident);
+        $this->ensureIncidentPreviousUrl($request, $incident);
         $data = $request->validate([
             'owner_user_id' => ['required', 'integer', 'min:1'],
             'expected_revision' => ['required', 'integer', 'min:0'],
@@ -40,6 +41,7 @@ class IncidentOwnershipController extends Controller
         $this->authorize('view', $incident);
         abort_unless((int) $delivery->change->incident_id === (int) $incident->id, 404);
         abort_unless($eligibility->canManage($request->user(), $incident), 403);
+        $this->ensureIncidentPreviousUrl($request, $incident);
         if (! in_array($delivery->status, ['failed', 'pending'], true)) {
             return back()->with('success', 'This notification has already been handled.');
         }
@@ -50,5 +52,16 @@ class IncidentOwnershipController extends Controller
         }
 
         return back()->with('success', 'Notification retry requested. Check its delivery status.');
+    }
+
+    private function ensureIncidentPreviousUrl(Request $request, ClientIncident $incident): void
+    {
+        if (! $request->hasSession() || $request->headers->has('referer')) {
+            return;
+        }
+        $previousPath = (string) parse_url((string) $request->session()->previousUrl(), PHP_URL_PATH);
+        if ($previousPath === '' || str_ends_with($previousPath, '/owners/options')) {
+            $request->session()->setPreviousUrl(url('/incidents/'.$incident->id));
+        }
     }
 }

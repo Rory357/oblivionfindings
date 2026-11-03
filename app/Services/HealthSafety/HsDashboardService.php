@@ -535,7 +535,8 @@ class HsDashboardService
                 ->orderBy('scheduled_at')
                 ->limit($limit)
                 ->get() as $drill) {
-                $label = trim(ucfirst((string) $drill->drill_type).' drill — '.($drill->site?->name ?? ''), ' —');
+                $drillType = ucfirst(str_replace('_', ' ', (string) $drill->drill_type));
+                $label = trim($drillType.' drill — '.($drill->site?->name ?? ''), ' —');
                 $items[] = $this->expiringItem('drill', 'Emergency drill', $label, $drill->scheduled_at, '/health-safety/drills', $drill->site?->name);
             }
 

@@ -33,7 +33,12 @@ function useConcernsRailCounts(enabled: boolean): Partial<Record<string, number>
         if (!enabled) return;
         let live = true;
         axios
-            .get<Record<string, number | null>>('/health-safety/rail-counts')
+            .get<Record<string, number | null>>('/health-safety/rail-counts', {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
             .then(({ data }) => {
                 if (!live) return;
                 setCounts(Object.fromEntries(Object.entries(data).filter((entry): entry is [string, number] => typeof entry[1] === 'number')));

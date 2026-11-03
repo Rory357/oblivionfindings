@@ -393,7 +393,10 @@ export function AssignIncidentOwner({
             fetch(
                 `/incidents/${incidentId}/owners/options?${new URLSearchParams({ q: search })}`,
                 {
-                    headers: { Accept: 'application/json' },
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
                     credentials: 'same-origin',
                     signal: controller.signal,
                 },

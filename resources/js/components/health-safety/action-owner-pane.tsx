@@ -96,7 +96,10 @@ export function ActionOwnerPane({
                 const response = await fetch(
                     `/health-safety/corrective-actions/${actionId}/owner-candidates?q=${encodeURIComponent(search)}`,
                     {
-                        headers: { Accept: 'application/json' },
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
                         signal: controller.signal,
                     },
                 );
