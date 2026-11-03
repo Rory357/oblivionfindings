@@ -5,6 +5,7 @@ namespace App\Services\Incidents;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
+use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\User;
@@ -1832,5 +1833,108 @@ class IncidentJourneyService
             $alert?->fresh(),
             $hsEvent->fresh(),
         );
+    }
+
+    /**
+     * Summarize the cross-module journey state for detail headers and footers.
+     *
+     * @param  array<string, mixed>|null  $healthSafetyFacts
+     */
+    public function journeyState(
+        ?ClientIncident $incident,
+        ?ControlRoomAlert $alert,
+        ?HsEvent $hsEvent,
+        ?array $healthSafetyFacts = null,
+    ): string {
+        $hasHs = $healthSafetyFacts === null ? $hsEvent !== null : ($healthSafetyFacts['present'] ?? false);
+        $hsStatus = $healthSafetyFacts === null ? $hsEvent?->status : ($healthSafetyFacts['status'] ?? null);
+        $handoverStatus = $healthSafetyFacts === null ? $hsEvent?->handover_status : ($healthSafetyFacts['handover_status'] ?? null);
+        $hsKnown = ! $hasHs || $healthSafetyFacts === null
+            || (($healthSafetyFacts['access'] ?? null) === 'readable' && $this->knownHsStatus($hsStatus));
+        if ($incident === null && $alert === null && ! $hasHs) {
+            return 'Journey needs review';
+        }
+        $incidentClosed = $incident === null || $incident->status === 'closed';
+        $healthSafetyClosed = ! $hasHs || ($hsKnown && $hsStatus === HsEvent::STATUS_CLOSED);
+        $operationalClosed = $alert === null || in_array($alert->status, [
+            ControlRoomAlert::STATUS_CLOSED,
+            ControlRoomAlert::STATUS_DISMISSED,
+        ], true);
+        $operationalResponseEnded = $alert !== null
+            && in_array($alert->status, [
+                ControlRoomAlert::STATUS_RESOLVED,
+                ControlRoomAlert::STATUS_CLOSED,
+                ControlRoomAlert::STATUS_DISMISSED,
+            ], true);
+
+        if ($incidentClosed && $healthSafetyClosed && $operationalClosed) {
+            return 'Journey closed';
+        }
+
+        if ($alert?->isActionable()) {
+            return 'Operational response active';
+        }
+
+        if ($operationalResponseEnded
+            && ! in_array($incident?->status, ['reviewed', 'closed'], true)
+        ) {
+            return 'Operationally resolved';
+        }
+
+        if ($hasHs && ! $hsKnown) {
+            return 'Journey needs review';
+        }
+
+        if ($hasHs
+            && in_array($handoverStatus, [
+                HsEvent::HANDOVER_NOT_READY,
+                HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+            ], true)
+        ) {
+            return 'H&S acceptance pending';
+        }
+
+        if ($hsStatus === HsEvent::STATUS_CLOSED) {
+            return 'Governance closed';
+        }
+
+        if ($hasHs && ($healthSafetyFacts === null
+            ? $hsEvent->correctiveActions()->where('status', HsCorrectiveAction::STATUS_COMPLETED)->exists()
+            : ($healthSafetyFacts['has_completed_action'] ?? false))) {
+            return 'Awaiting independent verification';
+        }
+
+        if ($hasHs && ($healthSafetyFacts === null ? $hsEvent->isOpen() : $hsStatus !== HsEvent::STATUS_CLOSED)) {
+            return 'H&S governance active';
+        }
+
+        if (in_array($incident?->status, ['reviewed', 'closed'], true)) {
+            return 'Incident review complete';
+        }
+
+        if ($operationalResponseEnded) {
+            return 'Operationally resolved';
+        }
+
+        if ($incident?->status === 'draft') {
+            return 'Incident draft';
+        }
+
+        if ($incident?->status === 'submitted') {
+            return 'Incident review pending';
+        }
+
+        return 'Journey needs review';
+    }
+
+    private function knownHsStatus(?string $status): bool
+    {
+        return in_array($status, [
+            HsEvent::STATUS_OPEN,
+            HsEvent::STATUS_INVESTIGATING,
+            HsEvent::STATUS_CORRECTIVE_ACTION,
+            HsEvent::STATUS_MONITORING,
+            HsEvent::STATUS_CLOSED,
+        ], true);
     }
 }

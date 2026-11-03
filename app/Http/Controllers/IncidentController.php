@@ -30,7 +30,6 @@ use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use App\Services\Incidents\IncidentClosureService;
 use App\Services\Incidents\IncidentEvidenceReadService;
 use App\Services\Incidents\IncidentJourney;
-use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Incidents\IncidentOwnershipService;
 use App\Services\Incidents\IncidentRegisterReadService;
@@ -61,7 +60,6 @@ class IncidentController extends Controller
     public function __construct(
         private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
         private readonly IncidentJourneyService $journeys,
-        private readonly IncidentJourneyPresenter $journeyPresenter,
         private readonly IncidentAlertLifecycleSignalService $incidentAlertSignals,
         private readonly IncidentReportDraftService $incidentReportDrafts,
         private readonly IncidentOwnershipService $owners,
@@ -453,7 +451,7 @@ class IncidentController extends Controller
             'close_gate' => $closeGatePayload,
             'journey_state' => $journeyRepairRequired
                 ? 'Journey repair required'
-                : $this->journeyPresenter->journeyState(
+                : $this->journeys->journeyState(
                     $incident,
                     $linkedControlRoomAlert,
                     $hsEvent,

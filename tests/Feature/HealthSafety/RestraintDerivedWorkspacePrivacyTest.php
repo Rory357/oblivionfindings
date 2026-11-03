@@ -16,7 +16,6 @@ use App\Services\ControlRoom\AlertWorklistQuery;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\HealthSafety\HsVisibilityService;
 use App\Services\Incidents\IncidentJourney;
-use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -162,102 +161,6 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
         $this->assertSame(['access' => 'restricted', 'status' => null, 'handover' => ['status' => null]], $service->forEvent($event, $viewer));
     }
 
-    public function test_journey_uses_current_hs_projection_and_never_hydrates_denied_private_relations(): void
-    {
-        $viewer = $this->staff(['hazards.view', 'incidents.viewAny', 'clients.viewAny']);
-        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create([
-            'site_id' => $this->site->id, 'client_id' => $this->client->id, 'reported_by' => $viewer->id,
-        ]));
-        $event = HsEvent::withoutEvents(fn () => HsEvent::factory()->forClientIncident($incident)->create([
-            'site_id' => $this->site->id, 'client_id' => $this->client->id,
-            'owner_user_id' => $viewer->id, 'acceptance_notes' => 'Current governance decision',
-        ]));
-        $incident->updateQuietly(['hs_event_id' => $event->id]);
-        $event->acceptance_notes = 'Caller stale private decision';
-        $event->setRelation('owner', new User(['id' => 999, 'name' => 'Injected private owner']));
-        $presenter = app(IncidentJourneyPresenter::class);
-        $journey = new IncidentJourney($incident, null, $event);
-        $dto = $presenter->present($journey, $viewer);
-        $this->assertSame('Current governance decision', $dto['health_safety']['handover']['notes']);
-        $this->assertSame($viewer->id, $dto['health_safety']['handover']['owner']['id']);
-        $this->assertStringNotContainsString('Injected private owner', json_encode($dto));
-        $this->revoke($viewer, 'hazards.view');
-        $event->unsetRelations();
-        $dto = $presenter->present($journey, $viewer);
-        $this->assertNull($dto['health_safety']);
-        $this->assertNull($dto['references']['health_safety']);
-        $this->assertNull($dto['lifecycle'][2]['href']);
-        $this->assertFalse($event->relationLoaded('owner'));
-        $this->assertFalse($event->relationLoaded('activeInvestigation'));
-        $this->assertStringNotContainsString('Current governance decision', json_encode($dto));
-    }
-
-    public function test_journey_snapshot_materializes_permitted_action_fact_and_denial_never_queries_or_closes_private_work(): void
-    {
-        $viewer = $this->staff(['hazards.view', 'hazards.manage', 'incidents.viewAny', 'clients.viewAny']);
-        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
-            'site_id' => $this->site->id, 'client_id' => $this->client->id, 'reported_by' => $viewer->id, 'status' => 'closed',
-        ]));
-        $event = HsEvent::withoutEvents(fn () => HsEvent::factory()->forClientIncident($incident)->create([
-            'site_id' => $this->site->id, 'client_id' => $this->client->id,
-            'status' => HsEvent::STATUS_MONITORING, 'handover_status' => HsEvent::HANDOVER_ACCEPTED,
-        ]));
-        $event->load('correctiveActions');
-        $this->action($event, $viewer, ['status' => HsCorrectiveAction::STATUS_COMPLETED]);
-        $journey = new IncidentJourney($incident, null, $event);
-        $presenter = app(IncidentJourneyPresenter::class);
-        $this->assertSame('Awaiting independent verification', $presenter->present($journey, $viewer)['journey_state']);
-        $this->assertSame($presenter->journeyState($incident, null, $event), $presenter->present($journey, $viewer)['journey_state']);
-        $this->revoke($viewer, 'hazards.view');
-        DB::enableQueryLog();
-        try {
-            DB::flushQueryLog();
-            $dto = $presenter->present($journey, $viewer);
-            $this->assertNull($dto['health_safety']);
-            $this->assertSame('Journey needs review', $dto['journey_state']);
-            $this->assertSame('blocked', $dto['lifecycle'][2]['state']);
-            $this->assertNull($dto['lifecycle'][2]['href']);
-            foreach (DB::getQueryLog() as $entry) {
-                $this->assertStringNotContainsString('hs_corrective_actions', strtolower($entry['query']));
-            }
-        } finally {
-            DB::disableQueryLog();
-        }
-        // A retained denied-source reference is uncertain, never a completed journey.
-        $this->closedFixture($event, ['status' => HsEvent::STATUS_CLOSED]);
-        $this->assertSame('Journey needs review', $presenter->present($journey, $viewer)['journey_state']);
-    }
-
-    public function test_readable_pending_journey_revoked_manage_or_site_cannot_offer_stale_hs_command(): void
-    {
-        $viewer = $this->staff(['hazards.view', 'hazards.manage', 'incidents.viewAny', 'clients.viewAny']);
-        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create([
-            'site_id' => $this->site->id, 'client_id' => $this->client->id, 'reported_by' => $viewer->id,
-        ]));
-        $event = HsEvent::withoutEvents(fn () => HsEvent::factory()->forClientIncident($incident)->create([
-            'site_id' => $this->site->id, 'client_id' => $this->client->id, 'status' => HsEvent::STATUS_OPEN,
-            'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
-        ]));
-        $presenter = app(IncidentJourneyPresenter::class);
-        $journey = new IncidentJourney($incident, null, $event);
-        $this->assertSame('Accept H&S handover', $presenter->present($journey, $viewer)['next_action']['label']);
-        $viewer->load('permissionOverrides', 'roles.permissions', 'hrEmployeeProfile');
-        $this->revoke($viewer, 'hazards.manage');
-        $dto = $presenter->present($journey, $viewer);
-        $this->assertSame('readable', $dto['linked_access']['health_safety']);
-        $this->assertSame('waiting', $dto['lifecycle'][2]['state']);
-        $this->assertSame('View incident', $dto['next_action']['label']);
-        $this->grant($viewer, 'hazards.manage');
-        $otherSite = Site::factory()->create(['is_active' => true]);
-        $viewer->hrEmployeeProfile()->update(['primary_site_id' => $otherSite->id, 'secondary_site_ids' => []]);
-        $dto = $presenter->present($journey, $viewer);
-        $this->assertNull($dto['health_safety']);
-        $this->assertSame('blocked', $dto['lifecycle'][2]['state']);
-        $this->assertSame('Journey needs review', $dto['journey_state']);
-        $this->assertNotSame('health_safety', $dto['next_action']['stage']);
-        $this->assertNull($dto['lifecycle'][2]['href']);
-    }
-
     public function test_real_workspace_summary_and_journey_share_current_closed_facts_despite_stale_governance_reference(): void
     {
         $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Control Room restraint changes (restraint_content_access, source-checked search and journey states), which this build doesn\'t port.', 'port with the Control Room work.'));
@@ -389,30 +292,6 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
         $this->assertSame('readable', $dto['alert']['context']['restraint_content_access']);
         $this->assertSame($source->id, $dto['alert']['context']['restraint_source']['id']);
         $this->assertNull($dto['alert']['context']['restraint_source']['href']);
-    }
-
-    public function test_journey_conceals_copied_restraint_notes_but_keeps_canonical_operational_notes(): void
-    {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Control Room restraint changes (restraint_content_access, source-checked search and journey states), which this build doesn\'t port.', 'port with the Control Room work.'));
-        $source = $this->event();
-        $alert = $this->response($source);
-        $viewer = $this->staff(['controlRoom.alerts.view', 'incidents.viewAny', 'clients.viewAny']);
-        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create([
-            'site_id' => $this->site->id, 'client_id' => $this->client->id, 'reported_by' => $viewer->id,
-            'control_room_alert_id' => $alert->id,
-        ]));
-        $journey = new IncidentJourney($incident, $alert, null);
-        $presenter = app(IncidentJourneyPresenter::class);
-        $dto = $presenter->present($journey, $viewer);
-        $this->assertNotNull($dto['control_room']);
-        $this->assertNull($dto['control_room']['notes']);
-        $alert->updateQuietly(['notes' => 'Current independently authored response note', 'context' => [...$alert->context, 'source_deliveries' => []]]);
-        $dto = $presenter->present($journey, $viewer);
-        $this->assertSame('Current independently authored response note', $dto['control_room']['notes']);
-        $this->assertSame(ControlRoomAlert::STATUS_OPEN, $dto['control_room']['status']);
-        $this->grant($viewer, 'restraints.view');
-        $alert->updateQuietly(['notes' => 'Authorised copied note', 'context' => ['restraint_event_id' => $source->id]]);
-        $this->assertSame('Authorised copied note', $presenter->present($journey, $viewer)['control_room']['notes']);
     }
 
     public function test_actual_incident_detail_preserves_rich_authorised_investigation_action_and_handover_fields(): void

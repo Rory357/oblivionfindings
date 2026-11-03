@@ -14,7 +14,6 @@ use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsVisibilityService;
-use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
@@ -38,7 +37,6 @@ class AlertWorkspaceService
         private LinkedOperationalEvidencePresenter $linkedEvidence,
         private ControlRoomAlertLifecycleService $lifecycle,
         private IncidentJourneyService $journeys,
-        private IncidentJourneyPresenter $journeyPresenter,
         private RestraintHsReferenceVisibility $restraintReferences,
     ) {}
 
@@ -418,7 +416,7 @@ class AlertWorkspaceService
             'linked_operational_evidence' => $linkedOperationalEvidence,
             'resolve_gate' => $resolveGate,
             'close_gate' => $closeGate,
-            'journey_state' => $this->journeyPresenter->journeyState(
+            'journey_state' => $this->journeys->journeyState(
                 $linkedIncident,
                 $alert,
                 $linkedHsEvent,
