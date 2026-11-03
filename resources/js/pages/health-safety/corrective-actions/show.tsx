@@ -86,9 +86,15 @@ import {
 import { useEffect, useState, type ReactNode } from 'react';
 
 export type CorrectiveActionWorkspace = {
+    history_state?: 'loaded' | 'restricted' | 'error';
     action: EventCorrectiveAction & {
         description: string | null;
+        created_at?: string | null;
+        created_by_name?: string | null;
+        assigned_at?: string | null;
+        assigned_by_name?: string | null;
         closed_at: string | null;
+        closed_by_name?: string | null;
     };
     review: {
         id: number;
@@ -481,6 +487,48 @@ function ActionRecord({
         if (/closed/.test(text)) return 'closed';
         return 'done';
     };
+    const historyError = workspace.history_state === 'error';
+    const recordStepActivity: Array<RecordProgressActivity & { step: ActionStepKey }> =
+        !loaded && !historyError
+            ? [
+                  ...(ca.created_at
+                      ? [
+                            {
+                                key: 'agreed-created',
+                                step: 'agreed' as const,
+                                time: formatDateTime(ca.created_at),
+                                who: ca.created_by_name ?? undefined,
+                                what: 'action created',
+                            },
+                        ]
+                      : []),
+                  ...(ca.verified_at
+                      ? [
+                            {
+                                key: 'checked-verified',
+                                step: 'checked' as const,
+                                time: formatDateTime(ca.verified_at),
+                                who: ca.verified_by_name ?? undefined,
+                                what:
+                                    ca.effectiveness_confirmed === false
+                                        ? 'checked the action: didn’t work'
+                                        : 'action independently verified',
+                            },
+                        ]
+                      : []),
+                  ...(ca.closed_at
+                      ? [
+                            {
+                                key: 'closed-at',
+                                step: 'closed' as const,
+                                time: formatDateTime(ca.closed_at),
+                                who: ca.closed_by_name ?? undefined,
+                                what: 'action closed',
+                            },
+                        ]
+                      : []),
+              ]
+            : [];
     const actionActivity: Array<RecordProgressActivity & { step: ActionStepKey }> = [
         ...ca.history.map((entry, index) => ({
             key: `h${index}`,
@@ -489,13 +537,26 @@ function ActionRecord({
             who: entry.actor ?? undefined,
             what: entry.detail ? `${entry.label.toLowerCase()}: ${entry.detail}` : entry.label.toLowerCase(),
         })),
-        ...ownership.history.map((change) => ({
-            key: `o${change.id}`,
-            step: 'owner' as const,
-            time: formatDateTime(change.changed_at),
-            who: change.changed_by,
-            what: `${change.previous_owner ? `handed the action from ${change.previous_owner} to ${change.owner}` : `made ${change.owner} the owner`}${change.reason ? ` — ${change.reason}` : ''}`,
-        })),
+        ...recordStepActivity,
+        ...(ownership.history.length
+            ? ownership.history.map((change) => ({
+                  key: `o${change.id}`,
+                  step: 'owner' as const,
+                  time: formatDateTime(change.changed_at),
+                  who: change.changed_by,
+                  what: `${change.previous_owner ? `handed the action from ${change.previous_owner} to ${change.owner}` : `made ${change.owner} the owner`}${change.reason ? ` — ${change.reason}` : ''}`,
+              }))
+            : ca.owner && ca.assigned_at
+              ? [
+                    {
+                        key: 'owner-assigned',
+                        step: 'owner' as const,
+                        time: formatDateTime(ca.assigned_at),
+                        who: ca.assigned_by_name ?? undefined,
+                        what: `made ${ca.owner.name} the owner`,
+                    },
+                ]
+              : []),
     ];
     const ownerLink = ownership.can_assign ? (
         <PaneLink onClick={() => select('overview', 'owner')}>
@@ -574,9 +635,17 @@ function ActionRecord({
                           ? [{ key: 'rework', label: 'Changes asked for', value: ca.rework.latest_reason }]
                           : []),
                   ]
-                : ca.rework.latest_reason
-                  ? [{ key: 'rework', label: 'Changes asked for', value: ca.rework.latest_reason }]
-                  : [],
+                : !loaded && ['completed', 'verified', 'closed'].includes(ca.status)
+                  ? [
+                        {
+                            key: 'what',
+                            label: 'What was done',
+                            value: 'Completion details need separate access.',
+                        },
+                    ]
+                  : ca.rework.latest_reason
+                    ? [{ key: 'rework', label: 'Changes asked for', value: ca.rework.latest_reason }]
+                    : [],
             empty:
                 ca.status === 'in_progress'
                     ? `${owner ?? 'The owner'} is doing the work. They mark it done and add evidence.`
@@ -620,8 +689,11 @@ function ActionRecord({
         ...paneByStep[shownStep],
         activity: {
             items: actionActivity.filter((entry) => entry.step === shownStep),
-            state: loaded || shownStep === 'owner' ? 'ready' : 'error',
-            onAll: () => select('history'),
+            state: historyError && shownStep !== 'owner' ? 'error' : 'ready',
+            onAll:
+                loaded || ownership.history.length > 0 || historyError
+                    ? () => select('history')
+                    : undefined,
         },
     };
 
