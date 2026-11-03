@@ -567,6 +567,11 @@ Route::middleware([
         ->whereNumber('site')
         ->middleware(['permission:securityDevices.devices.view', 'throttle:20,1'])
         ->name('security-devices.sites.logbook.export');
+    // S&D 12j: place unplaced Site devices (e.g. radio sensors) onto the Site map by hand.
+    Route::post('/sites/{site}/network/place', [SitesController::class, 'placeOnMap'])
+        ->whereNumber('site')
+        ->middleware(['permission:securityDevices.devices.update', 'throttle:30,1'])
+        ->name('security-devices.sites.network.place');
     // S&D Phase F (pg-sdr-12c, pop-ups 42 and 43): a Site's house modes. Safe actions only; another Site's mode is 404.
     Route::post('/sites/{site}/modes', [\App\Domain\SecurityDevices\Screens\Http\SiteModesController::class, 'store'])
         ->whereNumber('site')

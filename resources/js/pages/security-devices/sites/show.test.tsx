@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -33,7 +34,7 @@ vi.mock('@inertiajs/react', async () => {
         ...actual,
         Head: () => null,
         usePage: () => ({ props: { auth: { user: { id: 7 } } } }),
-        router: { ...actual.router, get: vi.fn(), visit: vi.fn(), on: () => () => undefined },
+        router: { ...actual.router, get: vi.fn(), post: vi.fn(), delete: vi.fn(), visit: vi.fn(), on: () => () => undefined },
     };
 });
 vi.mock('@/layouts/app-layout', () => ({
@@ -396,6 +397,98 @@ describe('Site page', () => {
 
         expect(screen.getByText('Nothing reports links here yet.')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Add a hub' })).toBeInTheDocument();
+    });
+
+    it('lets device editors place unplaced radio devices on the map by hand and take manual links off (12j)', () => {
+        vi.mocked(router.post).mockImplementationOnce((_url, _data, options) => {
+            options?.onSuccess?.({} as never);
+            options?.onFinish?.();
+        });
+
+        render(
+            <SiteShow
+                {...fixture({
+                    tab: 'network',
+                    overview: null,
+                    network: {
+                        tree: { tier_counts: { gateways: 1, switches: 0, access_points: 0, devices: 3 }, sources: [], last_captured_at: null, mapped_count: 2, roots: [], unplaced: [] },
+                        links: {
+                            nothing: false,
+                            sources: [],
+                            threshold: 85,
+                            rows: [
+                                {
+                                    key: '1-10',
+                                    name: 'Synthetic sensor gateway → Existing leak sensor',
+                                    sub: 'Radio',
+                                    parent_id: 1,
+                                    child_id: 10,
+                                    child_kind: 'sensor',
+                                    child_href: '/security-devices/devices/10',
+                                    by: 'Placed by hand',
+                                    ports: 'Radio',
+                                    sure: null,
+                                    seen_at: null,
+                                    map: { state: 'on', tone: 'success', label: 'On the map', note: 'Placed by hand · {date}', at: '2026-10-29T01:00:00Z' },
+                                    relationship: { id: 77, device_id: 1 },
+                                },
+                            ],
+                            changes: [],
+                            unplaced: {
+                                count: 2,
+                                names: ['Kitchen water leak', 'Staff panic button'],
+                                more: 0,
+                                items: [
+                                    { id: 11, name: 'Kitchen water leak', kind: 'sensor', sub: 'Sensor' },
+                                    { id: 12, name: 'Staff panic button', kind: 'sensor', sub: 'Sensor' },
+                                ],
+                                parents: [
+                                    { id: 1, name: 'Synthetic sensor gateway', kind: 'sensor_gateway', sub: 'Sensor gateway' },
+                                    { id: 2, name: 'Synthetic gateway', kind: 'router', sub: 'Router' },
+                                    { id: 11, name: 'Kitchen water leak', kind: 'sensor', sub: 'Sensor' },
+                                    { id: 12, name: 'Staff panic button', kind: 'sensor', sub: 'Sensor' },
+                                ],
+                            },
+                            can: { change: true },
+                        },
+                    },
+                })}
+            />,
+        );
+
+        const placeButton = screen.getByRole('button', { name: 'Place them (2)' });
+        expect(placeButton).toBeInTheDocument();
+        fireEvent.click(placeButton);
+
+        expect(screen.getByTestId('sd-place-on-map')).toBeInTheDocument();
+        expect(screen.getByText('Synthetic sensor gateway · Sensor gateway')).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText(/Note/), { target: { value: 'Talks by radio' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Place 2 on the map' }));
+
+        expect(router.post).toHaveBeenCalledWith(
+            '/security-devices/sites/4/network/place',
+            {
+                parent_device_id: 1,
+                child_device_ids: [11, 12],
+                port: 'Radio',
+                notes: 'Talks by radio',
+            },
+            expect.any(Object),
+        );
+
+        // Manually placed rows show Take off the map and ask for a reason.
+        fireEvent.contextMenu(screen.getByText('Placed by hand'));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Take off the map' }));
+        expect(screen.getByTestId('sd-take-link-off')).toBeInTheDocument();
+        expect(screen.getByText('The map stops drawing it. The device goes back to Not placed yet, and you can place it again.')).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText(/Why it comes off/), { target: { value: 'Sensor retired' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Take off the map' }));
+        expect(router.delete).toHaveBeenCalledWith(
+            '/security-devices/devices/1/relationships/77',
+            expect.objectContaining({
+                data: { reason: 'Sensor retired' },
+            }),
+        );
     });
 
     it('is honest about what it doesn’t know about the internet line', () => {

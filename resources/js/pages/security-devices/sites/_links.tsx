@@ -6,20 +6,25 @@
  * off the map are on each row's menu, for people who may edit devices.
  */
 import { EntityContextMenu, EntityTable, useEntityContextMenu, type EntityTableColumn, type MenuItem } from '@/components/lists';
-import { PopupConfirm, PopupField } from '@/components/popup';
+import { PopupConfirm, PopupField, PopupForm, PopupSection } from '@/components/popup';
 import { iconForKind } from '@/components/security-devices/device-kind-icon';
 import { KnowList, Log, QuietLine } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDateOnly } from '@/lib/datetime';
 import { seenTime } from '@/lib/security-devices/device-time';
+import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
-import { ChevronDown, Cpu, Link2, Unlink } from 'lucide-react';
+import { Check, ChevronDown, ChevronsUpDown, Cpu, Link2, Unlink } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { BlockHead, ColumnsMenu, useColumns, type ColumnChoice } from '../devices/_parts';
-import type { FoundLink, LinksFound } from './_types';
+import type { FoundLink, LinksFound, UnplacedDeviceOption } from './_types';
 
 const COLUMNS: ColumnChoice[] = [
     { key: 'by', label: 'Found by' },
@@ -127,7 +132,7 @@ export function LinksFoundTable({ links, siteName, now }: { links: LinksFound; s
     const all: Record<string, EntityTableColumn<FoundLink>> = {
         by: { key: 'by', label: 'Found by', width: '1fr', cell: (row) => <span className="py-1 whitespace-normal">{row.by}</span> },
         ports: { key: 'ports', label: 'Ports', width: '1.1fr', cell: (row) => <span className="py-1 whitespace-normal">{row.ports ?? '—'}</span> },
-        sure: { key: 'sure', label: 'How sure', width: '90px', cell: (row) => <span className="whitespace-nowrap tabular-nums">{row.sure}%</span> },
+        sure: { key: 'sure', label: 'How sure', width: '90px', cell: (row) => <span className="whitespace-nowrap tabular-nums">{row.sure !== null ? `${row.sure}%` : '—'}</span> },
         seen: { key: 'seen', label: 'Last seen', width: '150px', cell: (row) => <span className="whitespace-nowrap">{row.seen_at ? seenTime(row.seen_at, now) : '—'}</span> },
         map: {
             key: 'map',
@@ -217,7 +222,11 @@ export function LinksFoundTable({ links, siteName, now }: { links: LinksFound; s
                 onConfirm={takeOff}
                 icon={Unlink}
                 title={`Take ${removing?.name ?? 'this link'} off the map?`}
-                description="The map stops drawing it. What the hub found stays in Links found, and you can add it again."
+                description={
+                    removing?.by === 'Placed by hand'
+                        ? 'The map stops drawing it. The device goes back to Not placed yet, and you can place it again.'
+                        : 'The map stops drawing it. What the hub found stays in Links found, and you can add it again.'
+                }
                 confirmLabel="Take off the map"
                 processing={processing}
                 processingLabel="Taking it off…"
@@ -261,18 +270,244 @@ export function LinkChanges({ links, now }: { links: LinksFound; now: Date }) {
     );
 }
 
-export function NotPlaced({ links }: { links: LinksFound }) {
-    const { count, names, more } = links.unplaced;
+function defaultParentId(items: UnplacedDeviceOption[], parents: UnplacedDeviceOption[], selectedIds: number[]): number | null {
+    const blocked = new Set(selectedIds);
+    const available = parents.filter((parent) => !blocked.has(parent.id));
+    if (available.length === 0) return null;
+
+    const allSensors = items.length > 0 && items.every((item) => item.kind === 'sensor');
+    if (allSensors) {
+        const sensorGateway = available.find((parent) => parent.kind === 'sensor_gateway');
+        if (sensorGateway) return sensorGateway.id;
+    }
+
+    return available[0]?.id ?? null;
+}
+
+export function NotPlaced({ links, siteId, siteName }: { links: LinksFound; siteId: number; siteName: string }) {
+    const { count, names, more, items = [], parents = [] } = links.unplaced;
+    const [open, setOpen] = useState(false);
+
     if (count === 0) {
         return <QuietLine title="Not placed yet" text="Every device here is on a link the hub or a person has reported." />;
     }
     const list = [...names, ...(more > 0 ? [`${more} more`] : [])];
     const words = list.length <= 1 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+    const canPlace = links.can.change && items.length > 0 && parents.length >= 2;
 
     return (
-        <QuietLine
-            title="Not placed yet"
-            text={`Nothing reports a link for ${words}, so ${count === 1 ? 'it isn’t' : 'they aren’t'} on the map. Devices that talk by radio to a sensor gateway are often like this.`}
-        />
+        <>
+            <QuietLine
+                title="Not placed yet"
+                text={`Nothing reports a link for ${words}, so ${count === 1 ? 'it isn’t' : 'they aren’t'} on the map. Devices that talk by radio to a sensor gateway are often like this.${canPlace ? ` Place ${count === 1 ? 'it' : 'them'} on the map by hand.` : ''}`}
+                action={
+                    canPlace
+                        ? {
+                              label: count === 1 ? 'Place on the map' : `Place them (${count})`,
+                              onClick: () => setOpen(true),
+                          }
+                        : null
+                }
+            />
+            {canPlace ? (
+                <PlaceOnMapPopup
+                    key={`${open ? 'open' : 'closed'}-${items.map((item) => item.id).join(',')}`}
+                    open={open}
+                    onClose={() => setOpen(false)}
+                    siteId={siteId}
+                    siteName={siteName}
+                    items={items}
+                    parents={parents}
+                />
+            ) : null}
+        </>
+    );
+}
+
+function PlaceOnMapPopup({
+    open,
+    onClose,
+    siteId,
+    siteName,
+    items,
+    parents,
+}: {
+    open: boolean;
+    onClose: () => void;
+    siteId: number;
+    siteName: string;
+    items: UnplacedDeviceOption[];
+    parents: UnplacedDeviceOption[];
+}) {
+    const initialSelected = useMemo(() => items.slice(0, 6).map((item) => item.id), [items]);
+    const [selectedIds, setSelectedIds] = useState<number[]>(initialSelected);
+    const [parentId, setParentId] = useState<number | null>(() => defaultParentId(items, parents, initialSelected));
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [port, setPort] = useState(() => (items.length > 0 && items.every((item) => item.kind === 'sensor') ? 'Radio' : ''));
+    const [notes, setNotes] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+    const availableParents = useMemo(() => parents.filter((parent) => !selectedSet.has(parent.id)), [parents, selectedSet]);
+    const chosenParent = availableParents.find((parent) => parent.id === parentId) ?? null;
+
+    const toggleChild = (id: number, checked: boolean) => {
+        const next = checked ? [...selectedIds, id] : selectedIds.filter((item) => item !== id);
+        setSelectedIds(next);
+        if (parentId !== null && next.includes(parentId)) {
+            setParentId(defaultParentId(items, parents, next));
+        }
+    };
+
+    const dirty = notes.trim() !== '' || (port.trim() !== '' && port.trim() !== 'Radio');
+
+    const submit = () => {
+        if (selectedIds.length === 0) {
+            setError('Pick at least one device to place on the map.');
+            return;
+        }
+        if (chosenParent === null) {
+            setError('Choose which device it sits under on the map.');
+            return;
+        }
+
+        setProcessing(true);
+        setError(null);
+        router.post(
+            `/security-devices/sites/${siteId}/network/place`,
+            {
+                parent_device_id: chosenParent.id,
+                child_device_ids: selectedIds,
+                port: port.trim() === '' ? null : port.trim(),
+                notes: notes.trim() === '' ? null : notes.trim(),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => onClose(),
+                onError: (errors) => setError(String(Object.values(errors)[0] ?? 'It couldn’t be placed on the map. Try again.')),
+                onFinish: () => setProcessing(false),
+            },
+        );
+    };
+
+    return (
+        <PopupForm
+            open={open}
+            onClose={onClose}
+            size="md"
+            icon={Link2}
+            title={items.length === 1 ? 'Place on the map' : 'Place on the map by hand'}
+            description={`Choose what ${items.length === 1 ? `${items[0].name} connects` : 'these devices connect'} through at ${siteName}.`}
+            error={error ?? undefined}
+            submitLabel={selectedIds.length <= 1 ? 'Place on the map' : `Place ${selectedIds.length} on the map`}
+            processingLabel="Placing…"
+            processing={processing}
+            submitDisabled={selectedIds.length === 0 || chosenParent === null}
+            onSubmit={submit}
+            dirty={dirty}
+            draftName="Place on the map"
+            testId="sd-place-on-map"
+        >
+            <PopupSection columns={2}>
+                <PopupField
+                    label={items.length === 1 ? 'Device to place' : 'Devices to place'}
+                    hint={items.length > 1 ? `${selectedIds.length} of ${items.length} ticked` : undefined}
+                    required
+                    wide
+                >
+                    <ul role="list" className="max-h-52 divide-y divide-border overflow-y-auto rounded-md border border-border">
+                        {items.map((item) => {
+                            const checked = selectedSet.has(item.id);
+                            const checkboxId = `sd-place-child-${item.id}`;
+                            return (
+                                <li key={item.id}>
+                                    <label
+                                        htmlFor={checkboxId}
+                                        className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted/50"
+                                    >
+                                        <Checkbox
+                                            id={checkboxId}
+                                            checked={checked}
+                                            onCheckedChange={(value) => toggleChild(item.id, value === true)}
+                                        />
+                                        <span className="min-w-0 flex-1 truncate font-medium text-foreground">{item.name}</span>
+                                        <span className="text-caption shrink-0">{item.sub}</span>
+                                    </label>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </PopupField>
+
+                <PopupField
+                    label="Under on the map"
+                    htmlFor="sd-place-parent"
+                    hint="e.g. a sensor gateway, switch, Wi-Fi point or recorder"
+                    required
+                    wide
+                >
+                    <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                        <PopoverTrigger asChild>
+                            <Button
+                                id="sd-place-parent"
+                                type="button"
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={pickerOpen}
+                                className="w-full justify-between font-normal"
+                            >
+                                <span className={cn('truncate', !chosenParent && 'text-muted-foreground')}>
+                                    {chosenParent ? `${chosenParent.name} · ${chosenParent.sub}` : 'Choose a device at this Site'}
+                                </span>
+                                <ChevronsUpDown aria-hidden="true" className="size-4 shrink-0 opacity-60" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                            <Command>
+                                <CommandInput placeholder="Search devices at this Site…" />
+                                <CommandList>
+                                    <CommandEmpty>No matching device at this Site.</CommandEmpty>
+                                    {availableParents.map((parent) => (
+                                        <CommandItem
+                                            key={parent.id}
+                                            value={`${parent.name} ${parent.sub} ${parent.id}`}
+                                            onSelect={() => {
+                                                setParentId(parent.id);
+                                                setPickerOpen(false);
+                                            }}
+                                        >
+                                            <Check aria-hidden="true" className={cn('size-4', parent.id === chosenParent?.id ? 'opacity-100' : 'opacity-0')} />
+                                            <span className="truncate">{parent.name}</span>
+                                            <span className="text-caption ml-auto shrink-0">{parent.sub}</span>
+                                        </CommandItem>
+                                    ))}
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+                </PopupField>
+
+                <PopupField label="Port or link" htmlFor="sd-place-port" hint="optional, e.g. Radio, Wi-Fi or Port 14">
+                    <Input
+                        id="sd-place-port"
+                        maxLength={64}
+                        value={port}
+                        onChange={(event) => setPort(event.target.value)}
+                        placeholder="e.g. Radio"
+                    />
+                </PopupField>
+
+                <PopupField label="Note" htmlFor="sd-place-notes" hint="optional">
+                    <Input
+                        id="sd-place-notes"
+                        maxLength={1000}
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                        placeholder="e.g. Talks to the sensor gateway by radio"
+                    />
+                </PopupField>
+            </PopupSection>
+        </PopupForm>
     );
 }

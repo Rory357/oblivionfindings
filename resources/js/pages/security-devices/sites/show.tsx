@@ -264,6 +264,7 @@ export default function SiteShow(props: SitePageProps) {
             <NetworkTab
                 tree={props.network.tree as SiteTopologyTree | undefined}
                 links={props.network.links ?? null}
+                siteId={site.id}
                 siteName={site.name}
                 hubLabel={hub?.label ?? null}
                 now={now}
@@ -436,6 +437,7 @@ function OverviewTab({ overview, siteName, now, onDevices }: { overview: NonNull
 function NetworkTab({
     tree,
     links,
+    siteId,
     siteName,
     hubLabel,
     now,
@@ -444,6 +446,7 @@ function NetworkTab({
 }: {
     tree: SiteTopologyTree | undefined;
     links: LinksFound | null;
+    siteId: number;
     siteName: string;
     hubLabel: string | null;
     now: Date;
@@ -472,6 +475,7 @@ function NetworkTab({
                 <>
                     {map}
                     <QuietLine title="Links found" text="Nothing reports links here yet." action={onAddHub ? { label: 'Add a hub', onClick: onAddHub } : null} />
+                    {links.unplaced.count > 0 ? <NotPlaced links={links} siteId={siteId} siteName={siteName} /> : null}
                 </>
             ) : (
                 <>
@@ -482,7 +486,7 @@ function NetworkTab({
                     <LinksFoundTable links={links} siteName={siteName} now={now} />
                     <SideBySide cols="minmax(0, 1.15fr) minmax(0, 1fr)">
                         <LinkChanges links={links} now={now} />
-                        <NotPlaced links={links} />
+                        <NotPlaced links={links} siteId={siteId} siteName={siteName} />
                     </SideBySide>
                 </>
             )}

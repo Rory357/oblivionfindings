@@ -468,4 +468,115 @@ class SitePageTabsTest extends TestCase
         ])->assertOk()->streamedContent();
         $this->assertStringContainsString('Hemi out of bed for over 10 minutes', $allowedCsv);
     }
+
+    public function test_unplaced_devices_can_be_placed_on_the_map_by_hand_audited_and_taken_off_again(): void
+    {
+        $gateway = $this->device($this->home, ['name' => 'Aurora House gateway', 'subcategory' => 'router']);
+        $sensorGateway = $this->device($this->home, ['name' => 'Aurora House sensor gateway', 'subcategory' => 'sensor_gateway']);
+        $leakSensor = $this->device($this->home, ['name' => 'Kitchen water leak', 'category' => 'sensor', 'subcategory' => 'leak_sensor']);
+        $panicSensor = $this->device($this->home, ['name' => 'Staff panic button', 'category' => 'sensor', 'subcategory' => 'panic_sensor']);
+        $otherDevice = $this->device($this->other, ['name' => 'Kōwhai Lodge router', 'subcategory' => 'router']);
+
+        DeviceRelationship::query()->create([
+            'parent_device_id' => $gateway->id,
+            'child_device_id' => $sensorGateway->id,
+            'relationship_type' => RelationshipType::ConnectedTo,
+            'created_by_user_id' => $this->viewer->id,
+        ]);
+
+        // Without devices.update: cannot place, and picker options are empty.
+        $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab=network')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('network.links.unplaced.count', 2)
+                ->where('network.links.unplaced.items', [])
+                ->where('network.links.unplaced.parents', [])
+                ->where('network.links.can.change', false));
+
+        $url = '/security-devices/sites/'.$this->home->id.'/network/place';
+        $this->actingAs($this->viewer)->post($url, [
+            'parent_device_id' => $sensorGateway->id,
+            'child_device_ids' => [$leakSensor->id, $panicSensor->id],
+            'port' => 'Radio',
+        ])->assertForbidden();
+        $this->assertSame(0, AuditLog::query()->where('action', 'security_devices.relationship.created')->count());
+
+        $this->grant('securityDevices.devices.update');
+
+        // With devices.update: unplaced items and parent options are Site-scoped only.
+        $before = $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab=network');
+        $before->assertOk()->assertInertia(fn ($page) => $page
+            ->where('network.links.unplaced.count', 2)
+            ->has('network.links.unplaced.items', 2)
+            ->where('network.links.unplaced.parents.0.name', 'Aurora House sensor gateway')
+            ->where('network.links.can.change', true));
+        $this->assertStringNotContainsString('Kōwhai Lodge router', $before->getContent());
+
+        // Cross-Site denial (both other Site route and mixing another Site's device ID into this Site).
+        $this->actingAs($this->viewer)->post('/security-devices/sites/'.$this->other->id.'/network/place', [
+            'parent_device_id' => $otherDevice->id,
+            'child_device_ids' => [$leakSensor->id],
+        ])->assertNotFound();
+        $this->actingAs($this->viewer)->post($url, [
+            'parent_device_id' => $otherDevice->id,
+            'child_device_ids' => [$leakSensor->id],
+        ])->assertNotFound();
+        $this->actingAs($this->viewer)->post($url, [
+            'parent_device_id' => $sensorGateway->id,
+            'child_device_ids' => [$otherDevice->id],
+        ])->assertNotFound();
+
+        // Self-link rejected.
+        $this->actingAs($this->viewer)->postJson($url, [
+            'parent_device_id' => $leakSensor->id,
+            'child_device_ids' => [$leakSensor->id],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['parent_device_id']);
+
+        // Place both radio sensors under the sensor gateway by hand.
+        $this->actingAs($this->viewer)->post($url, [
+            'parent_device_id' => $sensorGateway->id,
+            'child_device_ids' => [$leakSensor->id, $panicSensor->id],
+            'port' => 'Radio',
+            'notes' => 'Talks to the sensor gateway by radio',
+        ])->assertRedirect();
+
+        $this->assertSame(2, AuditLog::query()->where('action', 'security_devices.relationship.created')->count());
+
+        $after = $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab=network');
+        $after->assertOk()->assertInertia(fn ($page) => $page
+            ->where('network.links.unplaced.count', 0)
+            ->where('network.tree.mapped_count', 4)
+            ->has('network.links.rows', 3)
+            ->where('network.links.rows.1.name', 'Aurora House sensor gateway → Kitchen water leak')
+            ->where('network.links.rows.1.by', 'Placed by hand')
+            ->where('network.links.rows.1.sub', 'Radio')
+            ->where('network.links.rows.1.sure', null)
+            ->where('network.links.rows.1.map.state', 'on'));
+
+        // Take one manual link off the map: requires a reason, audits removal, and returns the sensor to unplaced.
+        $manualRel = DeviceRelationship::query()
+            ->active()
+            ->where('parent_device_id', $sensorGateway->id)
+            ->where('child_device_id', $leakSensor->id)
+            ->firstOrFail();
+
+        $this->actingAs($this->viewer)
+            ->delete('/security-devices/devices/'.$sensorGateway->id.'/relationships/'.$manualRel->id, [
+                'reason' => 'Sensor moved to laundry',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'security_devices.relationship.unlinked',
+            'auditable_id' => $manualRel->id,
+        ]);
+
+        $this->actingAs($this->viewer)->get('/security-devices/sites/'.$this->home->id.'?tab=network')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('network.links.unplaced.count', 1)
+                ->where('network.links.unplaced.names.0', 'Kitchen water leak')
+                ->where('network.tree.mapped_count', 3)
+                ->has('network.links.rows', 2));
+    }
 }
