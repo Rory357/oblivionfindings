@@ -45,11 +45,14 @@ import {
     toDatetimeLocal,
     WORKER_TIMEZONE,
 } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import { useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
+    CalendarDays,
     CheckCircle2,
+    ChevronDown,
     ClipboardList,
     Clock3,
     CloudOff,
@@ -1145,6 +1148,7 @@ function PeopleStep({
     siteOptions: { value: string; label: string }[];
     isNearMiss: boolean;
 }) {
+    const fieldId = useId();
     const selectClient = (clientId: string) => {
         setData('client_id', clientId);
         const clientSiteId = clients.find(
@@ -1168,12 +1172,23 @@ function PeopleStep({
                 }
             />
             {!isNearMiss ? (
-                <Field label="Incident type" required error={errors.type}>
+                <Field
+                    label="Incident type"
+                    required
+                    labelId={`${fieldId}-type`}
+                    errorId={errors.type ? `${fieldId}-type-error` : undefined}
+                    error={errors.type}
+                >
                     <TilePicker
                         value={d.type}
                         onChange={(v) => setData('type', v)}
                         options={INCIDENT_TYPE_TILES}
                         cols={3}
+                        labelledBy={`${fieldId}-type`}
+                        describedBy={
+                            errors.type ? `${fieldId}-type-error` : undefined
+                        }
+                        invalid={Boolean(errors.type)}
                     />
                 </Field>
             ) : null}
@@ -1183,6 +1198,7 @@ function PeopleStep({
                     onChange={selectClient}
                     placeholder="Select client"
                     options={clientOptions}
+                    openDownward
                 />
             </Field>
             <Field
@@ -1195,6 +1211,7 @@ function PeopleStep({
                     onChange={(value) => setData('site_id', value)}
                     placeholder="Select site"
                     options={siteOptions}
+                    openDownward
                 />
             </Field>
             <FieldErr>{errors.shift_id}</FieldErr>
@@ -1340,36 +1357,54 @@ function StraightStep({
                         (row.done && !row.time
                             ? 'Choose the time it was done.'
                             : undefined);
+                    const toggleRow = (nextDone: boolean) =>
+                        update(index, {
+                            done: nextDone,
+                            time:
+                                nextDone && !row.time ? nowWallTime() : row.time,
+                        });
                     return (
                         <li
                             key={row.key}
-                            className="grid gap-2 rounded-xl border border-border p-3"
+                            data-testid={`straight-away-row-${row.key}`}
+                            onClick={(event) => {
+                                const target = event.target as HTMLElement;
+                                if (
+                                    target.closest(
+                                        '[data-slot="checkbox"], label, input, textarea, button, [data-time-picker]',
+                                    )
+                                ) {
+                                    return;
+                                }
+                                toggleRow(!row.done);
+                            }}
+                            className="grid cursor-pointer gap-2 rounded-xl border border-border p-3"
                         >
                             <div className="flex flex-wrap items-center gap-3">
                                 <div className="frontline-tap flex min-w-0 flex-1 items-center gap-3">
                                     <Checkbox
                                         id={id}
+                                        aria-label={item.label}
                                         checked={row.done}
                                         onCheckedChange={(value) =>
-                                            update(index, {
-                                                done: value === true,
-                                                time:
-                                                    value === true && !row.time
-                                                        ? nowWallTime()
-                                                        : row.time,
-                                            })
+                                            toggleRow(value === true)
                                         }
                                         className="frontline-hit"
                                     />
                                     <label
                                         htmlFor={id}
-                                        className="cursor-pointer text-sm font-medium text-foreground"
+                                        className="frontline-tap flex min-w-0 flex-1 cursor-pointer select-none items-center justify-between gap-3 text-sm font-medium text-foreground"
                                     >
-                                        {item.label}
+                                        <span>{item.label}</span>
+                                        {!row.done ? (
+                                            <span className="shrink-0 font-normal text-caption">
+                                                Not yet
+                                            </span>
+                                        ) : null}
                                     </label>
                                 </div>
                                 {row.done ? (
-                                    <div className="w-40">
+                                    <div className="w-40" data-time-picker>
                                         <TimePicker
                                             compact
                                             id={`${id}-time`}
@@ -1381,9 +1416,7 @@ function StraightStep({
                                             }
                                         />
                                     </div>
-                                ) : (
-                                    <span className="text-caption">Not yet</span>
-                                )}
+                                ) : null}
                             </div>
                             {item.detail ? (
                                 <Input
@@ -1449,6 +1482,7 @@ function SeverityStep({
     };
     setData: SetData;
 }) {
+    const severityLabelId = useId();
     return (
         <div className="flex flex-col gap-5">
             <StepHead
@@ -1456,12 +1490,13 @@ function SeverityStep({
                 title="Severity & immediate actions"
                 blurb="How serious was it, and what was done straight away?"
             />
-            <Field label="Severity" required>
+            <Field label="Severity" required labelId={severityLabelId}>
                 <TilePicker
                     value={d.severity}
                     onChange={(v) => setData('severity', v)}
                     options={SEVERITY_TILES}
                     cols={2}
+                    labelledBy={severityLabelId}
                 />
             </Field>
             <Field
@@ -1539,6 +1574,7 @@ function CouldStep({
     };
     setData: SetData;
 }) {
+    const potentialLabelId = useId();
     return (
         <div className="flex flex-col gap-5">
             <StepHead
@@ -1546,12 +1582,17 @@ function CouldStep({
                 title="What could have happened"
                 blurb="Capture the potential — this is what makes near misses so valuable."
             />
-            <Field label="Potential severity" required>
+            <Field
+                label="Potential severity"
+                required
+                labelId={potentialLabelId}
+            >
                 <TilePicker
                     value={d.potential_severity}
                     onChange={(v) => setData('potential_severity', v)}
                     options={POTENTIAL_TILES}
                     cols={2}
+                    labelledBy={potentialLabelId}
                 />
             </Field>
             <Field label="What could have happened">
@@ -1795,6 +1836,7 @@ function FollowupsStep({
                                                 : staffOptions
                                         }
                                         frontline
+                                        className="bg-background"
                                     />
                                     {f.assigned_to_user_id !== '' ? (
                                         <Button
@@ -1816,6 +1858,7 @@ function FollowupsStep({
                             )}
                             <Field
                                 label="Due"
+                                htmlFor={`${fieldId}-due-${i}`}
                                 error={dueAtError}
                                 errorId={`${fieldId}-due-error-${i}`}
                             >
@@ -1833,6 +1876,43 @@ function FollowupsStep({
                                     }
                                     onChange={(value) =>
                                         onUpdate(i, { due_at: value })
+                                    }
+                                    trigger={
+                                        <Button
+                                            type="button"
+                                            unstyled
+                                            id={`${fieldId}-due-${i}`}
+                                            aria-label={`Task ${i + 1} due: ${f.due_at ? formatDateOnly(f.due_at) : 'Choose date'}`}
+                                            aria-invalid={Boolean(dueAtError)}
+                                            aria-describedby={
+                                                dueAtError
+                                                    ? `${fieldId}-due-error-${i}`
+                                                    : undefined
+                                            }
+                                            className={cn(
+                                                'frontline-tap flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-left text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
+                                                !f.due_at &&
+                                                    'text-muted-foreground',
+                                            )}
+                                        >
+                                            <span className="flex min-w-0 items-center gap-2 truncate">
+                                                <CalendarDays
+                                                    className="size-4 shrink-0 text-muted-foreground"
+                                                    aria-hidden="true"
+                                                />
+                                                <span className="truncate">
+                                                    {f.due_at
+                                                        ? formatDateOnly(
+                                                              f.due_at,
+                                                          )
+                                                        : 'Choose date'}
+                                                </span>
+                                            </span>
+                                            <ChevronDown
+                                                className="size-4 shrink-0 opacity-50"
+                                                aria-hidden="true"
+                                            />
+                                        </Button>
                                     }
                                 />
                             </Field>
@@ -1918,7 +1998,7 @@ function ReviewStep({
                         label="Occurred"
                         value={
                             d.occurred_date
-                                ? `${d.occurred_date}${d.occurred_time ? ` ${d.occurred_time}` : ''}`
+                                ? `${formatDateOnly(d.occurred_date)}${d.occurred_time ? `, ${wallTime(d.occurred_time)}` : ''}`
                                 : undefined
                         }
                     />
