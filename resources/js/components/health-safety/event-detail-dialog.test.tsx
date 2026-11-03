@@ -2865,4 +2865,42 @@ describe('G3 safety review page: the ways through rules 1 and 2', () => {
         fireEvent.click(within(progress).getAllByRole('button', { name: 'Edit' })[0]);
         expect(screen.getByRole('dialog', { name: 'Correct the findings' })).toBeInTheDocument();
     });
+
+    it('offers "Add revised action" from the Actions tab with the same pop-up and permission rules as Overview', () => {
+        const onPaneChange = vi.fn();
+        const { unmount } = render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    handover: owned,
+                    worksafe: { decision_signed: true, notifiable: false },
+                    corrective_actions: [failedAction()],
+                    assignable_staff: [{ id: 8, name: 'Moana Rangi' }],
+                } as EventDetailOverrides)}
+                initialSection="actions"
+                onPaneChange={onPaneChange}
+            />,
+        );
+        expect(screen.getAllByText('Revised action needed').length).toBeGreaterThan(0);
+        const panel = screen.getByRole('tabpanel', { name: 'Actions' });
+        fireEvent.click(within(panel).getByRole('button', { name: 'Add revised action' }));
+        expect(onPaneChange).toHaveBeenCalledWith({ kind: 'ca_add', replacesActionId: 141 }, 'actions');
+        const dialog = screen.getByRole('dialog', { name: 'Add a revised action' });
+        expect(within(dialog).getByText(/Replaces CA-2026-0141/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/Check result: The rug still slides/)).toBeInTheDocument();
+        unmount();
+
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    handover: owned,
+                    worksafe: { decision_signed: true, notifiable: false },
+                    corrective_actions: [failedAction()],
+                    can: { manage: false },
+                } as EventDetailOverrides)}
+                initialSection="actions"
+            />,
+        );
+        const readOnlyPanel = screen.getByRole('tabpanel', { name: 'Actions' });
+        expect(within(readOnlyPanel).queryByRole('button', { name: 'Add revised action' })).not.toBeInTheDocument();
+    });
 });

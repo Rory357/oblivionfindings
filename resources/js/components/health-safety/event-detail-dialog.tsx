@@ -3216,7 +3216,7 @@ function ReviewCorrectiveActions({
     rowRefs: MutableRefObject<Record<number, HTMLElement | null>>;
     highlightActionId: number | null;
 }) {
-    const { showMenu, nodes, open, returnTo } = useActionMenu(d, onPane);
+    const { showMenu, nodes, open, returnTo, askClose } = useActionMenu(d, onPane);
 
     if (!d.corrective_actions.length) {
         return (
@@ -3272,27 +3272,43 @@ function ReviewCorrectiveActions({
                     </TableHeader>
                     <TableBody>
                         {d.corrective_actions.map((action) => {
-                            const stage = correctiveActionStage(action);
+                            const checked = ['verified', 'closed'].includes(
+                                action.status,
+                            );
+                            const worked =
+                                checked &&
+                                action.effectiveness_confirmed !== false;
+                            const failed =
+                                checked &&
+                                action.effectiveness_confirmed === false;
+                            const stage = failed
+                                ? {
+                                      stage: 4,
+                                      label: 'Checked — it didn’t work',
+                                      tone: 'critical' as const,
+                                  }
+                                : correctiveActionStage(action);
                             const owner =
                                 action.owner?.name ?? action.assigned_to_name;
                             const overdue =
                                 action.is_overdue &&
                                 action.status !== 'verified' &&
                                 action.status !== 'closed';
-                            const note =
-                                action.status === 'completed'
-                                    ? action.evidence.load_state !== 'loaded'
-                                        ? 'Completion evidence could not be loaded.'
-                                        : action.can_verify
-                                          ? 'Waiting for an independent check'
-                                          : 'A different person must verify this action.'
-                                    : action.verified_at
-                                      ? `Verified${action.verified_by_name ? ` by ${action.verified_by_name}` : ''} · ${action.effectiveness_confirmed ? 'effective' : 'not yet effective'}`
-                                      : !owner
-                                        ? 'Needs an owner'
-                                        : overdue
-                                          ? 'Overdue'
-                                          : undefined;
+                            const note = failed
+                                ? `${action.needs_revision ? 'Revised action needed' : 'Revised action added'}${action.verified_by_name ? ` · checked by ${action.verified_by_name}` : ''}`
+                                : action.status === 'completed'
+                                  ? action.evidence.load_state !== 'loaded'
+                                      ? 'Completion evidence could not be loaded.'
+                                      : action.can_verify
+                                        ? 'Waiting for an independent check'
+                                        : 'A different person must verify this action.'
+                                  : action.verified_at
+                                    ? `Checked${action.verified_by_name ? ` by ${action.verified_by_name}` : ''} · it worked`
+                                    : !owner
+                                      ? 'Needs an owner'
+                                      : overdue
+                                        ? 'Overdue'
+                                        : undefined;
                             return (
                                 <TableRow
                                     key={action.id}
@@ -3332,7 +3348,18 @@ function ReviewCorrectiveActions({
                                             {titleCase(
                                                 action.action_type,
                                             ).toLowerCase()}
+                                            {action.replaces
+                                                ? ` · Revised action for ${action.replaces.reference_number}`
+                                                : ''}
                                         </p>
+                                        {checked && action.check_notes ? (
+                                            <p className="mt-0.5 text-caption text-foreground">
+                                                <span className="font-semibold">
+                                                    Check result:
+                                                </span>{' '}
+                                                {action.check_notes}
+                                            </p>
+                                        ) : null}
                                         {action.rework.latest_reason ? (
                                             <p className="mt-0.5 text-caption text-status-warning-foreground">
                                                 Returned for rework:{' '}
@@ -3398,26 +3425,69 @@ function ReviewCorrectiveActions({
                                             tone={stage.tone}
                                         />
                                     </TableCell>
-                                    <TableCell className="px-2 py-3 text-right">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="frontline-hit size-8 text-muted-foreground"
-                                            aria-label={`Options for ${action.reference_number}`}
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                const rect =
-                                                    event.currentTarget.getBoundingClientRect();
-                                                showMenu(
-                                                    action,
-                                                    rect.left,
-                                                    rect.bottom,
-                                                );
-                                            }}
-                                        >
-                                            <MoreVertical className="size-4" />
-                                        </Button>
+                                    <TableCell className="px-2 py-3 text-right whitespace-nowrap">
+                                        <div className="inline-flex items-center justify-end gap-2">
+                                            {canAct && action.needs_revision ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        onPane({
+                                                            kind: 'ca_add',
+                                                            replacesActionId:
+                                                                action.id,
+                                                        });
+                                                    }}
+                                                >
+                                                    <Plus
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                    Add revised action
+                                                </Button>
+                                            ) : canAct &&
+                                              action.status === 'verified' &&
+                                              worked &&
+                                              d.can
+                                                  .manage_corrective_action_lifecycle ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        askClose(action);
+                                                    }}
+                                                >
+                                                    <Lock
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                    Close action
+                                                </Button>
+                                            ) : null}
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="frontline-hit size-8 text-muted-foreground"
+                                                aria-label={`Options for ${action.reference_number}`}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    const rect =
+                                                        event.currentTarget.getBoundingClientRect();
+                                                    showMenu(
+                                                        action,
+                                                        rect.left,
+                                                        rect.bottom,
+                                                    );
+                                                }}
+                                            >
+                                                <MoreVertical className="size-4" />
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             );
@@ -6754,9 +6824,17 @@ function CorrectiveActionControls({
     const canManageStrictLifecycle = d.can.manage_corrective_action_lifecycle;
     // Write controls require manage AND a live event — no lifecycle moves once closed.
     if (!d.can.manage || d.status === 'closed') return null;
-    if (!['open', 'in_progress', 'completed', 'verified'].includes(ca.status))
+    if (
+        !['open', 'in_progress', 'completed', 'verified'].includes(ca.status) &&
+        !ca.needs_revision
+    )
         return null;
-    if (ca.status !== 'open' && !canManageStrictLifecycle) return null;
+    if (
+        ca.status !== 'open' &&
+        !canManageStrictLifecycle &&
+        !ca.needs_revision
+    )
+        return null;
 
     return (
         <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
@@ -6819,7 +6897,21 @@ function CorrectiveActionControls({
                         </Button>
                     </>
                 ) : null}
-                {ca.status === 'verified' && canManageStrictLifecycle ? (
+                {ca.needs_revision ? (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                            onPane({ kind: 'ca_add', replacesActionId: ca.id })
+                        }
+                    >
+                        <Plus className="mr-1.5 h-3.5 w-3.5" /> Add revised
+                        action
+                    </Button>
+                ) : ca.status === 'verified' &&
+                  ca.effectiveness_confirmed !== false &&
+                  canManageStrictLifecycle ? (
                     <ArmedButton
                         label="Close"
                         icon={CheckCircle2}
