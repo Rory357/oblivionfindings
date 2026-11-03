@@ -190,9 +190,11 @@ curl -s http://127.0.0.1:9478/health
 
 `"status":"ok"` with `classes.chat.enabled: true`.
 
-### 9. The app's `.env`
+### 9. The app's settings
 
-On the same host, in the app's `.env` (the values from steps 3 and 4):
+**On the page (preferred since 3 November 2026):** an administrator opens Settings › Chat › Chat calling settings and enters the relay addresses, the two keys and the control key name there. Saving asks for their password. The page keeps the values encrypted in the database. It never shows a saved key again, and the settings audit records only that a key changed. A value saved on the page replaces the `.env` value for that setting; clearing it on the page falls back to `.env`. No `config:cache` or restart is needed.
+
+**Or in the app's `.env`,** on the same host (the values from steps 3 and 4):
 
 ```
 CHAT_RELAY_URLS=turn:relay.oblivionfindings.com:3479?transport=udp,turns:relay.oblivionfindings.com:443?transport=tcp
