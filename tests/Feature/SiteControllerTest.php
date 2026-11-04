@@ -597,14 +597,12 @@ class SiteControllerTest extends TestCase
         $this->get('/sites/create')->assertRedirect('/login');
     }
 
-    public function test_site_create_accessible_by_admin(): void
+    public function test_site_create_opens_the_add_site_popup_for_admin(): void
     {
+        // The full-page wizard is gone; old links open the Add site pop-up.
         $this->actingAs($this->admin)
             ->get('/sites/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('sites/create')
-            );
+            ->assertRedirect(route('sites.index', ['add' => 1]));
     }
 
     public function test_site_create_blocked_for_support_worker(): void
@@ -725,17 +723,21 @@ class SiteControllerTest extends TestCase
     // Edit
     // ──────────────────────────────────────
 
-    public function test_site_edit_accessible_by_admin(): void
+    public function test_site_edit_opens_the_edit_site_popup_for_admin(): void
     {
         $site = Site::factory()->create();
 
+        // The full-page editor is gone; old links open the Edit site pop-up,
+        // which loads the Site from the edit-details endpoint.
         $this->actingAs($this->admin)
             ->get("/sites/{$site->id}/edit")
+            ->assertRedirect(route('sites.show', ['site' => $site, 'edit' => 1]));
+
+        $this->actingAs($this->admin)
+            ->getJson(route('sites.edit-details', $site))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('sites/edit')
-                ->has('site')
-            );
+            ->assertJsonPath('site.id', $site->id)
+            ->assertJsonStructure(['site', 'links', 'reference' => ['users']]);
     }
 
     public function test_site_edit_blocked_for_support_worker(): void

@@ -11,7 +11,7 @@ use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
-use App\Models\SiteChecklistTemplate;
+use App\Models\SiteContact;
 use App\Models\SiteCoverageRequirement;
 use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
@@ -29,11 +29,14 @@ use App\Services\Fleet\BoundaryService;
 use App\Services\NotificationService;
 use App\Services\Operations\WorkforceMutationGuard;
 use App\Services\Sites\SiteContactService;
+use App\Services\Sites\SiteContactStaffDirectory;
 use App\Services\Sites\SitePhysicalRoomService;
 use App\Services\Sites\SiteReadinessService;
 use App\Services\UserSiteAccessService;
 use App\Support\NzRegions;
 use App\Support\SchemaCache;
+use App\Support\SiteGeofenceLimits;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -49,6 +52,7 @@ class SiteController extends Controller
     public function __construct(
         private readonly SiteContactService $siteContacts,
         private readonly SitePhysicalRoomService $physicalRooms,
+        private readonly SiteContactStaffDirectory $staffDirectory,
     ) {}
 
     public function index(Request $request)
@@ -561,26 +565,15 @@ class SiteController extends Controller
         return back()->with('success', $archived === 1 ? '1 site archived.' : "{$archived} sites archived.");
     }
 
+    /**
+     * The old full-page Add site wizard is gone (to-do #11): old links and
+     * bookmarks land on the Sites list with the Add site pop-up open.
+     */
     public function create(Request $request)
     {
-        $houseApproach = app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'];
         $this->authorize('create', Site::class);
 
-        $users = $this->staffPicker($request->user());
-
-        return inertia('sites/create', [
-            'users' => $users,
-            'regionOptions' => NzRegions::REGIONS,
-            'qualificationRequirementOptions' => [
-                'mapping_options' => app(WorkforceRequirementMapping::class)->catalog(),
-                'house_qualification_approach' => $houseApproach,
-                'new_requirement_defaults' => SiteStaffRequirement::newRequirementDefaults(
-                    $houseApproach,
-                ),
-            ],
-            'checklistTemplates' => $this->checklistTemplatesPayload(),
-            'availableAssets' => $this->availableAssetsPayload(null),
-        ]);
+        return redirect()->route('sites.index', ['add' => 1]);
     }
 
     public function store(StoreSiteRequest $request)
@@ -590,6 +583,7 @@ class SiteController extends Controller
         $validated = $request->validated();
         $user = $request->user();
         $this->assertResponsibleStaff($validated['primary_contact_user_id'] ?? null, $user);
+        $this->staffDirectory->assertPickable($validated['contacts'] ?? [], $user, 'contacts');
 
         $contacts = $validated['contacts'] ?? [];
         $rooms = $validated['rooms'] ?? [];
@@ -853,7 +847,7 @@ class SiteController extends Controller
             },
             'shape' => [
                 'center' => ['lat' => (float) $lat, 'lng' => (float) $lng],
-                'radius_m' => (int) ($geofence['radius_m'] ?? 120),
+                'radius_m' => SiteGeofenceLimits::clamp((int) ($geofence['radius_m'] ?? SiteGeofenceLimits::DEFAULT_RADIUS_M)),
             ],
             'breach_type' => $geofence['breach_type'] ?? 'both',
             'alert_config' => null,
@@ -861,6 +855,21 @@ class SiteController extends Controller
             'is_active' => (bool) ($geofence['is_active'] ?? true),
         ]);
         app(BoundaryService::class)->record($boundary->refresh(), $actor, 'Boundary created through the Site setup workflow.', 'created');
+    }
+
+    /**
+     * A current (not retired) boundary that belongs to the Site itself. Once
+     * one exists, its geometry is changed only through Shared boundaries,
+     * which versions it and holds changes that protected dependencies
+     * (resident locations, active monitoring) need their owner to review.
+     */
+    private function hasCurrentSiteBoundary(Site $site): bool
+    {
+        return AssetGeofence::query()
+            ->where('site_id', $site->id)
+            ->whereNull('asset_id')
+            ->whereNull('retired_at')
+            ->exists();
     }
 
     private function saveDocuments(Site $site, Request $request, ?int $userId): void
@@ -928,49 +937,101 @@ class SiteController extends Controller
         return $folder;
     }
 
+    /** Steps the Edit site pop-up can open on (its own step keys, plus "medication"). */
+    private const EDIT_STEPS = ['basics', 'location', 'spaces', 'rostering', 'contacts', 'equipment', 'medication', 'documents', 'finance', 'review'];
+
+    /**
+     * The old full-page editor is gone (to-do #11): old links and bookmarks
+     * open the Site page with the Edit site pop-up open (on ?step= if given).
+     */
     public function edit(Request $request, Site $site)
     {
-        $houseApproach = app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'];
         $this->authorize('update', $site);
 
-        $users = $this->staffPicker($request->user());
+        $params = ['site' => $site, 'edit' => 1];
+        $step = $request->query('step');
+        if (is_string($step) && in_array($step, self::EDIT_STEPS, true)) {
+            $params['step'] = $step;
+        }
 
-        $site->load('contacts');
+        return redirect()->route('sites.show', $params);
+    }
 
-        $rooms = SiteHouseRoom::where('site_id', $site->id)
+    /**
+     * Everything the Edit site pop-up loads: the Site's saved details for each
+     * step and the staff list for the lead and contact pickers. Lists are the
+     * live ones (active rooms, resources and zones; every contact), so a save
+     * never brings back something that was removed elsewhere.
+     */
+    public function editDetails(Request $request, Site $site): JsonResponse
+    {
+        $this->authorize('update', $site);
+        $user = $request->user();
+
+        $contacts = SiteContact::primeLinkedStaff(
+            $site->contacts()->orderByDesc('is_primary')->orderBy('id')->get(),
+        );
+
+        $rooms = SiteHouseRoom::query()
+            ->where('site_id', $site->id)
+            ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get(['id', 'name', 'notes']);
-
-        $resources = SiteHoResource::where('site_id', $site->id)
+            ->get(['id', 'name', 'notes', 'is_assignable']);
+        $resources = SiteHoResource::query()
+            ->where('site_id', $site->id)
+            ->where('is_active', true)
             ->orderBy('id')
             ->get(['id', 'name', 'resource_type', 'capacity']);
-
-        $zones = SiteFacilityZone::where('site_id', $site->id)
+        $zones = SiteFacilityZone::query()
+            ->where('site_id', $site->id)
+            ->where('is_active', true)
             ->orderBy('id')
             ->get(['id', 'name', 'zone_type']);
 
-        $checklistAssignments = SiteChecklistAssignment::where('site_id', $site->id)
+        $boundaries = SchemaCache::hasTable('asset_geofences')
+            ? AssetGeofence::query()
+                ->where('site_id', $site->id)
+                ->whereNull('asset_id')
+                ->whereNull('retired_at')
+                ->orderByDesc('is_active')
+                ->orderBy('name')
+                ->get(['id', 'name', 'type', 'shape', 'breach_type', 'is_active'])
+            : collect();
+
+        $coverage = SiteCoverageRequirement::query()
+            ->where('site_id', $site->id)
             ->where('is_active', true)
-            ->get(['id', 'template_id', 'frequency', 'assigned_to_user_id']);
+            ->orderByRaw("FIELD(day_of_week, 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')")
+            ->orderBy('starts_time')
+            ->get();
+        $requirements = SiteStaffRequirement::query()
+            ->where('site_id', $site->id)
+            ->where('is_active', true)
+            ->orderBy('requirement_name')
+            ->get(['id', 'requirement_name', 'category']);
 
-        $documents = SiteDocument::where('site_id', $site->id)
-            ->orderByDesc('created_at')
-            ->get(['id', 'title', 'category', 'folder', 'version', 'effective_date', 'expiry_date', 'notes', 'original_name', 'mime_type', 'size_bytes']);
+        $users = collect($this->staffPicker($user));
+        $lead = $site->primary_contact_user_id ? User::query()->find($site->primary_contact_user_id, ['id', 'name']) : null;
+        if ($lead && ! $users->contains('id', (int) $lead->id)) {
+            // The saved lead stays selectable even when this viewer couldn't
+            // pick them today; update() accepts an unchanged lead.
+            $users->push(['id' => (int) $lead->id, 'name' => $lead->name, ...SiteContact::workDetailsFor($lead)]);
+        }
 
-        $assignedAssetIds = Asset::where('site_id', $site->id)->pluck('id')->all();
+        $canManageBoundaries = (bool) ($user?->canDo('assets.geofences.manage') || $user?->canDo('fleet.manage'));
 
-        return inertia('sites/edit', [
+        return response()->json([
             'site' => [
-                'id' => $site->id,
-                'name' => $site->name,
+                'id' => (int) $site->id,
                 'type' => $site->type,
+                'name' => $site->name,
                 'brand_colour' => $site->brand_colour,
                 'phone' => $site->phone,
                 'email' => $site->email,
-                'emergency_plan_location' => $site->emergency_plan_location,
-                'medication_storage_location' => $site->medication_storage_location,
-                'notes' => $site->notes,
+                'primary_contact_user_id' => $site->primary_contact_user_id ? (int) $site->primary_contact_user_id : null,
+                'is_active' => (bool) $site->is_active,
+                'total_capacity' => $site->total_capacity,
                 'address_line_1' => $site->address_line_1,
                 'address_line_2' => $site->address_line_2,
                 'suburb' => $site->suburb,
@@ -981,109 +1042,201 @@ class SiteController extends Controller
                 'latitude' => $site->latitude,
                 'longitude' => $site->longitude,
                 'access_instructions' => $site->access_instructions,
-                'is_active' => $site->is_active,
-                'is_high_risk' => $site->is_high_risk,
-                'is_high_needs' => $site->is_high_needs,
+                'rooms' => $rooms->map(fn (SiteHouseRoom $room) => [
+                    'id' => (int) $room->id,
+                    'name' => $room->name,
+                    'notes' => $room->notes,
+                    'is_assignable' => (bool) $room->is_assignable,
+                ])->values(),
+                'resources' => $resources->map(fn (SiteHoResource $resource) => [
+                    'id' => (int) $resource->id,
+                    'name' => $resource->name,
+                    'resource_type' => $resource->resource_type,
+                    'capacity' => $resource->capacity,
+                ])->values(),
+                'zones' => $zones->map(fn (SiteFacilityZone $zone) => [
+                    'id' => (int) $zone->id,
+                    'name' => $zone->name,
+                    'zone_type' => $zone->zone_type,
+                ])->values(),
+                'contacts' => $contacts->map(fn (SiteContact $contact) => [
+                    'id' => (int) $contact->id,
+                    'type' => $contact->type,
+                    'user_id' => $contact->isStaffLinked() ? (int) $contact->user_id : null,
+                    'name' => $contact->name,
+                    'role' => $contact->role,
+                    'phone' => $contact->phone,
+                    'email' => $contact->email,
+                    'is_primary' => (bool) $contact->is_primary,
+                    'notes' => $contact->notes,
+                ])->values(),
+                'medication_storage_location' => $site->medication_storage_location,
+                'documents_count' => SiteDocument::query()->where('site_id', $site->id)->count(),
+                'rent_amount' => $site->rent_amount,
+                'rent_frequency' => $site->rent_frequency,
+                'lease_start_date' => $site->lease_start_date?->toDateString(),
+                'lease_end_date' => $site->lease_end_date?->toDateString(),
+                'landlord_name' => $site->landlord_name,
+                'landlord_contact' => $site->landlord_contact,
+                'weekly_food_budget' => $site->weekly_food_budget_cents === null
+                    ? null
+                    : number_format($site->weekly_food_budget_cents / 100, 2, '.', ''),
+                'is_high_risk' => (bool) $site->is_high_risk,
+                'is_high_needs' => (bool) $site->is_high_needs,
                 'risk_notes' => $site->risk_notes,
                 'risk_review_date' => $site->risk_review_date?->toDateString(),
-                'primary_contact_user_id' => $site->primary_contact_user_id,
-                'contacts' => $site->contacts->sortByDesc('is_primary')->values()->map(fn ($c) => [
-                    'id' => $c->id,
-                    'type' => $c->type,
-                    'name' => $c->name,
-                    'role' => $c->role,
-                    'phone' => $c->phone,
-                    'email' => $c->email,
-                    'is_primary' => (bool) $c->is_primary,
-                    'notes' => $c->notes,
-                ])->all(),
-                'rooms' => $rooms->all(),
-                'resources' => $resources->all(),
-                'zones' => $zones->all(),
-                'checklist_assignments' => $checklistAssignments->all(),
-                'documents' => $documents->all(),
-                'assigned_asset_ids' => $assignedAssetIds,
+                'emergency_plan_location' => $site->emergency_plan_location,
+                'notes' => $site->notes,
+                'boundaries' => $boundaries->map(fn (AssetGeofence $boundary) => [
+                    'id' => (int) $boundary->id,
+                    'name' => $boundary->name,
+                    'type' => $boundary->type,
+                    'radius_m' => $boundary->type === 'circle' && isset($boundary->shape['radius_m'])
+                        ? (int) round((float) $boundary->shape['radius_m'])
+                        : null,
+                    'breach_type' => $boundary->breach_type,
+                    'is_active' => (bool) $boundary->is_active,
+                ])->values(),
+                'coverage' => $coverage->map(fn (SiteCoverageRequirement $rule) => [
+                    'name' => $rule->name,
+                    'coverage_type' => $rule->coverage_type,
+                    'day_of_week' => $rule->day_of_week,
+                    'starts_time' => $rule->starts_time,
+                    'ends_time' => $rule->ends_time,
+                    'minimum_staff' => (int) $rule->minimum_staff,
+                    'role_requirements' => $rule->role_requirements ?? [],
+                    'allow_overstaffing' => (bool) $rule->allow_overstaffing,
+                    'shift_type' => $rule->shift_type,
+                    'service_context_id' => $rule->service_context_id,
+                ])->values(),
+                'credentials' => $requirements->map(fn (SiteStaffRequirement $requirement) => [
+                    'id' => (int) $requirement->id,
+                    'name' => $requirement->requirement_name,
+                    'category' => $requirement->category,
+                ])->values(),
             ],
-            'users' => $users,
-            'regionOptions' => NzRegions::REGIONS,
-            'qualificationRequirementOptions' => [
-                'mapping_options' => app(WorkforceRequirementMapping::class)->catalog(),
-                'house_qualification_approach' => $houseApproach,
-                'new_requirement_defaults' => SiteStaffRequirement::newRequirementDefaults(
-                    $houseApproach,
-                ),
+            'links' => [
+                'shift_coverage' => route('sites.show', ['site' => $site, 'tab' => 'shift_coverage']),
+                'staff_requirements' => route('sites.show', ['site' => $site, 'tab' => 'staff_requirements']),
+                'documents' => route('sites.show', ['site' => $site, 'tab' => 'documents']),
+                'boundaries' => $canManageBoundaries ? url('/fleet-assets/geofences?tab=boundaries&site_id='.$site->id) : null,
             ],
-            'checklistTemplates' => $this->checklistTemplatesPayload(),
-            'availableAssets' => $this->availableAssetsPayload($site->id),
+            'reference' => [
+                'users' => $users->values()->all(),
+                'regionOptions' => NzRegions::REGIONS,
+                // Rostering is read-only in Edit site (see update()).
+                'serviceContexts' => [],
+                'copyableSites' => [],
+                'credentialCatalogue' => [],
+                'coverageRoleKeys' => config('site_credentials.coverage_role_keys', []),
+            ],
         ]);
     }
 
+    /**
+     * Save the Edit site pop-up (and any other full Site edit).
+     *
+     * - Site details: only the fields sent are changed.
+     * - Contacts, rooms, resources, zones, assets and checklists: a list is
+     *   replaced only when it is sent or named in `collections`; a list the
+     *   form didn't load is never cleared.
+     * - Geofence: added when the Site has no current boundary; an existing
+     *   boundary is changed in Shared boundaries (versioned and reviewed).
+     * - Documents: new files are added; existing ones stay.
+     * - Rostering (coverage and staff requirements) is not saved here; those
+     *   are edited on the Site's Shift coverage and Staff requirements tabs.
+     */
     public function update(UpdateSiteRequest $request, Site $site)
     {
         $this->authorize('update', $site);
 
         $validated = $request->validated();
-        $this->assertResponsibleStaff(
-            $validated['primary_contact_user_id'] ?? null,
-            $request->user(),
-        );
-
-        $contacts = $validated['contacts'] ?? [];
-        $rooms = $validated['rooms'] ?? [];
-        $resources = $validated['resources'] ?? [];
-        $zones = $validated['zones'] ?? [];
-        $assets = $validated['assets'] ?? [];
-        $checklists = $validated['checklists'] ?? [];
-
-        // Finance: keep the dollars→cents conversion symmetric with store() so an
-        // edited weekly food budget actually persists.
-        $cents = $this->dollarsToCents($validated['weekly_food_budget'] ?? null);
-        if ($cents !== null) {
-            $validated['weekly_food_budget_cents'] = $cents;
+        $user = $request->user();
+        $leadId = $validated['primary_contact_user_id'] ?? null;
+        if (! filled($leadId) || (int) $leadId !== (int) $site->primary_contact_user_id) {
+            $this->assertResponsibleStaff($leadId, $user);
         }
 
-        // UpdateSiteRequest accepts the same rostering/geofence arrays as the
-        // store request (so the edit path can share the modal), but the
-        // edit-via-modal fan-out is a follow-up — drop them here explicitly
-        // rather than letting Eloquent silently discard the non-fillable keys.
+        $collections = array_values(array_filter(
+            UpdateSiteRequest::COLLECTIONS,
+            fn (string $key): bool => array_key_exists($key, $validated)
+                || in_array($key, $validated['collections'] ?? [], true),
+        ));
+        $lists = [];
+        foreach (UpdateSiteRequest::COLLECTIONS as $key) {
+            $lists[$key] = $validated[$key] ?? [];
+        }
+
+        if (in_array('contacts', $collections, true)) {
+            $existingLinks = SiteContact::query()
+                ->where('site_id', $site->id)
+                ->whereNotNull('user_id')
+                ->pluck('user_id', 'id')
+                ->map(fn ($userId): int => (int) $userId)
+                ->all();
+            $this->staffDirectory->assertPickable($lists['contacts'], $user, 'contacts', $existingLinks);
+        }
+
+        // Finance: keep the dollars→cents conversion symmetric with store(). A
+        // sent-but-empty budget clears it.
+        if (array_key_exists('weekly_food_budget', $validated)) {
+            $validated['weekly_food_budget_cents'] = $this->dollarsToCents($validated['weekly_food_budget']);
+        }
+
+        $geofence = $validated['geofence'] ?? null;
+
         unset(
-            $validated['contacts'],
-            $validated['rooms'],
-            $validated['resources'],
-            $validated['zones'],
-            $validated['assets'],
-            $validated['checklists'],
+            $validated['collections'],
+            $validated['documents'],
             $validated['coverage'],
             $validated['credentials'],
             $validated['geofence'],
             $validated['weekly_food_budget'],
         );
+        foreach (UpdateSiteRequest::COLLECTIONS as $key) {
+            unset($validated[$key]);
+        }
 
-        DB::transaction(function () use (
-            $assets,
-            $checklists,
-            $contacts,
-            $request,
-            $resources,
-            $rooms,
-            $site,
-            $validated,
-            $zones,
-        ): void {
+        DB::transaction(function () use ($collections, $geofence, $lists, $request, $site, $user, $validated): void {
             $site->update($validated);
 
-            $this->siteContacts->sync($site, $contacts);
-            $this->syncRooms($site, $rooms, $request->user());
-            $this->syncResources($site, $resources);
-            $this->syncZones($site, $zones);
-            $this->assignAssets($site, $assets, $request->user()?->id);
-            $this->syncChecklists($site, $checklists);
+            if (in_array('contacts', $collections, true)) {
+                $this->siteContacts->sync($site, $lists['contacts']);
+            }
+            if (in_array('rooms', $collections, true)) {
+                $this->syncRooms($site, $lists['rooms'], $user);
+            }
+            if (in_array('resources', $collections, true)) {
+                $this->syncResources($site, $lists['resources']);
+            }
+            if (in_array('zones', $collections, true)) {
+                $this->syncZones($site, $lists['zones']);
+            }
+            if (in_array('assets', $collections, true)) {
+                $this->assignAssets($site, $lists['assets'], $user?->id);
+            }
+            if (in_array('checklists', $collections, true)) {
+                $this->syncChecklists($site, $lists['checklists']);
+            }
+
+            if (is_array($geofence) && ! $this->hasCurrentSiteBoundary($site)) {
+                $this->persistSiteGeofence($site, $geofence, $user);
+            }
+
+            // Documents last so disk writes only happen once every DB op succeeds.
+            $this->saveDocuments($site, $request, $user?->id);
         });
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'site', $site, null, [
+        app(NotificationService::class)->notifyCrud($user, 'updated', 'site', $site, null, [
             'title' => "Site updated: {$site->name}",
             'url' => url('/sites'),
         ]);
+
+        // The Edit site pop-up closes on success and stays on the page it was
+        // opened from (the Sites list or the Site page).
+        if ($request->boolean('_modal')) {
+            return back()->with('success', 'Site updated.');
+        }
 
         return redirect()
             ->route('sites.show', $site)
@@ -1122,14 +1275,6 @@ class SiteController extends Controller
         }
 
         return response()->json(['ok' => true]);
-    }
-
-    private function checklistTemplatesPayload(): array
-    {
-        return SiteChecklistTemplate::active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'description', 'applicable_to_type', 'frequency'])
-            ->all();
     }
 
     /**
@@ -1327,9 +1472,12 @@ class SiteController extends Controller
             }
         }
 
+        // A removed resource is deactivated, as on the Site's Resources page,
+        // so its bookings and history keep their record.
         SiteHoResource::where('site_id', $site->id)
             ->whereNotIn('id', $keepIds)
-            ->delete();
+            ->where('is_active', true)
+            ->update(['is_active' => false]);
     }
 
     private function syncZones(Site $site, array $zones): void
@@ -1371,9 +1519,11 @@ class SiteController extends Controller
             }
         }
 
+        // A removed zone is deactivated, as on the Site's Zones page.
         SiteFacilityZone::where('site_id', $site->id)
             ->whereNotIn('id', $keepIds)
-            ->delete();
+            ->where('is_active', true)
+            ->update(['is_active' => false]);
     }
 
     /**
@@ -1407,29 +1557,6 @@ class SiteController extends Controller
                     'updated_by_user_id' => $userId,
                 ]);
         }
-    }
-
-    private function availableAssetsPayload(?int $currentSiteId): array
-    {
-        return Asset::query()
-            ->select(['id', 'name', 'asset_tag', 'category', 'serial_number', 'site_id'])
-            ->where(function ($q) use ($currentSiteId) {
-                $q->whereNull('site_id');
-                if ($currentSiteId !== null) {
-                    $q->orWhere('site_id', $currentSiteId);
-                }
-            })
-            ->orderBy('name')
-            ->get()
-            ->map(fn ($a) => [
-                'id' => $a->id,
-                'name' => $a->name,
-                'asset_tag' => $a->asset_tag,
-                'category' => $a->category,
-                'serial_number' => $a->serial_number,
-                'is_assigned_here' => $currentSiteId !== null && $a->site_id === $currentSiteId,
-            ])
-            ->all();
     }
 
     private function syncChecklists(Site $site, array $checklists): void
@@ -1636,12 +1763,15 @@ class SiteController extends Controller
         return $allowed !== [] ? $allowed : array_keys($map);
     }
 
-    private function staffPicker(?User $viewer)
+    /**
+     * The Site-lead and staff-contact picker: id, name and work details only
+     * (see SiteContact), scoped like the Site-lead picker always was.
+     *
+     * @return list<array{id: int, name: string, role: string|null, phone: string|null, email: string|null}>
+     */
+    private function staffPicker(?User $viewer): array
     {
-        $query = User::query();
-        $this->siteAccess()->applyStaffScope($query, $viewer, self::SITE_BYPASS_PERMISSIONS);
-
-        return $query->select(['id', 'name'])->orderBy('name')->get();
+        return $this->staffDirectory->options($viewer);
     }
 
     private function assertResponsibleStaff(mixed $userId, ?User $actor): void
@@ -1650,8 +1780,7 @@ class SiteController extends Controller
             return;
         }
 
-        $query = User::query()->whereKey((int) $userId);
-        $this->siteAccess()->applyStaffScope($query, $actor, self::SITE_BYPASS_PERMISSIONS);
+        $query = $this->staffDirectory->query($actor)->whereKey((int) $userId);
 
         if (! $query->exists()) {
             throw ValidationException::withMessages([

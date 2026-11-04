@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Respite;
 
 use App\Domain\Governance\Models\NotifiableIncident;
+use App\Enums\ClientGender;
 use App\Http\Controllers\Controller;
 use App\Models\AssetGeofence;
 use App\Models\BehaviourSupportPlan;
@@ -271,6 +272,8 @@ class RespiteWorkspaceController extends Controller
             'preferred_name',
             'date_of_birth',
             'gender',
+            'gender_description',
+            'gender_recorded_as',
             'preferred_pronouns',
             'status',
             'phone',
@@ -411,7 +414,8 @@ class RespiteWorkspaceController extends Controller
             'last_name' => $client->last_name ?? '',
             'preferred_name' => $client->preferred_name ?? '',
             'date_of_birth' => $client->date_of_birth?->toDateString() ?? '',
-            'gender' => $client->gender ?? '',
+            // gender_recorded_as is shown as a "please choose" notice; the wizard never sends it back.
+            ...ClientGender::wizardValues($client->gender, $client->gender_description, $client->gender_recorded_as),
             'preferred_pronouns' => $client->preferred_pronouns ?? '',
             'nhi_number' => $client->nhi_number ?? '',
             'phone' => $client->phone ?? '',

@@ -3,6 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Models\SiteContact;
 use App\Models\SiteTypePlan;
 use App\Models\SiteTypePlanPin;
 use App\Support\OrgBranding;
@@ -58,11 +59,11 @@ class SiteEmergencyPlanService
             'email' => null,
         ]];
 
-        $siteContacts = $site->contacts()
+        $siteContacts = SiteContact::primeLinkedStaff($site->contacts()
             ->whereIn('type', ['emergency', 'manager', 'site_lead', 'after_hours'])
             ->orderByDesc('is_primary')
             ->orderBy('name')
-            ->get();
+            ->get());
 
         foreach ($siteContacts as $contact) {
             $contacts[] = [
@@ -101,4 +102,3 @@ class SiteEmergencyPlanService
             ->all();
     }
 }
-

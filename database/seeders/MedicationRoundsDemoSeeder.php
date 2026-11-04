@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ClientGender;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -95,7 +96,7 @@ class MedicationRoundsDemoSeeder extends Seeder
                     'first_name' => $c['first'],
                     'last_name' => $c['last'],
                     'preferred_name' => $c['first'],
-                    'gender' => ['female', 'male'][$i % 2],
+                    'gender' => [ClientGender::Female->value, ClientGender::Male->value][$i % 2],
                     'status' => 'active',
                     'email' => strtolower($c['first'].'.'.$c['last']).'@rounds-demo.test',
                     'city' => 'Auckland',

@@ -1165,6 +1165,21 @@ before.
   (`work_email` is nullable): a recruitment hire whose offer has no work
   email signs in with their personal address but gets no work email, and
   any page showing `work_email` renders nothing when it is null.
+- **Retyping a staff member's details** (corrected 2026-11-04, Add site
+  contacts: "pick staff as contacts instead of retyping their details"). A
+  contact or person field where someone who works here is typed in by hand
+  goes stale and invites personal numbers. Offer "Someone who works here"
+  (the scoped staff picker, `components/sites/site-contact-fields.tsx` for
+  Site contacts) beside "Someone outside the organisation"; store the link
+  (`user_id`) and show the HR work details live — job title, `work_phone`,
+  `work_email`. A missing work phone or email shows as missing, never a
+  personal one. Typing is for people outside the organisation.
+- **Field rows stretched by a taller column beside them** (corrected
+  2026-11-04, Add site › Location: the address fields "spread out with big
+  gaps" next to the map). A CSS grid column of fields next to a taller
+  column (a map, a preview) stretches its rows to fill the height. Give the
+  field column `content-start` (or make it a flex column), as both Location
+  columns now are.
 - **Bare `<Deferred>` from `@inertiajs/react`** (decided 2026-10-30 with the
   background-loading work). Inertia's own `<Deferred>` shows its fallback
   forever when the load fails, and drops back to the fallback on every full

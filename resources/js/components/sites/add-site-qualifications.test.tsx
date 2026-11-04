@@ -19,7 +19,13 @@ vi.mock('@inertiajs/react', async () => {
             const [errors, setErrors] = React.useState<Record<string, string>>(
                 {},
             );
+            const transformer = React.useRef(
+                (current: SiteWizardForm): unknown => current,
+            );
             return {
+                transform: (fn: (current: SiteWizardForm) => unknown) => {
+                    transformer.current = fn;
+                },
                 data,
                 errors,
                 processing: false,
@@ -39,7 +45,7 @@ vi.mock('@inertiajs/react', async () => {
                         onError?: (errors: Record<string, string>) => void;
                     },
                 ) => {
-                    transport.post(url, data);
+                    transport.post(url, transformer.current(data));
                     if (transport.rejection) {
                         setErrors(transport.rejection);
                         options.onError?.(transport.rejection);
@@ -145,10 +151,10 @@ function copyPattern() {
 function attemptSave() {
     fireEvent.click(
         screen.getByRole('button', {
-            name: /^Review\s*Risk, safety & create$/,
+            name: /^Review\s*Risk, safety & save$/,
         }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Create site' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add site' }));
 }
 
 it('submits copied source evidence while preserving legacy blank and explicit minimum choices', () => {

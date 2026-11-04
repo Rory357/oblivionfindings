@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Privacy\Services\DataSubjectRequestLifecycleService;
+use App\Enums\ClientGender;
 use App\Models\ClientConsent;
 use App\Models\DataSubjectRequest;
 use App\Models\RespiteBooking;
@@ -295,7 +296,9 @@ class DataSubjectRequestController extends Controller
                 'name' => $client->first_name.' '.$client->last_name,
                 'preferred_name' => $client->preferred_name,
                 'date_of_birth' => $client->date_of_birth?->format('Y-m-d'),
-                'gender' => $client->gender,
+                'gender' => ClientGender::displayLabel($client->gender, $client->gender_description),
+                // Text typed before Gender became a dropdown, still held for this person.
+                'gender_previously_recorded_as' => $client->gender_recorded_as,
                 'nhi_number' => $client->nhi_number,
                 'email' => $client->email,
                 'phone' => $client->phone,

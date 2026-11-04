@@ -3,7 +3,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { router } from '@inertiajs/react';
-import { Mail, Pencil, Phone, Plus, Trash2, UsersRound } from 'lucide-react';
+import {
+    BadgeCheck,
+    Mail,
+    Pencil,
+    Phone,
+    Plus,
+    Trash2,
+    UsersRound,
+} from 'lucide-react';
 import { useState } from 'react';
 import {
     AddContactDialog,
@@ -73,6 +81,13 @@ export function SiteProfileContacts({
                                                 contact.type ||
                                                 'Site contact'}
                                         </p>
+                                        {contact.user_id ? (
+                                            <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                                <BadgeCheck className="h-3.5 w-3.5" />
+                                                Works here · details from their
+                                                staff record
+                                            </p>
+                                        ) : null}
                                     </div>
                                     {contact.is_primary ? (
                                         <Badge variant="outline">Primary</Badge>

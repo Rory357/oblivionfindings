@@ -6,10 +6,12 @@ use App\Domain\Clinical\Models\ClientMealRestriction;
 use App\Domain\Clinical\Models\ClientMealRestrictionDiscrepancy;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Referrals\Services\ReferralActivationGuard;
+use App\Enums\ClientGender;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use App\Services\AuditLogger;
 use App\Services\Clients\ClientIdentityWrites;
+use App\Support\SchemaCache;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -35,7 +37,10 @@ class Client extends Model
         'last_name',
         'date_of_birth',
         'preferred_name',
+        // A code from App\Enums\ClientGender; the description is kept only for Another gender.
+        // gender_recorded_as (old typed text) is set by the saving hook, never mass assigned.
         'gender',
+        'gender_description',
         'status',
         'phone',
         'email',
@@ -455,6 +460,21 @@ class Client extends Model
             }
         });
         static::saving(function (Client $client) {
+            // Gender is one of the ClientGender codes for every writer, not only the forms.
+            if ($client->isDirty(['gender', 'gender_description'])
+                && SchemaCache::hasColumns('clients', ['gender_description', 'gender_recorded_as'])) {
+                $stored = ClientGender::forStorage(
+                    $client->gender,
+                    $client->gender_description,
+                    $client->gender_recorded_as,
+                );
+                foreach ($stored as $column => $value) {
+                    if ($client->getAttribute($column) !== $value) {
+                        $client->setAttribute($column, $value);
+                    }
+                }
+            }
+
             $raw = $client->nhi_number;
             if ($raw) {
                 $upper = self::normaliseNhi($raw);

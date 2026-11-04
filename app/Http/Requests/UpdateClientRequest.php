@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\ClientGender;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ServiceContext;
@@ -30,7 +31,7 @@ class UpdateClientRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:255'],
             'preferred_name' => ['nullable', 'string', 'max:255'],
             'date_of_birth' => ['nullable', 'date'],
-            'gender' => ['nullable', 'string', 'max:50'],
+            ...ClientGender::validationRules(),
             'preferred_pronouns' => ['nullable', 'string', 'max:50'],
             'status' => ['required', 'in:active,inactive,onboarding'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -312,6 +313,11 @@ class UpdateClientRequest extends FormRequest
                 );
             }
         });
+    }
+
+    public function messages(): array
+    {
+        return ClientGender::validationMessages();
     }
 
     private function nullableId(mixed $value): ?int

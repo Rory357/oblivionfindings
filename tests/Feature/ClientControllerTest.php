@@ -2108,7 +2108,8 @@ class ClientControllerTest extends TestCase
             'last_name' => 'NewLast',
             'preferred_name' => 'Nick',
             'date_of_birth' => '2000-12-25',
-            'gender' => 'non_binary',
+            'gender' => 'another_gender',
+            'gender_description' => 'Non-binary',
             'status' => 'inactive',
             'phone' => '0229999999',
             'email' => 'updated@example.com',
@@ -2802,9 +2803,9 @@ class ClientControllerTest extends TestCase
         );
     }
 
-    public function test_store_validates_gender_max_length(): void
+    public function test_store_refuses_gender_not_on_the_list(): void
     {
-        $data = $this->validClientData(['gender' => str_repeat('x', 51)]);
+        $data = $this->validClientData(['gender' => 'Woman']);
 
         $response = $this->actingAs($this->admin)->post('/clients', $data);
 
