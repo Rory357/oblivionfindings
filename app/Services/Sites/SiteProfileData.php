@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\SiteChecklistRun;
+use App\Models\SiteContact;
 use App\Models\SiteHazard;
 use App\Models\User;
 use App\Models\UserUiPreference;
@@ -14,7 +15,6 @@ use App\Services\Sites\Profile\SiteProfileAdminPresenter;
 use App\Services\Sites\Profile\SiteProfileOperationsPresenter;
 use App\Services\Sites\Profile\SiteProfilePeoplePresenter;
 use App\Services\Sites\Profile\SiteProfileSafetyPresenter;
-use App\Models\SiteContact;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -509,10 +509,12 @@ class SiteProfileData
      */
     private function primeNamedContacts(Site $site): Collection
     {
-        $contacts = $site->contacts()
+        // Staff-linked contacts read their staff record's work details; the
+        // extra reads happen only when a contact is linked.
+        $contacts = SiteContact::primeLinkedStaff($site->contacts()
             ->orderByDesc('is_primary')
             ->orderBy('id')
-            ->get(['id', 'site_id', 'type', 'name', 'role', 'phone', 'email', 'is_primary']);
+            ->get(['id', 'site_id', 'user_id', 'type', 'name', 'role', 'phone', 'email', 'is_primary']));
         $ofType = fn (string $type): ?SiteContact => $contacts
             ->first(fn (SiteContact $contact): bool => strcasecmp(rtrim((string) $contact->type), $type) === 0);
 

@@ -23,6 +23,11 @@ import {
     type GroupedProfileNavGroup,
 } from '@/components/page/grouped-profile-nav';
 import {
+    siteStepFromParam,
+    type StepKey,
+} from '@/components/sites/add-site-dialog';
+import { EditSiteDialog } from '@/components/sites/edit-site-dialog';
+import {
     SiteTechnologyProjectionPanel,
     type SiteTechnologyProjection,
 } from '@/components/sites/site-technology-projection';
@@ -423,6 +428,34 @@ export default function SiteShow(props: SiteProfileProps) {
     const [searchOpen, setSearchOpen] = useState(false);
     const [locationOpen, setLocationOpen] = useState(false);
     const [geofenceOpen, setGeofenceOpen] = useState(false);
+    // The Edit site pop-up; /sites/{site}/edit redirects here with ?edit=1
+    // (and ?step=…) so old links and bookmarks still open it.
+    const [editSite, setEditSite] = useState<{ step?: StepKey } | null>(() => {
+        if (typeof window === 'undefined') return null;
+        const query = new URLSearchParams(window.location.search);
+        return query.get('edit') === '1' && permissions['site.update']
+            ? { step: siteStepFromParam(query.get('step')) }
+            : null;
+    });
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has('edit') && !url.searchParams.has('step'))
+            return;
+        // A one-off flag: a refresh, "back" or a save's redirect shouldn't reopen it.
+        url.searchParams.delete('edit');
+        url.searchParams.delete('step');
+        window.history.replaceState(window.history.state, '', url);
+    }, []);
+    // A site with no geofence sets one up in Edit site's Location step; a
+    // saved one is changed in Shared boundaries.
+    const configureGeofence = useCallback(() => {
+        if (overview.geofences.length === 0 && permissions['site.update']) {
+            setEditSite({ step: 'location' });
+            return;
+        }
+        setGeofenceOpen(true);
+    }, [overview.geofences.length, permissions]);
     const [loadingProps, setLoadingProps] = useState<
         Partial<Record<SiteProfileDataProp, boolean>>
     >({});
@@ -650,11 +683,7 @@ export default function SiteShow(props: SiteProfileProps) {
                                         icon={Pencil}
                                         aria-label="Edit Site"
                                         title="Edit Site"
-                                        onClick={() =>
-                                            router.visit(
-                                                `/sites/${site.id}/edit`,
-                                            )
-                                        }
+                                        onClick={() => setEditSite({})}
                                     />
                                 ) : null}
                                 {quickActions.length ? (
@@ -795,8 +824,8 @@ export default function SiteShow(props: SiteProfileProps) {
                                                 percent={hero.checks.percent}
                                                 caption={
                                                     <>
-                                                        {hero.checks.on_time}{' '}
-                                                        of {hero.checks.total}
+                                                        {hero.checks.on_time} of{' '}
+                                                        {hero.checks.total}
                                                         <br />
                                                         done on time
                                                     </>
@@ -833,9 +862,7 @@ export default function SiteShow(props: SiteProfileProps) {
                                             label={hero.occupancy.label}
                                             value={`${hero.occupancy.occupied}/${hero.occupancy.total}`}
                                             ariaLabel={`View ${terminology.people.toLowerCase()} and room placements`}
-                                            onClick={() =>
-                                                selectTab('clients')
-                                            }
+                                            onClick={() => selectTab('clients')}
                                         >
                                             <PageHeaderMeterBar
                                                 percent={occupancyPercent}
@@ -852,9 +879,7 @@ export default function SiteShow(props: SiteProfileProps) {
                                         <PageHeaderMeterBlock
                                             label={hero.occupancy.label}
                                             ariaLabel={`View ${terminology.people.toLowerCase()}`}
-                                            onClick={() =>
-                                                selectTab('clients')
-                                            }
+                                            onClick={() => selectTab('clients')}
                                         >
                                             <PageHeaderMeterBig>
                                                 {hero.occupancy.total}
@@ -946,7 +971,7 @@ export default function SiteShow(props: SiteProfileProps) {
                             propErrors={propErrors}
                             onNavigate={selectTab}
                             onEditLocation={() => setLocationOpen(true)}
-                            onConfigureGeofence={() => setGeofenceOpen(true)}
+                            onConfigureGeofence={configureGeofence}
                             onRetry={(dataProp) => requestProp(dataProp, true)}
                         />
                     </div>
@@ -989,6 +1014,14 @@ export default function SiteShow(props: SiteProfileProps) {
                 siteName={site.name}
                 geofences={overview.geofences}
             />
+            {permissions['site.update'] ? (
+                <EditSiteDialog
+                    siteId={site.id}
+                    isOpen={editSite !== null}
+                    initialStep={editSite?.step}
+                    onClose={() => setEditSite(null)}
+                />
+            ) : null}
             <TabSearchPalette
                 open={searchOpen}
                 onClose={() => setSearchOpen(false)}

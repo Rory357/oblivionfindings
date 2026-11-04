@@ -2,16 +2,23 @@
 
 namespace App\Http\Requests;
 
-use App\Models\SiteContact;
+use App\Http\Requests\Sites\SiteContactRules;
 use App\Services\Eligibility\WorkforceRequirementMapping;
+use App\Support\SiteGeofenceLimits;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreSiteRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return $this->user()?->canDo('sites.create') ?? false;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if (is_array($this->input('contacts'))) {
+            $this->merge(['contacts' => SiteContactRules::withoutLinkedDetails($this->input('contacts'))]);
+        }
     }
 
     public function rules(): array
@@ -42,14 +49,7 @@ class StoreSiteRequest extends FormRequest
             'risk_review_date' => ['nullable', 'date'],
             'primary_contact_user_id' => ['nullable', 'exists:users,id'],
             'contacts' => ['nullable', 'array'],
-            'contacts.*.id' => ['nullable', 'integer'],
-            'contacts.*.type' => ['required_with:contacts.*', 'string', Rule::in(SiteContact::TYPES)],
-            'contacts.*.name' => ['required_with:contacts.*', 'string', 'max:255'],
-            'contacts.*.role' => ['nullable', 'string', 'max:255'],
-            'contacts.*.phone' => ['nullable', 'string', 'max:60'],
-            'contacts.*.email' => ['nullable', 'string', 'email', 'max:255'],
-            'contacts.*.is_primary' => ['nullable', 'boolean'],
-            'contacts.*.notes' => ['nullable', 'string', 'max:5000'],
+            ...SiteContactRules::rows('contacts.*'),
 
             'rooms' => ['nullable', 'array'],
             'rooms.*.id' => ['nullable', 'integer'],
@@ -60,7 +60,7 @@ class StoreSiteRequest extends FormRequest
             'resources' => ['nullable', 'array'],
             'resources.*.id' => ['nullable', 'integer'],
             'resources.*.name' => ['required_with:resources.*', 'string', 'max:255'],
-            'resources.*.resource_type' => ['nullable', 'string', 'max:60'],
+            'resources.*.resource_type' => ['nullable', 'string', 'in:boardroom,training_room,meeting_room,other'],
             'resources.*.capacity' => ['nullable', 'integer', 'min:0'],
 
             'zones' => ['nullable', 'array'],
@@ -124,7 +124,7 @@ class StoreSiteRequest extends FormRequest
             // Geofence — circle seeded into the shared AssetGeofence at create
             'geofence' => ['nullable', 'array'],
             'geofence.mode' => ['nullable', 'in:radius,draw'],
-            'geofence.radius_m' => ['nullable', 'integer', 'min:25', 'max:2000'],
+            'geofence.radius_m' => SiteGeofenceLimits::radiusRules(),
             'geofence.breach_type' => ['nullable', 'in:enter,exit,both'],
             'geofence.is_active' => ['nullable', 'boolean'],
 

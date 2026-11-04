@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteContact;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -181,7 +182,7 @@ class SiteContactService
 
     /**
      * @param  array<int, array<string, mixed>>  $contacts
-     * @return Collection<int, array{id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}>
+     * @return Collection<int, array{id: int|null, user_id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}>
      */
     private function normalizeBatch(array $contacts, string $path): Collection
     {
@@ -191,8 +192,14 @@ class SiteContactService
     }
 
     /**
+     * A staff-linked contact (user_id) takes its name, role, phone and email
+     * from the staff record's work details; whatever the form sent for those
+     * is ignored. The values are also stored, as the fallback for when the
+     * staff record is gone. Callers check the viewer may pick that staff
+     * member (SiteContactStaffDirectory) before saving.
+     *
      * @param  array<string, mixed>  $contact
-     * @return array{id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}
+     * @return array{id: int|null, user_id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}
      */
     private function normalize(array $contact, string $path): array
     {
@@ -204,7 +211,21 @@ class SiteContactService
             ]);
         }
 
-        $name = trim((string) ($contact['name'] ?? ''));
+        $userId = filled($contact['user_id'] ?? null) ? (int) $contact['user_id'] : null;
+        $staff = null;
+        if ($userId !== null) {
+            $user = User::query()
+                ->with(['hrEmployeeProfile:'.implode(',', SiteContact::STAFF_PROFILE_COLUMNS)])
+                ->find($userId, ['id', 'name']);
+            if (! $user instanceof User) {
+                throw ValidationException::withMessages([
+                    "{$path}.user_id" => 'Choose a current staff member.',
+                ]);
+            }
+            $staff = SiteContact::workDetailsFor($user);
+        }
+
+        $name = $staff ? trim($staff['name']) : trim((string) ($contact['name'] ?? ''));
         if ($name === '') {
             throw ValidationException::withMessages([
                 "{$path}.name" => 'Enter the contact name.',
@@ -213,18 +234,19 @@ class SiteContactService
 
         return [
             'id' => filled($contact['id'] ?? null) ? (int) $contact['id'] : null,
+            'user_id' => $userId,
             'type' => $type,
             'name' => $name,
-            'role' => $this->nullableTrimmed($contact['role'] ?? null),
-            'phone' => $this->nullableTrimmed($contact['phone'] ?? null),
-            'email' => $this->nullableTrimmed($contact['email'] ?? null),
+            'role' => $staff ? $staff['role'] : $this->nullableTrimmed($contact['role'] ?? null),
+            'phone' => $staff ? $staff['phone'] : $this->nullableTrimmed($contact['phone'] ?? null),
+            'email' => $staff ? $staff['email'] : $this->nullableTrimmed($contact['email'] ?? null),
             'is_primary' => (bool) ($contact['is_primary'] ?? false),
             'notes' => $this->nullableTrimmed($contact['notes'] ?? null),
         ];
     }
 
     /**
-     * @param  Collection<int, array{id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}>  $contacts
+     * @param  Collection<int, array{id: int|null, user_id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}>  $contacts
      * @param  Collection<int, SiteContact>  $existing
      */
     private function assertBatchIntegrity(
@@ -268,7 +290,7 @@ class SiteContactService
         }
     }
 
-    /** @param array{id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null} $contact */
+    /** @param array{id: int|null, user_id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null} $contact */
     private function assertUniqueIdentity(Site $site, array $contact, ?int $exceptId = null): void
     {
         $duplicate = SiteContact::query()
@@ -287,12 +309,13 @@ class SiteContactService
     }
 
     /**
-     * @param  array{id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}  $contact
-     * @return array{type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}
+     * @param  array{id: int|null, user_id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}  $contact
+     * @return array{user_id: int|null, type: string, name: string, role: string|null, phone: string|null, email: string|null, is_primary: bool, notes: string|null}
      */
     private function payload(array $contact): array
     {
         return [
+            'user_id' => $contact['user_id'],
             'type' => $contact['type'],
             'name' => $contact['name'],
             'role' => $contact['role'],

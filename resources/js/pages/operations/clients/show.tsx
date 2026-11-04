@@ -390,6 +390,9 @@ type Props = {
         preferred_name?: string | null;
         date_of_birth?: string | null;
         gender?: string | null;
+        gender_description?: string | null;
+        gender_label?: string | null;
+        gender_recorded_as?: string | null;
         status: string;
         phone?: string | null;
         email?: string | null;

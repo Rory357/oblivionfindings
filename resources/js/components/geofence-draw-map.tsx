@@ -3,6 +3,7 @@
  * Pure Leaflet + React state. No leaflet-draw.
  */
 import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -16,12 +17,34 @@ export interface GeofenceShape {
     coordinates?: { lat: number; lng: number }[];
 }
 
+type DrawMode = 'circle' | 'rectangle' | 'polygon';
+
 interface Props {
     center?: { lat: number; lng: number };
     zoom?: number;
     height?: number;
     initialShape?: GeofenceShape | null;
     onShapeChange: (shape: GeofenceShape | null) => void;
+    /** Circle radius limits and quick sizes, in metres. Add / Edit site pass
+     *  the Site geofence limits (lib/site-geofence.ts, 10–2,000 m); other
+     *  callers keep the Fleet defaults. */
+    minRadius?: number;
+    maxRadius?: number;
+    radiusStep?: number;
+    radiusPresets?: readonly number[];
+    /** Shapes on offer. With one shape the shape picker and Clear are hidden. */
+    modes?: readonly DrawMode[];
+    /** Accessible name for the radius slider. */
+    radiusLabel?: string;
+}
+
+const ALL_MODES: readonly DrawMode[] = ['circle', 'rectangle', 'polygon'];
+const DEFAULT_PRESETS: readonly number[] = [50, 100, 200, 500, 1000, 2000];
+
+function radiusText(metres: number): string {
+    return metres >= 1000
+        ? `${(metres / 1000).toLocaleString('en-NZ', { maximumFractionDigits: 1 })} km`
+        : `${metres} m`;
 }
 
 const PURPLE = '#7c3aed';
@@ -55,6 +78,12 @@ export default function GeofenceDrawMap({
     height = 480,
     initialShape,
     onShapeChange,
+    minRadius = 25,
+    maxRadius = 5000,
+    radiusStep = 25,
+    radiusPresets = DEFAULT_PRESETS,
+    modes = ALL_MODES,
+    radiusLabel = 'Geofence radius in metres',
 }: Props) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<L.Map | null>(null);
@@ -62,17 +91,31 @@ export default function GeofenceDrawMap({
     const markersRef = useRef<L.Marker[]>([]);
     const previewRef = useRef<L.Polyline | null>(null);
 
-    const [mode, setMode] = useState<'circle' | 'rectangle' | 'polygon'>(
-        initialShape?.type === 'rectangle'
-            ? 'rectangle'
-            : initialShape?.type === 'polygon'
-              ? 'polygon'
-              : 'circle',
+    const clampRadius = useCallback(
+        (value: number) =>
+            Math.min(
+                maxRadius,
+                Math.max(minRadius, Number.isFinite(value) ? value : minRadius),
+            ),
+        [minRadius, maxRadius],
     );
-    const [radius, setRadius] = useState(
-        initialShape?.type === 'circle'
-            ? String(initialShape.radius_m ?? 200)
-            : '200',
+    const [mode, setMode] = useState<DrawMode>(() => {
+        const wanted: DrawMode =
+            initialShape?.type === 'rectangle'
+                ? 'rectangle'
+                : initialShape?.type === 'polygon'
+                  ? 'polygon'
+                  : 'circle';
+        return modes.includes(wanted) ? wanted : modes[0];
+    });
+    const [radius, setRadius] = useState(() =>
+        String(
+            clampRadius(
+                initialShape?.type === 'circle'
+                    ? (initialShape.radius_m ?? 200)
+                    : 200,
+            ),
+        ),
     );
     const [circleCenter, setCircleCenter] = useState<{
         lat: number;
@@ -250,7 +293,7 @@ export default function GeofenceDrawMap({
             cbRef.current(null);
             return;
         }
-        const r = Math.max(Number(radius) || 25, 25);
+        const r = clampRadius(Number(radius));
         const circle = L.circle([circleCenter.lat, circleCenter.lng], {
             radius: r,
             ...FILL,
@@ -260,7 +303,7 @@ export default function GeofenceDrawMap({
             setCircleCenter(p),
         );
         cbRef.current({ type: 'circle', center: circleCenter, radius_m: r });
-    }, [mode, circleCenter, radius, clearLayers, addDragMarker]);
+    }, [mode, circleCenter, radius, clearLayers, addDragMarker, clampRadius]);
 
     // ── RECTANGLE render ──
     useEffect(() => {
@@ -342,7 +385,7 @@ export default function GeofenceDrawMap({
 
     // Mode switch
     const switchMode = useCallback(
-        (m: 'circle' | 'rectangle' | 'polygon') => {
+        (m: DrawMode) => {
             clearLayers();
             setCircleCenter(null);
             setRectCorners([]);
@@ -371,7 +414,7 @@ export default function GeofenceDrawMap({
                     ok: false,
                 };
             return {
-                text: `Center: ${circleCenter.lat}, ${circleCenter.lng} · Radius: ${radius}m`,
+                text: `Centre: ${circleCenter.lat}, ${circleCenter.lng} · Radius: ${radiusText(Number(radius))}`,
                 ok: true,
             };
         }
@@ -406,41 +449,53 @@ export default function GeofenceDrawMap({
             className="space-y-0"
             style={{ isolation: 'isolate', position: 'relative', zIndex: 0 }}
         >
-            {/* Mode tabs */}
-            <div className="flex items-center justify-between px-1 pb-2">
-                <div className="flex gap-0.5 rounded-lg border p-0.5">
-                    {[
-                        { k: 'circle' as const, I: Circle, l: 'Circle' },
-                        { k: 'rectangle' as const, I: Square, l: 'Rectangle' },
-                        { k: 'polygon' as const, I: Pentagon, l: 'Polygon' },
-                    ].map(({ k, I, l }) => (
-                        <Button
-                            key={k}
-                            type="button"
-                            variant={mode === k ? 'default' : 'ghost'}
-                            size="sm"
-                            onClick={() => switchMode(k)}
-                            className={cn(
-                                'h-auto gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
-                                mode === k
-                                    ? 'bg-primary text-white shadow-sm'
-                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                            )}
-                        >
-                            <I className="h-3.5 w-3.5" /> {l}
-                        </Button>
-                    ))}
+            {/* Mode tabs (hidden when only one shape is on offer) */}
+            {modes.length > 1 ? (
+                <div className="flex items-center justify-between px-1 pb-2">
+                    <div className="flex gap-0.5 rounded-lg border p-0.5">
+                        {[
+                            { k: 'circle' as const, I: Circle, l: 'Circle' },
+                            {
+                                k: 'rectangle' as const,
+                                I: Square,
+                                l: 'Rectangle',
+                            },
+                            {
+                                k: 'polygon' as const,
+                                I: Pentagon,
+                                l: 'Polygon',
+                            },
+                        ]
+                            .filter(({ k }) => modes.includes(k))
+                            .map(({ k, I, l }) => (
+                                <Button
+                                    key={k}
+                                    type="button"
+                                    variant={mode === k ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => switchMode(k)}
+                                    className={cn(
+                                        'h-auto gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
+                                        mode === k
+                                            ? 'bg-primary text-white shadow-sm'
+                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                                    )}
+                                >
+                                    <I className="h-3.5 w-3.5" /> {l}
+                                </Button>
+                            ))}
+                    </div>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearAll}
+                        className="text-status-critical hover:text-status-critical"
+                    >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" /> Clear
+                    </Button>
                 </div>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearAll}
-                    className="text-status-critical hover:text-status-critical"
-                >
-                    <Trash2 className="mr-1 h-3.5 w-3.5" /> Clear
-                </Button>
-            </div>
+            ) : null}
 
             {/* Map */}
             <div
@@ -455,49 +510,58 @@ export default function GeofenceDrawMap({
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">
-                                Radius:{' '}
+                                Radius{' '}
                                 <span className="font-bold text-primary">
-                                    {radius}m
+                                    {radiusText(Number(radius))}
                                 </span>
                             </span>
-                            {Number(radius) >= 1000 && (
-                                <span className="text-xs text-muted-foreground">
-                                    {(Number(radius) / 1000).toFixed(1)} km
-                                </span>
-                            )}
+                            <span className="text-xs text-muted-foreground">
+                                {radiusText(minRadius)} to{' '}
+                                {radiusText(maxRadius)}
+                            </span>
                         </div>
                         <input
                             type="range"
-                            min="25"
-                            max="5000"
-                            step="25"
+                            min={minRadius}
+                            max={maxRadius}
+                            step={radiusStep}
                             value={radius}
-                            onChange={(e) => setRadius(e.target.value)}
-                            className="h-2 w-full cursor-pointer appearance-none rounded-full bg-primary/10 accent-purple-600"
+                            onChange={(e) =>
+                                setRadius(
+                                    String(clampRadius(Number(e.target.value))),
+                                )
+                            }
+                            aria-label={radiusLabel}
+                            aria-valuetext={radiusText(Number(radius))}
+                            className="h-2 w-full cursor-pointer accent-primary"
                         />
-                        <div className="flex gap-1.5">
-                            {[50, 100, 200, 500, 1000, 2000].map((r) => (
-                                <Button
-                                    key={r}
-                                    type="button"
-                                    variant={
-                                        String(r) === radius
-                                            ? 'default'
-                                            : 'ghost'
-                                    }
-                                    size="xs"
-                                    onClick={() => setRadius(String(r))}
-                                    className={cn(
-                                        'h-auto rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors',
-                                        String(r) === radius
-                                            ? 'bg-primary text-white'
-                                            : 'bg-primary/10 text-primary hover:bg-primary/10',
-                                    )}
-                                >
-                                    {r >= 1000 ? `${r / 1000}km` : `${r}m`}
-                                </Button>
-                            ))}
-                        </div>
+                        <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            size="sm"
+                            value={
+                                radiusPresets.includes(Number(radius))
+                                    ? radius
+                                    : ''
+                            }
+                            onValueChange={(value) => {
+                                if (value) setRadius(value);
+                            }}
+                            aria-label="Quick radius sizes"
+                            className="flex-wrap"
+                        >
+                            {radiusPresets
+                                .filter((r) => r >= minRadius && r <= maxRadius)
+                                .map((r) => (
+                                    <ToggleGroupItem
+                                        key={r}
+                                        value={String(r)}
+                                        className="px-2.5 text-xs"
+                                    >
+                                        {radiusText(r)}
+                                    </ToggleGroupItem>
+                                ))}
+                        </ToggleGroup>
                     </div>
                 )}
                 {mode === 'rectangle' && (

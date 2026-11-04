@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ClientGender;
 use App\Models\Client;
 use App\Models\ClientCondition;
 use App\Models\ClientEmergencyContact;
@@ -12,9 +13,9 @@ use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
 
 class SystemClientsSeeder extends Seeder
 {
@@ -28,7 +29,7 @@ class SystemClientsSeeder extends Seeder
             ->orderBy('id')
             ->get();
 
-        if (!$site || !$serviceContext || $workers->isEmpty()) {
+        if (! $site || ! $serviceContext || $workers->isEmpty()) {
             return;
         }
 
@@ -51,7 +52,7 @@ class SystemClientsSeeder extends Seeder
         $clients = collect();
 
         foreach ($seedClients as $idx => $c) {
-            $email = strtolower($c['first_name'] . '.' . $c['last_name']) . '@client.demo.test';
+            $email = strtolower($c['first_name'].'.'.$c['last_name']).'@client.demo.test';
 
             // Client email is encrypted, so it cannot be a lookup key: a match on it
             // never found the earlier row, and every re-run added 12 duplicate people.
@@ -71,10 +72,10 @@ class SystemClientsSeeder extends Seeder
                 'first_name' => $c['first_name'],
                 'last_name' => $c['last_name'],
                 'preferred_name' => $c['first_name'],
-                'gender' => ['female', 'male'][($idx % 2)],
+                'gender' => [ClientGender::Female->value, ClientGender::Male->value][($idx % 2)],
                 'status' => 'active',
-                'phone' => '021 ' . str_pad((string) rand(1000000, 9999999), 7, '0', STR_PAD_LEFT),
-                'address_line_1' => (string) rand(1, 40) . ' Example Road',
+                'phone' => '021 '.str_pad((string) rand(1000000, 9999999), 7, '0', STR_PAD_LEFT),
+                'address_line_1' => (string) rand(1, 40).' Example Road',
                 'suburb' => 'Auckland Central',
                 'city' => 'Auckland',
                 'postcode' => '1010',
@@ -106,11 +107,11 @@ class SystemClientsSeeder extends Seeder
 
             // Emergency contacts
             ClientEmergencyContact::updateOrCreate(
-                ['client_id' => $client->id, 'email' => 'kin.' . $client->id . '@demo.test'],
+                ['client_id' => $client->id, 'email' => 'kin.'.$client->id.'@demo.test'],
                 [
-                    'name' => 'Next of Kin ' . $client->first_name,
+                    'name' => 'Next of Kin '.$client->first_name,
                     'relationship' => 'Parent/Guardian',
-                    'phone' => '027 ' . str_pad((string) rand(1000000, 9999999), 7, '0', STR_PAD_LEFT),
+                    'phone' => '027 '.str_pad((string) rand(1000000, 9999999), 7, '0', STR_PAD_LEFT),
                     'notes' => 'Primary contact',
                 ]
             );
@@ -152,9 +153,9 @@ class SystemClientsSeeder extends Seeder
                     }
                 }
 
-                if (!$sectionColumn) {
+                if (! $sectionColumn) {
                     throw new \RuntimeException(
-                        "client_onboarding_overrides exists but no identifier column found (expected one of: section, key, module, area, tab, slug, type)."
+                        'client_onboarding_overrides exists but no identifier column found (expected one of: section, key, module, area, tab, slug, type).'
                     );
                 }
 
@@ -207,9 +208,9 @@ class SystemClientsSeeder extends Seeder
         foreach ($clients->take(4) as $client) {
             // Client portal user
             $uClient = User::updateOrCreate(
-                ['email' => 'portal.client.' . $client->id . '@demo.test'],
+                ['email' => 'portal.client.'.$client->id.'@demo.test'],
                 [
-                    'name' => $client->first_name . ' ' . $client->last_name . ' (Portal)',
+                    'name' => $client->first_name.' '.$client->last_name.' (Portal)',
                     'password' => $portalPassword,
                     'role' => 'client',
                     'approved_at' => now(),
@@ -224,9 +225,9 @@ class SystemClientsSeeder extends Seeder
 
             // Next-of-kin portal user
             $uNok = User::updateOrCreate(
-                ['email' => 'portal.nok.' . $client->id . '@demo.test'],
+                ['email' => 'portal.nok.'.$client->id.'@demo.test'],
                 [
-                    'name' => 'Guardian of ' . $client->first_name,
+                    'name' => 'Guardian of '.$client->first_name,
                     'password' => $portalPassword,
                     'role' => 'next_of_kin',
                     'approved_at' => now(),

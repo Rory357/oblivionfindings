@@ -1,20 +1,29 @@
-import { Badge } from '@/components/ui/badge';
+/**
+ * Site profile › Contacts: add and edit one contact. A contact is either
+ * someone who works here (picked from the staff list; name, job title, work
+ * phone and work email come from their staff record) or someone outside the
+ * organisation (typed in). Same choice as the Add / Edit site pop-up
+ * (to-do #10).
+ */
+import { PopupForm } from '@/components/popup';
+import {
+    ContactSourceChoice,
+    defaultContactSource,
+    StaffContactPicker,
+    type ContactSource,
+    type SiteStaffOption,
+} from '@/components/sites/site-contact-fields';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Field } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
-import { Loader2, Star } from 'lucide-react';
+import axios from 'axios';
+import { Pencil, UserPlus } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import {
     CONTACT_TYPES,
     getContactType,
@@ -31,6 +40,8 @@ export type { ContactTypeDef, ContactTypeKey };
 
 export type ContactFormValues = {
     type: ContactTypeKey | string;
+    source: ContactSource;
+    user_id: string;
     name: string;
     role: string;
     phone: string;
@@ -42,6 +53,8 @@ export type ContactFormValues = {
 export type ContactRecord = {
     id: number;
     type?: string | null;
+    /** Set when the contact is someone who works here. */
+    user_id?: number | null;
     name: string;
     role?: string | null;
     phone?: string | null;
@@ -50,9 +63,43 @@ export type ContactRecord = {
     notes?: string | null;
 };
 
-function FieldError({ message }: { message?: string }) {
-    if (!message) return null;
-    return <p className="mt-1 text-xs text-status-critical">{message}</p>;
+/** The staff the viewer may pick, loaded when a contact pop-up opens. */
+function useSiteStaff(siteId: number) {
+    const [staff, setStaff] = useState<SiteStaffOption[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [failed, setFailed] = useState(false);
+    const [attempt, setAttempt] = useState(0);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        axios
+            .get<{ staff: SiteStaffOption[] }>(
+                `/sites/${siteId}/contacts/staff`,
+                {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                },
+            )
+            .then((response) => {
+                setStaff(response.data.staff ?? []);
+                setFailed(false);
+                setLoading(false);
+            })
+            .catch((error: unknown) => {
+                if (axios.isCancel(error)) return;
+                setFailed(true);
+                setLoading(false);
+            });
+        return () => controller.abort();
+    }, [siteId, attempt]);
+
+    const retry = useCallback(() => {
+        setLoading(true);
+        setFailed(false);
+        setAttempt((n) => n + 1);
+    }, []);
+
+    return { staff, loading, failed, retry };
 }
 
 // ── Type picker (Send Kudos-style category grid) ──────────────────────────
@@ -74,21 +121,17 @@ function ContactTypePicker({
                         unstyled
                         key={t.key}
                         type="button"
+                        aria-pressed={active}
                         onClick={() => onChange(t.key)}
                         className={cn(
                             'group flex items-start gap-2 rounded-xl border bg-card/40 p-3 text-left transition-all',
-                            'hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                            'hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                             active
-                                ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
+                                ? 'border-primary bg-primary-fill/10 ring-1 ring-primary/40'
                                 : 'border-border',
                         )}
                     >
-                        <span
-                            className={cn(
-                                'mt-0.5 shrink-0 rounded-lg p-1.5',
-                                'bg-background/60',
-                            )}
-                        >
+                        <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
                             <Icon className={cn('h-4 w-4', t.accent)} />
                         </span>
                         <span className="min-w-0">
@@ -111,128 +154,199 @@ function ContactTypePicker({
 function ContactFields({
     form,
     lockType = false,
+    staff,
+    current,
 }: {
     form: ReturnType<typeof useForm<ContactFormValues>>;
     lockType?: boolean;
+    staff: ReturnType<typeof useSiteStaff>;
+    current?: SiteStaffOption | null;
 }) {
-    const selectedType = getContactType(form.data.type);
+    const { data, setData, errors } = form;
+    const selectedType = getContactType(data.type);
     const SelectedIcon = selectedType.icon;
 
+    const pickStaff = (person: SiteStaffOption | null) =>
+        setData((prev) => ({
+            ...prev,
+            source: 'staff',
+            user_id: person ? String(person.id) : '',
+            name: person?.name ?? '',
+            role: person?.role ?? '',
+            phone: person?.phone ?? '',
+            email: person?.email ?? '',
+        }));
+    const changeSource = (source: ContactSource) => {
+        if (source === data.source) return;
+        // Switching clears the other way's details.
+        setData((prev) => ({
+            ...prev,
+            source,
+            user_id: '',
+            name: '',
+            role: '',
+            phone: '',
+            email: '',
+        }));
+    };
+    const changeType = (type: ContactTypeKey) => {
+        const untouched =
+            !data.user_id &&
+            !data.name.trim() &&
+            !data.role.trim() &&
+            !data.phone.trim() &&
+            !data.email.trim();
+        setData((prev) => ({
+            ...prev,
+            type,
+            source: untouched ? defaultContactSource(type) : prev.source,
+        }));
+    };
+
     return (
-        <div className="space-y-4">
+        <div className="grid gap-4">
             <div>
                 <Label className="mb-2 block">
                     Contact type <span className="text-status-critical">*</span>
                 </Label>
                 {lockType ? (
-                    <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
+                    <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-3">
                         <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
                             <SelectedIcon
                                 className={cn('h-4 w-4', selectedType.accent)}
                             />
                         </span>
                         <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-medium">
-                                    {selectedType.label}
-                                </span>
-                                <Badge
-                                    variant="outline"
-                                    className="text-[10px]"
-                                >
-                                    From Overview
-                                </Badge>
-                            </div>
+                            <span className="text-sm font-medium">
+                                {selectedType.label}
+                            </span>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                This role is locked for the Overview row you
-                                opened.
+                                Set by the Overview row you opened.
                             </p>
                         </div>
                     </div>
                 ) : (
                     <ContactTypePicker
-                        value={form.data.type}
-                        onChange={(v) => form.setData('type', v)}
+                        value={data.type}
+                        onChange={changeType}
                     />
                 )}
-                <FieldError message={form.errors.type} />
+                {errors.type ? (
+                    <p className="mt-1 text-xs text-status-critical">
+                        {errors.type}
+                    </p>
+                ) : null}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                    <Label htmlFor="c-name">
-                        Name <span className="text-status-critical">*</span>
-                    </Label>
-                    <Input
-                        id="c-name"
-                        value={form.data.name}
-                        onChange={(e) => form.setData('name', e.target.value)}
-                        placeholder="Full name"
-                        required
-                    />
-                    <FieldError message={form.errors.name} />
-                </div>
-
-                <div className="sm:col-span-2">
-                    <Label htmlFor="c-role">Role / title</Label>
-                    <Input
-                        id="c-role"
-                        value={form.data.role}
-                        onChange={(e) => form.setData('role', e.target.value)}
-                        placeholder="e.g. Service Manager, RN, Father"
-                    />
-                    <FieldError message={form.errors.role} />
-                </div>
-
-                <div>
-                    <Label htmlFor="c-phone">Phone</Label>
-                    <Input
-                        id="c-phone"
-                        value={form.data.phone}
-                        onChange={(e) => form.setData('phone', e.target.value)}
-                        placeholder="+64 21 …"
-                    />
-                    <FieldError message={form.errors.phone} />
-                </div>
-
-                <div>
-                    <Label htmlFor="c-email">Email</Label>
-                    <Input
-                        id="c-email"
-                        type="email"
-                        value={form.data.email}
-                        onChange={(e) => form.setData('email', e.target.value)}
-                    />
-                    <FieldError message={form.errors.email} />
-                </div>
-
-                <div className="flex items-center gap-2 sm:col-span-2">
-                    <Checkbox
-                        id="c-primary"
-                        checked={form.data.is_primary}
-                        onCheckedChange={(checked) =>
-                            form.setData('is_primary', !!checked)
-                        }
-                    />
-                    <Label htmlFor="c-primary" className="text-sm font-normal">
-                        Mark as primary contact for this site
-                    </Label>
-                </div>
-
-                <div className="sm:col-span-2">
-                    <Label htmlFor="c-notes">Notes</Label>
-                    <Textarea
-                        id="c-notes"
-                        rows={3}
-                        value={form.data.notes}
-                        onChange={(e) => form.setData('notes', e.target.value)}
-                        placeholder="Availability, languages, additional context…"
-                    />
-                    <FieldError message={form.errors.notes} />
-                </div>
+            <div className="grid gap-2">
+                <Label>Who is it?</Label>
+                <ContactSourceChoice
+                    value={data.source}
+                    onChange={changeSource}
+                />
             </div>
+
+            {data.source === 'staff' ? (
+                <Field
+                    label="Staff member"
+                    required
+                    error={errors.user_id}
+                    span
+                >
+                    <StaffContactPicker
+                        value={data.user_id}
+                        onChange={pickStaff}
+                        staff={staff.staff}
+                        current={current}
+                        loading={staff.loading}
+                        failed={staff.failed}
+                        onRetry={staff.retry}
+                    />
+                </Field>
+            ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Name" required error={errors.name} span>
+                        <Input
+                            value={data.name}
+                            onChange={(e) => setData('name', e.target.value)}
+                            placeholder="Full name"
+                            aria-invalid={!!errors.name}
+                        />
+                    </Field>
+                    <Field label="Role / title" error={errors.role} span>
+                        <Input
+                            value={data.role}
+                            onChange={(e) => setData('role', e.target.value)}
+                            placeholder="e.g. Father, GP, plumber"
+                        />
+                    </Field>
+                    <Field label="Phone" error={errors.phone}>
+                        <Input
+                            value={data.phone}
+                            onChange={(e) => setData('phone', e.target.value)}
+                            placeholder="021 123 4567"
+                        />
+                    </Field>
+                    <Field label="Email" error={errors.email}>
+                        <Input
+                            type="email"
+                            value={data.email}
+                            onChange={(e) => setData('email', e.target.value)}
+                        />
+                    </Field>
+                </div>
+            )}
+
+            <div className="flex items-center gap-2">
+                <Checkbox
+                    id="c-primary"
+                    checked={data.is_primary}
+                    onCheckedChange={(checked) =>
+                        setData('is_primary', !!checked)
+                    }
+                />
+                <Label htmlFor="c-primary" className="text-sm font-normal">
+                    Mark as primary contact for this site
+                </Label>
+            </div>
+
+            <Field label="Notes" error={errors.notes} span>
+                <Textarea
+                    rows={3}
+                    value={data.notes}
+                    onChange={(e) => setData('notes', e.target.value)}
+                    placeholder="Availability, languages, additional context…"
+                />
+            </Field>
         </div>
     );
+}
+
+/** What the server wants: a staff contact sends only its link. */
+function contactSubmission(data: ContactFormValues) {
+    const { source, ...rest } = data;
+    if (source === 'staff') {
+        return {
+            type: rest.type,
+            user_id: rest.user_id,
+            is_primary: rest.is_primary,
+            notes: rest.notes,
+        };
+    }
+    return { ...rest, user_id: '' };
+}
+
+function contactErrorStep(
+    data: ContactFormValues,
+): Partial<Record<keyof ContactFormValues, string>> {
+    if (data.source === 'staff' && !data.user_id)
+        return {
+            user_id:
+                'Choose who this is, or switch to someone outside the organisation.',
+        };
+    if (data.source === 'outside' && !data.name.trim())
+        return { name: 'Enter their name.' };
+    return {};
 }
 
 // ── Add ───────────────────────────────────────────────────────────────────
@@ -252,21 +366,15 @@ export function AddContactDialog({
     lockType?: boolean;
     onSaved?: () => void;
 }) {
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-xl">
-                {isOpen && (
-                    <AddContactBody
-                        siteId={siteId}
-                        onClose={onClose}
-                        type={type}
-                        lockType={lockType}
-                        onSaved={onSaved}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
+    return isOpen ? (
+        <AddContactBody
+            siteId={siteId}
+            onClose={onClose}
+            type={type}
+            lockType={lockType}
+            onSaved={onSaved}
+        />
+    ) : null;
 }
 
 function AddContactBody({
@@ -282,8 +390,12 @@ function AddContactBody({
     lockType: boolean;
     onSaved?: () => void;
 }) {
+    const startType = type ?? 'site_contact';
+    const staff = useSiteStaff(siteId);
     const form = useForm<ContactFormValues>({
-        type: type ?? 'site_contact',
+        type: startType,
+        source: defaultContactSource(startType),
+        user_id: '',
         name: '',
         role: '',
         phone: '',
@@ -292,8 +404,14 @@ function AddContactBody({
         notes: '',
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const submit = () => {
+        const problems = contactErrorStep(form.data);
+        form.clearErrors();
+        if (Object.keys(problems).length) {
+            form.setError(problems);
+            return;
+        }
+        form.transform(contactSubmission);
         form.post(`/sites/${siteId}/contacts`, {
             preserveScroll: true,
             preserveState: true,
@@ -305,33 +423,22 @@ function AddContactBody({
     };
 
     return (
-        <form onSubmit={handleSubmit}>
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <Star className="h-4 w-4 text-primary" />
-                    New Site Contact
-                </DialogTitle>
-                <DialogDescription>
-                    Pick a contact type, then fill in the details.
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-3">
-                <ContactFields form={form} lockType={lockType} />
-            </div>
-
-            <DialogFooter className="mt-4">
-                <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={form.processing}>
-                    {form.processing && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Save contact
-                </Button>
-            </DialogFooter>
-        </form>
+        <PopupForm
+            open
+            onClose={onClose}
+            size="md"
+            icon={UserPlus}
+            title="Add site contact"
+            description="Pick someone who works here, or add someone from outside the organisation."
+            submitLabel="Add contact"
+            processingLabel="Adding…"
+            processing={form.processing}
+            onSubmit={submit}
+            dirty={form.isDirty}
+            draftName="a new site contact"
+        >
+            <ContactFields form={form} lockType={lockType} staff={staff} />
+        </PopupForm>
     );
 }
 
@@ -350,20 +457,15 @@ export function EditContactDialog({
     onClose: () => void;
     onSaved?: () => void;
 }) {
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-xl">
-                {isOpen && contact && (
-                    <EditContactBody
-                        siteId={siteId}
-                        contact={contact}
-                        onClose={onClose}
-                        onSaved={onSaved}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
+    return isOpen && contact ? (
+        <EditContactBody
+            key={contact.id}
+            siteId={siteId}
+            contact={contact}
+            onClose={onClose}
+            onSaved={onSaved}
+        />
+    ) : null;
 }
 
 function EditContactBody({
@@ -377,9 +479,23 @@ function EditContactBody({
     onClose: () => void;
     onSaved?: () => void;
 }) {
+    const staff = useSiteStaff(siteId);
+    const linked = contact.user_id != null;
+    // The saved staff member stays selectable even if this viewer couldn't pick them today.
+    const current: SiteStaffOption | null = linked
+        ? {
+              id: contact.user_id as number,
+              name: contact.name,
+              role: contact.role,
+              phone: contact.phone,
+              email: contact.email,
+          }
+        : null;
     const form = useForm<ContactFormValues>({
         type: (getContactType(contact.type).key ??
             'site_contact') as ContactTypeKey,
+        source: linked ? 'staff' : 'outside',
+        user_id: linked ? String(contact.user_id) : '',
         name: contact.name ?? '',
         role: contact.role ?? '',
         phone: contact.phone ?? '',
@@ -388,8 +504,14 @@ function EditContactBody({
         notes: contact.notes ?? '',
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const submit = () => {
+        const problems = contactErrorStep(form.data);
+        form.clearErrors();
+        if (Object.keys(problems).length) {
+            form.setError(problems);
+            return;
+        }
+        form.transform(contactSubmission);
         form.put(`/sites/${siteId}/contacts/${contact.id}`, {
             preserveScroll: true,
             preserveState: true,
@@ -401,29 +523,21 @@ function EditContactBody({
     };
 
     return (
-        <form onSubmit={handleSubmit}>
-            <DialogHeader>
-                <DialogTitle>Edit contact</DialogTitle>
-                <DialogDescription>
-                    Update the contact's details.
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-3">
-                <ContactFields form={form} />
-            </div>
-
-            <DialogFooter className="mt-4">
-                <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={form.processing}>
-                    {form.processing && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Save changes
-                </Button>
-            </DialogFooter>
-        </form>
+        <PopupForm
+            open
+            onClose={onClose}
+            size="md"
+            icon={Pencil}
+            title="Edit contact"
+            description={`Change how ${contact.name || 'this contact'} is listed for this site.`}
+            submitLabel="Save changes"
+            processingLabel="Saving…"
+            processing={form.processing}
+            onSubmit={submit}
+            dirty={form.isDirty}
+            draftName={`changes to ${contact.name || 'this contact'}`}
+        >
+            <ContactFields form={form} staff={staff} current={current} />
+        </PopupForm>
     );
 }

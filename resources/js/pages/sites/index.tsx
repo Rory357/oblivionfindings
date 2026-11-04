@@ -73,6 +73,7 @@ import {
     AddSiteDialog,
     type AddSiteReferenceData,
 } from '@/components/sites/add-site-dialog';
+import { EditSiteDialog } from '@/components/sites/edit-site-dialog';
 import {
     type SiteWorkCan,
     SiteWorkDialogs,
@@ -531,7 +532,21 @@ export default function SitesIndex() {
         siteWork = NO_SITE_WORK,
     } = usePage<PageProps>().props;
     const can = auth?.can ?? {};
-    const [addSiteOpen, setAddSiteOpen] = useState(false);
+    // /sites/create redirects here with ?add=1 (old links and bookmarks).
+    const [addSiteOpen, setAddSiteOpen] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).get('add') === '1',
+    );
+    const [editSiteId, setEditSiteId] = useState<number | null>(null);
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has('add')) return;
+        // Drop the one-off flag so a refresh or "back" doesn't reopen it.
+        url.searchParams.delete('add');
+        window.history.replaceState(window.history.state, '', url);
+    }, []);
     const work = useSiteWork();
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
@@ -681,11 +696,12 @@ export default function SitesIndex() {
                 },
             },
             { separator: true },
-            can.sites?.update && {
-                label: 'Edit details',
-                icon: Pencil,
-                onClick: () => router.visit(`/sites/${s.id}/edit`),
-            },
+            can.sites?.update &&
+                !s.archived && {
+                    label: 'Edit details',
+                    icon: Pencil,
+                    onClick: () => setEditSiteId(s.id),
+                },
             can.calendar?.create && {
                 label: 'Add calendar event',
                 icon: Calendar,
@@ -1361,6 +1377,13 @@ export default function SitesIndex() {
                             only: ['sites', 'summary', 'savedViewCounts'],
                         })
                     }
+                />
+            ) : null}
+            {can.sites?.update ? (
+                <EditSiteDialog
+                    siteId={editSiteId}
+                    isOpen={editSiteId !== null}
+                    onClose={() => setEditSiteId(null)}
                 />
             ) : null}
         </AppLayout>

@@ -33,6 +33,13 @@ import {
     TilePicker,
     type IconType,
 } from '@/components/wizard/primitives';
+import {
+    ANOTHER_GENDER,
+    GENDER_DESCRIPTION_MAX_LENGTH,
+    GENDER_OPTIONS,
+    genderLabel,
+    genderRecordedAsNotice,
+} from '@/lib/client-gender';
 import { formatDateOnly } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { useForm, usePage } from '@inertiajs/react';
@@ -138,6 +145,10 @@ export type ClientWizardForm = {
     preferred_name: string;
     date_of_birth: string;
     gender: string;
+    /** Their own words, kept only for Another gender. */
+    gender_description: string;
+    /** Text typed before Gender was a dropdown; shown as a notice, never sent. */
+    gender_recorded_as: string;
     preferred_pronouns: string;
     nhi_number: string;
     phone: string;
@@ -507,6 +518,8 @@ function initialForm(
         preferred_name: '',
         date_of_birth: '',
         gender: '',
+        gender_description: '',
+        gender_recorded_as: '',
         preferred_pronouns: '',
         nhi_number: '',
         phone: '',
@@ -740,6 +753,9 @@ function validateStep(
             e.service_context_id = 'Choose a service context';
         if (d.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email))
             e.email = 'Enter a valid email';
+        if (d.gender === ANOTHER_GENDER && !d.gender_description.trim())
+            e.gender_description =
+                'Describe their gender in their own words, or choose another option';
         if (d.nhi_number && nhiState(d.nhi_number) === 'bad')
             e.nhi_number = 'NHI must be 3 letters + 4 digits';
         if (d.create_client_portal_user && !d.email)
@@ -932,6 +948,7 @@ function AddClientBody({
             form.transform((payload) => {
                 const permitted = { ...payload } as Partial<ClientWizardForm>;
                 delete permitted.service_start_date;
+                delete permitted.gender_recorded_as;
                 if (!canEditMedical) {
                     delete permitted.medical;
                     delete permitted.conditions;
@@ -944,6 +961,7 @@ function AddClientBody({
             form.transform((payload) => {
                 const permitted = { ...payload } as Partial<ClientWizardForm>;
                 delete permitted.service_start_date;
+                delete permitted.gender_recorded_as;
                 return permitted;
             });
             form.post('/operations/clients', options);
@@ -1312,11 +1330,15 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                             ) : null}
                         </div>
                     </Field>
-                    <Field label="Gender">
-                        <Input
+                    <Field label="Gender" error={err('gender')}>
+                        <SelectInput
                             value={data.gender}
-                            onChange={(e) => set('gender', e.target.value)}
-                            placeholder="e.g. Male, Female, Non-binary"
+                            onChange={(v) => set('gender', v)}
+                            placeholder="Select gender"
+                            options={GENDER_OPTIONS.map((o) => ({
+                                value: o.value,
+                                label: o.label,
+                            }))}
                         />
                     </Field>
                     <Field label="Pronouns">
@@ -1337,6 +1359,30 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                             }))}
                         />
                     </Field>
+                    {data.gender === ANOTHER_GENDER ? (
+                        <Field
+                            label="Describe their gender"
+                            required
+                            hint="in their own words"
+                            error={err('gender_description')}
+                            span
+                        >
+                            <Input
+                                value={data.gender_description}
+                                onChange={(e) =>
+                                    set('gender_description', e.target.value)
+                                }
+                                maxLength={GENDER_DESCRIPTION_MAX_LENGTH}
+                                placeholder="e.g. Non-binary, takatāpui"
+                                aria-invalid={!!err('gender_description')}
+                            />
+                        </Field>
+                    ) : null}
+                    {data.gender_recorded_as && !data.gender ? (
+                        <InfoCard icon={AlertTriangle} tone="warn">
+                            {genderRecordedAsNotice(data.gender_recorded_as)}
+                        </InfoCard>
+                    ) : null}
                     <Field
                         label="NHI number"
                         hint="NZ National Health Index"
@@ -2657,6 +2703,13 @@ function ReviewStep({
                                 ? `${age != null ? age + ' yrs · ' : ''}${data.date_of_birth}`
                                 : ''
                         }
+                    />
+                    <ReviewRow
+                        label="Gender"
+                        value={genderLabel(
+                            data.gender,
+                            data.gender_description,
+                        )}
                     />
                     <ReviewRow label="NHI" value={data.nhi_number} />
                     <ReviewRow label="Site" value={siteName} />

@@ -23,6 +23,7 @@ use App\Domain\SecurityDevices\Presenters\ClientProfileHealthcareDevicesPresente
 use App\Domain\SecurityDevices\Services\PersonalTrackingLocationExportService;
 use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Enums\ClientGender;
 use App\Enums\NextOfKinRelationship;
 use App\Http\Controllers\Operations\ClientLocationLocateController;
 use App\Http\Requests\Operations\StoreClientLocateRequest;
@@ -798,6 +799,10 @@ class ClientController extends Controller
                 'preferred_name' => $client->preferred_name,
                 'date_of_birth' => optional($client->date_of_birth)->toDateString(),
                 'gender' => $client->gender,
+                'gender_description' => $client->gender_description,
+                'gender_label' => ClientGender::displayLabel($client->gender, $client->gender_description),
+                // Typed before Gender became a dropdown and not yet replaced by a choice.
+                'gender_recorded_as' => ClientGender::waitingForChoice($client->gender, $client->gender_recorded_as),
                 'status' => $client->status,
                 'phone' => $client->phone,
                 'email' => $client->email,
@@ -2701,7 +2706,7 @@ class ClientController extends Controller
             // hydrate the canonical Add Client completion wizard from one full
             // round-trippable shape.
             'client' => $client->only([
-                'id', 'site_id', 'room_id', 'service_context_id', 'nhi_number', 'first_name', 'last_name', 'preferred_name', 'date_of_birth', 'gender', 'status',
+                'id', 'site_id', 'room_id', 'service_context_id', 'nhi_number', 'first_name', 'last_name', 'preferred_name', 'date_of_birth', 'gender', 'gender_description', 'status',
                 'phone', 'email', 'address_line_1', 'address_line_2', 'suburb', 'city', 'postcode',
                 'profile_photo_path', 'funding_type', 'funding_notes',
             ]),
@@ -2750,7 +2755,8 @@ class ClientController extends Controller
             'last_name' => $client->last_name ?? '',
             'preferred_name' => $client->preferred_name ?? '',
             'date_of_birth' => $client->date_of_birth?->toDateString() ?? '',
-            'gender' => $client->gender ?? '',
+            // gender_recorded_as is shown as a "please choose" notice; the wizard never sends it back.
+            ...ClientGender::wizardValues($client->gender, $client->gender_description, $client->gender_recorded_as),
             'preferred_pronouns' => $client->preferred_pronouns ?? '',
             'nhi_number' => $client->nhi_number ?? '',
             'phone' => $client->phone ?? '',

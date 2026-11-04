@@ -484,11 +484,11 @@ class EstateOperationsPresenter
                     ->all(),
             ] : null,
             'changes' => $this->recentChanges($context, (int) $site->id),
-            'contacts' => SiteContact::query()
+            'contacts' => SiteContact::primeLinkedStaff(SiteContact::query()
                 ->where('site_id', $site->id)
                 ->orderByDesc('is_primary')
                 ->orderBy('name')
-                ->get()
+                ->get())
                 ->map(fn (SiteContact $contact) => [
                     'id' => $contact->id,
                     'type' => $contact->type,

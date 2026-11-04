@@ -1,3 +1,4 @@
+import { ClientGenderFields } from '@/components/clients/gender-fields';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 
@@ -23,6 +24,7 @@ export default function CreateClient({
         preferred_name: '',
         date_of_birth: '',
         gender: '',
+        gender_description: '',
         status: 'active',
         phone: '',
         email: '',
@@ -191,23 +193,15 @@ export default function CreateClient({
                             )}
                         </div>
 
-                        <div>
-                            <label className="text-sm font-medium">
-                                Gender
-                            </label>
-                            <input
-                                className="mt-1 w-full rounded-md border bg-transparent p-2"
-                                value={data.gender}
-                                onChange={(e) =>
-                                    setData('gender', e.target.value)
-                                }
-                            />
-                            {errors.gender && (
-                                <div className="mt-1 text-xs text-status-critical">
-                                    {errors.gender}
-                                </div>
-                            )}
-                        </div>
+                        <ClientGenderFields
+                            gender={data.gender}
+                            description={data.gender_description}
+                            onGenderChange={(v) => setData('gender', v)}
+                            onDescriptionChange={(v) =>
+                                setData('gender_description', v)
+                            }
+                            errors={errors}
+                        />
                     </div>
 
                     <div>

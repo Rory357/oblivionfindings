@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ClientGender;
 use App\Models\Client;
 use App\Support\Fixtures\HistoricalClientFixture;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -72,6 +73,31 @@ class ClientFactory extends Factory
                 'user_id' => null, // Will be set after user creation
             ];
         });
+    }
+
+    /**
+     * A gender chosen from the dropdown. The description is kept only for
+     * Another gender (the model clears it for every other option).
+     */
+    public function gender(ClientGender $gender, ?string $description = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'gender' => $gender->value,
+            'gender_description' => $gender === ClientGender::AnotherGender ? $description : null,
+        ]);
+    }
+
+    /**
+     * A person whose gender was typed before the dropdown and could not be
+     * mapped: no option chosen yet, the typed text kept for someone to review.
+     */
+    public function withUnmappedGender(string $typed): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'gender' => null,
+            'gender_description' => null,
+            'gender_recorded_as' => $typed,
+        ]);
     }
 
     /**

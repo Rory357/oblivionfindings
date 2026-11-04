@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AttendanceService;
+use App\Enums\ClientGender;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientIncident;
@@ -92,7 +93,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                     'service_context_id' => $serviceContext->id,
                     'preferred_name' => 'PW Lifecycle',
                     'date_of_birth' => now()->subYears(40)->toDateString(),
-                    'gender' => 'not_stated',
+                    'gender' => ClientGender::PreferNotToSay->value,
                     'status' => 'active',
                     'city' => $site->city ?: 'Auckland',
                     'funding_type' => 'demo',
@@ -288,7 +289,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'service_context_id' => $serviceContext->id,
                 'preferred_name' => 'PW Meds',
                 'date_of_birth' => now()->subYears(42)->toDateString(),
-                'gender' => 'not_stated',
+                'gender' => ClientGender::PreferNotToSay->value,
                 'status' => 'active',
                 'city' => $fallbackClient->city ?: 'Auckland',
                 'funding_type' => 'demo',
@@ -324,7 +325,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'service_context_id' => $serviceContext->id,
                 'preferred_name' => 'PW Attendance',
                 'date_of_birth' => now()->subYears(40)->toDateString(),
-                'gender' => 'not_stated',
+                'gender' => ClientGender::PreferNotToSay->value,
                 'status' => 'active',
                 'city' => $fallbackClient->city ?: 'Auckland',
                 'funding_type' => 'demo',

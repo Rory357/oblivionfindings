@@ -6,6 +6,7 @@ use App\Domain\Hr\Services\HrEligibilityRuleSettings;
 use App\Models\Client;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Models\SiteContact;
 use App\Models\SiteCoverageRequirement;
 use App\Models\SiteStaffRequirement;
 use App\Models\User;
@@ -111,16 +112,21 @@ class SiteProfilePeoplePresenter
     /** @return array<string, mixed> */
     public function contacts(User $user, Site $site): array
     {
+        // A staff-linked contact shows its staff record's work details
+        // (SiteContact), so they stay current.
+        $contacts = SiteContact::primeLinkedStaff($site->contacts()
+            ->orderByDesc('is_primary')
+            ->orderBy('name')
+            ->limit(100)
+            ->get(['id', 'site_id', 'user_id', 'type', 'name', 'role', 'phone', 'email', 'is_primary', 'notes']));
+
         return [
             'locked' => false,
-            'items' => $site->contacts()
-                ->orderByDesc('is_primary')
-                ->orderBy('name')
-                ->limit(100)
-                ->get(['id', 'type', 'name', 'role', 'phone', 'email', 'is_primary', 'notes'])
-                ->map(fn ($contact) => [
+            'items' => $contacts
+                ->map(fn (SiteContact $contact) => [
                     'id' => $contact->id,
                     'type' => $contact->type,
+                    'user_id' => $contact->isStaffLinked() ? (int) $contact->user_id : null,
                     'name' => $contact->name,
                     'role' => $contact->role,
                     'phone' => $contact->phone,

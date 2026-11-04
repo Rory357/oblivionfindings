@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Domain\Referrals\Services\ReferralActivationGuard;
+use App\Enums\ClientGender;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ServiceContext;
@@ -32,7 +34,7 @@ class StoreClientRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:255'],
             'preferred_name' => ['nullable', 'string', 'max:255'],
             'date_of_birth' => ['nullable', 'date'],
-            'gender' => ['nullable', 'string', 'max:50'],
+            ...ClientGender::validationRules(),
             'preferred_pronouns' => ['nullable', 'string', 'max:50'],
             'status' => ['required', 'in:active,inactive,onboarding'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -80,7 +82,7 @@ class StoreClientRequest extends FormRequest
 
             // ── Care setup ───────────────────────────────────────────────────
             // Recorded by the separate commencement review only when the organisation requires it for everyone.
-            'service_start_date' => \App\Domain\Referrals\Services\ReferralActivationGuard::requiredForEveryone() ? ['prohibited'] : ['nullable', 'date'],
+            'service_start_date' => ReferralActivationGuard::requiredForEveryone() ? ['prohibited'] : ['nullable', 'date'],
             'key_worker_id' => ['nullable', 'integer', 'exists:users,id'],
             'risk_level' => ['nullable', 'in:low,medium,high,critical'],
             'safeguarding_flag' => ['nullable', 'boolean'],
@@ -276,6 +278,7 @@ class StoreClientRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...ClientGender::validationMessages(),
             'email.required_if' => 'An email is required to create a portal login.',
             'service_start_date.prohibited' => 'Create the person in onboarding, then use Prepare support to arrange the separate service-start review.',
         ];

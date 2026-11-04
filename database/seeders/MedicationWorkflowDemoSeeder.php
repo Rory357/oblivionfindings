@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ClientGender;
 use App\Models\Client;
 use App\Models\ClientCondition;
 use App\Models\ClientControlledDrugDiscrepancy;
@@ -20,20 +21,23 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Comprehensive seeder to demonstrate the complete medication management workflow.
- * 
+ *
  * Run with: php artisan db:seed --class=MedicationWorkflowDemoSeeder
  */
 class MedicationWorkflowDemoSeeder extends Seeder
 {
     private ServiceContext $serviceContext;
+
     private array $workers = [];
+
     private array $managers = [];
+
     private Carbon $today;
 
     public function run(): void
     {
         $this->command->info('Starting Medication Workflow Demo Seeder...');
-        
+
         $this->today = now()->startOfDay();
         $this->serviceContext = ServiceContext::query()->firstOrCreate(
             ['name' => 'Demo Residential Home'],
@@ -42,17 +46,17 @@ class MedicationWorkflowDemoSeeder extends Seeder
 
         // Get or create users for the workflow
         $this->setupUsers();
-        
+
         // Create demo clients with complete medical profiles
         $clients = $this->createDemoClients();
-        
+
         foreach ($clients as $client) {
             $this->seedMedicalProfile($client);
             $this->seedConditions($client);
             $this->seedEmergencyContacts($client);
             $this->seedMedicationsAndWorkflow($client);
         }
-        
+
         $this->command->info('Medication Workflow Demo Seeder completed successfully!');
         $this->command->info('');
         $this->command->info('Demo data includes:');
@@ -74,7 +78,7 @@ class MedicationWorkflowDemoSeeder extends Seeder
     {
         // Ensure we have support workers
         $this->workers = User::query()->whereIn('role', ['support_worker', 'admin'])->limit(5)->get()->toArray();
-        
+
         if (empty($this->workers)) {
             // Create demo workers if none exist
             for ($i = 1; $i <= 3; $i++) {
@@ -92,7 +96,7 @@ class MedicationWorkflowDemoSeeder extends Seeder
 
         // Ensure we have managers for witnessing
         $this->managers = User::query()->whereIn('role', ['manager', 'clinical_lead', 'admin'])->limit(3)->get()->toArray();
-        
+
         if (empty($this->managers)) {
             for ($i = 1; $i <= 2; $i++) {
                 $user = User::firstOrCreate(
@@ -107,8 +111,8 @@ class MedicationWorkflowDemoSeeder extends Seeder
             }
         }
 
-        $this->workers = array_map(fn($u) => (object)$u, $this->workers);
-        $this->managers = array_map(fn($u) => (object)$u, $this->managers);
+        $this->workers = array_map(fn ($u) => (object) $u, $this->workers);
+        $this->managers = array_map(fn ($u) => (object) $u, $this->managers);
     }
 
     private function createDemoClients(): array
@@ -118,28 +122,28 @@ class MedicationWorkflowDemoSeeder extends Seeder
                 'first_name' => 'Sarah',
                 'last_name' => 'Johnson',
                 'date_of_birth' => '1955-03-15',
-                'gender' => 'female',
+                'gender' => ClientGender::Female->value,
                 'email' => 'sarah.j@demo.local',
             ],
             [
                 'first_name' => 'Michael',
                 'last_name' => 'Chen',
                 'date_of_birth' => '1962-07-22',
-                'gender' => 'male',
+                'gender' => ClientGender::Male->value,
                 'email' => 'michael.c@demo.local',
             ],
             [
                 'first_name' => 'Emma',
                 'last_name' => 'Williams',
                 'date_of_birth' => '1948-11-08',
-                'gender' => 'female',
+                'gender' => ClientGender::Female->value,
                 'email' => 'emma.w@demo.local',
             ],
             [
                 'first_name' => 'James',
                 'last_name' => 'Anderson',
                 'date_of_birth' => '1958-05-30',
-                'gender' => 'male',
+                'gender' => ClientGender::Male->value,
                 'email' => 'james.a@demo.local',
             ],
         ];
@@ -162,33 +166,33 @@ class MedicationWorkflowDemoSeeder extends Seeder
     {
         $profiles = [
             [
-                'medical_history' => "Type 2 diabetes diagnosed 2015. Hypertension since 2010. History of falls in 2019. Mild cognitive impairment noted in 2021. Previous hip replacement surgery 2018.",
-                'disabilities' => "Reduced mobility - uses walking frame. Visual impairment (cataracts). Some short-term memory difficulties.",
-                'allergies' => "Penicillin - severe rash and breathing difficulty. Shellfish - mild stomach upset.",
-                'notes' => "Prefers morning medications with breakfast. Needs reminders for PRN medications. Family very involved in care planning.",
+                'medical_history' => 'Type 2 diabetes diagnosed 2015. Hypertension since 2010. History of falls in 2019. Mild cognitive impairment noted in 2021. Previous hip replacement surgery 2018.',
+                'disabilities' => 'Reduced mobility - uses walking frame. Visual impairment (cataracts). Some short-term memory difficulties.',
+                'allergies' => 'Penicillin - severe rash and breathing difficulty. Shellfish - mild stomach upset.',
+                'notes' => 'Prefers morning medications with breakfast. Needs reminders for PRN medications. Family very involved in care planning.',
             ],
             [
-                'medical_history' => "Chronic back pain (degenerative disc disease). Asthma since childhood. Depression and anxiety. Insomnia.",
-                'disabilities' => "Chronic pain limits mobility. Difficulty with stairs. Requires grab rails in bathroom.",
-                'allergies' => "NSAIDs - stomach bleeding risk. Latex contact dermatitis.",
-                'notes' => "Uses PRN pain medication regularly. Benefits from non-pharm interventions (heat packs, massage).",
+                'medical_history' => 'Chronic back pain (degenerative disc disease). Asthma since childhood. Depression and anxiety. Insomnia.',
+                'disabilities' => 'Chronic pain limits mobility. Difficulty with stairs. Requires grab rails in bathroom.',
+                'allergies' => 'NSAIDs - stomach bleeding risk. Latex contact dermatitis.',
+                'notes' => 'Uses PRN pain medication regularly. Benefits from non-pharm interventions (heat packs, massage).',
             ],
             [
                 'medical_history' => "Dementia (Alzheimer's type) diagnosed 2020. Osteoarthritis. High cholesterol. History of TIAs.",
-                'disabilities' => "Significant memory impairment. Wandering behavior. Difficulty with ADLs. Requires supervision.",
-                'allergies' => "Sulfa drugs. Aspirin.",
-                'notes' => "Full medication administration required - cannot self-medicate. Daughter is primary contact and medical POA.",
+                'disabilities' => 'Significant memory impairment. Wandering behavior. Difficulty with ADLs. Requires supervision.',
+                'allergies' => 'Sulfa drugs. Aspirin.',
+                'notes' => 'Full medication administration required - cannot self-medicate. Daughter is primary contact and medical POA.',
             ],
             [
-                'medical_history' => "COPD (Chronic Obstructive Pulmonary Disease). Heart failure. Chronic kidney disease stage 3. Gout.",
-                'disabilities' => "Oxygen dependent (2L/min). Severe mobility limitations. Wheelchair for distances.",
-                'allergies' => "Codeine - severe nausea. Contrast dye.",
-                'notes' => "Complex medication regime. Requires nebulizer medications. Monitor for drug interactions with renal impairment.",
+                'medical_history' => 'COPD (Chronic Obstructive Pulmonary Disease). Heart failure. Chronic kidney disease stage 3. Gout.',
+                'disabilities' => 'Oxygen dependent (2L/min). Severe mobility limitations. Wheelchair for distances.',
+                'allergies' => 'Codeine - severe nausea. Contrast dye.',
+                'notes' => 'Complex medication regime. Requires nebulizer medications. Monitor for drug interactions with renal impairment.',
             ],
         ];
 
         $profileData = $profiles[$client->id % count($profiles)];
-        
+
         ClientMedicalProfile::updateOrCreate(
             ['client_id' => $client->id],
             $profileData
@@ -211,7 +215,7 @@ class MedicationWorkflowDemoSeeder extends Seeder
         // Assign 2-4 conditions per client
         $numConditions = rand(2, 4);
         $selectedConditions = array_slice($conditions, ($client->id * 2) % count($conditions), $numConditions);
-        
+
         foreach ($selectedConditions as $condition) {
             ClientCondition::firstOrCreate(
                 [
@@ -277,13 +281,13 @@ class MedicationWorkflowDemoSeeder extends Seeder
     {
         $worker = $this->workers[array_rand($this->workers)];
         $witness = $this->managers[array_rand($this->managers)];
-        
+
         $shift = Shift::query()
             ->where('client_id', $client->id)
             ->whereDate('starts_at', $this->today->toDateString())
             ->first();
 
-        if (!$shift) {
+        if (! $shift) {
             $shift = Shift::create([
                 'client_id' => $client->id,
                 'user_id' => $worker->id,
@@ -296,15 +300,15 @@ class MedicationWorkflowDemoSeeder extends Seeder
 
         // 1. Regular Medication (BID - twice daily)
         $this->createRegularMedication($client, $worker, $witness, $shift);
-        
+
         // 2. PRN Medication
         $this->createPrnMedication($client, $worker, $witness, $shift);
-        
+
         // 3. Controlled Drug (if applicable)
         if (rand(1, 3) === 1) {
             $this->createControlledDrug($client, $worker, $witness, $shift);
         }
-        
+
         // 4. Ceased medication (for history)
         $this->createCeasedMedication($client);
     }
@@ -317,9 +321,9 @@ class MedicationWorkflowDemoSeeder extends Seeder
             ['name' => 'Paracetamol', 'dosage' => '1g', 'frequency' => 'Four times daily', 'route' => 'oral', 'form' => 'tablet'],
             ['name' => 'Atorvastatin', 'dosage' => '20mg', 'frequency' => 'Once daily at night', 'route' => 'oral', 'form' => 'tablet'],
         ];
-        
+
         $medData = $medNames[$client->id % count($medNames)];
-        
+
         $medication = ClientMedication::updateOrCreate(
             [
                 'client_id' => $client->id,
@@ -328,14 +332,14 @@ class MedicationWorkflowDemoSeeder extends Seeder
             [
                 'dosage' => $medData['dosage'],
                 'frequency' => $medData['frequency'],
-                'dose_times' => $medData['frequency'] === 'Once daily' ? ['08:00'] : 
+                'dose_times' => $medData['frequency'] === 'Once daily' ? ['08:00'] :
                                ($medData['frequency'] === 'Once daily at night' ? ['20:00'] :
                                ($medData['frequency'] === 'Twice daily' ? ['08:00', '20:00'] : ['08:00', '12:00', '16:00', '20:00'])),
                 'is_prn' => false,
                 'controlled_drug' => false,
                 'route' => $medData['route'],
                 'form' => $medData['form'],
-                'prescriber' => 'Dr. ' . ['Smith', 'Jones', 'Taylor', 'Brown'][$client->id % 4],
+                'prescriber' => 'Dr. '.['Smith', 'Jones', 'Taylor', 'Brown'][$client->id % 4],
                 'pharmacy' => ['Countdown Pharmacy', 'Life Pharmacy', 'Unichem', 'Chemist Warehouse'][$client->id % 4],
                 'start_date' => $this->today->copy()->subMonths(6)->toDateString(),
                 'instructions' => 'Give with food. Monitor for side effects.',
@@ -350,7 +354,7 @@ class MedicationWorkflowDemoSeeder extends Seeder
             ['client_medication_id' => $medication->id],
             [
                 'on_hand' => $onHand,
-                'unit' => $medData['form'] . 's',
+                'unit' => $medData['form'].'s',
                 'reorder_level' => 10,
                 'last_counted_at' => $this->today->copy()->subDays(rand(1, 7)),
             ]
@@ -359,19 +363,19 @@ class MedicationWorkflowDemoSeeder extends Seeder
         // Create administrations with various statuses
         foreach ($medication->dose_times as $time) {
             $scheduled = $this->today->copy()->setTimeFromTimeString($time);
-            
+
             // Random status: 70% given, 10% missed, 10% refused, 10% withheld
             $rand = rand(1, 100);
-            $status = match(true) {
+            $status = match (true) {
                 $rand <= 70 => 'given',
                 $rand <= 80 => 'missed',
                 $rand <= 90 => 'refused',
                 default => 'withheld',
             };
-            
+
             $adminAt = $status === 'given' ? $scheduled->copy()->addMinutes(rand(-5, 15)) : null;
-            
-            $reason = match($status) {
+
+            $reason = match ($status) {
                 'missed' => ['Client at appointment', 'Medication unavailable', 'Staff shortage'][rand(0, 2)],
                 'refused' => ['Client declined', 'Feeling unwell', 'Preference'][rand(0, 2)],
                 'withheld' => ['Clinical hold - awaiting review', 'NPO for procedure', 'Contraindicated'][rand(0, 2)],
@@ -401,13 +405,13 @@ class MedicationWorkflowDemoSeeder extends Seeder
             ['name' => 'Paracetamol', 'dosage' => '1g', 'prn_reason' => 'Pain / fever', 'max_per_day' => '4'],
             ['name' => 'Ondansetron', 'dosage' => '4mg', 'prn_reason' => 'Nausea', 'max_per_day' => '3'],
         ];
-        
+
         $medData = $prnMeds[$client->id % count($prnMeds)];
-        
+
         $medication = ClientMedication::updateOrCreate(
             [
                 'client_id' => $client->id,
-                'name' => $medData['name'] . ' (PRN)',
+                'name' => $medData['name'].' (PRN)',
             ],
             [
                 'dosage' => $medData['dosage'],
@@ -442,7 +446,7 @@ class MedicationWorkflowDemoSeeder extends Seeder
         $numAdmin = rand(0, 2);
         for ($i = 0; $i < $numAdmin; $i++) {
             $adminTime = $this->today->copy()->setTime(rand(9, 17), rand(0, 59));
-            
+
             $admin = ClientMedicationAdministration::create([
                 'client_id' => $client->id,
                 'client_medication_id' => $medication->id,
@@ -453,7 +457,7 @@ class MedicationWorkflowDemoSeeder extends Seeder
                 'administered_at' => $adminTime->copy()->addMinutes(5),
                 'status' => 'given',
                 'dose_given' => $medData['dosage'],
-                'reason' => 'PRN: ' . $medData['prn_reason'] . ' - escalating symptoms',
+                'reason' => 'PRN: '.$medData['prn_reason'].' - escalating symptoms',
                 'notes' => 'Effective relief observed within 30 minutes',
             ]);
 
@@ -511,24 +515,24 @@ class MedicationWorkflowDemoSeeder extends Seeder
     }
 
     private function createControlledDrugEntry(
-        Client $client, 
-        ClientMedication $medication, 
-        object $worker, 
-        object $witness, 
+        Client $client,
+        ClientMedication $medication,
+        object $worker,
+        object $witness,
         Shift $shift,
         string $entryType,
         ?int $quantity = null
     ): void {
         $stock = ClientMedicationStock::where('client_medication_id', $medication->id)->first();
         $before = $stock?->on_hand ?? 0;
-        
+
         $qty = $quantity ?? rand(1, 3);
-        $after = match($entryType) {
+        $after = match ($entryType) {
             'received' => $before + $qty,
             'administered', 'disposed', 'wasted' => max(0, $before - $qty),
             default => $before,
         };
-        
+
         if ($stock) {
             $stock->update(['on_hand' => $after]);
         }
@@ -543,7 +547,7 @@ class MedicationWorkflowDemoSeeder extends Seeder
             'unit' => $stock?->unit ?? 'units',
             'on_hand_before' => $before,
             'on_hand_after' => $after,
-            'reason' => match($entryType) {
+            'reason' => match ($entryType) {
                 'received' => 'Pharmacy delivery',
                 'administered' => 'Pain management',
                 'disposed' => 'Expired medication',
@@ -558,18 +562,18 @@ class MedicationWorkflowDemoSeeder extends Seeder
     }
 
     private function createControlledDrugDiscrepancy(
-        Client $client, 
-        ClientMedication $medication, 
-        object $worker, 
+        Client $client,
+        ClientMedication $medication,
+        object $worker,
         object $witness
     ): void {
         $stock = ClientMedicationStock::where('client_medication_id', $medication->id)->first();
         $before = $stock?->on_hand ?? 100;
         $difference = rand(-5, 5);
         $after = max(0, $before + $difference);
-        
+
         $isOpen = rand(1, 3) === 1; // 1 in 3 chance of being open
-        
+
         ClientControlledDrugDiscrepancy::create([
             'client_id' => $client->id,
             'client_medication_id' => $medication->id,
