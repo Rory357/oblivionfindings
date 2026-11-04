@@ -278,8 +278,11 @@ class SiteController extends Controller
             'hazards_trend' => $hazardsTrend,
             'hazards_week' => $hazardsWeek,
             'hazards_week_delta' => $hazardsWeek - $hazardsPrevWeek,
-            'overdue' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->overdue_checklists_count ?? 0) + (int) ($site->open_maintenance_count ?? 0)),
+            'overdue' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->overdue_checklists_count ?? 0)
+                + (int) ($site->overdue_inspections_count ?? 0)
+                + (int) ($site->open_maintenance_count ?? 0)),
             'overdue_checks' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->overdue_checklists_count ?? 0)),
+            'overdue_inspections' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->overdue_inspections_count ?? 0)),
             'overdue_maintenance' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->open_maintenance_count ?? 0)),
             'checks_on_time' => [
                 'on_time' => $checksOnTime,
@@ -339,7 +342,47 @@ class SiteController extends Controller
                 ],
             ],
             'savedViewCounts' => $savedViewCounts,
+            'siteWork' => $this->siteWorkPayload($user, $liveSites),
         ]);
+    }
+
+    /**
+     * Inspections and maintenance actions offered on the Sites list (header
+     * menu, each site's menu and the Overdue list). The flags mirror what the
+     * target endpoints enforce: scheduling and recording go through
+     * SiteInspectionController (route permission + SitePolicy::update), and
+     * logging maintenance through AssetMaintenanceController
+     * (assets.maintenance.record + AssetPolicy). The site list is the live
+     * (non-archived) roster this viewer can already see.
+     */
+    private function siteWorkPayload(?User $user, Collection $liveSites): array
+    {
+        $canUpdateSites = (bool) $user?->canDo('sites.update');
+        $can = [
+            'schedule' => $canUpdateSites && (bool) $user?->canDo('checklists.schedule'),
+            'record' => $canUpdateSites && (bool) $user?->canDo('checklists.run'),
+            'maintenance' => (bool) $user?->canDo('assets.maintenance.record'),
+            'runChecklists' => (bool) $user?->canDo('checklists.run'),
+        ];
+
+        $sites = ($can['schedule'] || $can['record'] || $can['maintenance'])
+            ? $liveSites
+                ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                ->values()
+                ->map(fn (Site $site) => [
+                    'id' => $site->id,
+                    'name' => $site->name,
+                    'type' => $site->type,
+                    'region' => $site->resolved_region,
+                    'is_active' => (bool) $site->is_active,
+                ])
+                ->all()
+            : [];
+
+        return [
+            'can' => $can,
+            'sites' => $sites,
+        ];
     }
 
     public function updateContactInfo(Request $request, Site $site)
@@ -1437,6 +1480,9 @@ class SiteController extends Controller
             'hazards as open_hazards_count' => fn ($q) => $q->open(),
             'hazards as recent_hazards_count' => fn ($q) => $q->where('updated_at', '>=', now()->subDays(90)),
             'checklistRuns as overdue_checklists_count' => fn ($q) => $q->overdue(),
+            'inspectionSchedules as overdue_inspections_count' => fn ($q) => $q
+                ->where('is_active', true)
+                ->whereDate('next_due_date', '<', now()->toDateString()),
             'checklistAssignments as checklist_assignments_count' => fn ($q) => $q->active(),
             'assets as open_maintenance_count' => fn ($q) => $this->openMaintenanceQuery($q),
             'geofences as configured_geofences_count' => fn ($q) => $q->whereNull('retired_at')->whereNotNull('shape'),
@@ -1483,6 +1529,7 @@ class SiteController extends Controller
             'vacancies' => max(0, $roomsTotal - $roomsOccupied),
             'open_hazards_count' => (int) ($site->open_hazards_count ?? 0),
             'overdue_checklists_count' => (int) ($site->overdue_checklists_count ?? 0),
+            'overdue_inspections_count' => (int) ($site->overdue_inspections_count ?? 0),
             'open_maintenance_count' => (int) ($site->open_maintenance_count ?? 0),
             'readiness' => $readinessService->slim($site),
             'geofence_status' => $this->resolveGeofenceStatus($site, $geofencesBySite),
@@ -1533,12 +1580,20 @@ class SiteController extends Controller
         return $expected ? 'missing' : 'na';
     }
 
+    /**
+     * Assets whose scheduled servicing is due or past due. `requires_maintenance`
+     * means "this asset has scheduled servicing" (the asset form's switch), not
+     * "needs work now", so it must be paired with a due date. The old OR here
+     * counted every serviced asset as overdue, and logging the work could never
+     * clear it. Same rule as the Site profile (SiteProfileAttentionService) and
+     * SiteWorkController's Overdue list.
+     */
     private function openMaintenanceQuery($query)
     {
-        return $query->where(function ($maintenance) {
-            $maintenance->where('requires_maintenance', true)
-                ->orWhereDate('maintenance_due_at', '<=', now()->toDateString());
-        });
+        return $query
+            ->where('requires_maintenance', true)
+            ->whereNotNull('maintenance_due_at')
+            ->whereDate('maintenance_due_at', '<=', now()->toDateString());
     }
 
     private function citiesForRegion(string $region): array

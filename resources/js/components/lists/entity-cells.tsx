@@ -170,6 +170,69 @@ export function ProgressValue({
     );
 }
 
+/**
+ * Day bars — one short bar per day (a week: Mon → Sun), each filled by its
+ * share of a daily target, with the day's initial beneath. The numbers live in
+ * the accessible label and each bar's title, so colour is never the only
+ * signal. An empty bar is an honest zero, never a fabricated value.
+ */
+export function DayBars({
+    days,
+    target,
+    label,
+}: {
+    days: {
+        key: string;
+        /** One-letter day initial shown under the bar ("M"). */
+        initial: string;
+        value: number;
+        /** Hover/accessible text for the day ("Mon 2 Nov · 2 of 3 main meals"). */
+        title: string;
+        /** Marks today. */
+        current?: boolean;
+    }[];
+    /** The value that fills a bar. */
+    target: number;
+    /** Accessible summary of the whole strip. */
+    label: string;
+}) {
+    return (
+        <span role="img" aria-label={label} className="flex items-end gap-1">
+            {days.map((d) => {
+                const share = target > 0 ? Math.min(1, d.value / target) : 0;
+                return (
+                    <span
+                        key={d.key}
+                        title={d.title}
+                        className="flex w-3 flex-col items-center gap-0.5"
+                    >
+                        <span className="relative block h-5 w-full overflow-hidden rounded-[3px] bg-muted">
+                            {share > 0 ? (
+                                <span
+                                    className="absolute inset-x-0 bottom-0 block bg-primary"
+                                    style={{
+                                        height: `${Math.round(share * 100)}%`,
+                                    }}
+                                />
+                            ) : null}
+                        </span>
+                        <span
+                            className={cn(
+                                'text-[10.5px] leading-none',
+                                d.current
+                                    ? 'font-semibold text-foreground'
+                                    : 'text-muted-foreground',
+                            )}
+                        >
+                            {d.initial}
+                        </span>
+                    </span>
+                );
+            })}
+        </span>
+    );
+}
+
 /** Muted em-dash for honest empty values. */
 export function EmptyValue() {
     return <span className="text-muted-foreground">—</span>;

@@ -80,7 +80,7 @@ test('sites reports head office page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/sites/reports/head-office')
-            ->waitForText('Head Office', 10)
+            ->waitForText('Head office', 10)
             ->assertPathBeginsWith('/sites');
     });
 });

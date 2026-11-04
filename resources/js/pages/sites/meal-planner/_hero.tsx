@@ -15,6 +15,7 @@ import { WeekPicker } from '@/components/rostering/week-picker';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { Link } from '@inertiajs/react';
 import {
     Bell,
     Building2,
@@ -28,6 +29,7 @@ import {
     ChevronsUpDown,
     CircleCheck,
     Home,
+    LayoutGrid,
     LayoutTemplate,
     Loader2,
     Package,
@@ -252,10 +254,13 @@ function SiteSearch({
     sites,
     currentSiteId,
     onSelect,
+    allSitesHref,
 }: {
     sites: SiteSearchItem[];
     currentSiteId: number;
     onSelect: (id: number) => void;
+    /** Offers "All sites" above the list — the all-sites planner overview. */
+    allSitesHref?: string;
 }) {
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState('');
@@ -402,6 +407,28 @@ function SiteSearch({
                                 />
                             </div>
                         </div>
+                        {allSitesHref ? (
+                            <div className="border-b border-border p-1.5">
+                                <Link
+                                    href={allSitesHref}
+                                    onClick={() => setOpen(false)}
+                                    className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                >
+                                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
+                                        <LayoutGrid className="h-4 w-4" />
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-[13.5px] font-medium text-foreground">
+                                            All sites
+                                        </span>
+                                        <span className="block truncate text-[11.5px] text-muted-foreground">
+                                            Meals, allergens, stock and spend
+                                            for every site
+                                        </span>
+                                    </span>
+                                </Link>
+                            </div>
+                        ) : null}
                         <div className="nice-scroll max-h-[300px] overflow-y-auto p-1.5">
                             {flat.length === 0 && (
                                 <div className="px-3 py-6 text-center text-[13px] text-muted-foreground">
@@ -647,6 +674,7 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                             sites={sites}
                             currentSiteId={site.id}
                             onSelect={props.onSelectSite}
+                            allSitesHref="/catering"
                         />
                     ) : null}
                     <HeroBell

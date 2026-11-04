@@ -31,8 +31,20 @@ class SiteMealPlanAggregate
 
     public function residentQuery(Site $site, ?User $actor): Builder
     {
+        return $this->residentQueryForSites([(int) $site->id], $actor);
+    }
+
+    /**
+     * residentQuery() for several Sites in one read (the all-sites Meal
+     * Planner overview). The same boundary: active residents placed at the
+     * Site, inside the actor's client Site scope.
+     *
+     * @param  array<int, int>  $siteIds
+     */
+    public function residentQueryForSites(array $siteIds, ?User $actor): Builder
+    {
         $query = Client::query()
-            ->where('site_id', $site->id)
+            ->whereIn('site_id', $siteIds)
             ->where('status', 'active');
 
         return $this->siteAccess->applyClientScope(
@@ -47,6 +59,65 @@ class SiteMealPlanAggregate
         return MealRecipe::query()
             ->active()
             ->visibleToSite($site->id);
+    }
+
+    /**
+     * recipeQuery() for several Sites in one read: active recipes shared with
+     * every Site, plus each Site's own house recipes. Check one recipe against
+     * one Site with recipeVisibleToSite().
+     *
+     * @param  array<int, int>  $siteIds
+     */
+    public function recipeQueryForSites(array $siteIds): Builder
+    {
+        return MealRecipe::query()
+            ->active()
+            ->where(function (Builder $query) use ($siteIds): void {
+                $query->where('scope', 'shared')
+                    ->orWhere(fn (Builder $house) => $house
+                        ->where('scope', 'house')
+                        ->whereIn('site_id', $siteIds));
+            });
+    }
+
+    /** MealRecipe::scopeVisibleToSite's rule, for a recipe already read. */
+    public function recipeVisibleToSite(MealRecipe $recipe, int $siteId): bool
+    {
+        return $recipe->scope === 'shared'
+            || ($recipe->scope === 'house' && (int) $recipe->site_id === $siteId);
+    }
+
+    /**
+     * Whether resolve() would accept these residents and recipe for their
+     * Site, checked against ids already read through residentQuery*() and
+     * recipeQuery*() instead of fresh reads. Read-only rollups use it to count
+     * exactly the entries the planner calendar shows (SiteMealPlanController
+     * ::index drops an entry resolve() refuses) without running the clinical
+     * gate once per entry.
+     *
+     * @param  array<int, mixed>  $residentIds
+     * @param  array<int, true>  $visibleResidentIds  keyed by Client id
+     * @param  array<int, true>  $visibleRecipeIds  keyed by recipe id
+     */
+    public function wouldResolve(
+        array $residentIds,
+        ?int $recipeId,
+        array $visibleResidentIds,
+        array $visibleRecipeIds,
+    ): bool {
+        try {
+            $ids = $this->normaliseResidentIds($residentIds);
+        } catch (ValidationException) {
+            return false;
+        }
+
+        foreach ($ids as $id) {
+            if (! isset($visibleResidentIds[$id])) {
+                return false;
+            }
+        }
+
+        return $recipeId === null || isset($visibleRecipeIds[$recipeId]);
     }
 
     /**

@@ -1,4 +1,4 @@
-import PageShell from '@/components/page-shell';
+import { PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -7,7 +7,7 @@ import { ActivityFeed } from '@/components/operations/dashboard/activity-feed';
 import { KpiCards } from '@/components/operations/dashboard/kpi-cards';
 import { ModulesGrid } from '@/components/operations/dashboard/modules-grid';
 import { NeedsAttentionStrip } from '@/components/operations/dashboard/needs-attention';
-import { OperationsHero } from '@/components/operations/dashboard/operations-hero';
+import { OperationsHeader } from '@/components/operations/dashboard/operations-header';
 import { ShiftTimeline } from '@/components/operations/dashboard/shift-timeline';
 import { ShiftsBarChart } from '@/components/operations/dashboard/shifts-bar-chart';
 import { StatusDonuts } from '@/components/operations/dashboard/status-donuts';
@@ -93,7 +93,6 @@ type Props = {
 
 export default function OperationsDashboard({
     stats,
-    current_user,
     today_label,
     week,
     hero,
@@ -116,16 +115,19 @@ export default function OperationsDashboard({
     };
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+            ]}
+        >
             <Head title="Operations" />
-            <PageShell>
-                <div className="space-y-5">
-                    <OperationsHero
-                        firstName={current_user.first_name}
+            <PageLayout
+                hero={
+                    <OperationsHeader
                         todayLabel={today_label}
                         week={week}
                         hero={hero}
-                        activeClients={stats.active_clients}
                         siteOptions={site_options}
                         siteFilter={siteFilter}
                         onSiteFilterChange={setSiteFilter}
@@ -135,7 +137,9 @@ export default function OperationsDashboard({
                         onClientFilterChange={setClientFilter}
                         onWeekChange={onWeekChange}
                     />
-
+                }
+            >
+                <div className="flex flex-col gap-5">
                     <NeedsAttentionStrip attention={attention} />
 
                     <KpiCards metrics={metrics} />
@@ -163,7 +167,7 @@ export default function OperationsDashboard({
 
                     <ModulesGrid openShifts={stats.unassigned_shifts} />
                 </div>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

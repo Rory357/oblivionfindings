@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Str;
+use Pdo\Mysql;
 
 return [
 
@@ -63,7 +64,8 @@ return [
             // falls inside a local DST spring-forward gap fail with error 1292.
             'timezone' => env('DB_TIMEZONE', '+00:00'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                // Pdo\Mysql (PHP 8.4+): PHP 8.5 deprecates PDO::MYSQL_ATTR_SSL_CA.
+                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
                 // Opt-in client-side prepares (off by default → prod unchanged).
                 // Tests set DB_EMULATE_PREPARES=true to dodge the MySQL 1615
                 // "prepared statement needs to be re-prepared" flake that hits
@@ -89,7 +91,7 @@ return [
             'engine' => null,
             'timezone' => env('DB_TIMEZONE', '+00:00'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
 
