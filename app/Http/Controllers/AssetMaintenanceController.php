@@ -34,7 +34,7 @@ class AssetMaintenanceController extends Controller
             'next_due_at' => $data['next_due_at'] ?? null,
         ]);
 
-        if (!empty($data['next_due_at'])) {
+        if (! empty($data['next_due_at'])) {
             $asset->update([
                 'requires_maintenance' => true,
                 'maintenance_due_at' => $data['next_due_at'],

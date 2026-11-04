@@ -43,7 +43,7 @@ class SiteReportingController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Hub                                                                */
+    /*  Hub */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -91,7 +91,7 @@ class SiteReportingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Packs — Houses, Facilities, Head office                           */
+    /*  Packs — Houses, Facilities, Head office */
     /* ------------------------------------------------------------------ */
 
     public function houses(Request $request)
@@ -190,7 +190,7 @@ class SiteReportingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  One Site's report                                                 */
+    /*  One Site's report */
     /* ------------------------------------------------------------------ */
 
     public function perSiteDetail(Request $request, Site $site)
@@ -323,7 +323,7 @@ class SiteReportingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Overdue corrective actions                                        */
+    /*  Overdue corrective actions */
     /* ------------------------------------------------------------------ */
 
     public function overdueCorrectiveActions(Request $request)
@@ -378,7 +378,7 @@ class SiteReportingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Checklist trends                                                   */
+    /*  Checklist trends */
     /* ------------------------------------------------------------------ */
 
     public function checklistTrends(Request $request)
@@ -491,7 +491,7 @@ class SiteReportingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Inspections & maintenance                                          */
+    /*  Inspections & maintenance */
     /* ------------------------------------------------------------------ */
 
     public function inspectionsMaintenance(Request $request)
@@ -602,7 +602,7 @@ class SiteReportingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Asset condition                                                    */
+    /*  Asset condition */
     /* ------------------------------------------------------------------ */
 
     public function assetConditionReport(Request $request)
@@ -682,7 +682,7 @@ class SiteReportingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Exports                                                            */
+    /*  Exports */
     /* ------------------------------------------------------------------ */
 
     public function export(Request $request)
@@ -810,7 +810,7 @@ class SiteReportingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     /**

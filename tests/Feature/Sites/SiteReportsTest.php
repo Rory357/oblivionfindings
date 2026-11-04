@@ -15,6 +15,7 @@ use App\Models\SiteHazard;
 use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -61,12 +62,12 @@ class SiteReportsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Fixtures                                                           */
+    /*  Fixtures */
     /* ------------------------------------------------------------------ */
 
-    private function nzToday(): \Carbon\CarbonImmutable
+    private function nzToday(): CarbonImmutable
     {
-        return \Carbon\CarbonImmutable::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
+        return CarbonImmutable::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
     }
 
     private function hazard(Site $site, array $fields = []): SiteHazard
@@ -137,7 +138,7 @@ class SiteReportsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /*  The hub and every report render                                   */
+    /*  The hub and every report render */
     /* ------------------------------------------------------------------ */
 
     public function test_hub_lists_packs_and_sites_with_the_default_period(): void
@@ -241,7 +242,7 @@ class SiteReportsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Filters narrow the results                                         */
+    /*  Filters narrow the results */
     /* ------------------------------------------------------------------ */
 
     public function test_region_filter_narrows_sites_and_carries_on_every_report(): void
@@ -410,7 +411,7 @@ class SiteReportsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Only Sites the viewer can access                                   */
+    /*  Only Sites the viewer can access */
     /* ------------------------------------------------------------------ */
 
     public function test_a_site_worker_only_sees_their_own_site(): void
