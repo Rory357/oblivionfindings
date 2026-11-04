@@ -110,6 +110,7 @@ per page.
   | Plain text | 12.5, `#2a2b3a` ref; muted `—` for empty |
   | Emphasis text | e.g. vacancy count in `status-success` |
   | Open link | brand link + arrow (rows without a kebab-only pattern) |
+  | Day bars (`DayBars`) | 7 short brand bars (Mon → Sun), each filled by its share of a daily target, day initial beneath (today in bold); the numbers in each bar's title and the strip's accessible label — e.g. main meals planned per day on the Meal Planner overview |
 - **Column spec**: the component takes per-entity columns as
   `{key, label, cell, width(fr)}` and the row data; widths in `fr` on
   a CSS grid. New entities add a spec, not a fork.

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Asset;
 use App\Models\AssetMaintenanceLog;
 use App\Services\AuditLogger;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AssetMaintenanceController extends Controller
@@ -39,6 +40,18 @@ class AssetMaintenanceController extends Controller
                 'maintenance_due_at' => $data['next_due_at'],
                 'updated_by_user_id' => $request->user()?->id,
             ]);
+        } elseif (
+            $asset->maintenance_due_at !== null
+            && $asset->maintenance_due_at->toDateString() <= Carbon::parse($data['performed_at'])->toDateString()
+        ) {
+            // The service that was due has been done and no next one is
+            // planned: clear the due date so the asset stops showing as
+            // overdue (Sites list, Site profile). A log dated before the due
+            // date (catching up on older work) leaves it alone.
+            $asset->update([
+                'maintenance_due_at' => null,
+                'updated_by_user_id' => $request->user()?->id,
+            ]);
         }
 
         AuditLogger::log('assets.maintenance.create', $log, [
@@ -47,6 +60,6 @@ class AssetMaintenanceController extends Controller
             'client_id' => $asset->client_id,
         ]);
 
-        return back();
+        return back()->with('success', 'Maintenance logged.');
     }
 }

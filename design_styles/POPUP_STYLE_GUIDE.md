@@ -241,8 +241,17 @@ font, so `rem` values are ~12.5% smaller than expected):
 - **Multi-tab dialog with structured fields** — `min(92vw, 1100px)`
 
 `min(92vw, …)` narrows gracefully on small screens; the rem cap is the
-desktop maximum. For long forms add `max-h-[90vh] overflow-y-auto` so the
-body scrolls without pushing the dialog off-screen.
+desktop maximum.
+
+Height: `DialogContent` caps itself at the screen height
+(`max-h-[calc(100dvh-2rem)]`) and scrolls, so no pop-up can push its last
+fields or buttons off-screen (3 Nov 2026, the Plan a meal pop-up). A long
+form whose title and buttons must stay in view scrolls only its fields, like
+the pop-up kit: `DialogContent` gets `flex max-h-[88dvh] flex-col
+overflow-hidden`, the form `flex min-h-0 flex-1 flex-col`, and the fields sit
+in one `min-h-0 flex-1 overflow-y-auto scrollbar-pretty` wrapper with the
+`DialogFooter` after it (reference: the Add/Edit meal pop-up in
+`pages/sites/meal-planner/_dialogs.tsx`).
 
 **Anti-pattern**: `<DialogContent className="max-w-3xl">` / `sm:max-w-3xl`
 / `!max-w-[56rem]`. Tailwind utilities are unreliable here because the

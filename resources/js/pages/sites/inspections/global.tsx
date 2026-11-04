@@ -1,27 +1,39 @@
 import {
     PageHeader,
     PageHeaderFilterSelect,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
     type PageHeaderRailItem,
 } from '@/components/page';
+import {
+    FREQUENCY_LABELS,
+    SiteWorkDialogs,
+    daysPastDue,
+    overdueLabel,
+    overdueVariant,
+    useSiteWork,
+    type SiteWorkCan,
+} from '@/components/sites/work';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import {
-    AlertTriangle,
     Building2,
     CalendarClock,
+    CalendarPlus,
     CheckCircle2,
     ClipboardCheck,
     ClipboardList,
-    Clock,
     Wrench,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -43,6 +55,8 @@ type InspectionSchedule = {
     next_due_date?: string | null;
     is_active: boolean;
     assigned_to_name?: string | null;
+    /** checklists.run + SitePolicy::update on this schedule's Site. */
+    can_record?: boolean;
 };
 
 type InspectionRecord = {
@@ -70,6 +84,15 @@ type Props = {
         due_state?: 'overdue' | 'due_soon';
         result?: 'pass' | 'fail' | 'partial' | 'na';
     };
+    can?: SiteWorkCan;
+    /** Assets with servicing due or past due, per Site (SiteWorkQueue). */
+    maintenanceDue?: { site_id: number; count: number }[];
+};
+
+const NO_WORK: SiteWorkCan = {
+    schedule: false,
+    record: false,
+    maintenance: false,
 };
 
 type View = 'schedules' | 'records';
@@ -87,7 +110,10 @@ export default function GlobalSiteInspections({
     sites,
     inspectionTypes,
     filters,
+    can = NO_WORK,
+    maintenanceDue = [],
 }: Props) {
+    const work = useSiteWork();
     const [view, setView] = useState<View>('schedules');
     const [query, setQuery] = useState('');
     const [siteFilter, setSiteFilter] = useState<string>(
@@ -185,6 +211,16 @@ export default function GlobalSiteInspections({
     const completedPassCount = filteredRecords.filter(
         (r) => r.result === 'pass',
     ).length;
+    const maintenanceDueCount = maintenanceDue
+        .filter(
+            (row) => siteFilter === 'all' || String(row.site_id) === siteFilter,
+        )
+        .reduce((sum, row) => sum + row.count, 0);
+    const workSites = sites.map((site) => ({
+        id: site.id,
+        name: site.name,
+        type: site.type,
+    }));
 
     const railItems: PageHeaderRailItem<View>[] = [
         {
@@ -221,11 +257,43 @@ export default function GlobalSiteInspections({
                         title="Inspections & Maintenance"
                         subline={`Schedules and records across every site · ${sites.length} ${sites.length === 1 ? 'site' : 'sites'} · ${schedules.length} schedules · ${records.length} recent records`}
                         actions={
-                            <PageHeaderSearch
-                                value={query}
-                                onChange={setQuery}
-                                placeholder="Search inspections, sites…"
-                            />
+                            <>
+                                <PageHeaderSearch
+                                    value={query}
+                                    onChange={setQuery}
+                                    placeholder="Search inspections, sites…"
+                                />
+                                {can.record ? (
+                                    <PageHeaderGlassButton
+                                        icon={ClipboardCheck}
+                                        onClick={() =>
+                                            work.open({ kind: 'record' })
+                                        }
+                                    >
+                                        Record result
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {can.maintenance ? (
+                                    <PageHeaderGlassButton
+                                        icon={Wrench}
+                                        onClick={() =>
+                                            work.open({ kind: 'maintenance' })
+                                        }
+                                    >
+                                        Log maintenance
+                                    </PageHeaderGlassButton>
+                                ) : null}
+                                {can.schedule ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={CalendarPlus}
+                                        onClick={() =>
+                                            work.open({ kind: 'schedule' })
+                                        }
+                                    >
+                                        Schedule inspection
+                                    </PageHeaderPrimaryButton>
+                                ) : null}
+                            </>
                         }
                         meters={
                             <>
@@ -298,6 +366,26 @@ export default function GlobalSiteInspections({
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
                                         of {filteredRecords.length} shown
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Maintenance due"
+                                    tone={
+                                        maintenanceDueCount > 0
+                                            ? 'warning'
+                                            : 'success'
+                                    }
+                                    ariaLabel="Open the list of assets due for servicing"
+                                    onClick={work.openOverdue}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {maintenanceDueCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {maintenanceDueCount === 1
+                                            ? 'asset'
+                                            : 'assets'}{' '}
+                                        due for servicing
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             </>
@@ -421,61 +509,95 @@ export default function GlobalSiteInspections({
                             ) : (
                                 <div className="space-y-2">
                                     {filteredSchedules.map((schedule) => {
-                                        const overdue =
-                                            !!schedule.next_due_date &&
-                                            new Date(schedule.next_due_date) <
-                                                today;
+                                        const daysOverdue = daysPastDue(
+                                            schedule.next_due_date,
+                                        );
                                         return (
                                             <div
                                                 key={schedule.id}
-                                                className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                                                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
                                             >
-                                                <div>
+                                                <div className="min-w-0">
                                                     <div className="font-medium">
                                                         {schedule.title}
                                                     </div>
                                                     <div className="text-sm text-muted-foreground">
-                                                        {schedule.site_name} •{' '}
-                                                        {
-                                                            schedule.inspection_type
-                                                        }{' '}
-                                                        • {schedule.frequency}
+                                                        {[
+                                                            schedule.site_name,
+                                                            schedule.inspection_type,
+                                                            FREQUENCY_LABELS[
+                                                                schedule
+                                                                    .frequency
+                                                            ] ??
+                                                                schedule.frequency,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(' · ')}
                                                     </div>
                                                     <div className="mt-1 text-xs text-muted-foreground">
                                                         {schedule.assigned_to_name
-                                                            ? `Assigned: ${schedule.assigned_to_name} • `
+                                                            ? `Assigned to ${schedule.assigned_to_name} · `
                                                             : ''}
-                                                        Due:{' '}
-                                                        {schedule.next_due_date ??
-                                                            '—'}
+                                                        Due{' '}
+                                                        {formatDateOnly(
+                                                            schedule.next_due_date,
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    {!schedule.is_active && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-border/30 text-muted-foreground"
-                                                        >
-                                                            Inactive
-                                                        </Badge>
-                                                    )}
-                                                    {overdue ? (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-status-critical/30 bg-status-critical text-status-critical"
-                                                        >
-                                                            <AlertTriangle className="mr-1 h-3 w-3" />
-                                                            Overdue
-                                                        </Badge>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {!schedule.is_active ? (
+                                                        <StatusBadge
+                                                            variant="neutral"
+                                                            label="Inactive"
+                                                        />
+                                                    ) : daysOverdue !== null ? (
+                                                        <StatusBadge
+                                                            variant={overdueVariant(
+                                                                daysOverdue,
+                                                            )}
+                                                            label={overdueLabel(
+                                                                daysOverdue,
+                                                            )}
+                                                        />
                                                     ) : (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-border/30 text-muted-foreground"
-                                                        >
-                                                            <Clock className="mr-1 h-3 w-3" />
-                                                            Scheduled
-                                                        </Badge>
+                                                        <StatusBadge
+                                                            variant="neutral"
+                                                            label="Scheduled"
+                                                        />
                                                     )}
+                                                    {schedule.can_record ? (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                work.open({
+                                                                    kind: 'record',
+                                                                    site: {
+                                                                        id: schedule.site_id,
+                                                                        name:
+                                                                            schedule.site_name ??
+                                                                            'Site',
+                                                                        type: schedule.site_type,
+                                                                    },
+                                                                    schedule: {
+                                                                        id: schedule.id,
+                                                                        title: schedule.title,
+                                                                        inspection_type:
+                                                                            schedule.inspection_type,
+                                                                        frequency:
+                                                                            schedule.frequency,
+                                                                        due_date:
+                                                                            schedule.next_due_date,
+                                                                        days_overdue:
+                                                                            daysOverdue,
+                                                                    },
+                                                                })
+                                                            }
+                                                        >
+                                                            Record result
+                                                        </Button>
+                                                    ) : null}
                                                     <Button
                                                         asChild
                                                         size="sm"
@@ -484,7 +606,7 @@ export default function GlobalSiteInspections({
                                                         <Link
                                                             href={`/sites/${schedule.site_id}/inspections`}
                                                         >
-                                                            Open Site
+                                                            Open site
                                                         </Link>
                                                     </Button>
                                                 </div>
@@ -557,7 +679,7 @@ export default function GlobalSiteInspections({
                                                     <Link
                                                         href={`/sites/${record.site_id}/inspections`}
                                                     >
-                                                        Open Site
+                                                        Open site
                                                     </Link>
                                                 </Button>
                                             </div>
@@ -569,6 +691,18 @@ export default function GlobalSiteInspections({
                     </Card>
                 )}
             </PageLayout>
+
+            <SiteWorkDialogs
+                work={work}
+                sites={workSites}
+                overdue={{
+                    siteId: siteFilter === 'all' ? null : Number(siteFilter),
+                    groups: ['maintenance'],
+                    title: 'Maintenance due',
+                    description:
+                        'Assets with servicing due or past due, most overdue first',
+                }}
+            />
         </AppLayout>
     );
 }

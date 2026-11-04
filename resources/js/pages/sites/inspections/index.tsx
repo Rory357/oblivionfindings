@@ -11,21 +11,11 @@ import {
     PageLayout,
     type PageHeaderRailItem,
 } from '@/components/page';
+import { ScheduleInspectionDialog } from '@/components/sites/work';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import {
     AlertCircle,
     Calendar,
@@ -36,7 +26,6 @@ import {
     Clock,
     Plus,
     Repeat,
-    X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -72,6 +61,8 @@ type Props = {
     records: {
         data: InspectionRecord[];
     };
+    /** checklists.schedule + SitePolicy::update on this Site. */
+    can?: { schedule?: boolean };
 };
 
 type View = 'schedules' | 'records';
@@ -92,7 +83,13 @@ const resultColors: Record<string, string> = {
     na: 'border-border/30 text-muted-foreground',
 };
 
-export default function SiteInspections({ site, schedules, records }: Props) {
+export default function SiteInspections({
+    site,
+    schedules,
+    records,
+    can,
+}: Props) {
+    const canSchedule = can?.schedule ?? false;
     const [showForm, setShowForm] = useState(false);
     const [view, setView] = useState<View>('schedules');
     const [query, setQuery] = useState('');
@@ -108,28 +105,9 @@ export default function SiteInspections({ site, schedules, records }: Props) {
         url.searchParams.delete('action');
         window.history.replaceState(window.history.state, '', url);
         setView('schedules');
-        setShowForm(true);
+        if (canSchedule) setShowForm(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const form = useForm({
-        inspection_type: '',
-        title: '',
-        description: '',
-        frequency: 'monthly' as const,
-        first_due_date: '',
-        assigned_to_user_id: '',
-        auto_create_calendar_event: true,
-    });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        form.post(`/sites/${site.id}/inspections`, {
-            onSuccess: () => {
-                setShowForm(false);
-                form.reset();
-            },
-        });
-    };
 
     const today = useMemo(() => new Date(), []);
     const sevenDaysFromNow = useMemo(() => {
@@ -259,15 +237,17 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                                     onChange={setQuery}
                                     placeholder="Search inspections…"
                                 />
-                                <PageHeaderPrimaryButton
-                                    icon={Plus}
-                                    onClick={() => {
-                                        setView('schedules');
-                                        setShowForm(true);
-                                    }}
-                                >
-                                    Schedule inspection
-                                </PageHeaderPrimaryButton>
+                                {canSchedule ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={Plus}
+                                        onClick={() => {
+                                            setView('schedules');
+                                            setShowForm(true);
+                                        }}
+                                    >
+                                        Schedule inspection
+                                    </PageHeaderPrimaryButton>
+                                ) : null}
                             </>
                         }
                         meters={
@@ -412,150 +392,6 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                     />
                 }
             >
-                {/* Add Form */}
-                {showForm && (
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>Schedule New Inspection</CardTitle>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setShowForm(false)}
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Inspection Type *</Label>
-                                        <Input
-                                            value={form.data.inspection_type}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'inspection_type',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="e.g., Fire Safety, Electrical"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label>Title *</Label>
-                                        <Input
-                                            value={form.data.title}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'title',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label>Frequency *</Label>
-                                        <Select
-                                            value={form.data.frequency}
-                                            onValueChange={(v) =>
-                                                form.setData(
-                                                    'frequency',
-                                                    v as any,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="weekly">
-                                                    Weekly
-                                                </SelectItem>
-                                                <SelectItem value="monthly">
-                                                    Monthly
-                                                </SelectItem>
-                                                <SelectItem value="quarterly">
-                                                    Quarterly
-                                                </SelectItem>
-                                                <SelectItem value="bi_annual">
-                                                    Bi-annual
-                                                </SelectItem>
-                                                <SelectItem value="annual">
-                                                    Annual
-                                                </SelectItem>
-                                                <SelectItem value="custom">
-                                                    Custom
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <Label>First Due Date *</Label>
-                                        <Input
-                                            type="date"
-                                            value={form.data.first_due_date}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'first_due_date',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <Label>Description</Label>
-                                    <Textarea
-                                        value={form.data.description}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'description',
-                                                e.target.value,
-                                            )
-                                        }
-                                        rows={3}
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={
-                                            form.data.auto_create_calendar_event
-                                        }
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'auto_create_calendar_event',
-                                                e.target.checked,
-                                            )
-                                        }
-                                    />
-                                    <Label className="font-normal">
-                                        Create calendar event
-                                    </Label>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button
-                                        type="submit"
-                                        disabled={form.processing}
-                                    >
-                                        Schedule
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowForm(false)}
-                                    >
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
-
                 {view === 'schedules' ? (
                     <Card>
                         <CardHeader>
@@ -672,6 +508,14 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                     </Card>
                 )}
             </PageLayout>
+
+            {canSchedule && showForm ? (
+                <ScheduleInspectionDialog
+                    open
+                    onClose={() => setShowForm(false)}
+                    site={site}
+                />
+            ) : null}
         </AppLayout>
     );
 }

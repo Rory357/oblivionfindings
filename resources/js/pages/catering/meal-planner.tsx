@@ -1,57 +1,59 @@
 import { PageLayout } from '@/components/page';
-import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import MealPlannerSubTabs from '@/pages/sites/meal-planner';
-import { Head, Link } from '@inertiajs/react';
-import { Home } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
 
-type Props = { default_site_id: number | null; can_create_sites?: boolean };
+/**
+ * One site's Meal Planner (/catering?site=…). The side menu opens the
+ * all-sites overview (meal-planner-overview.tsx); the breadcrumb and the
+ * site switcher's "All sites" lead back to it.
+ */
+type Props = {
+    default_site_id: number;
+    default_site_name: string;
+    /** Monday (Y-m-d) of the week the link asked for; this week when null. */
+    default_week?: string | null;
+};
 
 export default function CateringMealPlanner({
     default_site_id,
-    can_create_sites,
+    default_site_name,
+    default_week,
 }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Sites & Locations', href: '/sites' },
-                { title: 'Meal Planner', href: '/catering' },
+                { title: 'Meal planner', href: '/catering' },
+                {
+                    title: default_site_name,
+                    href: `/catering?site=${default_site_id}`,
+                },
             ]}
         >
-            <Head title="Meal Planner" />
+            <Head title={`${default_site_name} · Meal planner`} />
             <PageLayout width="full">
-                {default_site_id ? (
-                    <MealPlannerSubTabs
-                        mode="standalone"
-                        defaultSiteId={default_site_id}
-                    />
-                ) : (
-                    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
-                        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sites-bg text-sites-deep">
-                            <Home className="h-7 w-7" />
-                        </span>
-                        <div>
-                            <div className="text-[16px] font-semibold text-foreground">
-                                No sites yet
-                            </div>
-                            <p className="mx-auto mt-1 max-w-md text-[13.5px] text-muted-foreground">
-                                Create a house or office to start planning
-                                meals, tracking inventory and building shopping
-                                lists.
-                            </p>
-                        </div>
-                        {can_create_sites === false ? (
-                            <p className="text-[12.5px] text-muted-foreground">
-                                Contact an administrator to add a site.
-                            </p>
-                        ) : (
-                            <Button asChild>
-                                <Link href="/sites/create">Create a site</Link>
-                            </Button>
-                        )}
-                    </div>
-                )}
+                <MealPlannerSubTabs
+                    mode="standalone"
+                    defaultSiteId={default_site_id}
+                    defaultWeek={default_week ?? undefined}
+                    onSiteChange={(site) =>
+                        // Switching sites keeps the planner's state; the URL,
+                        // history entry and breadcrumb follow the new site.
+                        router.replace({
+                            url: `/catering?site=${site.id}`,
+                            props: (current) => ({
+                                ...current,
+                                default_site_id: site.id,
+                                default_site_name:
+                                    site.name || current.default_site_name,
+                                default_week: null,
+                            }),
+                            preserveState: true,
+                            preserveScroll: true,
+                        })
+                    }
+                />
             </PageLayout>
         </AppLayout>
     );
