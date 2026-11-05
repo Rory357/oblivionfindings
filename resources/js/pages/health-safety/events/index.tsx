@@ -1229,11 +1229,9 @@ export function EventTable({
                                 open &&
                                 ['high', 'critical'].includes(ev.severity) &&
                                 (!ev.worksafe_decision_signed || ev.flags.worksafe_pending);
-                            const captionClass = urgent
-                                ? 'text-xs text-muted-foreground dark:text-status-critical-foreground/80'
-                                : ev.blocked
-                                  ? 'text-xs text-muted-foreground dark:text-status-info-foreground/80'
-                                  : 'text-caption';
+                            // Muted text fails contrast on the tinted rows in dark mode; a softened foreground reads in
+                            // both modes without dark: colour pairs (DESIGN.md anti-pattern).
+                            const captionClass = urgent || ev.blocked ? 'text-xs text-foreground/75' : 'text-caption';
                             const next = ev.next ?? null;
                             return (
                                 <TableRow
@@ -1255,7 +1253,7 @@ export function EventTable({
                                         urgent
                                             ? 'bg-status-critical-bg/60 hover:bg-status-critical-bg'
                                             : ev.blocked
-                                              ? 'bg-status-info-bg/40 hover:bg-status-info-bg'
+                                              ? 'bg-accent/60 hover:bg-accent'
                                               : '',
                                     )}
                                 >

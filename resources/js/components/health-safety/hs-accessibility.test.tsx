@@ -80,7 +80,7 @@ describe('Health & Safety accessibility regressions', () => {
         expect(screen.getByRole('button', { name: /closed\s*6\s*60%/i })).toBeInTheDocument();
     });
 
-    it('uses mode-aware status foreground utilities instead of unlayered text-caption on tinted safety review rows and supports keyboard activation', () => {
+    it('uses a token caption colour that reads in both modes (not text-caption) on tinted safety review rows and supports keyboard activation', () => {
         const onOpen = vi.fn();
         const blockedRow: EventRow = {
             id: 57,
@@ -121,9 +121,10 @@ describe('Health & Safety accessibility regressions', () => {
 
         const row = screen.getByRole('row', { name: 'Open safety review HSE-2026-9906' });
         expect(row.querySelector('.text-caption')).toBeNull();
-        expect(within(row).getByText('Waiting for independent sign-off').className).toContain(
-            'dark:text-status-info-foreground/80',
-        );
+        // A token colour that reads in both modes, with no dark: colour pair (DESIGN.md anti-pattern).
+        const caption = within(row).getByText('Waiting for independent sign-off').className;
+        expect(caption).toContain('text-foreground/75');
+        expect(caption).not.toMatch(/\bdark:/);
 
         fireEvent.keyDown(row, { key: 'Enter' });
         expect(onOpen).toHaveBeenCalledWith(57);
