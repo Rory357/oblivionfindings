@@ -82,8 +82,10 @@ final class BehaviourSupportApprovalPolicyPrivacyTest extends BehaviourSupportPo
 
     public function test_current_staff_dates_approval_and_activity_are_required_independently_of_grant(): void
     {
+        // Staff dates are judged against the worker's local day (HrCurrentStaffService), not the UTC day.
+        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'));
         foreach ([
-            ['is_active' => false], ['start_date' => now()->addDay()->toDateString()], ['end_date' => now()->subDay()->toDateString()],
+            ['is_active' => false], ['start_date' => $today->copy()->addDay()->toDateString()], ['end_date' => $today->copy()->subDay()->toDateString()],
         ] as $profile) {
             $actor = $this->staff([Policy::PERMISSION]);
             $actor->hrEmployeeProfile->update($profile);
