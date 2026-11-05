@@ -3,6 +3,7 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Services\HealthSafety\PpeAccessService;
+use Illuminate\Database\DeadlockException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use PDOException;
@@ -45,13 +46,16 @@ final class PpeAccessDeadlockRetryTest extends PpeCommandTestCase
     {
         $calls = 0;
         try {
-            DB::transaction(fn () => app(PpeAccessService::class)->withCurrentViewer($this->manager, function () use (&$calls) {
-                $calls++;
-                throw $this->databaseFailure(1213, '40001', 'Deadlock found when trying to get lock');
-            }, true));
+            DB::transaction(function () use (&$calls) {
+                return app(PpeAccessService::class)->withCurrentViewer($this->manager, function () use (&$calls) {
+                    $calls++;
+                    throw $this->databaseFailure(1213, '40001', 'Deadlock found when trying to get lock');
+                }, true);
+            });
             $this->fail('The deadlock must reach the outer transaction.');
-        } catch (QueryException $failure) {
-            $this->assertSame(1213, $failure->errorInfo[1]);
+        } catch (DeadlockException $failure) {
+            // Laravel hands a nested deadlock to the outer transaction as a DeadlockException.
+            $this->assertStringContainsString('Deadlock found', $failure->getMessage());
         }
         $this->assertSame(1, $calls);
     }
