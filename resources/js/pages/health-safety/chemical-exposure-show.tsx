@@ -212,7 +212,7 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
     ) : undefined;
     const next: RecordProgressNext | null = !stages ? null : inError ? {
         kicker: 'Entered in error', title: 'Kept for the record',
-        text: [inError.by?.name, inError.at ? dateTimeWithYear(inError.at) : null].filter(Boolean).join(' · ') || 'Marked as entered in error', tone: 'done',
+        text: [inError.by?.name, inError.at ? dateTimeWithYear(inError.at) : null].filter(Boolean).join(' · ') || 'Marked as entered in error',
     } : stages.first ? {
         kicker: stages.first.due_at ? `Next step · ${stages.overdue ? 'was due' : 'due'} ${dateTimeWithYear(stages.first.due_at)}` : 'Next step', title: stages.first.instruction,
         text: <>Follow-up for <b>{stages.first.assigned_to?.name ?? 'a named person'}</b>{stages.first.recorded_by ? <> · assigned by {stages.first.recorded_by.name}</> : null}</>, action: nextButton,

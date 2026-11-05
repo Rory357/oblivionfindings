@@ -561,13 +561,6 @@ export function ProcedureWorkspace({
                         : 'You are reading a historical version. Check the current instructions before using this procedure.'}
                 </Note>
             )}
-            {withdrawn && (
-                <Note icon={Info}>
-                    Withdrawn{withdrawnMeta ? ` by ${withdrawnMeta}` : ''}. It
-                    is kept for the record and can’t be changed.
-                    {withdrawal?.reason ? ` Reason: ${withdrawal.reason}` : ''}
-                </Note>
-            )}
             {working && !withdrawn && (
                 <Note icon={Info}>
                     This is a working revision.
