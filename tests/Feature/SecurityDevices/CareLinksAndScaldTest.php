@@ -189,3 +189,128 @@ it('raises no hazard without the hazards.create permission', function (): void {
     $this->actingAs($viewer)->postJson("/security-devices/alerts/{$alert->id}/hazard")->assertForbidden();
     expect(SiteHazard::query()->count())->toBe(0);
 });
+
+it('renders the 7b Nights view, 4-check readiness ring, 7-night bars, and hides the resident’s name without client access', function (): void {
+    $this->travelTo(($this->nz)('2026-11-04 09:00'));
+
+    $this->bed->forceFill(['name' => 'Room 4 bed sensor'])->save();
+    $this->hemi->forceFill(['last_name' => 'Ruru'])->save();
+    ($this->consent)($this->hemi);
+    $plan = \App\Models\CarePlan::query()->create([
+        'client_id' => $this->hemi->id,
+        'title' => 'Hemi falls prevention plan',
+        'status' => 'active',
+        'plan_type' => 'support',
+        'starts_at' => '2026-10-01',
+        'next_review_at' => '2027-01-12',
+        'created_by' => $this->keeper->id,
+    ]);
+    ($this->link)(['care_plan_id' => $plan->id])->assertCreated();
+
+    // Tonight's night shift on the roster (2026-11-04 22:00 -> 2026-11-05 07:00 NZ).
+    \App\Models\Shift::query()->create([
+        'site_id' => $this->site->id,
+        'client_id' => $this->hemi->id,
+        'user_id' => $this->keeper->id,
+        'starts_at' => ($this->nz)('2026-11-04 22:00'),
+        'ends_at' => ($this->nz)('2026-11-05 07:00'),
+        'status' => 'scheduled',
+    ]);
+
+    $history = app(SensorReadingHistory::class);
+    $rules = app(CareRules::class);
+    // Last night (Tue 3 Nov 22:00 -> Wed 4 Nov 06:00 NZ): in bed at 22:15, out 12 min at 01:10 (opens alert), back at 01:22, up for the day at 07:05.
+    $history->record($this->bed->id, ['occupancy' => 1], ($this->nz)('2026-11-03 22:15'));
+    $history->record($this->bed->id, ['occupancy' => 0], ($this->nz)('2026-11-04 01:10'));
+    $rules->tick(($this->nz)('2026-11-04 01:21'));
+    $history->record($this->bed->id, ['occupancy' => 1], ($this->nz)('2026-11-04 01:22'));
+    $history->record($this->bed->id, ['occupancy' => 0], ($this->nz)('2026-11-04 07:05'));
+
+    // Clinical viewer who MAY view clients vs IT/device viewer who MAY NOT view clients.
+    $clinical = ($this->person)(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'clients.viewAny']);
+    $deviceOnly = ($this->person)(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view']);
+
+    $this->actingAs($clinical)
+        ->get("/security-devices/devices/{$this->bed->id}")
+        ->assertOk()
+        ->assertInertia(function ($page): void {
+            $page->component('security-devices/devices/sensor')
+                ->where('tab', 'nights')
+                ->where('meters.0.label', 'Right now')
+                ->where('meters.0.value', 'Up')
+                ->where('meters.1.label', 'Last night')
+                ->where('meters.1.value', 'Out once')
+                ->where('meters.2.label', 'Alerts in 7 nights')
+                ->where('meters.2.value', '1')
+                ->where('nights.readiness.passed', 4)
+                ->where('nights.readiness.label', 'Ready to alert night staff')
+                ->where('nights.seven_nights.values.6', 12)
+                ->where('nights.person_card.href', '/clients/'.$this->hemi->id);
+            $props = $page->toArray()['props'];
+            expect($props['nights']['care_banner']['kicker'])->toContain('Hemi');
+            expect(collect($props['nights']['last_night']['items'])->pluck('title')->all())->toContain('Out of bed for 12 min');
+        });
+
+    // Viewer without client access never sees Hemi's name on Nights OR on Alerts!
+    $nightsBody = (string) $this->actingAs($deviceOnly)
+        ->get("/security-devices/devices/{$this->bed->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('nights.readiness.passed', 4)
+            ->where('nights.person_card.name', 'Resident')
+            ->where('nights.person_card.href', null)
+            ->where('nights.care_banner.person_href', null))
+        ->getContent();
+    expect($nightsBody)->not->toContain('Hemi');
+
+    $alertsBody = (string) $this->actingAs($deviceOnly)
+        ->get("/security-devices/devices/{$this->bed->id}?tab=alerts")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('alerts.0.title', 'A person out of bed for over 10 minutes'))
+        ->getContent();
+    expect($alertsBody)->not->toContain('Hemi');
+});
+
+it('shows the 7c tap temperature, hottest today and H&S hazard meters on a scald probe', function (): void {
+    $tap = ($this->sensor)('Hot water at Room 3 tap', $this->site);
+    $tap->forceFill([
+        'battery_level' => 96,
+        'config' => ['care' => ['scald_watch' => true]],
+        'meta' => ['observed' => ['sensor_readings' => [
+            'temperature' => ['label' => 'Temperature', 'value' => 58.0, 'unit' => 'C', 'state' => 'warning', 'observed_at' => now()->subMinute()->toIso8601String()],
+        ]]],
+    ])->save();
+
+    $history = app(SensorReadingHistory::class);
+    $base = CarbonImmutable::now('UTC')->subMinutes(5)->startOfMinute();
+    $history->record($tap->id, ['temperature' => 52.0], $base);
+    $history->record($tap->id, ['temperature' => 61.0], $base->addMinute());
+    $history->record($tap->id, ['temperature' => 58.0], $base->addMinutes(2));
+
+    $alert = DeviceAlert::query()->where('device_id', $tap->id)->where('kind', 'scald_risk')->sole();
+    $viewer = ($this->person)(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'hazards.create']);
+
+    $this->actingAs($viewer)
+        ->get("/security-devices/devices/{$tap->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('device.badge.label', 'Too hot')
+            ->where('meters.0.label', 'At the tap now')
+            ->where('meters.0.value', '58 °C')
+            ->where('meters.1.label', 'Hottest today')
+            ->where('meters.1.value', '61 °C')
+            ->where('meters.2.label', 'H&S hazard')
+            ->where('meters.2.value', 'Ready to raise')
+            ->where('meters.3.label', 'Battery')
+            ->where('meters.3.value', '96%')
+            ->where('care.scald.alert.can_raise_hazard', true));
+
+    $this->actingAs($viewer)->postJson("/security-devices/alerts/{$alert->id}/hazard")->assertCreated();
+
+    $this->actingAs($viewer)
+        ->get("/security-devices/devices/{$tap->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('meters.2.value', 'Raised')
+            ->where('care.scald.alert.hazard_raised', true));
+});

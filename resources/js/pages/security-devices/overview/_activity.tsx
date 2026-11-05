@@ -185,17 +185,19 @@ export function ActivityBody({ activity, now, canExport }: { activity: ActivityD
                     />
                 )}
                 <Surface title={`${dayLabel} by kind`} sub={activity.today ? 'Midnight to now' : 'The whole day'}>
-                    {total === 0 ? (
-                        <p className="text-subtle">Nothing yet.</p>
-                    ) : (
-                        <DonutChart
-                            size={140}
-                            thickness={20}
-                            centerValue={activity.today ? formatTime(now) : 'All day'}
-                            centerLabel={activity.today ? 'so far' : undefined}
-                            data={activity.by_kind.filter((group) => group.count > 0).map((group) => ({ label: group.label, value: group.count, color: GROUP_COLOUR[group.key] }))}
-                        />
-                    )}
+                    <div className="px-[18px] pt-2 pb-4">
+                        {total === 0 ? (
+                            <p className="text-subtle">Nothing yet.</p>
+                        ) : (
+                            <DonutChart
+                                size={140}
+                                thickness={20}
+                                centerValue={activity.today ? formatTime(now) : 'All day'}
+                                centerLabel={activity.today ? 'so far' : undefined}
+                                data={activity.by_kind.filter((group) => group.count > 0).map((group) => ({ label: group.label, value: group.count, color: GROUP_COLOUR[group.key] }))}
+                            />
+                        )}
+                    </div>
                 </Surface>
                 <KnowList
                     title="What’s in this stream"

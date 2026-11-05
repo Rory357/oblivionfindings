@@ -6,7 +6,9 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Notifications\MonitoringCheckAlertNotification;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Throwable;
@@ -44,6 +46,13 @@ final class MonitoringAlertNotificationDispatcher
             return null;
         }
 
+        $observedAt = $observation->observed_at !== null
+            ? CarbonImmutable::parse($observation->observed_at)->utc()
+            : CarbonImmutable::now('UTC');
+        if (app(SecurityDevicesSettings::class)->isQuietHours($observedAt)) {
+            return null;
+        }
+
         $route = $this->policies->resolveAlertRoute($device, $monitor, $siteId);
         $isCritical = $to === MonitorState::Failed;
         $notifyInApp = $isCritical ? $route['critical_notify_in_app'] : $route['warning_notify_in_app'];
@@ -65,7 +74,7 @@ final class MonitoringAlertNotificationDispatcher
         }
 
         // S&D 13d: the IT person on call (Rostering) is told first; the rest hear at the one-hour reminder.
-        $recipients = app(\App\Domain\SecurityDevices\Alerts\ItOnCall::class)->first($this->policies->resolveItRecipients($siteId, $route['recipient_role']));
+        $recipients = app(\App\Domain\SecurityDevices\Alerts\ItOnCall::class)->first($this->policies->resolveItRecipients($siteId, $route['recipient_role']), $observedAt);
         if ($recipients->isEmpty()) {
             return null;
         }

@@ -337,4 +337,107 @@ class SensorTrackerPagesTest extends TestCase
         $this->assertSame(1, QueclinkPendingCommand::query()->count());
         $this->assertSame('GTRTO', QueclinkPendingCommand::query()->sole()->command_word);
     }
+
+    public function test_sensor_alert_limits_are_configurable_permission_checked_and_audited(): void
+    {
+        $without = $this->viewerWith(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.devices.update']);
+        $manager = $this->viewerWith(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'securityDevices.automations.manage']);
+        $at = CarbonImmutable::now()->subMinute();
+
+        $sensor = $this->sensor($this->home, [
+            'meta' => ['observed' => [
+                'last_telemetry_at' => $at->toIso8601String(),
+                'sensor_readings' => [
+                    'temperature' => ['label' => 'Temperature', 'value' => 14.5, 'unit' => 'C', 'state' => 'healthy', 'observed_at' => $at->toIso8601String()],
+                    'co2' => ['label' => 'CO2', 'value' => 900, 'unit' => 'ppm', 'state' => 'healthy', 'observed_at' => $at->toIso8601String()],
+                ],
+            ]],
+        ]);
+        $otherSensor = $this->sensor($this->other, ['name' => 'Other Site sensor']);
+
+        // Refused without securityDevices.automations.manage, and 404 for another Site's sensor.
+        $this->actingAs($without)
+            ->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+                'metrics' => ['temperature' => ['enabled' => true, 'below' => 16, 'above' => null]],
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($manager)
+            ->putJson('/security-devices/devices/'.$otherSensor->id.'/alert-limits', [
+                'metrics' => ['temperature' => ['enabled' => true, 'below' => 16, 'above' => null]],
+            ])
+            ->assertNotFound();
+
+        // Invalid bounds (below >= above) rejected with 422.
+        $this->actingAs($manager)
+            ->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+                'metrics' => ['temperature' => ['enabled' => true, 'below' => 25, 'above' => 20]],
+            ])
+            ->assertUnprocessable();
+
+        // Save custom per-sensor limits: Too cold below 16 °C, CO2 above 1,200 ppm, Battery under 15%.
+        $this->actingAs($manager)
+            ->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+                'metrics' => [
+                    'temperature' => ['enabled' => true, 'below' => 16, 'above' => null],
+                    'co2' => ['enabled' => true, 'warning_at' => 1200, 'critical_at' => null],
+                ],
+                'battery' => ['enabled' => true, 'below' => 15],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'security_devices.sensor_limits.updated',
+            'auditable_type' => $sensor->getMorphClass(),
+            'auditable_id' => $sensor->id,
+            'user_id' => $manager->id,
+        ]);
+
+        // 14.5 °C is now below the custom 16 °C limit, so a reading_temperature alert opened immediately.
+        $this->assertDatabaseHas('security_device_alerts', [
+            'device_id' => $sensor->id,
+            'kind' => 'reading_temperature',
+            'state' => DeviceAlert::STATE_OPEN,
+        ]);
+
+        $this->actingAs($manager)
+            ->get('/security-devices/devices/'.$sensor->id)
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $page->component('security-devices/devices/sensor')
+                    ->where('can.manage_rules', true)
+                    ->where('meters.0.tone', 'warning')
+                    ->where('meters.0.caption.text', 'Below the usual range')
+                    ->where('readings.series.0.limits', [
+                        ['value' => 16, 'label' => 'Alert below 16 °C'],
+                    ])
+                    ->where('readings.series.1.limits', [
+                        ['value' => 1200, 'label' => 'Alert at 1,200 ppm'],
+                    ]);
+                $rules = collect($page->toArray()['props']['readings']['rules'])->keyBy('key');
+                $this->assertSame('Too cold below 16 °C', $rules['temperature']['label']);
+                $this->assertSame('CO₂ above 1,200 ppm', $rules['co2']['label']);
+                $this->assertSame('Battery under 15%', $rules['battery']['label']);
+            });
+
+        // Subsequent MQTT telemetry also uses the stored custom limits (1,100 ppm stays healthy when limit is 1,200 ppm; 17.5 °C recovers temperature).
+        app(\App\Domain\SecurityDevices\Iot\Mqtt\MqttSensorIntakeService::class)->applyTelemetry(
+            $sensor->fresh(),
+            (int) $this->home->id,
+            'mqtt',
+            'sensors/room-3',
+            ['temperature' => 17.5, 'co2' => 1100],
+            CarbonImmutable::now('UTC'),
+        );
+
+        $this->assertDatabaseHas('security_device_alerts', [
+            'device_id' => $sensor->id,
+            'kind' => 'reading_temperature',
+            'state' => DeviceAlert::STATE_DONE,
+        ]);
+        $this->assertDatabaseMissing('security_device_alerts', [
+            'device_id' => $sensor->id,
+            'kind' => 'reading_co2',
+        ]);
+    }
 }

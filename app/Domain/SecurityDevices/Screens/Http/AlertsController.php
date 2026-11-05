@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Alerts\Models\OnCallHandover;
 use App\Domain\SecurityDevices\Screens\Alerts\AlertRulesPresenter;
 use App\Domain\SecurityDevices\Screens\Alerts\AlertsPresenter;
 use App\Domain\SecurityDevices\Screens\Alerts\AutomationsPresenter;
+use App\Domain\SecurityDevices\Screens\Alerts\OnCallPresenter;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceFormOptions;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
@@ -139,6 +140,23 @@ final class AlertsController extends Controller
         $hazard = app(\App\Domain\SecurityDevices\Care\ScaldWatch::class)->raiseHazard($user, $record);
 
         return response()->json(['hazard_id' => (int) $hazard->id, 'url' => '/hazards/'.$hazard->id], 201);
+    }
+
+    /**
+     * S&D round 3 (pg-sdr-13d): read-only "All handovers" page. Same permission as reading handover
+     * notes on the On call tab (canOpen + alerts.acknowledge), scoped to the viewer's Sites.
+     */
+    public function handovers(Request $request, OnCallPresenter $onCall): Response
+    {
+        $user = $request->user();
+        abort_unless(
+            $user instanceof User
+                && AlertsPresenter::canOpen($user)
+                && $user->canDo('securityDevices.alerts.acknowledge'),
+            403,
+        );
+
+        return Inertia::render('security-devices/alerts/handovers', $onCall->presentHandovers($user, $request->only(['q', 'page'])));
     }
 
     /**

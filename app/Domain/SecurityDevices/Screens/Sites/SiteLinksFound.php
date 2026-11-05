@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Presenters\TopologyWorkspacePresenter;
+use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceEntry;
 use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use App\Models\Site;
@@ -69,13 +70,21 @@ final class SiteLinksFound
             $relationship = $relationships->get($key);
             $rows[$key] = $this->row($link, $relationship, $byId, $threshold, $now);
         }
-        // A link on the map that the latest checks no longer report: when it was last seen.
+        // Links on the map that the latest checks didn't report: either seen in an older check, or placed by hand (12j).
         $missing = $relationships->keys()->diff(array_keys($rows))->values()->all();
-        foreach ($this->lastSeen($site, $missing, $byId->keys()->all()) as $key => $history) {
-            $rows[$key] = $this->row([...$history, 'by' => [self::sourceLabel($history['source'], $hubLabel)]], $relationships->get($key), $byId, $threshold, $now, true);
+        $historyByPair = $this->lastSeen($site, $missing, $byId->keys()->all());
+        foreach ($missing as $key) {
+            $relationship = $relationships->get($key);
+            if (isset($historyByPair[$key])) {
+                $history = $historyByPair[$key];
+                $rows[$key] = $this->row([...$history, 'by' => [self::sourceLabel($history['source'], $hubLabel)]], $relationship, $byId, $threshold, $now, true);
+            } elseif ($relationship !== null) {
+                $rows[$key] = $this->manualRow($relationship, $byId);
+            }
         }
         $rows = collect($rows)->sortBy(fn (array $row): string => self::ORDER[$row['map']['state']].'|'.mb_strtolower($row['name']))->values();
 
+        $canChange = $viewer->canDo('securityDevices.devices.update');
         $linked = collect($rows)->flatMap(fn (array $row): array => [$row['parent_id'], $row['child_id']])
             ->merge($relationships->flatMap(fn (DeviceRelationship $relationship): array => [(int) $relationship->parent_device_id, (int) $relationship->child_device_id]))
             ->unique()->flip();
@@ -109,8 +118,17 @@ final class SiteLinksFound
                 'count' => $unplaced->count(),
                 'names' => $unplaced->take(6)->map(fn (DeviceEntry $entry): string => $entry->name())->all(),
                 'more' => max(0, $unplaced->count() - 6),
+                'items' => $canChange && $entries->count() >= 2 ? $unplaced->map(fn (DeviceEntry $entry): array => [
+                    'id' => $entry->id(),
+                    'name' => $entry->name(),
+                    'kind' => $entry->kind->value,
+                    'sub' => $entry->kind->label(),
+                ])->all() : [],
+                'parents' => $canChange && $unplaced->isNotEmpty() && $entries->count() >= 2
+                    ? $this->parentOptions($entries)
+                    : [],
             ],
-            'can' => ['change' => $viewer->canDo('securityDevices.devices.update')],
+            'can' => ['change' => $canChange],
         ];
     }
 
@@ -191,6 +209,80 @@ final class SiteLinksFound
             'map' => ['at' => null, ...$map],
             'relationship' => $relationship === null ? null : ['id' => (int) $relationship->id, 'device_id' => (int) $relationship->parent_device_id],
         ];
+    }
+
+    /**
+     * A link a person placed on the map by hand that no hub or service has reported (12j).
+     *
+     * @param  Collection<int, DeviceEntry>  $byId
+     * @return array<string, mixed>
+     */
+    private function manualRow(DeviceRelationship $relationship, Collection $byId): array
+    {
+        $parentId = (int) $relationship->parent_device_id;
+        $childId = (int) $relationship->child_device_id;
+        $parent = $byId->get($parentId);
+        $child = $byId->get($childId);
+        $port = $relationship->port !== null && trim((string) $relationship->port) !== '' ? trim((string) $relationship->port) : null;
+        $sub = match (true) {
+            $port !== null && preg_match('/^radio\b/i', $port) === 1 => 'Radio',
+            $port !== null && preg_match('/^(wi-?fi|wlan|wireless)\b/i', $port) === 1 => 'Wi-Fi',
+            default => 'Placed by hand',
+        };
+
+        return [
+            'key' => self::pair($parentId, $childId),
+            'name' => ($parent?->name() ?? 'A device').' → '.($child?->name() ?? 'a device'),
+            'sub' => $sub,
+            'parent_id' => $parentId,
+            'child_id' => $childId,
+            'child_kind' => $child?->kind->value,
+            'child_href' => '/security-devices/devices/'.$childId,
+            'by' => 'Placed by hand',
+            'ports' => $port,
+            'sure' => null,
+            'seen_at' => null,
+            'map' => [
+                'state' => 'on',
+                'tone' => 'success',
+                'label' => 'On the map',
+                'note' => 'Placed by hand · {date}',
+                'at' => $relationship->created_at?->toIso8601String(),
+            ],
+            'relationship' => ['id' => (int) $relationship->id, 'device_id' => $parentId],
+        ];
+    }
+
+    /**
+     * Visible devices at this Site that an unplaced device can sit under, gateways and bridges first.
+     *
+     * @param  Collection<int, DeviceEntry>  $entries
+     * @return list<array{id: int, name: string, kind: string, sub: string}>
+     */
+    private function parentOptions(Collection $entries): array
+    {
+        return $entries
+            ->sortBy(fn (DeviceEntry $entry): string => sprintf(
+                '%d|%s',
+                match ($entry->kind) {
+                    DeviceKind::SensorGateway => 0,
+                    DeviceKind::Switch => 1,
+                    DeviceKind::WifiPoint => 2,
+                    DeviceKind::Recorder => 3,
+                    DeviceKind::Router => 4,
+                    DeviceKind::NetworkDevice, DeviceKind::Hub => 5,
+                    default => 6,
+                },
+                mb_strtolower($entry->name()),
+            ))
+            ->map(fn (DeviceEntry $entry): array => [
+                'id' => $entry->id(),
+                'name' => $entry->name(),
+                'kind' => $entry->kind->value,
+                'sub' => $entry->kind->label(),
+            ])
+            ->values()
+            ->all();
     }
 
     /**

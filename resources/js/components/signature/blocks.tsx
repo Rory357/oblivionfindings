@@ -398,6 +398,8 @@ export function Log({ title, sub, action, items, limit = 8 }: Omit<SurfaceProps,
 /*  People and places                                                  */
 /* ------------------------------------------------------------------ */
 
+export type PersonDayState = 'done' | 'now' | 'upcoming' | 'off';
+
 export interface PersonCardItem {
     name: string;
     sub?: ReactNode;
@@ -405,6 +407,8 @@ export interface PersonCardItem {
     presence?: 'on' | 'away';
     /** One flag under the name — a <StatusBadge>. */
     flag?: ReactNode;
+    /** Optional Monday–Sunday week strip (pg-sdr-13d). */
+    days?: { label: string; state: PersonDayState }[];
     foot?: ReactNode;
     href?: string;
     /** The card opens its record in place (a dialog) — the whole card is the button. */
@@ -435,6 +439,31 @@ export function PeopleCards({ title, sub, action, cols = 3, items }: { title?: s
                                     {p.flag ? <span className="sg-flag">{p.flag}</span> : null}
                                 </div>
                             </div>
+                            {p.days?.length ? (
+                                <div className="sg-day" aria-label="On-call week">
+                                    {p.days.map((d) => (
+                                        <span
+                                            key={d.label}
+                                            className={cn(
+                                                d.state === 'done' && 'sg-day--done',
+                                                d.state === 'now' && 'sg-day--now',
+                                                d.state === 'off' && 'sg-day--off',
+                                            )}
+                                        >
+                                            {d.label}
+                                            <span className="sr-only">
+                                                {d.state === 'done'
+                                                    ? ' (done)'
+                                                    : d.state === 'now'
+                                                      ? ' (today)'
+                                                      : d.state === 'off'
+                                                        ? ' (not on call)'
+                                                        : ' (coming up)'}
+                                            </span>
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : null}
                             {p.foot ? <div className="sg-pf">{p.foot}</div> : null}
                         </>
                     );

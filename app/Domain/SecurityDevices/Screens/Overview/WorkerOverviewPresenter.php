@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlertEvent;
 use App\Domain\SecurityDevices\Alerts\StaffOnShift;
+use App\Domain\SecurityDevices\Care\Models\DevicePersonLink;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Screens\Alerts\AlertsPresenter;
@@ -15,6 +16,8 @@ use App\Domain\SecurityDevices\Screens\Devices\DeviceDirectory;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceEntry;
 use App\Domain\SecurityDevices\Screens\Devices\Pages\AlarmPagePresenter;
 use App\Domain\SecurityDevices\Screens\Devices\Pages\SensorPagePresenter;
+use App\Domain\SecurityDevices\Screens\Sites\AlertWords;
+use App\Domain\SecurityDevices\Screens\Sites\SiteStream;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Shift;
 use App\Models\Site;
@@ -116,12 +119,19 @@ final class WorkerOverviewPresenter
         $siteId = (int) $site->id;
         $onShift = $this->staff->onShift($siteId, $now)->contains(fn (User $person): bool => (int) $person->id === (int) $viewer->id);
         $toldIds = $this->toldAlertIds($viewer, $now->subDays(14));
+        $personLinkedDeviceIds = DevicePersonLink::query()
+            ->whereNull('unlinked_at')
+            ->pluck('device_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->flip();
         $entries = $this->directory->entries($viewer, $siteId)
-            ->reject(fn (DeviceEntry $entry): bool => $entry->state === DeviceState::Retired || self::linkedToPerson($entry->device))
+            ->reject(fn (DeviceEntry $entry): bool => $entry->state === DeviceState::Retired
+                || $personLinkedDeviceIds->has($entry->id())
+                || self::linkedToPerson($entry->device))
             ->sortBy(fn (DeviceEntry $entry): string => mb_strtolower($entry->name()))
             ->values();
 
-        $safety = $this->safety($siteId, $onShift, $toldIds);
+        $safety = $this->safety($viewer, $siteId, $onShift, $toldIds);
         $kit = $this->kit($viewer, $entries, $this->worksAt($viewer, $siteId, $shift));
         $around = $this->around($entries, $base['can']['open_devices']);
 
@@ -253,7 +263,7 @@ final class WorkerOverviewPresenter
      * @param  list<int>  $toldIds
      * @return list<array<string, mixed>>
      */
-    private function safety(int $siteId, bool $onShift, array $toldIds): array
+    private function safety(User $viewer, int $siteId, bool $onShift, array $toldIds): array
     {
         if (! $onShift && $toldIds === []) {
             return [];
@@ -270,6 +280,7 @@ final class WorkerOverviewPresenter
         if ($alerts->isEmpty()) {
             return [];
         }
+        $carePeople = SiteStream::carePeople($viewer, $alerts);
         $opened = DeviceAlertEvent::query()
             ->whereIn('alert_id', $alerts->pluck('id')->all())
             ->where('kind', 'opened')
@@ -277,15 +288,16 @@ final class WorkerOverviewPresenter
             ->get(['alert_id', 'text', 'detail'])
             ->keyBy('alert_id');
 
-        return $alerts->map(function (DeviceAlert $alert) use ($opened): array {
+        return $alerts->map(function (DeviceAlert $alert) use ($carePeople, $opened): array {
+            $words = new AlertWords($alert, $carePeople[(int) $alert->id] ?? false);
             $event = $opened->get($alert->id);
-            $what = trim((string) ($event?->text ?? ''));
-            $detail = trim((string) ($event?->detail ?? ''));
+            $what = (string) ($words->text($event?->text) ?? '');
+            $detail = (string) ($words->text($event?->detail) ?? '');
             $safety = in_array($alert->kind, self::SAFETY_KINDS, true);
 
             return [
                 'id' => (int) $alert->id,
-                'title' => (string) $alert->title,
+                'title' => $words->title(),
                 'tone' => $alert->severity === 'critical' ? 'critical' : 'warning',
                 'safety' => $safety,
                 'at' => $alert->opened_at->toIso8601String(),
@@ -604,22 +616,34 @@ final class WorkerOverviewPresenter
             return [];
         }
         $alertIds = $notifications->map(fn (DatabaseNotification $notification): int => (int) data_get($notification->data, 'context.alert_id', 0))->filter()->unique()->values()->all();
-        $here = DeviceAlert::query()->whereIn('id', $alertIds === [] ? [0] : $alertIds)->where('site_id', $siteId)->pluck('id')->map(fn (mixed $id): int => (int) $id)->flip();
+        $here = DeviceAlert::query()
+            ->whereIn('id', $alertIds === [] ? [0] : $alertIds)
+            ->where('site_id', $siteId)
+            ->get(['id', 'device_id', 'site_id', 'kind', 'title', 'opened_at'])
+            ->keyBy(fn (DeviceAlert $alert): int => (int) $alert->id);
+        $carePeople = SiteStream::carePeople($viewer, $here->values());
 
         return $notifications
             ->filter(fn (DatabaseNotification $notification): bool => $here->has((int) data_get($notification->data, 'context.alert_id', 0)))
             ->take(8)
-            ->map(fn (DatabaseNotification $notification): array => [
-                'id' => (string) $notification->id,
-                'at' => $notification->created_at?->toIso8601String(),
-                'tone' => match ((string) data_get($notification->data, 'severity')) {
-                    'critical' => 'critical',
-                    'warning' => 'warning',
-                    default => 'info',
-                },
-                'title' => (string) data_get($notification->data, 'title', 'An alert'),
-                'sub' => trim((string) data_get($notification->data, 'body', '')),
-            ])
+            ->map(function (DatabaseNotification $notification) use ($here, $carePeople): array {
+                $alertId = (int) data_get($notification->data, 'context.alert_id', 0);
+                /** @var DeviceAlert $alert */
+                $alert = $here->get($alertId);
+                $words = new AlertWords($alert, $carePeople[$alertId] ?? false);
+
+                return [
+                    'id' => (string) $notification->id,
+                    'at' => $notification->created_at?->toIso8601String(),
+                    'tone' => match ((string) data_get($notification->data, 'severity')) {
+                        'critical' => 'critical',
+                        'warning' => 'warning',
+                        default => 'info',
+                    },
+                    'title' => $words->text((string) data_get($notification->data, 'title', 'An alert')) ?? 'An alert',
+                    'sub' => (string) ($words->text(trim((string) data_get($notification->data, 'body', ''))) ?? ''),
+                ];
+            })
             ->values()
             ->all();
     }

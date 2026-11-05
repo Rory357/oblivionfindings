@@ -31,7 +31,32 @@ final class CommandCredentialLeaseService
             throw new RuntimeException('A governed command credential is unavailable.');
         }
 
-        return $this->leases->acquire($siteId, $reference->reference_key, [$leaseCapability]);
+        $lease = $this->leases->acquire($siteId, $reference->reference_key, [$leaseCapability]);
+        $sshUser = in_array(strtolower(trim($capability)), ['device.remote_shell', 'network.config.backup'], true)
+            ? trim((string) (data_get($device->config ?? [], 'ssh.user') ?? ''))
+            : '';
+        if ($sshUser === '') {
+            return $lease;
+        }
+
+        $material = $lease->material();
+        try {
+            $material['username'] = $sshUser;
+
+            return new CredentialLease(
+                leaseId: $lease->leaseId,
+                expiresAt: $lease->expiresAt,
+                material: $material,
+            );
+        } finally {
+            foreach ($material as &$value) {
+                if (is_string($value) && $value !== '' && function_exists('sodium_memzero')) {
+                    sodium_memzero($value);
+                }
+                $value = null;
+            }
+            unset($value);
+        }
     }
 
     public function available(Device $device, int $siteId, string $capability): bool

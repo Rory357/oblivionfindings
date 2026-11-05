@@ -45,6 +45,30 @@ final class SitePagePresenter
     /** The Logbook's "What" choices (12i). */
     public const array LOGBOOK_WHAT = ['everything', 'alerts', 'alarm', 'modes', 'devices', 'people'];
 
+    public const array LOGBOOK_WHAT_LABELS = [
+        'everything' => 'Everything',
+        'alerts' => 'Alerts',
+        'alarm' => 'Alarm',
+        'modes' => 'Modes',
+        'devices' => 'Devices',
+        'people' => 'Who did what',
+    ];
+
+    /**
+     * @param  array<string, mixed>  $line
+     */
+    public static function matchesLogbookWhat(array $line, string $what): bool
+    {
+        return match ($what) {
+            'alerts' => in_array($line['kind'] ?? null, ['alert', 'hs'], true),
+            'alarm' => ($line['kind'] ?? null) === 'alarm',
+            'modes' => ($line['kind'] ?? null) === 'mode',
+            'devices' => in_array($line['kind'] ?? null, ['device', 'planned'], true),
+            'people' => ($line['by'] ?? null) !== null,
+            default => true,
+        };
+    }
+
     /** The Alerts tab keeps closed alerts this long; Alerts › Done has the same 30 days. */
     public const int ALERT_DAYS = 30;
 
@@ -472,14 +496,7 @@ final class SitePagePresenter
         $end = $isToday ? $now : $day->addDay()->utc();
         $start = $day->subDay()->utc();
         $lines = collect($this->stream->between($viewer, $entries, [(int) $site->id => (string) $site->name], $start, $end, true, 600))
-            ->filter(fn (array $line): bool => match ($what) {
-                'alerts' => in_array($line['kind'], ['alert', 'hs'], true),
-                'alarm' => $line['kind'] === 'alarm',
-                'modes' => $line['kind'] === 'mode',
-                'devices' => in_array($line['kind'], ['device', 'planned'], true),
-                'people' => $line['by'] !== null,
-                default => true,
-            })
+            ->filter(fn (array $line): bool => self::matchesLogbookWhat($line, $what))
             ->values();
         $in = fn (CarbonImmutable $from, CarbonImmutable $to): array => $lines
             ->filter(fn (array $line): bool => $line['at'] !== null && CarbonImmutable::parse($line['at'])->gte($from) && CarbonImmutable::parse($line['at'])->lt($to))

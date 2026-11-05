@@ -20,7 +20,7 @@ use Inertia\Response;
  */
 final class SensorTrackerPageController extends Controller
 {
-    private const array SENSOR_PROPS = ['device', 'tab', 'tabs', 'range', 'meters', 'can', 'readings', 'alerts'];
+    private const array SENSOR_PROPS = ['device', 'tab', 'tabs', 'range', 'meters', 'can', 'nights', 'readings', 'alerts', 'care'];
 
     private const array TRACKER_PROPS = ['device', 'tab', 'tabs', 'meters', 'can', 'privacy', 'commands', 'location', 'console'];
 

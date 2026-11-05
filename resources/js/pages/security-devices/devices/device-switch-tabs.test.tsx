@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import axios from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DevicePage from './device';
@@ -23,7 +23,7 @@ vi.mock('@/layouts/app-layout', () => ({
 }));
 vi.mock('axios', async () => {
     const actual = await vi.importActual<typeof import('axios')>('axios');
-    return { default: { ...actual.default, put: vi.fn(), post: vi.fn(), get: vi.fn(), isAxiosError: actual.default.isAxiosError } };
+    return { default: { ...actual.default, put: vi.fn(), patch: vi.fn(), post: vi.fn(), get: vi.fn(), isAxiosError: actual.default.isAxiosError } };
 });
 
 const TABS = [
@@ -125,7 +125,10 @@ const settings: SettingsTab = {
     edit: { domain: 'it_infrastructure', category: 'network', subcategory: 'switch' },
 };
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.removeItem('sd.device.ports.columns');
+});
 afterEach(cleanup);
 
 describe('Switch · Ports tab (pg-sdr-3d)', () => {
@@ -152,6 +155,24 @@ describe('Switch · Ports tab (pg-sdr-3d)', () => {
         expect(screen.getByText(/Oblivion doesn’t do this, or restart the switch/)).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /power|restart|turn (on|off)/i })).not.toBeInTheDocument();
         expect(screen.getByText('Port 4 · Synthetic back yard camera')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+    });
+
+    it('hides optional port columns chosen off in Columns while keeping Port and Plugged in', () => {
+        render(<DevicePage {...pageFixture({ tab: 'ports', tabs: TABS, ports })} />);
+        expect(within(screen.getByRole('table')).getByText('Power (PoE)')).toBeInTheDocument();
+        expect(within(screen.getByRole('table')).getByText('Speed')).toBeInTheDocument();
+
+        window.localStorage.setItem('sd.device.ports.columns', JSON.stringify(['port', 'plugged_in', 'errors', 'changed']));
+        cleanup();
+
+        render(<DevicePage {...pageFixture({ tab: 'ports', tabs: TABS, ports })} />);
+        const table = screen.getByRole('table');
+        expect(within(table).getByText('Port')).toBeInTheDocument();
+        expect(within(table).getByText('Plugged in')).toBeInTheDocument();
+        expect(within(table).getByText('Errors')).toBeInTheDocument();
+        expect(within(table).queryByText('Power (PoE)')).not.toBeInTheDocument();
+        expect(within(table).queryByText('Speed')).not.toBeInTheDocument();
     });
 });
 
@@ -240,5 +261,72 @@ describe('Switch · Settings tab (pg-sdr-3f)', () => {
         expect(screen.queryByRole('button', { name: 'Remove device' })).not.toBeInTheDocument();
         expect(screen.getByText('Synthetic SW-24')).toBeInTheDocument();
         expect(screen.getByText(/by Synthetic Adder, from a scan/)).toBeInTheDocument();
+    });
+
+    it('saves update summary, looked-after person and IT-admin-only SSH user without exposing SSH user to others', async () => {
+        vi.mocked(axios.patch).mockResolvedValue({ data: { ok: true, changed: ['looked_after_by_user_id', 'ssh_user', 'tell_it_update_ready'] } });
+
+        // Without terminal permission (ssh: null): SSH user row is hidden.
+        const { unmount } = render(
+            <DevicePage
+                {...pageFixture({
+                    tab: 'settings',
+                    tabs: TABS,
+                    settings: { ...settings, ssh: null },
+                })}
+            />,
+        );
+        expect(screen.queryByLabelText(/^SSH user/)).not.toBeInTheDocument();
+        unmount();
+
+        // IT admin + device editor sees Looked after by, SSH user, and Tell IT when an update is ready.
+        render(
+            <DevicePage
+                {...pageFixture({
+                    tab: 'settings',
+                    tabs: [...TABS, { key: 'terminal', label: 'Terminal' }],
+                    settings: {
+                        ...settings,
+                        watching: { ...settings.watching, tell_it_update_ready: true },
+                        about: { ...settings.about, looked_after_by: null },
+                        staff_options: [
+                            { id: 12, name: 'Jordan Peri', sub: 'IT', label: 'Jordan Peri, IT' },
+                            { id: 15, name: 'Ana Ruha', sub: 'House lead', label: 'Ana Ruha, House lead' },
+                        ],
+                        ssh: { user: null },
+                        it: [
+                            ['MAC', '74:ac:b9:00:00:01'],
+                            ['Software', '6.6.61 · 6.6.65 ready'],
+                            ['SSH user', 'From the saved login'],
+                        ],
+                    },
+                })}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('combobox', { name: 'Looked after by' }));
+        fireEvent.click(await screen.findByText('Jordan Peri'));
+        fireEvent.change(screen.getByLabelText(/^SSH user/), { target: { value: 'netadmin' } });
+        fireEvent.click(screen.getByRole('switch', { name: 'Tell IT when an update is ready' }));
+
+        expect(screen.getByText('3 changes not saved')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
+        const dialog = screen.getByRole('dialog');
+        expect(within(dialog).getByText('Save 3 changes to Synthetic switch?')).toBeInTheDocument();
+        expect(within(dialog).getByText(/Not set → Jordan Peri, IT/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/From the saved login → netadmin/)).toBeInTheDocument();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+        await waitFor(() => {
+            expect(axios.patch).toHaveBeenCalledWith(
+                '/security-devices/devices/41/settings',
+                {
+                    looked_after_by_user_id: 12,
+                    ssh_user: 'netadmin',
+                    tell_it_update_ready: false,
+                },
+                expect.anything(),
+            );
+        });
     });
 });

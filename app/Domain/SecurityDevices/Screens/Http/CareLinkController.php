@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Screens\Http;
 use App\Domain\SecurityDevices\Care\DevicePersonLinks;
 use App\Domain\SecurityDevices\Care\Models\DevicePersonLink;
 use App\Domain\SecurityDevices\Care\ScaldWatch;
+use App\Domain\SecurityDevices\Iot\Readings\SensorAlertRules;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -12,14 +13,15 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
 /**
- * S&D Phase F: link a sensor to a person's care (pop-up 65), unlink it, and turn a hot-water
- * probe's scald watch on or off. Every check lives in DevicePersonLinks and ScaldWatch.
+ * S&D Phase F + E6: link a sensor to a person's care (pop-up 65), unlink it, turn a hot-water
+ * probe's scald watch on or off, and update a sensor's configurable alert limits.
  */
 final class CareLinkController extends Controller
 {
     public function __construct(
         private readonly DevicePersonLinks $links,
         private readonly ScaldWatch $scald,
+        private readonly SensorAlertRules $alertRules,
     ) {}
 
     /** Pop-up 65's people, their consent state and care plans. */
@@ -68,6 +70,17 @@ final class CareLinkController extends Controller
         $this->scald->set($this->user($request), $device, (bool) $validated['on']);
 
         return response()->json(['on' => (bool) $validated['on']]);
+    }
+
+    public function alertLimits(Request $request, Device $device): JsonResponse
+    {
+        $validated = $request->validate([
+            'metrics' => ['nullable', 'array'],
+            'battery' => ['nullable', 'array'],
+        ]);
+        $this->alertRules->update($this->user($request), $device, $validated);
+
+        return response()->json(['message' => 'Alert limits saved.']);
     }
 
     private function user(Request $request): User

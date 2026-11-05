@@ -7,12 +7,16 @@ use App\Domain\SecurityDevices\Alerts\ItOnCall;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlertEvent;
 use App\Domain\SecurityDevices\Alerts\Models\OnCallHandover;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Domain\SecurityDevices\Setup\Models\SecurityDeviceSetting;
 use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -25,22 +29,34 @@ final class OnCallPresenter
     /** The IT alerts that go to the person on call first. */
     public const array KINDS = DeviceAlertEngine::ON_CALL_KINDS;
 
+    public const int HANDOVERS_PER_PAGE = 20;
+
+    private const array WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
     public function __construct(
         private readonly ItOnCall $onCall,
         private readonly SecurityDevicesSettings $settings,
+        private readonly SecurityDevicesAccessService $access,
     ) {}
 
     /**
      * @param  Builder<DeviceAlert>  $alerts  the viewer's alerts (their Sites' devices)
      * @return array<string, mixed>
      */
-    public function present(User $viewer, Builder $alerts, CarbonImmutable $now): array
+    public function present(User $viewer, Builder $alerts, CarbonImmutable $now, ?int $siteFilter = null): array
     {
         $shifts = $this->onCall->shifts($now->subDays(7), $now->addDays(14));
-        $current = $shifts->first(fn (Shift $shift): bool => $shift->starts_at <= $now && $shift->ends_at > $now);
+        $coveringNow = $shifts->filter(fn (Shift $shift): bool => $shift->starts_at <= $now && $shift->ends_at > $now)->values();
+        $current = $coveringNow->first();
+        $backup = $current === null
+            ? null
+            : $coveringNow->first(fn (Shift $shift): bool => (int) $shift->user_id !== (int) $current->user_id);
         $later = $shifts->filter(fn (Shift $shift): bool => $shift->starts_at > $now)->values();
         $earlier = $shifts->filter(fn (Shift $shift): bool => $shift->ends_at <= $now)->sortByDesc('ends_at')->values();
-        $people = collect([$current, $later->first(), $later->get(1), $current === null ? $earlier->first() : null])
+        $picked = $backup !== null
+            ? [$current, $later->first(), $backup, $later->get(1)]
+            : [$current, $later->first(), $later->get(1), $current === null ? $earlier->first() : null];
+        $people = collect($picked)
             ->filter()
             ->unique('id')
             ->take(3)
@@ -48,15 +64,17 @@ final class OnCallPresenter
                 'id' => (int) $shift->id,
                 'name' => (string) $shift->staff?->name,
                 'role' => $this->roleLabel($shift->staff),
-                'when' => $shift === $current ? 'now' : ($shift->starts_at > $now ? 'next' : 'before'),
+                'when' => $shift === $current ? 'now' : ($shift === $backup ? 'backup' : ($shift->starts_at > $now ? 'next' : 'before')),
                 'from' => CarbonImmutable::parse($shift->starts_at)->utc()->toIso8601String(),
                 'to' => CarbonImmutable::parse($shift->ends_at)->utc()->toIso8601String(),
+                'days' => $shift === $current ? $this->weekDays($shift, $now) : null,
             ])
             ->values()
             ->all();
 
         $roleName = $this->settings->role(SecurityDevicesSettings::DEVICES_ROLE);
         $readsNotes = $viewer->canDo('securityDevices.alerts.acknowledge');
+        $notes = $readsNotes ? $this->visibleHandovers($viewer) : collect();
 
         return [
             'now' => $current === null ? null : [
@@ -66,8 +84,10 @@ final class OnCallPresenter
             ],
             'people' => $people,
             'role' => $roleName === null ? null : (string) (Role::query()->where('name', $roleName)->value('label') ?: $roleName),
-            'handover' => $readsNotes ? $this->handover() : null,
+            'handover' => $notes->isEmpty() ? null : $this->formatHandover($notes->first()),
+            'handover_count' => $notes->count(),
             'waiting' => $this->waiting($alerts),
+            'summary' => $this->summary($viewer, $now, $siteFilter),
             'delivery' => $this->delivery(),
             'can' => [
                 'rostering' => $viewer->canDo('rostering.viewAny'),
@@ -75,6 +95,78 @@ final class OnCallPresenter
                 'setup' => $viewer->canDo('securityDevices.monitoring.manage'),
             ],
         ];
+    }
+
+    /**
+     * Read-only "All handovers" page (pg-sdr-13d), newest first, scoped to the viewer's Sites.
+     *
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
+     */
+    public function presentHandovers(User $viewer, array $query = []): array
+    {
+        $search = is_string($query['q'] ?? null) ? trim($query['q']) : '';
+        $needle = mb_strtolower($search);
+        $notes = $this->visibleHandovers($viewer)
+            ->when($needle !== '', fn (Collection $rows): Collection => $rows->filter(function (OnCallHandover $note) use ($needle): bool {
+                $haystack = mb_strtolower(implode(' ', array_filter([
+                    $note->from?->name,
+                    $note->to?->name,
+                    $note->still_open,
+                    $note->coming_up,
+                    $note->good_to_know,
+                ])));
+
+                return str_contains($haystack, $needle);
+            })->values());
+
+        $total = $notes->count();
+        $lastPage = max(1, (int) ceil($total / self::HANDOVERS_PER_PAGE));
+        $page = min($lastPage, max(1, (int) ($query['page'] ?? 1)));
+        $offset = ($page - 1) * self::HANDOVERS_PER_PAGE;
+        $slice = $notes->slice($offset, self::HANDOVERS_PER_PAGE)->values();
+
+        return [
+            'rows' => $slice->map(fn (OnCallHandover $note): array => [
+                'id' => (int) $note->id,
+                ...$this->formatHandover($note),
+            ])->all(),
+            'meta' => [
+                'total' => $total,
+                'page' => $page,
+                'last_page' => $lastPage,
+                'from' => $total === 0 ? 0 : $offset + 1,
+                'to' => min($total, $offset + $slice->count()),
+            ],
+            'q' => $search,
+        ];
+    }
+
+    /**
+     * Monday–Sunday of the current NZ week for the active on-call shift (pg-sdr-13d).
+     *
+     * @return list<array{label: string, state: 'done'|'now'|'upcoming'|'off'}>
+     */
+    private function weekDays(Shift $shift, CarbonImmutable $now): array
+    {
+        $zone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $today = $now->setTimezone($zone)->startOfDay();
+        $monday = $today->startOfWeek(CarbonInterface::MONDAY);
+        $from = CarbonImmutable::parse($shift->starts_at)->setTimezone($zone);
+        $to = CarbonImmutable::parse($shift->ends_at)->setTimezone($zone);
+
+        $days = [];
+        foreach (self::WEEK_DAYS as $index => $label) {
+            $dayStart = $monday->addDays($index);
+            $dayEnd = $dayStart->addDay();
+            $covered = $from->lt($dayEnd) && $to->gt($dayStart);
+            $state = ! $covered
+                ? 'off'
+                : ($dayStart->isSameDay($today) ? 'now' : ($dayStart->lt($today) ? 'done' : 'upcoming'));
+            $days[] = ['label' => $label, 'state' => $state];
+        }
+
+        return $days;
     }
 
     private function roleLabel(?User $user): ?string
@@ -88,15 +180,41 @@ final class OnCallPresenter
         return $role === null ? null : (string) ($role->label ?: ucfirst(str_replace('_', ' ', (string) $role->name)));
     }
 
-    /** @return array{from: string, to: string|null, at: string, still_open: string|null, coming_up: string|null, good_to_know: string|null}|null */
-    private function handover(): ?array
+    /** @return Collection<int, OnCallHandover> */
+    private function visibleHandovers(User $viewer): Collection
     {
         if (! Schema::hasTable('security_device_on_call_handovers')) {
-            return null;
+            return collect();
         }
-        $note = OnCallHandover::query()->with(['from:id,name', 'to:id,name'])->latest('id')->first();
+        $rows = OnCallHandover::query()
+            ->with(['from:id,name,approved_at', 'to:id,name,approved_at'])
+            ->orderByDesc('id')
+            ->limit(500)
+            ->get();
+        if ($this->access->canViewAllSites($viewer)) {
+            return $rows;
+        }
+        $viewerSites = $this->access->accessibleSiteIds($viewer);
+        $sharesSiteCache = [];
+        $sharesSite = function (?User $person) use ($viewerSites, &$sharesSiteCache): bool {
+            if (! $person instanceof User || $viewerSites === []) {
+                return false;
+            }
 
-        return $note === null ? null : [
+            return $sharesSiteCache[$person->id] ??= array_intersect($viewerSites, $this->access->accessibleSiteIds($person)) !== [];
+        };
+
+        return $rows->filter(fn (OnCallHandover $note): bool => (int) $note->from_user_id === (int) $viewer->id
+            || (int) $note->to_user_id === (int) $viewer->id
+            || $sharesSite($note->from)
+            || $sharesSite($note->to))
+            ->values();
+    }
+
+    /** @return array{from: string, to: string|null, at: string, still_open: string|null, coming_up: string|null, good_to_know: string|null} */
+    private function formatHandover(OnCallHandover $note): array
+    {
+        return [
             'from' => (string) $note->from?->name,
             'to' => $note->to?->name,
             'at' => CarbonImmutable::parse($note->created_at)->utc()->toIso8601String(),
@@ -127,6 +245,12 @@ final class OnCallPresenter
             ->orderBy('at')
             ->get(['alert_id', 'at'])
             ->groupBy('alert_id');
+        $held = $open->isEmpty() ? [] : DeviceAlertEvent::query()
+            ->whereIn('alert_id', $open->pluck('id'))
+            ->where('kind', 'held')
+            ->pluck('alert_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
 
         return $open->map(fn (DeviceAlert $alert): array => [
             'id' => (int) $alert->id,
@@ -135,7 +259,45 @@ final class OnCallPresenter
             'title' => (string) $alert->title,
             'told_at' => ($at = $told->get($alert->id)?->first()?->at) === null ? null : CarbonImmutable::parse($at)->utc()->toIso8601String(),
             'reminded_at' => $alert->reminded_at === null ? null : CarbonImmutable::parse($alert->reminded_at)->utc()->toIso8601String(),
+            'held' => in_array((int) $alert->id, $held, true),
         ])->values()->all();
+    }
+
+    /** @return array{at: string, text: string}|null */
+    private function summary(User $viewer, CarbonImmutable $now, ?int $siteFilter): ?array
+    {
+        if (! Schema::hasTable('security_device_settings')) {
+            return null;
+        }
+        $last = SecurityDeviceSetting::query()->where('key', DeviceAlertEngine::SUMMARY_LAST)->value('value');
+        if (! is_array($last) || ! is_string($last['day'] ?? null) || ! is_string($last['at'] ?? null) || ! is_array($last['items'] ?? null)) {
+            return null;
+        }
+        $zone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        if ($last['day'] !== $now->setTimezone($zone)->format('Y-m-d')) {
+            return null;
+        }
+        $accessible = $this->access->accessibleSiteIds($viewer);
+        $allowedSites = $siteFilter !== null
+            ? (in_array($siteFilter, $accessible, true) ? [$siteFilter] : [])
+            : $accessible;
+        $labels = collect($last['items'])
+            ->filter(fn (mixed $item): bool => is_array($item)
+                && is_numeric($item['site_id'] ?? null)
+                && in_array((int) $item['site_id'], $allowedSites, true)
+                && is_string($item['label'] ?? null)
+                && trim($item['label']) !== '')
+            ->map(fn (array $item): string => (string) $item['label'])
+            ->values()
+            ->all();
+        if ($labels === []) {
+            return null;
+        }
+        $text = count($labels) <= 3
+            ? implode(' · ', $labels)
+            : implode(' · ', array_slice($labels, 0, 3)).' · and '.(count($labels) - 3).' more';
+
+        return ['at' => $last['at'], 'text' => $text];
     }
 
     /** The same switches as Setup › Alerts & checks. Text messages need a provider first (D13). @return list<array<string, mixed>> */
@@ -149,6 +311,12 @@ final class OnCallPresenter
                 'when' => 'A device or hub stops answering',
                 'sub' => 'Or a check fails · everyone in the IT role is reminded after an hour if nobody acknowledges',
                 'app' => $on(SecurityDevicesSettings::DEVICES_APP), 'email' => $on(SecurityDevicesSettings::DEVICES_EMAIL), 'push' => $on(SecurityDevicesSettings::DEVICES_PUSH),
+            ],
+            [
+                'key' => 'summary',
+                'when' => 'Daily summary',
+                'sub' => 'Low batteries, overnight alerts and hub updates, at 6:00 am',
+                'app' => $on(SecurityDevicesSettings::SUMMARY_APP), 'email' => $on(SecurityDevicesSettings::SUMMARY_EMAIL), 'push' => $on(SecurityDevicesSettings::SUMMARY_PUSH),
             ],
             [
                 'key' => 'logins',

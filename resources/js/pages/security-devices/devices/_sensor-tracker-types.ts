@@ -51,7 +51,7 @@ export type AlertLine = {
 /*  Sensor                                                             */
 /* ------------------------------------------------------------------ */
 
-export type SensorTab = 'readings' | 'alerts';
+export type SensorTab = 'nights' | 'readings' | 'alerts';
 export type SensorRange = '24h' | '7d' | '30d';
 
 export type SensorMeter = {
@@ -73,24 +73,96 @@ export type SensorSeries = {
     limits: { value: number; label: string }[];
 };
 
+export type SensorRuleRow = {
+    key?: string;
+    label: string;
+    hint: string;
+    enabled?: boolean;
+};
+
+export type SensorEditableMetricRule = {
+    key: string;
+    label: string;
+    unit: string;
+    mode: 'range' | 'threshold';
+    enabled: boolean;
+    below: number | null;
+    above: number | null;
+    warning_at: number | null;
+    critical_at: number | null;
+};
+
+export type SensorEditableRules = {
+    metrics: SensorEditableMetricRule[];
+    battery: { enabled: boolean; below: number } | null;
+};
+
+export type SensorNightsData = {
+    care_banner: {
+        kicker: string;
+        title: string;
+        sub: string;
+        night_hours: string;
+        person_href: string | null;
+    } | null;
+    can_link: boolean;
+    last_night: {
+        sub: string;
+        items: { key: string; time: string; tone: SgTone; title: string; sub: string | null }[];
+        empty: string | null;
+    };
+    seven_nights: {
+        labels: string[];
+        values: number[];
+        note: string;
+    };
+    readiness: {
+        passed: number;
+        of: number;
+        label: string;
+        sub: TimedText;
+        checks: { state: SgTone; label: string; note: string | null }[];
+    };
+    person_card: {
+        name: string;
+        sub: string | null;
+        flag: string;
+        href: string | null;
+        key_worker: string | null;
+    } | null;
+    what_it_senses: FactLine[];
+};
+
+export type SensorScaldAlert = {
+    id: number;
+    title: string;
+    opened_at: string | null;
+    hazard_raised: boolean;
+    hazard_url: string | null;
+    can_raise_hazard: boolean;
+    alert_href: string;
+};
+
 export type SensorPageProps = {
     device: PageDevice;
     tab: SensorTab;
     tabs: { key: SensorTab; label: string }[];
     range: SensorRange;
     meters: SensorMeter[];
-    can: PageCan;
+    can: PageCan & { manage_rules?: boolean };
+    nights?: SensorNightsData | null;
     readings: {
         series: SensorSeries[];
-        rules: { label: string; hint: string }[];
+        rules: SensorRuleRow[];
+        editable_rules?: SensorEditableRules | null;
         where: { rows: FactLine[]; gateway_href: string | null };
     } | null;
     alerts: AlertLine[] | null;
-    /** S&D Phase F (7b, 7c, pop-up 65): the person this sensor is linked to, and the scald watch. */
+    /** S&D Phase F + E6 (7b, 7c, pop-up 65): the person this sensor is linked to, and the scald watch. */
     care?: {
         link: { title: string; rule: string | null; plan: string | null; person_href: string | null; linked_at: string | null } | null;
         can_link: boolean;
-        scald: { on: boolean; can_change: boolean } | null;
+        scald: { on: boolean; can_change: boolean; alert?: SensorScaldAlert | null } | null;
     };
     deviceForm?: DeviceFormData;
 };
