@@ -41,14 +41,11 @@ type Draft = {
     name: string;
     room: string;
     lookedAfterId: number | null;
-    sshUser: string;
     watch: boolean;
     offline: boolean;
     updateReady: boolean;
 };
 type Change = { key: keyof Draft; label: string; from: string; to: string; loosens: string | null };
-
-const SSH_USER_RE = /^[a-zA-Z0-9._-]{1,64}$/;
 
 function onOff(value: boolean): string {
     return value ? 'On' : 'Off';
@@ -178,14 +175,12 @@ export function SettingsTabView({
     const noun = settings.noun;
     const watching = settings.watching;
     const staffOptions = useMemo(() => settings.staff_options ?? [], [settings.staff_options]);
-    const canSsh = settings.ssh !== undefined && settings.ssh !== null;
     const savedLookedAfterLabel = settings.about.looked_after_by?.label ?? null;
     const saved: Draft = useMemo(
         () => ({
             name: settings.name,
             room: settings.room ?? '',
             lookedAfterId: settings.about.looked_after_by?.id ?? null,
-            sshUser: settings.ssh?.user ?? '',
             watch: watching.on,
             offline: watching.offline_alert,
             updateReady: watching.tell_it_update_ready ?? true,
@@ -194,7 +189,6 @@ export function SettingsTabView({
             settings.name,
             settings.room,
             settings.about.looked_after_by?.id,
-            settings.ssh?.user,
             watching.on,
             watching.offline_alert,
             watching.tell_it_update_ready,
@@ -233,15 +227,6 @@ export function SettingsTabView({
             label: 'Looked after by',
             from: labelForStaff(saved.lookedAfterId),
             to: labelForStaff(draft.lookedAfterId),
-            loosens: null,
-        });
-    }
-    if (canSsh && draft.sshUser.trim() !== saved.sshUser) {
-        changes.push({
-            key: 'sshUser',
-            label: 'SSH user',
-            from: saved.sshUser || 'From the saved login',
-            to: draft.sshUser.trim() || 'From the saved login',
             loosens: null,
         });
     }
@@ -304,11 +289,6 @@ export function SettingsTabView({
             setError('Choose why it’s no longer watched.');
             return;
         }
-        const trimmedSsh = draft.sshUser.trim();
-        if (canSsh && trimmedSsh !== saved.sshUser && trimmedSsh !== '' && !SSH_USER_RE.test(trimmedSsh)) {
-            setError('Enter an SSH username (letters, numbers, dots, hyphens or underscores only, up to 64 characters — never a password).');
-            return;
-        }
         setSaving(true);
         setError(null);
         const base = `/security-devices/devices/${device.id}`;
@@ -333,9 +313,6 @@ export function SettingsTabView({
             const extraPayload: Record<string, unknown> = {};
             if (changes.some((change) => change.key === 'lookedAfterId')) {
                 extraPayload.looked_after_by_user_id = draft.lookedAfterId;
-            }
-            if (canSsh && changes.some((change) => change.key === 'sshUser')) {
-                extraPayload.ssh_user = trimmedSsh || null;
             }
             if (changes.some((change) => change.key === 'updateReady')) {
                 extraPayload.tell_it_update_ready = draft.updateReady;
@@ -367,7 +344,6 @@ export function SettingsTabView({
     const nameChanged = draft.name.trim() !== saved.name;
     const roomChanged = draft.room.trim() !== saved.room;
     const lookedAfterChanged = draft.lookedAfterId !== saved.lookedAfterId;
-    const sshChanged = canSsh && draft.sshUser.trim() !== saved.sshUser;
     const watchChanged = draft.watch !== saved.watch;
     const offlineChanged = !watchChanged && draft.offline !== saved.offline;
     const updateReadyChanged = draft.updateReady !== saved.updateReady;
@@ -480,32 +456,6 @@ export function SettingsTabView({
                                 }
                             />
                         ) : null}
-                        {canSsh ? (
-                            <Changed changed={sshChanged}>
-                                <SettingRow
-                                    label={<RowLabel label="SSH user" changed={sshChanged} />}
-                                    hint={
-                                        sshChanged
-                                            ? `Was ${saved.sshUser || 'from the saved login'} · username only, never a password`
-                                            : 'Username only, never a password · leave blank to use the saved login'
-                                    }
-                                    htmlFor="sd-settings-ssh-user"
-                                    control={
-                                        <Input
-                                            id="sd-settings-ssh-user"
-                                            type="text"
-                                            autoComplete="off"
-                                            spellCheck={false}
-                                            className="h-9 w-64 max-w-full"
-                                            value={draft.sshUser}
-                                            maxLength={64}
-                                            placeholder="From the saved login"
-                                            onChange={(event) => set('sshUser', event.target.value)}
-                                        />
-                                    }
-                                />
-                            </Changed>
-                        ) : null}
                         {settings.read_through ? <SettingRow label="Read through" hint="How Oblivion reads it" control={<ReadOnly>{settings.read_through}</ReadOnly>} /> : null}
                     </SettingGroup>
 
@@ -589,7 +539,7 @@ export function SettingsTabView({
                         action={onRemove ? { label: 'Remove device', onClick: onRemove } : null}
                     />
 
-                    {can.edit || can.watch || canSsh ? (
+                    {can.edit || can.watch ? (
                         <SaveBar
                             count={changes.length}
                             onDiscard={() => setDraft(saved)}

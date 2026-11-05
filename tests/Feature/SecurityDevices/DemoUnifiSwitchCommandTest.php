@@ -134,7 +134,8 @@ it('idempotently seeds one demo UniFi switch whose Ports, History and Settings t
             ->where('tab', 'settings')
             ->where('settings.watching.tell_it_update_ready', true)
             ->where('settings.about.looked_after_by.id', $itAdmin->id)
-            ->where('settings.ssh.user', 'ubnt-admin'));
+            // Audit fix (5 Nov): the SSH user comes from the saved login; nothing here overrides it.
+            ->where('settings.ssh', null));
 
     foreach (['overview', 'ports', 'history', 'settings'] as $tab) {
         $this->actingAs($otherViewer)

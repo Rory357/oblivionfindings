@@ -25,11 +25,38 @@ use Illuminate\Support\Facades\Gate;
  * in/out-of-bed log, minutes out of bed over the last 7 nights, and the 4-check readiness ring.
  *
  * Built strictly from readings and records already stored (`security_device_sensor_readings`,
- * `DevicePersonLink`, `CarePlan`, `ClientConsent`, `Shift`, `DeviceAlert`). A resident's name and
- * record link are included only when the viewer may open that resident's record (`Gate::allows('view', $client)`).
+ * `DevicePersonLink`, `CarePlan`, `ClientConsent`, `Shift`, `DeviceAlert`).
+ *
+ * Privacy: in/out of bed is about one resident, so the page shows any of it only when `mayShow()`
+ * says so: the viewer may open that resident's record AND their consent to monitoring sensors is
+ * active. Inside, resident details stay hidden from anyone who can't open the record.
+ *
+ * Truth: a state is claimed only from a reading. Time the state isn't known (before the first
+ * reading, or while the sensor was offline) is never counted as in bed. "Night staff told" is said
+ * only when a stored out-of-bed alert matches that time out of bed.
+ *
+ * @phpstan-type OccupancyRow object{value: float, at: CarbonImmutable}
+ * @phpstan-type OfflineSpell array{from: CarbonImmutable, to: CarbonImmutable, open: bool}
+ * @phpstan-type NightHistory array{rows: Collection<int, object{value: float, at: CarbonImmutable}>, offline: list<array{from: CarbonImmutable, to: CarbonImmutable, open: bool}>, alerts: Collection<int, DeviceAlert>}
+ * @phpstan-type Episode array{from: CarbonImmutable, to: CarbonImmutable, minutes: int, back: bool, end: string, from_start: bool, alert: DeviceAlert|null}
  */
 final class SensorNightsPresenter
 {
+    /** Days of readings loaded: 7 nights plus the one that may be in progress, plus a margin. */
+    private const int HISTORY_DAYS = 9;
+
+    /** The newest readings kept when a chatty sensor sends more than this in HISTORY_DAYS. */
+    private const int ROW_LIMIT = 10_000;
+
+    /**
+     * A reading older than this before the night starts doesn't tell the state at its start: a
+     * sensor that has sent nothing for a whole day may have stopped, so nothing is claimed.
+     */
+    private const int STATE_KEPT_HOURS = 24;
+
+    /** Roster shifts that count as filled: scheduled or started (never cancelled, draft or no-show). */
+    private const array ROSTERED_STATES = ['scheduled', 'in_progress'];
+
     public function __construct(
         private readonly SensorMonitoringConsent $consent,
     ) {}
@@ -48,13 +75,48 @@ final class SensorNightsPresenter
     }
 
     /**
+     * Whether the viewer may see this bed sensor's nights at all (the Nights tab and the bed meters):
+     * only when they may open the linked resident's record and the resident's consent to monitoring
+     * sensors is active. An unlinked bed sensor shows the ordinary sensor page.
+     */
+    public function mayShow(User $viewer, ?DevicePersonLink $link): bool
+    {
+        $client = $link?->client;
+        if (! $client instanceof Client || ! Gate::forUser($viewer)->allows('view', $client)) {
+            return false;
+        }
+
+        return $this->consent->state($client)['active'];
+    }
+
+    /**
+     * Everything stored that the meters and the Nights tab read, loaded once per page: bed readings,
+     * offline spells, and (only for viewers who may see alerts) the out-of-bed alerts with who was told.
+     *
+     * @return NightHistory
+     */
+    public function history(Device $device, bool $canSeeAlerts, CarbonImmutable $now): array
+    {
+        $fromUtc = $now->utc()->subDays(self::HISTORY_DAYS);
+        $toUtc = $now->utc();
+
+        return [
+            'rows' => $this->occupancyRows((int) $device->id, $fromUtc, $toUtc),
+            'offline' => $this->offlineSpells((int) $device->id, $fromUtc, $toUtc),
+            'alerts' => $canSeeAlerts ? $this->outOfBedAlerts((int) $device->id, $fromUtc) : collect(),
+        ];
+    }
+
+    /**
      * Header meters for drawing 7b: Right now · Last night · Alerts in 7 nights.
      *
+     * @param  NightHistory  $history
      * @return list<array<string, mixed>>
      */
     public function meters(
         Device $device,
         ?DevicePersonLink $link,
+        array $history,
         bool $canSeeAlerts,
         CarbonImmutable $now,
     ): array {
@@ -63,39 +125,44 @@ final class SensorNightsPresenter
         $to = (string) ($rule['to'] ?? '06:00');
         $limitMinutes = max(1, (int) ($rule['minutes'] ?? 10));
 
-        $rows = $this->occupancyRows((int) $device->id, $now->subDays(9), $now);
-        $rightNow = $this->rightNowMeter($device, $rows, $rule, $now);
+        $rightNow = $this->rightNowMeter($device, $history, $rule, $now);
 
         [$nightStart, $nightEnd] = $this->lastNightWindow($now, $from, $to);
-        $nightSummary = $this->summariseNight($rows, $nightStart, $nightEnd, $now);
-
-        $alertsLastNight = $canSeeAlerts
-            ? DeviceAlert::query()
-                ->where('device_id', $device->id)
-                ->where('kind', 'care_out_of_bed')
-                ->where('opened_at', '>=', $nightStart->utc())
-                ->where('opened_at', '<=', $nightEnd->utc())
-                ->count()
-            : 0;
+        $nightSummary = $this->summariseNight($history, $nightStart, $nightEnd, $now);
+        $alertsLastNight = count(array_filter($nightSummary['episodes'], fn (array $ep): bool => $ep['alert'] !== null));
 
         $lastNightValue = null;
         $lastNightCaption = 'No bed readings recorded';
         if ($nightSummary['has_data']) {
             $count = count($nightSummary['episodes']);
             $lastNightValue = match ($count) {
-                0 => 'In bed all night',
+                0 => $nightSummary['whole_night'] ? 'In bed all night' : 'Not seen out of bed',
                 1 => 'Out once',
                 2 => 'Out twice',
                 default => "Out {$count} times",
             };
             if ($count === 0) {
-                $lastNightCaption = 'Night hours '.self::clockFromHm($from).' – '.self::clockFromHm($to);
+                $lastNightCaption = $nightSummary['whole_night']
+                    ? 'Night hours '.self::clockFromHm($from).' – '.self::clockFromHm($to)
+                    : 'No readings for part of the night';
             } else {
                 $longest = max(array_map(fn (array $ep): int => $ep['minutes'], $nightSummary['episodes']));
-                $alertNote = $canSeeAlerts
-                    ? ($alertsLastNight === 0 ? 'no alert' : ($alertsLastNight === 1 ? '1 alert' : "{$alertsLastNight} alerts"))
-                    : 'under '.$limitMinutes.' min rule';
-                $lastNightCaption = "Longest {$longest} min · {$alertNote}";
+                $parts = ["Longest {$longest} min"];
+                $parts[] = $canSeeAlerts
+                    ? match ($alertsLastNight) {
+                        0 => 'no alert',
+                        1 => '1 alert',
+                        default => "{$alertsLastNight} alerts",
+                    }
+                    : match (true) {
+                        $longest > $limitMinutes => "over the {$limitMinutes} min rule",
+                        $longest === $limitMinutes => "at the {$limitMinutes} min rule",
+                        default => "under the {$limitMinutes} min rule",
+                    };
+                if (! $nightSummary['whole_night']) {
+                    $parts[] = 'gaps in readings';
+                }
+                $lastNightCaption = implode(' · ', $parts);
             }
         }
 
@@ -115,13 +182,11 @@ final class SensorNightsPresenter
         ];
 
         if ($canSeeAlerts) {
-            $weekAlerts = DeviceAlert::query()
-                ->where('device_id', $device->id)
-                ->where('kind', 'care_out_of_bed')
-                ->where('opened_at', '>=', $now->subDays(7))
-                ->orderByDesc('opened_at')
-                ->limit(20)
-                ->get(['id', 'opened_at']);
+            $sevenDaysAgo = $now->utc()->subDays(7);
+            $weekAlerts = $history['alerts']
+                ->filter(fn (DeviceAlert $alert): bool => $alert->opened_at !== null && $alert->opened_at->gte($sevenDaysAgo))
+                ->sortByDesc(fn (DeviceAlert $alert): int => $alert->opened_at?->getTimestamp() ?? 0)
+                ->values();
             $count = $weekAlerts->count();
             $latest = $weekAlerts->first()?->opened_at;
             $meters[] = [
@@ -158,8 +223,10 @@ final class SensorNightsPresenter
     }
 
     /**
-     * Full payload for the "Nights" tab (pg-sdr-7b).
+     * Full payload for the "Nights" tab (pg-sdr-7b). The caller shows it only when `mayShow()`;
+     * resident details are still hidden here from anyone who can't open the record.
      *
+     * @param  NightHistory  $history
      * @param  array{id: int, name: string, state: string, state_label: string}|null  $gateway
      * @return array<string, mixed>
      */
@@ -167,6 +234,7 @@ final class SensorNightsPresenter
         User $viewer,
         Device $device,
         ?DevicePersonLink $link,
+        array $history,
         ?int $siteId,
         ?string $siteName,
         ?array $gateway,
@@ -189,17 +257,17 @@ final class SensorNightsPresenter
         $limitMinutes = max(1, (int) ($rule['minutes'] ?? 10));
         $fromWords = self::clockFromHm($from);
         $toWords = self::clockFromHm($to);
-        $room = trim((string) $device->location_description);
+        // The room says where the resident sleeps: only for viewers who may open their record.
+        $room = $canSeePerson ? trim((string) $device->location_description) : '';
 
-        $rows = $this->occupancyRows((int) $device->id, $now->subDays(9), $now);
         [$lastNightStart, $lastNightEnd] = $this->lastNightWindow($now, $from, $to);
 
         return [
             'care_banner' => $this->careBanner($link, $canSeePerson, $shortName, $siteName, $fromWords, $toWords, $limitMinutes),
             'can_link' => $viewer->canDo('securityDevices.people.link') && ! $retired,
-            'last_night' => $this->lastNightLog($rows, $lastNightStart, $lastNightEnd, $fromWords, $toWords, $limitMinutes, $now),
-            'seven_nights' => $this->sevenNights($device, $rows, $lastNightStart, $from, $to, $canSeeAlerts, $now),
-            'readiness' => $this->readiness($device, $link, $canSeePerson, $shortName, $fullName, $room, $siteId, $from, $to, $lastReadingAt, $now),
+            'last_night' => $this->lastNightLog($history, $lastNightStart, $lastNightEnd, $fromWords, $toWords, $limitMinutes, $canSeeAlerts, $now),
+            'seven_nights' => $this->sevenNights($history, $lastNightStart, $from, $to, $canSeeAlerts, $now),
+            'readiness' => $this->readiness($link, $canSeePerson, $shortName, $fullName, $room, $siteId, $from, $to, $lastReadingAt, $now),
             'person_card' => $this->personCard($link, $canSeePerson, $fullName, $siteName, $room),
             'what_it_senses' => $this->whatItSenses($device, $gateway),
         ];
@@ -243,69 +311,111 @@ final class SensorNightsPresenter
     }
 
     /**
-     * @param  Collection<int, object{value: float, at: CarbonImmutable}>  $rows
+     * @param  NightHistory  $history
      * @return array{sub: string, items: list<array{key: string, time: string, tone: string, title: string, sub: ?string}>, empty: ?string}
      */
     private function lastNightLog(
-        Collection $rows,
+        array $history,
         CarbonImmutable $nightStart,
         CarbonImmutable $nightEnd,
         string $fromWords,
         string $toWords,
         int $limitMinutes,
+        bool $canSeeAlerts,
         CarbonImmutable $now,
     ): array {
         $sub = $nightStart->format('D j').' – '.$nightEnd->format('D j M');
-        $summary = $this->summariseNight($rows, $nightStart, $nightEnd, $now);
+        $summary = $this->summariseNight($history, $nightStart, $nightEnd, $now);
 
         if (! $summary['has_data']) {
             return [
                 'sub' => $sub,
                 'items' => [],
-                'empty' => 'No bed occupancy readings were recorded last night.',
+                'empty' => 'No bed readings were recorded last night.',
             ];
         }
 
+        $startUtc = $nightStart->utc();
+        $endUtc = $nightEnd->utc();
+        $clock = fn (CarbonImmutable $at): string => $at->lte($startUtc) ? $fromWords : $at->setTimezone(CareRules::ZONE)->format('g:i a');
+
+        /** @var list<array{sort: int, item: array{key: string, time: string, tone: string, title: string, sub: ?string}}> $items */
         $items = [];
-        if ($summary['first_in_bed_at'] !== null) {
-            $firstLocal = $summary['first_in_bed_at']->setTimezone(CareRules::ZONE);
-            $atStart = $summary['first_in_bed_at']->lte($nightStart->utc());
-            $items[] = [
+        $backTimes = array_map(fn (array $ep): int => $ep['to']->getTimestamp(), array_filter($summary['episodes'], fn (array $ep): bool => $ep['back']));
+        if ($summary['start_state'] === true) {
+            $items[] = ['sort' => $startUtc->getTimestamp(), 'item' => [
                 'key' => 'in-bed-start',
-                'time' => $atStart ? $fromWords : $firstLocal->format('g:i a'),
+                'time' => $fromWords,
                 'tone' => 'success',
                 'title' => 'In bed',
-                'sub' => $atStart ? 'Already in bed when night hours started' : "Night hours started at {$fromWords}",
-            ];
+                'sub' => 'Already in bed when night hours started',
+            ]];
+        } elseif ($summary['first_in_bed_at'] !== null && ! in_array($summary['first_in_bed_at']->getTimestamp(), $backTimes, true)) {
+            $items[] = ['sort' => $summary['first_in_bed_at']->getTimestamp(), 'item' => [
+                'key' => 'in-bed-start',
+                'time' => $clock($summary['first_in_bed_at']),
+                'tone' => 'success',
+                'title' => 'In bed',
+                'sub' => "Night hours started at {$fromWords}",
+            ]];
         }
 
         foreach ($summary['episodes'] as $index => $ep) {
-            /** @var CarbonImmutable $epFrom */
-            $epFrom = $ep['from'];
-            /** @var CarbonImmutable $epTo */
-            $epTo = $ep['to'];
             $mins = $ep['minutes'];
             $over = $mins >= $limitMinutes;
-            $backClock = $epTo->setTimezone(CareRules::ZONE)->format('g:i a');
+            $endClock = $ep['to']->setTimezone(CareRules::ZONE)->format('g:i a');
 
-            $items[] = [
+            $first = array_values(array_filter([
+                $ep['from_start'] ? 'Already out of bed when night hours started' : null,
+                match ($ep['end']) {
+                    'back' => "Back at {$endClock}",
+                    'offline' => "Sensor went offline at {$endClock}",
+                    'now' => 'Currently out of bed',
+                    default => 'Still out of bed when night hours ended',
+                },
+            ]));
+            $rest = array_values(array_filter([
+                in_array($ep['end'], ['back', 'night_end'], true) || ($ep['end'] === 'now' && $over)
+                    ? match (true) {
+                        $mins > $limitMinutes => "over {$limitMinutes} minutes",
+                        $mins === $limitMinutes => "at the {$limitMinutes}-minute limit",
+                        default => "under {$limitMinutes} minutes",
+                    }
+                    : null,
+                // Who was told comes only from a stored alert that matches this time out of bed.
+                $canSeeAlerts ? ($ep['alert'] !== null ? self::toldWords($ep['alert']) : 'no alert') : null,
+            ]));
+
+            $items[] = ['sort' => $ep['from']->getTimestamp(), 'item' => [
                 'key' => 'out-'.$index,
-                'time' => $epFrom->setTimezone(CareRules::ZONE)->format('g:i a'),
-                'tone' => $over ? 'warning' : 'info',
-                'title' => "Out of bed for {$mins} min",
-                'sub' => $ep['back']
-                    ? ($over
-                        ? "Back at {$backClock} · over {$limitMinutes} minutes, night staff told"
-                        : "Back at {$backClock} · under {$limitMinutes} minutes, no alert")
-                    : ($now->lt($nightEnd->utc()) ? 'Currently out of bed' : 'Still out of bed when night hours ended'),
-            ];
+                'time' => $clock($ep['from']),
+                'tone' => $over || $ep['alert'] !== null ? 'warning' : 'info',
+                'title' => $ep['end'] === 'offline' ? "Out of bed for at least {$mins} min" : "Out of bed for {$mins} min",
+                'sub' => implode(' · ', [...$first, ...($rest !== [] ? [implode(', ', $rest)] : [])]),
+            ]];
         }
 
-        if ($now->gte($nightEnd->utc())) {
-            $upAfter = $rows->first(fn (object $row): bool => $row->at->gte($nightEnd->utc())
+        $effectiveEnd = $now->lt($endUtc) ? $now->utc() : $endUtc;
+        foreach ($summary['gaps'] as $index => $gap) {
+            $items[] = ['sort' => $gap['from']->getTimestamp(), 'item' => [
+                'key' => 'offline-'.$index,
+                'time' => $clock($gap['from']),
+                'tone' => 'none',
+                'title' => 'Sensor offline',
+                'sub' => $gap['to']->lt($effectiveEnd)
+                    ? 'No readings until '.$gap['to']->setTimezone(CareRules::ZONE)->format('g:i a')
+                    : ($now->lt($endUtc) ? 'No readings since then' : 'No readings for the rest of the night'),
+            ]];
+        }
+
+        usort($items, fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
+        $log = array_map(fn (array $row): array => $row['item'], $items);
+
+        if ($now->gte($endUtc)) {
+            $upAfter = $history['rows']->first(fn (object $row): bool => $row->at->gte($endUtc)
                 && $row->at->lte($nightEnd->addHours(6)->utc())
                 && $row->value < 0.5);
-            $items[] = [
+            $log[] = [
                 'key' => 'night-ended',
                 'time' => $toWords,
                 'tone' => 'none',
@@ -318,18 +428,20 @@ final class SensorNightsPresenter
 
         return [
             'sub' => $sub,
-            'items' => $items,
+            'items' => $log,
             'empty' => null,
         ];
     }
 
     /**
-     * @param  Collection<int, object{value: float, at: CarbonImmutable}>  $rows
-     * @return array{labels: list<string>, values: list<int>, note: string}
+     * Minutes out of bed for each of the last 7 nights. A night with no readings is null
+     * ("No readings" on screen), never 0.
+     *
+     * @param  NightHistory  $history
+     * @return array{labels: list<string>, values: list<int|null>, note: string}
      */
     private function sevenNights(
-        Device $device,
-        Collection $rows,
+        array $history,
         CarbonImmutable $lastNightStartLocal,
         string $from,
         string $to,
@@ -343,22 +455,27 @@ final class SensorNightsPresenter
         for ($offset = 6; $offset >= 0; $offset--) {
             $dayLocal = $lastNightStartLocal->subDays($offset)->startOfDay();
             [$startLocal, $endLocal] = self::windowForDay($dayLocal, $from, $to);
-            $summary = $this->summariseNight($rows, $startLocal, $endLocal, $now);
+            $summary = $this->summariseNight($history, $startLocal, $endLocal, $now);
             $labels[] = $startLocal->format('D');
             $values[] = $summary['total_minutes'];
         }
 
-        $note = 'No night alerts in the last 7 nights.';
+        $known = array_values(array_filter($values, fn (?int $value): bool => $value !== null));
+        $missing = count($values) - count($known);
+        $missingWords = match (true) {
+            $missing === 0 => '',
+            $missing === count($values) => ' No bed readings in the last 7 nights.',
+            $missing === 1 => ' No readings on 1 of the 7 nights.',
+            default => " No readings on {$missing} of the 7 nights.",
+        };
+
         if ($canSeeAlerts) {
-            $alerts = DeviceAlert::query()
-                ->with(['acknowledgedBy:id,name'])
-                ->where('device_id', $device->id)
-                ->where('kind', 'care_out_of_bed')
-                ->where('opened_at', '>=', $firstStartUtc)
-                ->orderByDesc('opened_at')
-                ->limit(10)
-                ->get(['id', 'opened_at', 'acknowledged_by_user_id', 'acknowledged_at']);
+            $alerts = $history['alerts']
+                ->filter(fn (DeviceAlert $alert): bool => $alert->opened_at !== null && $alert->opened_at->gte($firstStartUtc))
+                ->sortByDesc(fn (DeviceAlert $alert): int => $alert->opened_at?->getTimestamp() ?? 0)
+                ->values();
             $count = $alerts->count();
+            $note = 'No night alerts in the last 7 nights.';
             if ($count > 0) {
                 $latest = $alerts->first();
                 $when = $latest?->opened_at?->setTimezone(CareRules::ZONE)->format('D j M, g:i a') ?? '';
@@ -369,11 +486,14 @@ final class SensorNightsPresenter
                     ? "One alert in the last 7 nights: {$when}.{$ack}"
                     : "{$count} alerts in the last 7 nights · latest {$when}.{$ack}";
             }
+            $note .= $missingWords;
+        } elseif ($known === []) {
+            $note = 'No bed readings in the last 7 nights.';
         } else {
-            $total = array_sum($values);
-            $note = $total === 0
-                ? '0 minutes out of bed recorded in the last 7 nights.'
-                : "{$total} min out of bed in total across the last 7 nights.";
+            $total = array_sum($known);
+            $note = ($total === 0
+                ? 'No time out of bed recorded at night in the last 7 nights.'
+                : "{$total} min out of bed in total across the last 7 nights.").$missingWords;
         }
 
         return [
@@ -388,12 +508,14 @@ final class SensorNightsPresenter
      *   1. Linked to resident
      *   2. Falls plan in date
      *   3. Consent to monitoring sensors active
-     *   4. Night shift filled on the roster tonight
+     *   4. Night shift filled on the roster tonight (the whole night, not just part of it)
+     *
+     * Plan review dates, the consent date and the room are shown only to viewers who may open the
+     * resident's record.
      *
      * @return array<string, mixed>
      */
     private function readiness(
-        Device $device,
         ?DevicePersonLink $link,
         bool $canSeePerson,
         ?string $shortName,
@@ -410,7 +532,7 @@ final class SensorNightsPresenter
         $check1 = [
             'state' => $linkedOk ? 'success' : 'warning',
             'label' => $linkedOk
-                ? 'Linked to '.$personWords.($room !== '' ? ', '.$room : '')
+                ? 'Linked to '.$personWords.($canSeePerson && $room !== '' ? ', '.$room : '')
                 : 'Not linked to a resident’s falls plan',
             'note' => null,
         ];
@@ -430,7 +552,7 @@ final class SensorNightsPresenter
                 $plan instanceof CarePlan => 'Falls plan not active',
                 default => 'No falls plan linked',
             },
-            'note' => $plan?->next_review_at !== null
+            'note' => $canSeePerson && $plan?->next_review_at !== null
                 ? 'Next review '.CarbonImmutable::parse($plan->next_review_at->toDateString(), CareRules::ZONE)->format('D j M Y')
                 : null,
         ];
@@ -446,7 +568,9 @@ final class SensorNightsPresenter
                 });
             if ($activeConsent instanceof ClientConsent) {
                 $consentOk = true;
-                $consentNote = $activeConsent->given_at?->setTimezone(CareRules::ZONE)->format('D j M Y');
+                $consentNote = $canSeePerson
+                    ? $activeConsent->given_at?->setTimezone(CareRules::ZONE)->format('D j M Y')
+                    : null;
             } else {
                 $state = $this->consent->state($link->client);
                 $consentOk = $state['active'];
@@ -465,9 +589,11 @@ final class SensorNightsPresenter
         $shift = $this->nightRosterShift($siteId, $tonightStart, $tonightEnd, $now);
         $check4 = [
             'state' => $shift['filled'] ? 'success' : 'warning',
-            'label' => $shift['filled']
-                ? 'Night shift filled on the roster tonight'
-                : 'No night shift filled on the roster tonight',
+            'label' => match (true) {
+                $shift['filled'] => 'Night shift filled on the roster tonight',
+                $shift['partial'] => 'Night shift on the roster doesn’t cover the whole night',
+                default => 'No night shift filled on the roster tonight',
+            },
             'note' => $shift['note'],
         ];
 
@@ -486,6 +612,9 @@ final class SensorNightsPresenter
     }
 
     /**
+     * The "Linked to" card. Key worker, the falls-risk flag and the room are the resident's care
+     * details: only for viewers who may open their record.
+     *
      * @return array<string, mixed>|null
      */
     private function personCard(
@@ -499,17 +628,22 @@ final class SensorNightsPresenter
             return null;
         }
         $client = $link->client;
-        $client->loadMissing('keyWorker:id,name');
-        $keyWorker = $client->keyWorker?->name;
+        $keyWorker = null;
+        if ($canSeePerson) {
+            $client->loadMissing('keyWorker:id,name');
+            $keyWorker = $client->keyWorker?->name;
+        }
 
         return [
             'name' => $canSeePerson && $fullName !== null ? $fullName : 'Resident',
-            'sub' => implode(' · ', array_filter([$siteName, $room !== '' ? $room : null])) ?: null,
-            'flag' => match ($link->purpose) {
-                'falls' => 'Falls risk',
-                'wandering' => 'Wandering risk',
-                default => 'Linked sensor',
-            },
+            'sub' => implode(' · ', array_filter([$siteName, $canSeePerson && $room !== '' ? $room : null])) ?: null,
+            'flag' => $canSeePerson
+                ? match ($link->purpose) {
+                    'falls' => 'Falls risk',
+                    'wandering' => 'Wandering risk',
+                    default => 'Linked sensor',
+                }
+                : null,
             'href' => $canSeePerson ? '/clients/'.$client->id : null,
             'key_worker' => $keyWorker !== null && trim($keyWorker) !== '' ? trim($keyWorker) : null,
         ];
@@ -540,13 +674,15 @@ final class SensorNightsPresenter
     }
 
     /**
-     * @param  Collection<int, object{value: float, at: CarbonImmutable}>  $rows
+     * @param  NightHistory  $history
      * @param  array<string, mixed>  $rule
      * @return array<string, mixed>
      */
-    private function rightNowMeter(Device $device, Collection $rows, array $rule, CarbonImmutable $now): array
+    private function rightNowMeter(Device $device, array $history, array $rule, CarbonImmutable $now): array
     {
-        $latestRow = $rows->last();
+        /** @var list<object{value: float, at: CarbonImmutable}> $list */
+        $list = $history['rows']->values()->all();
+        $latestRow = $list === [] ? null : $list[array_key_last($list)];
         $observed = data_get($device->meta, 'observed.sensor_readings.occupancy');
         $inBed = null;
         $latestAt = null;
@@ -559,30 +695,48 @@ final class SensorNightsPresenter
             $latestAt = is_string($observed['observed_at'] ?? null) ? CarbonImmutable::parse($observed['observed_at']) : null;
         }
 
-        if ($inBed === null) {
+        // Offline now, with nothing heard since it went quiet: don't claim in or out of bed.
+        $quietNow = null;
+        foreach ($history['offline'] as $spell) {
+            if ($spell['open'] && ($latestAt === null || $latestAt->lte($spell['from']))) {
+                $quietNow = $spell;
+            }
+        }
+
+        if ($inBed === null || $quietNow !== null) {
             return [
                 'key' => 'right_now',
                 'label' => 'Right now',
                 'value' => null,
                 'from' => null,
                 'ago' => null,
-                'caption' => ['text' => 'No bed reading yet', 'at' => null],
+                'caption' => $quietNow !== null
+                    ? ['text' => 'Sensor offline since {time}', 'at' => $quietNow['from']->toIso8601String()]
+                    : ['text' => 'No bed reading yet', 'at' => null],
                 'tone' => 'brand',
                 'tab' => 'nights',
                 'bar' => null,
             ];
         }
 
-        // Walk back to find when the current in-bed/out-of-bed state started.
+        // Walk back to find when the current in-bed/out-of-bed state started, never past a time the
+        // sensor was offline (the state before it went quiet may not have lasted).
+        $floor = null;
+        foreach ($history['offline'] as $spell) {
+            if (! $spell['open'] && $latestAt !== null && $spell['to']->lte($latestAt) && ($floor === null || $spell['to']->gt($floor))) {
+                $floor = $spell['to'];
+            }
+        }
         $since = $latestAt;
-        for ($i = $rows->count() - 1; $i >= 0; $i--) {
-            /** @var object{value: float, at: CarbonImmutable} $row */
-            $row = $rows->values()->get($i);
-            if (($row->value >= 0.5) === $inBed) {
-                $since = $row->at;
-            } else {
+        for ($i = count($list) - 1; $i >= 0; $i--) {
+            $row = $list[$i];
+            if ($floor !== null && $row->at->lt($floor)) {
                 break;
             }
+            if (($row->value >= 0.5) !== $inBed) {
+                break;
+            }
+            $since = $row->at;
         }
 
         $insideNight = CareRules::insideNight($rule, $now);
@@ -608,88 +762,195 @@ final class SensorNightsPresenter
     }
 
     /**
-     * @param  Collection<int, object{value: float, at: CarbonImmutable}>  $rows
+     * One night window, from readings only:
+     * - the state at the window start is the last reading before it (within STATE_KEPT_HOURS, and
+     *   not while the sensor was offline); out of bed then opens a time out of bed at the window start;
+     * - while offline, the state is unknown until the next reading, and a time out of bed that was
+     *   open is cut at the moment it went quiet (never "back in bed");
+     * - `whole_night` is true only when the state was known for the whole window;
+     * - no known state and no readings at all: `has_data` false and `total_minutes` null.
+     *
+     * @param  NightHistory  $history
      * @return array{
      *     has_data: bool,
+     *     whole_night: bool,
+     *     start_state: bool|null,
      *     first_in_bed_at: CarbonImmutable|null,
-     *     episodes: list<array{from: CarbonImmutable, to: CarbonImmutable, minutes: int, back: bool}>,
-     *     total_minutes: int
+     *     episodes: list<Episode>,
+     *     gaps: list<array{from: CarbonImmutable, to: CarbonImmutable}>,
+     *     total_minutes: int|null
      * }
      */
     private function summariseNight(
-        Collection $rows,
+        array $history,
         CarbonImmutable $nightStartLocal,
         CarbonImmutable $nightEndLocal,
         CarbonImmutable $now,
     ): array {
+        $rows = $history['rows'];
         $startUtc = $nightStartLocal->utc();
         $endUtc = $nightEndLocal->utc();
         $effectiveEndUtc = $now->lt($endUtc) ? $now->utc() : $endUtc;
+        $empty = [
+            'has_data' => false, 'whole_night' => false, 'start_state' => null, 'first_in_bed_at' => null,
+            'episodes' => [], 'gaps' => [], 'total_minutes' => null,
+        ];
 
         if ($effectiveEndUtc->lte($startUtc)) {
-            return ['has_data' => false, 'first_in_bed_at' => null, 'episodes' => [], 'total_minutes' => 0];
+            return $empty;
         }
 
-        $baseline = $rows->last(fn (object $row): bool => $row->at->lte($startUtc));
-        $inside = $rows->filter(fn (object $row): bool => $row->at->gt($startUtc) && $row->at->lte($effectiveEndUtc))->values();
-
-        if ($baseline === null && $inside->isEmpty()) {
-            return ['has_data' => false, 'first_in_bed_at' => null, 'episodes' => [], 'total_minutes' => 0];
-        }
-
-        $inBed = $baseline !== null ? ($baseline->value >= 0.5) : null;
-        $firstInBedAt = $inBed === true ? $startUtc : null;
-        $outSince = null;
-        $episodes = [];
-
-        foreach ($inside as $row) {
-            $rowInBed = $row->value >= 0.5;
-            if ($rowInBed) {
-                if ($firstInBedAt === null) {
-                    $firstInBedAt = $row->at;
+        // Offline spells, clipped to the window.
+        $gaps = [];
+        $offlineAtStart = false;
+        foreach ($history['offline'] as $spell) {
+            $gapFrom = $spell['from']->max($startUtc);
+            $gapTo = $spell['to']->min($effectiveEndUtc);
+            if ($gapTo->gt($gapFrom)) {
+                $gaps[] = ['from' => $gapFrom, 'to' => $gapTo];
+                if ($spell['from']->lte($startUtc)) {
+                    $offlineAtStart = true;
                 }
-                if ($outSince !== null) {
-                    $mins = max(1, (int) round($outSince->diffInSeconds($row->at) / 60));
-                    $episodes[] = ['from' => $outSince, 'to' => $row->at, 'minutes' => $mins, 'back' => true];
-                    $outSince = null;
-                }
-                $inBed = true;
-            } else {
-                if ($outSince === null && ($inBed === true || $baseline === null)) {
-                    $outSince = $row->at;
-                }
-                $inBed = false;
             }
         }
 
-        if ($outSince !== null && $effectiveEndUtc->gt($outSince)) {
-            $mins = max(1, (int) round($outSince->diffInSeconds($effectiveEndUtc) / 60));
-            $episodes[] = ['from' => $outSince, 'to' => $effectiveEndUtc, 'minutes' => $mins, 'back' => false];
+        $keptFrom = $startUtc->subHours(self::STATE_KEPT_HOURS);
+        $baseline = $rows->last(fn (object $row): bool => $row->at->lte($startUtc) && $row->at->gte($keptFrom));
+        $inside = $rows->filter(fn (object $row): bool => $row->at->gt($startUtc) && $row->at->lte($effectiveEndUtc))->values();
+
+        // Went quiet after that reading (even if back before the night started): nothing heard since.
+        foreach ($baseline !== null ? $history['offline'] : [] as $spell) {
+            if ($spell['from']->gt($baseline->at) && $spell['from']->lte($startUtc)) {
+                $offlineAtStart = true;
+            }
         }
 
-        $totalMinutes = array_sum(array_map(fn (array $ep): int => $ep['minutes'], $episodes));
+        $state = $baseline !== null && ! $offlineAtStart ? ($baseline->value >= 0.5) : null;
+        if ($state === null && $inside->isEmpty()) {
+            return [...$empty, 'gaps' => $gaps];
+        }
+
+        // Readings and the moments the sensor went quiet, in time order.
+        $events = [];
+        foreach ($inside as $row) {
+            $events[] = ['at' => $row->at, 'quiet' => false, 'in' => $row->value >= 0.5, 'until' => null];
+        }
+        foreach ($gaps as $gap) {
+            if ($gap['from']->gt($startUtc)) {
+                $events[] = ['at' => $gap['from'], 'quiet' => true, 'in' => null, 'until' => $gap['to']];
+            }
+        }
+        usort($events, fn (array $a, array $b): int => [$a['at']->getTimestamp(), $a['quiet'] ? 0 : 1] <=> [$b['at']->getTimestamp(), $b['quiet'] ? 0 : 1]);
+
+        $startState = $state;
+        $firstInBedAt = $state === true ? $startUtc : null;
+        $outSince = $state === false ? $startUtc : null;
+        $outFromStart = $state === false;
+        $cursor = $startUtc;
+        $unknownSeconds = 0;
+        /** @var list<array{from: CarbonImmutable, to: CarbonImmutable, end: string, from_start: bool, match_until: CarbonImmutable}> $spells */
+        $spells = [];
+
+        foreach ($events as $event) {
+            if ($state === null) {
+                $unknownSeconds += max(0, $event['at']->getTimestamp() - $cursor->getTimestamp());
+            }
+            $cursor = $event['at'];
+
+            if ($event['quiet']) {
+                if ($outSince !== null) {
+                    $spells[] = ['from' => $outSince, 'to' => $event['at'], 'end' => 'offline', 'from_start' => $outFromStart, 'match_until' => $event['until']];
+                    $outSince = null;
+                    $outFromStart = false;
+                }
+                $state = null;
+
+                continue;
+            }
+
+            if ($event['in']) {
+                $firstInBedAt ??= $event['at'];
+                if ($outSince !== null) {
+                    $spells[] = ['from' => $outSince, 'to' => $event['at'], 'end' => 'back', 'from_start' => $outFromStart, 'match_until' => $event['at']];
+                    $outSince = null;
+                    $outFromStart = false;
+                }
+                $state = true;
+            } else {
+                if ($outSince === null) {
+                    $outSince = $event['at'];
+                    $outFromStart = false;
+                }
+                $state = false;
+            }
+        }
+
+        if ($state === null) {
+            $unknownSeconds += max(0, $effectiveEndUtc->getTimestamp() - $cursor->getTimestamp());
+        }
+        if ($outSince !== null && $effectiveEndUtc->gt($outSince)) {
+            $spells[] = [
+                'from' => $outSince,
+                'to' => $effectiveEndUtc,
+                'end' => $now->lt($endUtc) ? 'now' : 'night_end',
+                'from_start' => $outFromStart,
+                'match_until' => $effectiveEndUtc,
+            ];
+        }
+
+        // Match each time out of bed to a stored out-of-bed alert opened within it.
+        $usedAlerts = [];
+        $episodes = [];
+        foreach ($spells as $spell) {
+            $alert = $history['alerts']->first(fn (DeviceAlert $candidate): bool => ! isset($usedAlerts[(int) $candidate->id])
+                && $candidate->opened_at !== null
+                && $candidate->opened_at->gte($spell['from'])
+                && $candidate->opened_at->lte($spell['match_until']));
+            if ($alert instanceof DeviceAlert) {
+                $usedAlerts[(int) $alert->id] = true;
+            }
+            $seconds = max(0, $spell['to']->getTimestamp() - $spell['from']->getTimestamp());
+            $episodes[] = [
+                'from' => $spell['from'],
+                'to' => $spell['to'],
+                'minutes' => max(1, (int) round($seconds / 60)),
+                'back' => $spell['end'] === 'back',
+                'end' => $spell['end'],
+                'from_start' => $spell['from_start'],
+                'alert' => $alert instanceof DeviceAlert ? $alert : null,
+            ];
+        }
 
         return [
             'has_data' => true,
+            'whole_night' => $unknownSeconds === 0,
+            'start_state' => $startState,
             'first_in_bed_at' => $firstInBedAt,
             'episodes' => $episodes,
-            'total_minutes' => $totalMinutes,
+            'gaps' => $gaps,
+            'total_minutes' => array_sum(array_map(fn (array $ep): int => $ep['minutes'], $episodes)),
         ];
     }
 
+    /** "Mere Tane told" from the alert's own timeline, or "alert opened" when nobody was on shift to tell. */
+    private static function toldWords(DeviceAlert $alert): string
+    {
+        $told = $alert->relationLoaded('events')
+            ? $alert->events->first(fn (object $event): bool => $event->kind === 'told')
+            : null;
+        $text = $told !== null ? trim((string) $told->text) : '';
+
+        return $text !== '' ? $text : 'alert opened';
+    }
+
     /**
+     * Bed readings in the window, newest kept first when a chatty sensor sends more than the limit,
+     * returned oldest first, with the last reading before the window (the state it started in).
+     *
      * @return Collection<int, object{value: float, at: CarbonImmutable}>
      */
     private function occupancyRows(int $deviceId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): Collection
     {
-        $baseline = DB::table('security_device_sensor_readings')
-            ->where('device_id', $deviceId)
-            ->where('metric', 'occupancy')
-            ->where('observed_at', '<', $fromUtc->utc()->format('Y-m-d H:i:s'))
-            ->orderByDesc('observed_at')
-            ->limit(1)
-            ->get(['value', 'observed_at']);
-
         $recent = DB::table('security_device_sensor_readings')
             ->where('device_id', $deviceId)
             ->where('metric', 'occupancy')
@@ -697,14 +958,75 @@ final class SensorNightsPresenter
                 $fromUtc->utc()->format('Y-m-d H:i:s'),
                 $toUtc->utc()->format('Y-m-d H:i:s'),
             ])
-            ->orderBy('observed_at')
-            ->limit(10_000)
-            ->get(['value', 'observed_at']);
+            ->orderByDesc('observed_at')
+            ->limit(self::ROW_LIMIT)
+            ->get(['value', 'observed_at'])
+            ->reverse()
+            ->values();
+
+        // Cut off at the limit: the reading before the window no longer tells the state before the
+        // oldest row kept, so leave it out rather than claim a state for the missing stretch.
+        $baseline = $recent->count() >= self::ROW_LIMIT
+            ? collect()
+            : DB::table('security_device_sensor_readings')
+                ->where('device_id', $deviceId)
+                ->where('metric', 'occupancy')
+                ->where('observed_at', '<', $fromUtc->utc()->format('Y-m-d H:i:s'))
+                ->orderByDesc('observed_at')
+                ->limit(1)
+                ->get(['value', 'observed_at']);
 
         return $baseline->concat($recent)->map(fn (object $row): object => (object) [
             'value' => (float) $row->value,
             'at' => CarbonImmutable::parse((string) $row->observed_at, 'UTC'),
         ])->values();
+    }
+
+    /**
+     * When this sensor was offline (its own "offline" alerts) in the window; an open one runs to now.
+     *
+     * @return list<array{from: CarbonImmutable, to: CarbonImmutable, open: bool}>
+     */
+    private function offlineSpells(int $deviceId, CarbonImmutable $fromUtc, CarbonImmutable $toUtc): array
+    {
+        return DeviceAlert::query()
+            ->where('device_id', $deviceId)
+            ->where('kind', 'offline')
+            ->where('opened_at', '<=', $toUtc)
+            ->where(fn ($query) => $query->whereNull('closed_at')->orWhere('closed_at', '>=', $fromUtc))
+            ->orderBy('opened_at')
+            ->limit(200)
+            ->get(['id', 'opened_at', 'closed_at'])
+            ->filter(fn (DeviceAlert $alert): bool => $alert->opened_at !== null)
+            ->map(fn (DeviceAlert $alert): array => [
+                'from' => $alert->opened_at->utc(),
+                'to' => ($alert->closed_at ?? $toUtc)->utc(),
+                'open' => $alert->closed_at === null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * This sensor's out-of-bed alerts in the window, oldest first, with who was told.
+     *
+     * @return Collection<int, DeviceAlert>
+     */
+    private function outOfBedAlerts(int $deviceId, CarbonImmutable $fromUtc): Collection
+    {
+        return DeviceAlert::query()
+            ->with([
+                'acknowledgedBy:id,name',
+                'events' => fn ($query) => $query->where('kind', 'told'),
+            ])
+            ->where('device_id', $deviceId)
+            ->where('kind', 'care_out_of_bed')
+            ->where('opened_at', '>=', $fromUtc)
+            ->orderByDesc('opened_at')
+            ->limit(200)
+            ->get(['id', 'device_id', 'opened_at', 'acknowledged_by_user_id', 'acknowledged_at'])
+            ->sortBy(fn (DeviceAlert $alert): int => $alert->opened_at?->getTimestamp() ?? 0)
+            ->values();
     }
 
     /**
@@ -747,7 +1069,11 @@ final class SensorNightsPresenter
     }
 
     /**
-     * @return array{filled: bool, note: string|null}
+     * Filled only when scheduled or started roster shifts at the Site together cover the whole
+     * night window (what's left of it, once the night has started). Someone clocked in is noted,
+     * but isn't the roster.
+     *
+     * @return array{filled: bool, partial: bool, note: string|null}
      */
     private function nightRosterShift(
         ?int $siteId,
@@ -756,43 +1082,66 @@ final class SensorNightsPresenter
         CarbonImmutable $now,
     ): array {
         if ($siteId === null || $siteId < 1) {
-            return ['filled' => false, 'note' => null];
+            return ['filled' => false, 'partial' => false, 'note' => null];
         }
 
         $startUtc = $tonightStartLocal->utc();
         $endUtc = $tonightEndLocal->utc();
+        $coverFrom = $now->utc()->gt($startUtc) ? $now->utc() : $startUtc;
+        $clock = fn (CarbonImmutable $at): string => $at->setTimezone(CareRules::ZONE)->format('g:i a');
 
-        $shift = Shift::query()
+        $shifts = Shift::query()
             ->where('starts_at', '<', $endUtc)
-            ->where('ends_at', '>', $startUtc)
-            ->whereNotIn('status', ['cancelled', 'declined', 'no_show'])
+            ->where('ends_at', '>', $coverFrom)
+            ->whereIn('status', self::ROSTERED_STATES)
             ->whereNotNull('user_id')
             ->where(fn ($query) => $query
                 ->where('site_id', $siteId)
                 ->orWhere(fn ($derived) => $derived->whereNull('site_id')->whereHas('client', fn ($client) => $client->where('site_id', $siteId))))
             ->orderBy('starts_at')
-            ->first(['id', 'starts_at', 'ends_at']);
+            ->limit(50)
+            ->get(['id', 'starts_at', 'ends_at']);
 
-        if ($shift !== null) {
-            $shiftStart = CarbonImmutable::parse($shift->starts_at)->setTimezone(CareRules::ZONE)->format('g:i a');
-            $shiftEnd = CarbonImmutable::parse($shift->ends_at)->setTimezone(CareRules::ZONE)->format('g:i a');
+        // Walk the shifts in start order; any gap before the window ends means not filled.
+        $reached = $coverFrom;
+        $gapUntil = $endUtc;
+        $firstStart = null;
+        foreach ($shifts as $shift) {
+            $shiftStart = CarbonImmutable::parse($shift->starts_at)->utc();
+            $shiftEnd = CarbonImmutable::parse($shift->ends_at)->utc();
+            if ($shiftStart->gt($reached)) {
+                $gapUntil = $shiftStart;
 
-            return ['filled' => true, 'note' => "{$shiftStart} – {$shiftEnd}"];
-        }
-
-        if ($now->gte($startUtc) && $now->lt($endUtc)) {
-            $clockedIn = HrAttendanceSession::query()
-                ->where('site_id', $siteId)
-                ->where('clock_in_at', '<=', $now->utc())
-                ->whereNull('clock_out_at')
-                ->where('status', 'open')
-                ->exists();
-            if ($clockedIn) {
-                return ['filled' => true, 'note' => 'Staff clocked in on site'];
+                break;
+            }
+            $firstStart ??= $shiftStart;
+            if ($shiftEnd->gt($reached)) {
+                $reached = $shiftEnd;
+            }
+            if ($reached->gte($endUtc)) {
+                break;
             }
         }
 
-        return ['filled' => false, 'note' => null];
+        if ($firstStart !== null && $reached->gte($endUtc)) {
+            return ['filled' => true, 'partial' => false, 'note' => $clock($firstStart).' – '.$clock($reached)];
+        }
+
+        $clockedIn = $now->gte($startUtc) && $now->lt($endUtc) && HrAttendanceSession::query()
+            ->where('site_id', $siteId)
+            ->where('clock_in_at', '<=', $now->utc())
+            ->whereNull('clock_out_at')
+            ->where('status', 'open')
+            ->exists();
+        $clockedInWords = $clockedIn ? 'Someone is clocked in on site now' : null;
+
+        if ($shifts->isEmpty()) {
+            return ['filled' => false, 'partial' => false, 'note' => $clockedInWords];
+        }
+
+        $gapWords = 'Not covered from '.$clock($reached).' to '.$clock($gapUntil);
+
+        return ['filled' => false, 'partial' => true, 'note' => $clockedInWords !== null ? $gapWords.' · '.$clockedInWords : $gapWords];
     }
 
     private static function clockFromHm(string $hm): string

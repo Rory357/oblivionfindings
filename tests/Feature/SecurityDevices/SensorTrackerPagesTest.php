@@ -440,4 +440,47 @@ class SensorTrackerPagesTest extends TestCase
             'kind' => 'reading_co2',
         ]);
     }
+
+    public function test_changing_limits_never_reads_as_a_recovery_and_safety_sensors_keep_their_battery_alert(): void
+    {
+        // Audit fixes (5 Nov): sensible limits only, a rule change says who closed the alert, and the
+        // sensor keeps what changed; a scald probe's battery alert can't be turned off.
+        $manager = $this->viewerWith(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'securityDevices.automations.manage']);
+        $manager->forceFill(['name' => 'Jordan Peri'])->save();
+        $at = CarbonImmutable::now()->subMinute();
+        $sensor = $this->sensor($this->home, [
+            'meta' => ['observed' => [
+                'last_telemetry_at' => $at->toIso8601String(),
+                'sensor_readings' => [
+                    'temperature' => ['label' => 'Temperature', 'value' => 34.0, 'unit' => 'C', 'state' => 'warning', 'observed_at' => $at->toIso8601String()],
+                ],
+            ]],
+        ]);
+        app(\App\Domain\SecurityDevices\Alerts\DeviceAlertEngine::class)->onReading($sensor, 'temperature', 'Temperature', 'warning', 34.0, 'C', CarbonImmutable::now('UTC'));
+        $alert = DeviceAlert::query()->where('device_id', $sensor->id)->where('kind', 'reading_temperature')->sole();
+
+        // A limit no sensor could ever read is refused.
+        $this->actingAs($manager)->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+            'metrics' => ['temperature' => ['enabled' => true, 'below' => 12, 'above' => 100000]],
+        ])->assertUnprocessable();
+
+        // Raising the high limit ends the alert: it closes as a rule change by Jordan, not "back to 34 °C".
+        $this->actingAs($manager)->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+            'metrics' => ['temperature' => ['enabled' => true, 'below' => 12, 'above' => 36]],
+        ])->assertOk();
+        $closed = $alert->fresh();
+        $this->assertSame(DeviceAlert::STATE_DONE, $closed->state);
+        $this->assertSame('rule_changed', $closed->close_reason);
+        $this->assertSame('Temperature alert limits changed by Jordan Peri', $closed->events()->where('kind', 'rule_changed')->value('text'));
+        $this->assertFalse($closed->events()->where('kind', 'recovered')->exists());
+        $history = \App\Domain\SecurityDevices\Iot\Readings\SensorAlertRules::history($sensor->fresh());
+        $this->assertSame('Jordan Peri', $history[0]['by']);
+        $this->assertSame(['Temperature below 12 °C or above 32 °C → Temperature below 12 °C or above 36 °C'], $history[0]['changes']);
+
+        // A tap probe watching for scalds keeps its battery alert.
+        $probe = $this->sensor($this->home, ['name' => 'Bathroom tap probe', 'config' => ['care' => ['scald_watch' => true]]]);
+        $this->actingAs($manager)->putJson('/security-devices/devices/'.$probe->id.'/alert-limits', [
+            'battery' => ['enabled' => false, 'below' => 20],
+        ])->assertUnprocessable()->assertJsonValidationErrors('battery.enabled');
+    }
 }

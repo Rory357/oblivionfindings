@@ -734,7 +734,7 @@ Route::middleware([
         ->whereNumber('device')
         ->middleware([
             'permission:securityDevices.devices.view',
-            'permission:securityDevices.devices.update|securityDevices.monitoring.manage|securityDevices.terminal.use',
+            'permission:securityDevices.devices.update|securityDevices.monitoring.manage',
             'throttle:20,1',
         ])
         ->name('security-devices.devices.settings.update');

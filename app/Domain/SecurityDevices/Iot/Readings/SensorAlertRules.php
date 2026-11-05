@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Iot\Readings;
 
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
+use App\Domain\SecurityDevices\Care\DevicePersonLinks;
 use App\Domain\SecurityDevices\Care\ScaldWatch;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
@@ -45,6 +46,26 @@ final class SensorAlertRules
 
     public const int DEFAULT_BATTERY_BELOW = 20;
 
+    /**
+     * The values a limit may take for each reading (audit fix, 5 Nov): a limit outside what the
+     * sensor can ever read would switch its alert off while the rule still says On.
+     *
+     * @var array<string, array{0: float, 1: float}>
+     */
+    public const array RANGES = [
+        'temperature' => [-40.0, 80.0],
+        'humidity' => [0.0, 100.0],
+        'co2' => [400.0, 10_000.0],
+        'tvoc' => [0.0, 60_000.0],
+        'pm25' => [0.0, 1_000.0],
+        'pressure' => [800.0, 1_100.0],
+        'illuminance' => [0.0, 200_000.0],
+        'people_count' => [0.0, 500.0],
+    ];
+
+    /** How many limit changes a sensor keeps, newest first, with who changed what. */
+    public const int HISTORY_KEEP = 20;
+
     private const array METRIC_UNITS = [
         'temperature' => 'C',
         'humidity' => '%',
@@ -60,6 +81,7 @@ final class SensorAlertRules
         private readonly SecurityDevicesAccessService $access,
         private readonly CanonicalDeviceSiteResolver $sites,
         private readonly DeviceAlertEngine $alerts,
+        private readonly DevicePersonLinks $links,
     ) {}
 
     public static function canManage(User $viewer, bool $retired = false): bool
@@ -221,10 +243,16 @@ final class SensorAlertRules
         $storedBattery = data_get($device->config ?? [], self::CONFIG_KEY.'.battery');
         if ($hasBattery || is_array($storedBattery)) {
             $battery = self::batteryRule($device);
+            // A sensor that keeps a resident safe can't lose its battery alert (see update()).
+            $locked = app(DevicePersonLinks::class)->currentFor($device) !== null || ScaldWatch::watches($device);
             $rows[] = [
                 'key' => 'battery',
+                'locked' => $locked,
                 'label' => 'Battery under '.$battery['below'].'%',
-                'hint' => 'Included in the 6:00 am morning summary',
+                // Safety and care sensors tell staff on shift at once (DeviceAlertEngine::onBattery).
+                'hint' => in_array((string) $device->domain, ['security', 'iot_healthcare'], true)
+                    ? $who.' at once, and in the 6:00 am summary'
+                    : 'Included in the 6:00 am morning summary',
                 'enabled' => $battery['enabled'],
             ];
         }
@@ -302,14 +330,22 @@ final class SensorAlertRules
         $now = CarbonImmutable::now('UTC');
         $readingChanges = [];
         $batteryToEvaluate = null;
+        $batteryTurnedOff = false;
+        // A sensor that keeps a resident safe (linked to their care, or watching a tap for scalds)
+        // never loses its battery alert: a flat battery would silence it with no warning.
+        $keepsSomeoneSafe = $this->links->currentFor($device) !== null || ScaldWatch::watches($device);
 
         DB::transaction(function () use (
+            $actor,
             $device,
             $submittedMetrics,
             $submittedBattery,
             $siteId,
+            $now,
+            $keepsSomeoneSafe,
             &$readingChanges,
             &$batteryToEvaluate,
+            &$batteryTurnedOff,
         ): void {
             /** @var Device $locked */
             $locked = Device::query()->whereKey($device->id)->lockForUpdate()->firstOrFail();
@@ -317,6 +353,7 @@ final class SensorAlertRules
             $stored = is_array($config[self::CONFIG_KEY] ?? null) ? $config[self::CONFIG_KEY] : [];
             $metricsStore = is_array($stored['metrics'] ?? null) ? $stored['metrics'] : [];
             $changedFields = [];
+            $changeWords = [];
 
             foreach ($submittedMetrics as $metric => $payload) {
                 if (! is_string($metric) || ! isset(SensorPagePresenter::METRICS[$metric]) || ! is_array($payload)) {
@@ -324,6 +361,9 @@ final class SensorAlertRules
                 }
                 $current = self::metricRule($locked, $metric);
                 $next = $this->validatedMetric($metric, $current, $payload);
+                if (self::ruleWords($metric, $current) !== self::ruleWords($metric, $next)) {
+                    $changeWords[] = self::ruleWords($metric, $current).' → '.self::ruleWords($metric, $next);
+                }
                 $metricsStore[$metric] = $metric === 'co2'
                     ? [
                         'enabled' => $next['enabled'],
@@ -346,8 +386,28 @@ final class SensorAlertRules
                 $below = array_key_exists('below', $submittedBattery)
                     ? $this->validatedBatteryBelow($submittedBattery['below'])
                     : $currentBattery['below'];
+                if (! $enabled && $keepsSomeoneSafe) {
+                    throw ValidationException::withMessages(['battery.enabled' => 'This sensor keeps a resident safe, so its battery alert stays on. You can change the percentage.']);
+                }
+                $batteryWords = fn (bool $on, int $percent): string => $on ? "Battery under {$percent}%" : 'Battery alert off';
+                if ($batteryWords($currentBattery['enabled'], $currentBattery['below']) !== $batteryWords($enabled, $below)) {
+                    $changeWords[] = $batteryWords($currentBattery['enabled'], $currentBattery['below']).' → '.$batteryWords($enabled, $below);
+                }
+                $batteryTurnedOff = $currentBattery['enabled'] && ! $enabled;
                 $stored['battery'] = ['enabled' => $enabled, 'below' => $below];
                 $changedFields[] = 'sensor_limits.battery';
+            }
+
+            // The audit log keeps who changed which rules; the sensor keeps what they changed, in words.
+            if ($changeWords !== []) {
+                $history = is_array($stored['history'] ?? null) ? $stored['history'] : [];
+                array_unshift($history, [
+                    'at' => $now->toIso8601String(),
+                    'by_user_id' => (int) $actor->id,
+                    'by' => (string) $actor->name,
+                    'changes' => $changeWords,
+                ]);
+                $stored['history'] = array_slice($history, 0, self::HISTORY_KEEP);
             }
 
             $config[self::CONFIG_KEY] = $stored;
@@ -400,6 +460,12 @@ final class SensorAlertRules
 
         $fresh = $device->fresh() ?? $device;
         foreach ($readingChanges as $metric => $change) {
+            if ($change['state'] === 'healthy') {
+                // The reading didn't recover: a person changed the rule. Say so, and who.
+                $this->alerts->closeForRuleChange($fresh, 'reading_'.$metric, $actor, $now, ucfirst($change['label']).' alert limits changed by '.$actor->name);
+
+                continue;
+            }
             $this->alerts->onReading(
                 $fresh,
                 (string) $metric,
@@ -410,9 +476,41 @@ final class SensorAlertRules
                 $now,
             );
         }
-        if ($batteryToEvaluate !== null) {
+        if ($batteryTurnedOff) {
+            $this->alerts->closeForRuleChange($fresh, 'battery', $actor, $now, 'Battery alert turned off by '.$actor->name);
+        } elseif ($batteryToEvaluate !== null) {
             $this->alerts->onBattery($fresh, $batteryToEvaluate, $now);
         }
+    }
+
+    /**
+     * The latest limit changes on this sensor, newest first, for the Alert rules card.
+     *
+     * @return list<array{at: string, by: string, changes: list<string>}>
+     */
+    public static function history(Device $device, int $limit = 3): array
+    {
+        $history = data_get($device->config ?? [], self::CONFIG_KEY.'.history');
+
+        return collect(is_array($history) ? $history : [])
+            ->filter(fn (mixed $row): bool => is_array($row) && is_string($row['at'] ?? null) && is_array($row['changes'] ?? null))
+            ->take($limit)
+            ->map(fn (array $row): array => [
+                'at' => (string) $row['at'],
+                'by' => (string) ($row['by'] ?? 'Someone'),
+                'changes' => array_values(array_filter($row['changes'], 'is_string')),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** One rule in words, for the change history: "Too warm above 32 °C" or "Temperature alert off". */
+    private static function ruleWords(string $metric, array $rule): string
+    {
+        [$label] = SensorPagePresenter::METRICS[$metric];
+        $hasThreshold = $rule['below'] !== null || $rule['above'] !== null || $rule['warning_at'] !== null;
+
+        return $rule['enabled'] && $hasThreshold ? self::ruleLabel($metric, $rule) : $label.' alert off';
     }
 
     /**
@@ -430,12 +528,6 @@ final class SensorAlertRules
             $critical = array_key_exists('critical_at', $payload) ? $this->validatedFloat($metric, $payload['critical_at']) : $current['critical_at'];
             if ($enabled && $warning === null) {
                 throw ValidationException::withMessages(['metrics.'.$metric => "Enter a {$label} level before turning this alert on."]);
-            }
-            if ($warning !== null && ($warning <= 0 || $warning > 50_000)) {
-                throw ValidationException::withMessages(['metrics.'.$metric => "Choose a {$label} limit between 1 and 50,000 ppm."]);
-            }
-            if ($critical !== null && ($critical <= 0 || $critical > 50_000)) {
-                throw ValidationException::withMessages(['metrics.'.$metric => "Choose an urgent {$label} limit between 1 and 50,000 ppm."]);
             }
             if ($warning !== null && $critical !== null && $critical <= $warning) {
                 throw ValidationException::withMessages(['metrics.'.$metric => "The urgent {$label} level must be higher than the first alert level."]);
@@ -478,8 +570,10 @@ final class SensorAlertRules
             throw ValidationException::withMessages(['metrics.'.$metric => 'Enter a valid number.']);
         }
         $num = round((float) $raw, 1);
-        if (! is_finite($num) || $num < -100 || $num > 100_000) {
-            throw ValidationException::withMessages(['metrics.'.$metric => 'Enter a sensible limit between -100 and 100,000.']);
+        [$min, $max] = self::RANGES[$metric] ?? [-100.0, 100_000.0];
+        if (! is_finite($num) || $num < $min || $num > $max) {
+            [$label] = SensorPagePresenter::METRICS[$metric] ?? [ucfirst($metric)];
+            throw ValidationException::withMessages(['metrics.'.$metric => "For {$label}, choose a limit between ".self::valueWords($metric, $min).' and '.self::valueWords($metric, $max).'.']);
         }
 
         return $num;

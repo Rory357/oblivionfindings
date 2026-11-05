@@ -91,11 +91,18 @@ final class SiteLogbookExport
             ->sortBy(fn (DeviceEntry $entry): string => $entry->sortKey())
             ->values();
 
-        return collect($this->stream->between($viewer, $entries, [(int) $site->id => (string) $site->name], $start, $end, true, self::MAX_ROWS))
+        $all = $this->stream->between($viewer, $entries, [(int) $site->id => (string) $site->name], $start, $end, true, self::MAX_ROWS, self::MAX_ROWS);
+        // If the whole logbook hit the cap, a filtered export may be missing older lines: say so.
+        $this->capped = count($all) >= self::MAX_ROWS;
+
+        return collect($all)
             ->filter(fn (array $line): bool => SitePagePresenter::matchesLogbookWhat($line, $what))
             ->values()
             ->all();
     }
+
+    /** Whether the last lines() call reached the row cap before the What filter. */
+    private bool $capped = false;
 
     /**
      * @param  list<array<string, mixed>>  $lines
@@ -105,7 +112,7 @@ final class SiteLogbookExport
     {
         $zone = SiteStream::zone();
 
-        return array_map(function (array $line) use ($zone): array {
+        $rows = array_map(function (array $line) use ($zone): array {
             $when = isset($line['at']) && is_string($line['at'])
                 ? CarbonImmutable::parse($line['at'])->setTimezone($zone)->format('Y-m-d H:i')
                 : '';
@@ -118,6 +125,11 @@ final class SiteLogbookExport
                 (string) ($line['by'] ?? ''),
             ];
         }, $lines);
+        if ($this->capped) {
+            $rows[] = ['', '', 'Older entries may be missing: this export reached its '.number_format(self::MAX_ROWS).'-line limit. Narrow the dates to export earlier ones.', '', ''];
+        }
+
+        return $rows;
     }
 
     /**
@@ -168,7 +180,7 @@ final class SiteLogbookExport
             'exportedBy' => (string) $viewer->name,
             'reason' => $reason,
             'rows' => $rows,
-            'capped' => $count >= self::MAX_ROWS,
+            'capped' => $this->capped || $count >= self::MAX_ROWS,
             'footer' => 'Confidential · Exported by '.$viewer->name.' · '.$nzNow->format('D j M Y, g:i a').' · NZ time',
         ])->render();
     }

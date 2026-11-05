@@ -374,6 +374,7 @@ final class AlertsPresenter
                 'lasted' => DeviceAlertEngine::duration($alert->opened_at, $alert->closed_at ?? $now),
                 'how' => match ($alert->close_reason) {
                     'behind' => 'Covered by the device in front of it',
+                    'rule_changed' => 'Closed when its alert limits changed',
                     default => 'Cleared by itself',
                 },
             ])->all(),

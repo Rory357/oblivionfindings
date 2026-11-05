@@ -23,12 +23,13 @@ import { TrendChart, type TrendRangeKey } from '@/components/security-devices/de
 import { iconForKind } from '@/components/security-devices/device-kind-icon';
 import { DeviceFormPopup, useDeviceFormOptions } from '@/components/security-devices/device-popups';
 import { PersonLinkPopup } from '@/components/security-devices/person-link-popup';
-import { Log, Note, PeopleCards, PointBars, QuietLine, Ring, RingCard, SideBySide, Surface } from '@/components/signature/blocks';
+import { Log, Note, PeopleCards, QuietLine, Ring, RingCard, SideBySide, Surface } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
 import { Pencil, SlidersHorizontal } from 'lucide-react';
@@ -39,6 +40,7 @@ import type {
     SensorEditableRules,
     SensorNightsData,
     SensorPageProps,
+    SensorRuleChange,
     SensorRuleRow,
     SensorScaldAlert,
     SensorSeries,
@@ -336,12 +338,14 @@ function SensorLimitsPopup({
 
 function AlertRules({
     rules,
+    history = [],
     deviceId,
     canManage,
     hasEditable,
     onEdit,
 }: {
     rules: SensorRuleRow[];
+    history?: SensorRuleChange[];
     deviceId: number;
     canManage: boolean;
     hasEditable: boolean;
@@ -363,8 +367,11 @@ function AlertRules({
                     : { metrics: { [rule.key]: { enabled } } };
             await axios.put(`/security-devices/devices/${deviceId}/alert-limits`, payload);
             router.reload();
-        } catch {
-            setError('That alert rule couldn’t be changed. Try again.');
+        } catch (failure) {
+            const errors = axios.isAxiosError(failure)
+                ? (failure.response?.data?.errors as Record<string, string[]> | undefined)
+                : undefined;
+            setError(errors ? (Object.values(errors)[0]?.[0] ?? 'That alert rule couldn’t be changed. Try again.') : 'That alert rule couldn’t be changed. Try again.');
         } finally {
             setBusyKey(null);
         }
@@ -387,7 +394,7 @@ function AlertRules({
                                         <b className="text-sm font-semibold">{rule.label}</b>
                                         <small className="text-caption">{rule.hint}</small>
                                     </span>
-                                    {canManage && rule.key ? (
+                                    {canManage && rule.key && !rule.locked ? (
                                         <Switch
                                             checked={on}
                                             disabled={busyKey !== null}
@@ -404,6 +411,24 @@ function AlertRules({
                 ) : (
                     <p className="px-[18px] pt-2 pb-4 text-sm text-muted-foreground">No alert limits set for this sensor yet.</p>
                 )}
+                {rules.some((rule) => rule.locked) ? (
+                    <p className="text-caption px-[18px] pb-3">This sensor keeps a resident safe, so its battery alert stays on.</p>
+                ) : null}
+                {history.length > 0 ? (
+                    <div className="border-t border-border px-[18px] pt-3 pb-4">
+                        <p className="text-caption font-semibold">Changed lately</p>
+                        <ul className="mt-1.5 grid gap-1.5">
+                            {history.map((change) => (
+                                <li key={change.at} className="text-sm">
+                                    <span className="text-muted-foreground">
+                                        {formatDateTime(change.at)} · {change.by}:
+                                    </span>{' '}
+                                    {change.changes.join('; ')}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : null}
             </Surface>
             {error ? (
                 <Note tone="critical">
@@ -559,6 +584,44 @@ function CareCard({ care, deviceId, onLink }: { care: NonNullable<SensorPageProp
 }
 
 /**
+ * Minutes out of bed on each of the last 7 nights, drawn like the shared point bars. A night with no
+ * readings says "No readings" and draws no bar: it is never shown as 0.
+ */
+function NightBars({ values, labels, note, height = 140 }: { values: (number | null)[]; labels: string[]; note: string; height?: number }) {
+    const title = 'Minutes out of bed at night';
+    const max = Math.max(1, ...values.filter((value): value is number => value !== null));
+    const summary = values.map((value, index) => `${labels[index] ?? ''} ${value === null ? 'no readings' : value}`).join(', ');
+    return (
+        <Surface title={title} sub="Last 7 nights">
+            <div className="sg-chart">
+                <div className="sg-bars" style={{ height }} role="img" aria-label={`${title}: ${summary}`}>
+                    {values.map((value, index) => (
+                        <div key={index} className={index === values.length - 1 ? 'sg-bar--last' : undefined}>
+                            {value === null ? (
+                                <span aria-hidden="true" className="text-center text-xs leading-tight text-muted-foreground">
+                                    No readings
+                                </span>
+                            ) : (
+                                <>
+                                    <b aria-hidden="true">{value}</b>
+                                    <i aria-hidden="true" style={{ height: Math.max(4, (value / max) * (height - 36)) }} />
+                                </>
+                            )}
+                        </div>
+                    ))}
+                </div>
+                <div className="sg-xl" aria-hidden="true">
+                    {labels.map((label, index) => (
+                        <span key={index}>{label}</span>
+                    ))}
+                </div>
+                {note ? <p className="sg-chart-note">{note}</p> : null}
+            </div>
+        </Surface>
+    );
+}
+
+/**
  * S&D E6 (pg-sdr-7b): bed sensor Nights view — care rule banner, last night's log, 7-night out-of-bed
  * bar chart, 4-check readiness ring, linked resident card, and what it senses.
  */
@@ -642,13 +705,7 @@ function NightsView({
                     ) : (
                         <QuietLine title="Last night" sub={nights.last_night.sub} text={nights.last_night.empty ?? 'No bed occupancy readings were recorded last night.'} />
                     )}
-                    <PointBars
-                        title="Minutes out of bed at night"
-                        sub="Last 7 nights"
-                        values={nights.seven_nights.values}
-                        labels={nights.seven_nights.labels}
-                        note={nights.seven_nights.note}
-                    />
+                    <NightBars values={nights.seven_nights.values} labels={nights.seven_nights.labels} note={nights.seven_nights.note} />
                 </>
             }
             side={
@@ -672,7 +729,7 @@ function NightsView({
                                 {
                                     name: nights.person_card.name,
                                     sub: nights.person_card.sub ?? undefined,
-                                    flag: <StatusBadge variant="warning">{nights.person_card.flag}</StatusBadge>,
+                                    flag: nights.person_card.flag ? <StatusBadge variant="warning">{nights.person_card.flag}</StatusBadge> : undefined,
                                     href: nights.person_card.href ?? undefined,
                                     foot: nights.person_card.key_worker ? (
                                         <>
@@ -785,6 +842,7 @@ export default function SensorPage(props: SensorPageProps) {
                         {props.care ? <CareCard care={props.care} deviceId={device.id} onLink={() => setLinking(true)} /> : null}
                         <AlertRules
                             rules={readings.rules}
+                            history={readings.rules_history ?? []}
                             deviceId={device.id}
                             canManage={Boolean(can.manage_rules)}
                             hasEditable={Boolean(readings.editable_rules)}

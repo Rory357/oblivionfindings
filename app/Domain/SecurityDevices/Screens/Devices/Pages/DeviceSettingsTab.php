@@ -50,8 +50,6 @@ final class DeviceSettingsTab
         'collector' => 'the hub',
     ];
 
-    public const string SSH_USER_PATTERN = '/\A[a-zA-Z0-9._-]{1,64}\z/';
-
     private const array NETWORK_KINDS = [
         DeviceKind::Switch,
         DeviceKind::Router,
@@ -77,13 +75,6 @@ final class DeviceSettingsTab
         return ($meta['tell_it_update_ready'] ?? true) !== false;
     }
 
-    public static function sshUser(Device $device): ?string
-    {
-        $user = trim((string) (data_get($device->config ?? [], 'ssh.user') ?? ''));
-
-        return $user !== '' ? $user : null;
-    }
-
     /**
      * @param  Collection<int, Monitor>  $monitors  its enabled checks, with profile and collector
      * @return array<string, mixed>
@@ -103,8 +94,7 @@ final class DeviceSettingsTab
         $provider = strtolower(trim((string) $device->provider));
         $canEdit = $viewer->canDo('securityDevices.devices.update');
         $canTerminal = $viewer->canDo('securityDevices.terminal.use');
-        $sshUser = $canTerminal ? self::sshUser($device) : null;
-        $lookedAfterBy = $this->lookedAfterBy($viewer, $device);
+        $lookedAfterBy = $this->lookedAfterBy($viewer, $device, $siteId);
         $readyUpdate = DeviceUpdates::available($device);
         $software = $device->firmware_version ? (string) $device->firmware_version : 'Not available';
         if ($readyUpdate !== null && $readyUpdate['next'] !== null) {
@@ -145,8 +135,9 @@ final class DeviceSettingsTab
                 'looked_after_by' => $lookedAfterBy,
             ],
             'staff_options' => $canEdit ? $this->staffOptions($viewer, $siteId) : [],
-            // Shown and edited only by IT admins (the people who may use the terminal); never a password.
-            'ssh' => $canTerminal ? ['user' => $sshUser] : null,
+            // pg-sdr-3f: the SSH user comes from the saved login (read-only, IT admins only). The saved
+            // login's username is never sent to a screen, and nothing here overrides it (audit fix, 5 Nov).
+            'ssh' => null,
             'it' => array_values(array_filter([
                 $device->mac_address ? ['MAC', (string) $device->mac_address] : null,
                 ['Software', $software],
@@ -158,7 +149,7 @@ final class DeviceSettingsTab
                         default => 'A connected service',
                     }]
                     : null,
-                $canTerminal ? ['SSH user', $sshUser !== null ? $sshUser : 'From the saved login'] : null,
+                $canTerminal ? ['SSH user', 'From the saved login'] : null,
             ])),
             // The device update route needs its current kind sent back unchanged with a new name or room.
             'edit' => $canEdit ? [
@@ -182,17 +173,23 @@ final class DeviceSettingsTab
         $this->access->assertCanViewDevice($actor, $device);
         abort_unless(self::supports($device), 404);
 
-        foreach (['password', 'passwd', 'ssh_password', 'secret', 'passphrase'] as $forbidden) {
+        foreach (['password', 'passwd', 'ssh_password', 'secret', 'passphrase', 'ssh_user'] as $forbidden) {
             if (array_key_exists($forbidden, $input)) {
                 throw ValidationException::withMessages([
-                    'ssh_user' => 'SSH user takes a username only, never a password.',
+                    $forbidden => 'Logins are changed only under Saved logins, by the people who may replace them.',
                 ]);
             }
         }
 
+        try {
+            $siteId = $this->sites->resolve((int) $device->id);
+            $siteId = $siteId > 0 ? $siteId : null;
+        } catch (Throwable) {
+            $siteId = null;
+        }
+
         $hasUpdateReady = array_key_exists('tell_it_update_ready', $input);
         $hasLookedAfterBy = array_key_exists('looked_after_by_user_id', $input);
-        $hasSshUser = array_key_exists('ssh_user', $input);
 
         if ($hasUpdateReady) {
             abort_unless(
@@ -216,41 +213,13 @@ final class DeviceSettingsTab
                         'looked_after_by_user_id' => 'Choose a staff member from your Sites.',
                     ]);
                 }
-                $nextStaff = $this->findStaffOption($actor, (int) $rawId);
+                $nextStaff = $this->findStaffOption($actor, (int) $rawId, $siteId);
                 if ($nextStaff === null) {
                     throw ValidationException::withMessages([
-                        'looked_after_by_user_id' => 'Choose an active staff member from your Sites.',
+                        'looked_after_by_user_id' => 'Choose an active staff member at this device’s Site.',
                     ]);
                 }
             }
-        }
-
-        $nextSshUser = null;
-        if ($hasSshUser) {
-            abort_unless($actor->canDo('securityDevices.terminal.use'), 403);
-            $rawSsh = $input['ssh_user'];
-            if ($rawSsh !== null && ! is_string($rawSsh)) {
-                throw ValidationException::withMessages([
-                    'ssh_user' => 'Enter an SSH username (letters, numbers, dots, hyphens or underscores only — never a password).',
-                ]);
-            }
-            $trimmed = trim((string) ($rawSsh ?? ''));
-            if ($trimmed !== '') {
-                if (preg_match(self::SSH_USER_PATTERN, $trimmed) !== 1
-                    || in_array(strtolower($trimmed), ['password', 'passwd', 'secret', 'passphrase'], true)) {
-                    throw ValidationException::withMessages([
-                        'ssh_user' => 'Enter an SSH username (letters, numbers, dots, hyphens or underscores only, up to 64 characters — never a password).',
-                    ]);
-                }
-                $nextSshUser = $trimmed;
-            }
-        }
-
-        try {
-            $siteId = $this->sites->resolve((int) $device->id);
-            $siteId = $siteId > 0 ? $siteId : null;
-        } catch (Throwable) {
-            $siteId = null;
         }
 
         return DB::transaction(function () use (
@@ -259,10 +228,8 @@ final class DeviceSettingsTab
             $siteId,
             $hasUpdateReady,
             $hasLookedAfterBy,
-            $hasSshUser,
             $input,
             $nextStaff,
-            $nextSshUser,
         ): array {
             $locked = Device::query()->whereKey($device->id)->lockForUpdate()->firstOrFail();
             $meta = is_array($locked->meta) ? $locked->meta : [];
@@ -285,7 +252,7 @@ final class DeviceSettingsTab
                 $previousId = is_numeric($meta['looked_after_by_user_id'] ?? null) ? (int) $meta['looked_after_by_user_id'] : null;
                 $nextId = $nextStaff['id'] ?? null;
                 if ($previousId !== $nextId) {
-                    $previousStaff = $previousId !== null ? $this->findStaffOption($actor, $previousId) : null;
+                    $previousStaff = $previousId !== null ? $this->findStaffOption($actor, $previousId, $siteId) : null;
                     if ($nextId === null) {
                         unset($meta['looked_after_by_user_id']);
                     } else {
@@ -296,27 +263,6 @@ final class DeviceSettingsTab
                         'to' => $nextId,
                         'from_label' => $previousStaff['label'] ?? null,
                         'to_label' => $nextStaff['label'] ?? null,
-                    ];
-                }
-            }
-
-            if ($hasSshUser) {
-                $previousSsh = self::sshUser($locked);
-                if ($previousSsh !== $nextSshUser) {
-                    $ssh = is_array($config['ssh'] ?? null) ? $config['ssh'] : [];
-                    if ($nextSshUser === null) {
-                        unset($ssh['user']);
-                    } else {
-                        $ssh['user'] = $nextSshUser;
-                    }
-                    if ($ssh === []) {
-                        unset($config['ssh']);
-                    } else {
-                        $config['ssh'] = $ssh;
-                    }
-                    $changes['ssh_user'] = [
-                        'from' => $previousSsh,
-                        'to' => $nextSshUser,
                     ];
                 }
             }
@@ -407,13 +353,13 @@ final class DeviceSettingsTab
     }
 
     /** @return array{id: int, label: string}|null */
-    private function lookedAfterBy(User $viewer, Device $device): ?array
+    private function lookedAfterBy(User $viewer, Device $device, ?int $siteId): ?array
     {
         $raw = is_array($device->meta) ? ($device->meta['looked_after_by_user_id'] ?? null) : null;
         if (! is_numeric($raw) || (int) $raw < 1) {
             return null;
         }
-        $option = $this->findStaffOption($viewer, (int) $raw);
+        $option = $this->findStaffOption($viewer, (int) $raw, $siteId);
 
         return $option === null ? null : ['id' => $option['id'], 'label' => $option['label']];
     }
@@ -423,88 +369,41 @@ final class DeviceSettingsTab
      *
      * @return list<array{id: int, name: string, sub: string, label: string}>
      */
+    /**
+     * Staff at this device's Site, by the same rule as S&D's other staff pickers
+     * (SecurityDevicesAccessService::assignableStaffAtSite: other people only with the staff list key).
+     *
+     * @return list<array{id: int, name: string, sub: string, label: string}>
+     */
     private function staffOptions(User $viewer, ?int $siteId): array
     {
-        $siteIds = $this->access->accessibleSiteIds($viewer);
-        if ($siteIds === []) {
+        if ($siteId === null) {
             return [];
         }
-        $profiles = $this->scopedStaffProfiles($siteIds)
-            ->limit(300)
-            ->get(['user_id', 'primary_site_id', 'secondary_site_ids', 'position_title']);
-        if ($profiles->isEmpty()) {
+        $people = $this->access->assignableStaffAtSite($viewer, $siteId);
+        if ($people->isEmpty()) {
             return [];
         }
-        $names = User::query()
-            ->whereIn('id', $profiles->pluck('user_id')->all())
-            ->whereNotNull('approved_at')
-            ->pluck('name', 'id');
+        $titles = HrEmployeeProfile::query()->whereIn('user_id', $people->pluck('id')->all())->pluck('position_title', 'user_id');
 
-        return $profiles
-            ->filter(fn (HrEmployeeProfile $profile): bool => $names->has($profile->user_id))
-            ->map(function (HrEmployeeProfile $profile) use ($names, $siteId): array {
-                $coversDeviceSite = $siteId !== null && (
-                    (int) $profile->primary_site_id === $siteId
-                    || in_array($siteId, array_map('intval', (array) ($profile->secondary_site_ids ?? [])), true)
-                );
-
-                return [
-                    'order' => $coversDeviceSite ? 0 : 1,
-                    ...self::formatStaffOption((int) $profile->user_id, (string) $names->get($profile->user_id), $profile->position_title),
-                ];
-            })
-            ->sortBy(fn (array $row): string => $row['order'].'|'.mb_strtolower($row['name']).'|'.$row['id'])
-            ->map(function (array $row): array {
-                unset($row['order']);
-
-                return $row;
-            })
+        return $people
+            ->map(fn (User $person): array => self::formatStaffOption((int) $person->id, (string) $person->name, $titles->get($person->id)))
             ->values()
             ->all();
     }
 
     /** @return array{id: int, name: string, sub: string, label: string}|null */
-    private function findStaffOption(User $viewer, int $userId): ?array
+    private function findStaffOption(User $viewer, int $userId, ?int $siteId): ?array
     {
-        $siteIds = $this->access->accessibleSiteIds($viewer);
-        if ($siteIds === []) {
+        if ($siteId === null || ! $this->access->canReadStaffAtSite($viewer, $userId, $siteId)) {
             return null;
         }
-        $profile = $this->scopedStaffProfiles($siteIds)
-            ->where('user_id', $userId)
-            ->first(['user_id', 'position_title']);
-        if (! $profile instanceof HrEmployeeProfile) {
-            return null;
-        }
-        $name = User::query()
-            ->whereKey($userId)
-            ->whereNotNull('approved_at')
-            ->value('name');
+        $name = User::query()->whereKey($userId)->whereNotNull('approved_at')->value('name');
         if (! is_string($name) || trim($name) === '') {
             return null;
         }
 
-        return self::formatStaffOption($userId, $name, $profile->position_title);
-    }
-
-    /** @param list<int> $siteIds */
-    private function scopedStaffProfiles(array $siteIds): \Illuminate\Database\Eloquent\Builder
-    {
-        return HrEmployeeProfile::query()
-            ->where('is_active', true)
-            ->whereNotNull('user_id')
-            ->where(function ($dates): void {
-                $dates->whereNull('start_date')->orWhereDate('start_date', '<=', today());
-            })
-            ->where(function ($dates): void {
-                $dates->whereNull('end_date')->orWhereDate('end_date', '>=', today());
-            })
-            ->where(function ($sites) use ($siteIds): void {
-                $sites->whereIn('primary_site_id', $siteIds);
-                foreach ($siteIds as $id) {
-                    $sites->orWhereJsonContains('secondary_site_ids', $id);
-                }
-            });
+        return self::formatStaffOption($userId, $name, HrEmployeeProfile::query()->where('user_id', $userId)->value('position_title'));
     }
 
     /** @return array{id: int, name: string, sub: string, label: string} */

@@ -78,7 +78,12 @@ export type SensorRuleRow = {
     label: string;
     hint: string;
     enabled?: boolean;
+    /** A sensor that keeps a resident safe can't turn this off (its battery alert). */
+    locked?: boolean;
 };
+
+/** Who changed a sensor's alert limits, when, and what (newest first). */
+export type SensorRuleChange = { at: string; by: string; changes: string[] };
 
 export type SensorEditableMetricRule = {
     key: string;
@@ -113,7 +118,8 @@ export type SensorNightsData = {
     };
     seven_nights: {
         labels: string[];
-        values: number[];
+        /** Minutes out of bed each night; null when the night has no readings ("No readings", never 0). */
+        values: (number | null)[];
         note: string;
     };
     readiness: {
@@ -123,10 +129,11 @@ export type SensorNightsData = {
         sub: TimedText;
         checks: { state: SgTone; label: string; note: string | null }[];
     };
+    /** Flag, room and key worker are null unless the viewer may open the resident's record. */
     person_card: {
         name: string;
         sub: string | null;
-        flag: string;
+        flag: string | null;
         href: string | null;
         key_worker: string | null;
     } | null;
@@ -154,6 +161,8 @@ export type SensorPageProps = {
     readings: {
         series: SensorSeries[];
         rules: SensorRuleRow[];
+        /** Only for people who may see alerts. */
+        rules_history?: SensorRuleChange[];
         editable_rules?: SensorEditableRules | null;
         where: { rows: FactLine[]; gateway_href: string | null };
     } | null;

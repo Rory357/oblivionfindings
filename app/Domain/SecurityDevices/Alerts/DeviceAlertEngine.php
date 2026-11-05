@@ -194,14 +194,21 @@ final class DeviceAlertEngine
         try {
             $rule = \App\Domain\SecurityDevices\Iot\Readings\SensorAlertRules::batteryRule($device);
             if (! $rule['enabled']) {
-                $this->closeKind($device, 'battery', $at, fn (): string => 'Battery alert rule turned off');
+                $this->closeKind($device, 'battery', $at, fn (): string => 'Battery alert rule turned off', 'rule_changed');
 
                 return;
             }
             $low = $rule['below'];
             $ok = min(100, max(self::BATTERY_OK, $low + 10));
             if ($percent < $low) {
-                $this->open($device, null, 'battery', 'warning', (string) $device->name.": battery {$percent}%", $at, "Battery {$percent}%", 'Change it soon so it keeps working', null, '6:00 am summary');
+                // A panic button, alarm, door, camera, bed sensor or care tracker with a flat battery stops
+                // protecting someone: staff on shift are told straight away, as before (never loosened).
+                // Other devices' batteries wait for the 6:00 am summary (pg-sdr-15g).
+                if (in_array((string) $device->domain, ['security', 'iot_healthcare'], true)) {
+                    $this->openForHouse($device, 'battery', 'warning', (string) $device->name.": battery {$percent}%", $at, "Battery {$percent}%", 'Change it soon so it keeps working');
+                } else {
+                    $this->open($device, null, 'battery', 'warning', (string) $device->name.": battery {$percent}%", $at, "Battery {$percent}%", 'Change it soon so it keeps working', null, '6:00 am summary');
+                }
 
                 return;
             }
@@ -331,16 +338,29 @@ final class DeviceAlertEngine
     }
 
     /** @param  callable(DeviceAlert): string  $words */
-    private function closeKind(Device $device, string $kind, CarbonImmutable $at, callable $words): void
+    private function closeKind(Device $device, string $kind, CarbonImmutable $at, callable $words, string $reason = 'recovered', ?User $actor = null): void
     {
-        DB::transaction(function () use ($device, $kind, $at, $words): void {
+        DB::transaction(function () use ($device, $kind, $at, $words, $reason, $actor): void {
             $alert = DeviceAlert::query()->where('device_id', $device->id)->active()->where('kind', $kind)->lockForUpdate()->latest('id')->first();
             if ($alert === null) {
                 return;
             }
-            $alert->forceFill(['state' => DeviceAlert::STATE_DONE, 'closed_at' => $at, 'close_reason' => 'recovered', 'snoozed_until' => null, 'remind_at' => null])->save();
-            $this->event($alert, $at, 'recovered', $words($alert));
+            $alert->forceFill(['state' => DeviceAlert::STATE_DONE, 'closed_at' => $at, 'close_reason' => $reason, 'snoozed_until' => null, 'remind_at' => null])->save();
+            $this->event($alert, $at, $reason === 'recovered' ? 'recovered' : 'rule_changed', $words($alert), null, $actor);
         }, 3);
+    }
+
+    /**
+     * A person changed a sensor's alert limits so its open alert no longer applies: it closes as a rule
+     * change, never as "back to normal", and names who changed it (audit fix, 5 Nov).
+     */
+    public function closeForRuleChange(Device $device, string $kind, User $actor, CarbonImmutable $at, string $words): void
+    {
+        try {
+            $this->closeKind($device, $kind, $at, fn (): string => $words, 'rule_changed', $actor);
+        } catch (Throwable $exception) {
+            Log::error('Alert could not be closed after a rule change', ['device_id' => $device->id, 'kind' => $kind, 'error' => $exception->getMessage()]);
+        }
     }
 
     private static function unitWords(string $unit): string
@@ -691,6 +711,22 @@ final class DeviceAlertEngine
             if (SecurityDeviceSetting::query()->where('key', self::SUMMARY_SENT_DAY)->first()?->value === $day) {
                 return 0;
             }
+            // The day's summary is decided once, at the first tick after 6:00 am, even when there's
+            // nothing to send: anything that turns up later waits for tomorrow's (audit fix, 5 Nov).
+            $claimed = DB::transaction(function () use ($day): bool {
+                $row = SecurityDeviceSetting::query()->where('key', self::SUMMARY_SENT_DAY)->lockForUpdate()->first();
+                if ($row !== null && $row->value === $day) {
+                    return false;
+                }
+                $row ??= new SecurityDeviceSetting(['key' => self::SUMMARY_SENT_DAY]);
+                $row->value = $day;
+                $row->save();
+
+                return true;
+            }, 3);
+            if (! $claimed) {
+                return 0;
+            }
 
             $cutoff = $this->morningCutoff($now, $settings);
             $since = $cutoff->subHours(24);
@@ -698,8 +734,13 @@ final class DeviceAlertEngine
             $heldAlerts = DeviceAlert::query()
                 ->with(['device', 'monitor', 'site:id,name'])
                 ->whereBetween('opened_at', [$since, $cutoff])
-                ->whereHas('events', fn ($q) => $q->where('kind', 'held'))
-                ->whereDoesntHave('events', fn ($q) => $q->where('kind', 'told'))
+                // Held overnight, plus low batteries on safety and care devices: staff on shift were told
+                // straight away, and the summary still lists them for IT (pg-sdr-13d's "Room 3 sensor battery").
+                ->where(fn ($held) => $held
+                    ->where(fn ($waited) => $waited->whereHas('events', fn ($q) => $q->where('kind', 'held'))
+                        ->whereDoesntHave('events', fn ($q) => $q->where('kind', 'told')))
+                    ->orWhere(fn ($battery) => $battery->where('kind', 'battery')->where('state', DeviceAlert::STATE_OPEN)
+                        ->whereDoesntHave('events', fn ($q) => $q->where('kind', 'told')->where('detail', 'like', 'Morning summary%'))))
                 ->orderBy('opened_at')
                 ->orderBy('id')
                 ->get();
@@ -758,21 +799,6 @@ final class DeviceAlertEngine
                 return 0;
             }
 
-            $claimed = DB::transaction(function () use ($day): bool {
-                $row = SecurityDeviceSetting::query()->where('key', self::SUMMARY_SENT_DAY)->lockForUpdate()->first();
-                if ($row !== null && $row->value === $day) {
-                    return false;
-                }
-                $row ??= new SecurityDeviceSetting(['key' => self::SUMMARY_SENT_DAY]);
-                $row->value = $day;
-                $row->save();
-
-                return true;
-            }, 3);
-            if (! $claimed) {
-                return 0;
-            }
-
             $channels = $settings->channels(SecurityDevicesSettings::SUMMARY_APP, SecurityDevicesSettings::SUMMARY_EMAIL, SecurityDevicesSettings::SUMMARY_PUSH);
             $defaultRole = $settings->role(SecurityDevicesSettings::DEVICES_ROLE);
             $siteRecipients = [];
@@ -791,6 +817,8 @@ final class DeviceAlertEngine
             $alertRecipientNames = [];
             /** @var list<array{site_id: int, label: string}> $summaryItems */
             $summaryItems = [];
+            /** @var list<array{device: Device, marker: string}> $toldUpdates updates that reach someone */
+            $toldUpdates = [];
 
             foreach ($heldAlerts as $alert) {
                 $siteId = (int) ($alert->site_id ?? ($alert->device ? $this->siteId($alert->device) : 0));
@@ -846,15 +874,16 @@ final class DeviceAlertEngine
                     ? "{$updateDevice->name}: software update {$item['next']} ready"
                     : "{$updateDevice->name}: software update ready";
                 $summaryItems[] = ['site_id' => $siteId, 'label' => $line];
-                foreach ($recipientsFor($siteId, $defaultRole) as $person) {
+                $people = $recipientsFor($siteId, $defaultRole);
+                foreach ($people as $person) {
                     $perUser[$person->id] ??= ['user' => $person, 'lines' => [], 'alert_ids' => []];
                     if (! in_array($line, $perUser[$person->id]['lines'], true)) {
                         $perUser[$person->id]['lines'][] = $line;
                     }
                 }
-                $meta = is_array($updateDevice->meta) ? $updateDevice->meta : [];
-                $meta['update_ready_notified_version'] = $item['marker'];
-                $updateDevice->forceFill(['meta' => $meta])->saveQuietly();
+                if ($people->isNotEmpty()) {
+                    $toldUpdates[] = $item;
+                }
             }
 
             SecurityDeviceSetting::query()->updateOrCreate(
@@ -878,6 +907,15 @@ final class DeviceAlertEngine
                     alertIds: array_values(array_unique($entry['alert_ids'])),
                 ));
                 $sent++;
+            }
+
+            // An update counts as told only once a summary carrying it actually went to someone.
+            if ($sent > 0) {
+                foreach ($toldUpdates as $item) {
+                    $meta = is_array($item['device']->meta) ? $item['device']->meta : [];
+                    $meta['update_ready_notified_version'] = $item['marker'];
+                    $item['device']->forceFill(['meta' => $meta])->saveQuietly();
+                }
             }
 
             $how = array_map(fn (string $channel): string => match ($channel) {

@@ -30,7 +30,8 @@ use Illuminate\Support\Str;
  * - Standard sensors (7): latest readings with per-sensor configurable alert limits, 24h/7d/30d trends,
  *   battery forecast, where it is and the gateway it reports through.
  * - Bed sensors linked to a falls plan (7b): Nights view with last night's log, 7-night out-of-bed
- *   minutes, 4-check readiness ring, and privacy-gated resident details.
+ *   minutes, 4-check readiness ring, and privacy-gated resident details. Shown only to viewers who
+ *   may open the linked resident's record while their consent to monitoring sensors is active.
  * - Hot-water scald probes (7c): At the tap now, Hottest today, H&S hazard and Battery meters, plus
  *   the open scald-risk hazard banner.
  */
@@ -88,11 +89,14 @@ final class SensorPagePresenter
         $range = is_string($input['range'] ?? null) && array_key_exists($input['range'], self::RANGES) ? $input['range'] : '24h';
 
         $link = $this->links->currentFor($device);
-        $isBedSensor = SensorNightsPresenter::isBedSensor($device, $link);
+        // In or out of bed is about one resident: the Nights tab and the bed meters only for viewers
+        // who may open their record, while their consent to monitoring sensors is active. Anyone
+        // else sees a bed sensor as an ordinary sensor.
+        $showNights = SensorNightsPresenter::isBedSensor($device, $link) && $this->nights->mayShow($viewer, $link);
         $isScaldProbe = ScaldWatch::watches($device);
 
         $tabs = array_values(array_filter([
-            $isBedSensor ? 'nights' : null,
+            $showNights ? 'nights' : null,
             'readings',
             $canSeeAlerts ? 'alerts' : null,
         ]));
@@ -110,8 +114,11 @@ final class SensorPagePresenter
             ? ['label' => 'Too hot', 'tone' => 'critical']
             : ['label' => $state->label(), 'tone' => $state->tone()];
 
+        // Loaded once for both the meters and the Nights tab.
+        $nightHistory = $showNights ? $this->nights->history($device, $canSeeAlerts, $now) : null;
+
         $meters = match (true) {
-            $isBedSensor => $this->nights->meters($device, $link, $canSeeAlerts, $now),
+            $nightHistory !== null => $this->nights->meters($device, $link, $nightHistory, $canSeeAlerts, $now),
             $isScaldProbe => $this->scaldMeters($device, $readings, $battery, $daysLeft, $canSeeAlerts, $now),
             default => $this->meters($readings, $battery, $daysLeft, $device),
         };
@@ -149,12 +156,14 @@ final class SensorPagePresenter
                 'see_events' => $canSeeAlerts,
                 'manage_rules' => $canManageRules,
             ],
-            'nights' => $tab === 'nights'
-                ? $this->nights->present($viewer, $device, $link, $entry?->siteId, $siteName, $gateway, $lastReadingAt, $canSeeAlerts, $retired, $now)
+            'nights' => $tab === 'nights' && $nightHistory !== null
+                ? $this->nights->present($viewer, $device, $link, $nightHistory, $entry?->siteId, $siteName, $gateway, $lastReadingAt, $canSeeAlerts, $retired, $now)
                 : null,
             'readings' => $tab === 'readings' ? [
                 'series' => $this->series($device, $readings, $range, $now),
                 'rules' => SensorAlertRules::ruleRows($device, $readings, $battery !== null, $siteName),
+                // Who changed this sensor's limits lately, and what (audit fix, 5 Nov).
+                'rules_history' => $canSeeAlerts ? SensorAlertRules::history($device) : [],
                 'editable_rules' => $canManageRules ? SensorAlertRules::editableRules($device, $readings, $battery !== null) : null,
                 'where' => $this->where($device, $entry, $siteName, $gateway, $readings, $lastReadingAt),
             ] : null,
@@ -368,10 +377,12 @@ final class SensorPagePresenter
             ->latest('id')
             ->first();
 
+        // On a hot-water tap the tone follows the 45 °C scald rule only, not the room-temperature
+        // limits (normal hot water is well above those).
         $tapNowTone = match (true) {
             $temp === null => 'brand',
-            $temp > ScaldWatch::LIMIT_C || $activeScald !== null => 'critical',
-            ($readings['temperature']['state'] ?? 'healthy') === 'warning' => 'warning',
+            $temp > ScaldWatch::LIMIT_C => 'critical',
+            $activeScald !== null => 'warning',
             default => 'success',
         };
         $tapNowCaption = match (true) {
@@ -381,9 +392,11 @@ final class SensorPagePresenter
                 'at' => $activeScald->opened_at->toIso8601String(),
             ],
             $temp > ScaldWatch::LIMIT_C => ['text' => 'Over 45 °C · scald risk', 'at' => null],
+            $activeScald !== null => ['text' => 'Back under 45 °C · watching for 24 hours', 'at' => null],
             default => ['text' => 'At or under 45 °C · safe', 'at' => null],
         };
 
+        // Hottest today: today's readings only (the NZ day). An older reading is never "today".
         $todayStartUtc = $now->setTimezone(CareRules::ZONE)->startOfDay()->utc();
         $hottestRow = DB::table('security_device_sensor_readings')
             ->where('device_id', $device->id)
@@ -393,10 +406,16 @@ final class SensorPagePresenter
             ->orderByDesc('observed_at')
             ->first(['value', 'observed_at']);
 
-        $hottestVal = $hottestRow !== null ? (float) $hottestRow->value : $temp;
-        $hottestAt = $hottestRow !== null
-            ? CarbonImmutable::parse((string) $hottestRow->observed_at, 'UTC')->toIso8601String()
-            : ($readings['temperature']['at'] ?? null);
+        $storedAt = is_string($readings['temperature']['at'] ?? null) ? CarbonImmutable::parse($readings['temperature']['at']) : null;
+        $storedIsToday = $temp !== null && $storedAt !== null && $storedAt->gte($todayStartUtc);
+        [$hottestVal, $hottestAt] = match (true) {
+            $hottestRow !== null => [
+                (float) $hottestRow->value,
+                CarbonImmutable::parse((string) $hottestRow->observed_at, 'UTC')->toIso8601String(),
+            ],
+            $storedIsToday => [$temp, $storedAt->toIso8601String()],
+            default => [null, null],
+        };
 
         $hazard = $activeScald?->hazard_id !== null ? SiteHazard::query()->find($activeScald->hazard_id) : null;
         if ($hazard === null) {
@@ -436,8 +455,12 @@ final class SensorPagePresenter
                 'hazard',
                 'H&S hazard',
                 'None',
-                ['text' => 'Tap under 45 °C', 'at' => null],
-                'success',
+                ['text' => match (true) {
+                    $temp === null => 'No reading yet',
+                    $temp > ScaldWatch::LIMIT_C => 'Waiting for three hot readings in a row',
+                    default => 'Tap at or under 45 °C',
+                }, 'at' => null],
+                $temp !== null && $temp <= ScaldWatch::LIMIT_C ? 'success' : 'brand',
             ),
         };
 

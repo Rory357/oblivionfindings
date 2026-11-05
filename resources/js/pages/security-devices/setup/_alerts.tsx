@@ -24,7 +24,7 @@ export function SetupAlertRules({ data, draft }: { data: NonNullable<SetupProps[
                 <RoleRow settingKey="alerts.devices.role" draft={draft} />
                 <SettingRow
                     label="Low batteries"
-                    hint="Sensors and care trackers below 20%"
+                    hint="Below 20% unless a sensor has its own limit · panic buttons, alarms, doors, cameras and care sensors also tell staff on shift straight away"
                     control={<span className="text-subtle">One summary at 6:00 am</span>}
                 />
                 <RosterRow draft={draft} />

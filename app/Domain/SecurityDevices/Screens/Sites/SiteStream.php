@@ -83,14 +83,15 @@ final class SiteStream
      *                         otherwise each alert is one line with what happened next (Activity)
      * @return list<array<string, mixed>>
      */
-    public function between(User $viewer, Collection $entries, array $sites, CarbonImmutable $from, CarbonImmutable $to, bool $logbook, int $limit = 400): array
+    public function between(User $viewer, Collection $entries, array $sites, CarbonImmutable $from, CarbonImmutable $to, bool $logbook, int $limit = 400, ?int $perSource = null): array
     {
         if (! self::mayView($viewer) || $sites === [] || $to->lte($from)) {
             return [];
         }
         $byId = $entries->keyBy(fn (DeviceEntry $entry): int => $entry->id());
         $now = CarbonImmutable::now('UTC');
-        $perSource = max(self::PER_SOURCE, min($limit, 2500));
+        // The screens keep their usual reads; only the logbook export asks for more (audit fix, 5 Nov).
+        $perSource = max(1, min($perSource ?? self::PER_SOURCE, 2500));
         $lines = [
             ...$this->alerts($viewer, $byId, $sites, $from, $to, $now, $logbook, $perSource),
             ...$this->deviceEvents($viewer, $byId, $sites, $from, $to, $perSource),

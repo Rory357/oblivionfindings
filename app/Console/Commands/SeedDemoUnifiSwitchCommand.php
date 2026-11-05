@@ -158,9 +158,7 @@ final class SeedDemoUnifiSwitchCommand extends Command
             'firmware_version' => '6.6.61',
             'last_seen_at' => now()->subMinutes(2),
             'meta' => $meta,
-            'config' => [
-                'ssh' => ['user' => 'ubnt-admin'],
-            ],
+            'config' => null,
             'created_by_user_id' => $switch->created_by_user_id ?? $actorId,
             'deleted_at' => null,
         ])->save();
@@ -533,7 +531,7 @@ final class SeedDemoUnifiSwitchCommand extends Command
                 'meta' => [
                     'actor_id' => $actorId,
                     'site_id' => $site->id,
-                    'fields' => ['tell_it_update_ready', 'ssh_user'],
+                    'fields' => ['tell_it_update_ready'],
                     'after' => ['is_enabled' => true],
                 ],
                 'ip_address' => '127.0.0.1',

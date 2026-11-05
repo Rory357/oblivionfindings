@@ -109,7 +109,8 @@ export type SettingsTab = {
     };
     staff_options?: StaffChoice[];
     /** Null for anyone who may not use the terminal (non-IT-admins). */
-    ssh?: { user: string | null } | null;
+    /** Always null since the audit (5 Nov): the SSH user comes from the saved login, shown read-only in it. */
+    ssh?: null;
     it: [string, string][];
     edit: { domain: string; category: string; subcategory: string | null } | null;
 };

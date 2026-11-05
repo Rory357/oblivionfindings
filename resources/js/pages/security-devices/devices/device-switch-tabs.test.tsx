@@ -263,8 +263,8 @@ describe('Switch · Settings tab (pg-sdr-3f)', () => {
         expect(screen.getByText(/by Synthetic Adder, from a scan/)).toBeInTheDocument();
     });
 
-    it('saves update summary, looked-after person and IT-admin-only SSH user without exposing SSH user to others', async () => {
-        vi.mocked(axios.patch).mockResolvedValue({ data: { ok: true, changed: ['looked_after_by_user_id', 'ssh_user', 'tell_it_update_ready'] } });
+    it('saves update summary and looked-after person; the SSH user is read-only, from the saved login (audit fix)', async () => {
+        vi.mocked(axios.patch).mockResolvedValue({ data: { ok: true, changed: ['looked_after_by_user_id', 'tell_it_update_ready'] } });
 
         // Without terminal permission (ssh: null): SSH user row is hidden.
         const { unmount } = render(
@@ -279,7 +279,7 @@ describe('Switch · Settings tab (pg-sdr-3f)', () => {
         expect(screen.queryByLabelText(/^SSH user/)).not.toBeInTheDocument();
         unmount();
 
-        // IT admin + device editor sees Looked after by, SSH user, and Tell IT when an update is ready.
+        // IT admin + device editor: Looked after by and Tell IT when an update is ready can change; SSH user can't.
         render(
             <DevicePage
                 {...pageFixture({
@@ -293,7 +293,7 @@ describe('Switch · Settings tab (pg-sdr-3f)', () => {
                             { id: 12, name: 'Jordan Peri', sub: 'IT', label: 'Jordan Peri, IT' },
                             { id: 15, name: 'Ana Ruha', sub: 'House lead', label: 'Ana Ruha, House lead' },
                         ],
-                        ssh: { user: null },
+                        ssh: null,
                         it: [
                             ['MAC', '74:ac:b9:00:00:01'],
                             ['Software', '6.6.61 · 6.6.65 ready'],
@@ -306,15 +306,15 @@ describe('Switch · Settings tab (pg-sdr-3f)', () => {
 
         fireEvent.click(screen.getByRole('combobox', { name: 'Looked after by' }));
         fireEvent.click(await screen.findByText('Jordan Peri'));
-        fireEvent.change(screen.getByLabelText(/^SSH user/), { target: { value: 'netadmin' } });
+        expect(screen.queryByLabelText(/^SSH user/)).not.toBeInTheDocument();
+        expect(screen.getByText('From the saved login')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('switch', { name: 'Tell IT when an update is ready' }));
 
-        expect(screen.getByText('3 changes not saved')).toBeInTheDocument();
+        expect(screen.getByText('2 changes not saved')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
         const dialog = screen.getByRole('dialog');
-        expect(within(dialog).getByText('Save 3 changes to Synthetic switch?')).toBeInTheDocument();
+        expect(within(dialog).getByText('Save 2 changes to Synthetic switch?')).toBeInTheDocument();
         expect(within(dialog).getByText(/Not set → Jordan Peri, IT/)).toBeInTheDocument();
-        expect(within(dialog).getByText(/From the saved login → netadmin/)).toBeInTheDocument();
 
         fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
         await waitFor(() => {
@@ -322,7 +322,6 @@ describe('Switch · Settings tab (pg-sdr-3f)', () => {
                 '/security-devices/devices/41/settings',
                 {
                     looked_after_by_user_id: 12,
-                    ssh_user: 'netadmin',
                     tell_it_update_ready: false,
                 },
                 expect.anything(),

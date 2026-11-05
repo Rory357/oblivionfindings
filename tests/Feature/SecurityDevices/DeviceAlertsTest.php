@@ -548,6 +548,34 @@ class DeviceAlertsTest extends TestCase
         Notification::assertSentTo($ana, SecurityDeviceAlertNotification::class, fn (SecurityDeviceAlertNotification $n): bool => $n->alertId === (int) $routerAlert->id);
     }
 
+    public function test_a_flat_battery_on_a_safety_device_tells_staff_on_shift_at_once_even_in_quiet_hours(): void
+    {
+        // Audit fix (5 Nov): a panic button with a flat battery stops protecting someone, so its notice never waits.
+        Notification::fake();
+        $this->freezeAt('2026-11-02T11:00:00Z'); // midnight NZDT, inside the default quiet hours
+        $it = $this->person(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'securityDevices.monitoring.manage']);
+        $onShift = User::factory()->create(['approved_at' => now(), 'name' => 'Mere Tane']);
+        Shift::factory()->create([
+            'client_id' => \App\Models\Client::factory()->create(['site_id' => $this->home->id])->id, 'site_id' => $this->home->id,
+            'user_id' => $onShift->id, 'starts_at' => now()->subHours(2), 'ends_at' => now()->addHours(8), 'status' => 'scheduled',
+        ]);
+        $panic = Device::factory()->security()->create(['name' => 'Lounge panic button']);
+        DeviceAssignment::create(['device_id' => $panic->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $this->home->id, 'assigned_at' => now()->subDays(3)]);
+
+        $this->engine->onBattery($panic, 12, CarbonImmutable::now('UTC'));
+
+        Notification::assertSentTo($onShift, SecurityDeviceAlertNotification::class);
+        $alert = DeviceAlert::query()->where('device_id', $panic->id)->sole();
+        expect($alert->events()->pluck('kind')->all())->toBe(['opened', 'told']);
+
+        // IT still sees it in the 6:00 am summary.
+        $this->freezeAt('2026-11-02T17:00:00Z');
+        $this->engine->tick();
+        $sent = Notification::sent($it, SecurityDeviceMorningSummaryNotification::class);
+        expect($sent)->toHaveCount(1)
+            ->and(implode(' | ', $sent->first()->lines))->toContain('Lounge panic button: battery 12%');
+    }
+
     public function test_setup_saves_quiet_hours_and_summary_channels_and_logs_plain_english_history(): void
     {
         $manager = $this->person(['securityDevices.viewAny', 'securityDevices.integrations.view', 'securityDevices.automations.manage']);

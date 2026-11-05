@@ -251,15 +251,15 @@ it('renders the 7b Nights view, 4-check readiness ring, 7-night bars, and hides 
             expect(collect($props['nights']['last_night']['items'])->pluck('title')->all())->toContain('Out of bed for 12 min');
         });
 
-    // Viewer without client access never sees Hemi's name on Nights OR on Alerts!
+    // Viewer without client access gets no Nights tab at all (in or out of bed is about Hemi), and
+    // never sees Hemi's name on the sensor page OR on Alerts.
     $nightsBody = (string) $this->actingAs($deviceOnly)
         ->get("/security-devices/devices/{$this->bed->id}")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('nights.readiness.passed', 4)
-            ->where('nights.person_card.name', 'Resident')
-            ->where('nights.person_card.href', null)
-            ->where('nights.care_banner.person_href', null))
+            ->where('tab', 'readings')
+            ->where('nights', null)
+            ->where('care.link.person_href', null))
         ->getContent();
     expect($nightsBody)->not->toContain('Hemi');
 
@@ -313,4 +313,180 @@ it('shows the 7c tap temperature, hottest today and H&S hazard meters on a scald
         ->assertInertia(fn ($page) => $page
             ->where('meters.2.value', 'Raised')
             ->where('care.scald.alert.hazard_raised', true));
+});
+
+/*
+ * Audit fixes for the 7b Nights view and the 7c meters: nothing is claimed that the stored readings,
+ * alerts and roster don't show, and in/out of bed never reaches someone who can't open the record.
+ */
+
+it('counts time out of bed from the start of the night when they were already up, never “In bed all night”', function (): void {
+    $this->travelTo(($this->nz)('2026-11-04 09:00'));
+    ($this->consent)($this->hemi);
+    ($this->link)()->assertCreated();
+    $history = app(SensorReadingHistory::class);
+    // Up at 9:30 pm, before the night hours (10 pm – 6 am); back in bed at 11:40 pm; up for the day at 7:05 am.
+    $history->record($this->bed->id, ['occupancy' => 0], ($this->nz)('2026-11-03 21:30'));
+    $history->record($this->bed->id, ['occupancy' => 1], ($this->nz)('2026-11-03 23:40'));
+    $history->record($this->bed->id, ['occupancy' => 0], ($this->nz)('2026-11-04 07:05'));
+    $clinical = ($this->person)(['securityDevices.viewAny', 'securityDevices.devices.view', 'clients.viewAny']);
+
+    $this->actingAs($clinical)
+        ->get("/security-devices/devices/{$this->bed->id}")
+        ->assertOk()
+        ->assertInertia(function ($page): void {
+            $page->where('tab', 'nights')
+                ->where('meters.0.value', 'Up')
+                ->where('meters.1.label', 'Last night')
+                ->where('meters.1.value', 'Out once')
+                // No events.view: nothing about alerts, and never "under the rule" for 100 minutes.
+                ->where('meters.1.caption.text', 'Longest 100 min · over the 10 min rule')
+                ->where('nights.seven_nights.values.6', 100)
+                ->where('nights.seven_nights.values.5', null);
+            $items = collect($page->toArray()['props']['nights']['last_night']['items']);
+            $out = $items->firstWhere('key', 'out-0');
+            expect($items->pluck('title')->all())->not->toContain('In bed all night')
+                ->and($out['time'])->toBe('10:00 pm')
+                ->and($out['title'])->toBe('Out of bed for 100 min')
+                ->and($out['sub'])->toBe('Already out of bed when night hours started · Back at 11:40 pm · over 10 minutes');
+        });
+});
+
+it('says “Not available” for a night with no bed readings, and never draws it as 0', function (): void {
+    $this->travelTo(($this->nz)('2026-11-04 09:00'));
+    ($this->consent)($this->hemi);
+    ($this->link)()->assertCreated();
+    $clinical = ($this->person)(['securityDevices.viewAny', 'securityDevices.devices.view', 'clients.viewAny']);
+    $page = fn () => $this->actingAs($clinical)->get("/security-devices/devices/{$this->bed->id}")->assertOk();
+
+    $page()->assertInertia(fn ($page) => $page
+        ->where('tab', 'nights')
+        ->where('meters.0.value', null)
+        ->where('meters.1.value', null)
+        ->where('meters.1.caption.text', 'No bed readings recorded')
+        ->where('nights.last_night.items', [])
+        ->where('nights.last_night.empty', 'No bed readings were recorded last night.')
+        ->where('nights.seven_nights.values', [null, null, null, null, null, null, null]));
+
+    // One "in bed" reading at 9 pm on Sat 31 Oct: that night is a real 0, but a reading more than a
+    // day old doesn't say anything about later nights.
+    app(SensorReadingHistory::class)->record($this->bed->id, ['occupancy' => 1], ($this->nz)('2026-10-31 21:00'));
+    $page()->assertInertia(fn ($page) => $page
+        ->where('meters.1.value', null)
+        ->where('nights.seven_nights.labels', ['Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue'])
+        ->where('nights.seven_nights.values', [null, null, null, 0, null, null, null]));
+});
+
+it('never shows in or out of bed to someone who can’t open the resident’s record', function (): void {
+    $this->travelTo(($this->nz)('2026-11-04 09:00'));
+    $this->bed->forceFill(['name' => 'Room 4 bed sensor'])->save();
+    ($this->consent)($this->hemi);
+    ($this->link)()->assertCreated();
+    $history = app(SensorReadingHistory::class);
+    $history->record($this->bed->id, ['occupancy' => 1], ($this->nz)('2026-11-03 22:15'));
+    $history->record($this->bed->id, ['occupancy' => 0], ($this->nz)('2026-11-04 01:10'));
+    $history->record($this->bed->id, ['occupancy' => 1], ($this->nz)('2026-11-04 01:30'));
+    $history->record($this->bed->id, ['occupancy' => 0], ($this->nz)('2026-11-04 07:05'));
+    // May see devices and their alerts, but not Hemi's record.
+    $deviceOnly = ($this->person)(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view']);
+
+    foreach (['', '?tab=nights'] as $query) {
+        $body = (string) $this->actingAs($deviceOnly)
+            ->get("/security-devices/devices/{$this->bed->id}{$query}")
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $props = $page->toArray()['props'];
+                $json = json_encode($props, JSON_UNESCAPED_UNICODE);
+                expect($props['tab'])->toBe('readings')
+                    ->and(collect($props['tabs'])->pluck('key')->all())->toBe(['readings', 'alerts'])
+                    ->and($props['nights'])->toBeNull()
+                    ->and(collect($props['meters'])->pluck('key')->intersect(['right_now', 'last_night', 'alerts_7d'])->values()->all())->toBe([])
+                    ->and($json)->not->toContain('In bed')
+                    ->and($json)->not->toContain('Out of bed')
+                    ->and($json)->not->toContain('Out once')
+                    ->and($json)->not->toContain('Falls risk');
+            })
+            ->getContent();
+        expect($body)->not->toContain('Hemi');
+    }
+});
+
+it('only counts the night shift as filled when the roster covers the whole night', function (): void {
+    $this->travelTo(($this->nz)('2026-11-04 09:00'));
+    ($this->consent)($this->hemi);
+    ($this->link)()->assertCreated();
+    $clinical = ($this->person)(['securityDevices.viewAny', 'securityDevices.devices.view', 'clients.viewAny']);
+    $shift = fn (string $from, string $to, string $status = 'scheduled') => \App\Models\Shift::query()->create([
+        'site_id' => $this->site->id,
+        'client_id' => $this->hemi->id,
+        'user_id' => $this->keeper->id,
+        'starts_at' => ($this->nz)($from),
+        'ends_at' => ($this->nz)($to),
+        'status' => $status,
+    ]);
+
+    // Tonight's night hours: Wed 4 Nov 10 pm – Thu 5 Nov 6 am. Only 10 pm – 2 am is rostered; the
+    // shift for the rest was cancelled.
+    $shift('2026-11-04 22:00', '2026-11-05 02:00');
+    $shift('2026-11-05 02:00', '2026-11-05 07:00', 'cancelled');
+    $this->actingAs($clinical)
+        ->get("/security-devices/devices/{$this->bed->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('nights.readiness.checks.3.state', 'warning')
+            ->where('nights.readiness.checks.3.label', 'Night shift on the roster doesn’t cover the whole night')
+            ->where('nights.readiness.checks.3.note', 'Not covered from 2:00 am to 6:00 am'));
+
+    // A scheduled shift for the rest of the night: now it's filled.
+    $shift('2026-11-05 02:00', '2026-11-05 07:00');
+    $this->actingAs($clinical)
+        ->get("/security-devices/devices/{$this->bed->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('nights.readiness.checks.3.state', 'success')
+            ->where('nights.readiness.checks.3.label', 'Night shift filled on the roster tonight')
+            ->where('nights.readiness.checks.3.note', '10:00 pm – 7:00 am'));
+});
+
+it('keeps normal hot water out of warning on a scald probe, and only counts today’s readings as hottest today', function (): void {
+    $this->travelTo(($this->nz)('2026-11-04 12:00'));
+    $probe = function (string $name, CarbonImmutable $at): Device {
+        $tap = ($this->sensor)($name, $this->site);
+        $tap->forceFill([
+            'config' => ['care' => ['scald_watch' => true]],
+            'meta' => ['observed' => ['sensor_readings' => [
+                'temperature' => ['label' => 'Temperature', 'value' => 41.0, 'unit' => 'C', 'state' => 'healthy', 'observed_at' => $at->toIso8601String()],
+            ]]],
+        ])->save();
+        app(SensorReadingHistory::class)->record($tap->id, ['temperature' => 41.0], $at);
+
+        return $tap;
+    };
+    $viewer = ($this->person)(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view']);
+
+    // 41 °C is normal hot water: over the room-temperature limit (32 °C), but under the 45 °C scald rule.
+    $today = $probe('Hot water at Room 5 tap', CarbonImmutable::now('UTC')->subMinute());
+    $this->actingAs($viewer)
+        ->get("/security-devices/devices/{$today->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('device.badge.label', fn (string $label): bool => $label !== 'Too hot')
+            ->where('meters.0.label', 'At the tap now')
+            ->where('meters.0.value', '41 °C')
+            ->where('meters.0.tone', 'success')
+            ->where('meters.0.caption.text', 'At or under 45 °C · safe')
+            ->where('meters.1.label', 'Hottest today')
+            ->where('meters.1.value', '41 °C')
+            ->where('meters.2.value', 'None')
+            ->where('meters.2.tone', 'success'));
+
+    // Only a reading from yesterday: Hottest today is "Not available", never yesterday's reading.
+    $yesterday = $probe('Hot water at Room 6 tap', CarbonImmutable::now('UTC')->subDay());
+    $this->actingAs($viewer)
+        ->get("/security-devices/devices/{$yesterday->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('meters.1.label', 'Hottest today')
+            ->where('meters.1.value', null)
+            ->where('meters.1.caption.text', 'No reading today'));
 });

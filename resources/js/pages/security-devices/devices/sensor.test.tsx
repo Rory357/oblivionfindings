@@ -226,8 +226,9 @@ describe('Sensor page (pg-sdr-7)', () => {
                         },
                         seven_nights: {
                             labels: ['Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue'],
-                            values: [4, 0, 14, 6, 3, 0, 8],
-                            note: 'One alert in the last 7 nights: Sat 24 Oct, 2:40 am.',
+                            // Thu has no readings: null, never drawn as 0.
+                            values: [4, null, 14, 6, 3, 0, 8],
+                            note: 'One alert in the last 7 nights: Sat 24 Oct, 2:40 am. No readings on 1 of the 7 nights.',
                         },
                         readiness: {
                             passed: 4,
@@ -241,12 +242,13 @@ describe('Sensor page (pg-sdr-7)', () => {
                                 { state: 'success', label: 'Night shift filled on the roster tonight', note: '10:00 pm – 7:00 am' },
                             ],
                         },
+                        // Without access to the resident's record: no room, flag or key worker.
                         person_card: {
                             name: 'Resident',
-                            sub: 'Synthetic House · Room 3',
-                            flag: 'Falls risk',
+                            sub: 'Synthetic House',
+                            flag: null,
                             href: null,
-                            key_worker: 'Synthetic Worker',
+                            key_worker: null,
                         },
                         what_it_senses: [
                             { label: 'Senses', text: 'In bed or out of bed only', at: null },
@@ -260,7 +262,14 @@ describe('Sensor page (pg-sdr-7)', () => {
         expect(within(meterBlock('Right now')).getByText('Up')).toBeInTheDocument();
         expect(within(meterBlock('Last night')).getByText('Out twice')).toBeInTheDocument();
         expect(screen.getByText('Out of bed for 6 min')).toBeInTheDocument();
-        expect(screen.getByRole('img', { name: /Minutes out of bed at night/ })).toBeInTheDocument();
+        const bars = screen.getByRole('img', { name: /Minutes out of bed at night/ });
+        expect(bars).toHaveAccessibleName('Minutes out of bed at night: Wed 4, Thu no readings, Fri 14, Sat 6, Sun 3, Mon 0, Tue 8');
+        // The night with no readings says so and draws no bar; only Mon's real 0 is written as 0.
+        expect(within(bars).getByText('No readings')).toBeInTheDocument();
+        expect(within(bars).getAllByText('0')).toHaveLength(1);
+        expect(bars.querySelectorAll('i')).toHaveLength(6);
+        expect(screen.queryByText('Falls risk')).not.toBeInTheDocument();
+        expect(screen.queryByText('Synthetic Worker')).not.toBeInTheDocument();
         expect(screen.getByRole('img', { name: '4 of 4' })).toBeInTheDocument();
         expect(screen.getByText('Ready to alert night staff')).toBeInTheDocument();
         expect(screen.getByText('Night shift filled on the roster tonight')).toBeInTheDocument();
