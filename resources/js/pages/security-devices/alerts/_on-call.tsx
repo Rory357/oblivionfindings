@@ -38,6 +38,7 @@ const WHEN_WORDS: Record<OnCall['people'][number]['when'], string> = {
     now: 'on call now',
     next: 'on call next',
     before: 'was on call',
+    backup: 'backup',
 };
 
 const onOff = (on: boolean) =>
@@ -124,13 +125,25 @@ export function OnCallTab({ data, now }: { data: OnCall; now: Date }) {
                             id: person.id,
                             name: person.name,
                             sub: `${person.role ? `${person.role} · ` : ''}${WHEN_WORDS[person.when]}`,
-                            presence: person.when === 'now' ? 'on' : undefined,
-                            foot: (
-                                <>
-                                    <b>{formatDate(person.from)}</b> to{' '}
-                                    {formatDateTime(person.to)}
-                                </>
-                            ),
+                            presence:
+                                person.when === 'now' ||
+                                person.when === 'backup'
+                                    ? 'on'
+                                    : undefined,
+                            days: person.days ?? undefined,
+                            foot:
+                                person.when === 'backup' ? (
+                                    <>
+                                        <b>Told after an hour</b> if nobody
+                                        acknowledges · until{' '}
+                                        {formatDateTime(person.to)}
+                                    </>
+                                ) : (
+                                    <>
+                                        <b>{formatDate(person.from)}</b> to{' '}
+                                        {formatDateTime(person.to)}
+                                    </>
+                                ),
                         }))}
                     />
                 ) : (
@@ -144,6 +157,10 @@ export function OnCallTab({ data, now }: { data: OnCall; now: Date }) {
                         <Story
                             title="Handover notes"
                             sub={`From ${note.from}${note.to ? ` to ${note.to}` : ''} · ${formatDateTime(note.at)}`}
+                            action={{
+                                label: 'All handovers',
+                                href: '/security-devices/alerts/on-call/handovers',
+                            }}
                             paras={paras}
                         />
                     ) : (
@@ -225,7 +242,7 @@ export function OnCallTab({ data, now }: { data: OnCall; now: Date }) {
                 </section>
             </div>
             <SideColumn>
-                {data.waiting.length === 0 ? (
+                {data.waiting.length === 0 && !data.summary ? (
                     <QuietLine
                         title={first ? `With ${first} now` : 'Waiting on someone'}
                         text="No device or hub alert is waiting for someone to acknowledge it."
@@ -233,29 +250,48 @@ export function OnCallTab({ data, now }: { data: OnCall; now: Date }) {
                 ) : (
                     <Log
                         title={first ? `With ${first} now` : 'Waiting on someone'}
-                        sub="Open IT alerts nobody has acknowledged yet"
-                        items={data.waiting.map((alert) => ({
-                            key: alert.id,
-                            time: seenTime(alert.at, now),
-                            tone: alert.tone,
-                            title: alert.title,
-                            sub: [
-                                alert.told_at
-                                    ? `Told ${seenTime(alert.told_at, now)}`
-                                    : 'Nobody told yet',
-                                alert.reminded_at
-                                    ? `reminded ${seenTime(alert.reminded_at, now)}`
-                                    : null,
-                                'not acknowledged yet',
-                            ]
-                                .filter(Boolean)
-                                .join(' · '),
-                            action: {
-                                label: 'Open',
-                                href: `/security-devices/alerts?alert=${alert.id}`,
-                                ariaLabel: `Open ${alert.title}`,
-                            },
-                        }))}
+                        sub={
+                            data.waiting.length > 0
+                                ? 'Open IT alerts nobody has acknowledged yet'
+                                : 'Sent in today’s morning summary'
+                        }
+                        items={[
+                            ...data.waiting.map((alert) => ({
+                                key: alert.id,
+                                time: seenTime(alert.at, now),
+                                tone: alert.tone,
+                                title: alert.title,
+                                sub: [
+                                    alert.told_at
+                                        ? `Told ${seenTime(alert.told_at, now)}`
+                                        : alert.held
+                                          ? 'Waiting for the 6:00 am summary'
+                                          : 'Nobody told yet',
+                                    alert.reminded_at
+                                        ? `reminded ${seenTime(alert.reminded_at, now)}`
+                                        : null,
+                                    'not acknowledged yet',
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · '),
+                                action: {
+                                    label: 'Open',
+                                    href: `/security-devices/alerts?alert=${alert.id}`,
+                                    ariaLabel: `Open ${alert.title}`,
+                                },
+                            })),
+                            ...(data.summary
+                                ? [
+                                      {
+                                          key: 'morning-summary',
+                                          time: seenTime(data.summary.at, now),
+                                          tone: 'info' as const,
+                                          title: 'Morning summary',
+                                          sub: data.summary.text,
+                                      },
+                                  ]
+                                : []),
+                        ]}
                     />
                 )}
                 {data.now === null ? (

@@ -562,6 +562,16 @@ Route::middleware([
         ->whereNumber('site')
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.sites.show');
+    // S&D 12i: export a day or date range of the Site's logbook as PDF or CSV, with a required audited reason.
+    Route::post('/sites/{site}/logbook/export', [SitesController::class, 'exportLogbook'])
+        ->whereNumber('site')
+        ->middleware(['permission:securityDevices.devices.view', 'throttle:20,1'])
+        ->name('security-devices.sites.logbook.export');
+    // S&D 12j: place unplaced Site devices (e.g. radio sensors) onto the Site map by hand.
+    Route::post('/sites/{site}/network/place', [SitesController::class, 'placeOnMap'])
+        ->whereNumber('site')
+        ->middleware(['permission:securityDevices.devices.update', 'throttle:30,1'])
+        ->name('security-devices.sites.network.place');
     // S&D Phase F (pg-sdr-12c, pop-ups 42 and 43): a Site's house modes. Safe actions only; another Site's mode is 404.
     Route::post('/sites/{site}/modes', [\App\Domain\SecurityDevices\Screens\Http\SiteModesController::class, 'store'])
         ->whereNumber('site')
@@ -633,7 +643,9 @@ Route::middleware([
     // S&D rebuild Phase D: Alerts, and what people do on one. The controller checks permissions.
     Route::get('/alerts', [AlertsController::class, 'index'])
         ->name('security-devices.alerts.index');
-    // S&D round 3 (pg-sdr-13d): a handover note for the next person on IT on call.
+    // S&D round 3 (pg-sdr-13d): handover notes between the people on IT on call.
+    Route::get('/alerts/on-call/handovers', [AlertsController::class, 'handovers'])
+        ->name('security-devices.alerts.on-call.handovers');
     Route::post('/alerts/on-call/handover', [AlertsController::class, 'handover'])
         ->middleware('throttle:10,1')
         ->name('security-devices.alerts.on-call.handover');
@@ -717,12 +729,23 @@ Route::middleware([
         ->middleware(['permission:securityDevices.savedLogins.manage', 'throttle:10,1'])
         ->name('security-devices.devices.saved-login.update');
 
-    // S&D Phase F: link a sensor to a person's care (pop-up 65, consent checked) and the scald watch.
+    // S&D v13 (pg-sdr-3f): per-device Settings extras (update notice, looked-after-by person, IT-admin SSH user).
+    Route::patch('/devices/{device}/settings', [\App\Domain\SecurityDevices\Screens\Http\DevicePageController::class, 'updateSettings'])
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.devices.update|securityDevices.monitoring.manage',
+            'throttle:20,1',
+        ])
+        ->name('security-devices.devices.settings.update');
+
+    // S&D Phase F + E6: link a sensor to a person's care (pop-up 65, consent checked), scald watch, and per-sensor alert limits.
     Route::prefix('/devices/{device}')->whereNumber('device')->middleware('throttle:30,1')->group(function (): void {
         Route::get('/care-link/options', [CareLinkController::class, 'options'])->name('security-devices.devices.care-link.options');
         Route::post('/care-link', [CareLinkController::class, 'store'])->name('security-devices.devices.care-link.store');
         Route::delete('/care-link', [CareLinkController::class, 'destroy'])->name('security-devices.devices.care-link.destroy');
         Route::put('/scald-watch', [CareLinkController::class, 'scaldWatch'])->name('security-devices.devices.scald-watch');
+        Route::put('/alert-limits', [CareLinkController::class, 'alertLimits'])->name('security-devices.devices.alert-limits');
     });
 
     // ── S&D rebuild C6: the old pages send people to the six-entry menu ──

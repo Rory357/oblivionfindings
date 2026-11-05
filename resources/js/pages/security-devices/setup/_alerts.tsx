@@ -1,13 +1,15 @@
 /**
- * Setup › Alerts & checks › Alert rules (pg-sdr-15g): who is told when a rule doesn't say, and
- * how. Quiet hours and the morning summary aren't built yet, so they aren't shown.
+ * Setup › Alerts & checks › Alert rules (pg-sdr-15g): who is told when a rule doesn't say, how
+ * each notice goes out (including the 6:00 am summary), and overnight quiet hours for device and
+ * hub alerts. Safety alerts never wait.
  */
+import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
 import { OnOff, SettingGroup, SettingRow } from '@/components/referrals/settings-ui';
 import { Note } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight, Send, Users } from 'lucide-react';
-import { ChannelGroup, RoleRow, type SettingsDraft } from './_settings';
+import { ArrowUpRight, Moon, Send, Users } from 'lucide-react';
+import { ChannelGroup, formatClock, labelWithBadge, RoleRow, type SettingsDraft } from './_settings';
 import type { SetupProps } from './_types';
 
 export function SetupAlertRules({ data, draft }: { data: NonNullable<SetupProps['alerts']>; draft: SettingsDraft }) {
@@ -20,6 +22,11 @@ export function SetupAlertRules({ data, draft }: { data: NonNullable<SetupProps[
                     control={<span className="text-subtle">Staff on shift at that house · Control Room straight away</span>}
                 />
                 <RoleRow settingKey="alerts.devices.role" draft={draft} />
+                <SettingRow
+                    label="Low batteries"
+                    hint="Below 20% unless a sensor has its own limit · panic buttons, alarms, doors, cameras and care sensors also tell staff on shift straight away"
+                    control={<span className="text-subtle">One summary at 6:00 am</span>}
+                />
                 <RosterRow draft={draft} />
             </SettingGroup>
             <ChannelGroup
@@ -43,8 +50,14 @@ export function SetupAlertRules({ data, draft }: { data: NonNullable<SetupProps[
                         hint: 'People who manage connected services at that Site · one notice per scan',
                         keys: ['notify.new_devices.app', 'notify.new_devices.email', 'notify.new_devices.push'],
                     },
+                    {
+                        label: 'Daily summary',
+                        hint: 'Low batteries, overnight alerts and hub updates, at 6:00 am',
+                        keys: ['alerts.summary.app', 'alerts.summary.email', 'alerts.summary.push'],
+                    },
                 ]}
             />
+            <QuietHoursGroup draft={draft} />
             <Note>
                 {data.rules === 0 ? 'No rules of your own yet, so these defaults apply everywhere.' : data.rules === 1 ? '1 rule of your own changes these for some devices.' : `${data.rules} rules of your own change these for some devices.`}{' '}
                 <Button variant="link" className="h-auto px-0" asChild>
@@ -65,9 +78,76 @@ function RosterRow({ draft }: { draft: SettingsDraft }) {
 
     return (
         <SettingRow
-            label={label}
+            label={labelWithBadge(label, draft, ['alerts.safety.roster'])}
             hint="From Rostering and clock-ins, at the moment it happens. Off, or nobody on shift: everyone at that Site who can acknowledge alerts"
             control={<OnOff label={label} checked={draft.value('alerts.safety.roster') === true} onChange={(next) => draft.set('alerts.safety.roster', next)} disabled={!row.can_change} />}
         />
+    );
+}
+
+function QuietHoursGroup({ draft }: { draft: SettingsDraft }) {
+    const toggle = draft.settings?.['alerts.quiet_hours.on'];
+    const startRow = draft.settings?.['alerts.quiet_hours.start'];
+    const endRow = draft.settings?.['alerts.quiet_hours.end'];
+    if (!toggle || toggle.type !== 'bool' || !startRow || startRow.type !== 'time' || !endRow || endRow.type !== 'time') {
+        return null;
+    }
+    const on = draft.value('alerts.quiet_hours.on') === true;
+    const startValue = typeof draft.value('alerts.quiet_hours.start') === 'string' ? (draft.value('alerts.quiet_hours.start') as string) : '22:00';
+    const endValue = typeof draft.value('alerts.quiet_hours.end') === 'string' ? (draft.value('alerts.quiet_hours.end') as string) : '06:00';
+    const canEditTimes = on && startRow.can_change && endRow.can_change;
+
+    return (
+        <SettingGroup
+            icon={Moon}
+            title="Quiet hours"
+            caption="Device and hub alerts wait for the 6:00 am summary; safety alerts never wait"
+        >
+            <SettingRow
+                label={labelWithBadge('Hold device alerts overnight', draft, ['alerts.quiet_hours.on'])}
+                hint="Safety alerts, care rules, emergencies and internet-exposure checks never wait"
+                control={
+                    <OnOff
+                        label="Hold device alerts overnight"
+                        checked={on}
+                        onChange={(next) => draft.set('alerts.quiet_hours.on', next)}
+                        disabled={!toggle.can_change}
+                    />
+                }
+            />
+            <SettingRow
+                label={labelWithBadge('Quiet hours', draft, ['alerts.quiet_hours.start', 'alerts.quiet_hours.end'])}
+                hint="NZ time · alerts still show on Alerts right away, and go out together in the morning summary"
+                control={
+                    canEditTimes ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="w-44">
+                                <TimePicker
+                                    id="setting-quiet-hours-start"
+                                    label="Quiet hours start"
+                                    value={startValue}
+                                    onChange={(next) => draft.set('alerts.quiet_hours.start', next)}
+                                    compact
+                                />
+                            </div>
+                            <span className="text-sm text-muted-foreground">until</span>
+                            <div className="w-44">
+                                <TimePicker
+                                    id="setting-quiet-hours-end"
+                                    label="Quiet hours end"
+                                    value={endValue}
+                                    onChange={(next) => draft.set('alerts.quiet_hours.end', next)}
+                                    compact
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <span className="text-subtle">
+                            {on ? `${formatClock(startValue)} until ${formatClock(endValue)}` : 'Off'}
+                        </span>
+                    )
+                }
+            />
+        </SettingGroup>
     );
 }

@@ -8,17 +8,24 @@ use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Enums\RelationshipType;
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
+use App\Models\AuditLog;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Notifications\SecurityDeviceMorningSummaryNotification;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
@@ -309,6 +316,181 @@ class SwitchPortsHistorySettingsTest extends TestCase
         $theirs = $this->device($this->other, ['name' => 'Synthetic Lodge switch', 'subcategory' => 'switch']);
         foreach (['ports', 'history', 'settings'] as $tab) {
             $this->actingAs($this->viewer)->get('/security-devices/devices/'.$theirs->id.'?tab='.$tab)->assertNotFound();
+            $this->actingAs($manager)->patchJson('/security-devices/devices/'.$theirs->id.'/settings', ['tell_it_update_ready' => false])->assertNotFound();
+        }
+    }
+
+    public function test_settings_extras_save_audit_and_follow_the_staff_and_saved_login_rules(): void
+    {
+        $switch = $this->device($this->home, [
+            'name' => 'Aurora House switch',
+            'subcategory' => 'switch',
+            'provider' => 'unifi',
+            'status' => DeviceStatus::Active,
+            'firmware_version' => '6.6.61',
+            'meta' => [
+                'firmware_status' => 'updateAvailable',
+                'firmware_update_version' => '6.6.65',
+            ],
+        ]);
+
+        $jordan = User::factory()->create(['name' => 'Jordan Peri', 'approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $jordan->id,
+            'primary_site_id' => $this->home->id,
+            'secondary_site_ids' => [],
+            'position_title' => 'IT',
+            'is_active' => true,
+        ]);
+
+        $otherSiteStaff = User::factory()->create(['name' => 'Secret Lodge Staff', 'approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $otherSiteStaff->id,
+            'primary_site_id' => $this->other->id,
+            'secondary_site_ids' => [],
+            'position_title' => 'IT',
+            'is_active' => true,
+        ]);
+
+        // A manager who may read the staff list (the same keys as S&D's other staff pickers).
+        $manager = $this->viewerWith([
+            'securityDevices.viewAny',
+            'securityDevices.devices.view',
+            'securityDevices.events.view',
+            'securityDevices.devices.update',
+            'securityDevices.monitoring.manage',
+            'staff.viewAny',
+            'hazards.view',
+        ], 'Synthetic Manager');
+        // One who may edit devices but not read the staff list: only themself to choose.
+        $editor = $this->viewerWith([
+            'securityDevices.viewAny',
+            'securityDevices.devices.view',
+            'securityDevices.devices.update',
+        ], 'Synthetic Editor');
+
+        $itAdmin = $this->viewerWith([
+            'securityDevices.viewAny',
+            'securityDevices.devices.view',
+            'securityDevices.events.view',
+            'securityDevices.terminal.use',
+        ], 'Synthetic IT Admin');
+
+        // Audit fix (5 Nov): the SSH user comes from the saved login, read-only. Nothing here can set it,
+        // and password-like fields are always refused.
+        $this->actingAs($manager)
+            ->patchJson('/security-devices/devices/'.$switch->id.'/settings', ['ssh_user' => 'netadmin'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ssh_user');
+        $this->actingAs($manager)
+            ->patchJson('/security-devices/devices/'.$switch->id.'/settings', ['password' => 'never-accepted'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('password');
+        // The terminal key alone no longer opens this save.
+        $this->actingAs($itAdmin)
+            ->patchJson('/security-devices/devices/'.$switch->id.'/settings', ['tell_it_update_ready' => false])
+            ->assertForbidden();
+
+        // Staff from another Site can never be chosen.
+        $this->actingAs($manager)
+            ->patchJson('/security-devices/devices/'.$switch->id.'/settings', [
+                'looked_after_by_user_id' => $otherSiteStaff->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('looked_after_by_user_id');
+
+        $managerSettings = $this->actingAs($manager)->get('/security-devices/devices/'.$switch->id.'?tab=settings');
+        $managerSettings->assertOk()->assertInertia(function ($page) use ($jordan): void {
+            $page->where('settings.ssh', null)
+                ->where('settings.watching.tell_it_update_ready', true);
+            $options = collect($page->toArray()['props']['settings']['staff_options']);
+            $this->assertTrue($options->contains(fn (array $opt): bool => $opt['id'] === $jordan->id && $opt['label'] === 'Jordan Peri, IT'));
+            $itFacts = collect($page->toArray()['props']['settings']['it']);
+            $this->assertSame(['Software', '6.6.61 · 6.6.65 ready'], $itFacts->firstWhere(0, 'Software'));
+            $this->assertNull($itFacts->firstWhere(0, 'SSH user'));
+        });
+        $this->assertStringNotContainsString('Secret Lodge Staff', $managerSettings->getContent());
+
+        // Without the staff list key, the picker offers only the person themself.
+        $this->actingAs($editor)->get('/security-devices/devices/'.$switch->id.'?tab=settings')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($editor): void {
+                $ids = collect($page->toArray()['props']['settings']['staff_options'])->pluck('id')->all();
+                $this->assertSame([$editor->id], $ids);
+            });
+        $this->actingAs($editor)
+            ->patchJson('/security-devices/devices/'.$switch->id.'/settings', ['looked_after_by_user_id' => $jordan->id])
+            ->assertUnprocessable();
+
+        // Manager saves Looked after by and turns off Tell IT when an update is ready.
+        $this->actingAs($manager)
+            ->patchJson('/security-devices/devices/'.$switch->id.'/settings', [
+                'looked_after_by_user_id' => $jordan->id,
+                'tell_it_update_ready' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('changed', ['tell_it_update_ready', 'looked_after_by_user_id']);
+
+        $this->assertSame(
+            1,
+            AuditLog::query()
+                ->where('action', 'security_devices.device.settings_updated')
+                ->where('auditable_type', $switch->getMorphClass())
+                ->where('auditable_id', $switch->id)
+                ->count(),
+        );
+
+        // IT admins see "SSH user · From the saved login", never a username.
+        $this->actingAs($itAdmin)->get('/security-devices/devices/'.$switch->id.'?tab=settings')
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $page->where('settings.ssh', null)->where('settings.watching.tell_it_update_ready', false);
+                $itFacts = collect($page->toArray()['props']['settings']['it']);
+                $this->assertSame(['SSH user', 'From the saved login'], $itFacts->firstWhere(0, 'SSH user'));
+            });
+
+        $this->actingAs($manager)->get('/security-devices/devices/'.$switch->id.'?tab=history')
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $titles = collect($page->toArray()['props']['history']['lines'])->pluck('title')->all();
+                $this->assertContains('Looked after by changed', $titles);
+                $this->assertContains('Update notices turned off', $titles);
+            });
+
+        // Morning summary: decided once at 6:00 am. With update notices off nothing goes; an update found
+        // later never sends a "morning" summary mid-day; the next morning carries it, once.
+        Notification::fake();
+        try {
+            CarbonImmutable::setTestNow('2026-11-04T17:00:00Z'); // 6:00 am NZDT, Thu
+            Carbon::setTestNow('2026-11-04T17:00:00Z');
+            $this->assertSame(0, app(DeviceAlertEngine::class)->sendMorningSummary(CarbonImmutable::now('UTC')));
+            Notification::assertNothingSent();
+
+            $this->actingAs($manager)
+                ->patchJson('/security-devices/devices/'.$switch->id.'/settings', ['tell_it_update_ready' => true])
+                ->assertOk();
+
+            CarbonImmutable::setTestNow('2026-11-05T01:15:00Z'); // 2:15 pm the same day
+            Carbon::setTestNow('2026-11-05T01:15:00Z');
+            $this->assertSame(0, app(DeviceAlertEngine::class)->sendMorningSummary(CarbonImmutable::now('UTC')));
+            Notification::assertNothingSent();
+
+            CarbonImmutable::setTestNow('2026-11-05T17:00:00Z'); // 6:00 am the next morning
+            Carbon::setTestNow('2026-11-05T17:00:00Z');
+            $this->assertGreaterThan(0, app(DeviceAlertEngine::class)->sendMorningSummary(CarbonImmutable::now('UTC')));
+            Notification::assertSentTo(
+                $manager,
+                SecurityDeviceMorningSummaryNotification::class,
+                fn (SecurityDeviceMorningSummaryNotification $n): bool => in_array('Aurora House switch: software update 6.6.65 ready', $n->lines, true),
+            );
+
+            // Told once: the morning after doesn't repeat it.
+            CarbonImmutable::setTestNow('2026-11-06T17:00:00Z');
+            Carbon::setTestNow('2026-11-06T17:00:00Z');
+            $this->assertSame(0, app(DeviceAlertEngine::class)->sendMorningSummary(CarbonImmutable::now('UTC')));
+        } finally {
+            CarbonImmutable::setTestNow();
+            Carbon::setTestNow();
         }
     }
 }

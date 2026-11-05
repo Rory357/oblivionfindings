@@ -83,20 +83,22 @@ final class SiteStream
      *                         otherwise each alert is one line with what happened next (Activity)
      * @return list<array<string, mixed>>
      */
-    public function between(User $viewer, Collection $entries, array $sites, CarbonImmutable $from, CarbonImmutable $to, bool $logbook, int $limit = 400): array
+    public function between(User $viewer, Collection $entries, array $sites, CarbonImmutable $from, CarbonImmutable $to, bool $logbook, int $limit = 400, ?int $perSource = null): array
     {
         if (! self::mayView($viewer) || $sites === [] || $to->lte($from)) {
             return [];
         }
         $byId = $entries->keyBy(fn (DeviceEntry $entry): int => $entry->id());
         $now = CarbonImmutable::now('UTC');
+        // The screens keep their usual reads; only the logbook export asks for more (audit fix, 5 Nov).
+        $perSource = max(1, min($perSource ?? self::PER_SOURCE, 2500));
         $lines = [
-            ...$this->alerts($viewer, $byId, $sites, $from, $to, $now, $logbook),
-            ...$this->deviceEvents($viewer, $byId, $sites, $from, $to),
-            ...$this->modes($sites, $from, $to, count($sites) > 1),
-            ...$this->scans($sites, $from, $to, count($sites) > 1),
-            ...$this->quietTimes($byId, $sites, $from, $to, $now),
-            ...($logbook ? [] : $this->doors($viewer, $sites, $from, $to, $now)),
+            ...$this->alerts($viewer, $byId, $sites, $from, $to, $now, $logbook, $perSource),
+            ...$this->deviceEvents($viewer, $byId, $sites, $from, $to, $perSource),
+            ...$this->modes($sites, $from, $to, count($sites) > 1, $perSource),
+            ...$this->scans($sites, $from, $to, count($sites) > 1, $perSource),
+            ...$this->quietTimes($byId, $sites, $from, $to, $now, $perSource),
+            ...($logbook ? [] : $this->doors($viewer, $sites, $from, $to, $now, $perSource)),
         ];
         usort($lines, fn (array $a, array $b): int => [$b['at'], $b['key']] <=> [$a['at'], $a['key']]);
 
@@ -157,7 +159,7 @@ final class SiteStream
      * @param  array<int, string>  $sites
      * @return list<array<string, mixed>>
      */
-    private function alerts(User $viewer, Collection $byId, array $sites, CarbonImmutable $from, CarbonImmutable $to, CarbonImmutable $now, bool $logbook): array
+    private function alerts(User $viewer, Collection $byId, array $sites, CarbonImmutable $from, CarbonImmutable $to, CarbonImmutable $now, bool $logbook, int $limit = self::PER_SOURCE): array
     {
         if ($byId->isEmpty() || ! AlertsPresenter::canOpen($viewer)) {
             return [];
@@ -171,7 +173,7 @@ final class SiteStream
                 ->when($logbook, fn ($also) => $also->orWhereHas('events', fn ($events) => $events
                     ->whereIn('kind', self::ALERT_ACTIONS)->where('at', '>=', $from)->where('at', '<', $to))))
             ->orderByDesc('opened_at')
-            ->limit(self::PER_SOURCE)
+            ->limit($limit)
             ->get();
         $people = self::carePeople($viewer, $alerts);
         $lines = [];
@@ -270,7 +272,7 @@ final class SiteStream
      * @param  array<int, string>  $sites
      * @return list<array<string, mixed>>
      */
-    private function deviceEvents(User $viewer, Collection $byId, array $sites, CarbonImmutable $from, CarbonImmutable $to): array
+    private function deviceEvents(User $viewer, Collection $byId, array $sites, CarbonImmutable $from, CarbonImmutable $to, int $limit = self::PER_SOURCE): array
     {
         if ($byId->isEmpty()) {
             return [];
@@ -282,7 +284,7 @@ final class SiteStream
             ->where('device_events.occurred_at', '<', $to);
         $this->access->applyTemporalEventCustodyScope($query, $viewer);
 
-        return $query->orderByDesc('device_events.occurred_at')->orderByDesc('device_events.id')->limit(self::PER_SOURCE)
+        return $query->orderByDesc('device_events.occurred_at')->orderByDesc('device_events.id')->limit($limit)
             ->get(['device_events.id', 'device_events.device_id', 'device_events.event_type', 'device_events.severity', 'device_events.payload', 'device_events.source', 'device_events.occurred_at'])
             ->map(function (DeviceEvent $event) use ($byId, $sites): array {
                 /** @var DeviceEntry $entry */
@@ -341,13 +343,13 @@ final class SiteStream
      * @param  array<int, string>  $sites
      * @return list<array<string, mixed>>
      */
-    private function modes(array $sites, CarbonImmutable $from, CarbonImmutable $to, bool $named): array
+    private function modes(array $sites, CarbonImmutable $from, CarbonImmutable $to, bool $named, int $limit = self::PER_SOURCE): array
     {
         $events = HouseModeEvent::query()->with('actor:id,name')->done()
             ->whereIn('site_id', array_keys($sites))
             ->where('at', '>=', $from)->where('at', '<', $to)
             ->orderByDesc('at')->orderByDesc('id')
-            ->limit(self::PER_SOURCE)
+            ->limit($limit)
             ->get();
         $lines = [];
         foreach ($events as $event) {
@@ -403,14 +405,14 @@ final class SiteStream
      * @param  array<int, string>  $sites
      * @return list<array<string, mixed>>
      */
-    private function scans(array $sites, CarbonImmutable $from, CarbonImmutable $to, bool $named): array
+    private function scans(array $sites, CarbonImmutable $from, CarbonImmutable $to, bool $named, int $limit = self::PER_SOURCE): array
     {
         return DiscoveryRun::query()->with('scope:id,site_id')
             ->whereHas('scope', fn ($scope) => $scope->whereIn('site_id', array_keys($sites)))
             ->whereNotNull('completed_at')
             ->where('completed_at', '>=', $from)->where('completed_at', '<', $to)
             ->orderByDesc('completed_at')
-            ->limit(self::PER_SOURCE)
+            ->limit($limit)
             ->get(['id', 'discovery_scope_id', 'status', 'found_count', 'proposed_count', 'completed_at'])
             ->map(function (DiscoveryRun $run) use ($sites, $named): array {
                 $siteId = (int) ($run->scope?->site_id ?? 0);
@@ -445,7 +447,7 @@ final class SiteStream
      * @param  array<int, string>  $sites
      * @return list<array<string, mixed>>
      */
-    private function quietTimes(Collection $byId, array $sites, CarbonImmutable $from, CarbonImmutable $to, CarbonImmutable $now): array
+    private function quietTimes(Collection $byId, array $sites, CarbonImmutable $from, CarbonImmutable $to, CarbonImmutable $now, int $limit = self::PER_SOURCE): array
     {
         $visible = $byId->keys()->all() ?: [0];
 
@@ -456,7 +458,7 @@ final class SiteStream
                 ->orWhereIn('monitor_id', \App\Domain\Monitoring\Models\Monitor::query()->whereIn('device_id', $visible)->select('id')))
             ->where('created_at', '>=', $from)->where('created_at', '<', $to)
             ->orderByDesc('created_at')
-            ->limit(self::PER_SOURCE)
+            ->limit($limit)
             ->get(['id', 'site_id', 'device_id', 'monitor_id', 'name', 'starts_at', 'ends_at', 'reason', 'status', 'created_by_user_id', 'created_at'])
             ->map(function (MonitoringMaintenanceWindow $window) use ($byId, $sites, $now): array {
                 $deviceId = $window->device_id ?? $window->monitor?->device_id;
@@ -495,7 +497,7 @@ final class SiteStream
      * @param  array<int, string>  $sites
      * @return list<array<string, mixed>>
      */
-    private function doors(User $viewer, array $sites, CarbonImmutable $from, CarbonImmutable $to, CarbonImmutable $now): array
+    private function doors(User $viewer, array $sites, CarbonImmutable $from, CarbonImmutable $to, CarbonImmutable $now, int $limit = self::PER_SOURCE): array
     {
         if (! AccessPagePresenter::canSeeDoors($viewer)) {
             return [];
@@ -511,7 +513,7 @@ final class SiteStream
             ->whereIn('kind', ['forced', 'held_open', 'denied', 'unlocked'])
             ->where('occurred_at', '>=', $from)->where('occurred_at', '<', $to)
             ->orderByDesc('occurred_at')
-            ->limit(self::PER_SOURCE)
+            ->limit($limit)
             ->get()
             ->map(function (AccessEvent $event) use ($consoles, $sites, $now): array {
                 $who = AccessNames::who($event, $event->person, $now);

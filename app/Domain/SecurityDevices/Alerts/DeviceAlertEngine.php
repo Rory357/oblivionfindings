@@ -11,9 +11,11 @@ use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlertEvent;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Setup\Models\SecurityDeviceSetting;
 use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Models\User;
 use App\Notifications\SecurityDeviceAlertNotification;
+use App\Notifications\SecurityDeviceMorningSummaryNotification;
 use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +42,15 @@ final class DeviceAlertEngine
 
     /** IT alerts that tell the person on call first (ItOnCall); the rest of IT hears at the reminder. */
     public const array ON_CALL_KINDS = ['offline', 'failing', 'hub_offline', 'mqtt_logins'];
+
+    /** Device, hub and battery alerts whose notices wait for the 6:00 am summary during quiet hours. */
+    public const array QUIET_HOURS_KINDS = ['offline', 'failing', 'hub_offline', 'mqtt_logins', 'battery'];
+
+    /** NZ date ("YYYY-MM-DD") whose 6:00 am summary has already gone out. */
+    public const string SUMMARY_SENT_DAY = 'alerts.summary.sent_day';
+
+    /** Today's 6:00 am summary items by Site, for Alerts › On call (pg-sdr-13d). */
+    public const string SUMMARY_LAST = 'alerts.summary.last';
 
     /**
      * Safety events from the device itself (S&D Phase E): event type → [kind, severity, words].
@@ -95,16 +106,17 @@ final class DeviceAlertEngine
                 return;
             }
             $settings = app(SecurityDevicesSettings::class);
-            $people = (int) $hub->site_id > 0
-                ? app(ItOnCall::class)->first($this->policies->resolveItRecipients((int) $hub->site_id, $settings->role(SecurityDevicesSettings::DEVICES_ROLE)))
+            $held = $settings->isQuietHours($at);
+            $people = ! $held && (int) $hub->site_id > 0
+                ? app(ItOnCall::class)->first($this->policies->resolveItRecipients((int) $hub->site_id, $settings->role(SecurityDevicesSettings::DEVICES_ROLE)), $at)
                 : collect();
-            $channels = $settings->channels(SecurityDevicesSettings::DEVICES_APP, SecurityDevicesSettings::DEVICES_EMAIL, SecurityDevicesSettings::DEVICES_PUSH);
+            $channels = $held ? [] : $settings->channels(SecurityDevicesSettings::DEVICES_APP, SecurityDevicesSettings::DEVICES_EMAIL, SecurityDevicesSettings::DEVICES_PUSH);
             $told = $people->isNotEmpty() && $channels !== []
                 ? ['names' => $people->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all(), 'channels' => $channels]
                 : null;
             $label = CoveringHubResolver::label($hub);
             $created = $this->open($device, null, 'mqtt_logins', 'warning', "{$label}: {$count} wrong sensor logins from {$address}", $at,
-                "{$count} wrong logins in 10 minutes from {$address}", 'The hub ignores that address for 10 minutes. Check the gateway’s login, or who else is on the network.', $told);
+                "{$count} wrong logins in 10 minutes from {$address}", 'The hub ignores that address for 10 minutes. Check the gateway’s login, or who else is on the network.', $told, $held ? 'Quiet hours' : null);
             if ($created !== null && $told !== null) {
                 $this->notify($people, $created, "{$count} wrong sensor logins in 10 minutes", $channels);
             }
@@ -176,16 +188,31 @@ final class DeviceAlertEngine
         }
     }
 
-    /** A battery level arrived: below 20% opens a warning, a new battery (30% or more) closes it. */
+    /** A battery level arrived: below the sensor's low-battery rule (default 20%) opens a warning (6:00 am summary); a fresh battery closes it. */
     public function onBattery(Device $device, int $percent, CarbonImmutable $at): void
     {
         try {
-            if ($percent < self::BATTERY_LOW) {
-                $this->openForHouse($device, 'battery', 'warning', (string) $device->name.": battery {$percent}%", $at, "Battery {$percent}%", 'Change it soon so it keeps working');
+            $rule = \App\Domain\SecurityDevices\Iot\Readings\SensorAlertRules::batteryRule($device);
+            if (! $rule['enabled']) {
+                $this->closeKind($device, 'battery', $at, fn (): string => 'Battery alert rule turned off', 'rule_changed');
 
                 return;
             }
-            if ($percent >= self::BATTERY_OK) {
+            $low = $rule['below'];
+            $ok = min(100, max(self::BATTERY_OK, $low + 10));
+            if ($percent < $low) {
+                // A panic button, alarm, door, camera, bed sensor or care tracker with a flat battery stops
+                // protecting someone: staff on shift are told straight away, as before (never loosened).
+                // Other devices' batteries wait for the 6:00 am summary (pg-sdr-15g).
+                if (in_array((string) $device->domain, ['security', 'iot_healthcare'], true)) {
+                    $this->openForHouse($device, 'battery', 'warning', (string) $device->name.": battery {$percent}%", $at, "Battery {$percent}%", 'Change it soon so it keeps working');
+                } else {
+                    $this->open($device, null, 'battery', 'warning', (string) $device->name.": battery {$percent}%", $at, "Battery {$percent}%", 'Change it soon so it keeps working', null, '6:00 am summary');
+                }
+
+                return;
+            }
+            if ($percent >= $ok) {
                 $this->closeKind($device, 'battery', $at, fn (): string => "Battery back to {$percent}%");
             }
         } catch (Throwable $exception) {
@@ -311,16 +338,29 @@ final class DeviceAlertEngine
     }
 
     /** @param  callable(DeviceAlert): string  $words */
-    private function closeKind(Device $device, string $kind, CarbonImmutable $at, callable $words): void
+    private function closeKind(Device $device, string $kind, CarbonImmutable $at, callable $words, string $reason = 'recovered', ?User $actor = null): void
     {
-        DB::transaction(function () use ($device, $kind, $at, $words): void {
+        DB::transaction(function () use ($device, $kind, $at, $words, $reason, $actor): void {
             $alert = DeviceAlert::query()->where('device_id', $device->id)->active()->where('kind', $kind)->lockForUpdate()->latest('id')->first();
             if ($alert === null) {
                 return;
             }
-            $alert->forceFill(['state' => DeviceAlert::STATE_DONE, 'closed_at' => $at, 'close_reason' => 'recovered', 'snoozed_until' => null, 'remind_at' => null])->save();
-            $this->event($alert, $at, 'recovered', $words($alert));
+            $alert->forceFill(['state' => DeviceAlert::STATE_DONE, 'closed_at' => $at, 'close_reason' => $reason, 'snoozed_until' => null, 'remind_at' => null])->save();
+            $this->event($alert, $at, $reason === 'recovered' ? 'recovered' : 'rule_changed', $words($alert), null, $actor);
         }, 3);
+    }
+
+    /**
+     * A person changed a sensor's alert limits so its open alert no longer applies: it closes as a rule
+     * change, never as "back to normal", and names who changed it (audit fix, 5 Nov).
+     */
+    public function closeForRuleChange(Device $device, string $kind, User $actor, CarbonImmutable $at, string $words): void
+    {
+        try {
+            $this->closeKind($device, $kind, $at, fn (): string => $words, 'rule_changed', $actor);
+        } catch (Throwable $exception) {
+            Log::error('Alert could not be closed after a rule change', ['device_id' => $device->id, 'kind' => $kind, 'error' => $exception->getMessage()]);
+        }
     }
 
     private static function unitWords(string $unit): string
@@ -385,17 +425,18 @@ final class DeviceAlertEngine
             }
             $label = CoveringHubResolver::label($hub);
             if ($offline) {
-                // Told as Setup › Alerts & checks says for "a device or hub stops answering".
+                // Told as Setup › Alerts & checks says for "a device or hub stops answering" (or held in quiet hours).
                 $settings = app(SecurityDevicesSettings::class);
-                $people = (int) $hub->site_id > 0
-                    ? app(ItOnCall::class)->first($this->policies->resolveItRecipients((int) $hub->site_id, $settings->role(SecurityDevicesSettings::DEVICES_ROLE)))
+                $held = $settings->isQuietHours($at);
+                $people = ! $held && (int) $hub->site_id > 0
+                    ? app(ItOnCall::class)->first($this->policies->resolveItRecipients((int) $hub->site_id, $settings->role(SecurityDevicesSettings::DEVICES_ROLE)), $at)
                     : collect();
-                $channels = $settings->channels(SecurityDevicesSettings::DEVICES_APP, SecurityDevicesSettings::DEVICES_EMAIL, SecurityDevicesSettings::DEVICES_PUSH);
+                $channels = $held ? [] : $settings->channels(SecurityDevicesSettings::DEVICES_APP, SecurityDevicesSettings::DEVICES_EMAIL, SecurityDevicesSettings::DEVICES_PUSH);
                 $told = $people->isNotEmpty() && $channels !== []
                     ? ['names' => $people->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all(), 'channels' => $channels]
                     : null;
                 $created = $this->open($device, null, 'hub_offline', 'critical', "{$label} has stopped answering", $at,
-                    'Stopped answering', 'Devices at its Sites show “Can’t check” until it’s back', $told);
+                    'Stopped answering', 'Devices at its Sites show “Can’t check” until it’s back', $told, $held ? 'Quiet hours' : null);
                 if ($created !== null && $told !== null) {
                     $this->notify($people, $created, 'Devices at its Sites can’t be checked until it’s back', $channels);
                 }
@@ -419,9 +460,10 @@ final class DeviceAlertEngine
         $title = $offline ? "{$name} is offline" : ($critical ? "{$name}: {$check} isn’t passing" : "{$name}: {$check} needs attention");
         $confirmations = max(1, (int) ($monitor->profile?->failure_confirmations ?? 1));
         $detail = $confirmations > 1 ? "{$confirmations} missed checks in a row" : null;
+        $held = $told === null && app(SecurityDevicesSettings::class)->isQuietHours($at);
 
         $this->open($device, $monitor, $kind, $critical ? 'critical' : 'warning', $title, $at,
-            $offline ? 'Stopped answering' : "{$check} started failing", $detail, $told);
+            $offline ? 'Stopped answering' : "{$check} started failing", $detail, $told, $held ? 'Quiet hours' : null);
     }
 
     /**
@@ -430,9 +472,9 @@ final class DeviceAlertEngine
      *
      * @param  array{names: list<string>, channels: list<string>}|null  $told
      */
-    private function open(Device $device, ?Monitor $monitor, string $kind, string $severity, string $title, CarbonImmutable $at, string $what, ?string $detail, ?array $told): ?DeviceAlert
+    private function open(Device $device, ?Monitor $monitor, string $kind, string $severity, string $title, CarbonImmutable $at, string $what, ?string $detail, ?array $told, ?string $heldReason = null): ?DeviceAlert
     {
-        return DB::transaction(function () use ($device, $monitor, $kind, $severity, $title, $at, $what, $detail, $told): ?DeviceAlert {
+        return DB::transaction(function () use ($device, $monitor, $kind, $severity, $title, $at, $what, $detail, $told, $heldReason): ?DeviceAlert {
             Device::query()->whereKey($device->id)->lockForUpdate()->first();
             $alert = DeviceAlert::query()->where('device_id', $device->id)->active()->whereIn('kind', self::family($kind))->lockForUpdate()->latest('id')->first();
 
@@ -449,7 +491,11 @@ final class DeviceAlertEngine
                     'last_failing_at' => $at,
                 ]);
                 $this->event($alert, $at, 'opened', $what, $detail);
-                $this->toldEvent($alert, $at, $told);
+                if ($heldReason !== null && $told === null) {
+                    $this->event($alert, $at, 'held', 'Held for the morning summary', $heldReason);
+                } else {
+                    $this->toldEvent($alert, $at, $told);
+                }
 
                 return $alert;
             }
@@ -467,7 +513,13 @@ final class DeviceAlertEngine
                     $alert->forceFill(['state' => DeviceAlert::STATE_OPEN, 'snoozed_until' => null]);
                     $this->event($alert, $at, 'back', 'Back from snooze because it got worse');
                 }
-                $this->toldEvent($alert, $at, $told);
+                if ($heldReason !== null && $told === null) {
+                    if (! $alert->events()->where('kind', 'held')->exists()) {
+                        $this->event($alert, $at, 'held', 'Held for the morning summary', $heldReason);
+                    }
+                } else {
+                    $this->toldEvent($alert, $at, $told);
+                }
             }
             $alert->save();
 
@@ -600,6 +652,9 @@ final class DeviceAlertEngine
                 });
             });
 
+        $this->sendMorningSummary($now);
+
+        $settings = app(SecurityDevicesSettings::class);
         $reminded = 0;
         DeviceAlert::query()->with(['device', 'acknowledgedBy'])->where('state', DeviceAlert::STATE_OPEN)
             ->where(fn ($query) => $query
@@ -607,8 +662,23 @@ final class DeviceAlertEngine
                 ->orWhere(fn ($due) => $due->where(fn ($level) => $level->where('severity', 'critical')->orWhereIn('kind', self::ON_CALL_KINDS))
                     ->whereNull('acknowledged_at')->whereNull('reminded_at')->where('opened_at', '<=', $now->subMinutes(self::REMIND_AFTER_MINUTES))))
             ->orderBy('id')
-            ->each(function (DeviceAlert $alert) use ($now, &$reminded): void {
+            ->each(function (DeviceAlert $alert) use ($now, $settings, &$reminded): void {
                 $mine = $alert->remind_at !== null && $alert->acknowledgedBy !== null;
+                if (! $mine && in_array($alert->kind, self::QUIET_HOURS_KINDS, true)) {
+                    if ($settings->isQuietHours($now)) {
+                        return;
+                    }
+                    $wasHeld = DeviceAlertEvent::query()->where('alert_id', $alert->id)->where('kind', 'held')->exists();
+                    if ($wasHeld) {
+                        $toldAt = DeviceAlertEvent::query()->where('alert_id', $alert->id)->where('kind', 'told')->latest('at')->value('at');
+                        $anchor = $toldAt !== null
+                            ? CarbonImmutable::parse($toldAt)->utc()
+                            : $this->morningCutoff($now, $settings);
+                        if ($anchor->gt($now->subMinutes(self::REMIND_AFTER_MINUTES))) {
+                            return;
+                        }
+                    }
+                }
                 $people = $mine ? collect([$alert->acknowledgedBy]) : $this->peopleToTell($alert);
                 $alert->forceFill(['reminded_at' => $now, 'remind_at' => null])->save();
                 if ($people->isEmpty()) {
@@ -620,6 +690,266 @@ final class DeviceAlertEngine
             });
 
         return ['back' => $back, 'reminded' => $reminded];
+    }
+
+    /**
+     * At 6:00 am NZ time (or once quiet hours end, if later), send one morning summary per IT
+     * recipient covering held overnight alerts, low batteries and overnight hub update reports,
+     * scoped to that recipient's Sites. Never sends twice on the same NZ day.
+     */
+    public function sendMorningSummary(?CarbonImmutable $now = null): int
+    {
+        $now ??= CarbonImmutable::now('UTC');
+        try {
+            $settings = app(SecurityDevicesSettings::class);
+            $zone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+            $local = $now->setTimezone($zone);
+            if ($local->hour < 6 || $settings->isQuietHours($now)) {
+                return 0;
+            }
+            $day = $local->format('Y-m-d');
+            if (SecurityDeviceSetting::query()->where('key', self::SUMMARY_SENT_DAY)->first()?->value === $day) {
+                return 0;
+            }
+            // The day's summary is decided once, at the first tick after 6:00 am, even when there's
+            // nothing to send: anything that turns up later waits for tomorrow's (audit fix, 5 Nov).
+            $claimed = DB::transaction(function () use ($day): bool {
+                $row = SecurityDeviceSetting::query()->where('key', self::SUMMARY_SENT_DAY)->lockForUpdate()->first();
+                if ($row !== null && $row->value === $day) {
+                    return false;
+                }
+                $row ??= new SecurityDeviceSetting(['key' => self::SUMMARY_SENT_DAY]);
+                $row->value = $day;
+                $row->save();
+
+                return true;
+            }, 3);
+            if (! $claimed) {
+                return 0;
+            }
+
+            $cutoff = $this->morningCutoff($now, $settings);
+            $since = $cutoff->subHours(24);
+
+            $heldAlerts = DeviceAlert::query()
+                ->with(['device', 'monitor', 'site:id,name'])
+                ->whereBetween('opened_at', [$since, $cutoff])
+                // Held overnight, plus low batteries on safety and care devices: staff on shift were told
+                // straight away, and the summary still lists them for IT (pg-sdr-13d's "Room 3 sensor battery").
+                ->where(fn ($held) => $held
+                    ->where(fn ($waited) => $waited->whereHas('events', fn ($q) => $q->where('kind', 'held'))
+                        ->whereDoesntHave('events', fn ($q) => $q->where('kind', 'told')))
+                    ->orWhere(fn ($battery) => $battery->where('kind', 'battery')->where('state', DeviceAlert::STATE_OPEN)
+                        ->whereDoesntHave('events', fn ($q) => $q->where('kind', 'told')->where('detail', 'like', 'Morning summary%'))))
+                ->orderBy('opened_at')
+                ->orderBy('id')
+                ->get();
+
+            $hubUpdates = MonitoringCollector::query()
+                ->whereNull('revoked_at')
+                ->whereNotNull('enrolled_at')
+                ->whereNotNull('site_id')
+                ->whereNotNull('update_state')
+                ->orderBy('name')
+                ->orderBy('id')
+                ->get()
+                ->filter(function (MonitoringCollector $hub) use ($since, $cutoff): bool {
+                    $state = is_array($hub->update_state) ? $hub->update_state : [];
+                    $outcome = $state['outcome'] ?? null;
+                    $reported = $state['reported_at'] ?? null;
+                    if (! in_array($outcome, ['installed', 'rolled_back', 'failed'], true) || ! is_string($reported)) {
+                        return false;
+                    }
+                    $at = CarbonImmutable::parse($reported)->utc();
+
+                    return $at->gte($since) && $at->lte($cutoff);
+                })
+                ->values();
+
+            $deviceUpdates = Device::query()
+                ->operational()
+                ->whereIn('provider', ['unifi', 'ubiquiti'])
+                ->orderBy('name')
+                ->orderBy('id')
+                ->get()
+                ->map(function (Device $device): ?array {
+                    $meta = is_array($device->meta) ? $device->meta : [];
+                    if (($meta['tell_it_update_ready'] ?? true) === false) {
+                        return null;
+                    }
+                    $update = \App\Domain\SecurityDevices\Screens\Devices\DeviceUpdates::available($device);
+                    if ($update === null) {
+                        return null;
+                    }
+                    $marker = $update['next'] ?? 'ready';
+                    if (($meta['update_ready_notified_version'] ?? null) === $marker) {
+                        return null;
+                    }
+                    $siteId = $this->siteId($device);
+                    if ($siteId === null) {
+                        return null;
+                    }
+
+                    return ['device' => $device, 'site_id' => $siteId, 'next' => $update['next'], 'marker' => $marker];
+                })
+                ->filter()
+                ->values();
+
+            if ($heldAlerts->isEmpty() && $hubUpdates->isEmpty() && $deviceUpdates->isEmpty()) {
+                return 0;
+            }
+
+            $channels = $settings->channels(SecurityDevicesSettings::SUMMARY_APP, SecurityDevicesSettings::SUMMARY_EMAIL, SecurityDevicesSettings::SUMMARY_PUSH);
+            $defaultRole = $settings->role(SecurityDevicesSettings::DEVICES_ROLE);
+            $siteRecipients = [];
+            $recipientsFor = function (int $siteId, ?string $role) use (&$siteRecipients, $now): \Illuminate\Support\Collection {
+                if ($siteId <= 0) {
+                    return collect();
+                }
+                $cacheKey = $siteId.':'.($role ?? '');
+
+                return $siteRecipients[$cacheKey] ??= app(ItOnCall::class)->first($this->policies->resolveItRecipients($siteId, $role), $now);
+            };
+
+            /** @var array<int, array{user: User, lines: list<string>, alert_ids: list<int>}> $perUser */
+            $perUser = [];
+            /** @var array<int, list<string>> $alertRecipientNames */
+            $alertRecipientNames = [];
+            /** @var list<array{site_id: int, label: string}> $summaryItems */
+            $summaryItems = [];
+            /** @var list<array{device: Device, marker: string}> $toldUpdates updates that reach someone */
+            $toldUpdates = [];
+
+            foreach ($heldAlerts as $alert) {
+                $siteId = (int) ($alert->site_id ?? ($alert->device ? $this->siteId($alert->device) : 0));
+                $openedClock = strtolower($alert->opened_at->setTimezone($zone)->format('g:i a'));
+                $line = $alert->state === DeviceAlert::STATE_DONE && $alert->closed_at !== null
+                    ? "{$alert->title} (opened {$openedClock}, back after ".self::duration($alert->opened_at, $alert->closed_at).')'
+                    : "{$alert->title} (since {$openedClock}, still open)";
+                $summaryItems[] = [
+                    'site_id' => $siteId,
+                    'label' => $alert->state === DeviceAlert::STATE_DONE ? "{$alert->title} (cleared overnight)" : (string) $alert->title,
+                ];
+                $role = $defaultRole;
+                if (in_array($alert->kind, ['offline', 'failing'], true) && $alert->device instanceof Device && $siteId > 0) {
+                    $route = $this->policies->resolveAlertRoute($alert->device, $alert->monitor, $siteId);
+                    $role = $route['recipient_role'] ?? null;
+                }
+                $people = $recipientsFor($siteId, $role);
+                $alertRecipientNames[$alert->id] = $people->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all();
+                foreach ($people as $person) {
+                    $perUser[$person->id] ??= ['user' => $person, 'lines' => [], 'alert_ids' => []];
+                    if (! in_array($line, $perUser[$person->id]['lines'], true)) {
+                        $perUser[$person->id]['lines'][] = $line;
+                    }
+                    $perUser[$person->id]['alert_ids'][] = (int) $alert->id;
+                }
+            }
+
+            foreach ($hubUpdates as $hub) {
+                $siteId = (int) $hub->site_id;
+                $state = (array) $hub->update_state;
+                $label = CoveringHubResolver::label($hub);
+                $to = is_string($state['to_version'] ?? null) ? $state['to_version'] : 'the new version';
+                $from = is_string($state['from_version'] ?? null) ? $state['from_version'] : null;
+                $line = match ($state['outcome'] ?? null) {
+                    'installed' => "{$label} updated itself to {$to}",
+                    'rolled_back' => "{$label} couldn’t update to {$to} and went back".($from !== null ? " to {$from}" : ''),
+                    default => "{$label} couldn’t update to {$to}",
+                };
+                $summaryItems[] = ['site_id' => $siteId, 'label' => $line];
+                foreach ($recipientsFor($siteId, $defaultRole) as $person) {
+                    $perUser[$person->id] ??= ['user' => $person, 'lines' => [], 'alert_ids' => []];
+                    if (! in_array($line, $perUser[$person->id]['lines'], true)) {
+                        $perUser[$person->id]['lines'][] = $line;
+                    }
+                }
+            }
+
+            foreach ($deviceUpdates as $item) {
+                /** @var Device $updateDevice */
+                $updateDevice = $item['device'];
+                $siteId = (int) $item['site_id'];
+                $line = $item['next'] !== null
+                    ? "{$updateDevice->name}: software update {$item['next']} ready"
+                    : "{$updateDevice->name}: software update ready";
+                $summaryItems[] = ['site_id' => $siteId, 'label' => $line];
+                $people = $recipientsFor($siteId, $defaultRole);
+                foreach ($people as $person) {
+                    $perUser[$person->id] ??= ['user' => $person, 'lines' => [], 'alert_ids' => []];
+                    if (! in_array($line, $perUser[$person->id]['lines'], true)) {
+                        $perUser[$person->id]['lines'][] = $line;
+                    }
+                }
+                if ($people->isNotEmpty()) {
+                    $toldUpdates[] = $item;
+                }
+            }
+
+            SecurityDeviceSetting::query()->updateOrCreate(
+                ['key' => self::SUMMARY_LAST],
+                ['value' => ['day' => $day, 'at' => $now->toIso8601String(), 'items' => $summaryItems]],
+            );
+
+            if ($channels === []) {
+                return 0;
+            }
+
+            $sent = 0;
+            foreach ($perUser as $entry) {
+                $count = count($entry['lines']);
+                $title = $count === 1 ? '1 overnight item' : "{$count} overnight items";
+                Notification::send(collect([$entry['user']]), new SecurityDeviceMorningSummaryNotification(
+                    day: $day,
+                    title: $title,
+                    lines: $entry['lines'],
+                    channels: $channels,
+                    alertIds: array_values(array_unique($entry['alert_ids'])),
+                ));
+                $sent++;
+            }
+
+            // An update counts as told only once a summary carrying it actually went to someone.
+            if ($sent > 0) {
+                foreach ($toldUpdates as $item) {
+                    $meta = is_array($item['device']->meta) ? $item['device']->meta : [];
+                    $meta['update_ready_notified_version'] = $item['marker'];
+                    $item['device']->forceFill(['meta' => $meta])->saveQuietly();
+                }
+            }
+
+            $how = array_map(fn (string $channel): string => match ($channel) {
+                'database' => 'app', 'mail' => 'email', 'push' => 'push', default => $channel,
+            }, $channels);
+            foreach ($heldAlerts as $alert) {
+                $names = $alertRecipientNames[$alert->id] ?? [];
+                if ($names !== []) {
+                    $this->event($alert, $now, 'told', self::names($names).' told', 'Morning summary · '.self::names($how));
+                }
+            }
+
+            return $sent;
+        } catch (Throwable $exception) {
+            Log::error('Morning summary could not be sent', ['error' => $exception->getMessage()]);
+
+            return 0;
+        }
+    }
+
+    private function morningCutoff(CarbonImmutable $now, SecurityDevicesSettings $settings): CarbonImmutable
+    {
+        $zone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $local = $now->setTimezone($zone);
+        $cutoff = $local->startOfDay()->setTime(6, 0);
+        if ($settings->bool(SecurityDevicesSettings::QUIET_HOURS_ON)) {
+            [$endHour, $endMinute] = array_map('intval', explode(':', $settings->time(SecurityDevicesSettings::QUIET_HOURS_END)));
+            $quietEnd = $local->startOfDay()->setTime($endHour, $endMinute);
+            if ($quietEnd->gt($cutoff)) {
+                $cutoff = $quietEnd;
+            }
+        }
+
+        return $cutoff->utc();
     }
 
     /* ------------------------------------------------------------------ */

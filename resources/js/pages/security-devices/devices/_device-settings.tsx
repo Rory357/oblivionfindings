@@ -14,18 +14,20 @@ import { OnOff, SaveBar, SettingGroup, SettingRow } from '@/components/referrals
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { FactRows, QuietLine } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateOnly, WORKER_TIMEZONE } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
-import { Bell, KeyRound, Tag } from 'lucide-react';
+import { Bell, Check, ChevronsUpDown, KeyRound, Tag } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MainSide, plural } from './_device-page-parts';
-import type { DevicePageProps, SettingsTab } from './_device-page-types';
+import type { DevicePageProps, SettingsTab, StaffChoice } from './_device-page-types';
 
 /** NativeMonitoringDefinitionService's four stop-watching reasons, in the words 2e shows them in. */
 export const STOP_REASONS: { value: string; label: string }[] = [
@@ -35,7 +37,14 @@ export const STOP_REASONS: { value: string; label: string }[] = [
     { value: 'device_retired', label: 'Being retired' },
 ];
 
-type Draft = { name: string; room: string; watch: boolean; offline: boolean };
+type Draft = {
+    name: string;
+    room: string;
+    lookedAfterId: number | null;
+    watch: boolean;
+    offline: boolean;
+    updateReady: boolean;
+};
 type Change = { key: keyof Draft; label: string; from: string; to: string; loosens: string | null };
 
 function onOff(value: boolean): string {
@@ -80,6 +89,75 @@ function ReadOnly({ children }: { children: ReactNode }) {
     return <span className="rounded-md border border-border bg-card px-2.5 py-1 text-[13px]">{children}</span>;
 }
 
+function LookedAfterPicker({
+    options,
+    value,
+    fallbackLabel,
+    onChange,
+}: {
+    options: StaffChoice[];
+    value: number | null;
+    fallbackLabel: string | null;
+    onChange: (next: number | null) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const chosen = options.find((option) => option.id === value) ?? null;
+    const display = chosen ? chosen.label : value !== null && fallbackLabel ? fallbackLabel : 'Not set';
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    id="sd-settings-looked-after"
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    aria-label="Looked after by"
+                    className="h-9 w-64 max-w-full justify-between font-normal"
+                >
+                    <span className="truncate">{display}</span>
+                    <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-0">
+                <Command>
+                    <CommandInput placeholder="Find a staff member…" />
+                    <CommandList>
+                        <CommandEmpty>No staff member matches.</CommandEmpty>
+                        <CommandItem
+                            value="Not set"
+                            onSelect={() => {
+                                onChange(null);
+                                setOpen(false);
+                            }}
+                        >
+                            <Check className={cn('mr-2 size-4', value === null ? 'opacity-100' : 'opacity-0')} />
+                            <span>Not set</span>
+                        </CommandItem>
+                        {options.map((option) => (
+                            <CommandItem
+                                key={option.id}
+                                value={`${option.name} ${option.sub}`}
+                                onSelect={() => {
+                                    onChange(option.id);
+                                    setOpen(false);
+                                }}
+                            >
+                                <Check className={cn('mr-2 size-4 shrink-0', value === option.id ? 'opacity-100' : 'opacity-0')} />
+                                <span className="flex min-w-0 flex-col">
+                                    <span className="truncate text-sm font-medium">{option.name}</span>
+                                    <span className="truncate text-xs text-muted-foreground">{option.sub}</span>
+                                </span>
+                            </CommandItem>
+                        ))}
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
 export function SettingsTabView({
     props,
     settings,
@@ -96,9 +174,25 @@ export function SettingsTabView({
     const { device, can, actions } = props;
     const noun = settings.noun;
     const watching = settings.watching;
+    const staffOptions = useMemo(() => settings.staff_options ?? [], [settings.staff_options]);
+    const savedLookedAfterLabel = settings.about.looked_after_by?.label ?? null;
     const saved: Draft = useMemo(
-        () => ({ name: settings.name, room: settings.room ?? '', watch: watching.on, offline: watching.offline_alert }),
-        [settings.name, settings.room, watching.on, watching.offline_alert],
+        () => ({
+            name: settings.name,
+            room: settings.room ?? '',
+            lookedAfterId: settings.about.looked_after_by?.id ?? null,
+            watch: watching.on,
+            offline: watching.offline_alert,
+            updateReady: watching.tell_it_update_ready ?? true,
+        }),
+        [
+            settings.name,
+            settings.room,
+            settings.about.looked_after_by?.id,
+            watching.on,
+            watching.offline_alert,
+            watching.tell_it_update_ready,
+        ],
     );
     const [draft, setDraft] = useState<Draft>(saved);
     useEffect(() => setDraft(saved), [saved]);
@@ -110,14 +204,32 @@ export function SettingsTabView({
     const allowLeave = useRef(false);
 
     const canRename = can.edit && settings.edit !== null;
+    const canUpdateReady = can.watch || can.edit;
     const canWatchOn = can.watch && !watching.on && !!settings.address && settings.site_id !== null;
     const canWatchOff = can.watch && watching.on && !watching.by_service && watching.stop_ids.length > 0;
     const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
+
+    const labelForStaff = (id: number | null): string => {
+        if (id === null) return 'Not set';
+        const match = staffOptions.find((option) => option.id === id);
+        if (match) return match.label;
+        if (id === saved.lookedAfterId && savedLookedAfterLabel) return savedLookedAfterLabel;
+        return 'Staff member';
+    };
 
     const dependents = watching.dependents;
     const changes: Change[] = [];
     if (draft.name.trim() !== saved.name) changes.push({ key: 'name', label: 'Name', from: saved.name, to: draft.name.trim(), loosens: null });
     if (draft.room.trim() !== saved.room) changes.push({ key: 'room', label: 'Room or spot', from: saved.room || 'Not set', to: draft.room.trim() || 'Not set', loosens: null });
+    if (draft.lookedAfterId !== saved.lookedAfterId) {
+        changes.push({
+            key: 'lookedAfterId',
+            label: 'Looked after by',
+            from: labelForStaff(saved.lookedAfterId),
+            to: labelForStaff(draft.lookedAfterId),
+            loosens: null,
+        });
+    }
     if (draft.watch !== saved.watch) {
         changes.push({
             key: 'watch',
@@ -135,6 +247,15 @@ export function SettingsTabView({
             from: onOff(saved.offline),
             to: onOff(draft.offline),
             loosens: draft.offline ? null : `If the ${noun} goes offline, nobody is told${dependents > 0 ? ` and the ${plural(dependents, 'device', 'devices')} behind it go grey` : ''}.`,
+        });
+    }
+    if (draft.updateReady !== saved.updateReady) {
+        changes.push({
+            key: 'updateReady',
+            label: 'Tell IT when an update is ready',
+            from: onOff(saved.updateReady),
+            to: onOff(draft.updateReady),
+            loosens: null,
         });
     }
     const loosening = changes.filter((change) => change.loosens !== null);
@@ -189,6 +310,16 @@ export function SettingsTabView({
                     json,
                 );
             }
+            const extraPayload: Record<string, unknown> = {};
+            if (changes.some((change) => change.key === 'lookedAfterId')) {
+                extraPayload.looked_after_by_user_id = draft.lookedAfterId;
+            }
+            if (changes.some((change) => change.key === 'updateReady')) {
+                extraPayload.tell_it_update_ready = draft.updateReady;
+            }
+            if (Object.keys(extraPayload).length > 0) {
+                await axios.patch(`${base}/settings`, extraPayload, json);
+            }
             const watch = changes.find((change) => change.key === 'watch');
             const offline = changes.find((change) => change.key === 'offline');
             if ((watch && draft.watch) || (offline && draft.offline)) {
@@ -212,8 +343,10 @@ export function SettingsTabView({
 
     const nameChanged = draft.name.trim() !== saved.name;
     const roomChanged = draft.room.trim() !== saved.room;
+    const lookedAfterChanged = draft.lookedAfterId !== saved.lookedAfterId;
     const watchChanged = draft.watch !== saved.watch;
     const offlineChanged = !watchChanged && draft.offline !== saved.offline;
+    const updateReadyChanged = draft.updateReady !== saved.updateReady;
     const added = settings.about.added_at
         ? `${formatDateOnly(new Date(settings.about.added_at).toLocaleDateString('en-CA', { timeZone: WORKER_TIMEZONE }))}${settings.about.added_by ? ` by ${settings.about.added_by}` : ''}${settings.about.from_scan ? ', from a scan' : ''}`
         : null;
@@ -270,6 +403,25 @@ export function SettingsTabView({
                                         />
                                     ) : (
                                         <ReadOnly>{settings.room ?? 'Not set'}</ReadOnly>
+                                    )
+                                }
+                            />
+                        </Changed>
+                        <Changed changed={lookedAfterChanged}>
+                            <SettingRow
+                                label={<RowLabel label="Looked after by" changed={lookedAfterChanged} />}
+                                hint={lookedAfterChanged ? `Was ${labelForStaff(saved.lookedAfterId)}` : `Who looks after this ${noun}`}
+                                htmlFor={canRename ? 'sd-settings-looked-after' : undefined}
+                                control={
+                                    canRename ? (
+                                        <LookedAfterPicker
+                                            options={staffOptions}
+                                            value={draft.lookedAfterId}
+                                            fallbackLabel={savedLookedAfterLabel}
+                                            onChange={(next) => set('lookedAfterId', next)}
+                                        />
+                                    ) : (
+                                        <ReadOnly>{savedLookedAfterLabel ?? 'Not set'}</ReadOnly>
                                     )
                                 }
                             />
@@ -359,6 +511,20 @@ export function SettingsTabView({
                                 }
                             />
                         ) : null}
+                        <Changed changed={updateReadyChanged}>
+                            <SettingRow
+                                label={<RowLabel label="Tell IT when an update is ready" changed={updateReadyChanged} />}
+                                hint={updateReadyChanged ? `Was ${onOff(saved.updateReady).toLowerCase()} · in the 6:00 am summary` : 'In the 6:00 am summary'}
+                                control={
+                                    <OnOff
+                                        label="Tell IT when an update is ready"
+                                        checked={draft.updateReady}
+                                        onChange={(next) => set('updateReady', next)}
+                                        disabled={!canUpdateReady}
+                                    />
+                                }
+                            />
+                        </Changed>
                         {watching.other_checks > 0 && watching.on ? (
                             <SettingRow
                                 label="Other checks"
@@ -467,7 +633,11 @@ export function SettingsTabView({
                 <>
                     <FactRows
                         title={`About this ${noun}`}
-                        rows={[['Model', settings.about.model], ...(added ? ([['Added', added]] as [string, string][]) : [])]}
+                        rows={[
+                            ['Model', settings.about.model],
+                            ...(added ? ([['Added', added]] as [string, string][]) : []),
+                            ['Looked after by', savedLookedAfterLabel ?? 'Not set'],
+                        ]}
                     />
                     {settings.it.length > 0 ? <FactRows title="For IT" rows={settings.it} /> : null}
                 </>

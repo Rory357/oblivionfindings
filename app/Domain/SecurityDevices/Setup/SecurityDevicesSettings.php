@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Setup\Models\SecurityDeviceSetting;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuditLogger;
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -51,6 +52,20 @@ final class SecurityDevicesSettings
     /** Safety alerts go to the staff on shift at that house, from the roster and clock-ins. */
     public const string SAFETY_ROSTER = 'alerts.safety.roster';
 
+    /** pg-sdr-15g: the 6:00 am summary (low batteries, overnight alerts and hub updates). */
+    public const string SUMMARY_APP = 'alerts.summary.app';
+
+    public const string SUMMARY_EMAIL = 'alerts.summary.email';
+
+    public const string SUMMARY_PUSH = 'alerts.summary.push';
+
+    /** pg-sdr-15g: hold device and hub alerts overnight for the 6:00 am summary; safety alerts never wait. */
+    public const string QUIET_HOURS_ON = 'alerts.quiet_hours.on';
+
+    public const string QUIET_HOURS_START = 'alerts.quiet_hours.start';
+
+    public const string QUIET_HOURS_END = 'alerts.quiet_hours.end';
+
     /** D22: sensor gateways may send unencrypted MQTT to their Site's hub on the house network. */
     public const string MQTT_PLAIN = 'mqtt.allow_unencrypted';
 
@@ -71,7 +86,7 @@ final class SecurityDevicesSettings
     private const string MANAGE_ALERTS = 'securityDevices.automations.manage';
 
     /**
-     * type: bool | role. loosens: the value that loosens a safety check (true, false) or null.
+     * type: bool | role | time. loosens: the value that loosens a safety check (true, false) or null.
      *
      * @var array<string, array{type: string, permission: string, loosens: bool|null}>
      */
@@ -88,6 +103,12 @@ final class SecurityDevicesSettings
         self::SAFETY_EMAIL => ['type' => 'bool', 'permission' => self::MANAGE_ALERTS, 'loosens' => false],
         self::SAFETY_PUSH => ['type' => 'bool', 'permission' => self::MANAGE_ALERTS, 'loosens' => false],
         self::SAFETY_ROSTER => ['type' => 'bool', 'permission' => self::MANAGE_ALERTS, 'loosens' => null],
+        self::SUMMARY_APP => ['type' => 'bool', 'permission' => self::MANAGE_ALERTS, 'loosens' => null],
+        self::SUMMARY_EMAIL => ['type' => 'bool', 'permission' => self::MANAGE_ALERTS, 'loosens' => null],
+        self::SUMMARY_PUSH => ['type' => 'bool', 'permission' => self::MANAGE_ALERTS, 'loosens' => null],
+        self::QUIET_HOURS_ON => ['type' => 'bool', 'permission' => self::MANAGE_ALERTS, 'loosens' => null],
+        self::QUIET_HOURS_START => ['type' => 'time', 'permission' => self::MANAGE_ALERTS, 'loosens' => null],
+        self::QUIET_HOURS_END => ['type' => 'time', 'permission' => self::MANAGE_ALERTS, 'loosens' => null],
         self::MQTT_PLAIN => ['type' => 'bool', 'permission' => self::MANAGE_SCANS, 'loosens' => true],
         self::WATCH_ON_ADD => ['type' => 'bool', 'permission' => 'securityDevices.monitoring.manage', 'loosens' => false],
         self::WATCH_PHONES => ['type' => 'bool', 'permission' => 'securityDevices.monitoring.manage', 'loosens' => null],
@@ -135,6 +156,36 @@ final class SecurityDevicesSettings
         return is_string($value) && $value !== '' ? $value : null;
     }
 
+    /** A wall-clock time ("22:00") in Pacific/Auckland. */
+    public function time(string $key): string
+    {
+        $this->assertKnown($key, 'time');
+
+        return $this->clock($this->value($key), (string) $this->default($key));
+    }
+
+    /**
+     * Whether device and hub alerts should wait for the morning summary at this moment
+     * (in Pacific/Auckland). Safety alerts never ask this.
+     */
+    public function isQuietHours(?CarbonImmutable $at = null): bool
+    {
+        if (! $this->bool(self::QUIET_HOURS_ON)) {
+            return false;
+        }
+        $zone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $clock = ($at ?? CarbonImmutable::now('UTC'))->setTimezone($zone)->format('H:i');
+        $start = $this->time(self::QUIET_HOURS_START);
+        $end = $this->time(self::QUIET_HOURS_END);
+        if ($start === $end) {
+            return false;
+        }
+
+        return $start < $end
+            ? ($clock >= $start && $clock < $end)
+            : ($clock >= $start || $clock < $end);
+    }
+
     /**
      * Every setting with its value, whether it was changed from the default, whether this person
      * may change it, and for a role its choices.
@@ -155,6 +206,8 @@ final class SecurityDevicesSettings
             ];
             if ($definition['type'] === 'bool') {
                 $row += ['on' => (bool) $value, 'default' => (bool) $default, 'loosens_when_on' => $definition['loosens'] === true, 'loosens_when_off' => $definition['loosens'] === false];
+            } elseif ($definition['type'] === 'time') {
+                $row += ['value' => $this->clock($value, (string) $default), 'default' => (string) $default];
             } else {
                 $roles ??= Role::query()->orderBy('level')->orderBy('label')->get(['name', 'label'])
                     ->map(fn (Role $role): array => ['value' => (string) $role->name, 'label' => (string) ($role->label ?: ucfirst(str_replace('_', ' ', (string) $role->name)))])
@@ -191,6 +244,9 @@ final class SecurityDevicesSettings
             if ($definition['type'] === 'role' && $value !== null && ! (is_string($value) && Role::query()->where('name', $value)->exists())) {
                 $errors[$key] = 'Choose a role that exists.';
             }
+            if ($definition['type'] === 'time' && ! (is_string($value) && preg_match('/\A([01]\d|2[0-3]):[0-5]\d\z/', $value) === 1)) {
+                $errors[$key] = 'Choose a valid time (such as 22:00).';
+            }
         }
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
@@ -199,6 +255,15 @@ final class SecurityDevicesSettings
         foreach (array_keys($changes) as $key) {
             if (! $actor->canDo(self::DEFINITIONS[$key]['permission'])) {
                 throw new AuthorizationException('You can’t change this setting.');
+            }
+        }
+        if (array_key_exists(self::QUIET_HOURS_START, $changes) || array_key_exists(self::QUIET_HOURS_END, $changes)) {
+            $nextStart = (string) ($changes[self::QUIET_HOURS_START] ?? $this->time(self::QUIET_HOURS_START));
+            $nextEnd = (string) ($changes[self::QUIET_HOURS_END] ?? $this->time(self::QUIET_HOURS_END));
+            if ($nextStart === $nextEnd) {
+                throw ValidationException::withMessages([
+                    self::QUIET_HOURS_END => 'Choose a different start and end time.',
+                ]);
             }
         }
         if ($reason === null) {
@@ -255,9 +320,12 @@ final class SecurityDevicesSettings
     {
         return match ($key) {
             self::DAILY_SCANS, self::DEVICES_APP, self::DEVICES_EMAIL, self::NEW_DEVICES_APP, self::WATCH_ON_ADD, self::SAFETY_EMAIL, self::SAFETY_PUSH, self::SAFETY_ROSTER,
+            self::SUMMARY_APP, self::SUMMARY_EMAIL, self::QUIET_HOURS_ON,
             self::ACCESS_LEAVERS, self::ACCESS_CHANGES => true,
-            self::DEVICES_PUSH, self::NEW_DEVICES_EMAIL, self::NEW_DEVICES_PUSH, self::WATCH_PHONES, self::MQTT_PLAIN => false,
+            self::DEVICES_PUSH, self::NEW_DEVICES_EMAIL, self::NEW_DEVICES_PUSH, self::SUMMARY_PUSH, self::WATCH_PHONES, self::MQTT_PLAIN => false,
             self::DEVICES_ROLE => null,
+            self::QUIET_HOURS_START => '22:00',
+            self::QUIET_HOURS_END => '06:00',
             // Off for new organisations. Where the server already scanned networks itself
             // before this switch existed, that keeps working until someone turns it off.
             self::SERVER_SCANS => DiscoveryScope::query()
@@ -265,6 +333,11 @@ final class SecurityDevicesSettings
                 ->whereNull('collector_id')
                 ->exists(),
         };
+    }
+
+    private function clock(mixed $value, string $fallback): string
+    {
+        return is_string($value) && preg_match('/\A([01]\d|2[0-3]):[0-5]\d\z/', $value) === 1 ? $value : $fallback;
     }
 
     /** @return array<string, mixed> */

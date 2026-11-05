@@ -212,6 +212,50 @@ describe('Setup', () => {
         expect(screen.getByText('This loosens a safety check.')).toBeInTheDocument();
     });
 
+    it('shows the 6:00 am daily summary channels and overnight quiet hours without claiming printer toner', () => {
+        render(
+            <SetupPage
+                {...fixture({
+                    section: 'alerts',
+                    tab: 'rules',
+                    overview: null,
+                    sections: [...sections.slice(0, 3), { key: 'alerts', label: 'Alerts & checks', tabs: [{ key: 'rules', label: 'Alert rules' }] }, sections[3]],
+                    alerts: { rules: 2 },
+                    settings: {
+                        'alerts.devices.role': { type: 'role', value: null, default: null, changed: false, can_change: true, options: [{ value: null, label: 'IT for that Site' }] },
+                        'alerts.devices.app': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: true, can_change: true },
+                        'alerts.devices.email': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'alerts.devices.push': { type: 'bool', on: false, default: false, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'notify.new_devices.app': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'notify.new_devices.email': { type: 'bool', on: false, default: false, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'notify.new_devices.push': { type: 'bool', on: false, default: false, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'alerts.summary.app': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'alerts.summary.email': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'alerts.summary.push': { type: 'bool', on: false, default: false, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'alerts.quiet_hours.on': { type: 'bool', on: true, default: true, changed: false, loosens_when_on: false, loosens_when_off: false, can_change: true },
+                        'alerts.quiet_hours.start': { type: 'time', value: '22:00', default: '22:00', changed: false, can_change: true },
+                        'alerts.quiet_hours.end': { type: 'time', value: '06:00', default: '06:00', changed: false, can_change: true },
+                    },
+                })}
+            />,
+        );
+
+        expect(screen.getByText('Low batteries')).toBeInTheDocument();
+        expect(screen.getByText('One summary at 6:00 am')).toBeInTheDocument();
+        expect(screen.queryByText(/toner/i)).not.toBeInTheDocument();
+        expect(screen.getByText('Daily summary')).toBeInTheDocument();
+        expect(screen.getByRole('switch', { name: 'Daily summary: Email' })).toBeChecked();
+        expect(screen.getByRole('switch', { name: 'Hold device alerts overnight' })).toBeChecked();
+        expect(screen.getByRole('button', { name: /Quiet hours start/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Quiet hours end/ })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('switch', { name: 'Hold device alerts overnight' }));
+        expect(screen.getByText('1 change not saved')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
+        expect(screen.getByText('Save 1 change to alert rules?')).toBeInTheDocument();
+        expect(screen.queryByText('This loosens a safety check.')).not.toBeInTheDocument();
+    });
+
     it('lists the change history with export and a pager', () => {
         render(
             <SetupPage

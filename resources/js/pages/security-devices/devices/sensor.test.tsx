@@ -189,4 +189,141 @@ describe('Sensor page (pg-sdr-7)', () => {
         expect(screen.getByText('Not linked to anyone’s care.')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Link to a person' })).toBeInTheDocument();
     });
+
+    it('renders the bed sensor Nights view with last night log, 7-night bars and 4-check readiness ring (pg-sdr-7b)', () => {
+        render(
+            <SensorPage
+                {...sensor({
+                    device: { ...sensor().device, name: 'Synthetic bed sensor' },
+                    tab: 'nights',
+                    tabs: [
+                        { key: 'nights', label: 'Nights' },
+                        { key: 'readings', label: 'Readings' },
+                        { key: 'alerts', label: 'Alerts' },
+                    ],
+                    meters: [
+                        { key: 'right_now', label: 'Right now', value: 'Up', caption: { text: 'Out of bed since 7:05 am · day time, no alerts', at: null }, tone: 'brand', tab: 'nights' },
+                        { key: 'last_night', label: 'Last night', value: 'Out twice', caption: { text: 'Longest 6 min · no alert', at: null }, tone: 'brand', tab: 'nights' },
+                        { key: 'alerts_7d', label: 'Alerts in 7 nights', value: '1', caption: { text: 'Sat 24 Oct, 2:40 am', at: null }, tone: 'warning', tab: 'alerts' },
+                    ],
+                    readings: null,
+                    nights: {
+                        care_banner: {
+                            kicker: 'Linked to a resident’s falls plan',
+                            title: 'Alert night staff if they are out of bed for over 10 minutes between 10:00 pm and 6:00 am',
+                            sub: 'Goes to whoever is on the night shift at Synthetic House',
+                            night_hours: '10:00 pm – 6:00 am',
+                            person_href: null,
+                        },
+                        can_link: false,
+                        last_night: {
+                            sub: 'Mon 2 – Tue 3 Nov',
+                            items: [
+                                { key: 'in-bed-start', time: '10:12 pm', tone: 'success', title: 'In bed', sub: 'Night hours started at 10:00 pm' },
+                                { key: 'out-0', time: '1:48 am', tone: 'info', title: 'Out of bed for 6 min', sub: 'Back at 1:54 am · under 10 minutes, no alert' },
+                            ],
+                            empty: null,
+                        },
+                        seven_nights: {
+                            labels: ['Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue'],
+                            // Thu has no readings: null, never drawn as 0.
+                            values: [4, null, 14, 6, 3, 0, 8],
+                            note: 'One alert in the last 7 nights: Sat 24 Oct, 2:40 am. No readings on 1 of the 7 nights.',
+                        },
+                        readiness: {
+                            passed: 4,
+                            of: 4,
+                            label: 'Ready to alert night staff',
+                            sub: { text: 'Checked {ago}', at: minutesAgo(1) },
+                            checks: [
+                                { state: 'success', label: 'Linked to a resident, Room 3', note: null },
+                                { state: 'success', label: 'Falls plan in date', note: 'Next review Tue 12 Jan 2027' },
+                                { state: 'success', label: 'Consent to the bed sensor recorded', note: 'Thu 3 Sep 2026' },
+                                { state: 'success', label: 'Night shift filled on the roster tonight', note: '10:00 pm – 7:00 am' },
+                            ],
+                        },
+                        // Without access to the resident's record: no room, flag or key worker.
+                        person_card: {
+                            name: 'Resident',
+                            sub: 'Synthetic House',
+                            flag: null,
+                            href: null,
+                            key_worker: null,
+                        },
+                        what_it_senses: [
+                            { label: 'Senses', text: 'In bed or out of bed only', at: null },
+                            { label: 'Doesn’t', text: 'No camera, no sound', at: null },
+                        ],
+                    },
+                })}
+            />,
+        );
+
+        expect(within(meterBlock('Right now')).getByText('Up')).toBeInTheDocument();
+        expect(within(meterBlock('Last night')).getByText('Out twice')).toBeInTheDocument();
+        expect(screen.getByText('Out of bed for 6 min')).toBeInTheDocument();
+        const bars = screen.getByRole('img', { name: /Minutes out of bed at night/ });
+        expect(bars).toHaveAccessibleName('Minutes out of bed at night: Wed 4, Thu no readings, Fri 14, Sat 6, Sun 3, Mon 0, Tue 8');
+        // The night with no readings says so and draws no bar; only Mon's real 0 is written as 0.
+        expect(within(bars).getByText('No readings')).toBeInTheDocument();
+        expect(within(bars).getAllByText('0')).toHaveLength(1);
+        expect(bars.querySelectorAll('i')).toHaveLength(6);
+        expect(screen.queryByText('Falls risk')).not.toBeInTheDocument();
+        expect(screen.queryByText('Synthetic Worker')).not.toBeInTheDocument();
+        expect(screen.getByRole('img', { name: '4 of 4' })).toBeInTheDocument();
+        expect(screen.getByText('Ready to alert night staff')).toBeInTheDocument();
+        expect(screen.getByText('Night shift filled on the roster tonight')).toBeInTheDocument();
+        expect(screen.getByText('In bed or out of bed only')).toBeInTheDocument();
+    });
+
+    it('renders hot-water scald meters and hazard banner (pg-sdr-7c), and opens Edit limits when permitted', () => {
+        render(
+            <SensorPage
+                {...sensor({
+                    can: { ...sensor().can, manage_rules: true },
+                    meters: [
+                        { key: 'tap_now', label: 'At the tap now', value: '58 °C', caption: { text: 'Over 45 °C since {time}', at: minutesAgo(15) }, tone: 'critical', tab: 'readings' },
+                        { key: 'hottest_today', label: 'Hottest today', value: '61 °C', caption: { text: 'At {time}', at: minutesAgo(10) }, tone: 'warning', tab: 'readings' },
+                        { key: 'hazard', label: 'H&S hazard', value: 'Raised', caption: { text: 'Scald risk · {time}', at: minutesAgo(12) }, tone: 'critical', tab: 'alerts' },
+                        { key: 'battery', label: 'Battery', value: '96%', caption: { text: 'About 3 years left', at: null }, tone: 'success', tab: 'readings' },
+                    ],
+                    readings: {
+                        ...sensor().readings!,
+                        rules: [{ key: 'temperature', label: 'Too cold below 16 °C', hint: 'Staff on shift at Synthetic House · in the app', enabled: true }],
+                        editable_rules: {
+                            metrics: [{ key: 'temperature', label: 'Temperature', unit: '°C', mode: 'range', enabled: true, below: 16, above: null, warning_at: null, critical_at: null }],
+                            battery: { enabled: true, below: 20 },
+                        },
+                    },
+                    care: {
+                        link: null,
+                        can_link: false,
+                        scald: {
+                            on: true,
+                            can_change: true,
+                            alert: {
+                                id: 91,
+                                title: 'Scald risk: Hot water at Room 3 tap is over 45 °C',
+                                opened_at: minutesAgo(15),
+                                hazard_raised: true,
+                                hazard_url: '/hazards/14',
+                                can_raise_hazard: false,
+                                alert_href: '/security-devices/alerts?alert=91',
+                            },
+                        },
+                    },
+                })}
+            />,
+        );
+
+        expect(within(meterBlock('At the tap now')).getByText('58 °C')).toBeInTheDocument();
+        expect(within(meterBlock('Hottest today')).getByText('61 °C')).toBeInTheDocument();
+        expect(within(meterBlock('H&S hazard')).getByText('Raised')).toBeInTheDocument();
+        expect(screen.getByText('Scald risk: Hot water at Room 3 tap is over 45 °C')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Open hazard' })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit limits' }));
+        expect(screen.getByRole('heading', { name: 'Edit alert limits' })).toBeInTheDocument();
+        expect(screen.getByLabelText('Low limit (°C)')).toHaveValue(16);
+    });
 });

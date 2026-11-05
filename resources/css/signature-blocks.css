@@ -478,6 +478,64 @@
     display: block;
     margin-top: 6px;
 }
+.sg-day {
+    position: relative;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    padding-top: 2px;
+}
+.sg-day::before {
+    content: '';
+    position: absolute;
+    top: 7px;
+    right: 6px;
+    left: 6px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--sg-quiet-line);
+}
+.sg-day > span {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 5px;
+    font-size: calc(11rem / 14);
+    font-variant-numeric: tabular-nums;
+    color: var(--muted-foreground);
+}
+.sg-day > span:first-child {
+    justify-items: start;
+}
+.sg-day > span:last-child {
+    justify-items: end;
+}
+.sg-day > span::before {
+    content: '';
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--card);
+    box-shadow: inset 0 0 0 2px var(--sg-ring-rest);
+}
+.sg-day > span.sg-day--done::before {
+    background: radial-gradient(circle, var(--primary) 0 3px, var(--card) 3.5px);
+    box-shadow: inset 0 0 0 2px var(--primary);
+}
+.sg-day > span.sg-day--now {
+    font-weight: 650;
+    color: var(--primary);
+}
+.sg-day > span.sg-day--now::before {
+    box-shadow:
+        inset 0 0 0 3.5px var(--primary),
+        0 0 10px -2px var(--primary);
+}
+.sg-day > span.sg-day--off::before {
+    box-shadow: none;
+    outline: 1.5px dashed var(--muted-foreground);
+    outline-offset: -1.5px;
+}
 .sg-pf {
     display: flex;
     flex-wrap: wrap;

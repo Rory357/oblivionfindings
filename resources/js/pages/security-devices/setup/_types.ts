@@ -105,7 +105,15 @@ export type SettingRole = {
     options: { value: string | null; label: string }[];
 };
 
-export type SettingRow = SettingSwitch | SettingRole;
+export type SettingTime = {
+    type: 'time';
+    value: string;
+    default: string;
+    changed: boolean;
+    can_change: boolean;
+};
+
+export type SettingRow = SettingSwitch | SettingRole | SettingTime;
 
 export type NetworkRow = {
     id: number;

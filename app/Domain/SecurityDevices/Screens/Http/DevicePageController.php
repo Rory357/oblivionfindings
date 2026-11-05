@@ -5,8 +5,10 @@ namespace App\Domain\SecurityDevices\Screens\Http;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Screens\Devices\DeviceFormOptions;
 use App\Domain\SecurityDevices\Screens\Devices\Pages\DevicePagePresenter;
+use App\Domain\SecurityDevices\Screens\Devices\Pages\DeviceSettingsTab;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
@@ -50,5 +52,13 @@ final class DevicePageController extends Controller
             ...$props,
             'deviceForm' => Inertia::optional(fn (): array => $this->formOptions->present($user)),
         ]);
+    }
+
+    public function updateSettings(Request $request, Device $device, DeviceSettingsTab $settingsTab): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User && $user->canDo('securityDevices.devices.view'), 403);
+
+        return response()->json($settingsTab->save($user, $device, $request->all()));
     }
 }

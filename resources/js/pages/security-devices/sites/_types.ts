@@ -131,12 +131,19 @@ export type FoundLink = {
     child_href: string;
     by: string;
     ports: string | null;
-    /** How sure Oblivion is, 0–100. */
-    sure: number;
+    /** How sure Oblivion is, 0–100; null when placed on the map by hand. */
+    sure: number | null;
     seen_at: string | null;
     /** `note` may carry "{time}" or "{date}" for `at`. */
     map: { state: LinkMapState; tone: 'success' | 'info' | 'neutral' | 'warning'; label: string; note: string; at: string | null };
     relationship: { id: number; device_id: number } | null;
+};
+
+export type UnplacedDeviceOption = {
+    id: number;
+    name: string;
+    kind: string;
+    sub: string;
 };
 
 export type LinksFound = {
@@ -146,7 +153,13 @@ export type LinksFound = {
     threshold: number;
     rows: FoundLink[];
     changes: { key: string; at: string | null; tone: 'success' | 'info' | 'warning'; title: string; sub: string }[];
-    unplaced: { count: number; names: string[]; more: number };
+    unplaced: {
+        count: number;
+        names: string[];
+        more: number;
+        items?: UnplacedDeviceOption[];
+        parents?: UnplacedDeviceOption[];
+    };
     can: { change: boolean };
 };
 
