@@ -4,15 +4,17 @@
  * does. Choose / change the owner, add an action (or a revised action), record that WorkSafe was told, and close.
  * Every command is the existing server route; the server checks everything again.
  */
-import { useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import { CheckCircle2, FileDown, ListChecks, Search, ShieldAlert, UserRoundCheck } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 
 import type { EventCorrectiveAction, EventDetail } from '@/components/health-safety/event-detail-dialog';
 import { HazardStaffPicker } from '@/components/health-safety/hazard-staff-picker';
+import { collapsePendingWorksafeRequirements } from '@/components/health-safety/review-progress';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
 import { PopupCallout, PopupField, PopupForm } from '@/components/popup';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -454,23 +456,32 @@ export function WorksafeToldDialog({
     );
 }
 
-/** Close the safety review (board M8): only when nothing blocks it, or an approved "close anyway" covers what's left. */
+/** Close the safety review (board M8): one 480 pop-up for every close entry point, ready or blocked. */
 export function CloseReviewDialog({
     open,
     onClose,
     onDone,
     d,
+    reviewTitle,
     exceptionId,
+    exceptionReviewAt,
     incidentCloser,
+    onAskCloseAnyway,
 }: {
     open: boolean;
     onClose: () => void;
     onDone: () => void;
     d: EventDetail;
+    /** Sentence-case review title for the locked context line. */
+    reviewTitle?: string;
     /** An approved, current "close anyway" that covers what's left. */
     exceptionId?: number | null;
+    /** When the approved "close anyway" must be reviewed/closed by. */
+    exceptionReviewAt?: string | null;
     /** Who closes the incident afterwards ("Rāwiri Ngata, or another manager at Kauri House"). */
     incidentCloser?: string | null;
+    /** Opens the "Ask to close anyway" pop-up (board M12) when allowed. */
+    onAskCloseAnyway?: (() => void) | null;
 }) {
     const form = useForm<{ closure_summary: string; exception_id: string }>({
         closure_summary: '',
@@ -479,8 +490,27 @@ export function CloseReviewDialog({
     const requirements = d.close_readiness.requirements;
     const hard = requirements.filter((r) => r.classification === 'hard');
     const soft = requirements.filter((r) => r.classification === 'exceptional');
+    const hardBlockers = d.close_readiness.hard_blockers;
+    const exceptionalBlockers = d.close_readiness.exceptional_blockers;
+    const shownHardBlockers = collapsePendingWorksafeRequirements(hardBlockers);
+    const closeReady = d.can.close && hardBlockers.length === 0 && (exceptionalBlockers.length === 0 || !!exceptionId);
+    const pendingException = d.closure_exceptions.find((exception) => exception.status === 'pending') ?? null;
+    const inlineRequirementLabel = (label: string): string => {
+        const trimmed = label.replace(/\.$/, '');
+        if (/^(WorkSafe|H&S|Control Room|Site\b)/.test(trimmed)) return trimmed;
+        return trimmed ? trimmed[0].toLowerCase() + trimmed.slice(1) : trimmed;
+    };
     const line = (items: typeof requirements) =>
-        `${items.filter((r) => r.complete).length} of ${items.length} done (${items.map((r) => r.label.replace(/\.$/, '').toLowerCase()).join(', ')})`;
+        `${items.filter((r) => r.complete).length} of ${items.length} done (${collapsePendingWorksafeRequirements(items)
+            .map((r) => inlineRequirementLabel(r.label))
+            .join(', ')})`;
+    const blockedReason = !d.can.close
+        ? (d.close_authority?.text ?? 'Only the owner or someone who closes safety reviews at this Site can close it.')
+        : hardBlockers.length > 0
+          ? 'Finish the items above to close.'
+          : exceptionalBlockers.length > 0 && !exceptionId
+            ? 'Finish what’s open or get “close anyway” approved.'
+            : null;
 
     return (
         <PopupForm
@@ -488,20 +518,46 @@ export function CloseReviewDialog({
             onClose={onClose}
             icon={CheckCircle2}
             title="Close this safety review"
-            description="Everything’s done — say what we learned"
-            context={{ title: [d.title ?? d.reference_number, d.site?.name, d.reference_number].filter(Boolean).join(' · ') }}
+            description={
+                closeReady
+                    ? 'Everything’s done — say what we learned'
+                    : d.can.close
+                      ? 'Finish what’s left below before closing this safety review'
+                      : 'Check what’s left before this safety review can close'
+            }
+            context={{ title: [reviewTitle ?? d.title ?? d.reference_number, d.site?.name, d.reference_number].filter(Boolean).join(' · ') }}
             submitLabel="Close safety review"
             processingLabel="Closing…"
             processing={form.processing}
-            submitDisabled={!form.data.closure_summary.trim()}
-            onSubmit={() =>
+            submitDisabled={!closeReady || !form.data.closure_summary.trim()}
+            footerStart={blockedReason ? <span className="text-caption">{blockedReason}</span> : undefined}
+            secondary={
+                !closeReady && onAskCloseAnyway ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                            onClose();
+                            onAskCloseAnyway();
+                        }}
+                    >
+                        Ask to close anyway…
+                    </Button>
+                ) : undefined
+            }
+            onSubmit={() => {
+                if (!closeReady) return;
+                form.transform((data) => ({
+                    ...data,
+                    exception_id: exceptionId ? String(exceptionId) : '',
+                }));
                 form.post(`/health-safety/events/${d.id}/close`, {
                     preserveScroll: true,
                     onSuccess: (page) => {
                         if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
                     },
-                })
-            }
+                });
+            }}
             dirty={form.isDirty}
             draftName="what we learned"
             testId="close-review-dialog"
@@ -519,24 +575,106 @@ export function CloseReviewDialog({
                     </li>
                 ) : null}
             </ul>
-            <PopupField
-                label="What did we learn?"
-                htmlFor="close-review-learned"
-                required
-                hint="Kept with the safety review and shown in its history."
-                error={form.errors.closure_summary}
-            >
-                <Textarea
-                    id="close-review-learned"
-                    rows={4}
-                    value={form.data.closure_summary}
-                    onChange={(event) => form.setData('closure_summary', event.target.value)}
-                />
-            </PopupField>
-            <PopupCallout tone="warning">
-                This closes the safety review, and it can’t be reopened.
-                {incidentCloser ? ` The incident stays open until ${incidentCloser} closes it after the manager review.` : ''}
-            </PopupCallout>
+            {hardBlockers.length > 0 ? (
+                <PopupCallout tone="critical">
+                    <div className="grid gap-1.5">
+                        <p className="font-semibold">
+                            {hardBlockers.length === 1
+                                ? 'This must be done before the review can close'
+                                : `These ${hardBlockers.length} things must be done before the review can close`}
+                        </p>
+                        <ul className="list-disc space-y-1 pl-4">
+                            {shownHardBlockers.map((blocker) => (
+                                <li key={blocker.key}>
+                                    {blocker.href ? (
+                                        <Link
+                                            href={blocker.href}
+                                            onClick={onClose}
+                                            className="rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        >
+                                            {blocker.label}
+                                        </Link>
+                                    ) : (
+                                        blocker.label
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                        <p>A “close anyway” request can’t cover these, even an approved one.</p>
+                    </div>
+                </PopupCallout>
+            ) : null}
+            {exceptionalBlockers.length > 0 ? (
+                <PopupCallout tone={exceptionId ? 'info' : 'warning'}>
+                    <div className="grid gap-1.5">
+                        {exceptionId ? (
+                            <>
+                                <p className="font-semibold">Covered by an approved “close anyway”</p>
+                                <p>
+                                    Covers {exceptionalBlockers.map((blocker) => inlineRequirementLabel(blocker.label)).join('; ')}
+                                    {exceptionReviewAt ? ` until ${formatDate(exceptionReviewAt)}` : ''}.
+                                    {hardBlockers.length > 0 ? ' Finish the items above first.' : ' Checked again when you close.'}
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="font-semibold">
+                                    {exceptionalBlockers.length === 1
+                                        ? 'One item is still open'
+                                        : `${exceptionalBlockers.length} items are still open`}
+                                </p>
+                                <ul className="list-disc space-y-1 pl-4">
+                                    {exceptionalBlockers.map((blocker) => (
+                                        <li key={blocker.key}>
+                                            {blocker.href ? (
+                                                <Link
+                                                    href={blocker.href}
+                                                    onClick={onClose}
+                                                    className="rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                >
+                                                    {blocker.label}
+                                                </Link>
+                                            ) : (
+                                                blocker.label
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                                <p>
+                                    {pendingException
+                                        ? 'A “close anyway” request is waiting for an independent decision.'
+                                        : onAskCloseAnyway
+                                          ? 'Finish it first, or ask to close anyway if it truly can’t be finished in time.'
+                                          : 'Finish these first. “Close anyway” can only cover one open item once everything above is done.'}
+                                </p>
+                            </>
+                        )}
+                    </div>
+                </PopupCallout>
+            ) : null}
+            {d.can.close ? (
+                <PopupField
+                    label="What did we learn?"
+                    htmlFor="close-review-learned"
+                    required
+                    hint="Kept with the safety review and shown in its history."
+                    error={form.errors.closure_summary}
+                >
+                    <Textarea
+                        id="close-review-learned"
+                        rows={4}
+                        disabled={!closeReady}
+                        value={form.data.closure_summary}
+                        onChange={(event) => form.setData('closure_summary', event.target.value)}
+                    />
+                </PopupField>
+            ) : null}
+            {closeReady ? (
+                <PopupCallout tone="warning">
+                    This closes the safety review, and it can’t be reopened.
+                    {incidentCloser ? ` The incident stays open until ${incidentCloser} closes it after the manager review.` : ''}
+                </PopupCallout>
+            ) : null}
         </PopupForm>
     );
 }
@@ -816,7 +954,11 @@ export function DecideCloseAnywayDialog({
                 </div>
                 <div>
                     <dt className="font-semibold">Can’t be skipped {hard.every((r) => r.complete) ? '— all done' : '— not all done'}</dt>
-                    <dd className="text-muted-foreground">{hard.map((r) => r.label).join(' · ')}</dd>
+                    <dd className="text-muted-foreground">
+                        {collapsePendingWorksafeRequirements(hard)
+                            .map((r) => r.label)
+                            .join(' · ')}
+                    </dd>
                 </div>
                 <div>
                     <dt className="font-semibold">Why {asker} asked</dt>

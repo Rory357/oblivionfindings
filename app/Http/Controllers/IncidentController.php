@@ -30,7 +30,6 @@ use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use App\Services\Incidents\IncidentClosureService;
 use App\Services\Incidents\IncidentEvidenceReadService;
 use App\Services\Incidents\IncidentJourney;
-use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Incidents\IncidentOwnershipService;
 use App\Services\Incidents\IncidentRegisterReadService;
@@ -61,7 +60,6 @@ class IncidentController extends Controller
     public function __construct(
         private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
         private readonly IncidentJourneyService $journeys,
-        private readonly IncidentJourneyPresenter $journeyPresenter,
         private readonly IncidentAlertLifecycleSignalService $incidentAlertSignals,
         private readonly IncidentReportDraftService $incidentReportDrafts,
         private readonly IncidentOwnershipService $owners,
@@ -453,7 +451,7 @@ class IncidentController extends Controller
             'close_gate' => $closeGatePayload,
             'journey_state' => $journeyRepairRequired
                 ? 'Journey repair required'
-                : $this->journeyPresenter->journeyState(
+                : $this->journeys->journeyState(
                     $incident,
                     $linkedControlRoomAlert,
                     $hsEvent,
@@ -678,6 +676,7 @@ class IncidentController extends Controller
     ) {
         $actor = $request->user();
         abort_unless($actor?->canDo('incidents.create'), 403);
+        $this->ensureSafeIncidentPreviousUrl($request, route('incidents.index'));
         $canManageFollowups = $actor->canDo('incidents.followups.manage');
 
         $data = $request->validate([
@@ -1359,6 +1358,7 @@ class IncidentController extends Controller
     public function update(Request $request, ClientIncident $incident)
     {
         $this->authorize('update', $incident);
+        $this->ensureSafeIncidentPreviousUrl($request, url("/incidents/{$incident->id}"));
 
         $user = $request->user();
 
@@ -1558,6 +1558,7 @@ class IncidentController extends Controller
     public function review(Request $request, ClientIncident $incident)
     {
         $this->authorize('review', $incident);
+        $this->ensureSafeIncidentPreviousUrl($request, url("/incidents/{$incident->id}"));
 
         $data = $request->validate([
             'review_notes' => ['nullable', 'string'],
@@ -1619,6 +1620,7 @@ class IncidentController extends Controller
     public function close(Request $request, ClientIncident $incident)
     {
         $this->authorize('close', $incident);
+        $this->ensureSafeIncidentPreviousUrl($request, url("/incidents/{$incident->id}"));
 
         $data = $request->validate([
             'closed_outcome' => ['required', 'string', 'max:120'],
@@ -1671,6 +1673,7 @@ class IncidentController extends Controller
     public function reopen(Request $request, ClientIncident $incident)
     {
         $this->authorize('reopen', $incident);
+        $this->ensureSafeIncidentPreviousUrl($request, url("/incidents/{$incident->id}"));
 
         $data = $request->validate([
             'reopened_reason' => ['required', 'string', 'max:2000'],
@@ -1886,5 +1889,22 @@ class IncidentController extends Controller
             data_get($item->metadata, 'original_name') ?: basename($item->storage_path),
             $item->mime_type,
         );
+    }
+
+    private function ensureSafeIncidentPreviousUrl(Request $request, string $fallbackUrl): void
+    {
+        if (! $request->hasSession() || $request->headers->has('referer')) {
+            return;
+        }
+
+        $previousPath = (string) parse_url((string) $request->session()->previousUrl(), PHP_URL_PATH);
+        if (
+            $previousPath === ''
+            || $previousPath === '/health-safety/rail-counts'
+            || str_ends_with($previousPath, '/owners/options')
+            || str_starts_with($previousPath, '/incidents/drafts/')
+        ) {
+            $request->session()->setPreviousUrl($fallbackUrl);
+        }
     }
 }

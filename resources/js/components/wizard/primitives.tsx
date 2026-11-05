@@ -96,7 +96,9 @@ export function Field({
         isValidElement(children) && children.type !== Fragment
             ? (children as ReactElement<{ id?: string }>)
             : null;
-    const controlId = child && child.props.id == null ? generatedId : undefined;
+    const isGroupLabel = Boolean(labelId && !htmlFor && child?.props.id == null);
+    const controlId =
+        !isGroupLabel && child && child.props.id == null ? generatedId : undefined;
     const control = controlId
         ? cloneElement(child as ReactElement<{ id?: string }>, {
               id: controlId,
@@ -108,7 +110,11 @@ export function Field({
             {label ? (
                 <Label
                     id={labelId}
-                    htmlFor={htmlFor ?? child?.props.id ?? controlId}
+                    htmlFor={
+                        isGroupLabel
+                            ? undefined
+                            : (htmlFor ?? child?.props.id ?? controlId)
+                    }
                     className="mb-1.5 flex items-center gap-1.5"
                 >
                     {label}
@@ -207,6 +213,7 @@ export function SelectInput({
     ariaLabel,
     frontline = false,
     disabled = false,
+    openDownward = false,
     className,
 }: {
     id?: string;
@@ -221,6 +228,8 @@ export function SelectInput({
     /** Expand this control's own target on frontline forms. */
     frontline?: boolean;
     disabled?: boolean;
+    /** Keep the menu below the trigger instead of flipping upward over content above. */
+    openDownward?: boolean;
     className?: string;
 }) {
     return (
@@ -235,7 +244,16 @@ export function SelectInput({
             >
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent
+                side={openDownward ? 'bottom' : undefined}
+                avoidCollisions={openDownward ? false : undefined}
+                collisionPadding={openDownward ? 16 : undefined}
+                className={
+                    openDownward
+                        ? 'max-h-[min(20rem,var(--radix-select-content-available-height))]'
+                        : undefined
+                }
+            >
                 {options.map((o) => (
                     <SelectItem
                         key={o.value}
@@ -390,11 +408,20 @@ export function TilePicker({
                 {options.map((o) => {
                     const Icon = o.icon;
                     const active = value === o.key;
+                    const accessibleLabel = [
+                        o.label,
+                        o.description,
+                        o.meta,
+                        o.disabled,
+                    ]
+                        .filter(Boolean)
+                        .join(' ');
                     return (
                         <button
                             key={o.key}
                             type="button"
                             data-tile={o.key}
+                            aria-label={accessibleLabel}
                             aria-pressed={active}
                             aria-disabled={o.disabled ? true : undefined}
                             aria-invalid={invalid || undefined}
@@ -416,6 +443,7 @@ export function TilePicker({
                         >
                             {Icon ? (
                                 <span
+                                    aria-hidden="true"
                                     className={cn(
                                         'mt-0.5 shrink-0 rounded-lg p-1.5',
                                         active ? 'bg-primary/15' : 'bg-muted',

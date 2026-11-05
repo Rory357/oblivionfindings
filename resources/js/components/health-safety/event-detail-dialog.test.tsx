@@ -607,13 +607,22 @@ describe('Permanent safety review workspace', () => {
         const readiness = screen.getByRole('button', { name: /Closure readiness/ });
         expect(readiness).toHaveTextContent('4 things left · 1 done');
         fireEvent.click(readiness);
-        // … but the three that depend on the decision show as one plain line.
+        // … but the three that depend on the decision show as one plain line naming what it blocks.
+        const expectedLine =
+            'Record the WorkSafe decision first — it blocks WorkSafe notification, acknowledgement and Site preservation.';
         expect(
             screen.getByRole('link', {
-                name: 'Record the WorkSafe decision first. The other WorkSafe steps depend on it.',
+                name: expectedLine,
             }),
         ).toHaveAttribute('href', '/health-safety/events/17?action=worksafe-decision');
         expect(screen.queryByText(/before confirming/)).toBeNull();
+
+        // Picking the Closed step in the header strip also collapses the four WorkSafe lines into one.
+        const steps = screen.getByRole('list', { name: /Safety review steps/ });
+        fireEvent.click(within(steps).getByRole('button', { name: /Closed/ }));
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getByText(expectedLine)).toBeInTheDocument();
+        expect(within(progress).queryByText(/before confirming/)).toBeNull();
     });
 
     it('renders a real record page with linked summaries and section navigation', () => {
@@ -2864,5 +2873,156 @@ describe('G3 safety review page: the ways through rules 1 and 2', () => {
         expect(within(progress).getByRole('button', { name: /Back to the current step/ })).toBeInTheDocument();
         fireEvent.click(within(progress).getAllByRole('button', { name: 'Edit' })[0]);
         expect(screen.getByRole('dialog', { name: 'Correct the findings' })).toBeInTheDocument();
+    });
+
+    it('offers "Add revised action" from the Actions tab with the same pop-up and permission rules as Overview', () => {
+        const onPaneChange = vi.fn();
+        const { unmount } = render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    handover: owned,
+                    worksafe: { decision_signed: true, notifiable: false },
+                    corrective_actions: [failedAction()],
+                    assignable_staff: [{ id: 8, name: 'Moana Rangi' }],
+                } as EventDetailOverrides)}
+                initialSection="actions"
+                onPaneChange={onPaneChange}
+            />,
+        );
+        expect(screen.getAllByText('Revised action needed').length).toBeGreaterThan(0);
+        const panel = screen.getByRole('tabpanel', { name: 'Actions' });
+        fireEvent.click(within(panel).getByRole('button', { name: 'Add revised action' }));
+        expect(onPaneChange).toHaveBeenCalledWith({ kind: 'ca_add', replacesActionId: 141 }, 'actions');
+        const dialog = screen.getByRole('dialog', { name: 'Add a revised action' });
+        expect(within(dialog).getByText(/Replaces CA-2026-0141/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/Check result: The rug still slides/)).toBeInTheDocument();
+        unmount();
+
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    handover: owned,
+                    worksafe: { decision_signed: true, notifiable: false },
+                    corrective_actions: [failedAction()],
+                    can: { manage: false },
+                } as EventDetailOverrides)}
+                initialSection="actions"
+            />,
+        );
+        const readOnlyPanel = screen.getByRole('tabpanel', { name: 'Actions' });
+        expect(within(readOnlyPanel).queryByRole('button', { name: 'Add revised action' })).not.toBeInTheDocument();
+    });
+
+    it('renders safety review titles in sentence case without altering person or Site names (P14)', () => {
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    title: 'injury incident — Amelia Wilson',
+                    handover: owned,
+                    worksafe: { decision_signed: true, notifiable: false },
+                } as EventDetailOverrides)}
+            />,
+        );
+        expect(
+            screen.getByRole('heading', {
+                level: 1,
+                name: 'Injury incident — Amelia Wilson',
+            }),
+        ).toBeInTheDocument();
+    });
+
+    it('opens the single 480 close pop-up from both ?action=close links and the Progress button, ready or blocked (P8)', () => {
+        const blockedDetail = eventDetail({
+            handover: owned,
+            worksafe: { decision_signed: true, notifiable: false },
+            close_gate: {
+                allowed: false,
+                requirements: [
+                    {
+                        key: 'worksafe_decision',
+                        complete: true,
+                        label: 'WorkSafe decision recorded',
+                        href: '/health-safety/events/17?action=worksafe-decision',
+                    },
+                    {
+                        key: 'hs_investigation',
+                        complete: false,
+                        label: 'Complete the required investigation before closing this event.',
+                        href: '/health-safety/events/17?action=investigation',
+                    },
+                ],
+            },
+            next_step: {
+                key: 'close',
+                label: 'Close the safety review',
+                can: true,
+                who: '',
+            },
+            can: {
+                manage: true,
+                close: true,
+                request_closure_exception: true,
+                approve_closure_exception: false,
+                manage_corrective_action_lifecycle: true,
+                verify_corrective_actions: true,
+            },
+        } as EventDetailOverrides);
+
+        // 1. Arriving via an ?action=close link while blocked opens the 480 pop-up kit, never an inline panel.
+        const { unmount } = render(
+            <EventRecordWorkspace detail={blockedDetail} initialAction="close" />,
+        );
+        expect(screen.queryByRole('region', { name: 'Current safety review action' })).not.toBeInTheDocument();
+        const blockedPopup = screen.getByTestId('close-review-dialog');
+        expect(blockedPopup).toHaveAttribute('data-popup-size', 'sm');
+        expect(within(blockedPopup).getByText('Close this safety review')).toBeInTheDocument();
+        expect(
+            within(blockedPopup).getByRole('link', {
+                name: 'Complete the required investigation before closing this event.',
+            }),
+        ).toHaveAttribute('href', '/health-safety/events/17?action=investigation');
+        expect(within(blockedPopup).getByText(/Finish what’s open or get “close anyway” approved\./)).toBeInTheDocument();
+        expect(within(blockedPopup).getByRole('button', { name: 'Close safety review' })).toBeDisabled();
+        expect(within(blockedPopup).getByRole('button', { name: 'Ask to close anyway…' })).toBeInTheDocument();
+        unmount();
+
+        // 2. Clicking the Progress next-step button opens the exact same 480 pop-up kit and posts closure when ready.
+        const readyDetail = eventDetail({
+            handover: owned,
+            worksafe: { decision_signed: true, notifiable: false },
+            close_gate: {
+                allowed: true,
+                requirements: [
+                    {
+                        key: 'worksafe_decision',
+                        complete: true,
+                        label: 'WorkSafe decision recorded',
+                        href: '/health-safety/events/17?action=worksafe-decision',
+                    },
+                ],
+            },
+            next_step: {
+                key: 'close',
+                label: 'Close the safety review',
+                can: true,
+                who: '',
+            },
+        } as EventDetailOverrides);
+
+        render(<EventRecordWorkspace detail={readyDetail} />);
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        fireEvent.click(within(progress).getByRole('button', { name: 'Close safety review' }));
+
+        expect(screen.queryByRole('region', { name: 'Current safety review action' })).not.toBeInTheDocument();
+        const readyPopup = screen.getByTestId('close-review-dialog');
+        expect(readyPopup).toHaveAttribute('data-popup-size', 'sm');
+        fireEvent.change(within(readyPopup).getByLabelText(/What did we learn\?/), {
+            target: { value: 'Non-slip backing fitted on all lounge rugs.' },
+        });
+        fireEvent.click(within(readyPopup).getByRole('button', { name: 'Close safety review' }));
+        expect(inertia.post).toHaveBeenCalledWith('/health-safety/events/17/close', {
+            closure_summary: 'Non-slip backing fitted on all lounge rugs.',
+            exception_id: '',
+        });
     });
 });

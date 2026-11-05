@@ -34,7 +34,8 @@ final class HsCorrectiveActionWorkspace
                     ->whereKey($record->id)->select('hs_event_id')), UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
                 $action = HsCorrectiveAction::query()
                     ->whereHas('hsEvent', fn ($query) => $this->events->applyReadableScope($query, $viewer, $context, $sourceCandidates))
-                    ->with(['hsEvent.site:id,name', 'assignedTo:id,name', 'completedBy:id,name', 'verifiedBy:id,name',
+                    ->with(['hsEvent.site:id,name', 'creator:id,name', 'assignedTo:id,name', 'assignedBy:id,name',
+                        'completedBy:id,name', 'verifiedBy:id,name', 'closedBy:id,name',
                         'hsInvestigation', 'sourceControlRoomTask.alert'])
                     ->findOrFail($record->id);
                 $event = $action->hsEvent;
@@ -86,9 +87,17 @@ final class HsCorrectiveActionWorkspace
 
                 return [
                     'ownership' => $ownership,
+                    'history_state' => ! $participant
+                        ? 'restricted'
+                        : ($evidenceState === HsCorrectiveActionPresenter::EVIDENCE_LOADED ? 'loaded' : 'error'),
                     'action' => [...$detail,
                         'description' => $hasSource && ! $sourceReadable ? null : $action->description,
+                        'created_at' => $action->created_at?->toIso8601String(),
+                        'created_by_name' => $action->creator?->name,
+                        'assigned_at' => $action->assigned_at?->toIso8601String(),
+                        'assigned_by_name' => $action->assignedBy?->name,
                         'closed_at' => $action->closed_at?->toIso8601String(),
+                        'closed_by_name' => $action->closedBy?->name,
                     ],
                     'review' => [
                         'id' => $event->id,

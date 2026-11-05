@@ -39,7 +39,6 @@ use App\Services\HealthSafety\HsInvestigationCorrectionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\HealthSafety\RestraintAccessService;
 use App\Services\HealthSafety\SafeWorkProcedureAccessService;
-use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\UserSiteAccessService;
@@ -72,7 +71,6 @@ class HsEventController extends Controller
         private readonly HsCorrectiveActionPresenter $correctiveActionPresenter,
         private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
         private readonly IncidentJourneyService $journeys,
-        private readonly IncidentJourneyPresenter $journeyPresenter,
         private readonly NotifiableEventClassifier $notifiableEvents,
     ) {}
 
@@ -1608,7 +1606,7 @@ class HsEventController extends Controller
                 'control_room' => $alert === null ? ($linkedAlertId !== null ? 'restricted' : 'absent') : ($canOpenAlert ? 'readable' : 'restricted'),
             ],
             'incident_followups' => $incidentFollowups,
-            'journey_state' => $this->journeyPresenter->journeyState(
+            'journey_state' => $this->journeys->journeyState(
                 $sourceIncident,
                 $alert,
                 $hsEvent,

@@ -273,4 +273,49 @@ class IncidentOwnershipTest extends TestCase
         $this->post('/incidents/'.$incident->id.'/owner', $this->command($owner))->assertForbidden();
         $this->assertSame(0, IncidentOwnerChange::count());
     }
+
+    public function test_assigning_owner_without_referer_after_options_lookup_redirects_back_to_incident_page(): void
+    {
+        [, $actor, $owner, $incident] = $this->scenario();
+
+        $this->actingAs($actor)->get('/incidents/'.$incident->id)->assertOk();
+        $this->get('/incidents/'.$incident->id.'/owners/options?q=', [
+            'Accept' => 'application/json',
+            'X-Requested-With' => 'XMLHttpRequest',
+        ])->assertOk();
+
+        $this->post('/incidents/'.$incident->id.'/owner', $this->command($owner))
+            ->assertRedirect('/incidents/'.$incident->id)
+            ->assertSessionHasNoErrors();
+
+        // Even if a non-XHR options lookup polluted session previous URL on a no-referrer page,
+        // posting owner changes still returns to the incident page rather than the JSON options endpoint.
+        $this->getJson('/incidents/'.$incident->id.'/owners/options')->assertOk();
+        $replacement = $this->staff($incident->site, ['incidents.viewAny', 'incidents.owner.hold']);
+        $this->post('/incidents/'.$incident->id.'/owner', $this->command($replacement, 1, reason: 'Cover handover.'))
+            ->assertRedirect('/incidents/'.$incident->id)
+            ->assertSessionHasNoErrors();
+    }
+
+    public function test_stay_report_submission_without_referer_after_rail_counts_redirects_back_to_incidents_index(): void
+    {
+        [$site] = $this->scenario();
+        $actor = $this->staff($site, ['incidents.viewAny', 'incidents.create', 'clients.viewAny', 'hazards.view']);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+
+        $this->actingAs($actor)->get('/incidents')->assertOk();
+        $this->getJson('/health-safety/rail-counts')->assertOk();
+
+        $this->post('/incidents', [
+            'intent' => 'submit',
+            'stay' => true,
+            'type' => 'injury',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'description' => 'Referrerless modal incident submission after rail-counts.',
+            'severity' => 'low',
+        ])
+            ->assertRedirect(route('incidents.index'))
+            ->assertSessionHas('incident_report_result');
+    }
 }

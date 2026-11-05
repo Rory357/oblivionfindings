@@ -62,6 +62,7 @@ import {
 import {
     ClosureReadinessLine,
     agreedInvestigation,
+    collapsePendingWorksafeRequirements,
     currentReviewStep,
     reviewNextBar,
     reviewRoundSteps,
@@ -1389,7 +1390,15 @@ export function safetyReviewTitle(
     d: Pick<EventDetail, 'event_category' | 'client' | 'staff' | 'site'> &
         Partial<Pick<EventDetail, 'title'>>,
 ): string {
-    if (d.title) return d.title;
+    if (d.title) {
+        const trimmed = d.title.trim();
+        if (trimmed) {
+            const [head, ...rest] = trimmed.split(' — ');
+            const readable = head.replace(/(\p{L})_(\p{L})/gu, '$1 $2');
+            const sentence = readable.charAt(0).toUpperCase() + readable.slice(1);
+            return [sentence, ...rest].join(' — ');
+        }
+    }
     const category =
         EVENT_CATEGORY_LABELS[d.event_category] ?? titleCase(d.event_category);
     const worker = ['injury', 'exposure'].includes(d.event_category);
@@ -1604,7 +1613,14 @@ function reviewHeaderActions(
                 ? `Closure blocked: ${blockers.map((requirement) => requirement.label).join(' ')}`
                 : undefined,
         });
-    else if (canReviewClosureExceptions)
+    else if (
+        canReviewClosureExceptions &&
+        d.closure_exceptions.some(
+            (exception) =>
+                exception.status === 'pending' &&
+                (exception.can_decide ?? true),
+        )
+    )
         items.push({
             key: 'exception',
             label: 'Review a close-anyway request',
@@ -1692,8 +1708,8 @@ function SafetyReviewPage({
     const activity = useReviewActivity(d.id, true, d);
     const viewer = (usePage().props as { auth?: { user?: { id?: number; name?: string } } }).auth?.user;
     const viewerName = viewer?.name ?? null;
-    // Board M8: adding an action, telling WorkSafe and an ordinary close open as kit pop-ups over the page; every
-    // other step (and a close that still needs "close anyway") keeps its pane.
+    // Board M8: adding an action, telling WorkSafe, recording the WorkSafe decision and closing open as kit pop-ups
+    // over the page — one close UI whether opened from the Progress button, More, or an ?action=close link.
     // An approved, current "close anyway" that covers every item left (the same test as the close pane).
     const nowMs = Date.now();
     const exceptionalLeft = d.close_readiness.exceptional_blockers;
@@ -1708,13 +1724,12 @@ function SafetyReviewPage({
                   exceptionalLeft.every((blocker) => exception.scope.includes(blocker.key)),
           )
         : undefined;
-    const closeReady = d.can.close && d.close_readiness.hard_blockers.length === 0 && (exceptionalLeft.length === 0 || !!authorising);
     const dialogPane =
         pane &&
         (pane.kind === 'ca_add' ||
             pane.kind === 'worksafe_notify' ||
             pane.kind === 'worksafe_decision' ||
-            (pane.kind === 'close' && closeReady))
+            pane.kind === 'close')
             ? pane
             : null;
     // M12: one request covers one item, so "Ask to close anyway" is offered only when exactly one is left.
@@ -1844,14 +1859,12 @@ function SafetyReviewPage({
                                     <div>
                                         <dt>What happened</dt>
                                         <dd>{story}</dd>
-                                        <span />
                                     </div>
                                 ) : null}
                                 {straightAway ? (
                                     <div>
                                         <dt>What we did straight away</dt>
                                         <dd>{straightAway}</dd>
-                                        <span />
                                     </div>
                                 ) : null}
                             </dl>
@@ -2045,20 +2058,26 @@ function SafetyReviewPage({
             <AskCloseAnywayDialog open={askOpen} onClose={() => setAskOpen(false)} onDone={() => setAskOpen(false)} d={d} />
             {pendingException?.can_decide ? (
                 <DecideCloseAnywayDialog
-                    open={deciding}
-                    onClose={() => setDeciding(false)}
+                    open={deciding || (dialogPane?.kind === 'close' && !d.can.close)}
+                    onClose={() => {
+                        setDeciding(false);
+                        if (dialogPane?.kind === 'close' && !d.can.close) onPane(null);
+                    }}
                     d={d}
                     exception={pendingException}
                     viewerName={viewerName}
                 />
             ) : null}
             <CloseReviewDialog
-                open={dialogPane?.kind === 'close'}
+                open={dialogPane?.kind === 'close' && (d.can.close || !pendingException?.can_decide)}
                 onClose={() => onPane(null)}
                 onDone={onPaneDone}
                 d={d}
+                reviewTitle={safetyReviewTitle(d)}
                 exceptionId={authorising?.id ?? null}
+                exceptionReviewAt={authorising?.review_at ?? null}
                 incidentCloser={d.source?.type === 'ClientIncident' ? `a manager at ${d.site?.name ?? 'the site'}` : null}
+                onAskCloseAnyway={canAskCloseAnyway ? () => setAskOpen(true) : null}
             />
             {correcting ? (
                 <CorrectFindingsDialog
@@ -2083,13 +2102,6 @@ function SafetyReviewPage({
         </PageLayout>
     );
 }
-
-/** Closure checks that can only be met once the WorkSafe decision is recorded. */
-const WORKSAFE_DECISION_DEPENDENTS = [
-    'worksafe_notification',
-    'worksafe_acknowledgement',
-    'site_preservation',
-];
 
 /** The closure checks as a ring: done of total, every blocker in the server's words (an open one links to its step). */
 function ClosureRing({ d }: { d: EventDetail }) {
@@ -2121,28 +2133,7 @@ function ClosureRing({ d }: { d: EventDetail }) {
 
 /** The closing checks, each in the server's words (an open one links to its step). */
 function closureCheckItems(d: EventDetail): CheckItem[] {
-    const requirements = d.close_gate.requirements;
-    // While the WorkSafe decision is missing, its three dependent steps say the same thing, so they show as one
-    // plain line (MASTER for Stephan, 30 Oct). Every check still counts and still blocks closing exactly as before.
-    const decision = requirements.find(
-        (requirement) => requirement.key === 'worksafe_decision',
-    );
-    const waitingOnDecision = !!decision && !decision.complete;
-    const shown = waitingOnDecision
-        ? requirements
-              .filter(
-                  (requirement) =>
-                      !WORKSAFE_DECISION_DEPENDENTS.includes(requirement.key),
-              )
-              .map((requirement) =>
-                  requirement.key === 'worksafe_decision'
-                      ? {
-                            ...requirement,
-                            label: 'Record the WorkSafe decision first. The other WorkSafe steps depend on it.',
-                        }
-                      : requirement,
-              )
-        : requirements;
+    const shown = collapsePendingWorksafeRequirements(d.close_gate.requirements);
     const checks: CheckItem[] = shown.map((requirement) => ({
         state: requirement.complete ? 'success' : 'critical',
         label:
@@ -3216,7 +3207,7 @@ function ReviewCorrectiveActions({
     rowRefs: MutableRefObject<Record<number, HTMLElement | null>>;
     highlightActionId: number | null;
 }) {
-    const { showMenu, nodes, open, returnTo } = useActionMenu(d, onPane);
+    const { showMenu, nodes, open, returnTo, askClose } = useActionMenu(d, onPane);
 
     if (!d.corrective_actions.length) {
         return (
@@ -3272,27 +3263,43 @@ function ReviewCorrectiveActions({
                     </TableHeader>
                     <TableBody>
                         {d.corrective_actions.map((action) => {
-                            const stage = correctiveActionStage(action);
+                            const checked = ['verified', 'closed'].includes(
+                                action.status,
+                            );
+                            const worked =
+                                checked &&
+                                action.effectiveness_confirmed !== false;
+                            const failed =
+                                checked &&
+                                action.effectiveness_confirmed === false;
+                            const stage = failed
+                                ? {
+                                      stage: 4,
+                                      label: 'Checked — it didn’t work',
+                                      tone: 'critical' as const,
+                                  }
+                                : correctiveActionStage(action);
                             const owner =
                                 action.owner?.name ?? action.assigned_to_name;
                             const overdue =
                                 action.is_overdue &&
                                 action.status !== 'verified' &&
                                 action.status !== 'closed';
-                            const note =
-                                action.status === 'completed'
-                                    ? action.evidence.load_state !== 'loaded'
-                                        ? 'Completion evidence could not be loaded.'
-                                        : action.can_verify
-                                          ? 'Waiting for an independent check'
-                                          : 'A different person must verify this action.'
-                                    : action.verified_at
-                                      ? `Verified${action.verified_by_name ? ` by ${action.verified_by_name}` : ''} · ${action.effectiveness_confirmed ? 'effective' : 'not yet effective'}`
-                                      : !owner
-                                        ? 'Needs an owner'
-                                        : overdue
-                                          ? 'Overdue'
-                                          : undefined;
+                            const note = failed
+                                ? `${action.needs_revision ? 'Revised action needed' : 'Revised action added'}${action.verified_by_name ? ` · checked by ${action.verified_by_name}` : ''}`
+                                : action.status === 'completed'
+                                  ? action.evidence.load_state !== 'loaded'
+                                      ? 'Completion evidence could not be loaded.'
+                                      : action.can_verify
+                                        ? 'Waiting for an independent check'
+                                        : 'A different person must verify this action.'
+                                  : action.verified_at
+                                    ? `Checked${action.verified_by_name ? ` by ${action.verified_by_name}` : ''} · it worked`
+                                    : !owner
+                                      ? 'Needs an owner'
+                                      : overdue
+                                        ? 'Overdue'
+                                        : undefined;
                             return (
                                 <TableRow
                                     key={action.id}
@@ -3332,7 +3339,18 @@ function ReviewCorrectiveActions({
                                             {titleCase(
                                                 action.action_type,
                                             ).toLowerCase()}
+                                            {action.replaces
+                                                ? ` · Revised action for ${action.replaces.reference_number}`
+                                                : ''}
                                         </p>
+                                        {checked && action.check_notes ? (
+                                            <p className="mt-0.5 text-caption text-foreground">
+                                                <span className="font-semibold">
+                                                    Check result:
+                                                </span>{' '}
+                                                {action.check_notes}
+                                            </p>
+                                        ) : null}
                                         {action.rework.latest_reason ? (
                                             <p className="mt-0.5 text-caption text-status-warning-foreground">
                                                 Returned for rework:{' '}
@@ -3398,26 +3416,69 @@ function ReviewCorrectiveActions({
                                             tone={stage.tone}
                                         />
                                     </TableCell>
-                                    <TableCell className="px-2 py-3 text-right">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="frontline-hit size-8 text-muted-foreground"
-                                            aria-label={`Options for ${action.reference_number}`}
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                const rect =
-                                                    event.currentTarget.getBoundingClientRect();
-                                                showMenu(
-                                                    action,
-                                                    rect.left,
-                                                    rect.bottom,
-                                                );
-                                            }}
-                                        >
-                                            <MoreVertical className="size-4" />
-                                        </Button>
+                                    <TableCell className="px-2 py-3 text-right whitespace-nowrap">
+                                        <div className="inline-flex items-center justify-end gap-2">
+                                            {canAct && action.needs_revision ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        onPane({
+                                                            kind: 'ca_add',
+                                                            replacesActionId:
+                                                                action.id,
+                                                        });
+                                                    }}
+                                                >
+                                                    <Plus
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                    Add revised action
+                                                </Button>
+                                            ) : canAct &&
+                                              action.status === 'verified' &&
+                                              worked &&
+                                              d.can
+                                                  .manage_corrective_action_lifecycle ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        askClose(action);
+                                                    }}
+                                                >
+                                                    <Lock
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                    Close action
+                                                </Button>
+                                            ) : null}
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="frontline-hit size-8 text-muted-foreground"
+                                                aria-label={`Options for ${action.reference_number}`}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    const rect =
+                                                        event.currentTarget.getBoundingClientRect();
+                                                    showMenu(
+                                                        action,
+                                                        rect.left,
+                                                        rect.bottom,
+                                                    );
+                                                }}
+                                            >
+                                                <MoreVertical className="size-4" />
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             );
@@ -3875,23 +3936,38 @@ function CloseEventPane({
                 </InfoCard>
             ) : null}
 
-            <JourneyGateList gate={d.close_gate} />
+            <JourneyGateList
+                gate={{
+                    ...d.close_gate,
+                    requirements: collapsePendingWorksafeRequirements(
+                        d.close_gate.requirements,
+                    ),
+                }}
+            />
 
             {hardBlockers.length > 0 ? (
                 <PopupCallout tone="critical">
-                    <p className="font-semibold">
-                        {hardBlockers.length === 1
-                            ? 'This must be done before the review can close'
-                            : `These ${hardBlockers.length} things must be done before the review can close`}
-                    </p>
-                    <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
-                        {hardBlockers.map((blocker) => (
-                            <li key={blocker.key}>{blocker.label}</li>
-                        ))}
-                    </ul>
-                    <p className="mt-1.5">
-                        An exception can’t cover these, even an approved one.
-                    </p>
+                    {(() => {
+                        const shownHardBlockers =
+                            collapsePendingWorksafeRequirements(hardBlockers);
+                        return (
+                            <>
+                                <p className="font-semibold">
+                                    {hardBlockers.length === 1
+                                        ? 'This must be done before the review can close'
+                                        : `These ${hardBlockers.length} things must be done before the review can close`}
+                                </p>
+                                <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+                                    {shownHardBlockers.map((blocker) => (
+                                        <li key={blocker.key}>{blocker.label}</li>
+                                    ))}
+                                </ul>
+                                <p className="mt-1.5">
+                                    An exception can’t cover these, even an approved one.
+                                </p>
+                            </>
+                        );
+                    })()}
                 </PopupCallout>
             ) : null}
 
@@ -6754,9 +6830,17 @@ function CorrectiveActionControls({
     const canManageStrictLifecycle = d.can.manage_corrective_action_lifecycle;
     // Write controls require manage AND a live event — no lifecycle moves once closed.
     if (!d.can.manage || d.status === 'closed') return null;
-    if (!['open', 'in_progress', 'completed', 'verified'].includes(ca.status))
+    if (
+        !['open', 'in_progress', 'completed', 'verified'].includes(ca.status) &&
+        !ca.needs_revision
+    )
         return null;
-    if (ca.status !== 'open' && !canManageStrictLifecycle) return null;
+    if (
+        ca.status !== 'open' &&
+        !canManageStrictLifecycle &&
+        !ca.needs_revision
+    )
+        return null;
 
     return (
         <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
@@ -6819,7 +6903,21 @@ function CorrectiveActionControls({
                         </Button>
                     </>
                 ) : null}
-                {ca.status === 'verified' && canManageStrictLifecycle ? (
+                {ca.needs_revision ? (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                            onPane({ kind: 'ca_add', replacesActionId: ca.id })
+                        }
+                    >
+                        <Plus className="mr-1.5 h-3.5 w-3.5" /> Add revised
+                        action
+                    </Button>
+                ) : ca.status === 'verified' &&
+                  ca.effectiveness_confirmed !== false &&
+                  canManageStrictLifecycle ? (
                     <ArmedButton
                         label="Close"
                         icon={CheckCircle2}

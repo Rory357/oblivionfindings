@@ -25,6 +25,55 @@ import { formatDate, formatDateOnly } from '@/lib/datetime';
 
 const DONE = ['completed', 'verified', 'closed'];
 const CHECKED = ['verified', 'closed'];
+const WORKSAFE_DECISION_DEPENDENTS = [
+    'worksafe_notification',
+    'worksafe_acknowledgement',
+    'site_preservation',
+];
+
+export const PENDING_WORKSAFE_DECISION_LABEL =
+    'Record the WorkSafe decision first — it blocks WorkSafe notification, acknowledgement and Site preservation.';
+
+/**
+ * Collapses the four WorkSafe closure checks into one plain line naming what it blocks while the signed WorkSafe
+ * decision is still missing. Total check counts and hard-gate enforcement remain unchanged.
+ */
+export function collapsePendingWorksafeRequirements<
+    T extends { key: string; complete: boolean; label: string },
+>(requirements: T[]): T[] {
+    const hasIncompleteDependent = requirements.some(
+        (r) => WORKSAFE_DECISION_DEPENDENTS.includes(r.key) && !r.complete,
+    );
+    if (!hasIncompleteDependent) return requirements;
+
+    const decision = requirements.find((r) => r.key === 'worksafe_decision');
+    if (decision) {
+        if (decision.complete) return requirements;
+        return requirements
+            .filter((r) => !WORKSAFE_DECISION_DEPENDENTS.includes(r.key))
+            .map((r) =>
+                r.key === 'worksafe_decision'
+                    ? { ...r, label: PENDING_WORKSAFE_DECISION_LABEL }
+                    : r,
+            );
+    }
+
+    const waitingOnSignedDecision = requirements.some(
+        (r) =>
+            WORKSAFE_DECISION_DEPENDENTS.includes(r.key) &&
+            !r.complete &&
+            r.label.includes('signed WorkSafe decision'),
+    );
+    if (!waitingOnSignedDecision) return requirements;
+
+    let shownOnce = false;
+    return requirements.flatMap((r) => {
+        if (!WORKSAFE_DECISION_DEPENDENTS.includes(r.key)) return [r];
+        if (shownOnce) return [];
+        shownOnce = true;
+        return [{ ...r, label: PENDING_WORKSAFE_DECISION_LABEL }];
+    });
+}
 
 function day(iso: string | null | undefined): string | undefined {
     if (!iso) return undefined;
@@ -500,7 +549,7 @@ function stepPaneBase(
                           ) : null,
                       },
                   ]
-                : d.close_readiness.requirements
+                : collapsePendingWorksafeRequirements(d.close_readiness.requirements)
                       .filter((r) => !r.complete)
                       .map((r) => ({ key: r.key, label: 'Still to do', value: r.label })),
         empty: 'Nothing blocks closing.',

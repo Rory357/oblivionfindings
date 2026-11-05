@@ -1440,3 +1440,76 @@ describe('IncidentReportPage — standalone page for reporters without register 
         ).toBeInTheDocument();
     });
 });
+
+describe('IncidentReportDialog — accessibility & polish (P18)', () => {
+    it('gives incident-type tiles and Straight away checkboxes accessible names and toggles the whole Straight away row', () => {
+        renderDialog('incidents', {
+            defaults: {
+                ...defaults,
+                type: '',
+                occurred_at: '2026-11-02T09:30',
+            },
+            canManageFollowups: true,
+            staff: [{ id: 12, name: 'Rāwiri Ngata' }],
+        });
+
+        const typeGroup = screen.getByRole('group', { name: /Incident type/ });
+        for (const label of [
+            'Injury',
+            'Fall',
+            'Behaviour',
+            'Medication',
+            'Safeguarding',
+            'Property damage',
+            'Missing person',
+            'Complaint',
+            'Other',
+        ]) {
+            const tile = within(typeGroup).getByRole('button', { name: label });
+            expect(tile).toHaveAttribute('aria-label', label);
+        }
+        fireEvent.click(within(typeGroup).getByRole('button', { name: 'Injury' }));
+        expect(
+            within(typeGroup).getByRole('button', { name: 'Injury' }),
+        ).toHaveAttribute('aria-pressed', 'true');
+
+        openStep(/Straight away/);
+        for (const label of [
+            'Checked the person and made them safe',
+            'First aid given',
+            'Nurse, GP or 111 rung',
+            'Manager told',
+            'Family/whānau told',
+        ]) {
+            const checkbox = screen.getByRole('checkbox', { name: label });
+            expect(checkbox).toHaveAttribute('aria-label', label);
+        }
+
+        // Clicking the row container (outside the 16px box) toggles the tick, and clicking the label area toggles back.
+        const firstAidRow = screen.getByTestId('straight-away-row-first_aid');
+        const firstAidBox = screen.getByRole('checkbox', {
+            name: 'First aid given',
+        });
+        expect(firstAidBox).toHaveAttribute('aria-checked', 'false');
+        fireEvent.click(firstAidRow);
+        expect(firstAidBox).toHaveAttribute('aria-checked', 'true');
+        // Interacting with the detail input does not untick the row.
+        const whoGaveIt = screen.getByLabelText('First aid given — who gave it');
+        fireEvent.click(whoGaveIt);
+        expect(firstAidBox).toHaveAttribute('aria-checked', 'true');
+
+        // Follow-ups Due trigger uses the same background/input chrome as its neighbours rather than a card button.
+        openStep(/Follow-ups/);
+        fireEvent.click(screen.getByRole('button', { name: /Add follow-up/ }));
+        const dueTrigger = screen.getByRole('button', {
+            name: 'Task 1 due: Choose date',
+        });
+        expect(dueTrigger.className).toContain('bg-background');
+        expect(dueTrigger.className).not.toContain('bg-card');
+
+        // Review step formats Occurred in NZ format instead of raw 2026-11-02 09:30.
+        openReviewStep();
+        expect(screen.getByText('2 Nov 2026, 9:30 am')).toBeInTheDocument();
+        expect(screen.queryByText('2026-11-02 09:30')).not.toBeInTheDocument();
+    });
+});

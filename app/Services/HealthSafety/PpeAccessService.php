@@ -47,7 +47,7 @@ final class PpeAccessService
             $result = $operation($current, $reads, $sites);
             $this->assertDetached($result);
             return $result;
-        }));
+        }), 3);
     }
 
     public function assertOperation(User $current, string $operation): void

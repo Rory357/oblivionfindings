@@ -217,12 +217,10 @@ export default function SafetyReviewStory({ review }: { review: StoryReview }) {
                                 <div>
                                     <dt>What happened</dt>
                                     <dd>{review.story.what_happened || 'Not written in the report.'}</dd>
-                                    <span />
                                 </div>
                                 <div>
                                     <dt>What we did straight away</dt>
                                     <dd>{review.story.did_straight_away || 'Not written in the report.'}</dd>
-                                    <span />
                                 </div>
                             </dl>
                             <p className="sg-pnote">

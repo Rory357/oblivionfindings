@@ -210,7 +210,10 @@ export function useIncidentReportDraft<T extends Record<string, unknown>>({
 
         void axios
             .get<DraftResponse<T>>(draftUrl(identity.requestUuid), {
-                headers: { Accept: 'application/json' },
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
             })
             .then((response) => {
                 if (cancelled) return;

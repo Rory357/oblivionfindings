@@ -1229,6 +1229,11 @@ export function EventTable({
                                 open &&
                                 ['high', 'critical'].includes(ev.severity) &&
                                 (!ev.worksafe_decision_signed || ev.flags.worksafe_pending);
+                            const captionClass = urgent
+                                ? 'text-xs text-muted-foreground dark:text-status-critical-foreground/80'
+                                : ev.blocked
+                                  ? 'text-xs text-muted-foreground dark:text-status-info-foreground/80'
+                                  : 'text-caption';
                             const next = ev.next ?? null;
                             return (
                                 <TableRow
@@ -1247,12 +1252,16 @@ export function EventTable({
                                     className={cn(
                                         'cursor-pointer align-top focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                                         // Board M6: the urgent row tinted red, the blocked row tinted purple — never a coloured edge line.
-                                        urgent ? 'bg-status-critical-bg/60 hover:bg-status-critical-bg' : ev.blocked ? 'bg-accent/60 hover:bg-accent' : '',
+                                        urgent
+                                            ? 'bg-status-critical-bg/60 hover:bg-status-critical-bg'
+                                            : ev.blocked
+                                              ? 'bg-status-info-bg/40 hover:bg-status-info-bg'
+                                              : '',
                                     )}
                                 >
                                     <TableCell className="max-w-[18rem] px-4 py-3 whitespace-normal">
                                         <p className="font-semibold [overflow-wrap:anywhere] text-foreground">{title}</p>
-                                        <p className="mt-0.5 text-caption text-muted-foreground">
+                                        <p className={cn('mt-0.5', captionClass)}>
                                             Safety review {ev.reference_number}
                                             {from ? ` · ${from}` : ''}
                                         </p>
@@ -1264,14 +1273,14 @@ export function EventTable({
                                         >
                                             {when ? formatDateOnly(toDateInput(when)) : 'Not recorded'}
                                         </p>
-                                        {when ? <p className="mt-0.5 text-caption text-muted-foreground">{formatTime(when)}</p> : null}
+                                        {when ? <p className={cn('mt-0.5', captionClass)}>{formatTime(when)}</p> : null}
                                     </TableCell>
                                     <TableCell className="px-4 py-3">{ev.site_name ?? 'No site recorded'}</TableCell>
                                     <TableCell className="px-4 py-3">
                                         {ev.handover.owner ? (
                                             <PersonChip name={ev.handover.owner.name} />
                                         ) : (
-                                            <span className="text-caption">No owner yet</span>
+                                            <span className={captionClass}>No owner yet</span>
                                         )}
                                     </TableCell>
                                     <TableCell className="px-4 py-3 whitespace-normal">
@@ -1306,7 +1315,7 @@ export function EventTable({
                                     </TableCell>
                                     <TableCell className="max-w-[16rem] px-4 py-3 whitespace-normal">
                                         <p className="text-sm">{ev.summary ?? hsLabel('review_status', ev.status)}</p>
-                                        {ev.blocked ? <p className="mt-0.5 text-caption text-muted-foreground">{ev.blocked}</p> : null}
+                                        {ev.blocked ? <p className={cn('mt-0.5', captionClass)}>{ev.blocked}</p> : null}
                                     </TableCell>
                                     <TableCell className="max-w-[14rem] px-4 py-3 whitespace-normal">
                                         {next ? (
@@ -1323,10 +1332,10 @@ export function EventTable({
                                                     {next.label}
                                                 </Button>
                                             ) : (
-                                                <span className="text-caption">{next.who}</span>
+                                                <span className={captionClass}>{next.who}</span>
                                             )
                                         ) : (
-                                            <span className="text-caption">Nothing left to do</span>
+                                            <span className={captionClass}>Nothing left to do</span>
                                         )}
                                     </TableCell>
                                     <TableCell className="px-2 py-3 text-right">
