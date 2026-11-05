@@ -143,6 +143,13 @@ class SafeWorkProcedureController extends Controller
         return $this->transition($request, $procedure, 'restore');
     }
 
+    public function withdraw(Request $request, SafeWorkProcedure $procedure): RedirectResponse
+    {
+        $this->service->lifecycle($procedure, $request->user(), 'withdraw', $request->all());
+
+        return back()->with('success', 'Draft withdrawn. It no longer shows in the register; its history and your reason are kept.');
+    }
+
     private function transition(Request $request, SafeWorkProcedure $procedure, string $command): RedirectResponse
     {
         $this->service->lifecycle($procedure, $request->user(), $command, $request->all());
@@ -207,7 +214,8 @@ class SafeWorkProcedureController extends Controller
             if ($filters['site_id'] !== null) {
                 abort_unless(in_array($filters['site_id'], $sites, true), 403);
             }
-            $records = $reads->query(SafeWorkProcedure::query())->with(['publishedVersion.approvedBy', 'versions', 'owner', 'approvedBy'])->orderBy('title')->get();
+            // Withdrawn drafts leave every list; they stay readable on their own page and in history.
+            $records = $reads->query(SafeWorkProcedure::query()->where('status', '!=', 'withdrawn'))->with(['publishedVersion.approvedBy', 'versions', 'owner', 'approvedBy'])->orderBy('title')->get();
             $rows = $records->map(function ($record) use ($current, $sites) {
                 $published = $record->status !== 'archived' && $record->publishedVersion && (int) $record->publishedVersion->safe_work_procedure_id === (int) $record->id && $this->access->isApprovedVersion($record->publishedVersion) && $this->access->audienceAllows($record->publishedSnapshot(), $current, $sites);
                 $working = $this->access->workingAllowed($record, $current, $sites) && $this->access->allSitesAllowed($record->applicable_sites ?? [], $sites, $current);

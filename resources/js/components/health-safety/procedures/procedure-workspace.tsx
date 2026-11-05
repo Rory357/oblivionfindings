@@ -86,6 +86,7 @@ import {
 import { ProcedureDocuments } from './procedure-documents';
 import { procedureCategory, procedureStatus } from './procedure-kit';
 import { ProcedureRequestActions } from './procedure-request-actions';
+import { ProcedureWithdrawPopup } from './procedure-withdraw-popup';
 import type {
     ProcedurePickers,
     ProcedureRequest,
@@ -155,6 +156,7 @@ const HISTORY_TONES: Record<string, SgTone> = {
     'Changes requested': 'warning',
     'Review recorded': 'info',
     'Procedure archived': 'none',
+    'Draft withdrawn': 'none',
     'Restored for review': 'info',
     'Document added': 'info',
     'Document removed': 'warning',
@@ -179,6 +181,7 @@ export function ProcedureWorkspace({
     const [section, setSection] = useState<ProcedureSection>(location.section);
     const [command, setCommand] = useState<Command | null>(location.command);
     const [editing, setEditing] = useState(false);
+    const [withdrawing, setWithdrawing] = useState(false);
     const drafts = useSafetyWorkspaceDrafts();
     const panel = useRef<HTMLDivElement>(null);
     const interacted = useRef(false);
@@ -234,9 +237,16 @@ export function ProcedureWorkspace({
     /* ----- header ----- */
 
     const workingStatus = d.working_revision?.status ?? d.status;
+    const withdrawn = d.status === 'withdrawn';
+    const withdrawal = d.withdrawal ?? null;
+    const withdrawnMeta =
+        [withdrawal?.by?.name, day(withdrawal?.at)].filter(Boolean).join(' · ') ||
+        undefined;
     const chip =
         d.status === 'archived'
             ? { label: 'Archived', variant: 'neutral' as const }
+            : withdrawn
+              ? { label: 'Withdrawn', variant: 'neutral' as const }
             : historical
               ? { label: 'Historical version', variant: 'neutral' as const }
               : working
@@ -273,7 +283,12 @@ export function ProcedureWorkspace({
         ]
             .filter(Boolean)
             .join(' · ') || undefined;
-    const steps: PageHeaderStage[] = working
+    const steps: PageHeaderStage[] = withdrawn
+        ? [
+              { label: 'Draft', meta: d.owner?.name, state: 'done' },
+              { label: 'Withdrawn', meta: withdrawnMeta, state: 'now' },
+          ]
+        : working
         ? [
               {
                   label: 'Draft',
@@ -339,7 +354,13 @@ export function ProcedureWorkspace({
                       },
           ];
     const ack = d.acknowledgement;
-    const next: PageHeaderNextStep | null = historical
+    const next: PageHeaderNextStep | null = withdrawn
+        ? {
+              label: 'Withdrawn draft',
+              text: 'This draft was withdrawn. It is not in the register and was never published for staff use.',
+              meta: withdrawal?.reason ? `Reason: ${withdrawal.reason}` : undefined,
+          }
+        : historical
         ? {
               label:
                   d.status === 'archived' ? 'Archived' : 'Historical version',
@@ -441,6 +462,15 @@ export function ProcedureWorkspace({
             label: PROCEDURE_COMMAND_LABELS[item],
             run: () => move(section, item),
         })),
+        ...(d.can.withdraw
+            ? [
+                  {
+                      key: 'withdraw',
+                      label: 'Withdraw draft',
+                      run: () => drafts.request(() => setWithdrawing(true)),
+                  },
+              ]
+            : []),
     ];
 
     const side = (
@@ -499,7 +529,9 @@ export function ProcedureWorkspace({
                         <span>
                             {primary
                                 ? 'The next step is the button at the top of the page.'
-                                : 'This version is available to read. No changes are available for your current access.'}
+                                : withdrawn
+                                  ? 'A withdrawn draft is kept for the record. It can’t be changed.'
+                                  : 'This version is available to read. No changes are available for your current access.'}
                         </span>
                     </p>
                 )}
@@ -529,7 +561,14 @@ export function ProcedureWorkspace({
                         : 'You are reading a historical version. Check the current instructions before using this procedure.'}
                 </Note>
             )}
-            {working && (
+            {withdrawn && (
+                <Note icon={Info}>
+                    Withdrawn{withdrawnMeta ? ` by ${withdrawnMeta}` : ''}. It
+                    is kept for the record and can’t be changed.
+                    {withdrawal?.reason ? ` Reason: ${withdrawal.reason}` : ''}
+                </Note>
+            )}
+            {working && !withdrawn && (
                 <Note icon={Info}>
                     This is a working revision.
                     {d.publication
@@ -702,6 +741,13 @@ export function ProcedureWorkspace({
                     }}
                 />
             )}
+            {d.can.withdraw ? (
+                <ProcedureWithdrawPopup
+                    open={withdrawing}
+                    detail={d}
+                    onClose={() => setWithdrawing(false)}
+                />
+            ) : null}
             {drafts.confirmation}
         </SafetyFormDraftContext.Provider>
     );

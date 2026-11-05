@@ -290,6 +290,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::post('/{procedure}/record-review', [SafeWorkProcedureController::class, 'recordReview'])->name('record-review');
             Route::post('/{procedure}/archive', [SafeWorkProcedureController::class, 'archive'])->name('archive');
             Route::post('/{procedure}/restore', [SafeWorkProcedureController::class, 'restore'])->name('restore');
+            // A never-published draft made by mistake leaves the register with a reason (6 Nov 2026); never a hard delete.
+            Route::post('/{procedure}/withdraw', [SafeWorkProcedureController::class, 'withdraw'])->name('withdraw');
 
             // Controlled-document library (premium upload — reuses polymorphic HsAttachment)
             Route::post('/{procedure}/attachments', [SafeWorkProcedureController::class, 'uploadAttachment'])->name('attachments.store');

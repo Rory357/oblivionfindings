@@ -114,12 +114,20 @@ class SafeWorkProcedureService
                     $version = $this->snapshot($locked, $manifest, $current, $note);
                 } elseif ($command === 'archive') {
                     $locked->forceFill(['previous_status' => $locked->status, 'status' => 'archived', 'published_version_id' => null, 'published_review_date' => null]);
+                } elseif ($command === 'withdraw') {
+                    // A draft made by mistake leaves the register with a reason; the row, its versions and history stay (never deleted).
+                    $this->status($locked, ['draft']);
+                    $note = $this->requireNote($data, 'reason');
+                    if (! $this->neverPublished($locked, $reads)) {
+                        throw ValidationException::withMessages(['status' => 'Only a draft that has never been published can be withdrawn. Archive a published procedure instead.']);
+                    }
+                    $locked->forceFill(['previous_status' => 'draft', 'status' => 'withdrawn']);
                 } else {
                     abort(404);
                 }
             }
             $this->save($locked, $current);
-            $action = ['submit-for-review' => 'submitted_for_review', 'approve' => 'approved', 'request-changes' => 'changes_requested', 'record-review' => 'review_recorded', 'archive' => 'archived', 'restore' => 'restored'][$command];
+            $action = ['submit-for-review' => 'submitted_for_review', 'approve' => 'approved', 'request-changes' => 'changes_requested', 'record-review' => 'review_recorded', 'archive' => 'archived', 'restore' => 'restored', 'withdraw' => 'withdrawn'][$command];
             $this->audit('procedure.'.$action, $locked, $current, $note, $version, ['from' => $from, 'to' => $locked->status, 'published_review_date' => $locked->published_review_date?->toDateString()]);
 
             return $locked;
@@ -399,6 +407,14 @@ class SafeWorkProcedureService
             }
             throw ValidationException::withMessages(['assigned_to_user_id' => 'Choose a named current procedure manager with access to the document and source.', 'owner_id' => 'Choose a current procedure manager with access to its audience.']);
         }
+    }
+
+    /** No copy of this procedure was ever approved for staff use (controlled or captured legacy). */
+    private function neverPublished(SafeWorkProcedure $record, CurrentAuthorizationReads $reads): bool
+    {
+        return $record->published_version_id === null && $record->approved_at === null
+            && ! $reads->query(SafeWorkProcedureVersion::query())->where('safe_work_procedure_id', $record->id)->get()
+                ->contains(fn (SafeWorkProcedureVersion $version) => $this->access->isApprovedVersion($version));
     }
 
     private function workingVersion(SafeWorkProcedure $record, CurrentAuthorizationReads $reads): ?SafeWorkProcedureVersion
