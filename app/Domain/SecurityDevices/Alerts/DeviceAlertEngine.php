@@ -11,6 +11,7 @@ use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlertEvent;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Screens\DeviceKind;
 use App\Domain\SecurityDevices\Setup\Models\SecurityDeviceSetting;
 use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Models\User;
@@ -43,8 +44,14 @@ final class DeviceAlertEngine
     /** IT alerts that tell the person on call first (ItOnCall); the rest of IT hears at the reminder. */
     public const array ON_CALL_KINDS = ['offline', 'failing', 'hub_offline', 'mqtt_logins'];
 
-    /** Device, hub and battery alerts whose notices wait for the 6:00 am summary during quiet hours. */
+    /**
+     * Device, hub and battery alerts whose notices wait for the 6:00 am summary during quiet hours,
+     * except a router, gateway or hub that stops answering (see passesQuietHours()).
+     */
     public const array QUIET_HOURS_KINDS = ['offline', 'failing', 'hub_offline', 'mqtt_logins', 'battery'];
+
+    /** Devices whose "stopped answering" alert still tells IT on call during quiet hours. */
+    private const array QUIET_HOURS_PASS = [DeviceKind::Router, DeviceKind::SensorGateway, DeviceKind::Hub];
 
     /** NZ date ("YYYY-MM-DD") whose 6:00 am summary has already gone out. */
     public const string SUMMARY_SENT_DAY = 'alerts.summary.sent_day';
@@ -425,18 +432,18 @@ final class DeviceAlertEngine
             }
             $label = CoveringHubResolver::label($hub);
             if ($offline) {
-                // Told as Setup › Alerts & checks says for "a device or hub stops answering" (or held in quiet hours).
+                // Told as Setup › Alerts & checks says for "a device or hub stops answering", in quiet
+                // hours too (passesQuietHours()).
                 $settings = app(SecurityDevicesSettings::class);
-                $held = $settings->isQuietHours($at);
-                $people = ! $held && (int) $hub->site_id > 0
+                $people = (int) $hub->site_id > 0
                     ? app(ItOnCall::class)->first($this->policies->resolveItRecipients((int) $hub->site_id, $settings->role(SecurityDevicesSettings::DEVICES_ROLE)), $at)
                     : collect();
-                $channels = $held ? [] : $settings->channels(SecurityDevicesSettings::DEVICES_APP, SecurityDevicesSettings::DEVICES_EMAIL, SecurityDevicesSettings::DEVICES_PUSH);
+                $channels = $settings->channels(SecurityDevicesSettings::DEVICES_APP, SecurityDevicesSettings::DEVICES_EMAIL, SecurityDevicesSettings::DEVICES_PUSH);
                 $told = $people->isNotEmpty() && $channels !== []
                     ? ['names' => $people->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all(), 'channels' => $channels]
                     : null;
                 $created = $this->open($device, null, 'hub_offline', 'critical', "{$label} has stopped answering", $at,
-                    'Stopped answering', 'Devices at its Sites show “Can’t check” until it’s back', $told, $held ? 'Quiet hours' : null);
+                    'Stopped answering', 'Devices at its Sites show “Can’t check” until it’s back', $told);
                 if ($created !== null && $told !== null) {
                     $this->notify($people, $created, 'Devices at its Sites can’t be checked until it’s back', $channels);
                 }
@@ -453,14 +460,14 @@ final class DeviceAlertEngine
     private function failing(Device $device, Monitor $monitor, MonitorState $to, CarbonImmutable $at, ?array $told): void
     {
         $critical = $to === MonitorState::Failed;
-        $offline = $critical && self::isReachability($monitor);
+        $kind = self::checkKind($monitor, $to);
+        $offline = $kind === 'offline';
         $name = (string) $device->name;
         $check = (string) $monitor->name;
-        $kind = $offline ? 'offline' : 'failing';
         $title = $offline ? "{$name} is offline" : ($critical ? "{$name}: {$check} isn’t passing" : "{$name}: {$check} needs attention");
         $confirmations = max(1, (int) ($monitor->profile?->failure_confirmations ?? 1));
         $detail = $confirmations > 1 ? "{$confirmations} missed checks in a row" : null;
-        $held = $told === null && app(SecurityDevicesSettings::class)->isQuietHours($at);
+        $held = $told === null && ! self::passesQuietHours($device, $kind) && app(SecurityDevicesSettings::class)->isQuietHours($at);
 
         $this->open($device, $monitor, $kind, $critical ? 'critical' : 'warning', $title, $at,
             $offline ? 'Stopped answering' : "{$check} started failing", $detail, $told, $held ? 'Quiet hours' : null);
@@ -664,7 +671,8 @@ final class DeviceAlertEngine
             ->orderBy('id')
             ->each(function (DeviceAlert $alert) use ($now, $settings, &$reminded): void {
                 $mine = $alert->remind_at !== null && $alert->acknowledgedBy !== null;
-                if (! $mine && in_array($alert->kind, self::QUIET_HOURS_KINDS, true)) {
+                // A router, gateway or hub that stopped answering reminds the rest of IT at the hour, as by day.
+                if (! $mine && in_array($alert->kind, self::QUIET_HOURS_KINDS, true) && ! self::passesQuietHours($alert->device, (string) $alert->kind)) {
                     if ($settings->isQuietHours($now)) {
                         return;
                     }
@@ -1030,6 +1038,23 @@ final class DeviceAlertEngine
     private static function family(string $kind): array
     {
         return in_array($kind, self::AVAILABILITY_KINDS, true) ? self::AVAILABILITY_KINDS : [$kind];
+    }
+
+    /**
+     * During quiet hours a router, gateway or hub that stops answering still tells the IT person on
+     * call straight away, as at any other time (Stephan, 6 Nov: "Let them through"): the house's other
+     * devices go quiet with it. Every other alert in QUIET_HOURS_KINDS waits for the 6:00 am summary.
+     */
+    public static function passesQuietHours(?Device $device, string $kind): bool
+    {
+        return $kind === 'hub_offline'
+            || ($kind === 'offline' && $device instanceof Device && in_array(DeviceKind::of($device), self::QUIET_HOURS_PASS, true));
+    }
+
+    /** The alert kind a failing check opens: "offline" when a reachability check failed, else "failing". */
+    public static function checkKind(Monitor $monitor, MonitorState $to): string
+    {
+        return $to === MonitorState::Failed && self::isReachability($monitor) ? 'offline' : 'failing';
     }
 
     private static function isReachability(Monitor $monitor): bool

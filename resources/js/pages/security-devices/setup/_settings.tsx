@@ -20,6 +20,10 @@ import type { SettingRow as SettingData } from './_types';
 
 type Value = boolean | string | null;
 
+/** What still gets through during quiet hours (Stephan, 6 Nov: routers and hubs, "Let them through"). */
+export const QUIET_HOURS_HINT =
+    'Safety alerts, care rules, emergencies and internet-exposure checks never wait · a router, gateway or hub that stops answering still tells IT on call straight away';
+
 export const SETTING_WORDS: Record<string, { label: string; hint: string; loosens?: string }> = {
     'scans.daily': {
         label: 'Scan every day',
@@ -49,7 +53,7 @@ export const SETTING_WORDS: Record<string, { label: string; hint: string; loosen
     'alerts.summary.push': { label: 'Daily summary: push', hint: '' },
     'alerts.quiet_hours.on': {
         label: 'Hold device alerts overnight',
-        hint: 'Safety alerts, care rules, emergencies and internet-exposure checks never wait',
+        hint: QUIET_HOURS_HINT,
     },
     'alerts.quiet_hours.start': { label: 'Quiet hours start', hint: '' },
     'alerts.quiet_hours.end': { label: 'Quiet hours end', hint: '' },

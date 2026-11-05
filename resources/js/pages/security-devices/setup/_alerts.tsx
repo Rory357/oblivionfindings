@@ -1,7 +1,7 @@
 /**
  * Setup › Alerts & checks › Alert rules (pg-sdr-15g): who is told when a rule doesn't say, how
- * each notice goes out (including the 6:00 am summary), and overnight quiet hours for device and
- * hub alerts. Safety alerts never wait.
+ * each notice goes out (including the 6:00 am summary), and overnight quiet hours for device
+ * alerts. Safety alerts never wait, nor does a router, gateway or hub that stops answering.
  */
 import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
 import { OnOff, SettingGroup, SettingRow } from '@/components/referrals/settings-ui';
@@ -9,7 +9,7 @@ import { Note } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
 import { ArrowUpRight, Moon, Send, Users } from 'lucide-react';
-import { ChannelGroup, formatClock, labelWithBadge, RoleRow, type SettingsDraft } from './_settings';
+import { ChannelGroup, formatClock, labelWithBadge, QUIET_HOURS_HINT, RoleRow, type SettingsDraft } from './_settings';
 import type { SetupProps } from './_types';
 
 export function SetupAlertRules({ data, draft }: { data: NonNullable<SetupProps['alerts']>; draft: SettingsDraft }) {
@@ -101,11 +101,11 @@ function QuietHoursGroup({ draft }: { draft: SettingsDraft }) {
         <SettingGroup
             icon={Moon}
             title="Quiet hours"
-            caption="Device and hub alerts wait for the 6:00 am summary; safety alerts never wait"
+            caption="Device alerts wait for the 6:00 am summary; safety alerts never wait"
         >
             <SettingRow
                 label={labelWithBadge('Hold device alerts overnight', draft, ['alerts.quiet_hours.on'])}
-                hint="Safety alerts, care rules, emergencies and internet-exposure checks never wait"
+                hint={QUIET_HOURS_HINT}
                 control={
                     <OnOff
                         label="Hold device alerts overnight"

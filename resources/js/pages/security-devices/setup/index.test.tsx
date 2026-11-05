@@ -246,6 +246,8 @@ describe('Setup', () => {
         expect(screen.getByText('Daily summary')).toBeInTheDocument();
         expect(screen.getByRole('switch', { name: 'Daily summary: Email' })).toBeChecked();
         expect(screen.getByRole('switch', { name: 'Hold device alerts overnight' })).toBeChecked();
+        // Stephan, 6 Nov: a router, gateway or hub that stops answering still gets through.
+        expect(screen.getByText(/a router, gateway or hub that stops answering still tells IT on call straight away/)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Quiet hours start/ })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Quiet hours end/ })).toBeInTheDocument();
 

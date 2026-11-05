@@ -386,24 +386,24 @@ class DeviceAlertsTest extends TestCase
             'status' => 'scheduled', 'is_on_call' => true, 'published_at' => now(),
         ]);
 
-        // 11:30 pm NZDT (quiet hours 10:00 pm – 6:00 am): IT router check fails, sensor battery drops, and Kōwhai switch flaps.
+        // 11:30 pm NZDT (quiet hours 10:00 pm – 6:00 am): a Wi-Fi point stops answering, sensor battery drops, and Kōwhai switch flaps.
         $this->freezeAt('2026-11-02T10:30:00Z');
         $singleConfirm = MonitoringProfile::factory()->create(['failure_confirmations' => 1, 'recovery_confirmations' => 1]);
-        [$router, $routerPing] = $this->watched($this->home, 'Aurora House router');
-        $routerPing->forceFill(['profile_id' => $singleConfirm->id])->save();
+        [$hall, $hallPing] = $this->watched($this->home, 'Aurora House hall Wi-Fi point');
+        $hallPing->forceFill(['profile_id' => $singleConfirm->id])->save();
         [$otherSwitch, $otherPing] = $this->watched($this->other, 'Kōwhai Lodge switch');
         $otherPing->forceFill(['profile_id' => $singleConfirm->id])->save();
 
         $ingestor = app(\App\Domain\Monitoring\Services\MonitoringObservationIngestor::class);
         $ingestor->ingest(
-            $routerPing,
+            $hallPing,
             new ObservationInput(
-                sourceKey: 'qh-router-1',
+                sourceKey: 'qh-hall-1',
                 state: MonitorState::Failed,
                 observedAt: CarbonImmutable::parse('2026-11-02T10:30:00Z'),
             ),
             $this->home->id,
-            $router->id,
+            $hall->id,
             null,
         );
         $ingestor->ingest(
@@ -430,14 +430,14 @@ class DeviceAlertsTest extends TestCase
 
         // Held during quiet hours: open on Alerts right away, zero notifications sent overnight.
         Notification::assertNothingSent();
-        $routerAlert = DeviceAlert::query()->where('device_id', $router->id)->sole();
-        expect($routerAlert->state)->toBe(DeviceAlert::STATE_OPEN)
-            ->and($routerAlert->events()->pluck('kind')->all())->toBe(['opened', 'held']);
+        $hallAlert = DeviceAlert::query()->where('device_id', $hall->id)->sole();
+        expect($hallAlert->state)->toBe(DeviceAlert::STATE_OPEN)
+            ->and($hallAlert->events()->pluck('kind')->all())->toBe(['opened', 'held']);
 
         $this->actingAs($jordan)->get('/security-devices/alerts')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('queue.0.title', 'Aurora House router is offline')
+                ->where('queue.0.title', 'Aurora House hall Wi-Fi point is offline')
                 ->where('queue.0.sub', 'Aurora House · Waiting for the 6:00 am summary'));
 
         // Kōwhai Lodge switch recovers at 2:19 am NZDT, and Aurora House hub rolls back an overnight update at 2:20 am NZDT.
@@ -461,7 +461,7 @@ class DeviceAlertsTest extends TestCase
             'detail' => 'Health check timed out',
         ]);
 
-        // Still in quiet hours (more than 1 hour after router failed): no 1-hour reminder wakes anyone up.
+        // Still in quiet hours (more than 1 hour after the Wi-Fi point stopped answering): no 1-hour reminder wakes anyone up.
         expect($this->engine->tick())->toBe(['back' => 0, 'reminded' => 0]);
         Notification::assertNothingSent();
 
@@ -491,7 +491,7 @@ class DeviceAlertsTest extends TestCase
         expect($jordanNote->via($jordan))->toBe(['database', 'mail'])
             ->and($jordanNote->lines)->toHaveCount(3)
             ->and(implode(' | ', $jordanNote->lines))
-            ->toContain('Aurora House router is offline')
+            ->toContain('Aurora House hall Wi-Fi point is offline')
             ->toContain('Room 3 sensor: battery 14%')
             ->toContain('Aurora House hub couldn’t update to 1.3.2 and went back to 1.3.1')
             ->not->toContain('Kōwhai Lodge');
@@ -516,7 +516,7 @@ class DeviceAlertsTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('on_call.delivery.1.when', 'Daily summary')
-                ->where('on_call.summary.text', fn (string $text): bool => str_contains($text, 'Aurora House router is offline') && ! str_contains($text, 'Kōwhai Lodge')));
+                ->where('on_call.summary.text', fn (string $text): bool => str_contains($text, 'Aurora House hall Wi-Fi point is offline') && ! str_contains($text, 'Kōwhai Lodge')));
 
         // A second tick at 6:05 am sends no duplicate summary, and no 1-hour reminder yet (only 5 min since summary).
         $this->freezeAt('2026-11-02T17:05:00Z');
@@ -541,11 +541,87 @@ class DeviceAlertsTest extends TestCase
         );
         Notification::assertSentTo($jordan, MonitoringCheckAlertNotification::class);
 
-        // 7:01 am NZDT (1 hour after the 6:00 am summary): the unacknowledged overnight router alert reminds the rest of IT (Ana).
+        // 7:01 am NZDT (1 hour after the 6:00 am summary): the unacknowledged overnight Wi-Fi point alert reminds the rest of IT (Ana).
         $this->engine->acknowledge(DeviceAlert::query()->where('monitor_id', $wifiPing->id)->sole(), $jordan, null, false);
         CarbonImmutable::setTestNow('2026-11-02T18:01:00Z');
         expect($this->engine->tick())->toBe(['back' => 0, 'reminded' => 1]);
+        Notification::assertSentTo($ana, SecurityDeviceAlertNotification::class, fn (SecurityDeviceAlertNotification $n): bool => $n->alertId === (int) $hallAlert->id);
+    }
+
+    public function test_in_quiet_hours_a_router_or_hub_that_stops_answering_tells_it_on_call_now_and_other_it_alerts_wait(): void
+    {
+        // Stephan, 6 Nov ("Let them through"): a router or hub going quiet takes the house's other
+        // devices with it, so the IT person on call hears straight away, as by day.
+        Notification::fake();
+        $itKeys = ['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'securityDevices.alerts.acknowledge', 'securityDevices.monitoring.manage'];
+        $jordan = $this->person($itKeys, $this->home);
+        $jordan->forceFill(['name' => 'Jordan Peri'])->save();
+        $ana = $this->person($itKeys, $this->home);
+        $ana->forceFill(['name' => 'Ana Ruha'])->save();
+        Shift::factory()->create([
+            'site_id' => $this->home->id, 'user_id' => $jordan->id,
+            'starts_at' => CarbonImmutable::parse('2026-11-02T08:00:00Z'),
+            'ends_at' => CarbonImmutable::parse('2026-11-04T08:00:00Z'),
+            'status' => 'scheduled', 'is_on_call' => true, 'published_at' => now(),
+        ]);
+        $singleConfirm = MonitoringProfile::factory()->create(['failure_confirmations' => 1, 'recovery_confirmations' => 1]);
+        $ingestor = app(\App\Domain\Monitoring\Services\MonitoringObservationIngestor::class);
+
+        // 2:00 am NZDT, inside the default quiet hours (10:00 pm – 6:00 am): the router stops answering.
+        $this->freezeAt('2026-11-02T13:00:00Z');
+        [$router, $routerPing] = $this->watched($this->home, 'Aurora House router');
+        $router->forceFill(['subcategory' => 'router'])->save();
+        $routerPing->forceFill(['profile_id' => $singleConfirm->id])->save();
+        $ingestor->ingest($routerPing, new ObservationInput(sourceKey: 'qh-router-2am', state: MonitorState::Failed, observedAt: CarbonImmutable::now('UTC')), $this->home->id, $router->id, null);
+
+        // 2:05 am: a switch's web page check needs attention. Not urgent: it waits for 6:00 am.
+        $this->freezeAt('2026-11-02T13:05:00Z');
+        [$switch, $switchPage] = $this->watched($this->home, 'Aurora House switch', MonitorKind::Http);
+        $switch->forceFill(['subcategory' => 'switch'])->save();
+        $switchPage->forceFill(['profile_id' => $singleConfirm->id, 'name' => 'Web page'])->save();
+        $ingestor->ingest($switchPage, new ObservationInput(sourceKey: 'qh-switch-2am', state: MonitorState::Degraded, observedAt: CarbonImmutable::now('UTC')), $this->home->id, $switch->id, null);
+
+        // 2:10 am: the house's hub stops answering.
+        $this->freezeAt('2026-11-02T13:10:00Z');
+        [$hubDevice] = $this->watched($this->home, 'Aurora House hub PC');
+        $hub = MonitoringCollector::factory()->create([
+            'site_id' => $this->home->id, 'name' => 'Aurora House', 'collector_uuid' => (string) Str::uuid(),
+            'status' => 'online', 'approved_at' => now()->subDay(), 'revoked_at' => null, 'collector_device_id' => $hubDevice->id,
+        ]);
+        $this->engine->onHub($hub, true, CarbonImmutable::now('UTC'));
+
+        $routerAlert = DeviceAlert::query()->where('device_id', $router->id)->sole();
+        $switchAlert = DeviceAlert::query()->where('device_id', $switch->id)->sole();
+        $hubAlert = DeviceAlert::query()->where('device_id', $hubDevice->id)->sole();
+        expect($routerAlert->kind)->toBe('offline')
+            ->and($routerAlert->events()->pluck('kind')->all())->toBe(['opened', 'told'])
+            ->and($hubAlert->kind)->toBe('hub_offline')
+            ->and($hubAlert->events()->pluck('kind')->all())->toBe(['opened', 'told'])
+            ->and($switchAlert->kind)->toBe('failing')
+            ->and($switchAlert->events()->pluck('kind')->all())->toBe(['opened', 'held']);
+        // Jordan (on call) is told about the router and the hub now; nobody hears about the switch overnight.
+        Notification::assertSentToTimes($jordan, MonitoringCheckAlertNotification::class, 1);
+        Notification::assertSentTo($jordan, MonitoringCheckAlertNotification::class, fn (MonitoringCheckAlertNotification $n): bool => str_contains($n->title, 'Aurora House router'));
+        Notification::assertSentTo($jordan, SecurityDeviceAlertNotification::class, fn (SecurityDeviceAlertNotification $n): bool => $n->alertId === (int) $hubAlert->id);
+        Notification::assertNothingSentTo($ana);
+
+        // 3:11 am: nobody has acknowledged them, so the rest of IT hears at the hour, as by day. The switch still waits.
+        $this->freezeAt('2026-11-02T14:11:00Z');
+        expect($this->engine->tick())->toBe(['back' => 0, 'reminded' => 2]);
         Notification::assertSentTo($ana, SecurityDeviceAlertNotification::class, fn (SecurityDeviceAlertNotification $n): bool => $n->alertId === (int) $routerAlert->id);
+        Notification::assertSentTo($ana, SecurityDeviceAlertNotification::class, fn (SecurityDeviceAlertNotification $n): bool => $n->alertId === (int) $hubAlert->id);
+        Notification::assertNotSentTo($ana, SecurityDeviceAlertNotification::class, fn (SecurityDeviceAlertNotification $n): bool => $n->alertId === (int) $switchAlert->id);
+
+        // 6:00 am: the morning summary lists the switch only; the router and the hub were told already.
+        $this->freezeAt('2026-11-02T17:00:00Z');
+        expect($this->engine->tick())->toBe(['back' => 0, 'reminded' => 0]);
+        $sent = Notification::sent($jordan, SecurityDeviceMorningSummaryNotification::class);
+        expect($sent)->toHaveCount(1);
+        /** @var SecurityDeviceMorningSummaryNotification $summary */
+        $summary = $sent->first();
+        expect($summary->lines)->toHaveCount(1)
+            ->and($summary->lines[0])->toContain('Aurora House switch: Web page needs attention')
+            ->and(implode(' | ', $summary->lines))->not->toContain('router')->not->toContain('stopped answering');
     }
 
     public function test_a_flat_battery_on_a_safety_device_tells_staff_on_shift_at_once_even_in_quiet_hours(): void

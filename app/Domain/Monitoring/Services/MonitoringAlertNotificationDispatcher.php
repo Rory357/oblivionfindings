@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
 use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Notifications\MonitoringCheckAlertNotification;
 use Carbon\CarbonImmutable;
@@ -49,7 +50,10 @@ final class MonitoringAlertNotificationDispatcher
         $observedAt = $observation->observed_at !== null
             ? CarbonImmutable::parse($observation->observed_at)->utc()
             : CarbonImmutable::now('UTC');
-        if (app(SecurityDevicesSettings::class)->isQuietHours($observedAt)) {
+        // Quiet hours hold IT check notices for the 6:00 am summary, except a router, gateway or hub
+        // that stops answering: the person on call hears straight away (Stephan, 6 Nov).
+        if (app(SecurityDevicesSettings::class)->isQuietHours($observedAt)
+            && ! DeviceAlertEngine::passesQuietHours($device, DeviceAlertEngine::checkKind($monitor, $to))) {
             return null;
         }
 

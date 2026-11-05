@@ -59,7 +59,10 @@ final class SecurityDevicesSettings
 
     public const string SUMMARY_PUSH = 'alerts.summary.push';
 
-    /** pg-sdr-15g: hold device and hub alerts overnight for the 6:00 am summary; safety alerts never wait. */
+    /**
+     * pg-sdr-15g: hold device alerts overnight for the 6:00 am summary. Safety alerts never wait, and
+     * nor does a router, gateway or hub that stops answering (DeviceAlertEngine::passesQuietHours).
+     */
     public const string QUIET_HOURS_ON = 'alerts.quiet_hours.on';
 
     public const string QUIET_HOURS_START = 'alerts.quiet_hours.start';
