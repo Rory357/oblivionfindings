@@ -103,6 +103,13 @@ class SubstanceExposureRecord extends Model
     {
         return $query->where('medical_attention_sought', true);
     }
+
+    /** Active records only: leaves out exposures marked as entered in error (6 Nov 2026). For lists and counts; the record page still reads them. */
+    public function scopeNotEnteredInError($query)
+    {
+        return $query->whereDoesntHave('reviews', fn ($review) => $review->where('outcome', \App\Services\HealthSafety\ChemicalExposureSourceService::ENTERED_IN_ERROR));
+    }
+
     public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ChemicalExposureSourceVersion::class, 'exposure_id');

@@ -383,6 +383,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::post('/{exposure}/deliveries/{delivery}/retry', [ChemicalExposureWorkspaceController::class, 'retryDelivery'])->whereNumber(['exposure', 'delivery'])->middleware('throttle:30,1')->name('deliveries.retry');
             Route::put('/{exposure}', [ChemicalExposureWorkspaceController::class, 'correct'])->whereNumber('exposure')->name('correct');
             Route::post('/{exposure}/reviews', [ChemicalExposureWorkspaceController::class, 'review'])->whereNumber('exposure')->name('reviews.store');
+            // Entered in error (6 Nov 2026): kept and audited, hidden from active lists, never deleted. The service re-checks authority.
+            Route::post('/{exposure}/entered-in-error', [ChemicalExposureWorkspaceController::class, 'markEnteredInError'])->whereNumber('exposure')->name('entered-in-error.store');
             Route::post('/{exposure}/followups', [ChemicalExposureWorkspaceController::class, 'assignFollowup'])->whereNumber('exposure')->name('followups.store');
             Route::put('/{exposure}/followups/{followup}/reassign', [ChemicalExposureWorkspaceController::class, 'reassignFollowup'])->whereNumber(['exposure', 'followup'])->name('followups.reassign');
             Route::put('/{exposure}/followups/{followup}/complete', [ChemicalExposureWorkspaceController::class, 'completeFollowup'])->whereNumber(['exposure', 'followup'])->name('followups.complete');

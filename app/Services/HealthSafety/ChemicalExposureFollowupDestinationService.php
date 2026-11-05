@@ -340,7 +340,8 @@ final class ChemicalExposureFollowupDestinationService
     {
         $operation = function ($current, $reads, $sites) use ($filters, $navigation) {
             if (! $this->access->canRead($current)) { return []; }
-            $parents = $this->access->readableQuery($current, $reads, $sites)->select('id');
+            // Follow-ups on a record marked as entered in error leave the worklist with it (6 Nov 2026).
+            $parents = $this->access->readableQuery($current, $reads, $sites)->notEnteredInError()->select('id');
             $query = $reads->query(ChemicalExposureFollowup::query())->where('assigned_to', $current->id)->whereIn('exposure_id', $parents)
                 ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
                 ->when(empty($filters['include_done']), fn ($q) => $q->whereNull('completed_at'))->orderBy('id');

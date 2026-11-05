@@ -58,7 +58,7 @@ export interface ExposureRecordEnvelope {
     record: ExposureRecord | null;
     source_integrity: ExposureAttribution;
     command_context: { root_type: 'exposure'; root_id: number; expected_version: number; source_version_id: number | null } | null;
-    can: { correct: boolean; review: boolean; assign_followup: boolean; upload_evidence: boolean };
+    can: { correct: boolean; review: boolean; assign_followup: boolean; upload_evidence: boolean; mark_entered_in_error?: boolean };
 }
 
 export type ExposureIndexRecord = Omit<ExposureRecord, 'incident_connection'>;
@@ -147,6 +147,8 @@ export interface ExposureWorkspaceDetail extends ExposureRecordEnvelope {
     attachments: ExposureCollection<ExposureEvidence | ExposureRepair>;
     history: ExposureCollection<ExposureHistoryItem>;
     delivery: { state: 'unconfirmed' | 'repair_required'; attempts: null };
+    /** Set once the record is marked as entered in error (6 Nov 2026): kept as it is, hidden from active lists. */
+    entered_in_error?: { reason: string | null; at: string | null; by: ExposureIdentity | null; attribution_state: 'recorded' | 'repair_required' } | null;
 }
 export interface ExposureStaffChoices { items: ExposureIdentity[]; next_cursor: number | null }
 export interface ExposureIncidentChoices {

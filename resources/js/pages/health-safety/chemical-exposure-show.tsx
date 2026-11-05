@@ -23,10 +23,11 @@ import { CHEMICAL_EXPOSURES, exposureHref, exposureLocation, exposureReturn, typ
 import type { ExposureEvidence, ExposureFollowup, ExposureHistoryItem, ExposureWorkspaceDetail } from '@/lib/health-safety/chemical-exposure-read-contract';
 import type { SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { CheckCircle2, ClipboardCheck, FileText, History, Link2, ListChecks, LockKeyhole, MoreHorizontal, Paperclip, PencilLine, RefreshCw, TriangleAlert, UserPlus } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, FileText, FileX2, History, Link2, ListChecks, LockKeyhole, MoreHorizontal, Paperclip, PencilLine, RefreshCw, TriangleAlert, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ExposureCommandForm } from './components/exposure-command-form';
 import { ExposureDeliveryPanel } from './components/exposure-delivery-panel';
+import { ExposureEnteredInErrorPopup } from './components/exposure-entered-in-error-popup';
 import { earlierLinkChip, ExposureEarlierLink, type EarlierLink } from './components/exposure-earlier-link';
 import { ExposureRecordSide } from './components/exposure-overview';
 import { ExposureRecordPanel } from './components/exposure-record-panels';
@@ -57,9 +58,10 @@ type ExposureReviewRow = Extract<NonNullable<ExposureWorkspaceDetail['reviews'][
  */
 function exposureStages(detail: ExposureWorkspaceDetail) {
     const record = detail.record!;
-    const reviews = (detail.reviews.items ?? []).filter((row) => row.attribution_state !== 'repair_required') as ExposureReviewRow[];
+    // The Entered in error entry is not a review of the exposure, so it never marks the Reviewed step.
+    const reviews = (detail.reviews.items ?? []).filter((row) => row.attribution_state !== 'repair_required' && (row as ExposureReviewRow).outcome !== 'entered_in_error') as ExposureReviewRow[];
     const followups = (detail.followups.items ?? []).filter((row) => row.attribution_state !== 'repair_required') as ExposureFollowup[];
-    const latest = reviews[0]; const reviewed = latest !== undefined || (detail.reviews.page?.total ?? 0) > 0;
+    const latest = reviews[0]; const reviewed = latest !== undefined || (detail.reviews.page?.total ?? 0) > (detail.entered_in_error ? 1 : 0);
     const open = followups.filter((row) => row.completed_at === null).sort((a, b) => (a.due_at ?? '9999').localeCompare(b.due_at ?? '9999'));
     const first = open[0]; const now = Date.now();
     const overdue = !!first?.due_at && new Date(first.due_at).getTime() < now;
@@ -165,6 +167,10 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
         : action === 'reassign_followup' ? !!child && 'can_reassign' in child && child.can_reassign && child.completed_at === null
         : !!child && 'can_remove' in child && child.can_remove && child.attribution_state === 'recorded');
     const commandKey = `${action}:${sourceId ?? ''}`;
+    // Entered in error (6 Nov 2026): kept as it is; the server turns every change off and offers the mark to exposure managers.
+    const inError = admitted ? detail.entered_in_error ?? null : null;
+    const markAllowed = commandReady && detail.can.mark_entered_in_error === true && !inError;
+    const [marking, setMarking] = useState(false);
     const [retained, setRetained] = useState<Record<string, Pending>>(() => allowed && action ? { [commandKey]: { action, sourceId, child } } : {});
     useEffect(() => { if (allowed && action) setRetained((entries) => entries[commandKey] ? entries : { ...entries, [commandKey]: { action, sourceId, child } }); }, [allowed, action, commandKey, sourceId, child]);
     const returnTo = exposureReturn(return_to); const section = admitted ? location.section : 'overview';
@@ -188,6 +194,7 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
     };
     const open = (next: ExposureAction, source?: number) => move(next === 'review' ? 'reviews' : next.includes('followup') ? 'followups' : next.includes('evidence') ? 'evidence' : 'overview', next, source);
     const onPage = (key: ExposurePageKey, page: number) => drafts.request(() => router.get(href(section, undefined, undefined, { ...pages, [key]: page }), {}, { preserveState: true, preserveScroll: true }));
+    const markedDone = useCallback(() => { setMarking(false); interacted.current = true; router.get(exposureHref(detail.id, { section: 'overview', returnTo }), {}, { preserveState: false, preserveScroll: true }); }, [detail.id, returnTo]);
     const checkAccess = () => drafts.request(() => router.get(href('overview'), {}, { preserveState: false, preserveScroll: true }));
     useEffect(() => { if (!action && focusedFollowupId === null && (interacted.current || requestedFocus !== null)) panel.current?.focus(); }, [section, action, focusedFollowupId, requestedFocus]);
 
@@ -203,7 +210,10 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
     ) : barUsesReview ? (
         <Button onClick={() => open('review')}><ClipboardCheck aria-hidden="true" />Record a review</Button>
     ) : undefined;
-    const next: RecordProgressNext | null = !stages ? null : stages.first ? {
+    const next: RecordProgressNext | null = !stages ? null : inError ? {
+        kicker: 'Entered in error', title: 'Kept for the record',
+        text: [inError.by?.name, inError.at ? dateTimeWithYear(inError.at) : null].filter(Boolean).join(' · ') || 'Marked as entered in error', tone: 'done',
+    } : stages.first ? {
         kicker: stages.first.due_at ? `Next step · ${stages.overdue ? 'was due' : 'due'} ${dateTimeWithYear(stages.first.due_at)}` : 'Next step', title: stages.first.instruction,
         text: <>Follow-up for <b>{stages.first.assigned_to?.name ?? 'a named person'}</b>{stages.first.recorded_by ? <> · assigned by {stages.first.recorded_by.name}</> : null}</>, action: nextButton,
     } : !stages.reviewed ? {
@@ -221,8 +231,9 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
     const glass = header.slice(0, 1); const overflow = header.slice(1);
     const actions = admitted ? <>
         {glass.map((item) => <PageHeaderGlassButton key={item.key} icon={item.icon} onClick={() => open(item.key)}>{item.label}</PageHeaderGlassButton>)}
-        {overflow.length ? <DropdownMenu><DropdownMenuTrigger asChild><PageHeaderGlassButton icon={MoreHorizontal} aria-label="More exposure actions" /></DropdownMenuTrigger>
-            <DropdownMenuContent align="end">{overflow.map((item) => <DropdownMenuItem key={item.key} onSelect={() => open(item.key)}><item.icon className="size-4" />{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu> : null}
+        {overflow.length || markAllowed ? <DropdownMenu><DropdownMenuTrigger asChild><PageHeaderGlassButton icon={MoreHorizontal} aria-label="More exposure actions" /></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">{overflow.map((item) => <DropdownMenuItem key={item.key} onSelect={() => open(item.key)}><item.icon className="size-4" />{item.label}</DropdownMenuItem>)}
+                {markAllowed ? <DropdownMenuItem onSelect={() => drafts.request(() => setMarking(true))}><FileX2 className="size-4" />Mark as entered in error</DropdownMenuItem> : null}</DropdownMenuContent></DropdownMenu> : null}
         {commandReady && detail.can.review && !(progressShown && barUsesReview) ? <PageHeaderGlassButton icon={ClipboardCheck} onClick={() => open('review')}>Record a review</PageHeaderGlassButton> : null}
     </> : <PageHeaderPrimaryButton icon={RefreshCw} onClick={checkAccess}>Check current access</PageHeaderPrimaryButton>;
     const counted = (total: number | null | undefined) => (admitted && typeof total === 'number' ? { count: total } : {});
@@ -234,11 +245,17 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
             <PageLayout hero={<PageHeader variant="profile" wrapTitle title={title} icon={LockKeyhole} backHref={returnTo}
                 subline={admitted ? `${detail.record!.substance.name} · ${detail.record!.site.name}` : earlier_link ? 'An older record saved with an unconfirmed link to an incident · its private details stay withheld' : 'Current access or source history could not be confirmed'}
                 actions={actions}
-                titleChip={<PageHeaderStatusChip variant={admitted && (detail.source_integrity === 'recorded' || earlier_link?.state === 'reviewed') ? 'neutral' : 'warning'}>
-                    {admitted ? detail.source_integrity === 'legacy_unknown' ? earlierLinkChip(earlier_link) ?? 'Earlier provenance unconfirmed' : 'Private recorded source' : earlierLinkChip(earlier_link) ?? 'Details withheld'}</PageHeaderStatusChip>}
+                titleChip={<PageHeaderStatusChip variant={admitted && (inError || detail.source_integrity === 'recorded' || earlier_link?.state === 'reviewed') ? 'neutral' : 'warning'}>
+                    {admitted ? inError ? 'Entered in error' : detail.source_integrity === 'legacy_unknown' ? earlierLinkChip(earlier_link) ?? 'Earlier provenance unconfirmed' : 'Private recorded source' : earlierLinkChip(earlier_link) ?? 'Details withheld'}</PageHeaderStatusChip>}
                 strip={stages ? <PageHeaderSteps steps={stages.steps} selected={progressShown ? shownStep : null} onSelect={(key) => { setPicked(key === stages.current ? null : key as ExposureStepKey); if (section !== 'overview' || action) drafts.request(() => move('overview')); }} ariaLabel="Exposure steps" /> : undefined}
                 rail={<PageHeaderRail items={rail} value={section} onSelect={(next) => move(next)} ariaLabel="Private exposure sections" />} />}>
                 <div className="grid min-w-0 gap-5">
+                    {inError ? (
+                        <Note icon={FileX2}>
+                            <p><b>Marked as entered in error</b>{inError.by ? ` by ${inError.by.name}` : ''}{inError.at ? ` on ${dateTimeWithYear(inError.at)}` : ''}. It’s kept for the record, left out of the lists and can’t be changed.</p>
+                            {inError.reason ? <p className="mt-1">Reason: {inError.reason}</p> : null}
+                        </Note>
+                    ) : null}
                     {admitted && delivery_alert ? (
                         <Note tone={delivery_alert.state === 'needs_manager' ? 'critical' : 'warning'} icon={TriangleAlert}>
                             <p><b>This exposure isn’t on the H&amp;S register yet.</b> {DELIVERY_ALERT[delivery_alert.state]}</p>
@@ -274,7 +291,10 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, 
                         {admitted ? <aside className="min-w-0" aria-label="Care answers and record"><SideColumn><ExposureRecordSide detail={current} /></SideColumn></aside> : null}
                     </div>
                 </div>
-            </PageLayout>{drafts.confirmation}
+            </PageLayout>
+            {markAllowed ? <ExposureEnteredInErrorPopup open={marking} detail={detail} actorId={shared.auth.user.id} allowed={markAllowed}
+                onClose={() => setMarking(false)} onDone={markedDone} /> : null}
+            {drafts.confirmation}
         </SafetyFormDraftContext.Provider>
     </AppLayout>;
 }

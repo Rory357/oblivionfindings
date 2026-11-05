@@ -24,7 +24,9 @@ final class ChemicalRegisterExposureSummary
     {
         $sites = $siteId !== null ? array_values(array_intersect($visibleSiteIds, [$siteId])) : $visibleSiteIds;
         $since = now()->subDays($periodDays);
-        $exposures = fn () => SubstanceExposureRecord::query()->whereIn('site_id', $sites)->where('exposed_at', '>=', $since);
+        // Records marked as entered in error are not counted (6 Nov 2026). The WorkSafe count stays on the H&S event:
+        // a statutory decision is still made there, even when the exposure record itself was a mistake.
+        $exposures = fn () => SubstanceExposureRecord::query()->notEnteredInError()->whereIn('site_id', $sites)->where('exposed_at', '>=', $since);
         $worksafe = HsEvent::query()->where('event_category', HsEvent::CATEGORY_EXPOSURE)->whereIn('site_id', $sites)
             ->where('worksafe_notifiable', true)
             ->where(fn ($pending) => $pending->whereNull('worksafe_status')->orWhere('worksafe_status', HsEvent::WORKSAFE_PENDING));

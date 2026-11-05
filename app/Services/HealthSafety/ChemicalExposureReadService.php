@@ -78,7 +78,7 @@ final class ChemicalExposureReadService
         if ($substanceId !== null) { $this->access->assertSubstance($substanceId, $current, $reads); }
         if ($normalized['site_id'] !== null) { $this->access->assertSite($normalized['site_id'], $reads, $sites); }
         // Discovery uses only canonical identity scope. No medical predicate, date ordering, name search, count or body yet.
-        $query = $this->access->readableQuery($current, $reads, $sites)
+        $query = $this->access->readableQuery($current, $reads, $sites)->notEnteredInError()
             ->when($substanceId !== null, fn ($q) => $q->where('hazardous_substance_id', $substanceId))
             ->when($normalized['site_id'] !== null, fn ($q) => $q->where('site_id', $normalized['site_id']));
         $identities = $query->orderBy('id')->get(ChemicalExposureSourceService::BODY_ADMISSION_FIELDS);

@@ -82,8 +82,9 @@ function HistoryFacts({ facts }: { facts: ExposureHistoryFacts | null }) {
     })} />;
 }
 const HISTORY_WORDS: Record<string, string> = { create_exposure: 'Exposure reported', correct_exposure: 'Facts corrected', review: 'Review added', record_review: 'Review added',
-    assign_followup: 'Follow-up assigned', reassign_followup: 'Follow-up transferred', complete_followup: 'Follow-up completed', upload_evidence: 'Evidence added', remove_evidence: 'Evidence removed' };
-const historyTone = (command: string): SgTone => (command.includes('complete') ? 'success' : command.includes('review') ? 'warning' : command.startsWith('create') ? 'none' : 'info');
+    assign_followup: 'Follow-up assigned', reassign_followup: 'Follow-up transferred', complete_followup: 'Follow-up completed', upload_evidence: 'Evidence added', remove_evidence: 'Evidence removed',
+    mark_entered_in_error: 'Marked as entered in error' };
+const historyTone = (command: string): SgTone => (command === 'mark_entered_in_error' ? 'none' : command.includes('complete') ? 'success' : command.includes('review') ? 'warning' : command.startsWith('create') ? 'none' : 'info');
 
 /** The record's sections. All commands retain independent current server admission. */
 export function ExposureRecordPanel({ detail, section, open, onPage, focusedFollowupId = null }: { detail: ExposureWorkspaceDetail; section: ExposureSection;
@@ -109,7 +110,7 @@ export function ExposureRecordPanel({ detail, section, open, onPage, focusedFoll
             <Collection collection={detail.reviews} pageKey="reviews_page" onPage={onPage}>
                 {detail.reviews.items?.length ? <ol className="sg-log">{detail.reviews.items.map((row) => repaired(row)
                     ? <LogRow key={row.id} time="—" tone="warning" title={REPAIR} />
-                    : <LogRow key={row.id} time={dayOf(row.reviewed_at)} tone={/follow/.test(row.outcome) ? 'warning' : 'success'} title={label(row.outcome)}
+                    : <LogRow key={row.id} time={dayOf(row.reviewed_at)} tone={row.outcome === 'entered_in_error' ? 'none' : /follow/.test(row.outcome) ? 'warning' : 'success'} title={label(row.outcome)}
                         sub={<>{row.reviewed_at ? formatTime(row.reviewed_at) : 'Time not recorded'}{dot}{row.recorded_by?.name ?? 'Reviewer not recorded'}{dot}<span className="whitespace-pre-wrap">{text(row.notes)}</span>
                             {row.attribution_state === 'legacy_unknown' ? <>{dot}Earlier provenance unconfirmed</> : null}</>} />)}</ol>
                     : <p className="sg-quiet"><Ring tone="none" /><span>No admitted records are available on this page.</span></p>}

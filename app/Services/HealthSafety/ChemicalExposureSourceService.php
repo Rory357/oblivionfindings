@@ -28,6 +28,9 @@ use LogicException;
 /** Governed private source facts. No review is a clinical fitness, competence or WorkSafe approval. */
 final class ChemicalExposureSourceService
 {
+    /** The review outcome that marks an exposure as entered in error (6 Nov 2026). */
+    public const ENTERED_IN_ERROR = 'entered_in_error';
+
     public const BODY_ADMISSION_FIELDS = ['id', 'hazardous_substance_id', 'user_id', 'site_id', 'related_incident_id',
         'original_context', 'source_schema_version', 'source_revision', 'created_by'];
 
@@ -191,6 +194,38 @@ final class ChemicalExposureSourceService
             $this->save($child);
             return [$child, 'review', null, true, []];
         });
+    }
+
+    /**
+     * Entered in error (decided 6 Nov 2026): a governed, attributable entry with a required reason. The record, its
+     * children and its history are kept (never deleted); it leaves every active list and takes no further changes.
+     * Same authority as any exposure change: exposure manager, current Site, private-record read.
+     */
+    public function markEnteredInError(SubstanceExposureRecord|int $source, User $actor, array $input): array
+    {
+        $v = ChemicalCommandValues::normalize($input, ['reason' => ['required', 'string', 'max:2000']]);
+        $this->nonblank($v['reason'], 'reason');
+        return $this->command($source, $actor, 'mark_entered_in_error', $v, function ($root, $current, $reads, $sites) use ($v) {
+            if (self::enteredInError((int) $root->id, $reads)) {
+                ChemicalCommandValues::invalid('reason', 'This record is already marked as entered in error.');
+            }
+            // Open follow-ups leave the worklists with the record; their unsent notices are superseded, never sent.
+            $open = $reads->query(ChemicalExposureFollowup::query())->where('exposure_id', $root->id)->whereNull('completed_at')->pluck('id');
+            foreach ($open as $followupId) { $this->supersedePendingFollowupDeliveries($root, (int) $followupId, $current, $reads, $sites); }
+            $child = new ChemicalExposureReview(['exposure_id' => $root->id, 'source_schema_version' => 1,
+                'source_revision' => $root->source_revision + 1, 'reviewed_at' => now()->utc()->format('Y-m-d H:i:s').'.000000',
+                'outcome' => self::ENTERED_IN_ERROR, 'notes' => $v['reason'], 'recorded_by' => $current->id,
+                'recorder_snapshot' => ['id' => (int) $current->id, 'name' => $current->name]]);
+            $this->save($child);
+            return [$child, 'review', null, true, ['reason' => $v['reason']]];
+        });
+    }
+
+    /** Whether a governed Entered in error entry exists for this exposure. */
+    public static function enteredInError(int $exposureId, ?CurrentAuthorizationReads $reads = null): bool
+    {
+        $query = ChemicalExposureReview::query()->where('exposure_id', $exposureId)->where('outcome', self::ENTERED_IN_ERROR);
+        return ($reads ? $reads->query($query) : $query)->exists();
     }
 
     public function assignFollowup(SubstanceExposureRecord|int $source, User $actor, array $input): array
@@ -882,7 +917,7 @@ final class ChemicalExposureSourceService
     public function command(SubstanceExposureRecord|int $source, User $actor, string $command, array $v, callable $mutate, ?callable $afterAcceptance = null): array
     {
         if (! in_array($command, ['correct_exposure', 'review_exposure', 'assign_followup', 'reassign_followup', 'complete_followup',
-            'upload_evidence', 'remove_evidence'], true)) { throw new LogicException('This private command is not an allocated exposure operation.'); }
+            'upload_evidence', 'remove_evidence', 'mark_entered_in_error'], true)) { throw new LogicException('This private command is not an allocated exposure operation.'); }
         return $this->access->withCurrentViewer($actor, function ($current, $reads, $sites) use ($source, $actor, $command, $v, $mutate, $afterAcceptance) {
             $root = $this->access->source($source, $current, $reads, $sites);
             $previousVersion = $this->currentVersion($root, $root, 'exposure', $reads, $current, $sites);
@@ -896,6 +931,10 @@ final class ChemicalExposureSourceService
             }
             if ($root->source_revision !== $v['expected_version']) {
                 ChemicalCommandValues::invalid('expected_version', 'This private source changed. Review current work while retaining your entries.');
+            }
+            // A record marked as entered in error is kept as it is: no new change is accepted (earlier receipts still replay above).
+            if ($command !== 'mark_entered_in_error' && self::enteredInError((int) $root->id, $reads)) {
+                ChemicalCommandValues::invalid('entered_in_error', 'This record was marked as entered in error. It is kept as it is and can’t be changed.');
             }
             $before = $this->ledger->snapshot($root);
             [$child, $kind, $childBefore, $changed, $facts] = $mutate($root, $current, $reads, $sites);

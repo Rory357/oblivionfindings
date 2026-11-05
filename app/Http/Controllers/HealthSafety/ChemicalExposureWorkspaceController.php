@@ -106,7 +106,7 @@ final class ChemicalExposureWorkspaceController extends Controller
         return ['exposure_access' => 'readable', 'id' => $exposure, 'record' => null, 'source_integrity' => 'legacy_unknown',
             'command_context' => null, 'history' => $none, 'reviews' => $none, 'followups' => $none, 'attachments' => $none,
             'delivery' => ['state' => 'unconfirmed', 'attempts' => null],
-            'can' => ['correct' => false, 'review' => false, 'assign_followup' => false, 'upload_evidence' => false],
+            'can' => ['correct' => false, 'review' => false, 'assign_followup' => false, 'upload_evidence' => false, 'mark_entered_in_error' => false],
             'focused_followup_id' => null, 'followup_focus_state' => 'not_requested'];
     }
 
@@ -196,6 +196,8 @@ final class ChemicalExposureWorkspaceController extends Controller
         $exposure = $this->id($exposure); return $this->accepted($r, $this->source->correct($exposure, $r->user(), $this->input($r))); }
     public function review(Request $r, string|int $exposure) {
         $exposure = $this->id($exposure); return $this->accepted($r, $this->source->review($exposure, $r->user(), $this->input($r))); }
+    public function markEnteredInError(Request $r, string|int $exposure) {
+        $exposure = $this->id($exposure); return $this->accepted($r, $this->source->markEnteredInError($exposure, $r->user(), $this->input($r))); }
     public function assignFollowup(Request $r, string|int $exposure) {
         $exposure = $this->id($exposure); return $this->accepted($r, $this->source->assignFollowup($exposure, $r->user(), $this->input($r))); }
     public function reassignFollowup(Request $r, string|int $exposure, string|int $followup) {
