@@ -243,7 +243,7 @@ final class SensorAlertRules
         $storedBattery = data_get($device->config ?? [], self::CONFIG_KEY.'.battery');
         if ($hasBattery || is_array($storedBattery)) {
             $battery = self::batteryRule($device);
-            // A sensor that keeps a resident safe can't lose its battery alert (see update()).
+            // A sensor that keeps a resident safe can't lose its battery alert; the update method refuses it.
             $locked = app(DevicePersonLinks::class)->currentFor($device) !== null || ScaldWatch::watches($device);
             $rows[] = [
                 'key' => 'battery',
