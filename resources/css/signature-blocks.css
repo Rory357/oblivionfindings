@@ -1882,6 +1882,10 @@ a.sg-li:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: -2px;
 }
+.sg-ready > svg {
+    /* In a narrow side column long text squeezed the icons to dots (audit, 5 Nov). */
+    flex: none;
+}
 .sg-ready > svg:first-child {
     width: 20px;
     height: 20px;
