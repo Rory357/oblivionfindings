@@ -220,7 +220,47 @@ final class SafeguardingNamedPersonReporterAndSiteTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->where('rows.total', 1));
     }
 
-    public function test_the_migration_gives_the_key_to_admin_only(): void
+    // Stephan, 7 Nov 2026: provider managers and auditors "Keep their every-Site view"; HR loses it as decided.
+    public function test_provider_managers_and_auditors_keep_every_site_safeguarding_and_hr_does_not(): void
+    {
+        $own = $this->concern();
+        $elsewhere = $this->concern(['site_id' => $this->otherSite->id]);
+
+        foreach (['provider_manager', 'auditor'] as $role) {
+            $user = $this->withRole($role);
+            $this->actingAs($user)->get("/safeguarding/{$elsewhere->id}")->assertOk();
+            $this->actingAs($user)->get('/safeguarding')->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->where('rows.total', 2));
+            $this->assertTrue($user->can('view', $elsewhere), $role);
+        }
+
+        $hr = $this->withRole('hr');
+        $this->actingAs($hr)->get("/safeguarding/{$elsewhere->id}")->assertNotFound();
+        $this->actingAs($hr)->get("/safeguarding/{$own->id}")->assertOk();
+        $this->actingAs($hr)->get('/safeguarding')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('rows.total', 1)->where('rows.data.0.id', $own->id));
+        $this->assertFalse($hr->can('view', $elsewhere));
+    }
+
+    public function test_every_site_view_still_keeps_the_named_person_and_sensitive_rules(): void
+    {
+        foreach (['provider_manager', 'auditor'] as $role) {
+            $user = $this->withRole($role);
+            $naming = $this->namingAsPerpetrator($user, ['site_id' => $this->otherSite->id]);
+            $this->actingAs($user)->get("/safeguarding/{$naming->id}")
+                ->assertForbidden()
+                ->assertSee(SafeguardingConcernPolicy::NAMED_PERSON_MESSAGE);
+            $this->assertFalse($user->can('view', $naming), $role);
+        }
+
+        // What a need-to-know concern says still needs sensitive access: provider managers hold it, auditors don't.
+        $sensitive = $this->concern(['site_id' => $this->otherSite->id, 'is_sensitive' => true]);
+        $policy = app(SafeguardingConcernPolicy::class);
+        $this->assertTrue($policy->viewDetail($this->withRole('provider_manager'), $sensitive));
+        $this->assertFalse($policy->viewDetail($this->withRole('auditor'), $sensitive));
+    }
+
+    public function test_the_migration_gives_the_key_to_admin_provider_managers_and_auditors(): void
     {
         $key = Permission::where('key', 'safeguarding.viewAllSites')->sole();
         DB::table('role_permission')->where('permission_id', $key->id)->delete();
@@ -232,11 +272,26 @@ final class SafeguardingNamedPersonReporterAndSiteTest extends TestCase
 
         $id = Permission::where('key', 'safeguarding.viewAllSites')->sole()->id;
         $holders = DB::table('role_permission')->join('roles', 'roles.id', '=', 'role_permission.role_id')
-            ->where('permission_id', $id)->pluck('roles.name')->all();
-        $this->assertSame(['admin'], $holders);
-        foreach (['provider_manager', 'hr', 'auditor'] as $role) {
-            $this->assertFalse(Role::where('name', $role)->sole()->permissions()->where('key', 'safeguarding.viewAllSites')->exists());
+            ->where('permission_id', $id)->orderBy('roles.name')->pluck('roles.name')->all();
+        $this->assertSame(['admin', 'auditor', 'provider_manager'], $holders);
+        $this->assertFalse(Role::where('name', 'hr')->sole()->permissions()->where('key', 'safeguarding.viewAllSites')->exists());
+
+        // The seeder agrees, so a reseed doesn't take it back.
+        $this->seed(RbacSeeder::class);
+        foreach (['admin', 'provider_manager', 'auditor'] as $role) {
+            $this->assertTrue(Role::where('name', $role)->sole()->permissions()->where('key', 'safeguarding.viewAllSites')->exists(), $role);
         }
+        $this->assertFalse(Role::where('name', 'hr')->sole()->permissions()->where('key', 'safeguarding.viewAllSites')->exists());
+    }
+
+    // A staff member at $this->site who holds only the given seeded role's keys.
+    private function withRole(string $role): User
+    {
+        $user = $this->staff([]);
+        $user->forceFill(['role' => $role])->save();
+        $user->roles()->attach(Role::where('name', $role)->sole()->id);
+
+        return $user->fresh();
     }
 
     private function attachment(SafeguardingConcern $concern, User $uploader)

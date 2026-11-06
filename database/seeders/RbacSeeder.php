@@ -768,6 +768,9 @@ class RbacSeeder extends Seeder
             'assets.trackers.manage', 'assets.telemetry.ingest', 'assets.telemetry.view', 'assets.telemetry.export',
             'assets.alerts.view', 'assets.alerts.manage', 'assets.scan.record', 'assets.geofences.manage',
             'safeguarding.viewAny', 'safeguarding.create', 'safeguarding.update',
+            // P6 (Stephan, 7 Nov 2026: "Keep their every-Site view"): every-Site safeguarding moved off reports.viewAny onto
+            // its own key; provider managers keep it. Grant migration 2026_11_06_110000.
+            'safeguarding.viewAllSites',
             'safeguarding.closeAny', 'safeguarding.terminalOverride',
             'safeguarding.investigate', 'safeguarding.report.external', 'safeguarding.viewSensitive',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
@@ -966,6 +969,9 @@ class RbacSeeder extends Seeder
             'respite.daily-notes.view', 'respite.risk-plans.view', 'family_portal.viewAny',
             'assets.telemetry.view', 'assets.alerts.view',
             'safeguarding.viewAny', 'consents.viewAny', 'procedures.view',
+            // P6 (Stephan, 7 Nov 2026: "Keep their every-Site view"): auditors keep every-Site safeguarding on its own key
+            // now that reports.viewAny no longer opens it. Grant migration 2026_11_06_110000.
+            'safeguarding.viewAllSites',
             'staff.vetting.view',
             'privacy.viewRequests', 'hr.employees.viewAny', 'hr.employees.viewAllSites', 'hr.compliance.view',
             'hr.training.view', 'hr.vetting.view', 'hr.performance.view',

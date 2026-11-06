@@ -10,9 +10,10 @@ use Illuminate\Support\Facades\Schema;
  * Site's concerns. Now every-Site safeguarding needs its own key, safeguarding.viewAllSites. Everyone else sees
  * concerns at their own Sites (their HR profile Sites) only.
  *
- * Granted to admin only, which already saw every Site. Who loses every-Site safeguarding (they keep their own Sites):
- * provider_manager, hr and auditor, plus anyone given reports.viewAny directly. Give the key in Settings › Roles or to
- * a named person if someone needs every Site.
+ * Granted to admin, provider_manager and auditor, which already saw every Site (Stephan, 7 Nov 2026, for provider
+ * managers and auditors: "Keep their every-Site view"). Who loses every-Site safeguarding (they keep their own Sites):
+ * hr, plus anyone given reports.viewAny directly. Give the key in Settings › Roles or to a named person if someone
+ * needs every Site.
  *
  * Deploys don't run seeders, so this creates the key RbacSeeder seeds.
  */
@@ -21,6 +22,8 @@ return new class extends Migration
     private const KEY = 'safeguarding.viewAllSites';
 
     private const DESCRIPTION = 'See safeguarding concerns at every Site, when paired with safeguarding access';
+
+    private const ROLES = ['admin', 'provider_manager', 'auditor'];
 
     public function up(): void
     {
@@ -39,9 +42,11 @@ return new class extends Migration
                 'updated_at' => $now,
             ]);
             $permissionId = DB::table('permissions')->where('key', self::KEY)->value('id');
-            $adminId = DB::table('roles')->where('name', 'admin')->value('id');
-            if ($permissionId !== null && $adminId !== null) {
-                DB::table('role_permission')->insertOrIgnore(['role_id' => $adminId, 'permission_id' => $permissionId]);
+            if ($permissionId === null) {
+                return;
+            }
+            foreach (DB::table('roles')->whereIn('name', self::ROLES)->pluck('id') as $roleId) {
+                DB::table('role_permission')->insertOrIgnore(['role_id' => $roleId, 'permission_id' => $permissionId]);
             }
         });
     }
