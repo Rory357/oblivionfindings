@@ -41,7 +41,7 @@ it('shows no banner when nothing was refused', () => {
 });
 
 it('shows an unlogged-referral refusal in plain words', () => {
-    state.errors = { override_reason: 'Open work or an unlogged referral remains — record why you are closing anyway.' };
+    state.errors = { override_reason: 'Some safeguarding work is still open, or a referral isn’t logged yet. Say why you’re closing anyway.' };
     open();
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('The concern wasn’t triaged');
@@ -66,8 +66,8 @@ it('shows any other refusal or unmapped field error word for word, never silentl
 it('leaves field errors beside their own field and lists each refusal once', () => {
     expect(triageRefusals({ notes: 'Record why no further action is required.', substantiation: 'Pick one.' })).toEqual([]);
     expect(triageRefusals({
-        override_reason: 'Open work or an unlogged referral remains — record why you are closing anyway.',
-        triage: 'An override reason alone cannot authorise closure with open safeguarding work.',
+        override_reason: 'Some safeguarding work is still open, or a referral isn’t logged yet. Say why you’re closing anyway.',
+        triage: 'A reason alone can’t close a concern with open safeguarding work. Closing with open work needs its own permission.',
     })).toHaveLength(1);
 });
 

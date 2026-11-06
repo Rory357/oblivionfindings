@@ -458,12 +458,12 @@ final class SafeguardingTerminalTransitionService
         $hasUpdatePermission = $actor->canDo('safeguarding.update');
         $isAssignedOwner = (int) $concern->assigned_to_user_id === (int) $actor->id;
         if (! $hasUpdatePermission && ! $isAssignedOwner) {
-            throw new AuthorizationException('This action is unauthorized.');
+            throw new AuthorizationException('You can’t triage or close this concern.');
         }
         if ($concern->assigned_to_user_id !== null
             && ! $isAssignedOwner
             && ! $actor->canDo(self::CLOSE_ANY_PERMISSION)) {
-            throw new AuthorizationException('Only the assigned safeguarding lead or an explicitly authorised safeguarding lead can close this concern.');
+            throw new AuthorizationException('Only its safeguarding lead, or someone allowed to close any concern, can close it.');
         }
 
         $this->assertCanonicalSiteTuple($aggregate);
@@ -557,17 +557,17 @@ final class SafeguardingTerminalTransitionService
         }
         if ($overrideReason === null) {
             throw ValidationException::withMessages([
-                'override_reason' => 'Open work or an unlogged referral remains — record why you are closing anyway.',
+                'override_reason' => 'Some safeguarding work is still open, or a referral isn’t logged yet. Say why you’re closing anyway.',
             ]);
         }
         if (! $actor->canDo(self::OVERRIDE_PERMISSION)) {
             throw ValidationException::withMessages([
-                'override_reason' => 'An override reason alone cannot authorise closure with open safeguarding work.',
+                'override_reason' => 'A reason alone can’t close a concern with open safeguarding work. Closing with open work needs its own permission.',
             ]);
         }
         if (mb_strlen($overrideReason) < 20) {
             throw ValidationException::withMessages([
-                'override_reason' => 'Record a specific override reason of at least 20 characters.',
+                'override_reason' => 'Say why you’re closing anyway, in at least 20 characters.',
             ]);
         }
 
@@ -705,7 +705,7 @@ final class SafeguardingTerminalTransitionService
         string $requestHash,
     ): void {
         if ($transition->target_status !== $targetStatus || ! hash_equals($transition->request_hash, $requestHash)) {
-            throw new DomainException('A different terminal transition request already owns this safeguarding concern.');
+            throw new DomainException('Someone else is triaging or closing this concern right now. Refresh the page to see where it’s up to.');
         }
     }
 

@@ -1538,11 +1538,11 @@ const TRIAGE_PATHS = [
 // error slot) goes in the refusal banner, so no refusal is ever silently lost.
 const TRIAGE_FIELD_ERRORS = new Set(['substantiation', 'initial_risk', 'path', 'notes']);
 
-// The server's refusals are in plain words (6 Nov 2026). Only the close flow's "record why you are closing anyway" is
+// The server's refusals are in plain words (6 Nov 2026). Only the close flow's "say why you're closing anyway" is
 // reworded here, because triage has no "close anyway": the work must be finished, or another path chosen.
 const TRIAGE_REFUSAL_WORDS: Array<[RegExp, string]> = [
     [
-        /unlogged referral|open safeguarding work|override reason/i,
+        /unlogged referral|referral isn.t logged|open safeguarding work|safeguarding work is still open|override reason|closing anyway/i,
         'An external referral is still to be logged, or other safeguarding work is still open. Log the referral or finish the open work first, or choose another path.',
     ],
 ];
