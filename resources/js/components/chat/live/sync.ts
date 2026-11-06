@@ -94,7 +94,7 @@ const browserEnvironment = (): SyncEnvironment => ({
 });
 
 export class ChatSync {
-    private readonly env: SyncEnvironment;
+    private environment: SyncEnvironment | null;
     private readonly watchers = new Set<Watcher>();
     private readonly subscribers = new Map<
         LiveEventType,
@@ -107,7 +107,13 @@ export class ChatSync {
     private current: SyncState = 'off';
 
     constructor(environment?: SyncEnvironment) {
-        this.env = environment ?? browserEnvironment();
+        this.environment = environment ?? null;
+    }
+
+    // Read the browser on first use, not at import: the server render imports
+    // this module for every page, and the server has no window.
+    private get env(): SyncEnvironment {
+        return (this.environment ??= browserEnvironment());
     }
 
     get state() {
