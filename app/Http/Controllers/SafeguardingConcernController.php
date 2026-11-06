@@ -61,19 +61,31 @@ class SafeguardingConcernController extends Controller
             'to' => $request->get('to') ?: null,
         ];
 
+        // P1 (readiness audit, 6 Nov 2026): a need-to-know concern this reader sees only as a locked shell must not be
+        // found by what it says — its category, its subject or its words. Only its reference matches, as on the row.
+        $openDetail = function ($q) use ($user, $canSensitive): void {
+            if ($canSensitive || $user->canDo('safeguarding.declassification.approve')) {
+                return;
+            }
+            $q->where(fn ($w) => $w->where('is_sensitive', false)->orWhereNull('is_sensitive')
+                ->orWhere('assigned_to_user_id', $user->id)->orWhere('reported_by_user_id', $user->id));
+        };
+
         // Footer filters applied to any concern query; tab scope is layered on top.
-        $applyFilters = function ($q) use ($filters) {
+        $applyFilters = function ($q) use ($filters, $openDetail) {
             if ($filters['severity']) {
                 $q->where('severity', $filters['severity']);
             }
             if ($filters['category']) {
                 $q->where('abuse_category', $filters['category']);
+                $openDetail($q);
             }
             if ($filters['site_id']) {
                 $q->where('site_id', $filters['site_id']);
             }
             if ($filters['subject_id']) {
                 $q->where('subject_type', Client::class)->where('subject_id', $filters['subject_id']);
+                $openDetail($q);
             }
             if ($filters['from']) {
                 $q->whereDate('reported_at', '>=', $filters['from']);
@@ -83,10 +95,13 @@ class SafeguardingConcernController extends Controller
             }
             if ($filters['q']) {
                 $term = $filters['q'];
-                $q->where(function ($w) use ($term) {
+                $q->where(function ($w) use ($term, $openDetail) {
                     $w->where('reference_number', 'like', "%{$term}%")
-                        ->orWhere('description', 'like', "%{$term}%")
-                        ->orWhere('subject_name', 'like', "%{$term}%");
+                        ->orWhere(function ($words) use ($term, $openDetail) {
+                            $words->where(fn ($text) => $text->where('description', 'like', "%{$term}%")
+                                ->orWhere('subject_name', 'like', "%{$term}%"));
+                            $openDetail($words);
+                        });
                 });
             }
         };

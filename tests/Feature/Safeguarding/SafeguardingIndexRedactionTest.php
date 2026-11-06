@@ -65,6 +65,29 @@ class SafeguardingIndexRedactionTest extends TestCase
             );
     }
 
+    public function test_search_and_filters_never_find_a_locked_concern_by_what_it_says(): void
+    {
+        // Readiness audit P1 (6 Nov 2026): searching a name, a word or a category must not reveal that a need-to-know
+        // concern exists. Its reference still matches, as it is on the row anyway.
+        $viewer = $this->userWith(['safeguarding.viewAny']);
+        $locked = SafeguardingConcern::factory()->create(['is_sensitive' => true, 'subject_name' => 'Hidden Kauri',
+            'description' => 'Private words about Hidden Kauri.', 'abuse_category' => 'financial', 'status' => 'reported']);
+        SafeguardingConcern::factory()->create(['is_sensitive' => false, 'subject_name' => 'Open Totara',
+            'description' => 'Open words.', 'abuse_category' => 'financial', 'status' => 'reported']);
+
+        foreach (['q=Hidden', 'q=Private+words', 'category=financial'] as $query) {
+            $this->actingAs($viewer)->get('/safeguarding?tab=all&'.$query)->assertOk()->assertInertia(fn ($page) => $page
+                ->where('rows.data', fn ($rows) => collect($rows)->pluck('id')->doesntContain($locked->id))
+                ->where('tabCounts.all', str_starts_with($query, 'category') ? 1 : 0));
+        }
+        $this->actingAs($viewer)->get('/safeguarding?tab=all&q='.$locked->reference_number)->assertOk()
+            ->assertInertia(fn ($page) => $page->where('rows.data.0.id', $locked->id)->where('rows.data.0.restricted', true));
+
+        $cleared = $this->userWith(['safeguarding.viewAny', 'safeguarding.viewSensitive']);
+        $this->actingAs($cleared)->get('/safeguarding?tab=all&q=Hidden')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('rows.data.0.id', $locked->id));
+    }
+
     public function test_sensitive_concern_is_visible_to_cleared_viewer(): void
     {
         $viewer = $this->userWith(['safeguarding.viewAny', 'safeguarding.viewSensitive']);
