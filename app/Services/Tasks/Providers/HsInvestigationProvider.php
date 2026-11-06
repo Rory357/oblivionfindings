@@ -181,10 +181,12 @@ class HsInvestigationProvider implements ContextualHealthSafetyTaskProvider, Has
                     $includeSearchContext,
                     $context,
                 );
-                $client = $journey['person'] ?? ($event?->client ? [
+                // B1 (6 Nov 2026): no name on a task from a safeguarding or private exposure review (the review page names them to readers).
+                $hidePerson = $event !== null && \App\Services\HealthSafety\HsPrivateSourcePerson::isPrivateSource($event);
+                $client = $hidePerson ? null : ($journey['person'] ?? ($event?->client ? [
                     'id' => $event->client->id,
                     'name' => trim($event->client->first_name.' '.$event->client->last_name),
-                ] : null);
+                ] : null));
                 $site = $journey['site'] ?? ($event?->site ? [
                     'id' => $event->site->id,
                     'name' => $event->site->name,

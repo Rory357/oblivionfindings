@@ -152,8 +152,11 @@ class HsEventController extends Controller
             ? collect()
             : SiteInspectionRecord::whereIn('id', $inspectionIds)->pluck('site_id', 'id');
 
-        $events = $paginator->through(function (HsEvent $e) use ($request, $exposureMap, $inspectionMap) {
+        // B1 (6 Nov 2026): safeguarding and private exposure reviews name the person only to people who can open the source.
+        $privatePerson = app(\App\Services\HealthSafety\HsPrivateSourcePerson::class);
+        $events = $paginator->through(function (HsEvent $e) use ($request, $exposureMap, $inspectionMap, $privatePerson) {
             $source = $this->resolveSource($e->source_type, $e->source_id, $request->user(), $exposureMap, $inspectionMap, $e);
+            $hidePerson = $privatePerson->hides($e, $request->user());
 
             return [
                 'id' => $e->id,
@@ -164,8 +167,8 @@ class HsEventController extends Controller
                 'occurred_at' => $e->occurred_at?->toIso8601String(),
                 'reported_at' => $e->reported_at?->toIso8601String(),
                 'site_name' => $e->site?->name,
-                'client_name' => $e->client && (! app(FirstAidSourceProjectionService::class)->isFirstAidSource($e->source_type) || $source !== null) ? trim($e->client->first_name.' '.$e->client->last_name) : null,
-                'staff_name' => $e->staff?->name,
+                'client_name' => ! $hidePerson && $e->client && (! app(FirstAidSourceProjectionService::class)->isFirstAidSource($e->source_type) || $source !== null) ? trim($e->client->first_name.' '.$e->client->last_name) : null,
+                'staff_name' => $hidePerson ? null : $e->staff?->name,
                 'worksafe_notifiable' => $e->worksafe_notifiable,
                 'worksafe_status' => $e->worksafe_status,
                 'worksafe_decision_signed' => $e->hasSignedWorksafeDecision(),
@@ -1076,8 +1079,8 @@ class HsEventController extends Controller
         $basename = class_basename((string) $event->source_type);
         $readable = match (true) {
             $basename === 'ClientIncident' => $readableIncident !== null,
-            $basename === 'SubstanceExposureRecord' => app(\App\Services\HealthSafety\ChemicalExposureAccessService::class)->canRead($viewer),
-            $basename === 'SafeguardingConcern' => ($concern = SafeguardingConcern::query()->find($event->source_id)) !== null && $viewer->can('view', $concern),
+            $basename === 'SubstanceExposureRecord', $basename === 'SafeguardingConcern'
+                => ! app(\App\Services\HealthSafety\HsPrivateSourcePerson::class)->hides($event, $viewer),
             default => $source !== null,
         };
         $client = $event->client ? trim($event->client->first_name.' '.$event->client->last_name) : null;
@@ -1126,7 +1129,9 @@ class HsEventController extends Controller
             ...SafeWorkProcedureAccessService::PERMISSIONS, ...EmergencyDrillAccessService::PERMISSIONS,
             'healthSafety.events.close', 'healthSafety.closureExceptions.request', 'healthSafety.closureExceptions.approve',
             // K1a (B1.5): the close answer checks "close any"; B7's title checks wellbeing access for exposures.
-            'healthSafety.events.closeAny', 'hr.wellbeing.view'];
+            'healthSafety.events.closeAny', 'hr.wellbeing.view',
+            // B1 (6 Nov 2026): whether a safeguarding review may name its person follows the concern's own read.
+            'safeguarding.viewAny', 'safeguarding.viewSensitive', 'safeguarding.declassification.approve', 'reports.viewAny'];
     }
 
     /**
@@ -1537,6 +1542,7 @@ class HsEventController extends Controller
             ->values()
             ->all();
 
+        $hidePerson = app(\App\Services\HealthSafety\HsPrivateSourcePerson::class)->hides($hsEvent, $currentUser);
         $detail = [
             'id' => $hsEvent->id,
             'reference_number' => $hsEvent->reference_number,
@@ -1549,8 +1555,8 @@ class HsEventController extends Controller
             'reported_at' => $hsEvent->reported_at?->toIso8601String(),
             'description' => $readableIncident?->description,
             'site' => $hsEvent->site ? ['id' => $hsEvent->site->id, 'name' => $hsEvent->site->name] : null,
-            'client' => $hsEvent->client && (! app(FirstAidSourceProjectionService::class)->isFirstAidSource($hsEvent->source_type) || $source !== null) ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name.' '.$hsEvent->client->last_name)] : null,
-            'staff' => $hsEvent->staff ? ['id' => $hsEvent->staff->id, 'name' => $hsEvent->staff->name] : null,
+            'client' => ! $hidePerson && $hsEvent->client && (! app(FirstAidSourceProjectionService::class)->isFirstAidSource($hsEvent->source_type) || $source !== null) ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name.' '.$hsEvent->client->last_name)] : null,
+            'staff' => ! $hidePerson && $hsEvent->staff ? ['id' => $hsEvent->staff->id, 'name' => $hsEvent->staff->name] : null,
             'asset' => $hsEvent->asset ? ['id' => $hsEvent->asset->id, 'name' => $hsEvent->asset->name] : null,
             'worksafe' => [
                 'notifiable' => $hsEvent->worksafe_notifiable,
@@ -1613,7 +1619,7 @@ class HsEventController extends Controller
             ),
             'closed_at' => $hsEvent->closed_at?->toIso8601String(),
             'closure_summary' => $hsEvent->closure_summary,
-            'created_by_name' => $hsEvent->creator?->name,
+            'created_by_name' => $hidePerson ? null : $hsEvent->creator?->name,
             'source' => $source,
             'handover' => [
                 'status' => $hsEvent->handover_status,

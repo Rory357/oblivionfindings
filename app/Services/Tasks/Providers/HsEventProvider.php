@@ -169,10 +169,13 @@ class HsEventProvider implements ContextualHealthSafetyTaskProvider, HasModelCla
                     $includeSearchContext,
                     $context,
                 );
-                $client = $journey['person'] ?? ($event->client ? [
+                // B1 (6 Nov 2026): a safeguarding or private exposure card names no one here, as its title already says only kind
+                // and Site; the review page names the person to people who can open the source.
+                $hidePerson = \App\Services\HealthSafety\HsPrivateSourcePerson::isPrivateSource($event);
+                $client = $hidePerson ? null : ($journey['person'] ?? ($event->client ? [
                     'id' => $event->client->id,
                     'name' => trim($event->client->first_name.' '.$event->client->last_name),
-                ] : null);
+                ] : null));
                 $site = $journey['site'] ?? ($event->site ? [
                     'id' => $event->site->id,
                     'name' => $event->site->name,

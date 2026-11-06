@@ -51,6 +51,15 @@ class SafeguardingConcernPolicy
     }
 
     /**
+     * Whether the user may see what the concern says, not only that it exists: view() plus the need-to-know rule the
+     * concern page uses for its locked shell. Attachments, and the person named on its H&S safety review, follow this.
+     */
+    public function viewDetail(User $user, SafeguardingConcern $concern): bool
+    {
+        return $this->view($user, $concern) && $this->canAccessSensitiveConcern($user, $concern);
+    }
+
+    /**
      * Determine if the user can create safeguarding concerns.
      */
     public function create(User $user): bool

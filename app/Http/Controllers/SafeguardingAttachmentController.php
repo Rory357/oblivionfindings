@@ -52,7 +52,8 @@ class SafeguardingAttachmentController extends Controller
     {
         $actualConcern = $attachment->concern()->firstOrFail();
         abort_unless($actualConcern->is($concern), 404);
-        $this->authorize('view', $actualConcern);
+        // A need-to-know concern's files follow its page: someone who sees only its locked shell gets none of them.
+        $this->authorize('viewDetail', $actualConcern);
 
         // Sensitive evidence is need-to-know.
         if ($attachment->is_sensitive) {
