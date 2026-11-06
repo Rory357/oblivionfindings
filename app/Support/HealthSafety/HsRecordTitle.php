@@ -47,7 +47,12 @@ final class HsRecordTitle
         $words = self::INJURY_WORDS[$type] ?? 'Injury';
         $body = trim(preg_replace('/\s+/u', ' ', (string) $bodyPart) ?? '');
         if ($body !== '' && in_array($type, self::WITH_BODY_PART, true)) {
-            return $words.' '.mb_strtolower(mb_substr($body, 0, 1)).mb_substr($body, 1);
+            // "Left wrist" reads "Strain left wrist", but a word typed with capitals after its first letter (an acronym
+            // like "ACL", or "AUDIT TEST") is kept as typed (readiness audit F3, 6 Nov 2026).
+            $first = (string) preg_split('/\s/u', $body)[0];
+            $keep = mb_strlen($first) > 1 && mb_substr($first, 1) !== mb_strtolower(mb_substr($first, 1));
+
+            return $words.' '.($keep ? $body : mb_strtolower(mb_substr($body, 0, 1)).mb_substr($body, 1));
         }
 
         return $words;

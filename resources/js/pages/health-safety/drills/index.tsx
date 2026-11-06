@@ -136,9 +136,9 @@ const PERIODS = [
 
 /** "Thu 12 Nov" — a drill's day on the worker's NZ calendar ("Due 14 Jul" while it's overdue). */
 function drillDay(iso: string): string {
-    const day = toDateInput(iso);
-    const weekday = new Date(`${day}T00:00:00Z`).toLocaleDateString('en-NZ', { weekday: 'short', timeZone: 'UTC' });
-    return `${weekday} ${formatDate(iso)}`;
+    // formatDate already starts with the weekday on the NZ calendar ("Thu 12 Nov"); adding another one read "Thu Thu
+    // 12 Nov" (readiness audit F4, 6 Nov 2026).
+    return formatDate(iso);
 }
 
 /** The lead block's rows (G4-12): overdue planned drills and overdue things to fix, oldest due date first. */
