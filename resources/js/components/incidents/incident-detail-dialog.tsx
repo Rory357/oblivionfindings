@@ -111,6 +111,8 @@ export type IncidentDetail = {
     description: string | null;
     immediate_action_taken: string | null;
     witnesses: string | null;
+    // P4: true when this is a safeguarding incident whose words, witnesses and files the viewer may not see.
+    content_restricted?: boolean;
     is_notifiable: boolean | null;
     worksafe_notification_status: string | null;
     worksafe_notified_at: string | null;
@@ -418,7 +420,7 @@ export function IncidentDetailDialog({
                 >
                     <ExternalLink className="h-4 w-4" /> Open full page
                 </Link>
-                {d.can.update && d.status === 'draft' ? (
+                {d.can.update && d.status === 'draft' && !d.content_restricted ? (
                     <Button
                         size="sm"
                         variant="outline"
@@ -1627,7 +1629,7 @@ export function TimelineSection({ d }: { d: IncidentDetail }) {
 
 export function PhotosSection({ d }: { d: IncidentDetail }) {
     // Attachments are only mutable while the incident is a draft (server guardrail).
-    const canEdit = d.status === 'draft' && d.can.update;
+    const canEdit = d.status === 'draft' && d.can.update && !d.content_restricted;
     const canPortal = d.can.portalManage;
     const [removing, setRemoving] = useState<
         IncidentDetail['attachments'][number] | null

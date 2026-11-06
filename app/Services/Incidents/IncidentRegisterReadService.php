@@ -28,6 +28,8 @@ final class IncidentRegisterReadService
         'incidents.create', 'incidents.followups.manage', 'incidents.followups.complete', 'incidents.templates.manage',
         'incidents.portal.manage', 'incidents.update', 'incidents.submit', 'incidents.approve', 'incidents.reopen',
         'safeguarding.create', 'safeguarding.viewAny', 'clients.viewAny', 'clients.viewAssigned',
+        // P4: deciding whether a safeguarding incident's words show reads the safeguarding concern rules.
+        'safeguarding.viewSensitive', 'safeguarding.declassification.approve', 'safeguarding.viewAllSites',
         'reports.viewAny', 'hazards.view', 'hazards.manage', 'compliance.view',
         'controlRoom.viewAny', 'controlRoom.alerts.view', 'controlRoom.alerts.manage', 'controlRoom.alerts.assign',
         'controlRoom.alerts.escalate', 'controlRoom.alerts.create', 'medications.controlled.view',
@@ -146,9 +148,13 @@ final class IncidentRegisterReadService
                 ->tap(fn (Builder $query) => app(IncidentAccessService::class)->apply($query, $user, $reads))
                 ->when($q !== '', function ($query) use ($q) {
                     $term = '%'.$q.'%';
-                    $query->where(fn ($sub) => $sub->where('description', 'like', $term)
-                        ->orWhere('type', 'like', $term)
-                        ->orWhere('title', 'like', $term));
+                    // P4: a safeguarding incident's words are never searched; its type still is.
+                    $query->where(fn ($sub) => $sub->where(fn ($words) => $words
+                        ->where(fn ($text) => $text->where('description', 'like', $term)->orWhere('title', 'like', $term))
+                        ->where(fn ($kind) => $kind->where('type', '!=', 'safeguarding')->orWhereNull('type'))
+                        ->whereNotExists(fn ($linked) => $linked->selectRaw('1')->from('safeguarding_concerns')
+                            ->whereColumn('safeguarding_concerns.related_incident_id', 'client_incidents.id')))
+                        ->orWhere('type', 'like', $term));
                 })
                 ->when($severity, fn ($query) => $query->where('severity', $severity))
                 ->when($clientId, fn ($query) => $query->where('client_id', $clientId))
@@ -247,6 +253,8 @@ final class IncidentRegisterReadService
                 ]);
             $rowsKind = 'followups';
         } else {
+            // P4: one instance, so each row's linked-concern check is remembered.
+            $sgContent = app(IncidentSafeguardingContent::class);
             $rows = $applyTab((clone $base), $tab)
                 ->with($this->currentRelations([
                     'client:id,first_name,last_name,site_id',
@@ -264,7 +272,7 @@ final class IncidentRegisterReadService
                 ->orderByDesc('id')
                 ->paginate(50, ['*'], 'page', max(1, (int) $request->query('page', 1)))
                 ->withQueryString()
-                ->through(function (ClientIncident $incident) use ($user, $reads): array {
+                ->through(function (ClientIncident $incident) use ($user, $reads, $sgContent): array {
                     $directEvent = $incident->hsEvent;
                     $event = $directEvent !== null
                         && $this->journeys->hsEventIsCanonicalForIncident($incident, $directEvent)
@@ -278,7 +286,8 @@ final class IncidentRegisterReadService
                         'ownership' => $this->owners->summaryInCurrentReads($user, $incident, $reads),
                         'occurred_at' => $incident->occurred_at,
                         'type' => $incident->type,
-                        'description' => $incident->description,
+                        'description' => $sgContent->restricted($user, $incident) && filled($incident->description)
+                            ? $sgContent::RESTRICTED : $incident->description,
                         'severity' => $incident->severity,
                         'status' => $incident->status,
                         'source' => $incident->source,

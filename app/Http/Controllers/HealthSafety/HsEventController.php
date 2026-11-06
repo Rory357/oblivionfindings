@@ -1331,6 +1331,11 @@ class HsEventController extends Controller
         $sourceIncident = $incidentSource['incident'];
         $canOpenIncident = $sourceIncident !== null;
         $readableIncident = $sourceIncident;
+        // P4 (Stephan, 6 Nov 2026: "Safeguarding access only"): a safeguarding incident's words, witnesses and files
+        // read "Restricted" here for anyone without safeguarding access to it.
+        $sgIncidentHidden = $sourceIncident !== null
+            && app(\App\Services\Incidents\IncidentSafeguardingContent::class)->restricted($currentUser, $sourceIncident);
+        $sgText = fn ($value) => $sgIncidentHidden && filled($value) ? \App\Services\Incidents\IncidentSafeguardingContent::RESTRICTED : $value;
         if ($source !== null && $sourceIncident !== null) {
             if ($canOpenIncident && $sourceIncident->reference_number) {
                 $source['label'] = 'Incident '.$sourceIncident->reference_number;
@@ -1340,7 +1345,7 @@ class HsEventController extends Controller
             }
         }
         $alert = $this->detailControlRoomAlertInContext($hsEvent, $sourceIncident, $incidentSource['parent'], $currentUser, $context);
-        $handoverAttachments = $readableIncident?->attachments->map(fn (ClientIncidentAttachment $attachment) => [
+        $handoverAttachments = ($sgIncidentHidden ? null : $readableIncident)?->attachments->map(fn (ClientIncidentAttachment $attachment) => [
             'id' => $attachment->id,
             'name' => $attachment->original_name,
             'mime' => $attachment->mime ?? $attachment->mime_type,
@@ -1553,7 +1558,7 @@ class HsEventController extends Controller
             'status' => $hsEvent->status,
             'occurred_at' => $hsEvent->occurred_at?->toIso8601String(),
             'reported_at' => $hsEvent->reported_at?->toIso8601String(),
-            'description' => $readableIncident?->description,
+            'description' => $sgText($readableIncident?->description),
             'site' => $hsEvent->site ? ['id' => $hsEvent->site->id, 'name' => $hsEvent->site->name] : null,
             'client' => ! $hidePerson && $hsEvent->client && (! app(FirstAidSourceProjectionService::class)->isFirstAidSource($hsEvent->source_type) || $source !== null) ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name.' '.$hsEvent->client->last_name)] : null,
             'staff' => ! $hidePerson && $hsEvent->staff ? ['id' => $hsEvent->staff->id, 'name' => $hsEvent->staff->name] : null,
@@ -1643,10 +1648,10 @@ class HsEventController extends Controller
             'handover_summary' => [
                 'incident_reference' => $readableIncident?->reference_number,
                 'alert_reference' => $canOpenAlert ? $alert->reference_number : null,
-                'narrative' => $readableIncident?->description,
-                'immediate_controls' => $readableIncident?->immediate_action_taken
-                    ?? $readableIncident?->immediate_action,
-                'witnesses' => $readableIncident?->witnesses,
+                'narrative' => $sgText($readableIncident?->description),
+                'immediate_controls' => $sgText($readableIncident?->immediate_action_taken
+                    ?? $readableIncident?->immediate_action),
+                'witnesses' => $sgText($readableIncident?->witnesses),
                 'potential_consequence' => $readableIncident?->potential_consequence,
                 'reporter' => $readableIncident?->reporter?->name,
                 'source_label' => $source['label'] ?? null,
@@ -1788,7 +1793,10 @@ class HsEventController extends Controller
             : (int) ($event->clientIncident()->value('id') ?? 0);
 
         abort_unless($incidentId > 0 && (int) $attachment->incident_id === $incidentId, 404);
-        $this->authorize('view', ClientIncident::query()->findOrFail($incidentId));
+        $sourceIncident = ClientIncident::query()->findOrFail($incidentId);
+        $this->authorize('view', $sourceIncident);
+        // P4: a safeguarding incident's files open only for people with safeguarding access to it.
+        app(\App\Services\Incidents\IncidentSafeguardingContent::class)->assertCanSee($request->user(), $sourceIncident);
 
         return $this->streamPrivateAttachment(
             $attachment->disk,

@@ -30,6 +30,10 @@ class AuditExportController extends Controller
             ['sites.viewAll'],
         );
 
+        // P4 (Stephan, 6 Nov 2026: "Safeguarding access only"): a safeguarding incident's evidence pack (its words,
+        // files and change history) goes only to people with safeguarding access to it.
+        app(\App\Services\Incidents\IncidentSafeguardingContent::class)->assertCanSee($user, $incident);
+
         $incident->load(['client', 'reporter:id,name', 'attachments.uploader:id,name', 'followups.assignedTo:id,name', 'followups.creator:id,name']);
 
         $client = $incident->client;
@@ -111,22 +115,47 @@ class AuditExportController extends Controller
         app(MedicationGeneralAuditPrivacy::class)->nonMedication($auditQuery);
         $audit = $auditQuery->get();
 
+        // P4: a safeguarding incident this person can't open in full leaves out its words, files and change history.
+        $sgContent = app(\App\Services\Incidents\IncidentSafeguardingContent::class);
+        $sgContent->prime($incidents);
+        $hiddenIncidentIds = $incidents->filter(fn (ClientIncident $i) => $sgContent->restricted($user, $i))
+            ->map(fn (ClientIncident $i) => (int) $i->id)->values()->all();
+        $incidentRows = $incidents->map(function (ClientIncident $i) use ($hiddenIncidentIds, $sgContent, $user) {
+            $row = $i->toArray();
+            if (! in_array((int) $i->id, $hiddenIncidentIds, true)) {
+                return $row;
+            }
+            $row = $sgContent->mask($row, $user, $i, [...$sgContent::TEXT_FIELDS, 'immediate_response', 'review_notes']);
+            $row['attachments'] = [];
+
+            return $row;
+        })->values()->all();
+        $incidentMorph = (new ClientIncident)->getMorphClass();
+        $audit = $audit->reject(fn ($row) => in_array($row->auditable_type, [$incidentMorph, ClientIncident::class], true)
+            && in_array((int) $row->auditable_id, $hiddenIncidentIds, true))->values();
+
         $filename = 'audit_client_'.$client->id.'_'.now()->format('Ymd_His').'.zip';
 
-        return $this->buildZipAndDownload($filename, function (ZipArchive $zip, string $tmpDir) use ($client, $incidents, $audit) {
+        return $this->buildZipAndDownload($filename, function (ZipArchive $zip, string $tmpDir) use ($client, $incidents, $audit, $incidentRows, $hiddenIncidentIds) {
             $manifest = [
                 'generated_at' => now()->toIso8601String(),
                 'type' => 'client',
                 'client_id' => $client->id,
                 'client_name' => trim($client->first_name.' '.$client->last_name),
                 'medication_audit' => 'Not included. Medication audit is exported from eMAR › Reports › Audit trail, which records the purpose of each export.',
+                'safeguarding_incidents' => $hiddenIncidentIds === []
+                    ? 'All included.'
+                    : count($hiddenIncidentIds).' safeguarding incident(s) listed without their words, files or change history. Only people with safeguarding access see those.',
             ];
             $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT));
             $zip->addFromString('client.json', json_encode($client->toArray(), JSON_PRETTY_PRINT));
-            $zip->addFromString('incidents.json', json_encode($incidents->toArray(), JSON_PRETTY_PRINT));
+            $zip->addFromString('incidents.json', json_encode($incidentRows, JSON_PRETTY_PRINT));
             $zip->addFromString('audit_logs.json', json_encode($audit->toArray(), JSON_PRETTY_PRINT));
 
             foreach ($incidents as $incident) {
+                if (in_array((int) $incident->id, $hiddenIncidentIds, true)) {
+                    continue;
+                }
                 foreach ($incident->attachments as $a) {
                     $disk = $a->disk ?: 'public';
                     if (! $a->path) {

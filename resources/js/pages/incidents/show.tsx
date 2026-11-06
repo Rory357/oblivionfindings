@@ -309,7 +309,7 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                   : null;
     const responseActive = d.journey_state === 'Operational response active';
     const responseHref = responseActive ? d.control_room_alert?.url : null;
-    const canEditDraft = d.can.update && d.status === 'draft';
+    const canEditDraft = d.can.update && d.status === 'draft' && !d.content_restricted;
 
     // The Progress card's fixed next-step bar holds the page's only filled button; the header keeps the rest as
     // glass buttons, never offering the bar's action a second time.
@@ -723,6 +723,13 @@ function OverviewMain({
             {safeguardingEscalation(d) ? (
                 <Note tone="warning" icon={ShieldAlert}>
                     <SafeguardingEscalationText d={d} />
+                </Note>
+            ) : null}
+            {d.content_restricted ? (
+                <Note icon={ShieldAlert}>
+                    This is a safeguarding incident. What happened, what was
+                    done, who saw it and its files show only to people with
+                    safeguarding access.
                 </Note>
             ) : null}
             {worksafe.notifiable ? <WorksafeClock d={d} /> : null}

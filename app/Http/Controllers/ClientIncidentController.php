@@ -38,6 +38,20 @@ class ClientIncidentController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        // P4: a safeguarding incident's words show only to people with safeguarding access to it.
+        $sgContent = app(\App\Services\Incidents\IncidentSafeguardingContent::class);
+        $sgContent->prime($incidents);
+        foreach ($incidents as $row) {
+            if ($sgContent->restricted($user, $row)) {
+                foreach ($sgContent::TEXT_FIELDS as $field) {
+                    if (filled($row->getAttribute($field))) {
+                        $row->setAttribute($field, $sgContent::RESTRICTED);
+                    }
+                }
+                $row->setAttribute('immediate_response', []);
+            }
+        }
+
         $templates = IncidentTemplate::query()
             ->where('is_active', true)
             ->orderBy('name')
@@ -194,6 +208,7 @@ class ClientIncidentController extends Controller
 
         // require incident view perms
         $this->authorize('view', $incident);
+        app(\App\Services\Incidents\IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
 
         // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
         return $this->streamPrivateAttachment(

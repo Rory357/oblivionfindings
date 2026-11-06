@@ -112,15 +112,19 @@ final class IncidentJourneyTaskContext
             ->values()
             ->all();
 
-        $context['search_terms'] = array_values(array_filter([
-            ...($event?->investigations->pluck('reference_number')->all() ?? []),
-            ...($event?->correctiveActions->pluck('reference_number')->all() ?? []),
+        // P4: a safeguarding incident's own words never become /tasks search words, for anyone.
+        $ownWords = app(\App\Services\Incidents\IncidentSafeguardingContent::class)->isSafeguarding($incident) ? [] : [
             $incident->title,
             $incident->description,
             $incident->immediate_action_taken,
             $incident->immediate_action,
             $incident->witnesses,
             $incident->potential_consequence,
+        ];
+        $context['search_terms'] = array_values(array_filter([
+            ...($event?->investigations->pluck('reference_number')->all() ?? []),
+            ...($event?->correctiveActions->pluck('reference_number')->all() ?? []),
+            ...$ownWords,
             ...$sourceTaskTerms,
             ...$ownerTerms,
         ], fn ($term) => is_string($term) && filled($term)));

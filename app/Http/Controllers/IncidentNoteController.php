@@ -23,6 +23,8 @@ class IncidentNoteController extends Controller
     public function store(Request $request, ClientIncident $incident): RedirectResponse
     {
         $this->authorize('view', $incident);
+        // P4: a note sits beside the incident's words, so someone who sees "Restricted" can't add one.
+        app(\App\Services\Incidents\IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
         $data = $request->validate([
             'field' => ['required', Rule::in(ClientIncidentNote::FIELDS)],
             'note' => ['required', 'string', 'min:5', 'max:2000'],

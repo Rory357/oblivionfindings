@@ -28,6 +28,7 @@ use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\Incidents\IncidentAccessService;
 use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use App\Services\Incidents\IncidentClosureService;
+use App\Services\Incidents\IncidentSafeguardingContent;
 use App\Services\Incidents\IncidentEvidenceReadService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
@@ -342,7 +343,16 @@ class IncidentController extends Controller
             ])
             ->values()
             ->all();
+        // P4 (Stephan, 6 Nov 2026: "Safeguarding access only"): a safeguarding incident's words, notes on them and
+        // files show only to people with safeguarding access to it. Everyone else sees "Restricted".
+        $sgContent = app(IncidentSafeguardingContent::class);
+        $sgHidden = $sgContent->restricted($user, $incident);
+        $sgText = fn ($value) => $sgHidden && filled($value) ? $sgContent::RESTRICTED : $value;
+        if ($sgHidden) {
+            $reportNotes = [];
+        }
         $canAddNote = $user->canDo('incidents.approve')
+            && ! $sgHidden
             && ! in_array($incident->status, [null, '', 'draft'], true);
 
         return [
@@ -355,11 +365,12 @@ class IncidentController extends Controller
             'severity' => $incident->severity,
             'status' => $incident->status,
             'occurred_at' => $incident->occurred_at,
-            'description' => $incident->description,
-            'immediate_action_taken' => $incident->immediate_action_taken,
+            'description' => $sgText($incident->description),
+            'immediate_action_taken' => $sgText($incident->immediate_action_taken),
             // Decision 18: the reporter's timed ticks, shown under "Done straight away" on the incident page.
-            'immediate_response' => array_values((array) ($incident->immediate_response ?? [])),
-            'witnesses' => $incident->witnesses,
+            'immediate_response' => $sgHidden ? [] : array_values((array) ($incident->immediate_response ?? [])),
+            'witnesses' => $sgText($incident->witnesses),
+            'content_restricted' => $sgHidden,
             'is_notifiable' => $journeyRepairRequired || ($hsEvent && ! $canOpenHsEvent)
                 ? null
                 : ($hsEvent
@@ -403,7 +414,7 @@ class IncidentController extends Controller
             ] : null,
             'reporter' => $incident->reporter ? ['name' => $incident->reporter->name, 'email' => $incident->reporter->email] : null,
             'investigator' => $incident->investigator?->name,
-            'attachments' => $incident->attachments->map(fn (ClientIncidentAttachment $att) => [
+            'attachments' => ($sgHidden ? collect() : $incident->attachments)->map(fn (ClientIncidentAttachment $att) => [
                 'id' => $att->id,
                 'name' => $att->original_name,
                 'mime' => $att->mime ?? $att->mime_type,
@@ -1359,6 +1370,10 @@ class IncidentController extends Controller
     {
         $this->authorize('update', $incident);
         $this->ensureSafeIncidentPreviousUrl($request, url("/incidents/{$incident->id}"));
+        // P4: someone who sees "Restricted" can't change the words underneath it.
+        if ($request->hasAny([...IncidentSafeguardingContent::TEXT_FIELDS, 'immediate_response'])) {
+            app(IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
+        }
 
         $user = $request->user();
 
@@ -1458,6 +1473,7 @@ class IncidentController extends Controller
         abort_unless($request->user()?->canDo('incidents.portal.manage'), 403);
 
         abort_unless((int) $attachment->incident_id === (int) $incident->id, 404);
+        app(IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
 
         $data = $request->validate([
             'portal_visible' => ['required', 'boolean'],
@@ -1807,6 +1823,7 @@ class IncidentController extends Controller
     public function uploadAttachment(Request $request, ClientIncident $incident)
     {
         $this->authorize('update', $incident);
+        app(IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
 
         // Audit guardrail: attachments are only mutable while the incident is in draft.
         abort_unless($incident->status === 'draft', 403);
@@ -1840,6 +1857,7 @@ class IncidentController extends Controller
     public function removeAttachment(Request $request, ClientIncident $incident, ClientIncidentAttachment $attachment)
     {
         $this->authorize('update', $incident);
+        app(IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
 
         // Audit guardrail: attachments are only mutable while the incident is in draft.
         abort_unless($incident->status === 'draft', 403);

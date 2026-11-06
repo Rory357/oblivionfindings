@@ -1671,7 +1671,8 @@ class MyTasksController extends Controller
                             break;
                         }
                     }
-                    if ($description === null && $incident?->description) {
+                    // P4: never a safeguarding incident's own words.
+                    if ($description === null && $incident?->description && ! app(\App\Services\Incidents\IncidentSafeguardingContent::class)->isSafeguarding($incident)) {
                         $description = Str::limit(trim((string) $incident->description), 140);
                     }
 
