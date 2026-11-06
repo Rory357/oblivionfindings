@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\RoleNotificationPreference;
 use App\Models\NotificationEscalationRule;
 use App\Models\Timesheet;
@@ -19,6 +20,10 @@ use Illuminate\Support\Str;
 class NotificationService
 {
     protected static array $escalationRuleCache = [];
+
+    /** Incident notices that name the client: sent only to people who can open the incident (readiness audit B2). */
+    public const CLIENT_INCIDENT_SCOPED_EVENTS = ['incidents.submitted', 'incidents.high_severity_alert', 'incidents.high_unreviewed_reminder'];
+
     /**
      * Roles that should generally be kept in-the-loop for operational changes.
      * Portal roles (client/next_of_kin) are intentionally excluded from these
@@ -88,13 +93,18 @@ class NotificationService
         $extra = $this->applyRoutingDefaults($extra);
 
         $recipientScope = [
-            'recipient_scope' => $extra['data']['recipient_scope'] ?? (in_array($entityLabel, [
-                'medical profile', 'condition', 'emergency contact',
-            ], true) ? 'client_medical' : null),
+            'recipient_scope' => $extra['data']['recipient_scope'] ?? match (true) {
+                in_array($entityLabel, ['medical profile', 'condition', 'emergency contact'], true) => 'client_medical',
+                // Readiness audit B2 (6 Nov 2026): incident notices name the client and severity, so they go only to
+                // people who can open that incident (its Site, HR-confidential rule and the rest), never org-wide.
+                in_array($eventKey, self::CLIENT_INCIDENT_SCOPED_EVENTS, true) && $entity instanceof ClientIncident => 'client_incident',
+                default => null,
+            },
             'entity' => $entityLabel,
             'client_id' => $client?->id ?? ($entity?->client_id ?? null),
             'task_source' => $extra['data']['task_source'] ?? null,
             'task_id' => $extra['data']['task_id'] ?? null,
+            'entity_id' => $entity?->getKey(),
         ];
         $recipients = $this->filterRecipientScope(
             $this->resolveRecipients($actor, $entity, $client, $extra),
@@ -228,6 +238,14 @@ class NotificationService
         }
         if ($scope === 'referral_task') {
             return app(\App\Domain\Referrals\Services\ReferralTaskNotifications::class)->recipients($recipients, $payload);
+        }
+        if ($scope === 'client_incident') {
+            // Re-read the incident each time, so a delayed reminder follows today's Site and access, not the writer's.
+            $incident = is_numeric($payload['entity_id'] ?? null) ? ClientIncident::query()->find((int) $payload['entity_id']) : null;
+
+            return $incident === null ? collect() : $recipients
+                ->filter(fn (User $recipient): bool => app(\App\Services\Incidents\IncidentAccessService::class)->canView($recipient, $incident))
+                ->values();
         }
         if ($scope !== 'client_medical' || ! is_numeric($payload['client_id'] ?? null)) {
             return collect();
