@@ -4,6 +4,7 @@ import {
 } from '@/components/clinical/actual-event-time-field';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
@@ -1111,41 +1112,70 @@ function StaffMultiSelect({
     value: number[];
     onChange: (v: number[]) => void;
 }) {
+    // O6 (readiness audit, 6 Nov 2026): at real staff numbers the list needs a search; who is chosen stays at the top.
+    const [query, setQuery] = useState('');
     const toggle = (id: number) =>
         onChange(
             value.includes(id) ? value.filter((x) => x !== id) : [...value, id],
         );
     if (options.length === 0)
         return (
-            <p className="text-sm text-muted-foreground">No staff available.</p>
+            <p className="text-sm text-muted-foreground">
+                No staff are listed at this Site. Ask HR to add this Site to the
+                staff profiles of the people there.
+            </p>
         );
+    const needle = query.trim().toLowerCase();
+    const shown = [
+        ...options.filter((o) => value.includes(Number(o.value))),
+        ...options.filter(
+            (o) =>
+                !value.includes(Number(o.value)) &&
+                (needle === '' || o.label.toLowerCase().includes(needle)),
+        ),
+    ];
     return (
-        <GuardrailCard
-            unstyled
-            className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-border bg-card/50 p-2"
-        >
-            {options.map((o) => {
-                const id = Number(o.value);
-                const active = value.includes(id);
-                return (
-                    <Button
-                        unstyled
-                        key={o.value}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => toggle(id)}
-                        className={cn(
-                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
-                            active
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border bg-card text-foreground hover:border-primary/50',
-                        )}
-                    >
-                        {active ? <CheckCircle2 className="h-3 w-3" /> : null}
-                        {o.label}
-                    </Button>
-                );
-            })}
-        </GuardrailCard>
+        <div className="space-y-2">
+            <Input
+                aria-label="Search staff"
+                placeholder="Search staff…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+            />
+            <GuardrailCard
+                unstyled
+                className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-border bg-card/50 p-2"
+            >
+                {shown.length === value.length && needle !== '' ? (
+                    <p className="px-1 py-1.5 text-sm text-muted-foreground">
+                        No one matches “{query.trim()}”.
+                    </p>
+                ) : null}
+                {shown.map((o) => {
+                    const id = Number(o.value);
+                    const active = value.includes(id);
+                    return (
+                        <Button
+                            unstyled
+                            key={o.value}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => toggle(id)}
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
+                                active
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border bg-card text-foreground hover:border-primary/50',
+                            )}
+                        >
+                            {active ? (
+                                <CheckCircle2 className="h-3 w-3" />
+                            ) : null}
+                            {o.label}
+                        </Button>
+                    );
+                })}
+            </GuardrailCard>
+        </div>
     );
 }

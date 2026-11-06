@@ -273,20 +273,37 @@ final class RestraintRegisterService
         $siteIds = $filters['site_id'] ? [$filters['site_id']] : $sites;
         $siteRows = $reads->query(Site::query())->active()->notArchived()->whereNull('archived_at')->whereKey($siteIds)->orderBy('name')->get()->map(fn ($s) => ['id' => (int) $s->id, 'name' => $s->name])->all();
         $people = $reviewers = $owners = [];
-        $reads->query($this->staff->currentUsersQuery())->orderBy('name')->orderBy('id')->chunk(200, function ($rows) use (&$people, &$reviewers, &$owners, $siteRows, $reads, $event, $current, $sites) {
+        // O6 (readiness audit, 6 Nov 2026): only staff whose HR profile names one of these Sites (or the restraint's own
+        // Site) can pass the per-person check below, so the rest are left out in SQL first; and each person is checked
+        // once, not once per Site (it was every staff member x every Site, thousands of queries at real numbers). The
+        // per-person proof itself is unchanged.
+        $candidateSites = array_values(array_unique(array_map('intval', [...array_column($siteRows, 'id'), ...($event ? [(int) $event->site_id] : [])])));
+        $staffQuery = $reads->query($this->staff->currentUsersQuery())->whereHas('hrEmployeeProfile', function ($profile) use ($candidateSites): void {
+            $profile->where(function ($at) use ($candidateSites): void {
+                $at->whereIn('primary_site_id', $candidateSites === [] ? [0] : $candidateSites);
+                foreach ($candidateSites as $siteId) {
+                    $at->orWhereJsonContains('secondary_site_ids', $siteId)->orWhereJsonContains('secondary_site_ids', (string) $siteId);
+                }
+            });
+        });
+        $staffQuery->orderBy('name')->orderBy('id')->chunk(200, function ($rows) use (&$people, &$reviewers, &$owners, $siteRows, $reads, $event, $current, $sites) {
+            if ($siteRows === []) {
+                return false;
+            }
             foreach ($rows as $row) {
                 foreach ($siteRows as $site) {
                     if ($this->allowed(fn () => $this->access->eligibleStaff((int) $row->id, $site['id'], $reads))) {
                         $people[(int) $row->id] = ['id' => (int) $row->id, 'name' => $row->name];
+                        break;
                     }
-                    if ($event && $this->allowed(fn () => $this->access->assertStaffId((int) $row->id, $current, $reads, $sites, 'review_owner', $event))) {
-                        $reviewers[(int) $row->id] = ['id' => (int) $row->id, 'name' => $row->name];
-                    }
-                    // Decision 4: a follow-up can go to anyone who could record its outcome here, including a support
-                    // worker with restraints.followups.own at this Site — the same test the save uses.
-                    if ($event && ! isset($owners[(int) $row->id]) && $this->allowed(fn () => $this->access->assertStaffId((int) $row->id, $current, $reads, $sites, 'followup_recipient', $event))) {
-                        $owners[(int) $row->id] = ['id' => (int) $row->id, 'name' => $row->name];
-                    }
+                }
+                if ($event && $this->allowed(fn () => $this->access->assertStaffId((int) $row->id, $current, $reads, $sites, 'review_owner', $event))) {
+                    $reviewers[(int) $row->id] = ['id' => (int) $row->id, 'name' => $row->name];
+                }
+                // Decision 4: a follow-up can go to anyone who could record its outcome here, including a support
+                // worker with restraints.followups.own at this Site — the same test the save uses.
+                if ($event && $this->allowed(fn () => $this->access->assertStaffId((int) $row->id, $current, $reads, $sites, 'followup_recipient', $event))) {
+                    $owners[(int) $row->id] = ['id' => (int) $row->id, 'name' => $row->name];
                 }
             }
         });
