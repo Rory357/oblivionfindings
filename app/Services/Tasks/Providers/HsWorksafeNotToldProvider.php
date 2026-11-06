@@ -59,7 +59,7 @@ final class HsWorksafeNotToldProvider extends HsEventProvider
             return $item;
         }
         $item->title = 'Tell WorkSafe';
-        $item->type = 'WorkSafe';
+        $item->type = 'Safety review';
         $item->displayState = 'WorkSafe not told';
         $item->severity = 'critical';
         $item->description = 'This safety review is a notifiable event and WorkSafe hasn’t been told yet. The law says as soon as possible.';

@@ -396,7 +396,12 @@ export function incidentStepPane(d: IncidentProgressDetail, step: IncidentStepKe
             {
                 key: 'files',
                 label: 'Files',
-                value: d.attachments.length ? plural(d.attachments.length, 'file') : 'No files',
+                // P4: a safeguarding incident's files are hidden, not missing.
+                value: d.content_restricted
+                    ? 'Restricted'
+                    : d.attachments.length
+                      ? plural(d.attachments.length, 'file')
+                      : 'No files',
             },
         ];
         const files = d.attachments.length;
