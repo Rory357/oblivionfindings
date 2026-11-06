@@ -1140,7 +1140,9 @@ class RbacSeeder extends Seeder
         ];
         // Provider managers act on H&S items at their sites (Stephan, Q4, 31 Oct 2026), so their hazards keys never copy
         // restraint keys; their only restraint key is restraints.view, granted explicitly above (Q21, 2 Nov 2026).
-        $noRestraintCopy = Role::whereIn('name', ['provider_manager'])->pluck('id')->all();
+        // Maintenance coordinators read hazards for their maintenance work, never restraints or behaviour support plans
+        // (Stephan, 6 Nov 2026: "Remove it"; revoked by 2026_11_06_100000_revoke_maintenance_coordinator_restraint_access).
+        $noRestraintCopy = Role::whereIn('name', ['provider_manager', 'maintenance_coordinator'])->pluck('id')->all();
         foreach ($restraintGrantMap as $hazardKey => $grantKeys) {
             $hazard = Permission::where('key', $hazardKey)->first();
             if (! $hazard) {
