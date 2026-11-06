@@ -10,7 +10,11 @@ import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, SelectInput } from '@/components/wizard/primitives';
-import { toDatetimeLocal, workerTimeOffset } from '@/lib/datetime';
+import {
+    formatDurationMinutes,
+    toDatetimeLocal,
+    workerTimeOffset,
+} from '@/lib/datetime';
 import { hsLabel } from '@/lib/health-safety/hs-labels';
 import {
     restraintHref,
@@ -21,6 +25,19 @@ import { useMemo } from 'react';
 
 /** The restraint summary's limit (the server's max:120). */
 const RESTRAINT_SUMMARY_MAX = 120;
+
+/**
+ * Whole minutes from start to end, rounded down: the same sum the server checks (RestraintService). Null while the
+ * restraint is still going, or when the end isn't after the start (the server then explains which time to fix).
+ */
+export function elapsedWholeMinutes(
+    started: string | null | undefined,
+    ended: string | null | undefined,
+): number | null {
+    if (!started || !ended) return null;
+    const ms = Date.parse(ended) - Date.parse(started);
+    return Number.isFinite(ms) && ms > 0 ? Math.floor(ms / 60000) : null;
+}
 import { SourceCommandStatus } from './command-status';
 import {
     EMPTY_RESTRAINT_PICKERS,
@@ -604,9 +621,11 @@ export function RestraintEventCommandForm({
                 severity: v.severity,
                 started_at: instant('started_at', 'started_offset'),
                 ended_at: instant('ended_at', 'ended_offset'),
-                duration_minutes: v.duration_minutes
-                    ? Number(v.duration_minutes)
-                    : null,
+                // F2 (readiness audit, 6 Nov 2026): worked out from the start and end, the way the server checks it.
+                duration_minutes: elapsedWholeMinutes(
+                    instant('started_at', 'started_offset'),
+                    instant('ended_at', 'ended_offset'),
+                ),
                 trigger_description: v.trigger_description || null,
                 de_escalation_attempted: v.de_escalation_attempted || null,
                 restraint_description: v.restraint_description,
@@ -880,20 +899,23 @@ export function RestraintEventCommandForm({
                                 false,
                             )}
                             <Field
-                                label="Duration in minutes"
+                                label="Duration"
                                 error={form.errors.duration_minutes}
+                                hint="Worked out from the start and end times."
                             >
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    value={form.data.duration_minutes}
-                                    onChange={(event) =>
-                                        change(
-                                            'duration_minutes',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
+                                <p className="text-sm text-foreground" aria-live="polite">
+                                    {(() => {
+                                        const minutes = elapsedWholeMinutes(
+                                            instant('started_at', 'started_offset'),
+                                            instant('ended_at', 'ended_offset'),
+                                        );
+                                        return minutes == null
+                                            ? form.data.ended_at
+                                                ? 'Check the times: the end must be after the start.'
+                                                : 'Still going: add the end time when it ends.'
+                                            : formatDurationMinutes(minutes);
+                                    })()}
+                                </p>
                             </Field>
                             {text(
                                 'trigger_description',

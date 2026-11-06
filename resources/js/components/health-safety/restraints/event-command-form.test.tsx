@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { RestraintEventCommandForm } from './event-command-form';
+import { elapsedWholeMinutes, RestraintEventCommandForm } from './event-command-form';
 import type { RestraintEventDetail } from './types';
 
 const command = vi.hoisted(() => ({
@@ -213,4 +213,11 @@ it('restores preservation when the operator cancels an explicit observer replace
     fireEvent.click(replace);
     fireEvent.submit(container.querySelector('form')!);
     expect(command.save.mock.calls[0][2]).not.toHaveProperty('observed_by');
+});
+
+// Readiness audit F2 (6 Nov 2026): the duration is worked out from the times, rounded down, as the server checks it.
+it('works the duration out from the start and end, in whole minutes', () => {
+    expect(elapsedWholeMinutes('2026-11-06T01:00:00Z', '2026-11-06T01:15:59Z')).toBe(15);
+    expect(elapsedWholeMinutes('2026-11-06T01:00:00Z', null)).toBeNull();
+    expect(elapsedWholeMinutes('2026-11-06T01:00:00Z', '2026-11-06T00:59:00Z')).toBeNull();
 });

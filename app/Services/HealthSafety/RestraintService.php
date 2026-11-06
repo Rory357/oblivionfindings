@@ -566,15 +566,15 @@ class RestraintService
     {
         if ($row->ended_at) {
             if ($row->ended_at->lte($row->started_at)) {
-                throw ValidationException::withMessages(['ended_at' => 'End must follow actual start.']);
+                throw ValidationException::withMessages(['ended_at' => 'The end time must be after the start time.']);
             }
             $minutes = (int) floor($row->started_at->diffInSeconds($row->ended_at) / 60);
             if (isset($v['duration_minutes']) && $v['duration_minutes'] !== $minutes) {
-                throw ValidationException::withMessages(['duration_minutes' => 'Duration must equal elapsed whole minutes, rounded down from actual instants.']);
+                throw ValidationException::withMessages(['duration_minutes' => 'The duration must match the start and end times (whole minutes). Leave it blank and it is worked out for you.']);
             } $row->duration_minutes = $minutes;
         } else {
             if (isset($v['duration_minutes'])) {
-                throw ValidationException::withMessages(['duration_minutes' => 'Ongoing events have no completed elapsed duration.']);
+                throw ValidationException::withMessages(['duration_minutes' => 'A restraint that is still going has no duration yet. Add the end time when it ends.']);
             } $row->duration_minutes = null;
         }
         if ($row->injury_occurred && blank($row->injury_details)) {
