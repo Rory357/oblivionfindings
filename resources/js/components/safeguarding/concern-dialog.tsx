@@ -191,6 +191,7 @@ export type ConcernDetail = {
     related_incident_ref?: string | null;
     hs_event?: { id: number; reference_number: string; status: string } | null;
     control_room_alert_id?: number | null;
+    close_checklist?: CloseCheckItem[];
     access_log?: { by: string; at: string | null }[];
     can?: {
         update: boolean;
@@ -1507,21 +1508,13 @@ const TRIAGE_PATHS = [
 // error slot) goes in the refusal banner, so no refusal is ever silently lost.
 const TRIAGE_FIELD_ERRORS = new Set(['substantiation', 'initial_risk', 'path', 'notes']);
 
-// Plain words for refusals the server can send back from triage. The server's
-// own text is shown for anything not listed here.
+// The server's refusals are in plain words (6 Nov 2026). Only the close flow's "record why you are closing anyway" is
+// reworded here, because triage has no "close anyway": the work must be finished, or another path chosen.
 const TRIAGE_REFUSAL_WORDS: Array<[RegExp, string]> = [
-    [
-        /journey|is required|provenance|missing or conflicting|unavailable|does not belong/i,
-        'Its linked incident, H&S event or Control Room alert can’t be found or doesn’t match. Ask an administrator to check the links.',
-    ],
     [
         /unlogged referral|open safeguarding work|override reason/i,
         'An external referral is still to be logged, or other safeguarding work is still open. Log the referral or finish the open work first, or choose another path.',
     ],
-    [/canonical H&S safeguarding event/i, 'Its H&S safeguarding event is still open. Close that event first.'],
-    [/canonical H&S investigation/i, 'Its H&S investigation isn’t complete yet. Complete it first.'],
-    [/canonical H&S corrective work/i, 'Its H&S corrective actions still need checking or closing first.'],
-    [/Control Room/i, 'Its Control Room response is still open. Resolve it and its tasks first.'],
 ];
 
 export function triageRefusals(errors: Partial<Record<string, string>>): string[] {
@@ -1530,6 +1523,68 @@ export function triageRefusals(errors: Partial<Record<string, string>>): string[
         .map(([, message]) => TRIAGE_REFUSAL_WORDS.find(([pattern]) => pattern.test(message as string))?.[1] ?? (message as string));
 
     return Array.from(new Set(words));
+}
+
+export type CloseCheckItem = {
+    key: string;
+    label: string;
+    detail: string;
+    done: boolean;
+    href: string | null;
+};
+
+/** Close keys the terminal service hard-blocks on whichever way the concern ends (no override). */
+const LINKED_CLOSE_KEYS = ['links', 'hs_event', 'control_room'];
+
+/**
+ * B5 (Stephan, 6 Nov 2026: "Keep checks, say what to close"): what must be closed first, in plain words, each with a
+ * link to where it is done. The server decides; this list only says what it will look for.
+ */
+export function CloseChecklist({ title, items }: { title: string; items: CloseCheckItem[] }) {
+    if (!items.length) {
+        return null;
+    }
+    return (
+        <div>
+            <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {title}
+            </p>
+            <ul className="overflow-hidden rounded-xl border border-border" aria-label={title}>
+                {items.map((item) => (
+                    <li
+                        key={item.key}
+                        className="flex items-center gap-3 border-b border-border px-3.5 py-2.5 last:border-0"
+                    >
+                        <span
+                            className={`grid h-6 w-6 shrink-0 place-items-center rounded-md ${item.done ? 'bg-status-success-bg text-status-success' : 'bg-status-warning-bg text-status-warning'}`}
+                            aria-label={item.done ? 'Done' : 'Still to do'}
+                        >
+                            {item.done ? (
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : (
+                                <X className="h-3.5 w-3.5" />
+                            )}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-medium text-foreground">
+                                {item.label}
+                            </p>
+                            <p className="text-[11.5px] text-muted-foreground">
+                                {item.detail}
+                            </p>
+                        </div>
+                        {item.href && !item.done ? (
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={item.href}>
+                                    <ExternalLink className="h-3.5 w-3.5" /> Open
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
 }
 
 export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
@@ -1656,6 +1711,20 @@ export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void
                         An investigation record opens automatically — the
                         concern can't enter <b>Investigating</b> without one.
                     </InfoCard>
+                ) : null}
+                {form.data.path === 'no_action' &&
+                (d.close_checklist ?? []).some((item) => !item.done) ? (
+                    <>
+                        <InfoCard icon={AlertTriangle} tone="warn">
+                            <b>No further action</b> ends the concern, so
+                            everything below must be closed first. Close them,
+                            or choose another path.
+                        </InfoCard>
+                        <CloseChecklist
+                            title="Close these first"
+                            items={d.close_checklist ?? []}
+                        />
+                    </>
                 ) : null}
                 {form.data.path === 'no_action' ? (
                     <Field label="Rationale" required error={form.errors.notes}>
@@ -1800,6 +1869,13 @@ export function ClosePane({ d, onDone }: { d: ConcernDetail; onDone: () => void 
                         ))}
                     </div>
                 </div>
+
+                <CloseChecklist
+                    title="Linked work to close first"
+                    items={(d.close_checklist ?? []).filter((item) =>
+                        LINKED_CLOSE_KEYS.includes(item.key),
+                    )}
+                />
 
                 {blocked ? (
                     <>

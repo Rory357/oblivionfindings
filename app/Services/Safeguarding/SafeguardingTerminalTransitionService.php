@@ -320,7 +320,7 @@ final class SafeguardingTerminalTransitionService
         if ($concern->concern_type === 'incident_escalation' && $concern->related_incident_id) {
             $incident = ClientIncident::query()->lockForUpdate()->find($concern->related_incident_id);
             if (! $incident) {
-                throw new DomainException('The canonical incident journey is unavailable.');
+                throw new DomainException('Its linked incident can’t be found. Ask an administrator to check the links.');
             }
         }
 
@@ -379,13 +379,13 @@ final class SafeguardingTerminalTransitionService
         }
 
         if ($events->count() !== 1) {
-            throw new DomainException('One canonical H&S safeguarding event is required.');
+            throw new DomainException('Its H&S safety review can’t be found, or there is more than one. Ask an administrator to check the links.');
         }
 
         /** @var HsEvent $event */
         $event = $events->first();
         if ($incident && $incident->hs_event_id && (int) $incident->hs_event_id !== (int) $event->id) {
-            throw new DomainException('The incident and H&S safeguarding journey do not identify the same event.');
+            throw new DomainException('Its incident and its H&S safety review don’t match. Ask an administrator to check the links.');
         }
         if (! $incident) {
             $expectedKey = HsEvent::buildIdempotencyKey(
@@ -394,7 +394,7 @@ final class SafeguardingTerminalTransitionService
                 HsEvent::CATEGORY_SAFEGUARDING,
             );
             if (! hash_equals($expectedKey, (string) $event->idempotency_key)) {
-                throw new DomainException('The H&S safeguarding event provenance is invalid.');
+                throw new DomainException('Its H&S safety review doesn’t match this concern. Ask an administrator to check the links.');
             }
         }
 
@@ -412,15 +412,15 @@ final class SafeguardingTerminalTransitionService
             ->unique()
             ->values();
         if ($alertIds->count() !== 1) {
-            throw new DomainException('The canonical Control Room safeguarding alert is missing or conflicting.');
+            throw new DomainException('Its Control Room alert can’t be found, or there is more than one. Ask an administrator to check the links.');
         }
 
         $alert = ControlRoomAlert::query()->lockForUpdate()->find($alertIds->first());
         if (! $alert) {
-            throw new DomainException('The canonical Control Room safeguarding alert is unavailable.');
+            throw new DomainException('Its Control Room alert can’t be found. Ask an administrator to check the links.');
         }
         if (! $incident && (int) data_get($alert->context, 'concern_id') !== (int) $concern->id) {
-            throw new DomainException('The Control Room alert does not belong to this safeguarding concern.');
+            throw new DomainException('Its Control Room alert belongs to a different concern. Ask an administrator to check the links.');
         }
 
         return $alert;
@@ -508,7 +508,7 @@ final class SafeguardingTerminalTransitionService
             ->values();
 
         if ($siteIds->count() !== 1) {
-            throw new DomainException('The safeguarding, H&S and Control Room records do not share one canonical Site.');
+            throw new DomainException('This concern, its H&S safety review and its Control Room alert are at different Sites. Ask an administrator to check the links.');
         }
     }
 
@@ -583,12 +583,12 @@ final class SafeguardingTerminalTransitionService
             || $event->closed_at === null
             || $event->closed_by === null
             || blank($event->closure_summary)) {
-            throw new DomainException('Close the canonical H&S safeguarding event with its required evidence first.');
+            throw new DomainException('Its H&S safety review is still open. Close it first, with its WorkSafe decision and closing summary.');
         }
         if ($aggregate['hs_investigations']->contains(
             fn (HsInvestigation $investigation): bool => $investigation->status !== HsInvestigation::STATUS_COMPLETED,
         )) {
-            throw new DomainException('Complete the canonical H&S investigation before closing safeguarding.');
+            throw new DomainException('Its H&S safety review’s investigation isn’t complete yet. Complete it first.');
         }
         if ($aggregate['hs_actions']->contains(
             fn (HsCorrectiveAction $action): bool => ! in_array($action->status, [
@@ -596,7 +596,7 @@ final class SafeguardingTerminalTransitionService
                 HsCorrectiveAction::STATUS_CLOSED,
             ], true),
         )) {
-            throw new DomainException('Verify or close the canonical H&S corrective work before closing safeguarding.');
+            throw new DomainException('Its H&S safety review still has actions to check or close. Check or close them first.');
         }
 
         /** @var ControlRoomAlert $alert */
@@ -605,16 +605,16 @@ final class SafeguardingTerminalTransitionService
             || $alert->resolved_at === null
             || $alert->resolved_by_user_id === null
             || blank($alert->resolution_code)) {
-            throw new DomainException('Resolve the canonical Control Room safeguarding response with its required evidence first.');
+            throw new DomainException('Its Control Room alert isn’t resolved yet. Resolve it first, with a resolution.');
         }
         if ($alert->status === ControlRoomAlert::STATUS_CLOSED
             && ($alert->closed_at === null || $alert->closed_by_user_id === null)) {
-            throw new DomainException('The canonical Control Room alert closure provenance is incomplete.');
+            throw new DomainException('Its Control Room alert was closed without a record of who closed it. Ask an administrator to check it.');
         }
         if ($aggregate['alert_tasks']->contains(
             fn (AlertTask $task): bool => ! in_array($task->status, AlertTask::TERMINAL_STATUSES, true),
         )) {
-            throw new DomainException('Complete, cancel with governance, or transfer every protective Control Room task first.');
+            throw new DomainException('Its Control Room alert still has open tasks. Finish, cancel or hand over each one first.');
         }
 
         $actionsBySourceTask = $aggregate['hs_actions']->keyBy('source_control_room_task_id');
@@ -625,7 +625,7 @@ final class SafeguardingTerminalTransitionService
                 || $task->transferred_at === null
                 || $task->transferred_by_user_id === null
                 || ! in_array($action->status, [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED], true)) {
-                throw new DomainException('Transferred protective work does not have one completed canonical H&S action.');
+                throw new DomainException('A Control Room task handed over to H&S doesn’t have one finished H&S action. Check or close that action first.');
             }
         }
     }

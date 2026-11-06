@@ -1106,6 +1106,10 @@ class SafeguardingConcernController extends Controller
             'related_incident_ref' => $concern->relatedIncident?->reference_number,
             'hs_event' => $hsEvent,
             'control_room_alert_id' => $controlRoomAlertId,
+            // B5 (Stephan, 6 Nov 2026: "Keep checks, say what to close"): what must be closed before "No further
+            // action" or closing, each with a link. The terminal service still decides.
+            'close_checklist' => in_array($concern->status, ['closed', 'no_action_required'], true)
+                ? [] : app(\App\Services\Safeguarding\SafeguardingCloseChecklist::class)->forConcern($concern),
             'access_log' => $this->recentAccessLog($concern),
             'can' => [
                 'update' => $user->can('update', $concern),
