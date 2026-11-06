@@ -53,9 +53,10 @@ class HsWorkspaceController extends Controller
             'view' => $view,
             'report' => $report,
             'worksafe_waiting' => $worksafe,
+            // O4: an open report shows the period it covers; with none chosen that is the last 12 months.
             'filters' => [
-                'from' => $validated['from'] ?? '',
-                'to' => $validated['to'] ?? '',
+                'from' => $validated['from'] ?? ($view !== null ? HsGovernanceReportController::defaultPeriod()[0]->toDateString() : ''),
+                'to' => $validated['to'] ?? ($view !== null ? HsGovernanceReportController::defaultPeriod()[1]->toDateString() : ''),
                 'site_id' => $validated['site_id'] ?? null,
             ],
         ]);
