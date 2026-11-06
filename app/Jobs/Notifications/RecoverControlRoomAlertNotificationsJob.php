@@ -27,7 +27,8 @@ class RecoverControlRoomAlertNotificationsJob implements ShouldBeUnique, ShouldQ
     {
         Communication::query()
             ->whereNotNull('delivery_key')
-            ->where('purpose', 'notification')
+            // O2: SLA-breach escalation notices staged in their escalation's transaction are swept too.
+            ->whereIn('purpose', ['notification', 'escalation'])
             ->where('channel', 'in_app')
             ->whereIn('status', ['pending', 'failed'])
             ->whereNull('superseded_at')

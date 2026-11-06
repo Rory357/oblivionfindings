@@ -8,9 +8,11 @@ use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertAutomationService;
 use App\Services\ControlRoom\ControlRoomNotificationService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -29,14 +31,49 @@ class CheckControlRoomSlaBreaches implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * O2 (Stephan, 6 Nov 2026): how far ahead the pre-filter looks. A deadline due within this margin is still locked
+     * and checked, so a run that takes a while can never skip an SLA the old full scan would have escalated.
+     */
+    public const PREFILTER_MARGIN_MINUTES = 10;
+
+    /** O2: two runs never overlap; a run that finds one in progress is dropped (the next one is 5 minutes away). */
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping('control-room-sla-breaches'))->dontRelease()->expireAfter(600)];
+    }
+
+    /**
+     * O2: only SLAs with a not-yet-breached milestone that is due (or due within the margin) are worth locking. The
+     * exact breach check (AlertSla::checkForBreaches) still runs on the locked row and decides, as before.
+     */
+    public static function dueCandidates(Builder $query): Builder
+    {
+        $cutoff = now()->addMinutes(self::PREFILTER_MARGIN_MINUTES);
+
+        return $query->where(function (Builder $due) use ($cutoff): void {
+            foreach ([
+                ['acknowledged_at', 'acknowledge_deadline', 'acknowledge_breached'],
+                ['responded_at', 'response_deadline', 'response_breached'],
+                ['resolved_at', 'resolution_deadline', 'resolution_breached'],
+            ] as [$done, $deadline, $breached]) {
+                $due->orWhere(fn (Builder $milestone) => $milestone
+                    ->whereNull($done)
+                    ->whereNotNull($deadline)
+                    ->where($deadline, '<=', $cutoff)
+                    ->where(fn (Builder $flag) => $flag->where($breached, false)->orWhereNull($breached)));
+            }
+        });
+    }
+
     public function handle(ControlRoomNotificationService $notificationService, AlertAutomationService $automationService): void
     {
         $escalatedCount = 0;
 
-        AlertSla::query()
+        self::dueCandidates(AlertSla::query()
             ->applicable()
             ->whereHas('alert', fn ($query) => $query->actionable())
-            ->whereNull('resolved_at')
+            ->whereNull('resolved_at'))
             ->chunkById(100, function ($slas) use ($notificationService, $automationService, &$escalatedCount) {
                 foreach ($slas as $candidate) {
                     $escalated = DB::transaction(function () use ($candidate, $notificationService, $automationService): bool {
@@ -97,6 +134,8 @@ class CheckControlRoomSlaBreaches implements ShouldQueue
                         // Required notification, automation, audit, alert and
                         // SLA flags share the transaction. A failure rolls the
                         // whole escalation back so a retry sees truthful state.
+                        // O2: the notification is recorded here and sent once
+                        // this transaction commits (after the row lock).
                         $notificationService->notifySlaBreachEscalation($alert, $definition, $breaches);
                         $automationService->onAlertEscalated($alert, $previousLevel);
                         AuditLogger::logOrFail('controlRoom.alert.slaBreached', $alert, [

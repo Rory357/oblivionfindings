@@ -409,7 +409,10 @@ app(Schedule::class)
 app(Schedule::class)
     ->job(new CheckControlRoomSlaBreaches)
     ->timezone('Pacific/Auckland')
-    ->everyFiveMinutes();
+    ->everyFiveMinutes()
+    // O2: one server, one run at a time (the job has its own overlap guard too).
+    ->onOneServer()
+    ->withoutOverlapping();
 
 // Shift anomaly detection and control-room signal emission
 app(Schedule::class)
