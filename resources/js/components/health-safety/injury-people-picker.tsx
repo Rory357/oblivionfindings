@@ -48,6 +48,16 @@ export function InjuryPeoplePicker({ id, label, endpoint, group, value, onChange
         <HazardStaffPicker id={id} placeholder={value && !items.some((item) => String(item.id) === value) ? 'Your choice is kept — check it’s still right' : `Choose ${label.toLowerCase()}`} value={items.some((item) => String(item.id) === value) ? value : ''} onChange={(next) => { const person = items.find((item) => String(item.id) === next); if (person) { onChange(next); onSelection?.(person); } }} disabled={disabled || loading || !!failure || siteId === ''} options={items.map((item) => ({ value: String(item.id), label: item.name }))} searchLabel="Search this page" listLabel={label} />
         <div className="flex flex-wrap items-center gap-3"><Button type="button" variant="outline" className="frontline-tap" disabled={disabled || loading || page === 1} onClick={() => setPage(page - 1)}>Previous choices</Button><span className="text-caption">Page {page}</span><Button type="button" variant="outline" className="frontline-tap" disabled={disabled || loading || !pagination?.has_more} onClick={() => setPage(page + 1)}>More choices</Button></div>
         {loading && <p role="status" className="text-subtle">Loading…</p>}
+        {/* F1 (readiness audit, 6 Nov 2026): an empty list says why, instead of a dead end. */}
+        {!loading && !failure && pagination !== null && items.length === 0 && page === 1 && (
+            <p role="status" className="text-subtle">
+                {search.trim() !== ''
+                    ? `No one matches “${search.trim()}”.`
+                    : group === 'workers'
+                      ? 'No staff are listed at this Site. Ask HR to add this Site to the worker’s staff profile.'
+                      : 'No one at this Site can be chosen for this yet. Ask HR or an administrator to set it up.'}
+            </p>
+        )}
         {failure && <div className="space-y-2"><p role="alert" className="text-subtle text-status-critical">{failure}</p><Button type="button" variant="outline" className="frontline-tap" disabled={disabled || loading} onClick={() => setRetry(retry + 1)}>Search again</Button></div>}
     </div>;
 }
