@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -1501,6 +1502,36 @@ const TRIAGE_PATHS = [
     },
 ];
 
+// Errors the triage pane shows beside their own field. Anything else the server
+// sends back (a refusal under `triage` or `override_reason`, or a field with no
+// error slot) goes in the refusal banner, so no refusal is ever silently lost.
+const TRIAGE_FIELD_ERRORS = new Set(['substantiation', 'initial_risk', 'path', 'notes']);
+
+// Plain words for refusals the server can send back from triage. The server's
+// own text is shown for anything not listed here.
+const TRIAGE_REFUSAL_WORDS: Array<[RegExp, string]> = [
+    [
+        /journey|is required|provenance|missing or conflicting|unavailable|does not belong/i,
+        'Its linked incident, H&S event or Control Room alert can’t be found or doesn’t match. Ask an administrator to check the links.',
+    ],
+    [
+        /unlogged referral|open safeguarding work|override reason/i,
+        'An external referral is still to be logged, or other safeguarding work is still open. Log the referral or finish the open work first, or choose another path.',
+    ],
+    [/canonical H&S safeguarding event/i, 'Its H&S safeguarding event is still open. Close that event first.'],
+    [/canonical H&S investigation/i, 'Its H&S investigation isn’t complete yet. Complete it first.'],
+    [/canonical H&S corrective work/i, 'Its H&S corrective actions still need checking or closing first.'],
+    [/Control Room/i, 'Its Control Room response is still open. Resolve it and its tasks first.'],
+];
+
+export function triageRefusals(errors: Partial<Record<string, string>>): string[] {
+    const words = Object.entries(errors)
+        .filter(([key, message]) => !TRIAGE_FIELD_ERRORS.has(key) && !!message)
+        .map(([, message]) => TRIAGE_REFUSAL_WORDS.find(([pattern]) => pattern.test(message as string))?.[1] ?? (message as string));
+
+    return Array.from(new Set(words));
+}
+
 export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const staff = d.assignable_staff ?? [];
     const form = useForm<{
@@ -1542,6 +1573,7 @@ export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void
             onSuccess: onSuccessGuard(onDone),
         });
     };
+    const refusals = triageRefusals(form.errors);
     const cta =
         form.data.path === 'investigate'
             ? 'Triage → investigate'
@@ -1636,6 +1668,23 @@ export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void
                             placeholder="Why does this need no further safeguarding action?"
                         />
                     </Field>
+                ) : null}
+                {refusals.length ? (
+                    <Alert variant="critical">
+                        <AlertTriangle />
+                        <AlertTitle>The concern wasn’t triaged</AlertTitle>
+                        <AlertDescription>
+                            {refusals.length === 1 ? (
+                                <p>{refusals[0]}</p>
+                            ) : (
+                                <ul className="list-inside list-disc">
+                                    {refusals.map((refusal) => (
+                                        <li key={refusal}>{refusal}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </AlertDescription>
+                    </Alert>
                 ) : null}
             </PaneShell>
         </>
