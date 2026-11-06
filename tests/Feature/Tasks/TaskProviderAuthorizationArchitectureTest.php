@@ -20,6 +20,7 @@ use App\Services\Tasks\Providers\ChemicalExposureDeliveryProvider;
 use App\Services\Tasks\Providers\ChemicalExposureFollowupProvider;
 use App\Services\Tasks\Providers\HsClosureExceptionProvider;
 use App\Services\Tasks\Providers\HsEventReviewFlagProvider;
+use App\Services\Tasks\Providers\HsWorksafeNotToldProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
 use App\Services\Tasks\Providers\ControlRoomAlertProvider;
 use App\Services\Tasks\Providers\DataBreachProvider;
@@ -123,6 +124,7 @@ it('registers every task source behind exactly one authorization boundary', func
         ChemicalExposureFollowupProvider::class => 'chemical_exposure_followup',
         ChemicalExposureDeliveryProvider::class => 'chemical_exposure_delivery',
         HsEventReviewFlagProvider::class => 'hs_event_review',
+        HsWorksafeNotToldProvider::class => 'hs_worksafe_not_told',
         HsClosureExceptionProvider::class => 'hs_closure_exception',
     ]);
 

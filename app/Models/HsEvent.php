@@ -370,6 +370,19 @@ class HsEvent extends Model
         });
     }
 
+    /**
+     * O3 (Stephan, 6 Nov 2026: "Daily reminder + task"): open reviews marked WorkSafe-notifiable where WorkSafe hasn't
+     * been told yet. They get a daily reminder and a /tasks card until the notification is recorded.
+     */
+    public function scopeWorksafeNotTold($query)
+    {
+        return $query->where('hs_events.status', '!=', self::STATUS_CLOSED)
+            ->where('hs_events.worksafe_notifiable', true)
+            ->whereNull('hs_events.worksafe_notified_at')
+            ->where(fn ($status) => $status->whereNull('hs_events.worksafe_status')
+                ->orWhereNotIn('hs_events.worksafe_status', [self::WORKSAFE_NOTIFIED, self::WORKSAFE_ACKNOWLEDGED]));
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Helpers */
     /* ------------------------------------------------------------------ */

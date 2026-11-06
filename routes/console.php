@@ -61,6 +61,7 @@ use App\Jobs\ExpireQueclinkGovernedCommands;
 use App\Jobs\FleetAutoAlertJob;
 use App\Jobs\Governance\RecoverIncidentGovernanceEscalationsJob;
 use App\Jobs\HazardOverdueJob;
+use App\Jobs\HsWorksafeNotToldReminderJob;
 use App\Jobs\InspectionDueJob;
 use App\Jobs\Notifications\RecoverControlRoomAlertNotificationsJob;
 use App\Jobs\Operations\ProcessRecurringChargesJob;
@@ -511,6 +512,14 @@ app(Schedule::class)
     ->dailyAt('00:10')
     ->onOneServer()
     ->withoutOverlapping();
+
+// O3 (Stephan, 6 Nov 2026): a notifiable safety review where WorkSafe hasn't been told reminds its owner and the
+// Site's H&S officers every morning until the notification is recorded.
+app(Schedule::class)
+    ->job(new HsWorksafeNotToldReminderJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:30')
+    ->onOneServer();
 
 // Hazard overdue checks and escalations: daily at 09:00
 app(Schedule::class)
