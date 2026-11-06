@@ -19,6 +19,7 @@ use App\Models\ShiftOpenPosition;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Assurance\NzsAssuranceResolver;
+use App\Services\Chat\ChatRealtime;
 use App\Services\Clients\ClientPortalMembershipService;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\Fleet\FleetMapSettings;
@@ -237,6 +238,9 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'chatSharedExperience' => (bool) config('chat.shared_experience'),
+            // Oblivion Live switched on and configured (config only, no queries). While it is
+            // off the browser doesn't ask for a ticket (which would 404) and Chat just polls.
+            'chatLive' => $user !== null && app(ChatRealtime::class)->usesLive(),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
 
             // Per-user calendar subscribe (.ics) URL, shared so any calendar surface

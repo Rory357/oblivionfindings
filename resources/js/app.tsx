@@ -68,6 +68,10 @@ createInertiaApp({
                             }
                         ).auth;
                         setOfflineQueueActor(auth?.user?.id);
+                        const chatFlags = pageProps as {
+                            chatSharedExperience?: boolean;
+                            chatLive?: boolean;
+                        };
 
                         return (
                             <ChatPreferencesProvider
@@ -88,12 +92,11 @@ createInertiaApp({
                                             ? Number(auth.user.id)
                                             : null
                                     }
+                                    // Only while Live is on: otherwise its ticket
+                                    // request 404s on every page and Chat polls anyway.
                                     enabled={Boolean(
-                                        (
-                                            pageProps as {
-                                                chatSharedExperience?: boolean;
-                                            }
-                                        ).chatSharedExperience,
+                                        chatFlags.chatSharedExperience &&
+                                        chatFlags.chatLive,
                                     )}
                                 >
                                     <ChatCallingProvider
