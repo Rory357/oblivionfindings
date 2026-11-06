@@ -17,7 +17,9 @@
 */
 
 return [
-    'audit_log_years' => (int) env('RETENTION_AUDIT_LOG_YEARS', 2),
+    // 5 years: what Settings > Data shows as the default (readiness audit B6/F7, 6 Nov 2026). H&S records' history is
+    // kept at least 10 years whatever this says (AuditLog::HEALTH_SAFETY_MIN_RETENTION_YEARS).
+    'audit_log_years' => (int) env('RETENTION_AUDIT_LOG_YEARS', 5),
 
     'timeline_event_years' => (int) env('RETENTION_TIMELINE_EVENT_YEARS', 5),
 ];
