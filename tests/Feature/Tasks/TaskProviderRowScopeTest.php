@@ -883,6 +883,8 @@ function taskRbacMatrix(): array
         // to exposure and H&S managers only.
         'chemical_exposure_delivery' => ['visible' => [], 'hidden' => []],
         'hs_event_review' => ['visible' => [], 'hidden' => []],
+        // No WorkSafe-notifiable reviews here; HsWorksafeNotToldReminderTest proves who sees those cards.
+        'hs_worksafe_not_told' => ['visible' => [], 'hidden' => []],
         // No close-anyway requests here; HsClosureExceptionWorklistTest proves who sees them.
         'hs_closure_exception' => ['visible' => [], 'hidden' => []],
     ];
@@ -895,6 +897,8 @@ function taskRbacMatrix(): array
         'sitePermissions' => $sitePermissions,
         'globalBypasses' => [
             'reports.viewAny',
+            // P6 (6 Nov 2026): every-Site safeguarding has its own key; reports.viewAny no longer reaches it.
+            'safeguarding.viewAllSites',
             'healthSafety.viewAllSites',
             'sites.viewAll',
             'securityDevices.devices.viewAllSites',

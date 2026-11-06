@@ -79,7 +79,9 @@ final class SafeguardingCurrentReadHttpTest extends TestCase
 
     public function test_actual_footer_search_dates_filters_and_twenty_row_pagination_are_preserved(): void
     {
-        for ($i = 0; $i < 21; $i++) { $this->concern($this->site, ['description' => 'Known register search', 'severity' => 'high', 'abuse_category' => 'financial', 'reported_at' => '2026-10-01 12:00:00']); }
+        // P1 (6 Nov 2026): a need-to-know concern this reader sees only locked is never found by its words or category,
+        // so the rows this search and these filters must find are ordinary (not need-to-know) concerns.
+        for ($i = 0; $i < 21; $i++) { $this->concern($this->site, ['description' => 'Known register search', 'severity' => 'high', 'abuse_category' => 'financial', 'reported_at' => '2026-10-01 12:00:00', 'is_sensitive' => false]); }
         $this->concern($this->otherSite, ['description' => 'Known register search', 'reported_at' => '2026-10-01 12:00:00']);
         $this->concern($this->site, ['description' => 'Known register search', 'reported_at' => '2026-10-02 12:00:00']);
         $query = ['q' => 'Known register search', 'tab' => 'triage', 'severity' => 'high', 'category' => 'financial',
