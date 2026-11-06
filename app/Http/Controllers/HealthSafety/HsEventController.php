@@ -566,7 +566,7 @@ class HsEventController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', 'Event closed.');
+        return back()->with('success', 'Safety review closed.');
     }
 
     public function requestClosureException(Request $request, int $hsEvent)
