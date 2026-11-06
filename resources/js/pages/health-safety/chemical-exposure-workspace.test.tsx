@@ -317,7 +317,7 @@ it('withholds cached recovery references after private access withdrawal', async
     await waitFor(() => expect(screen.getByText('Upload reference 41')).toBeInTheDocument());
     rerender(<ChemicalExposureRecovery can={{ inspect: false, retry: false }} />);
     expect(screen.queryByText('Upload reference 41')).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Clean unaccepted staged bytes' })).not.toBeInTheDocument();
-    expect(screen.getByText(/Recovery details and changes are withheld/)).toBeInTheDocument();
+    expect(screen.getByText(/You don’t have access to it./)).toBeInTheDocument();
 });
 it('transfers the same incomplete follow-up to an eligible named person with a reason and exact reviewed revision', async () => {
     const d = detail(); io.read.mockResolvedValue({ data: { sites: [d.record!.site], staff: { items: [], next_cursor: null },
