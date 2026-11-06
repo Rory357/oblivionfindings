@@ -137,7 +137,7 @@ class AuditLog extends Model
     }
 
     /** Class names plus their morph aliases, so either stored form matches. @return list<string> */
-    private static function healthSafetyEvidenceTypes(): array
+    public static function healthSafetyEvidenceTypes(): array
     {
         $types = [];
         foreach (self::HEALTH_SAFETY_EVIDENCE_TYPES as $class) {

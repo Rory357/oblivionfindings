@@ -111,7 +111,7 @@ final class AuditLogViewService
                     ->orWhereHas('user', fn (Builder $users) => $users->where('name', 'like', "%{$needle}%"))
                     // #13: risk assessment rows never show a client, so a client's name can't find them either.
                     ->orWhere(fn (Builder $byClient) => $byClient
-                        ->where(fn (Builder $notRisk) => $notRisk->whereNull('auditable_type')->orWhereNotIn('auditable_type', self::riskAssessmentTypes()))
+                        ->where(fn (Builder $notRisk) => $notRisk->whereNull('auditable_type')->orWhereNotIn('auditable_type', self::clientlessTypes()))
                         ->whereHas('client', fn (Builder $clients) => $clients
                             ->where('first_name', 'like', "%{$needle}%")
                             ->orWhere('last_name', 'like', "%{$needle}%")));
@@ -124,7 +124,7 @@ final class AuditLogViewService
 
         if ($filters['client_id'] ?? null) {
             $query->where('client_id', $filters['client_id'])
-                ->where(fn (Builder $notRisk) => $notRisk->whereNull('auditable_type')->orWhereNotIn('auditable_type', self::riskAssessmentTypes()));
+                ->where(fn (Builder $notRisk) => $notRisk->whereNull('auditable_type')->orWhereNotIn('auditable_type', self::clientlessTypes()));
         }
 
         if ($filters['module'] ?? null) {
@@ -185,7 +185,10 @@ final class AuditLogViewService
                 'id' => (int) $log->user->id,
                 'name' => $log->user->name,
             ] : null,
-            'client' => $log->client ? [
+            // P5 (readiness audit, 6 Nov 2026): an H&S record's row (incident, restraint, safeguarding, first aid, injury,
+            // exposure, safety review…) never names the client here, for any viewer: the audit page is organisation-wide,
+            // and those records keep their own Site and need-to-know rules. Who changed what and when still shows.
+            'client' => $log->client && ! in_array($log->auditable_type, AuditLog::healthSafetyEvidenceTypes(), true) ? [
                 'id' => (int) $log->client->id,
                 'name' => trim($log->client->first_name.' '.$log->client->last_name),
             ] : null,
@@ -202,6 +205,12 @@ final class AuditLogViewService
     private function isRiskAssessment(AuditLog $log): bool
     {
         return in_array($log->auditable_type, self::riskAssessmentTypes(), true);
+    }
+
+    /** Rows that never show or match a client: risk assessments (#13) and H&S records (P5). @return list<string> */
+    private static function clientlessTypes(): array
+    {
+        return array_values(array_unique([...self::riskAssessmentTypes(), ...AuditLog::healthSafetyEvidenceTypes()]));
     }
 
     /** @return list<string> */
@@ -280,7 +289,8 @@ final class AuditLogViewService
             ->all();
 
         $clients = Client::query()
-            ->whereIn('id', (clone $visibleAudit)->select('client_id')->whereNotNull('client_id'))
+            ->whereIn('id', (clone $visibleAudit)->select('client_id')->whereNotNull('client_id')
+                ->where(fn (Builder $named) => $named->whereNull('auditable_type')->orWhereNotIn('auditable_type', self::clientlessTypes())))
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->limit(250)
