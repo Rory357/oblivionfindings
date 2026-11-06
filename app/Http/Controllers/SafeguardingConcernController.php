@@ -352,7 +352,9 @@ class SafeguardingConcernController extends Controller
         // A concern at a Site outside the viewer's Sites answers "not found", so its existence there isn't revealed;
         // one they can see but may not open answers "forbidden". Either way nothing about it (files, investigations,
         // risk reviews) is loaded first.
-        abort_unless($this->concernPolicy->applyVisibleScope(SafeguardingConcern::query()->whereKey($concern->getKey()), $user)->exists(), 404);
+        abort_unless($this->concernPolicy->applySiteScope(SafeguardingConcern::query()->whereKey($concern->getKey()), $user)->exists(), 404);
+        // P2: the person it names as the alleged perpetrator gets a plain refusal that doesn't say why.
+        abort_if($this->concernPolicy->namesAsAllegedPerpetrator($user, $concern), 403, SafeguardingConcernPolicy::NAMED_PERSON_MESSAGE);
         abort_unless($user->can('view', $concern), 403);
 
         $canSensitive = $user->can('viewSensitive', SafeguardingConcern::class);
@@ -427,6 +429,14 @@ class SafeguardingConcernController extends Controller
         $request->validate([
             'assigned_to_user_id' => 'required|exists:users,id',
         ]);
+
+        // P2: the person a concern names as the alleged perpetrator can't lead it.
+        $assignee = User::query()->find((int) $request->assigned_to_user_id);
+        if ($assignee && $this->concernPolicy->namesAsAllegedPerpetrator($assignee, $concern)) {
+            throw ValidationException::withMessages([
+                'assigned_to_user_id' => "This person is named as the alleged perpetrator, so they can't lead this concern.",
+            ]);
+        }
 
         $concern->update([
             'assigned_to_user_id' => $request->assigned_to_user_id,
@@ -957,6 +967,22 @@ class SafeguardingConcernController extends Controller
             return $base; // redacted shell — the dialog renders the locked state
         }
 
+        // P3 (Stephan, 6 Nov 2026: "Their report + status only"): someone who can open the concern only because they
+        // reported it sees what was reported and where it's up to. Not the people named, the triage, investigations,
+        // risk reviews, referrals, action plans, files, linked records or later notes.
+        if ($this->concernPolicy->isReporterOnly($user, $concern)) {
+            return [
+                ...$base,
+                'reporter_view' => true,
+                'concern_type' => $concern->concern_type,
+                'abuse_category' => $concern->abuse_category,
+                'location' => $concern->location,
+                'description' => $concern->description,
+                'immediate_actions' => $concern->immediate_actions,
+                'closed_at' => $concern->closed_at?->toISOString(),
+            ];
+        }
+
         $concern->load([
             'subject', 'allegedPerpetrator', 'reportedBy', 'assignedTo', 'closedBy', 'triagedBy',
             'site', 'investigations.leadInvestigator', 'externalReports.reportedBy',
@@ -1133,7 +1159,9 @@ class SafeguardingConcernController extends Controller
                 'request_declassification' => $user->can('requestDeclassification', $concern),
                 'approve_declassification' => $user->can('approveDeclassification', $concern),
             ],
+            // P2: the alleged perpetrator isn't offered as the lead.
             'assignable_staff' => User::staff()->select('id', 'name')->orderBy('name')->get()
+                ->reject(fn (User $u) => $this->concernPolicy->namesAsAllegedPerpetrator($u, $concern))
                 ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values()->all(),
         ];
     }

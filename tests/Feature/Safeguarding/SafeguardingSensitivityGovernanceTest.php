@@ -199,7 +199,7 @@ class SafeguardingSensitivityGovernanceTest extends TestCase
         $globalApprover = $this->userWith([
             'safeguarding.viewAny',
             'safeguarding.declassification.approve',
-            'reports.viewAny',
+            'safeguarding.viewAllSites',
         ]);
         $concern = SafeguardingConcern::factory()->create([
             'site_id' => null,
@@ -284,7 +284,7 @@ class SafeguardingSensitivityGovernanceTest extends TestCase
         $globalApprover = $this->userWith([
             'safeguarding.viewAny',
             'safeguarding.declassification.approve',
-            'reports.viewAny',
+            'safeguarding.viewAllSites',
         ]);
         $concern = $this->sensitiveConcern($requester);
 
@@ -329,7 +329,7 @@ class SafeguardingSensitivityGovernanceTest extends TestCase
         $approver = $this->userWith([
             'safeguarding.viewAny',
             'safeguarding.declassification.approve',
-            'reports.viewAny',
+            'safeguarding.viewAllSites',
         ]);
         $concern = $this->sensitiveConcern($requester);
         $review = $this->requestReview($concern, $requester);

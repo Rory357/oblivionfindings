@@ -76,7 +76,7 @@ final class HealthSafetyDashboardSafeguardingReadTest extends TestCase
         $this->assertNull($this->dashboard($this->otherSite->id)['kpis']['open_safeguarding']);
         HrEmployeeProfile::where('user_id', $this->viewer->id)->update(['secondary_site_ids' => [$this->otherSite->id]]);
         $this->assertSame(2, $this->dashboard($this->otherSite->id)['kpis']['open_safeguarding']);
-        $this->grant('reports.viewAny'); $this->assertSame(3, $this->dashboard()['kpis']['open_safeguarding']);
+        $this->grant('safeguarding.viewAllSites'); $this->assertSame(3, $this->dashboard()['kpis']['open_safeguarding']);
         $this->assertNull($this->dashboard()['safeguarding_source']['href'], 'No exact multi-Site filter exists on the current register.');
     }
 

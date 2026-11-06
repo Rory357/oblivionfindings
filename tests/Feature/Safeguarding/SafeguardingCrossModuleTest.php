@@ -76,7 +76,7 @@ class SafeguardingCrossModuleTest extends TestCase
 
     public function test_closing_a_concern_fails_closed_until_the_linked_owners_record_terminal_evidence(): void
     {
-        $user = $this->makeUser(['safeguarding.update', 'reports.viewAny']);
+        $user = $this->makeUser(['safeguarding.update', 'safeguarding.viewAllSites']);
         $site = Site::factory()->create();
         $concern = SafeguardingConcern::factory()->create([
             'site_id' => $site->id,

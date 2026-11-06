@@ -59,6 +59,14 @@ class UserSiteAccessService
      */
     public const ATTENDANCE_SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
 
+    /**
+     * P6 (Stephan, 6 Nov 2026: "Remove it"): safeguarding at every Site needs this safeguarding key. "View reports"
+     * (reports.viewAny) no longer widens safeguarding past a person's own Sites.
+     *
+     * @var array<int, string>
+     */
+    public const SAFEGUARDING_SITE_BYPASS_PERMISSIONS = ['safeguarding.viewAllSites'];
+
     /** @var array<string, bool> */
     private array $clientIncidentSiteColumnCache = [];
 

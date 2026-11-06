@@ -52,7 +52,7 @@ class SafeguardingTerminalTransitionTest extends TestCase
 
         $this->assertSame('monitoring', $concern->fresh()->status);
         $this->assertDatabaseCount('safeguarding_terminal_transitions', 0);
-        $this->grant($actor, 'reports.viewAny');
+        $this->grant($actor, 'safeguarding.viewAllSites');
 
         $this->actingAs($actor->fresh())
             ->post("/safeguarding/{$concern->id}/close", [
@@ -64,7 +64,7 @@ class SafeguardingTerminalTransitionTest extends TestCase
         $this->assertSame('closed', $concern->fresh()->status);
         $transition = SafeguardingTerminalTransition::query()->sole();
         $this->assertSame('explicit_global', data_get($transition->authority_snapshot, 'site_scope'));
-        $this->assertTrue($transition->authority_snapshot['permissions']['reports.viewAny']);
+        $this->assertTrue($transition->authority_snapshot['permissions']['safeguarding.viewAllSites']);
     }
 
     public function test_privacy_and_recorded_ownership_are_revalidated_under_locks(): void

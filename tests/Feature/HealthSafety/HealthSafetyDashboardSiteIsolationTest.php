@@ -578,9 +578,9 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $remoteSite = Site::factory()->create(['name' => 'Remote Site']);
         // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
         // The safeguarding count follows Safeguarding's own read: safeguarding access, and its own all-Sites permission
-        // (reports.viewAny); H&S all-Sites access doesn't widen it (Stephan, 26 Oct, Overview safeguarding count).
+        // (safeguarding.viewAllSites since P6, 6 Nov 2026); H&S all-Sites access doesn't widen it (Stephan, 26 Oct, Overview safeguarding count).
         $viewer = $this->userWithPermissions(
-            ['hazards.view', 'healthSafety.viewAllSites', 'fleet.viewAny', 'fleet.manage', 'incidents.viewAny', 'safeguarding.viewAny', 'reports.viewAny'],
+            ['hazards.view', 'healthSafety.viewAllSites', 'fleet.viewAny', 'fleet.manage', 'incidents.viewAny', 'safeguarding.viewAny', 'safeguarding.viewAllSites'],
             'Application H&S lead',
         );
         HrEmployeeProfile::factory()->create([

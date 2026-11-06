@@ -95,14 +95,14 @@ final class SafeguardingConcernReadScopeTest extends TestCase
         $this->concern($this->site); $this->concern($this->otherSite); $this->concern(null);
         $this->allow('healthSafety.viewAllSites'); $this->assertCount(2, $this->ids());
         $this->assertNull($this->reader->openCount($this->viewer, [$this->otherSite->id])['count']);
-        $this->allow('reports.viewAny'); $this->assertCount(3, $this->ids());
+        $this->allow('safeguarding.viewAllSites'); $this->assertCount(3, $this->ids());
         $this->otherSite->update(['is_active' => false]);
         $this->assertSame(1, $this->reader->openCount($this->viewer, [$this->otherSite->id])['count'], 'Actual reports policy bypass is not replaced by invented active-Site denial.');
     }
 
     public function test_missing_register_read_has_unknown_count_and_no_concern_or_child_sql(): void
     {
-        $this->concern($this->site); $this->allow('safeguarding.viewAny', false); $this->allow('reports.viewAny');
+        $this->concern($this->site); $this->allow('safeguarding.viewAny', false); $this->allow('safeguarding.viewAllSites');
         DB::enableQueryLog(); DB::flushQueryLog();
         try { $result = $this->reader->openCount($this->viewer); $sql = implode(' ', array_column(DB::getQueryLog(), 'query')); }
         finally { DB::disableQueryLog(); }

@@ -35,6 +35,7 @@ import {
     Search,
     Shield,
     ShieldAlert,
+    ShieldCheck,
     Trash2,
     UserCog,
     User as UserIcon,
@@ -64,6 +65,9 @@ export type ConcernDetail = {
     stage_index: number;
     occurred_at: string | null;
     reported_at: string | null;
+    // P3: true when the viewer sees the concern only as its reporter (their report and its status).
+    reporter_view?: boolean;
+    closed_at?: string | null;
     // Present only when not restricted:
     concern_type?: string;
     abuse_category?: string | null;
@@ -326,6 +330,32 @@ export function SafeguardingConcernDialog({
                         staff cleared to view sensitive concerns.
                     </p>
                 </div>
+            </WizardShell>
+        );
+    }
+
+    if (d.reporter_view) {
+        return (
+            <WizardShell
+                open={open}
+                onClose={onClose}
+                title={`Concern ${d.reference_number}`}
+                description="Your report"
+                railIcon={FileText}
+                railTitle="Your report"
+                railSub={d.reference_number}
+                steps={[
+                    {
+                        key: 'report',
+                        label: 'Your report',
+                        blurb: d.status_label,
+                        icon: FileText,
+                    },
+                ]}
+                stepIndex={0}
+                onStepClick={() => {}}
+            >
+                <ReporterView d={d} />
             </WizardShell>
         );
     }
@@ -1943,6 +1973,65 @@ export function ClosePane({ d, onDone }: { d: ConcernDetail; onDone: () => void 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle stage tracker                                            */
 /* ------------------------------------------------------------------ */
+
+/**
+ * P3: what the person who reported a concern sees afterwards: their report and where it's up to. The safeguarding
+ * lead's work (people named, triage, investigation, plans, files) isn't shown.
+ */
+export function ReporterView({ d }: { d: ConcernDetail }) {
+    return (
+        <div className="grid gap-4 sm:grid-cols-2">
+            <LifecycleTracker d={d} />
+
+            <InfoCard icon={ShieldCheck}>
+                You reported this concern. Here you can see what you reported
+                and where it's up to. The safeguarding lead handles the rest and
+                keeps the details private.
+            </InfoCard>
+
+            <ReviewCard icon={FileText} title="What you reported" span>
+                <p className="text-sm whitespace-pre-wrap text-foreground">
+                    {d.description || '—'}
+                </p>
+            </ReviewCard>
+
+            <ReviewCard icon={Search} title="Details">
+                <ReviewRow label="Type" value={titleCase(d.concern_type)} />
+                <ReviewRow
+                    label="Category"
+                    value={titleCase(d.abuse_category)}
+                />
+                <ReviewRow label="Where" value={d.location || '—'} />
+            </ReviewCard>
+
+            <ReviewCard icon={Clock} title="Where it's up to">
+                <ReviewRow label="Status" value={d.status_label} />
+                <ReviewRow
+                    label="Reported"
+                    value={d.reported_at ? formatDateTime(d.reported_at) : '—'}
+                />
+                {d.closed_at ? (
+                    <ReviewRow
+                        label="Closed"
+                        value={formatDateTime(d.closed_at)}
+                    />
+                ) : null}
+            </ReviewCard>
+
+            {d.immediate_actions ? (
+                <ReviewCard
+                    icon={ClipboardCheck}
+                    title="What you did straight away"
+                    span
+                >
+                    <p className="text-sm whitespace-pre-wrap text-foreground">
+                        {d.immediate_actions}
+                    </p>
+                </ReviewCard>
+            ) : null}
+        </div>
+    );
+}
 
 function LifecycleTracker({ d }: { d: ConcernDetail }) {
     const idx = d.stage_index;

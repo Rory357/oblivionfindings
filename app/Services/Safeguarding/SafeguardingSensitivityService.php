@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 class SafeguardingSensitivityService
 {
-    private const SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
+    private const SITE_BYPASS_PERMISSIONS = UserSiteAccessService::SAFEGUARDING_SITE_BYPASS_PERMISSIONS;
 
     public function __construct(
         private readonly SafeguardingConcernPolicy $policy,
@@ -414,7 +414,9 @@ class SafeguardingSensitivityService
                 || $candidate->can('viewSensitive', SafeguardingConcern::class)
                 || $candidate->can('approveDeclassification', $concern)
                 || (int) $concern->assigned_to_user_id === (int) $candidate->id
-                || (int) $concern->reported_by_user_id === (int) $candidate->id) {
+                || (int) $concern->reported_by_user_id === (int) $candidate->id
+                // P2: the alleged perpetrator never sees it, so it never becomes visible to them.
+                || $this->policy->namesAsAllegedPerpetrator($candidate, $concern)) {
                 return false;
             }
 

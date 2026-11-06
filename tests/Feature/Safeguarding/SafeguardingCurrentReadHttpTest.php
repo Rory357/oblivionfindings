@@ -59,7 +59,7 @@ final class SafeguardingCurrentReadHttpTest extends TestCase
     {
         $this->concern($this->site); $this->concern($this->otherSite); $this->grant('healthSafety.viewAllSites');
         $this->actingAs($this->viewer)->get('/safeguarding')->assertOk()->assertInertia(fn (Assert $page) => $page->where('rows.total', 1)->where('rows.data.0.restricted', true));
-        $this->grant('reports.viewAny');
+        $this->grant('safeguarding.viewAllSites');
         $this->actingAs($this->viewer)->get('/safeguarding')->assertOk()->assertInertia(fn (Assert $page) => $page->where('rows.total', 2)->where('rows.data.0.restricted', true));
         $this->grant('safeguarding.viewSensitive');
         $this->actingAs($this->viewer)->get('/safeguarding')->assertOk()->assertInertia(fn (Assert $page) => $page->where('rows.total', 2)->where('rows.data.0.restricted', false));

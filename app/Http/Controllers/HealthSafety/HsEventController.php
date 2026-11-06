@@ -1131,7 +1131,7 @@ class HsEventController extends Controller
             // K1a (B1.5): the close answer checks "close any"; B7's title checks wellbeing access for exposures.
             'healthSafety.events.closeAny', 'hr.wellbeing.view',
             // B1 (6 Nov 2026): whether a safeguarding review may name its person follows the concern's own read.
-            'safeguarding.viewAny', 'safeguarding.viewSensitive', 'safeguarding.declassification.approve', 'reports.viewAny'];
+            'safeguarding.viewAny', 'safeguarding.viewSensitive', 'safeguarding.declassification.approve', 'safeguarding.viewAllSites'];
     }
 
     /**

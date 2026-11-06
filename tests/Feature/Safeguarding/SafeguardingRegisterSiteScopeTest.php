@@ -194,7 +194,7 @@ class SafeguardingRegisterSiteScopeTest extends TestCase
 
     public function test_reports_bypass_reader_still_sees_every_site(): void
     {
-        $reader = $this->reader(['safeguarding.viewAny', 'reports.viewAny'], null);
+        $reader = $this->reader(['safeguarding.viewAny', 'safeguarding.viewAllSites'], null);
 
         $this->actingAs($reader)
             ->get('/safeguarding')

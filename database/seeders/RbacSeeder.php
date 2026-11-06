@@ -538,6 +538,9 @@ class RbacSeeder extends Seeder
 
             // Safeguarding
             ['key' => 'safeguarding.viewAny', 'description' => 'View all safeguarding concerns', 'group' => 'safeguarding', 'module' => 'Compliance'],
+            // P6 (Stephan, 6 Nov 2026: "Remove it"): every-Site safeguarding needs this key; reports.viewAny no longer
+            // widens it. Admin gets it with every ordinary key. Migration 2026_11_06_110000.
+            ['key' => 'safeguarding.viewAllSites', 'description' => 'See safeguarding concerns at every Site, when paired with safeguarding access', 'group' => 'safeguarding', 'module' => 'Compliance'],
             ['key' => 'safeguarding.create', 'description' => 'Create safeguarding concerns', 'group' => 'safeguarding', 'module' => 'Compliance'],
             ['key' => 'safeguarding.update', 'description' => 'Update safeguarding concerns', 'group' => 'safeguarding', 'module' => 'Compliance'],
             ['key' => 'safeguarding.closeAny', 'description' => 'Close a safeguarding concern owned by another safeguarding lead', 'group' => 'safeguarding', 'module' => 'Compliance'],

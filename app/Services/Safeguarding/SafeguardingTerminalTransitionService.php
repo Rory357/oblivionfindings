@@ -34,7 +34,7 @@ final class SafeguardingTerminalTransitionService
 
     public const CLOSE_ANY_PERMISSION = 'safeguarding.closeAny';
 
-    private const SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
+    private const SITE_BYPASS_PERMISSIONS = UserSiteAccessService::SAFEGUARDING_SITE_BYPASS_PERMISSIONS;
 
     private const TRANSACTION_ATTEMPTS = 3;
 
@@ -484,7 +484,7 @@ final class SafeguardingTerminalTransitionService
                     'safeguarding.update' => $hasUpdatePermission,
                     self::CLOSE_ANY_PERMISSION => $actor->canDo(self::CLOSE_ANY_PERMISSION),
                     self::OVERRIDE_PERMISSION => $actor->canDo(self::OVERRIDE_PERMISSION),
-                    'reports.viewAny' => $actor->canDo('reports.viewAny'),
+                    'safeguarding.viewAllSites' => $actor->canDo('safeguarding.viewAllSites'),
                     'safeguarding.viewSensitive' => $actor->canDo('safeguarding.viewSensitive'),
                 ],
             ]),
