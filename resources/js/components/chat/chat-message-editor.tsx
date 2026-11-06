@@ -142,8 +142,11 @@ export function ChatMessageEditor({
             className="max-h-[65dvh] min-w-0 space-y-2 overflow-y-auto"
             aria-label="Edit your message"
         >
-            <div className="flex items-center gap-2 rounded-lg border-l-2 border-primary bg-muted/40 p-2 text-xs">
-                <Pencil className="size-4" />
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-2 text-xs">
+                <Pencil
+                    className="size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                />
                 <div className="min-w-0 flex-1">
                     <strong>Editing your message</strong>
                     <p>Your separate draft, reply and files are kept.</p>
