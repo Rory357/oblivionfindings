@@ -516,6 +516,8 @@ export type EventDetail = {
     occurred_at: string | null;
     reported_at: string | null;
     description: string | null;
+    // F5: its chemical exposure was marked entered in error; a person records the decision and closes the review.
+    source_entered_in_error?: boolean;
     site: { id: number; name: string } | null;
     client: { id: number; name: string } | null;
     staff: { id: number; name: string } | null;
@@ -1838,6 +1840,13 @@ function SafetyReviewPage({
                 })}
             />
             <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
+            {d.source_entered_in_error && d.status !== 'closed' ? (
+                <InfoCard icon={History} tone="info">
+                    Its exposure was entered in error. Record the WorkSafe
+                    decision as not notifiable with the reason “Entered in
+                    error”, then close this safety review.
+                </InfoCard>
+            ) : null}
             {pendingException ? (
                 <QuietLine
                     title="“Close anyway” request"

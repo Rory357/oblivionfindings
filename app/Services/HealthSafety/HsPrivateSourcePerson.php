@@ -33,6 +33,16 @@ final class HsPrivateSourcePerson
         return self::sourceKind($event) !== null;
     }
 
+    /**
+     * F5 (Stephan, 6 Nov 2026: "Show it, let a person close it"): whether this review's chemical exposure was marked
+     * entered in error. The review stays open until a person records the WorkSafe decision and closes it.
+     */
+    public static function exposureEnteredInError(HsEvent $event): bool
+    {
+        return self::sourceKind($event) === 'exposure' && (int) $event->source_id > 0
+            && ChemicalExposureSourceService::enteredInError((int) $event->source_id);
+    }
+
     private static function sourceKind(HsEvent $event): ?string
     {
         $type = ltrim((string) $event->getRawOriginal('source_type'), '\\');

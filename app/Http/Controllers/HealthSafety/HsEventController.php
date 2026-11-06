@@ -1559,6 +1559,8 @@ class HsEventController extends Controller
             'occurred_at' => $hsEvent->occurred_at?->toIso8601String(),
             'reported_at' => $hsEvent->reported_at?->toIso8601String(),
             'description' => $sgText($readableIncident?->description),
+            // F5: the review says its exposure was entered in error; a person still records the decision and closes it.
+            'source_entered_in_error' => \App\Services\HealthSafety\HsPrivateSourcePerson::exposureEnteredInError($hsEvent),
             'site' => $hsEvent->site ? ['id' => $hsEvent->site->id, 'name' => $hsEvent->site->name] : null,
             'client' => ! $hidePerson && $hsEvent->client && (! app(FirstAidSourceProjectionService::class)->isFirstAidSource($hsEvent->source_type) || $source !== null) ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name.' '.$hsEvent->client->last_name)] : null,
             'staff' => ! $hidePerson && $hsEvent->staff ? ['id' => $hsEvent->staff->id, 'name' => $hsEvent->staff->name] : null,

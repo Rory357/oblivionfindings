@@ -816,6 +816,9 @@ export function AskCloseAnywayDialog({
  * "Record the WorkSafe decision" (board M12, 480): the law's meaning word for word in its hint; "Yes" leads straight
  * to "Record that WorkSafe was told". Also changes a recorded decision while the review is open (with a reason).
  */
+/** F5: the WorkSafe reason for a review whose exposure was entered in error. */
+export const ENTERED_IN_ERROR_REASON = 'Entered in error: its exposure record was marked entered in error, so there is nothing to tell WorkSafe.';
+
 export function WorksafeDecisionDialog({
     open,
     onClose,
@@ -885,6 +888,20 @@ export function WorksafeDecisionDialog({
             >
                 <Textarea id="worksafe-decision-why" rows={3} value={form.data.reason} onChange={(event) => form.setData('reason', event.target.value)} />
             </PopupField>
+            {d.source_entered_in_error && !revising ? (
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="self-start"
+                    onClick={() => {
+                        setChosen('no');
+                        form.setData({ ...form.data, notifiable: false, reason: ENTERED_IN_ERROR_REASON });
+                    }}
+                >
+                    Use “Entered in error”
+                </Button>
+            ) : null}
         </PopupForm>
     );
 }

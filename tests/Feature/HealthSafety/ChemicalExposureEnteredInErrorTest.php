@@ -73,6 +73,32 @@ final class ChemicalExposureEnteredInErrorTest extends ChemicalExposureCommandTe
         $this->assertSame(1, ChemicalExposureReview::where('exposure_id', $root->id)->count());
     }
 
+    public function test_its_safety_review_says_so_and_a_person_records_entered_in_error_as_the_worksafe_reason(): void
+    {
+        // F5 (Stephan, 6 Nov 2026: "Show it, let a person close it"): nothing closes the review by itself.
+        $root = $this->exposure();
+        $review = \App\Models\HsEvent::factory()->create([
+            'source_type' => SubstanceExposureRecord::class, 'source_id' => $root->id, 'site_id' => $this->site->id,
+            'status' => 'open', 'worksafe_notifiable' => null, 'worksafe_decided_at' => null,
+        ]);
+        $this->assertFalse(\App\Services\HealthSafety\HsPrivateSourcePerson::exposureEnteredInError($review));
+
+        $this->mark($root);
+        $review->refresh();
+        $this->assertTrue(\App\Services\HealthSafety\HsPrivateSourcePerson::exposureEnteredInError($review));
+        $this->assertNotSame('closed', $review->status);
+
+        $decided = app(\App\Services\HealthSafety\HsEventService::class)->recordWorksafeDecision(
+            $review, false, 'Entered in error: its exposure record was marked entered in error, so there is nothing to tell WorkSafe.', $this->manager);
+        $this->assertFalse($decided->worksafe_notifiable);
+        $this->assertTrue($decided->hasSignedWorksafeDecision());
+        $readiness = collect(app(\App\Services\HealthSafety\HsEventClosureService::class)->readiness($decided)->toArray()['requirements'])
+            ->keyBy('key');
+        foreach (['worksafe_decision', 'worksafe_notification', 'worksafe_acknowledgement', 'site_preservation'] as $key) {
+            $this->assertTrue((bool) $readiness[$key]['complete'], $key);
+        }
+    }
+
     public function test_a_marked_record_leaves_every_active_list_and_count(): void
     {
         $wrong = $this->exposure(['medical_attention_sought' => true]);
