@@ -48,6 +48,11 @@ final class MonitoringRecoveryOperatorWorkflowTest extends TestCase
         $site = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
         $actor = User::factory()->create(['approved_at' => now()]);
         $actor->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        // Support workers hold only the care-alert key in S&D now (Stephan, 7 Nov 2026). This viewer gets
+        // the module's two view keys directly, as the role gave them before.
+        $actor->permissionOverrides()->syncWithoutDetaching(Permission::query()
+            ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
+            ->pluck('id')->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all());
         $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
         $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
         HrEmployeeProfile::factory()->create(['user_id' => $actor->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [], 'is_active' => true]);

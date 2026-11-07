@@ -564,6 +564,14 @@ class HealthcareWorkspaceTest extends TestCase
         $viewer->roles()->syncWithoutDetaching([
             Role::query()->where('name', $role)->firstOrFail()->id,
         ]);
+        // Support workers and team leads hold only the care-alert key in S&D now (Stephan, 7 Nov 2026).
+        // These healthcare cases are about client and Site scope, so the viewer gets the module's two view
+        // keys directly, as the role gave them before. Each test's own denials come after this and win.
+        if (in_array($role, ['support_worker', 'team_lead'], true)) {
+            $viewer->permissionOverrides()->syncWithoutDetaching(Permission::query()
+                ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
+                ->pluck('id')->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all());
+        }
 
         return $viewer;
     }

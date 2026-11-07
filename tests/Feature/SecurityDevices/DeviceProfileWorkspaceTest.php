@@ -51,6 +51,11 @@ class DeviceProfileWorkspaceTest extends TestCase
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $this->worker = User::factory()->create();
         $this->worker->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        // Support workers hold only the care-alert key in S&D now (Stephan, 7 Nov 2026). This viewer gets
+        // the module's two view keys directly, as the role gave them before.
+        $this->worker->permissionOverrides()->syncWithoutDetaching(Permission::query()
+            ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
+            ->pluck('id')->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all());
         $this->worker->permissionOverrides()->syncWithoutDetaching([
             Permission::query()->where('key', 'controlRoom.alerts.view')->value('id') => ['allowed' => false],
         ]);
@@ -637,6 +642,11 @@ class DeviceProfileWorkspaceTest extends TestCase
         $unrelatedSite = Site::factory()->create();
         $viewer = User::factory()->create();
         $viewer->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        // Support workers hold only the care-alert key in S&D now (Stephan, 7 Nov 2026). This viewer gets
+        // the module's two view keys directly, as the role gave them before.
+        $viewer->permissionOverrides()->syncWithoutDetaching(Permission::query()
+            ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
+            ->pluck('id')->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all());
         $permissionIds = Permission::query()
             ->whereIn('key', [
                 'securityDevices.devices.viewAllSites',
