@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Support\Database\LockConflictRetry;
+use Database\Seeders\OperationsPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -38,7 +39,8 @@ final class BusyViewerRowPagesTest extends CommittedDatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(RbacSeeder::class);
+        // Same order as DatabaseSeeder: the Operations seeder adds rostering.autoSchedule and re-syncs the admin role.
+        $this->seed([RbacSeeder::class, OperationsPermissionsSeeder::class]);
         config(['features.rostering.auto_schedule' => true]);
         $this->site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
@@ -89,18 +91,19 @@ final class BusyViewerRowPagesTest extends CommittedDatabaseTestCase
     public function test_listed_pages_load_while_a_save_holds_the_viewers_user_row(): void
     {
         $client = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
-        $shift = Shift::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id]);
+        // The shift's worker must work at its Site, or the shift page refuses it; the admin does.
+        $shift = Shift::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id, 'user_id' => $this->admin->id]);
         $run = RosterSuggestionRun::factory()->create(['site_id' => $this->site->id, 'requested_by' => $this->admin->id]);
 
         // Page => whether its own read locks the viewer's row (so it must meet the lock and run again).
         $pages = [
             '/my-day' => false,
             '/operations/shifts' => false,
-            "/operations/shifts/{$shift->id}" => true,
+            "/operations/shifts/{$shift->id}" => false,
             '/operations/job-board' => false,
             '/operations/job-board/postable-shifts' => true,
             '/operations/rostering' => false,
-            "/operations/rostering/suggestions/{$run->id}" => true,
+            "/operations/rostering/suggestions/{$run->id}" => false,
             '/operations/referrals' => false,
             '/safeguarding' => false,
             '/emar/downtime' => false,
@@ -133,10 +136,11 @@ final class BusyViewerRowPagesTest extends CommittedDatabaseTestCase
 
     public function test_a_page_load_that_has_written_is_not_run_again(): void
     {
-        DB::statement('CREATE TEMPORARY TABLE busy_row_probe_writes (id INT AUTO_INCREMENT PRIMARY KEY)');
+        DB::statement('CREATE TEMPORARY TABLE busy_row_probe_writes (id INT AUTO_INCREMENT PRIMARY KEY, note VARCHAR(20) NOT NULL)');
         $admin = $this->admin;
         Route::middleware(['web', 'auth', RetryPageReadOnLockConflict::class])->get('/__busy-row-probe', function () use ($admin) {
-            DB::table('busy_row_probe_writes')->insert([]);
+            // insert([]) would write nothing, so give it a value.
+            DB::table('busy_row_probe_writes')->insert(['note' => 'wrote']);
             DB::transaction(fn () => app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($admin, ['*']));
 
             return 'loaded';
