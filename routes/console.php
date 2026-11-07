@@ -1062,6 +1062,8 @@ app(Schedule::class)->command('monitoring:run-daily-discovery')->everyFiveMinute
 
 // S&D Phase D: snoozed device alerts come back on time; open ones nobody has acknowledged remind people after an hour.
 app(Schedule::class)->command('security-devices:alerts-tick')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+// Safety fix round (7 Nov 2026): ended snoozes remind again and unanswered safety or care alerts escalate within minutes.
+app(Schedule::class)->command('security-devices:alerts-minute')->everyMinute()->withoutOverlapping()->onOneServer();
 
 // S&D Phase E: sensor readings are kept 13 months (Setup › Change history says so).
 app(Schedule::class)->command('security-devices:prune-readings')->dailyAt('03:40')->withoutOverlapping()->onOneServer();

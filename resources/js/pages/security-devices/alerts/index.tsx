@@ -759,7 +759,12 @@ export default function AlertsIndex(props: AlertsProps) {
     }
 
     const target = shown
-        ? { id: shown.id, title: shown.title, opened_at: shown.opened_at }
+        ? {
+              id: shown.id,
+              title: shown.title,
+              opened_at: shown.opened_at,
+              snooze_max_minutes: shown.snooze_max_minutes ?? null,
+          }
         : null;
 
     return (

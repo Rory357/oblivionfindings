@@ -18,7 +18,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { SettingRow as SettingData } from './_types';
 
-type Value = boolean | string | null;
+type Value = boolean | string | number | null;
 
 /** What still gets through during quiet hours (Stephan, 6 Nov: routers and hubs, "Let them through"). */
 export const QUIET_HOURS_HINT =
@@ -45,6 +45,27 @@ export const SETTING_WORDS: Record<string, { label: string; hint: string; loosen
     'alerts.devices.push': { label: 'Devices and hubs not answering: push', hint: '' },
     'notify.new_devices.email': { label: 'New device found by a scan: email', hint: '' },
     'notify.new_devices.push': { label: 'New device found by a scan: push', hint: '' },
+    // Safety fix round (7 Nov 2026): safety and care alerts are attended to, not snoozed, and escalate within minutes.
+    'alerts.safety.snooze': {
+        label: 'Allow snoozing safety and care alerts',
+        hint: 'Off: panic buttons, duress, alarms, forced doors, leaks, falls and care rules can only be attended to or resolved',
+        loosens: 'People could hide a panic button, alarm, fall or care alert for a while, up to the longest snooze below.',
+    },
+    'alerts.safety.snooze_max': {
+        label: 'Longest snooze',
+        hint: 'Only when snoozing is allowed. When the snooze ends the alert comes back and reminds again',
+        loosens: 'A snoozed safety or care alert would stay hidden for longer.',
+    },
+    'alerts.escalate.urgent': {
+        label: 'Panic, duress, falls, alarms and forced doors',
+        hint: 'If nobody has said they’re on it, the on-call manager for that house is told',
+        loosens: 'The on-call manager would hear later about a panic button, duress, fall, alarm or forced door nobody has answered.',
+    },
+    'alerts.escalate.care': {
+        label: 'Care rules, water leaks and hot water',
+        hint: 'If nobody has said they’re on it, the on-call manager is told; care rules also go to Control Room',
+        loosens: 'The on-call manager would hear later about a care alert nobody has answered.',
+    },
     'alerts.safety.roster': { label: 'Use the roster to find who is on shift', hint: 'From Rostering and clock-ins, at the moment it happens; off, or nobody on shift: everyone at that Site who can acknowledge alerts' },
     'alerts.safety.email': { label: 'Safety alerts: email', hint: '', loosens: 'Staff on shift would no longer get safety alerts by email.' },
     'alerts.safety.push': { label: 'Safety alerts: push', hint: '', loosens: 'Staff on shift would no longer get safety alerts on their phone.' },
@@ -106,7 +127,10 @@ export function useSettingsDraft(settings: Record<string, SettingData> | null) {
         () =>
             Object.entries(draft).map(([key, next]) => {
                 const row = settings?.[key];
-                const loosens = row?.type === 'bool' && ((row.loosens_when_on && next === true) || (row.loosens_when_off && next === false));
+                const savedMinutes = row?.type === 'minutes' ? row.value : null;
+                const loosens =
+                    (row?.type === 'bool' && ((row.loosens_when_on && next === true) || (row.loosens_when_off && next === false))) ||
+                    (row?.type === 'minutes' && row.loosens_when_up && typeof next === 'number' && savedMinutes !== null && next > savedMinutes);
                 return { key, from: saved(key), to: next, loosens: Boolean(loosens) };
             }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,6 +232,41 @@ export function RoleRow({ settingKey, draft }: { settingKey: string; draft: Sett
     );
 }
 
+/** A row whose value is a number of minutes from a short list (safety fix round, 7 Nov 2026). */
+export function MinutesRow({ settingKey, draft, disabled = false, disabledText }: { settingKey: string; draft: SettingsDraft; disabled?: boolean; disabledText?: string }) {
+    const row = draft.settings?.[settingKey];
+    if (!row || row.type !== 'minutes') return null;
+    const words = SETTING_WORDS[settingKey] ?? { label: settingKey, hint: '' };
+    const current = draft.value(settingKey);
+    const id = `setting-${settingKey}`;
+
+    return (
+        <SettingRow
+            label={labelWithBadge(words.label, draft, [settingKey])}
+            hint={row.can_change ? words.hint : `${words.hint}. You can’t change this here.`}
+            htmlFor={id}
+            control={
+                disabled ? (
+                    <span className="text-subtle">{disabledText ?? '—'}</span>
+                ) : (
+                    <Select value={String(typeof current === 'number' ? current : row.value)} onValueChange={(next) => draft.set(settingKey, Number(next))} disabled={!row.can_change}>
+                        <SelectTrigger id={id} className="w-40" aria-label={words.label}>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {row.choices.map((choice) => (
+                                <SelectItem key={choice} value={String(choice)}>
+                                    {choice === 1 ? '1 minute' : `${choice} minutes`}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )
+            }
+        />
+    );
+}
+
 /** Rows with In-app / Email / Push switch columns (DESIGN.md: anything that notifies people). */
 export function ChannelGroup({
     icon,
@@ -288,6 +347,7 @@ function valueWords(key: string, value: Value, draft: SettingsDraft): string {
     const row = draft.settings?.[key];
     if (row?.type === 'role') return row.options.find((option) => option.value === value)?.label ?? 'IT for that Site';
     if (row?.type === 'time') return formatClock(typeof value === 'string' ? value : null);
+    if (row?.type === 'minutes') return typeof value === 'number' ? `${value} min` : '—';
     return value ? 'On' : 'Off';
 }
 

@@ -18,6 +18,8 @@ use App\Domain\SecurityDevices\Screens\Devices\Pages\AlarmPagePresenter;
 use App\Domain\SecurityDevices\Screens\Devices\Pages\SensorPagePresenter;
 use App\Domain\SecurityDevices\Screens\Sites\AlertWords;
 use App\Domain\SecurityDevices\Screens\Sites\SiteStream;
+use App\Domain\SecurityDevices\Screens\Http\CareAlertController;
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Shift;
 use App\Models\Site;
@@ -56,7 +58,7 @@ final class WorkerOverviewPresenter
      * plus the care and scald kinds as the engine names them). An allow-list, so an IT alert (offline,
      * failing, hub, sensor broker) never reaches this view.
      */
-    private const array SAFETY_KINDS = ['panic', 'alarm', 'leak', 'forced', 'tamper', 'care_out_of_bed', 'care_door_night', 'scald_risk'];
+    private const array SAFETY_KINDS = ['panic', 'duress', 'fall', 'alarm', 'leak', 'forced', 'tamper', 'care_out_of_bed', 'care_door_night', 'scald_risk'];
 
     /** The other house alerts: batteries, and readings ("reading_*", matched by prefix). */
     private const array HOUSE_KINDS = [...self::SAFETY_KINDS, 'battery'];
@@ -288,7 +290,12 @@ final class WorkerOverviewPresenter
             ->get(['alert_id', 'text', 'detail'])
             ->keyBy('alert_id');
 
-        return $alerts->map(function (DeviceAlert $alert) use ($carePeople, $opened): array {
+        // Safety fix round (7 Nov 2026): someone who can't open the Alerts page opens a care or safety
+        // alert they were told about on its own page, and attends from there.
+        $canOpenAlerts = AlertsPresenter::canOpen($viewer);
+        $canAttend = $viewer->canDo(CareAlertController::KEY);
+
+        return $alerts->map(function (DeviceAlert $alert) use ($carePeople, $opened, $canOpenAlerts, $canAttend, $toldIds): array {
             $words = new AlertWords($alert, $carePeople[(int) $alert->id] ?? false);
             $event = $opened->get($alert->id);
             $what = (string) ($words->text($event?->text) ?? '');
@@ -300,6 +307,11 @@ final class WorkerOverviewPresenter
                 'title' => $words->title(),
                 'tone' => $alert->severity === 'critical' ? 'critical' : 'warning',
                 'safety' => $safety,
+                'href' => match (true) {
+                    $canOpenAlerts => '/security-devices/alerts?alert='.$alert->id,
+                    $canAttend && in_array($alert->kind, DeviceAlertEngine::safetyCareKinds(), true) && in_array((int) $alert->id, $toldIds, true) => '/security-devices/care-alerts/'.$alert->id,
+                    default => null,
+                },
                 'at' => $alert->opened_at->toIso8601String(),
                 'sub' => trim(implode('. ', array_filter([$what, $detail], fn (string $part): bool => $part !== ''))),
                 'then' => match (true) {

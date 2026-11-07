@@ -263,13 +263,15 @@ final class AlertsPresenter
             'can' => [
                 'acknowledge' => $active && $viewer->canDo('securityDevices.alerts.acknowledge'),
                 'assign' => $active && $viewer->canDo('securityDevices.alerts.acknowledge'),
-                'snooze' => $active && $viewer->canDo('securityDevices.alerts.acknowledge'),
+                // Safety fix round: safety and care alerts snooze only when Setup allows it, up to its longest snooze.
+                'snooze' => $active && $viewer->canDo('securityDevices.alerts.acknowledge') && DeviceAlertEngine::snoozeRule((string) $alert->kind)['allowed'],
                 'done' => $active && $viewer->canDo('securityDevices.alerts.acknowledge') && in_array($alert->kind, DeviceAlertEngine::safetyKinds(), true),
                 'report_incident' => $viewer->canDo('incidents.create'),
                 // S&D Phase F: a scald-risk alert raises its H&S hazard once; then it links to it.
                 'raise_hazard' => $alert->kind === 'scald_risk' && $alert->hazard_id === null && $viewer->canDo('hazards.create'),
             ],
             'hazard_url' => $alert->hazard_id !== null ? '/hazards/'.$alert->hazard_id : null,
+            'snooze_max_minutes' => DeviceAlertEngine::snoozeRule((string) $alert->kind)['max_minutes'],
         ];
     }
 
@@ -296,6 +298,8 @@ final class AlertsPresenter
             'offline' => "{$name} stopped answering at {time}.",
             'hub_offline' => "{$name} stopped answering at {time}. Devices at its Sites can’t be checked until it’s back; they keep working on their own.",
             'panic' => "The panic button on {$name} was pressed at {time}. Control Room has it too.",
+            'duress' => "A duress code was entered at {$name} at {time}: someone may be in danger. Control Room has it too.",
+            'fall' => "{$name} reported a possible fall at {time}. Control Room has it too.",
             'alarm' => "{$name} reported an alarm at {time}. Control Room has it too.",
             'leak' => "{$name} reported a water leak at {time}.",
             'forced' => "{$name} reported the door forced open at {time}. Control Room has it too.",

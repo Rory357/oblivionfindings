@@ -44,6 +44,8 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             ['key' => 'securityDevices.integrations.manage', 'description' => 'Manage device sync and discovery', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.monitoring.manage', 'description' => 'Author monitoring profiles, coverage, dependencies, maintenance windows, and retention', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.reports.view', 'description' => 'View hardware and compliance reports', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            // Safety fix round (7 Nov 2026). Grant migration 2026_11_07_100100_grant_care_alerts_attend.
+            ['key' => 'securityDevices.careAlerts.attend', 'description' => 'Open and attend to the care and safety alerts sent to you, at your own Sites (no snooze, no other alerts)', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.observe', 'description' => 'View authorised device command history', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.operate', 'description' => 'Run approved low-risk device diagnostics and actions', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.manage', 'description' => 'Run standard state-changing device management', 'group' => 'security_devices', 'module' => 'Security & Devices'],
@@ -165,11 +167,15 @@ class SecurityDevicesPermissionsSeeder extends Seeder
         $this->attachToRole('team_lead', [
             'securityDevices.viewAny',
             'securityDevices.devices.view',
+            // Safety fix round (Stephan, 7 Nov 2026: "Open just that alert"). Grant migration 2026_11_07_100100.
+            'securityDevices.careAlerts.attend',
         ]);
 
         $this->attachToRole('support_worker', [
             'securityDevices.viewAny',
             'securityDevices.devices.view',
+            // Safety fix round (Stephan, 7 Nov 2026: "Open just that alert"). Grant migration 2026_11_07_100100.
+            'securityDevices.careAlerts.attend',
         ]);
 
         $this->attachToRole('auditor', [

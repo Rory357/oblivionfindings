@@ -354,8 +354,24 @@ function OverviewTab({ overview, siteName, now, onDevices }: { overview: NonNull
     const total = overview.states.reduce((sum, row) => sum + row.count, 0);
     const known = overview.week ? overview.week.values.map((value, index) => ({ value, label: overview.week!.labels[index] })).filter((day) => day.value !== null) : [];
 
+    const stopped = overview.care_stopped ?? [];
+
     return (
         <div className="flex flex-col gap-5">
+            {stopped.length > 0 ? (
+                <Log
+                    title="Care alerts stopped: consent ended"
+                    sub="These sensors no longer alert staff about the person. Link them again once consent is renewed"
+                    items={stopped.map((row) => ({
+                        key: row.device_id,
+                        time: row.ended_at ? seenTime(row.ended_at, now) : '',
+                        tone: 'warning',
+                        title: `${row.person}’s consent ended`,
+                        sub: row.device,
+                        action: { label: 'Open sensor', href: row.device_href, ariaLabel: `Open sensor: ${row.device}` },
+                    }))}
+                />
+            ) : null}
             {overview.hub_down ? (
                 <KnowList
                     title={`${overview.hub_down.hub} has stopped answering`}

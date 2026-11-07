@@ -273,6 +273,8 @@ export type SitePageProps = {
         scan: { at: string | null; caption: string; href: string } | null;
     };
     overview: {
+        /** Safety fix round (F2): sensors whose care alerts stopped in the last 30 days because consent ended. */
+        care_stopped?: { device_id: number; device: string; device_href: string; person: string; ended_at: string | null }[];
         states: { state: DeviceState; count: number }[];
         cameras: { id: number; name: string; state: DeviceState; href: string }[];
         camera_count: number;

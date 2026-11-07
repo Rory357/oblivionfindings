@@ -51,7 +51,7 @@ final class MonthlyReport
     public const int LOG_ROWS = 50;
 
     /** Safety alerts: from the device itself (DeviceAlertEngine::SAFETY_EVENTS) and care plan sensors. */
-    public const array SAFETY_KINDS = ['panic', 'alarm', 'leak', 'forced', 'tamper', 'care_out_of_bed', 'care_door_night', 'scald_risk'];
+    public const array SAFETY_KINDS = ['panic', 'duress', 'fall', 'alarm', 'leak', 'forced', 'tamper', 'care_out_of_bed', 'care_door_night', 'scald_risk'];
 
     /** What "routers and gateways" means for time offline by Site. */
     private const array NETWORK_KINDS = [DeviceKind::Router, DeviceKind::SensorGateway];
@@ -545,6 +545,8 @@ final class MonthlyReport
             in_array($kind, ['care_out_of_bed', 'care_door_night'], true) => 'Care plan sensor',
             $kind === 'scald_risk' => 'Hot water too hot',
             $kind === 'panic' => 'Panic button',
+            $kind === 'duress' => 'Duress code',
+            $kind === 'fall' => 'Possible fall',
             $kind === 'alarm' => 'Alarm going off',
             $kind === 'leak' => 'Water leak',
             $kind === 'forced' => 'Door forced open',

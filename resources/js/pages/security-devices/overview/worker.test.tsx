@@ -134,6 +134,24 @@ describe('Support worker’s Overview (1c)', () => {
         expect(within(header as HTMLElement).getByText('Synthetic House')).toBeInTheDocument();
     });
 
+    it('opens a safety alert sent to them on its own page (safety fix round: the care-alert key)', () => {
+        const [first] = worker().safety;
+        render(
+            <Overview
+                {...worker({
+                    safety: [
+                        { ...first, href: '/security-devices/care-alerts/31' },
+                        { ...first, id: 32, title: 'Synthetic door: forced open', href: null },
+                    ],
+                })}
+            />,
+        );
+
+        const links = screen.getAllByRole('link', { name: /Open alert/ });
+        expect(links).toHaveLength(1);
+        expect(links[0]).toHaveAttribute('href', '/security-devices/care-alerts/31');
+    });
+
     it('explains when the person isn’t linked to a Site yet', () => {
         render(<Overview {...worker({ site: null, sites: [], meters: [], safety: [], kit: { brand: null, reported_at: null, items: [] }, around: [], told: [] })} />);
 

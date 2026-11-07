@@ -132,7 +132,17 @@ export type WorkerMeter = {
     device_id: number | null;
 };
 
-export type WorkerAlert = { id: number; title: string; tone: 'critical' | 'warning'; safety: boolean; at: string; sub: string; then: string };
+export type WorkerAlert = {
+    id: number;
+    title: string;
+    tone: 'critical' | 'warning';
+    safety: boolean;
+    /** Where the person opens it: the Alerts page, the alert on its own (care and safety alerts they were told about), or nowhere. */
+    href?: string | null;
+    at: string;
+    sub: string;
+    then: string;
+};
 
 export type WorkerKitItem = {
     key: string;

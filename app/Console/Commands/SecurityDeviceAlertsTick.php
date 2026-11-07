@@ -19,6 +19,8 @@ final class SecurityDeviceAlertsTick extends Command
         $result = $alerts->tick();
         // S&D Phase F: links whose consent ended come off first, so no rule runs without consent.
         $unlinked = $links->sweepConsents();
+        // Safety fix round (F2): house managers are warned 14 and 3 days before a resident's sensor consent ends.
+        app(\App\Domain\SecurityDevices\Care\ConsentEndings::class)->warn();
         $outOfBed = $care->tick();
         $cool = $scald->tick();
         // S&D Phase G: terminals past their idle or hour limit close; what devices sent is dropped an hour after.

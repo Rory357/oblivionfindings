@@ -2,6 +2,10 @@
 
 namespace App\Notifications;
 
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
+use App\Domain\SecurityDevices\Screens\Alerts\AlertsPresenter;
+use App\Domain\SecurityDevices\Screens\Http\CareAlertController;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -21,6 +25,8 @@ class SecurityDeviceAlertNotification extends Notification
         public readonly string $title,
         public readonly string $line,
         public readonly array $channels,
+        /** The alert's kind, so a care or safety alert opens the right view for the person told. */
+        public readonly ?string $kind = null,
     ) {}
 
     /** @return list<string> */
@@ -43,12 +49,32 @@ class SecurityDeviceAlertNotification extends Notification
     /** @return array{title: string, body: string, data: array<string, string>} */
     public function toPush(object $notifiable): array
     {
-        return ['title' => $this->title, 'body' => $this->line, 'data' => ['url' => $this->url()]];
+        return ['title' => $this->title, 'body' => $this->line, 'data' => ['url' => $this->urlFor($notifiable)]];
     }
 
     public function url(): string
     {
         return '/security-devices/alerts?alert='.$this->alertId;
+    }
+
+    /**
+     * Safety fix round (7 Nov 2026, Stephan: "Open just that alert"): someone who can't open the
+     * Alerts page but may attend to care and safety alerts (support workers, team leads) gets a link
+     * to that one alert. Everyone else opens it on the Alerts page, as before.
+     */
+    public function urlFor(object $notifiable): string
+    {
+        $canOpenAlerts = $notifiable instanceof User
+            && AlertsPresenter::canOpen($notifiable);
+        if (! $canOpenAlerts
+            && $this->kind !== null
+            && in_array($this->kind, DeviceAlertEngine::safetyCareKinds(), true)
+            && $notifiable instanceof User
+            && $notifiable->canDo(CareAlertController::KEY)) {
+            return '/security-devices/care-alerts/'.$this->alertId;
+        }
+
+        return $this->url();
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -58,7 +84,7 @@ class SecurityDeviceAlertNotification extends Notification
             ->greeting('Kia ora '.($notifiable->name ?? 'team').',')
             ->line($this->title.'.')
             ->line($this->line.'.')
-            ->action('Open the alert', url($this->url()));
+            ->action('Open the alert', url($this->urlFor($notifiable)));
     }
 
     /** @return array<string, mixed> */
@@ -70,8 +96,8 @@ class SecurityDeviceAlertNotification extends Notification
             'title' => $this->title,
             'body' => $this->line,
             'message' => $this->line,
-            'url' => $this->url(),
-            'action_url' => $this->url(),
+            'url' => $this->urlFor($notifiable),
+            'action_url' => $this->urlFor($notifiable),
             'context' => ['alert_id' => $this->alertId],
         ];
     }

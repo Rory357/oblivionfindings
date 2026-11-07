@@ -38,6 +38,8 @@ class SecurityDevicesPermissionsTest extends TestCase
         'securityDevices.integrations.manage',
         'securityDevices.monitoring.manage',
         'securityDevices.reports.view',
+        // Safety fix round (7 Nov 2026): open and attend only the care and safety alerts sent to you.
+        'securityDevices.careAlerts.attend',
         'securityDevices.commands.observe',
         'securityDevices.commands.operate',
         'securityDevices.commands.manage',
@@ -76,13 +78,14 @@ class SecurityDevicesPermissionsTest extends TestCase
         }
     }
 
-    public function test_exactly_66_security_devices_permissions(): void
+    public function test_exactly_67_security_devices_permissions(): void
     {
         $count = Permission::where('key', 'like', 'securityDevices.%')->count();
 
         // 50 before the S&D rebuild, plus its 16 new securityDevices.* keys (SecurityDevicesRebuildPermissions,
-        // granted by 2026_11_01_000100_grant_security_devices_rebuild_permissions).
-        $this->assertEquals(66, $count);
+        // granted by 2026_11_01_000100_grant_security_devices_rebuild_permissions), plus the safety fix round's
+        // securityDevices.careAlerts.attend (2026_11_07_100100_grant_care_alerts_attend).
+        $this->assertEquals(67, $count);
     }
 
     public function test_permissions_have_correct_group_and_module(): void
@@ -182,8 +185,12 @@ class SecurityDevicesPermissionsTest extends TestCase
         $expected = [
             'securityDevices.viewAny',
             'securityDevices.devices.view',
+            // Safety fix round: only the care and safety alerts sent to them, at their own Sites.
+            'securityDevices.careAlerts.attend',
         ];
         $denied = [
+            // ...and nothing that works the Alerts page: no acknowledge, assign or snooze.
+            'securityDevices.alerts.acknowledge',
             'securityDevices.devices.create',
             'securityDevices.devices.update',
             'securityDevices.devices.delete',

@@ -9,6 +9,9 @@ use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\EffectiveMonitoringPolicyResolver;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlertEvent;
+use App\Models\ControlRoom\SignalSource;
+use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\Medication\Alerts\OnCallResolver;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Screens\DeviceKind;
@@ -66,12 +69,33 @@ final class DeviceAlertEngine
      */
     public const array SAFETY_EVENTS = [
         'panic' => ['panic', 'critical', 'panic button pressed'],
+        'panic_alarm' => ['panic', 'critical', 'panic button pressed'],
+        'sos_triggered' => ['panic', 'critical', 'SOS pressed'],
+        // Safety fix round (7 Nov 2026): a duress code at the alarm panel told nobody on shift.
+        'duress' => ['duress', 'critical', 'duress code entered at the alarm'],
         'alarm_triggered' => ['alarm', 'critical', 'alarm going off'],
         'alarm_trigger' => ['alarm', 'critical', 'alarm going off'],
         'water_leak_detected' => ['leak', 'critical', 'water leak'],
+        'water_leak' => ['leak', 'critical', 'water leak'],
         'door_forced' => ['forced', 'critical', 'door forced open'],
+        // Safety fix round: a fall from a fall sensor only wrote a log line; now staff on shift hear.
+        'fall_detected' => ['fall', 'critical', 'possible fall'],
         'tamper' => ['tamper', 'warning', 'tampered with'],
     ];
+
+    /**
+     * Safety and care alerts: somebody must attend or resolve them, so they can't be snoozed
+     * unless Setup › Alerts & checks allows it, and then only up to its longest snooze (Stephan,
+     * 7 Nov 2026: "Default not snoozable but there should be a setting to enable snooze and be
+     * able to set time"). An unanswered one escalates to the on-call manager and Control Room
+     * within minutes (escalate()). Tamper stays an ordinary device alert.
+     *
+     * @return list<string>
+     */
+    public static function safetyCareKinds(): array
+    {
+        return ['panic', 'duress', 'alarm', 'leak', 'forced', 'fall', ...self::CARE_KINDS, ...self::EMERGENCY_KINDS];
+    }
 
     public function __construct(private readonly EffectiveMonitoringPolicyResolver $policies) {}
 
@@ -619,6 +643,13 @@ final class DeviceAlertEngine
             $locked = DeviceAlert::query()->whereKey($alert->id)->lockForUpdate()->firstOrFail();
             abort_unless($locked->isActive(), 409, 'This alert is already done.');
             $now = CarbonImmutable::now('UTC');
+            // Safety fix round (7 Nov 2026): safety and care alerts are attended or resolved, not
+            // snoozed, unless Setup allows it; then only up to its longest snooze.
+            $rule = self::snoozeRule((string) $locked->kind);
+            abort_unless($rule['allowed'], 409, 'Safety and care alerts can’t be snoozed: someone has to attend to them or resolve them.');
+            if ($rule['max_minutes'] !== null && $until->gt($now->addMinutes($rule['max_minutes'])->addSeconds(30))) {
+                abort(422, "Snooze a safety or care alert for {$rule['max_minutes']} minutes at most.");
+            }
             $locked->forceFill(['state' => DeviceAlert::STATE_SNOOZED, 'snoozed_until' => $until, 'snoozed_by_user_id' => $actor->id])->save();
             $why = $why !== null && trim($why) !== '' ? trim($why) : null;
             $this->event($locked, $now, 'snoozed', "{$actor->name} snoozed it until {until}", $why, $actor, $until);
@@ -645,19 +676,8 @@ final class DeviceAlertEngine
     public function tick(?CarbonImmutable $now = null): array
     {
         $now ??= CarbonImmutable::now('UTC');
-        $back = 0;
-        DeviceAlert::query()->where('state', DeviceAlert::STATE_SNOOZED)->where('snoozed_until', '<=', $now)->orderBy('id')
-            ->each(function (DeviceAlert $alert) use ($now, &$back): void {
-                DB::transaction(function () use ($alert, $now, &$back): void {
-                    $locked = DeviceAlert::query()->whereKey($alert->id)->lockForUpdate()->first();
-                    if ($locked === null || $locked->state !== DeviceAlert::STATE_SNOOZED) {
-                        return;
-                    }
-                    $locked->forceFill(['state' => DeviceAlert::STATE_OPEN, 'snoozed_until' => null])->save();
-                    $this->event($locked, $now, 'back', 'Snooze ended');
-                    $back++;
-                });
-            });
+        $back = $this->returnSnoozed($now);
+        $this->escalate($now);
 
         $this->sendMorningSummary($now);
 
@@ -667,6 +687,9 @@ final class DeviceAlertEngine
             ->where(fn ($query) => $query
                 ->where(fn ($due) => $due->whereNotNull('remind_at')->where('remind_at', '<=', $now))
                 ->orWhere(fn ($due) => $due->where(fn ($level) => $level->where('severity', 'critical')->orWhereIn('kind', self::ON_CALL_KINDS))
+                    // Safety and care alerts go to the on-call manager within minutes (escalate()), not to IT after an
+                    // hour. Lockdown and evacuation don't escalate, so they keep this reminder.
+                    ->whereNotIn('kind', array_values(array_diff(self::safetyCareKinds(), self::EMERGENCY_KINDS)))
                     ->whereNull('acknowledged_at')->whereNull('reminded_at')->where('opened_at', '<=', $now->subMinutes(self::REMIND_AFTER_MINUTES))))
             ->orderBy('id')
             ->each(function (DeviceAlert $alert) use ($now, $settings, &$reminded): void {
@@ -698,6 +721,195 @@ final class DeviceAlertEngine
             });
 
         return ['back' => $back, 'reminded' => $reminded];
+    }
+
+    /**
+     * Every minute (security-devices:alerts-minute): snoozes that have ended come back and remind
+     * again, and safety and care alerts nobody has answered escalate. Both are safe to run twice.
+     *
+     * @return array{back: int, escalated: int}
+     */
+    public function minute(?CarbonImmutable $now = null): array
+    {
+        $now ??= CarbonImmutable::now('UTC');
+
+        return ['back' => $this->returnSnoozed($now), 'escalated' => $this->escalate($now)];
+    }
+
+    /**
+     * Whether a person may snooze this kind of alert, and for how long at most (minutes; null for
+     * ordinary device alerts, which keep today's snooze of up to a week).
+     *
+     * @return array{allowed: bool, max_minutes: int|null}
+     */
+    public static function snoozeRule(string $kind): array
+    {
+        if (! in_array($kind, self::safetyCareKinds(), true)) {
+            return ['allowed' => true, 'max_minutes' => null];
+        }
+        $settings = app(SecurityDevicesSettings::class);
+        if (! $settings->bool(SecurityDevicesSettings::SAFETY_SNOOZE)) {
+            return ['allowed' => false, 'max_minutes' => null];
+        }
+
+        return ['allowed' => true, 'max_minutes' => $settings->minutes(SecurityDevicesSettings::SAFETY_SNOOZE_MAX)];
+    }
+
+    /** Kinds whose unanswered alert goes to the on-call manager after the shorter time. */
+    public const array URGENT_KINDS = ['panic', 'duress', 'fall', 'alarm', 'forced'];
+
+    /** Care-rule kinds only Security & devices sees: their escalation tells Control Room too. */
+    public const array S_AND_D_ONLY_KINDS = self::CARE_KINDS;
+
+    /** Snoozes that have ended come back, and the people told about the alert hear again. */
+    private function returnSnoozed(CarbonImmutable $now): int
+    {
+        $back = 0;
+        DeviceAlert::query()->where('state', DeviceAlert::STATE_SNOOZED)->where('snoozed_until', '<=', $now)->orderBy('id')
+            ->each(function (DeviceAlert $alert) use ($now, &$back): void {
+                $returned = DB::transaction(function () use ($alert, $now): ?DeviceAlert {
+                    $locked = DeviceAlert::query()->whereKey($alert->id)->lockForUpdate()->first();
+                    if ($locked === null || $locked->state !== DeviceAlert::STATE_SNOOZED) {
+                        return null;
+                    }
+                    $locked->forceFill(['state' => DeviceAlert::STATE_OPEN, 'snoozed_until' => null])->save();
+                    $this->event($locked, $now, 'back', 'Snooze ended');
+
+                    return $locked;
+                });
+                if ($returned === null) {
+                    return;
+                }
+                $back++;
+                // Safety fix round: a snooze that ends reminds again, whatever the kind of alert.
+                try {
+                    $returned->loadMissing(['device', 'acknowledgedBy']);
+                    $safety = in_array($returned->kind, self::safetyCareKinds(), true);
+                    $people = match (true) {
+                        $returned->acknowledgedBy !== null => collect([$returned->acknowledgedBy]),
+                        $safety && $returned->site_id !== null => app(StaffOnShift::class)->toTell((int) $returned->site_id),
+                        default => $this->peopleToTell($returned),
+                    };
+                    if ($people->isEmpty()) {
+                        return;
+                    }
+                    $this->notify($people, $returned, 'Snooze ended: it’s still open', $safety ? ['database', 'push'] : ['database', 'mail']);
+                    $this->event($returned, $now, 'reminded', 'Snooze ended: still open', 'Reminder sent to '.self::names($people->pluck('name')->all()));
+                } catch (Throwable $exception) {
+                    Log::warning('Snooze reminder could not be sent', ['alert_id' => $returned->id, 'error' => $exception->getMessage()]);
+                }
+            });
+
+        return $back;
+    }
+
+    /**
+     * Safety fix round (7 Nov 2026): a safety or care alert nobody has said they're on (acknowledged
+     * or taken) after the minutes in Setup goes to the on-call manager for that house, and to Control
+     * Room as critical when only Security & devices knows about it (care rules; panic, alarms, falls
+     * and the rest reach Control Room from the device itself). Someone already told is never the
+     * escalation: with nobody else on call, Control Room is told. Once per alert.
+     */
+    private function escalate(CarbonImmutable $now): int
+    {
+        $settings = app(SecurityDevicesSettings::class);
+        $urgent = $settings->minutes(SecurityDevicesSettings::ESCALATE_URGENT);
+        $care = $settings->minutes(SecurityDevicesSettings::ESCALATE_CARE);
+        $kinds = array_values(array_diff(self::safetyCareKinds(), self::EMERGENCY_KINDS));
+        $escalated = 0;
+        DeviceAlert::query()->with('device')
+            ->where('state', DeviceAlert::STATE_OPEN)
+            ->whereIn('kind', $kinds)
+            ->whereNull('acknowledged_at')->whereNull('assigned_at')
+            ->where('opened_at', '<=', $now->subMinutes(min($urgent, $care)))
+            ->whereDoesntHave('events', fn ($events) => $events->where('kind', 'escalated'))
+            ->orderBy('id')
+            ->each(function (DeviceAlert $alert) use ($now, $urgent, $care, &$escalated): void {
+                $after = in_array($alert->kind, self::URGENT_KINDS, true) ? $urgent : $care;
+                if ($alert->opened_at === null || $alert->opened_at->gt($now->subMinutes($after))) {
+                    return;
+                }
+                try {
+                    if ($this->escalateOne($alert, $now, $after)) {
+                        $escalated++;
+                    }
+                } catch (Throwable $exception) {
+                    Log::error('Safety alert could not be escalated', ['alert_id' => $alert->id, 'error' => $exception->getMessage()]);
+                }
+            });
+
+        return $escalated;
+    }
+
+    private function escalateOne(DeviceAlert $alert, CarbonImmutable $now, int $after): bool
+    {
+        $claimed = DB::transaction(function () use ($alert): bool {
+            $locked = DeviceAlert::query()->whereKey($alert->id)->lockForUpdate()->first();
+            if ($locked === null || $locked->state !== DeviceAlert::STATE_OPEN || $locked->acknowledged_at !== null || $locked->assigned_at !== null
+                || DeviceAlertEvent::query()->where('alert_id', $locked->id)->where('kind', 'escalated')->exists()) {
+                return false;
+            }
+            // Claimed first, so a second run never tells anyone twice.
+            $this->event($locked, CarbonImmutable::now('UTC'), 'escalated', 'Nobody had said they’re on it');
+
+            return true;
+        }, 3);
+        if (! $claimed) {
+            return false;
+        }
+
+        $siteId = $alert->site_id !== null ? (int) $alert->site_id : null;
+        $told = $siteId !== null ? app(StaffOnShift::class)->toTell($siteId)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all() : [];
+        $onCall = $siteId !== null ? (app(OnCallResolver::class)->at($siteId, $now)['user'] ?? null) : null;
+        if ($onCall instanceof User && in_array((int) $onCall->id, $told, true)) {
+            $onCall = null; // they were told already and haven't answered
+        }
+        $words = "Nobody has said they’re on it after {$after} min";
+        if ($onCall instanceof User) {
+            $this->notify(collect([$onCall]), $alert, $words.' · you’re on call', ['database', 'push', 'mail']);
+            $this->event($alert, $now, 'told', "{$onCall->name} told (on call)", "{$words}. App, push and email.");
+        }
+        $toControlRoom = in_array($alert->kind, self::S_AND_D_ONLY_KINDS, true) || ! $onCall instanceof User;
+        if ($toControlRoom && $siteId !== null) {
+            if ($this->tellControlRoom($alert, $siteId, $after)) {
+                $this->event($alert, $now, 'told', 'Control Room told (critical)', $onCall instanceof User ? $words.'.' : $words.', and nobody else is on call.');
+            } else {
+                $this->event($alert, $now, 'told', 'Control Room couldn’t be told', 'Its signal source for Security & devices isn’t set up. The alert stays open here.');
+            }
+        } elseif (! $onCall instanceof User) {
+            $this->event($alert, $now, 'told', 'Nobody else to tell', 'No on-call manager is set up for this house.');
+        }
+
+        return true;
+    }
+
+    /** A critical Control Room alert for an unanswered alert only Security & devices knows about. */
+    private function tellControlRoom(DeviceAlert $alert, int $siteId, int $after): bool
+    {
+        $source = SignalSource::query()->where('slug', 'security_devices')->first();
+        if ($source === null) {
+            return false;
+        }
+        $processor = app(SignalProcessingService::class);
+        $signal = $processor->ingest([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => 'care_alert_unanswered',
+            'idempotency_key' => hash('sha256', 'security-devices|unanswered|'.$alert->id),
+            'severity_hint' => 'critical',
+            'external_ref' => 'security_device_alert_'.$alert->id,
+            'payload' => ['title' => (string) $alert->title, 'kind' => (string) $alert->kind],
+            'normalized_data' => [
+                'security_device_alert_id' => (int) $alert->id,
+                'kind' => (string) $alert->kind,
+                'summary' => (string) $alert->title.' · nobody said they were on it after '.$after.' min',
+            ],
+            'occurred_at' => $alert->opened_at,
+            'received_at' => now(),
+            'site_id' => $siteId,
+        ]);
+        $processor->process($signal);
+
+        return true;
     }
 
     /**
@@ -986,6 +1198,7 @@ final class DeviceAlertEngine
                 title: $alert->title,
                 line: $line,
                 channels: $channels,
+                kind: (string) $alert->kind,
             ));
         } catch (Throwable $exception) {
             Log::warning('Device alert notification could not be sent', ['alert_id' => $alert->id, 'error' => $exception->getMessage()]);

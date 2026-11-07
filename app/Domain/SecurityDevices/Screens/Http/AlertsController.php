@@ -100,6 +100,14 @@ final class AlertsController extends Controller
         if ($until->gt(CarbonImmutable::now('UTC')->addDays(7))) {
             throw ValidationException::withMessages(['until' => 'Snooze for a week at most. For planned work, use Quiet time.']);
         }
+        // Safety fix round (7 Nov 2026): safety and care alerts are attended to, not snoozed, unless Setup allows it.
+        $rule = DeviceAlertEngine::snoozeRule((string) $record->kind);
+        if (! $rule['allowed']) {
+            throw ValidationException::withMessages(['until' => 'Safety and care alerts can’t be snoozed: someone has to attend to them or resolve them.']);
+        }
+        if ($rule['max_minutes'] !== null && $until->gt(CarbonImmutable::now('UTC')->addMinutes($rule['max_minutes'])->addSeconds(30))) {
+            throw ValidationException::withMessages(['until' => "Snooze a safety or care alert for {$rule['max_minutes']} minutes at most."]);
+        }
         $this->engine->snooze($record, $user, $until, $validated['why'] ?? null);
 
         return response()->json(['message' => 'Snoozed. It comes back early if it gets worse.']);

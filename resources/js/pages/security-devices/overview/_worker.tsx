@@ -114,9 +114,9 @@ export function WorkerOverview(props: WorkerOverviewProps) {
                                         sub={first.sub || undefined}
                                         then={first.then}
                                         actions={
-                                            can.open_alerts ? (
+                                            first.href ? (
                                                 <Button asChild variant="outline" size="sm">
-                                                    <Link href={`/security-devices/alerts?alert=${first.id}`}>Open alert</Link>
+                                                    <Link href={first.href}>Open alert</Link>
                                                 </Button>
                                             ) : undefined
                                         }
@@ -137,7 +137,7 @@ export function WorkerOverview(props: WorkerOverviewProps) {
                                             tone: alert.tone,
                                             title: alert.title,
                                             sub: alert.sub || undefined,
-                                            action: can.open_alerts ? { label: 'Open alert', href: `/security-devices/alerts?alert=${alert.id}`, ariaLabel: `Open alert: ${alert.title}` } : null,
+                                            action: alert.href ? { label: 'Open alert', href: alert.href, ariaLabel: `Open alert: ${alert.title}` } : null,
                                         }))}
                                     />
                                 ) : null}

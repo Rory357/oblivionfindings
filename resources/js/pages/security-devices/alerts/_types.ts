@@ -68,6 +68,8 @@ export type SelectedAlert = {
     };
     /** S&D Phase F: the H&S hazard raised from this alert. */
     hazard_url?: string | null;
+    /** Safety fix round: a safety or care alert Setup lets people snooze, for this many minutes at most. */
+    snooze_max_minutes?: number | null;
 };
 
 export type DoneRow = {

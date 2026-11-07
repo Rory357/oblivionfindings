@@ -155,6 +155,37 @@ describe('Snooze alert', () => {
     });
 });
 
+describe('Snooze a safety or care alert (safety fix round)', () => {
+    const capped = { ...target, title: 'Synthetic lounge button: panic button pressed', snooze_max_minutes: 10 };
+
+    it('opens on the longest snooze Setup allows, says so, and sends it', async () => {
+        const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: { message: 'Snoozed.' } });
+        const { rerender } = render(<SnoozeAlert open={false} alert={capped} onClose={vi.fn()} />);
+        rerender(<SnoozeAlert open alert={capped} onClose={vi.fn()} />);
+        const dialog = await screen.findByRole('dialog', { name: 'Snooze alert' });
+
+        expect(within(dialog).getByText(/A safety or care alert: 10 minutes at most/)).toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Snooze' }));
+
+        await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+        expect(post.mock.calls[0][0]).toBe('/security-devices/alerts/4/snooze');
+    });
+
+    it('refuses a snooze longer than the longest snooze without sending anything', async () => {
+        const post = vi.spyOn(axios, 'post');
+        const { rerender } = render(<SnoozeAlert open={false} alert={capped} onClose={vi.fn()} />);
+        rerender(<SnoozeAlert open alert={capped} onClose={vi.fn()} />);
+        const dialog = await screen.findByRole('dialog', { name: 'Snooze alert' });
+        // The chosen time is now 20 minutes away.
+        const real = Date.now();
+        vi.spyOn(Date, 'now').mockReturnValue(real - 10 * 60_000);
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Snooze' }));
+
+        expect(await within(dialog).findByText('Snooze a safety or care alert for 10 minutes at most.')).toBeInTheDocument();
+        expect(post).not.toHaveBeenCalled();
+    });
+});
+
 describe('Quiet time for planned work', () => {
     it('keeps the safety wording and asks for devices and a reason before pausing anything', async () => {
         const post = vi.spyOn(axios, 'post');

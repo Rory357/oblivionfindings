@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
 import { Pencil, SlidersHorizontal } from 'lucide-react';
@@ -533,6 +533,13 @@ function CareCard({ care, deviceId, onLink }: { care: NonNullable<SensorPageProp
 
     return (
         <>
+            {!care.link && care.stopped ? (
+                <Note tone="warning">
+                    <b>Care alerts stopped: consent ended.</b> {care.stopped.person}’s consent for sensor monitoring ended
+                    {care.stopped.ended_at ? ` on ${formatDateOnly(care.stopped.ended_at)}` : ''}, so this sensor no longer alerts staff about them. Link them again once
+                    consent is renewed.
+                </Note>
+            ) : null}
             {care.link ? (
                 <Surface title={care.link.title} sub={care.link.plan ? `From ${care.link.plan} · alerts go to whoever is on shift` : 'Alerts go to whoever is on shift'}>
                     <div className="grid gap-3 px-[18px] pt-2 pb-4">

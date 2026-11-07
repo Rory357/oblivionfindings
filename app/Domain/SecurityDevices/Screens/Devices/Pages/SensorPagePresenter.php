@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Screens\Devices\Pages;
 use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
 use App\Domain\SecurityDevices\Care\CareRules;
+use App\Domain\SecurityDevices\Care\ConsentEndings;
 use App\Domain\SecurityDevices\Care\DevicePersonLinks;
 use App\Domain\SecurityDevices\Care\Models\DevicePersonLink;
 use App\Domain\SecurityDevices\Care\ScaldWatch;
@@ -230,6 +231,8 @@ final class SensorPagePresenter
                 'linked_at' => $link->linked_at?->toIso8601String(),
             ],
             'can_link' => $viewer->canDo('securityDevices.people.link') && ! $retired,
+            // Safety fix round (F2, 7 Nov 2026): care alerts on this sensor stopped because consent ended.
+            'stopped' => $link === null ? (app(ConsentEndings::class)->recentStops($viewer, null, (int) $device->id)[0] ?? null) : null,
             'scald' => array_key_exists('temperature', $readings) || $watchesScald ? [
                 'on' => $watchesScald,
                 'can_change' => $viewer->canDo('securityDevices.devices.update') && ! $retired,

@@ -8,8 +8,8 @@ import { OnOff, SettingGroup, SettingRow } from '@/components/referrals/settings
 import { Note } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight, Moon, Send, Users } from 'lucide-react';
-import { ChannelGroup, formatClock, labelWithBadge, QUIET_HOURS_HINT, RoleRow, type SettingsDraft } from './_settings';
+import { ArrowUpRight, Moon, Send, ShieldAlert, Users } from 'lucide-react';
+import { ChannelGroup, formatClock, labelWithBadge, MinutesRow, QUIET_HOURS_HINT, RoleRow, SETTING_WORDS, type SettingsDraft } from './_settings';
 import type { SetupProps } from './_types';
 
 export function SetupAlertRules({ data, draft }: { data: NonNullable<SetupProps['alerts']>; draft: SettingsDraft }) {
@@ -18,7 +18,7 @@ export function SetupAlertRules({ data, draft }: { data: NonNullable<SetupProps[
             <SettingGroup icon={Users} title="Who is told when a rule doesn’t say" caption="Defaults for every Site; each rule can change them">
                 <SettingRow
                     label="Safety alerts"
-                    hint="Panic button, alarm going off, water leak, door forced open, tampering"
+                    hint="Panic button, duress, alarm going off, possible fall, water leak, door forced open, tampering"
                     control={<span className="text-subtle">Staff on shift at that house · Control Room straight away</span>}
                 />
                 <RoleRow settingKey="alerts.devices.role" draft={draft} />
@@ -57,6 +57,7 @@ export function SetupAlertRules({ data, draft }: { data: NonNullable<SetupProps[
                     },
                 ]}
             />
+            <SafetyAndCareGroup draft={draft} />
             <QuietHoursGroup draft={draft} />
             <Note>
                 {data.rules === 0 ? 'No rules of your own yet, so these defaults apply everywhere.' : data.rules === 1 ? '1 rule of your own changes these for some devices.' : `${data.rules} rules of your own change these for some devices.`}{' '}
@@ -67,6 +68,32 @@ export function SetupAlertRules({ data, draft }: { data: NonNullable<SetupProps[
                 </Button>
             </Note>
         </div>
+    );
+}
+
+/**
+ * Safety fix round (7 Nov 2026): when an unanswered safety or care alert goes to the on-call manager,
+ * and whether these alerts may be snoozed at all (Stephan: "Default not snoozable but there should be
+ * a setting to enable snooze and be able to set time"). A longer time or allowing snoozes loosens a
+ * safety check: Review changes asks why, and Change history keeps it.
+ */
+function SafetyAndCareGroup({ draft }: { draft: SettingsDraft }) {
+    const snooze = draft.settings?.['alerts.safety.snooze'];
+    if (!snooze || snooze.type !== 'bool') return null;
+    const allowed = draft.value('alerts.safety.snooze') === true;
+    const label = SETTING_WORDS['alerts.safety.snooze'].label;
+
+    return (
+        <SettingGroup icon={ShieldAlert} title="If nobody says they’re on it" caption="Safety and care alerts at a house: the staff on shift hear first, then the on-call manager after">
+            <MinutesRow settingKey="alerts.escalate.urgent" draft={draft} />
+            <MinutesRow settingKey="alerts.escalate.care" draft={draft} />
+            <SettingRow
+                label={labelWithBadge(label, draft, ['alerts.safety.snooze'])}
+                hint={snooze.can_change ? SETTING_WORDS['alerts.safety.snooze'].hint : `${SETTING_WORDS['alerts.safety.snooze'].hint}. You can’t change this here.`}
+                control={<OnOff label={label} checked={allowed} onChange={(next) => draft.set('alerts.safety.snooze', next)} disabled={!snooze.can_change} />}
+            />
+            <MinutesRow settingKey="alerts.safety.snooze_max" draft={draft} disabled={!allowed} disabledText="Not snoozable" />
+        </SettingGroup>
     );
 }
 

@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Screens\Sites;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryRun;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
+use App\Domain\SecurityDevices\Care\ConsentEndings;
 use App\Domain\SecurityDevices\Hubs\Services\CoveringHubResolver;
 use App\Domain\SecurityDevices\Hubs\Services\HubActionRules;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -141,7 +142,11 @@ final class SitePagePresenter
             'meters' => $this->meters($entries, $alerts, $site),
             // S&D Phase F: the header's House mode block and Change mode (pop-up 42), on every tab.
             'house' => $this->modes->house($site, $entries),
-            'overview' => $tab === 'overview' ? $this->overview($entries, $hub, $hubDown) : null,
+            'overview' => $tab === 'overview' ? [
+                ...$this->overview($entries, $hub, $hubDown),
+                // Safety fix round (F2, 7 Nov 2026): sensors whose care alerts stopped because consent ended.
+                'care_stopped' => app(ConsentEndings::class)->recentStops($viewer, (int) $site->id),
+            ] : null,
             'network' => $tab === 'network' ? $this->network($viewer, $site, $entries, $hub) : null,
             'internet' => $tab === 'internet' ? $this->internet($viewer, $entries) : null,
             'rooms' => $tab === 'rooms' ? $this->rooms->present($viewer, $site, $entries) : null,

@@ -105,13 +105,27 @@ Route::match(['GET', 'HEAD', 'POST'], '/security-devices/web/{token}/{path?}', [
     ->middleware('throttle:600,1')
     ->name('security-devices.web.serve');
 
+// Safety fix round (7 Nov 2026). Support workers and team leads hold the narrow care-alert key, not
+// securityDevices.viewAny (which would open the module's other pages): with it they reach their own
+// house's Overview (pg-sdr-1c) and open only the care and safety alerts sent to them. The
+// controllers check the keys.
+Route::middleware(['auth'])->prefix('security-devices')->group(function () {
+    // S&D rebuild C4: the Security & devices home.
+    Route::get('/', OverviewController::class)
+        ->name('security-devices.index');
+    Route::get('/care-alerts/{alert}', [\App\Domain\SecurityDevices\Screens\Http\CareAlertController::class, 'show'])
+        ->whereNumber('alert')
+        ->name('security-devices.care-alerts.show');
+    Route::post('/care-alerts/{alert}/attend', [\App\Domain\SecurityDevices\Screens\Http\CareAlertController::class, 'attend'])
+        ->whereNumber('alert')
+        ->middleware('throttle:30,1')
+        ->name('security-devices.care-alerts.attend');
+});
+
 Route::middleware([
     'auth',
     'permission:securityDevices.viewAny',
 ])->prefix('security-devices')->group(function () {
-    // S&D rebuild C4: the Security & devices home.
-    Route::get('/', OverviewController::class)
-        ->name('security-devices.index');
 
     // S&D rebuild C4b: Overview › Reports (pg-sdr-18b) as PDF or CSV, its camera viewing log, the monthly email,
     // and "Export" on the Devices and Alerts lists (today's three Reports CSVs, same key and scope).

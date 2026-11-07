@@ -217,11 +217,11 @@ class MonitoringRuntimeWorkspaceTest extends TestCase
             'site_id' => $allowedSite->id,
             'status' => ControlRoomAlert::STATUS_RESOLVED,
         ]);
-        $source = SignalSource::create([
-            'name' => 'Oblivion native monitoring',
-            'slug' => 'security_devices',
-            'status' => 'active',
-        ]);
+        // Migration 2026_11_07_100000 now restores the security_devices source, so reuse it.
+        $source = SignalSource::query()->firstOrCreate(
+            ['slug' => 'security_devices'],
+            ['name' => 'Oblivion native monitoring', 'status' => 'active'],
+        );
         Signal::create([
             'signal_source_id' => $source->id,
             'signal_type_code' => 'device_offline',

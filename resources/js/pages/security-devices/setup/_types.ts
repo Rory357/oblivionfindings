@@ -113,7 +113,18 @@ export type SettingTime = {
     can_change: boolean;
 };
 
-export type SettingRow = SettingSwitch | SettingRole | SettingTime;
+/** Safety fix round (7 Nov 2026): a number of minutes chosen from a short list; a longer time can loosen a safety check. */
+export type SettingMinutes = {
+    type: 'minutes';
+    value: number;
+    default: number;
+    choices: number[];
+    changed: boolean;
+    can_change: boolean;
+    loosens_when_up: boolean;
+};
+
+export type SettingRow = SettingSwitch | SettingRole | SettingTime | SettingMinutes;
 
 export type NetworkRow = {
     id: number;

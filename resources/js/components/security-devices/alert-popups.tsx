@@ -72,7 +72,13 @@ const RULES = '/security-devices/settings/monitoring/alert-routes';
 const JSON_HEADERS = { headers: { Accept: 'application/json' } };
 
 /** The alert a pop-up acts on, as the page knows it. */
-export type AlertTarget = { id: number; title: string; opened_at: string };
+export type AlertTarget = {
+    id: number;
+    title: string;
+    opened_at: string;
+    /** Safety and care alerts that Setup lets people snooze: the longest snooze, in minutes. */
+    snooze_max_minutes?: number | null;
+};
 
 /* ------------------------------------------------------------------ */
 /*  Shared bits                                                        */
@@ -748,13 +754,15 @@ export function SnoozeAlert({
     const [result, setResult] = useState<Failure>({});
     useEffect(() => {
         if (open) {
-            const start = nextWholeHour(60);
+            // A safety or care alert can only be snoozed up to Setup's longest snooze (safety fix round, 7 Nov 2026).
+            const cap = alert?.snooze_max_minutes ?? null;
+            const start = cap ? toDatetimeLocal(new Date(Date.now() + cap * 60_000)) : nextWholeHour(60);
             setUntil(start);
             setInitial(start);
             setWhy('');
             setResult({});
         }
-    }, [open, alert?.id]);
+    }, [open, alert?.id, alert?.snooze_max_minutes]);
     if (!alert) return null;
 
     const submit = () => {
@@ -772,6 +780,13 @@ export function SnoozeAlert({
         if (ahead < 5 * 60_000)
             return setResult({
                 fields: { until: 'Choose a time at least 5 minutes from now.' },
+            });
+        const cap = alert.snooze_max_minutes ?? null;
+        if (cap && ahead > cap * 60_000 + 30_000)
+            return setResult({
+                fields: {
+                    until: `Snooze a safety or care alert for ${cap} minutes at most.`,
+                },
             });
         if (ahead > 7 * 86_400_000)
             return setResult({
@@ -808,7 +823,11 @@ export function SnoozeAlert({
             size="sm"
             icon={AlarmClock}
             title="Snooze alert"
-            description="Hide it until a time. It comes back if it gets worse"
+            description={
+                alert.snooze_max_minutes
+                    ? `A safety or care alert: ${alert.snooze_max_minutes} minutes at most. It comes back and reminds again when the snooze ends`
+                    : 'Hide it until a time. It comes back if it gets worse'
+            }
             context={alertContext(alert)}
             error={result.error}
             callout={

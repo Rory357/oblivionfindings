@@ -171,6 +171,8 @@ export type SensorPageProps = {
     care?: {
         link: { title: string; rule: string | null; plan: string | null; person_href: string | null; linked_at: string | null } | null;
         can_link: boolean;
+        /** Safety fix round (F2): care alerts on this sensor stopped recently because the person's consent ended. */
+        stopped?: { person: string; ended_at: string | null } | null;
         scald: { on: boolean; can_change: boolean; alert?: SensorScaldAlert | null } | null;
     };
     deviceForm?: DeviceFormData;

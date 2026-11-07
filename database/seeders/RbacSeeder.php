@@ -865,6 +865,9 @@ class RbacSeeder extends Seeder
 
         // Support Worker
         $syncPermissions($supportWorker, [
+            // Safety fix round (Stephan, 7 Nov 2026: "Open just that alert"): open and attend to the care and safety
+            // alerts sent to them at their own Sites, nothing else. Grant migration 2026_11_07_100100.
+            'securityDevices.careAlerts.attend',
             // Create-only reporting of restraints and workplace injuries (MASTER for Stephan, 30 Oct).
             'restraints.report', 'injuries.report',
             // Decision 4 (G4, Stephan 1 Nov 2026): own a restraint follow-up and record its outcome. Grant migration 2026_11_01_233000.
@@ -985,6 +988,8 @@ class RbacSeeder extends Seeder
 
         // Team Lead
         $syncPermissions($teamLead, [
+            // Safety fix round (Stephan, 7 Nov 2026: "Open just that alert"). Grant migration 2026_11_07_100100.
+            'securityDevices.careAlerts.attend',
             'medications.errors.manage',
             'medications.controlled.manage',
             'sites.viewAny', 'sites.update',

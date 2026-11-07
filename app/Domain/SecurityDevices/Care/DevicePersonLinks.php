@@ -149,6 +149,8 @@ final class DevicePersonLinks
                 try {
                     if (! $link->client instanceof Client || ! $this->consent->state($link->client)['active']) {
                         $this->unlink(null, $link, 'consent_ended');
+                        // Safety fix round (F2): the house manager hears that this sensor's care alerts stopped.
+                        app(ConsentEndings::class)->stopped($link->refresh());
                         $ended++;
                     }
                 } catch (Throwable) {

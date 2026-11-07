@@ -15,6 +15,9 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use App\Support\MedicationJourney;
+use App\Support\WorkerClock;
+use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
 
 /**
  * Shared presentation for shift handovers, used by the Shift Handovers
@@ -402,11 +405,40 @@ class HandoverPresenter
                 }
             }
 
-            return collect($item)
-                ->filter(fn ($value) => is_string($value) && trim($value) !== '')
-                ->implode(' ');
+            // Shift incidents are stored as {type, status, severity, occurred_at}.
+            // Their UTC instant reads in NZ time after the words, never as ISO.
+            $words = [];
+            $when = null;
+            foreach ($item as $value) {
+                if (! is_string($value) || trim($value) === '') {
+                    continue;
+                }
+                $instant = $this->displayInstant($value);
+                if ($instant !== null) {
+                    $when ??= $instant;
+
+                    continue;
+                }
+                $words[] = $value;
+            }
+
+            return implode(' · ', array_filter([implode(' ', $words), $when], fn ($part) => $part !== null && $part !== ''));
         }
 
         return (string) ($item ?? '');
+    }
+
+    /** A stored ISO instant in NZ time, e.g. "Sat 2 May 2026, 3:30 pm"; null for any other text. */
+    protected function displayInstant(string $value): ?string
+    {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/', trim($value))) {
+            return null;
+        }
+
+        try {
+            return WorkerClock::display(CarbonImmutable::parse(trim($value)), 'D j M Y, g:i a');
+        } catch (InvalidFormatException) {
+            return null;
+        }
     }
 }

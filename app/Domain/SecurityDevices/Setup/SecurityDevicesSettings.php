@@ -84,14 +84,40 @@ final class SecurityDevicesSettings
     /** S&D Phase H: people, cards and visitor passes may be changed in UniFi Access from Oblivion. */
     public const string ACCESS_CHANGES = 'access.changes_from_oblivion';
 
+    /**
+     * Safety fix round (7 Nov 2026, Stephan: "Default not snoozable but there should be a setting to
+     * enable snooze and be able to set time"). Safety and care alerts can't be snoozed unless this
+     * is on, and then for at most SAFETY_SNOOZE_MAX minutes.
+     */
+    public const string SAFETY_SNOOZE = 'alerts.safety.snooze';
+
+    public const string SAFETY_SNOOZE_MAX = 'alerts.safety.snooze_max';
+
+    /**
+     * Minutes before an unanswered safety or care alert goes to the on-call manager (and to Control
+     * Room when only Security & devices knows about it): panic, duress, falls, alarms and forced
+     * doors (URGENT), and the rest (CARE).
+     */
+    public const string ESCALATE_URGENT = 'alerts.escalate.urgent';
+
+    public const string ESCALATE_CARE = 'alerts.escalate.care';
+
+    /** The minutes a person may choose for each "minutes" setting: the longest is the ceiling. */
+    public const array MINUTE_CHOICES = [
+        self::SAFETY_SNOOZE_MAX => [5, 10, 15, 30, 60],
+        self::ESCALATE_URGENT => [1, 2, 3, 5],
+        self::ESCALATE_CARE => [2, 3, 5, 10, 15],
+    ];
+
     private const string MANAGE_SCANS = 'securityDevices.integrations.manage';
 
     private const string MANAGE_ALERTS = 'securityDevices.automations.manage';
 
     /**
-     * type: bool | role | time. loosens: the value that loosens a safety check (true, false) or null.
+     * type: bool | role | time | minutes. loosens: the value that loosens a safety check (true, false),
+     * 'up' for minutes where a longer time loosens it, or null.
      *
-     * @var array<string, array{type: string, permission: string, loosens: bool|null}>
+     * @var array<string, array{type: string, permission: string, loosens: bool|string|null}>
      */
     private const array DEFINITIONS = [
         self::DAILY_SCANS => ['type' => 'bool', 'permission' => self::MANAGE_SCANS, 'loosens' => null],
@@ -118,6 +144,11 @@ final class SecurityDevicesSettings
         // Turning leavers off automatically is a safety check: switching it off loosens it.
         self::ACCESS_LEAVERS => ['type' => 'bool', 'permission' => 'securityDevices.accessControl.manage', 'loosens' => false],
         self::ACCESS_CHANGES => ['type' => 'bool', 'permission' => 'securityDevices.accessControl.manage', 'loosens' => null],
+        // Safety fix round: allowing snoozes, a longer snooze, or a slower escalation loosens a safety check.
+        self::SAFETY_SNOOZE => ['type' => 'bool', 'permission' => self::MANAGE_ALERTS, 'loosens' => true],
+        self::SAFETY_SNOOZE_MAX => ['type' => 'minutes', 'permission' => self::MANAGE_ALERTS, 'loosens' => 'up'],
+        self::ESCALATE_URGENT => ['type' => 'minutes', 'permission' => self::MANAGE_ALERTS, 'loosens' => 'up'],
+        self::ESCALATE_CARE => ['type' => 'minutes', 'permission' => self::MANAGE_ALERTS, 'loosens' => 'up'],
     ];
 
     /** @var array<string, mixed>|null */
@@ -157,6 +188,14 @@ final class SecurityDevicesSettings
         $value = $this->value($key);
 
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /** A number of minutes, always one of its choices. */
+    public function minutes(string $key): int
+    {
+        $this->assertKnown($key, 'minutes');
+
+        return $this->minuteValue($key, $this->value($key));
     }
 
     /** A wall-clock time ("22:00") in Pacific/Auckland. */
@@ -211,6 +250,8 @@ final class SecurityDevicesSettings
                 $row += ['on' => (bool) $value, 'default' => (bool) $default, 'loosens_when_on' => $definition['loosens'] === true, 'loosens_when_off' => $definition['loosens'] === false];
             } elseif ($definition['type'] === 'time') {
                 $row += ['value' => $this->clock($value, (string) $default), 'default' => (string) $default];
+            } elseif ($definition['type'] === 'minutes') {
+                $row += ['value' => $this->minuteValue($key, $value), 'default' => (int) $default, 'choices' => self::MINUTE_CHOICES[$key], 'loosens_when_up' => $definition['loosens'] === 'up'];
             } else {
                 $roles ??= Role::query()->orderBy('level')->orderBy('label')->get(['name', 'label'])
                     ->map(fn (Role $role): array => ['value' => (string) $role->name, 'label' => (string) ($role->label ?: ucfirst(str_replace('_', ' ', (string) $role->name)))])
@@ -250,6 +291,9 @@ final class SecurityDevicesSettings
             if ($definition['type'] === 'time' && ! (is_string($value) && preg_match('/\A([01]\d|2[0-3]):[0-5]\d\z/', $value) === 1)) {
                 $errors[$key] = 'Choose a valid time (such as 22:00).';
             }
+            if ($definition['type'] === 'minutes' && ! (is_int($value) && in_array($value, self::MINUTE_CHOICES[$key], true))) {
+                $errors[$key] = 'Choose one of the times offered.';
+            }
         }
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
@@ -271,8 +315,7 @@ final class SecurityDevicesSettings
         }
         if ($reason === null) {
             foreach ($changes as $key => $value) {
-                $loosens = self::DEFINITIONS[$key]['loosens'];
-                if ($loosens !== null && $value === $loosens && $this->value($key) !== $value) {
+                if ($this->loosens($key, $value)) {
                     throw ValidationException::withMessages(['reason' => 'Say why you’re loosening this safety check.']);
                 }
             }
@@ -292,12 +335,13 @@ final class SecurityDevicesSettings
                 $row->save();
                 if ($before !== $value) {
                     $loosens = self::DEFINITIONS[$key]['loosens'];
+                    $loosened = $loosens === 'up' ? (int) $value > $this->minuteValue($key, $before) : ($loosens !== null && $value === $loosens);
                     AuditLogger::logOrFail('security_devices.settings.changed', $row, [
                         'actor_id' => (int) $actor->id,
                         'key' => $key,
                         'from' => $before,
                         'to' => $value,
-                        'loosens_safety' => $loosens !== null && $value === $loosens,
+                        'loosens_safety' => $loosened,
                         'reason' => $reason,
                     ]);
                     $changed[] = $key;
@@ -310,6 +354,25 @@ final class SecurityDevicesSettings
         $this->stored = null;
 
         return $changed;
+    }
+
+    /** Whether saving this value would loosen a safety check (switching it on or off, or a longer time). */
+    private function loosens(string $key, mixed $value): bool
+    {
+        $loosens = self::DEFINITIONS[$key]['loosens'];
+        if ($loosens === 'up') {
+            return is_int($value) && $value > $this->minutes($key);
+        }
+
+        return $loosens !== null && $value === $loosens && $this->value($key) !== $value;
+    }
+
+    private function minuteValue(string $key, mixed $value): int
+    {
+        $choices = self::MINUTE_CHOICES[$key];
+        $fallback = (int) $this->default($key);
+
+        return is_numeric($value) && in_array((int) $value, $choices, true) ? (int) $value : $fallback;
     }
 
     private function value(string $key): mixed
@@ -325,7 +388,10 @@ final class SecurityDevicesSettings
             self::DAILY_SCANS, self::DEVICES_APP, self::DEVICES_EMAIL, self::NEW_DEVICES_APP, self::WATCH_ON_ADD, self::SAFETY_EMAIL, self::SAFETY_PUSH, self::SAFETY_ROSTER,
             self::SUMMARY_APP, self::SUMMARY_EMAIL, self::QUIET_HOURS_ON,
             self::ACCESS_LEAVERS, self::ACCESS_CHANGES => true,
-            self::DEVICES_PUSH, self::NEW_DEVICES_EMAIL, self::NEW_DEVICES_PUSH, self::SUMMARY_PUSH, self::WATCH_PHONES, self::MQTT_PLAIN => false,
+            self::DEVICES_PUSH, self::NEW_DEVICES_EMAIL, self::NEW_DEVICES_PUSH, self::SUMMARY_PUSH, self::WATCH_PHONES, self::MQTT_PLAIN, self::SAFETY_SNOOZE => false,
+            self::SAFETY_SNOOZE_MAX => 15,
+            self::ESCALATE_URGENT => 2,
+            self::ESCALATE_CARE => 5,
             self::DEVICES_ROLE => null,
             self::QUIET_HOURS_START => '22:00',
             self::QUIET_HOURS_END => '06:00',
