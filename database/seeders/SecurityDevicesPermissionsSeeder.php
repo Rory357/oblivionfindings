@@ -164,17 +164,16 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.commands.observe',
         ]);
 
+        // Stephan, 7 Nov 2026: "Just their care alerts", and "make the local test data match, so the two never
+        // drift". Team leads hold only the care-alert key (grant migration 2026_11_07_100100), as on .com.
         $this->attachToRole('team_lead', [
-            'securityDevices.viewAny',
-            'securityDevices.devices.view',
-            // Safety fix round (Stephan, 7 Nov 2026: "Open just that alert"). Grant migration 2026_11_07_100100.
             'securityDevices.careAlerts.attend',
         ]);
 
+        // Stephan, 7 Nov 2026: "Just their care alerts". Support workers hold only the care-alert key
+        // (grant migration 2026_11_07_100100): their own house's Overview and the care and safety alerts
+        // sent to them. No viewAny or devices.view, matching .com's role.
         $this->attachToRole('support_worker', [
-            'securityDevices.viewAny',
-            'securityDevices.devices.view',
-            // Safety fix round (Stephan, 7 Nov 2026: "Open just that alert"). Grant migration 2026_11_07_100100.
             'securityDevices.careAlerts.attend',
         ]);
 

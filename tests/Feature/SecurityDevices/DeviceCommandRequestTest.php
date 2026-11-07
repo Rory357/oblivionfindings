@@ -397,6 +397,11 @@ it('conceals a command target outside the actor approved Sites', function () {
 it('requires the exact capability permission and returns idempotent retries', function () {
     $site = Site::factory()->create();
     $supportWorker = commandRequestActor('support_worker', $site);
+    // Support workers hold only the care-alert key in S&D now (Stephan, 7 Nov 2026). This actor gets the
+    // module's two view keys directly, as the role gave them before, so the refusal below is about the
+    // missing command key.
+    grantCommandPermission($supportWorker, 'securityDevices.viewAny');
+    grantCommandPermission($supportWorker, 'securityDevices.devices.view');
     $device = commandRequestDevice($site);
     $payload = [
         'capability' => 'access.door.unlock_timed',

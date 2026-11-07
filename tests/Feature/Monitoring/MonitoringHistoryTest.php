@@ -10,6 +10,7 @@ use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\MonitoringHistoryService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -193,6 +194,11 @@ it('conceals monitor history across Sites for Site-scoped staff', function (): v
     $monitorA = Monitor::factory()->create(['device_id' => $deviceA->id]);
 
     $siteBViewer = createHistoryViewerAtSite($siteB, 'team_lead');
+    // Team leads hold only the care-alert key in S&D now (Stephan, 7 Nov 2026). This viewer gets the
+    // module's two view keys directly, as the role gave them before, so the refusal is the Site boundary.
+    $siteBViewer->permissionOverrides()->syncWithoutDetaching(Permission::query()
+        ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
+        ->pluck('id')->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all());
 
     $this->actingAs($siteBViewer)
         ->getJson("/security-devices/monitoring/monitors/{$monitorA->id}/history?range=24h")

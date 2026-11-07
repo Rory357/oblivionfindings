@@ -15,6 +15,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\AuditLog;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -422,6 +423,11 @@ class AccessControlWorkflowTest extends TestCase
     {
         $site = Site::factory()->create();
         $worker = $this->userWithRole('support_worker');
+        // Support workers hold only the care-alert key in S&D now (Stephan, 7 Nov 2026). This worker gets
+        // the module's two view keys directly, as the role gave them before: a general device viewer.
+        $worker->permissionOverrides()->syncWithoutDetaching(Permission::query()
+            ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
+            ->pluck('id')->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all());
         HrEmployeeProfile::factory()->create([
             'user_id' => $worker->id,
             'primary_site_id' => $site->id,

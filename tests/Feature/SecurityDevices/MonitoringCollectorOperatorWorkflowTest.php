@@ -227,6 +227,11 @@ final class MonitoringCollectorOperatorWorkflowTest extends TestCase
     {
         $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        // Support workers hold only the care-alert key in S&D now (Stephan, 7 Nov 2026). This viewer gets
+        // the module's two view keys directly, as the role gave them before.
+        $viewer->permissionOverrides()->syncWithoutDetaching(Permission::query()
+            ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
+            ->pluck('id')->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all());
         $overrides = Permission::query()
             ->whereIn('key', $permissions)
             ->pluck('id')

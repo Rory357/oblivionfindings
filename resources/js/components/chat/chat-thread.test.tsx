@@ -165,7 +165,8 @@ describe('shared Chat recovery and read behaviour', () => {
             await waitFor(() =>
                 expect(message.closest('p')).toHaveClass('text-xl'),
             );
-            expect(message.closest('article')).toHaveClass('mb-2');
+            // Compact spacing: a run of messages starts 0.5rem below the last (mt-3 otherwise).
+            expect(message.closest('article')).toHaveClass('mt-2');
             const input = screen.getByRole('textbox', { name: 'Message' });
             expect(input).toHaveClass('text-xl');
             fireEvent.change(input, { target: { value: 'Keep this draft' } });
@@ -1469,9 +1470,7 @@ describe('shared Chat recovery and read behaviour', () => {
                 name: /Actions for message from Alex/,
             }),
         );
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Edit my message' }),
-        );
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
         expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(
             'Hello Alex',
         );
@@ -1689,7 +1688,7 @@ describe('shared Chat recovery and read behaviour', () => {
                 name: /Actions for message from Rohan/,
             }),
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Reply' }));
         fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
         expect(
             screen.getByRole('dialog', { name: 'Before your first message' }),
@@ -2022,7 +2021,7 @@ describe('shared Chat recovery and read behaviour', () => {
                 name: /Actions for message from Rohan/,
             }),
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Reply' }));
         fireEvent.click(
             screen.getByRole('button', { name: 'Search this conversation' }),
         );
@@ -2133,7 +2132,7 @@ describe('shared Chat recovery and read behaviour', () => {
         );
     });
 
-    it('saves a message through the compact action dialog without changing its draft', async () => {
+    it('saves a message from the message menu without changing its draft', async () => {
         vi.mocked(chatRequest).mockResolvedValue(history as never);
         render(<ChatThread conversationId={71} actorId={1} policy={policy} />);
         await screen.findByText('Hello Alex');
@@ -2146,9 +2145,9 @@ describe('shared Chat recovery and read behaviour', () => {
             }),
         );
         expect(
-            screen.getByRole('dialog', { name: 'Message actions' }),
+            screen.getByRole('menu', { name: 'Message from Rohan' }),
         ).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Save for me' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Save for me' }));
         await waitFor(() =>
             expect(chatRequest).toHaveBeenCalledWith(
                 '/chat/api/messages/301/action',

@@ -46,6 +46,11 @@ class ReportsExportTest extends TestCase
         // support_worker lacks securityDevices.reports.view.
         $this->viewer = User::factory()->create();
         $this->viewer->roles()->attach(Role::where('name', 'support_worker')->first());
+        // Support workers hold only the care-alert key in S&D now (Stephan, 7 Nov 2026). This viewer gets
+        // the module's two view keys directly, as the role gave them before.
+        $this->viewer->permissionOverrides()->syncWithoutDetaching(Permission::query()
+            ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
+            ->pluck('id')->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all());
     }
 
     public function test_reports_index_requires_reports_view_permission(): void

@@ -232,6 +232,20 @@ test('linked context follows canonical device and alert permissions without leak
         ->assertJsonMissingPath('linked_context.alerts.0.payload')
         ->assertJsonMissingPath('linked_context.alerts.0.client_id');
 
+    // Support workers hold only the care-alert key in S&D (Stephan, 7 Nov 2026), so the requester sees
+    // their ticket, but the linked device only as a restricted placeholder until they hold the module's
+    // view keys.
+    $this->actingAs($this->worker)
+        ->getJson("/it/tickets/{$ticket->id}")
+        ->assertOk()
+        ->assertJsonPath('linked_context.devices.0.id', null)
+        ->assertJsonPath('linked_context.devices.0.name', null)
+        ->assertJsonPath('linked_context.devices.0.access.state', 'restricted');
+    $this->worker->permissionOverrides()->syncWithoutDetaching(Permission::query()
+        ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
+        ->pluck('id')->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all());
+    $this->worker->unsetRelation('permissionOverrides')->unsetRelation('roles');
+
     $this->actingAs($this->worker)
         ->getJson("/it/tickets/{$ticket->id}")
         ->assertOk()

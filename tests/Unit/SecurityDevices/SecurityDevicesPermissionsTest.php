@@ -175,20 +175,39 @@ class SecurityDevicesPermissionsTest extends TestCase
         }
     }
 
-    // ── Support Worker gets minimal read-only ─────────────────────
+    // ── Support Worker gets only their care alerts ────────────────
+
+    /**
+     * Stephan, 7 Nov 2026: "Just their care alerts", and "make the local test data match, so the two
+     * never drift". Among the Security & devices keys, support workers and team leads hold exactly one,
+     * as on .com. Anything more needs his OK and a change to this test.
+     */
+    public function test_support_workers_and_team_leads_hold_only_the_care_alert_key_among_security_devices_keys(): void
+    {
+        foreach (['support_worker', 'team_lead'] as $roleName) {
+            $keys = Role::query()->where('name', $roleName)->firstOrFail()->permissions()
+                ->where('key', 'like', 'securityDevices.%')
+                ->orderBy('key')
+                ->pluck('key')
+                ->all();
+
+            $this->assertSame(['securityDevices.careAlerts.attend'], $keys, "{$roleName} must hold only securityDevices.careAlerts.attend among the S&D keys.");
+        }
+    }
 
     public function test_support_worker_has_minimal_permissions(): void
     {
         $user = User::factory()->create();
         $user->roles()->attach(Role::where('name', 'support_worker')->first());
 
+        // Stephan, 7 Nov 2026: "Just their care alerts". The care and safety alerts sent to them, at their own
+        // Sites, and their own house's Overview; nothing else in Security & devices.
         $expected = [
-            'securityDevices.viewAny',
-            'securityDevices.devices.view',
-            // Safety fix round: only the care and safety alerts sent to them, at their own Sites.
             'securityDevices.careAlerts.attend',
         ];
         $denied = [
+            'securityDevices.viewAny',
+            'securityDevices.devices.view',
             // ...and nothing that works the Alerts page: no acknowledge, assign or snooze.
             'securityDevices.alerts.acknowledge',
             'securityDevices.devices.create',
@@ -404,8 +423,9 @@ class SecurityDevicesPermissionsTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_user_with_view_any_can_access_index(): void
+    public function test_support_worker_reaches_their_own_house_overview_through_the_care_alert_key(): void
     {
+        // No viewAny: the care-alert key admits the worker Overview (pg-sdr-1c) and nothing else.
         $user = User::factory()->create();
         $user->roles()->attach(Role::where('name', 'support_worker')->first());
 
@@ -416,7 +436,7 @@ class SecurityDevicesPermissionsTest extends TestCase
 
     public function test_reports_route_requires_reports_permission(): void
     {
-        // Support worker has viewAny but not reports.view.
+        // A support worker holds only the care-alert key, not reports.view.
         $user = User::factory()->create();
         $user->roles()->attach(Role::where('name', 'support_worker')->first());
 
@@ -459,10 +479,10 @@ class SecurityDevicesPermissionsTest extends TestCase
     {
         $user = User::factory()->create();
         $user->roles()->attach(Role::where('name', 'support_worker')->first());
-        $allSitesPermission = Permission::query()
-            ->where('key', 'securityDevices.devices.viewAllSites')
-            ->firstOrFail();
-        $user->permissionOverrides()->attach($allSitesPermission->id, ['allowed' => true]);
+        // Module access, device viewing and explicit all-Sites access, given directly (support workers hold none).
+        foreach (['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.devices.viewAllSites'] as $key) {
+            $user->permissionOverrides()->attach(Permission::query()->where('key', $key)->firstOrFail()->id, ['allowed' => true]);
+        }
 
         $categoryRoutes = [
             '/security-devices/alarms',

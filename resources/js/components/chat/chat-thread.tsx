@@ -33,6 +33,7 @@ import { registerChatSoundView } from './chat-sound-views';
 import { chatSync } from './live/sync';
 import { typingLabel, useTypingNames } from './live/typing';
 import { clearChatOutbox } from './thread/chat-outbox';
+import { messageMenuItems, ThreadMessageMenu } from './thread/message-menu';
 import { ThreadComposer } from './thread/thread-composer';
 import {
     ThreadFamilyNotice,
@@ -40,7 +41,6 @@ import {
     ThreadSearchBar,
     ThreadUpdateStatus,
 } from './thread/thread-header';
-import { ThreadMessageActions } from './thread/thread-message-actions';
 import { ThreadMessageList } from './thread/thread-message-list';
 import { ThreadOutboxMessages } from './thread/thread-outbox';
 import { ThreadPendingSend } from './thread/thread-pending-send';
@@ -79,7 +79,6 @@ export function ChatThread({
                 </p>
                 <Button
                     variant="outline"
-                    className="min-h-[44px]"
                     onClick={call.returnToCall}
                 >
                     {call.mode === 'followup'
@@ -183,9 +182,12 @@ function ChatThreadContent({
     });
     const typingText = typingLabel(useTypingNames(conversationId));
     const [deleting, setDeleting] = useState<ChatRemovalDraft | null>(null);
-    const [actionMessage, setActionMessage] = useState<ChatMessage | null>(
-        null,
-    );
+    // The one message menu (hover bar ⋯, right-click, Shift+F10), at a point on the screen.
+    const [menu, setMenu] = useState<{
+        message: ChatMessage;
+        x: number;
+        y: number;
+    } | null>(null);
     const [acting, setActing] = useState(false);
     const actionTrigger = useRef<HTMLButtonElement | null>(null);
     const detailsTrigger = useRef<HTMLButtonElement | null>(null);
@@ -221,13 +223,13 @@ function ChatThreadContent({
         messagesChanged: (updated) => {
             search.messagesChanged(updated);
             composer.messagesChanged(updated);
-            setActionMessage((current) =>
-                current && updated.has(current.id)
-                    ? updated.get(current.id)!.deleted
-                        ? null
-                        : updated.get(current.id)!
-                    : current,
-            );
+            setMenu((current) => {
+                const replacement = current && updated.get(current.message.id);
+                if (!current || !replacement) return current;
+                return replacement.deleted
+                    ? null
+                    : { ...current, message: replacement };
+            });
         },
         snapshotReset: search.revoke,
         accessLost: () => {
@@ -485,7 +487,6 @@ function ChatThreadContent({
                 },
             );
             if (signal.aborted || history.active.current !== id) return;
-            setActionMessage(null);
             await load(undefined, true);
         } catch (error) {
             if (!signal.aborted) toast.error((error as Error).message);
@@ -516,22 +517,60 @@ function ChatThreadContent({
         }
     }
 
+    function replyTo(message: ChatMessage) {
+        search.setOpen(false);
+        composer.setReply(message);
+        composer.focusSoon();
+    }
+    function startEdit(message: ChatMessage) {
+        const next = {
+            messageId: message.id,
+            version: message.edit_version ?? 0,
+            content: message.content,
+            mentions: message.mentions ?? [],
+        };
+        saveChatThreadMemory(key, { editing: next });
+        search.setOpen(false);
+        composer.setEditing(next);
+    }
+    function startRemove(message: ChatMessage) {
+        // Focus goes back to the message when the confirmation closes.
+        actionTrigger.current = document.getElementById(
+            `chat-message-${message.id}`,
+        ) as HTMLButtonElement | null;
+        const next = {
+            messageId: message.id,
+            version: message.edit_version ?? 0,
+            content: message.content,
+        };
+        saveChatThreadMemory(key, { removing: next });
+        setDeleting(next);
+    }
+    function copyText(message: ChatMessage) {
+        void navigator.clipboard
+            ?.writeText(message.content)
+            .then(() => toast.success('Copied'))
+            .catch(() => toast.error('The text couldn’t be copied.'));
+    }
+
     // Message rows are memoised, so the callbacks they get keep their identity.
-    const latest = useRef({ jumpToMessage, action });
-    latest.current = { jumpToMessage, action };
+    const latest = useRef({ jumpToMessage, action, replyTo });
+    latest.current = { jumpToMessage, action, replyTo };
     const onJump = useCallback((messageId: number) => {
         void latest.current.jumpToMessage(messageId);
     }, []);
     const onReact = useCallback((message: ChatMessage, emoji: string) => {
         void latest.current.action(message, 'react', emoji);
     }, []);
-    const onActions = useCallback(
-        (message: ChatMessage, trigger: HTMLButtonElement) => {
-            actionTrigger.current = trigger;
-            setActionMessage(message);
-        },
+    const onReply = useCallback((message: ChatMessage) => {
+        latest.current.replyTo(message);
+    }, []);
+    const onMenu = useCallback(
+        (message: ChatMessage, x: number, y: number) =>
+            setMenu({ message, x, y }),
         [],
     );
+    const closeMenu = useCallback(() => setMenu(null), []);
 
     function rememberPosition() {
         const el = viewport.current;
@@ -672,7 +711,9 @@ function ChatThreadContent({
                     onReturnToLatest={history.returnToLatest}
                     onJump={onJump}
                     onReact={onReact}
-                    onActions={onActions}
+                    canReact={conversation.can_send}
+                    onReply={onReply}
+                    onMenu={onMenu}
                 >
                     {!search.open &&
                         !contextMessage &&
@@ -689,6 +730,11 @@ function ChatThreadContent({
                                 captions={composer.fileCaptions}
                                 sending={composer.sending}
                                 checking={composer.checkingSend}
+                                onRetry={
+                                    conversation.can_send && policy.enabled
+                                        ? () => void composer.send()
+                                        : undefined
+                                }
                             />
                         )}
                     {!search.open && !contextMessage && (
@@ -716,7 +762,7 @@ function ChatThreadContent({
                 {!atEnd && !searchResults && (
                     <div className="relative h-0">
                         <Button
-                            className="absolute right-4 bottom-3 min-h-[44px] shadow-lg"
+                            className="absolute right-4 bottom-3 shadow-lg"
                             size="sm"
                             onClick={() => history.setAtEnd(true)}
                         >
@@ -751,50 +797,27 @@ function ChatThreadContent({
                         onChange?.();
                     }}
                 />
-                <ThreadMessageActions
-                    message={actionMessage}
-                    acting={acting}
-                    canSend={conversation.can_send}
-                    composerBusy={composer.sending || !!pendingBody}
-                    editing={!!composer.editing}
-                    onClose={() => setActionMessage(null)}
-                    onCloseAutoFocus={(event) => {
-                        event.preventDefault();
-                        if (!deleting && !composer.editing)
-                            actionTrigger.current?.focus();
-                    }}
-                    onReply={(message) => {
-                        search.setOpen(false);
-                        composer.setReply(message);
-                        setActionMessage(null);
-                        composer.focusSoon();
-                    }}
-                    onAction={(message, kind, emoji) =>
-                        void action(message, kind, emoji)
-                    }
-                    onEdit={(message) => {
-                        const next = {
-                            messageId: message.id,
-                            version: message.edit_version ?? 0,
-                            content: message.content,
-                            mentions: message.mentions ?? [],
-                        };
-                        saveChatThreadMemory(key, { editing: next });
-                        search.setOpen(false);
-                        composer.setEditing(next);
-                        setActionMessage(null);
-                    }}
-                    onRemove={(message) => {
-                        const next = {
-                            messageId: message.id,
-                            version: message.edit_version ?? 0,
-                            content: message.content,
-                        };
-                        saveChatThreadMemory(key, { removing: next });
-                        setDeleting(next);
-                        setActionMessage(null);
-                    }}
-                />
+                {menu && (
+                    <ThreadMessageMenu
+                        message={menu.message}
+                        x={menu.x}
+                        y={menu.y}
+                        canReact={conversation.can_send && !acting}
+                        onReact={onReact}
+                        onClose={closeMenu}
+                        items={messageMenuItems(menu.message, {
+                            canSend: conversation.can_send && !acting,
+                            composerBusy: composer.sending || !!pendingBody,
+                            editing: !!composer.editing,
+                            onReply: replyTo,
+                            onCopy: copyText,
+                            onPin: (message) => void action(message, 'pin'),
+                            onSave: (message) => void action(message, 'save'),
+                            onEdit: startEdit,
+                            onRemove: startRemove,
+                        })}
+                    />
+                )}
                 {deleting && (
                     <ChatMessageRemoval
                         actorId={actorId}

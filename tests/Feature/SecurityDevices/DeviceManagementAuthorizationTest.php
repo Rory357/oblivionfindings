@@ -115,7 +115,11 @@ it('enforces application Site workspace Device-class and ordered management-leve
 it('conceals CCTV management from the UI and direct path until media sensitivity access is present', function () {
     $site = Site::factory()->create();
     $actor = managementBoundaryActor($site);
+    // Support workers hold only the care-alert key in S&D now (Stephan, 7 Nov 2026), so the two view keys
+    // the role gave before are granted here with the command keys.
     grantManagementBoundaryPermissions($actor, [
+        'securityDevices.viewAny',
+        'securityDevices.devices.view',
         'securityDevices.commands.observe',
         'securityDevices.commands.control',
     ]);
