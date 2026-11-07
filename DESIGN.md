@@ -610,6 +610,15 @@ before.
   `border-t-[3px] border-t-primary`), or the same trick on a side or bottom
   edge. All removed 31 Oct 2026; never add one back, in any colour, on any
   box. Non-negotiable 8; ESLint `design/no-edge-accent-line`.
+  Chat's reply quotes count too (Rory, 1 Nov 2026, applying the rule to
+  Chat): the "Replying to …" preview above the composer, the quoted message
+  inside a bubble and the "Editing your message" strip were drawn with a
+  `border-l-2 border-primary` bar, and the v3 boards' `.ch-quote`/`.ch-reply`
+  and amber "important" message bar did the same. A quote is a neutral
+  bordered box with a reply icon; an important message gets a badge. In
+  Chat files a thick edge width (`border-l-2`, `border-t-4` …) is refused
+  even with a neutral colour, and so is a single-edge colour such as
+  `border-l-primary`: ESLint `design/no-chat-edge-bar`.
 
 - **Bordered status pills as list filters or tab strips** (corrected
   2026-11-01, Stephan on the H&S Safety reviews board: "i see you not

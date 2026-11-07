@@ -375,6 +375,10 @@ export function onChatActorReset(cleanup: () => void) {
         actorCleanups.delete(cleanup);
     };
 }
+/** Whether a draft-memory key belongs to the signed-in actor (memory for anyone else is never kept). */
+export function chatMemoryAccepts(key: string) {
+    return key.startsWith(`${draftActor}:`);
+}
 export function setChatDraftActor(actor: number | null) {
     if (draftActor === actor) return;
     actorCleanups.forEach((cleanup) => cleanup());
