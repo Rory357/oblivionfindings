@@ -180,6 +180,9 @@ export default [
                     'no-edge-accent-line': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-chat-edge-bar': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
@@ -236,9 +239,20 @@ export default [
             'resources/js/components/chat/chat-attachment-publication.tsx',
             'resources/js/components/chat/chat-attachment-queue.tsx',
             'resources/js/components/chat/chat-voice-recorder.tsx',
-            'resources/js/components/chat/chat-thread.tsx',
         ],
         rules: {
+            // DESIGN.md "Coloured edge lines", applied to Chat (Rory, 1 Nov 2026): reply quotes,
+            // edit strips and important messages had a left bar. In Chat any thick edge width is refused,
+            // whatever its colour, and so is a colour set on one edge (border-l-primary).
+            'design/no-chat-edge-bar': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/(?:^|\\s)(?:[^\\s:]+:)*border-(?:[tlrbxyse]-(?:2|3|4|8|\\[\\d+px\\])|[tlrbse]-(?!0(?:\\s|$))[a-z][a-z-]*(?:\\x2f\\d+)?)(?=\\s|$)/], TemplateElement[value.raw=/(?:^|\\s)(?:[^\\s:]+:)*border-(?:[tlrbxyse]-(?:2|3|4|8|\\[\\d+px\\])|[tlrbse]-(?!0(?:\\s|$))[a-z][a-z-]*(?:\\x2f\\d+)?)(?=\\s|$)/])',
+                    message:
+                        'No edge bars in Chat: a reply quote, edit strip or important message is a neutral bordered box with an icon or a StatusBadge, never a thick or coloured line on one edge. See DESIGN.md "Coloured edge lines" (the Chat reply-quote case).',
+                },
+            ],
             'design/no-blanket-descendant-size': [
                 'error',
                 {

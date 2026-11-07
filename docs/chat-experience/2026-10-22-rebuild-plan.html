@@ -385,7 +385,7 @@ html { scroll-behavior: smooth; }
             <tr><td>Clickable links; link previews</td><td><span class="st miss"><i></i>Missing</span></td><td>Links are plain text; automatic previews were ruled out</td><td class="k">C3.10</td></tr>
             <tr><td>Report a concern about a message</td><td><span class="st miss"><i></i>Missing</span></td><td>The spec requires it</td><td class="k">C5.9</td></tr>
             <tr><td>Select several messages</td><td><span class="st miss"><i></i>Missing</span></td><td>—</td><td class="k">C3.9</td></tr>
-            <tr><td>Load older messages on scroll</td><td><span class="st part"><i></i>Partly</span></td><td>A "Load earlier messages" button</td><td class="k">C2.7</td></tr>
+            <tr><td>Load older messages on scroll</td><td><span class="st built"><i></i>Built</span></td><td>Loads as you near the top and keeps your place (C2.7, 7 Nov); a button only after a failed load</td><td class="k">C2.7</td></tr>
             <tr><td>Header tabs (Chat, Files, Pinned, Notes); search in chat; people</td><td><span class="st part"><i></i>Partly</span></td><td>Search and people built; files, pinned and saved in pop-ups</td><td class="k">C3.11</td></tr>
 
             <tr class="grp"><td colspan="4">Writing a message</td></tr>
@@ -401,7 +401,7 @@ html { scroll-behavior: smooth; }
             <tr><td>@mentions of people</td><td><span class="st built"><i></i>Built</span></td><td>People only; no @team or @on-shift</td><td class="k">C5.3</td></tr>
             <tr><td>Quick replies and slash commands</td><td><span class="st miss"><i></i>Missing</span></td><td>The old page had quick replies</td><td class="k">C3.19</td></tr>
             <tr><td>Drafts that survive a refresh</td><td><span class="st part"><i></i>Partly</span></td><td>Kept in the tab; server drafts are switched off</td><td class="k">C3.20</td></tr>
-            <tr><td>Offline queue and retry</td><td><span class="st part"><i></i>Partly</span></td><td>Duplicate-safe, but one waiting message at a time</td><td class="k">C2.7</td></tr>
+            <tr><td>Offline queue and retry</td><td><span class="st built"><i></i>Built</span></td><td>Offline outbox (C2.7, 7 Nov): up to 20 text messages wait in memory, each with its own send reference; nothing sends until you tap Send</td><td class="k">C2.7</td></tr>
 
             <tr class="grp"><td colspan="4">Calls</td></tr>
             <tr><td>Voice call one-to-one; group voice up to 8</td><td><span class="st built"><i></i>Built</span></td><td>Off by default; needs the LiveKit server</td><td class="k">C4.4</td></tr>
@@ -660,7 +660,7 @@ html { scroll-behavior: smooth; }
               <li><span class="id">C2.4</span><span>A small Oblivion signer for Live tickets; Chat stops using php-jwt.</span><span class="size">S</span></li>
               <li><span class="id">C2.5</span><span>Oblivion voice-note checker for the formats browsers record; ffprobe becomes optional.</span><span class="size">M</span></li>
               <li><span class="id">C2.6</span><span>Message model, one migration: message kinds (text, card, poll, sticker, call, system), formatted text stored as a document (never HTML), threads, priority, scheduled send, shared-from, pin details, link cache.</span><span class="size">L</span></li>
-              <li><span class="id">C2.7</span><span>New screen architecture: split the 2,937-line thread file and its neighbours into small parts; Oblivion's own long-list rendering; an offline outbox in the browser; older messages load on scroll.</span><span class="size">L</span></li>
+              <li><span class="id">C2.7</span><span>New screen architecture: split the 2,937-line thread file and its neighbours into small parts; Oblivion's own long-list rendering; an offline outbox in the browser; older messages load on scroll. <b>Built 7 Nov 2026</b>: the thread is now <code>chat-thread.tsx</code> plus small parts in <code>components/chat/thread/</code>; rows are memoised and long histories mount only the rows near the view; reply quotes lost their edge bar (ESLint <code>design/no-chat-edge-bar</code>). The calling files are left for stage 5, which replaces them.</span><span class="size">L</span></li>
               <li><span class="id">C2.8</span><span>Remove pusher-js, Reverb and its parts, the web-push library and php-jwt from Chat; update the notices page; block their return.</span><span class="size">S</span></li>
             </ul>
             <p class="done"><b>Done when</b> the independent check finds no carried-over code and the register is signed off.</p>
