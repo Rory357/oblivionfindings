@@ -9,88 +9,46 @@ on:
     branches:
       - develop
       - main
+  # Round gates: `gh workflow run tests.yml --ref <branch>` (docs/testing/github-round-gate.md).
+  workflow_dispatch:
 
+# A newer push to a pull request or branch replaces its older run. Runs on main
+# queue instead of cancelling each other, so every landed commit gets a verdict.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+# Machine settings, as repository variables (Settings > Secrets and variables >
+# Actions > Variables). Unset means GitHub-hosted defaults. For a self-hosted
+# Linux runner with Docker (one runner instance per machine):
+#   TESTS_RUNS_ON         runner labels as JSON, e.g. ["self-hosted","linux","x64","oblivion-tests"]
+#   TESTS_FEATURE_SHARDS  feature shard numbers as JSON, e.g. [1] for one big machine (default 1..12)
+#   TESTS_WORKERS         Pest processes at once per machine (default 3)
+#   TESTS_MYSQL_MEMORY    InnoDB buffer pool of the test MySQL (default 2G)
+# Pull requests from forks always run on GitHub-hosted runners: the repository is public.
+env:
+  TESTS_WORKERS: ${{ vars.TESTS_WORKERS || '3' }}
+  TEST_DB_POOL_SIZE: ${{ vars.TESTS_WORKERS || '3' }}
+  DB_CONNECTION: mysql
+  DB_HOST: 127.0.0.1
+  DB_PORT: 3306
+  DB_DATABASE: oblivion_findings_codex_test
+  DB_USERNAME: testUser
+  DB_PASSWORD: test101
 
 jobs:
-  ci:
+  # TypeScript and vitest checks. PHP tests do not need built assets (every
+  # TestCase calls withoutVite()); the bundle itself is built by the
+  # database-bootstrap and visual-regression workflows.
+  frontend:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - suite: foundation
-            shard_index: 0
-            shard_count: 1
-            batch_size: 30
-          # Run the complete medication gate files as one named gate, apart
-          # from the broad feature shards and their unrelated failures.
-          - suite: emar-release
-            shard_index: 0
-            shard_count: 1
-            batch_size: 1
-          - suite: feature
-            shard_index: 0
-            shard_count: 8
-            batch_size: 12
-          - suite: feature
-            shard_index: 1
-            shard_count: 8
-            batch_size: 12
-          - suite: feature
-            shard_index: 2
-            shard_count: 8
-            batch_size: 12
-          - suite: feature
-            shard_index: 3
-            shard_count: 8
-            batch_size: 12
-          - suite: feature
-            shard_index: 4
-            shard_count: 8
-            batch_size: 12
-          - suite: feature
-            shard_index: 5
-            shard_count: 8
-            batch_size: 12
-          - suite: feature
-            shard_index: 6
-            shard_count: 8
-            batch_size: 12
-          - suite: feature
-            shard_index: 7
-            shard_count: 8
-            batch_size: 12
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_DATABASE: oblivion_findings_codex_test
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_USER: testUser
-          MYSQL_PASSWORD: test101
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=12
-
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.4
-          tools: composer:v2
-          coverage: none
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -101,21 +59,10 @@ jobs:
       - name: Install Node Dependencies
         run: npm ci
 
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Build Assets
-        # The bundle (incl. the Chat voice client) needs more than Node's default ~4 GB heap.
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
-        run: npm run build
-
       - name: Guard retired Today navigation
-        if: matrix.suite == 'foundation'
         run: npx vitest run resources/js/components/today-retirement.test.tsx
 
       - name: Check medication desktop types and workflows
-        if: matrix.suite == 'foundation'
         # Full-project typechecking needs more than Node's default ~4 GB heap.
         env:
           NODE_OPTIONS: --max-old-space-size=6144
@@ -125,53 +72,64 @@ jobs:
           npx vitest run resources/js/components/emar resources/js/lib/medication-navigation.test.ts resources/js/lib/medication-record-events.test.ts resources/js/components/client-safety-ribbon.test.tsx resources/js/pages/operations/clients/index.test.tsx resources/js/pages/sites/calendar/SiteCalendar.ssr.test.tsx
           npx vitest run resources/js/pages/health-clinical/ClientSummary.ssr.test.tsx resources/js/pages/operations/shifts/show.ssr.test.tsx resources/js/pages/meds/today resources/js/test/client-profile-navigation.test.tsx
 
-      - name: Copy Environment File
-        run: cp .env.example .env
+  foundation:
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON(vars.TESTS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Generate Application Key
-        run: php artisan key:generate
+      - name: Prepare PHP test machine
+        uses: ./.github/actions/php-test-machine
+        with:
+          mysql-memory: ${{ vars.TESTS_MYSQL_MEMORY || '2G' }}
 
-      # The TestCase creates a per-process isolated MySQL database via PDO at
-      # runtime (DB_DATABASE_<pid>). That requires testUser to have CREATE
-      # privilege globally, which the default MYSQL_USER setup doesn't grant.
-      - name: Grant testUser global privileges
-        run: |
-          mysql --host=127.0.0.1 --port=3306 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'testUser'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
-
-      - name: Crash-safe tests (${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_count }})
-        if: matrix.suite != 'emar-release'
-        env:
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: oblivion_findings_codex_test
-          DB_USERNAME: testUser
-          DB_PASSWORD: test101
+      - name: Crash-safe tests (foundation)
         run: >-
           php scripts/ci/run-pest-shard.php
-          --suite=${{ matrix.suite }}
-          --shard-index=${{ matrix.shard_index }}
-          --shard-count=${{ matrix.shard_count }}
-          --batch-size=${{ matrix.batch_size }}
+          --suite=foundation
+          --shard-index=0
+          --shard-count=1
+          --batch-size=30
+          --workers=${{ env.TESTS_WORKERS }}
+
+      - name: Keep results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-foundation
+          path: storage/logs/ci
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Stop MySQL
+        if: always()
+        run: docker rm -f oblivion-test-mysql >/dev/null 2>&1 || true
+
+  # The complete medication gate files as one named gate, apart from the broad
+  # feature shards.
+  emar-release:
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON(vars.TESTS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare PHP test machine
+        uses: ./.github/actions/php-test-machine
+        with:
+          mysql-memory: ${{ vars.TESTS_MYSQL_MEMORY || '2G' }}
 
       - name: Install protected-backup PDF verifier
-        if: matrix.suite == 'emar-release'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y qpdf
           test -x /usr/bin/qpdf
 
       - name: Medication and connected-care release gates
-        if: matrix.suite == 'emar-release'
         env:
           EMAR_BACKUP_QPDF_PATH: /usr/bin/qpdf
           APP_ENV: testing
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: oblivion_findings_codex_test
-          DB_USERNAME: testUser
-          DB_PASSWORD: test101
         run: >-
           php vendor/bin/pest
           tests/Feature/Emar/PackLedgerIntegrationTest.php
@@ -226,9 +184,95 @@ jobs:
           --log-junit storage/logs/emar-release-gates.xml
 
       - name: Retain medication gate results
-        if: always() && matrix.suite == 'emar-release'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: emar-release-gates
           path: storage/logs/emar-release-gates.xml
+          if-no-files-found: warn
+
+      - name: Keep results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-emar-release
+          path: storage/logs/emar-release-gates.xml
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Stop MySQL
+        if: always()
+        run: docker rm -f oblivion-test-mysql >/dev/null 2>&1 || true
+
+  feature:
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON(vars.TESTS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(vars.TESTS_FEATURE_SHARDS || '[1,2,3,4,5,6,7,8,9,10,11,12]') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare PHP test machine
+        uses: ./.github/actions/php-test-machine
+        with:
+          mysql-memory: ${{ vars.TESTS_MYSQL_MEMORY || '2G' }}
+
+      - name: Crash-safe tests (feature ${{ matrix.shard }}/${{ strategy.job-total }})
+        run: >-
+          php scripts/ci/run-pest-shard.php
+          --suite=feature
+          --shard-index=${{ strategy.job-index }}
+          --shard-count=${{ strategy.job-total }}
+          --batch-size=12
+          --workers=${{ env.TESTS_WORKERS }}
+
+      - name: Keep results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-feature-${{ matrix.shard }}
+          path: storage/logs/ci
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Stop MySQL
+        if: always()
+        run: docker rm -f oblivion-test-mysql >/dev/null 2>&1 || true
+
+  # One answer for the run: green when every failing test is on
+  # tests/ci/known-failures.php, nothing crashed and every shard reported.
+  verdict:
+    needs: [foundation, emar-release, feature]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Collect results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          path: storage/logs/verdict
+
+      - name: Verdict
+        env:
+          FEATURE_SHARDS: ${{ vars.TESTS_FEATURE_SHARDS || '[1,2,3,4,5,6,7,8,9,10,11,12]' }}
+        run: >-
+          php scripts/ci/test-verdict.php storage/logs/verdict
+          --expect-shards=$(php -r 'echo 1 + count(json_decode(getenv("FEATURE_SHARDS"), true));')
+
+      - name: Keep verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdict
+          path: |
+            storage/logs/verdict/verdict.json
+            storage/logs/verdict/verdict.md
+          retention-days: 30
           if-no-files-found: warn

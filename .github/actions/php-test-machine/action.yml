@@ -1,0 +1,71 @@
+name: PHP test machine
+description: >-
+  PHP 8.4, cached Composer dependencies, the testing .env, and a MySQL 8.0
+  server whose data directory lives in RAM (tmpfs). Works on GitHub-hosted
+  ubuntu runners and on a self-hosted Linux runner with Docker.
+
+inputs:
+  mysql-memory:
+    description: InnoDB buffer pool size for the test MySQL server.
+    default: 2G
+
+runs:
+  using: composite
+  steps:
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: 8.4
+        tools: composer:v2
+        coverage: none
+
+    - name: Restore Composer dependencies
+      id: vendor-cache
+      uses: actions/cache@v4
+      with:
+        path: vendor
+        key: vendor-${{ runner.os }}-php84-${{ hashFiles('composer.lock') }}
+
+    - name: Install Composer dependencies
+      shell: bash
+      run: composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
+
+    - name: Prepare environment file
+      shell: bash
+      run: |
+        cp .env.example .env
+        php artisan key:generate --no-interaction
+
+    # Durability settings only: nothing here changes what SQL means. The data
+    # directory is tmpfs, so table files cost no disk I/O. Binary logging
+    # stays on, as on the old service container and the local server.
+    - name: Start MySQL 8.0 (data in RAM)
+      shell: bash
+      run: |
+        docker rm -f oblivion-test-mysql >/dev/null 2>&1 || true
+        docker run -d --name oblivion-test-mysql \
+          --tmpfs /var/lib/mysql:rw \
+          -e MYSQL_ROOT_PASSWORD=root \
+          -e MYSQL_DATABASE=oblivion_findings_codex_test \
+          -e MYSQL_USER=testUser \
+          -e MYSQL_PASSWORD=test101 \
+          -p 3306:3306 \
+          mysql:8.0 \
+          --innodb-flush-log-at-trx-commit=0 \
+          --sync-binlog=0 \
+          --innodb-doublewrite=0 \
+          --innodb-buffer-pool-size=${{ inputs.mysql-memory }} \
+          --innodb-redo-log-capacity=1073741824 \
+          --max-connections=500 \
+          --table-open-cache=20000 \
+          --table-definition-cache=20000
+        for attempt in $(seq 1 90); do
+          if mysql --host=127.0.0.1 --port=3306 -uroot -proot -e 'SELECT 1' >/dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        # Each test process creates its own database, so testUser needs global CREATE.
+        mysql --host=127.0.0.1 --port=3306 -uroot -proot \
+          -e "GRANT ALL PRIVILEGES ON *.* TO 'testUser'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
+        mysql --host=127.0.0.1 --port=3306 -uroot -proot -e 'SELECT VERSION() AS mysql_version'
