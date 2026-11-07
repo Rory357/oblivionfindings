@@ -15,9 +15,17 @@ use Illuminate\Support\Facades\DB;
 
 final class ChatProjection
 {
+    /** Message kinds (C2.6). */
+    public const KINDS = ['text', 'card', 'poll', 'sticker', 'call', 'system'];
+
     public function __construct(private readonly ChatAccess $access, private readonly ClientFamilyCommunicationAccess $family) {}
 
-    public function conversation(OpsConversation $conversation, User $viewer): array
+    /**
+     * $summary leaves out the fields that check every member's access (mentionable_ids,
+     * can_manage_people, management). Lists use it; an opened conversation gets them from its
+     * own response, so a list of many conversations no longer runs those checks for each row.
+     */
+    public function conversation(OpsConversation $conversation, User $viewer, bool $summary = false): array
     {
         $conversation->loadMissing(['participants.user', 'client']);
         $member = $conversation->participants->firstWhere('user_id', $viewer->id);
@@ -38,10 +46,10 @@ final class ChatProjection
             'id' => $conversation->id,
             'title' => $conversation->title ?: $participants->filter(fn ($p) => $p->user_id !== $viewer->id)->map(fn ($p) => $p->user->name)->join(', '),
             'type' => $conversation->is_managed_channel ? 'channel' : $conversation->conversation_type,
-            'can_manage_people' => $this->access->canManageParticipants($viewer, $conversation),
+            ...($summary ? [] : ['can_manage_people' => $this->access->canManageParticipants($viewer, $conversation)]),
             'client' => $conversation->client ? ['id' => $conversation->client_id, 'name' => $conversation->client->first_name.' '.$conversation->client->last_name] : null,
             'participants' => $participants->map(fn ($p) => ['id' => $p->user_id, 'name' => $p->user->name, 'role' => $p->role])->values(),
-            'mentionable_ids' => app(ChatMentions::class)->eligible($conversation, $viewer)->pluck('id')->values(),
+            ...($summary ? [] : ['mentionable_ids' => app(ChatMentions::class)->eligible($conversation, $viewer)->pluck('id')->values()]),
             'latest_mention_id' => $latestMentionId ? (int) $latestMentionId : null,
             'latest' => $latest ? ['content' => $latest->content, 'created_at' => $latest->created_at?->toISOString()] : null,
             'unread' => max($member?->unread_marker ? 1 : 0, $unread->count()),
@@ -51,16 +59,16 @@ final class ChatProjection
             'can_send' => $policy['enabled'] && ($conversation->conversation_type !== 'family' || $policy['family_enabled'])
                 && ! $conversation->is_archived && ! $member?->is_archived_for_user && $this->access->allows($viewer, $conversation, true),
             'can_call' => $policy['enabled'] && $policy['calls_enabled'] && ($conversation->conversation_type !== 'family' || ($policy['family_enabled'] && $policy['family_calls_enabled'])),
-            'policy' => app(ChatSettings::class)->publicPolicy($conversation),
+            'policy' => app(ChatSettings::class)->publicPolicy($conversation, $policy),
             'care_team_cover' => (bool) $conversation->care_team_cover,
             'queue_status' => $conversation->queue_status,
             'response_clock' => $conversation->conversation_type === 'family'
-                ? app(ChatFamilyResponse::class)->project($conversation, $viewer, app(ChatSettings::class)->forConversation($conversation)) : null,
+                ? app(ChatFamilyResponse::class)->project($conversation, $viewer, $policy) : null,
             'assigned_to' => $conversation->assigned_to,
             'version' => $conversation->chat_version,
             'archived' => (bool) $conversation->is_archived,
             'archived_for_me' => (bool) $member?->is_archived_for_user,
-            'management' => app(ChatConversationManagement::class)->capabilities($viewer, $conversation),
+            ...($summary ? [] : ['management' => app(ChatConversationManagement::class)->capabilities($viewer, $conversation)]),
         ];
     }
 
@@ -77,7 +85,7 @@ final class ChatProjection
         if ($conversation) {
             $messages->each(fn (OpsMessage $message) => $message->setRelation('conversation', $conversation));
         }
-        EloquentCollection::make($messages->all())->loadMissing(['conversation', 'sender:id,name', 'reactions.user:id,name']);
+        EloquentCollection::make($messages->all())->loadMissing(['conversation', 'sender:id,name', 'pinnedBy:id,name', 'reactions.user:id,name']);
         $ids = $messages->pluck('id')->all();
         $replies = collect();
         foreach ($messages->filter(fn ($message) => $message->reply_to_id && $message->conversation)->groupBy('conversation_id') as $group) {
@@ -101,7 +109,7 @@ final class ChatProjection
 
     public function message(OpsMessage $message, User $viewer, ?array $batch = null): array
     {
-        $message->loadMissing(['sender:id,name', 'reactions.user:id,name']);
+        $message->loadMissing(['sender:id,name', 'pinnedBy:id,name', 'reactions.user:id,name']);
         $deleted = $message->trashed();
         $reply = ! $message->reply_to_id ? null : ($batch !== null
             ? $batch['replies']->get($message->conversation_id.':'.$message->reply_to_id)
@@ -120,8 +128,13 @@ final class ChatProjection
             'sender_name' => $message->sender?->name ?? 'Former participant',
             'mine' => (int) $message->sender_id === (int) $viewer->id,
             'content' => $deleted ? '' : $message->content,
+            'kind' => $this->kind($message),
+            // The formatted text, rendered by the browser as elements and never as HTML; null for plain text.
+            'document' => $deleted ? null : $message->body_document,
             'deleted' => $deleted,
             'pinned' => ! $deleted && $message->is_pinned,
+            'pinned_by_name' => ! $deleted && $message->is_pinned && $message->pinned_by ? ($message->pinned_by === $viewer->id ? 'You' : ($message->pinnedBy?->name ?? 'Former participant')) : null,
+            'pinned_at' => ! $deleted && $message->is_pinned ? $message->pinned_at?->toISOString() : null,
             'saved' => $saved,
             'mentions' => $mentions,
             'created_at' => $message->created_at?->toISOString(),
@@ -138,8 +151,18 @@ final class ChatProjection
             ]),
             // Existing record-linked media keeps its identity. It is never projected as a public storage path.
             'legacy_attachments' => $deleted ? [] : collect($message->attachments ?? [])->map(fn ($file) => $this->legacyAttachment($message, $file, $viewer)),
-            'reactions' => $deleted ? [] : $message->reactions->groupBy('emoji')->map(fn ($rows, $emoji) => ['emoji' => $emoji, 'count' => $rows->count(), 'mine' => $rows->contains('user_id', $viewer->id)])->values(),
+            // Who reacted is shown as names, as WhatsApp and Teams do; reacting is a visible action, unlike reading.
+            'reactions' => $deleted ? [] : $message->reactions->sortBy('id')->groupBy('emoji')->map(fn ($rows, $emoji) => [
+                'emoji' => (string) $emoji, 'count' => $rows->count(), 'mine' => $rows->contains('user_id', $viewer->id),
+                'people' => $rows->map(fn ($row) => $row->user_id === $viewer->id ? 'You' : ($row->user?->name ?? 'Former participant'))->take(20)->values(),
+            ])->values(),
         ];
+    }
+
+    /** Files belong to a text message, so the old 'attachment' type (and any older one) reads as 'text'. */
+    private function kind(OpsMessage $message): string
+    {
+        return in_array($message->message_type, self::KINDS, true) ? $message->message_type : 'text';
     }
 
     private function legacyAttachment(OpsMessage $message, array $file, User $viewer): array

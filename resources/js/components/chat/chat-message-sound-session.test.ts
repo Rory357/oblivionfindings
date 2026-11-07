@@ -8,10 +8,12 @@ const updates = vi.hoisted(() => ({
     refresh: null as null | (() => Promise<boolean>),
     stop: vi.fn(),
 }));
-vi.mock('./chat-update-watch', () => ({
-    watchChatUpdates: (refresh: () => Promise<boolean>) => {
-        updates.refresh = refresh;
-        return updates.stop;
+vi.mock('./live/sync', () => ({
+    chatSync: {
+        watch: (options: { refresh: () => Promise<boolean> }) => {
+            updates.refresh = options.refresh;
+            return updates.stop;
+        },
     },
 }));
 vi.mock('./api', async () => ({

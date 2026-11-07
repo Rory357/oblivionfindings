@@ -25,6 +25,7 @@ import { DeferredPanel } from '@/components/deferred-panel';
 import EndOfShiftChecklist, {
     type EndOfShiftBlocker,
 } from '@/components/end-of-shift-checklist';
+import { DoorClockinBand, DoorClockinNotice } from '@/components/security-devices/door-clockin-band';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SkeletonCard } from '@/components/ui/skeleton-card';
@@ -51,6 +52,11 @@ import {
 import { PaperworkPanel } from './components/paperwork-panel';
 import { QuickAddTask } from './components/quick-add-task';
 import { RecordCareActions } from './components/record-care-actions';
+import {
+    SomethingHappened,
+    WhatYouReported,
+    YourWorkplaceInjury,
+} from './components/report-cards';
 import { ShiftSummary } from './components/shift-summary';
 import { TaskDetailDialog } from './components/task-detail-dialog';
 import { TaskHelpInbox } from './components/task-help-inbox';
@@ -101,6 +107,7 @@ interface SharedAuth {
     user?: AuthUser | null;
     can?: {
         timesheets?: { create?: boolean };
+        safeguarding?: { create?: boolean };
         staff?: {
             availabilityUpdateSelf?: boolean;
         };
@@ -717,6 +724,17 @@ export default function MyDay() {
                 onAdd={() => openNewTask()}
             />
             <div className="h-5" aria-hidden="true" />
+            {/* G4-1: reporting comes first in the body (Stephan, 1 Nov: "Keep My Day, add H&S only"). */}
+            <div className="mb-5 empty:hidden">
+                <SomethingHappened
+                    canSafeguarding={!!auth?.can?.safeguarding?.create}
+                    onIncident={() =>
+                        router.visit(
+                            myDayIncidentHref({ shiftId: activeShift?.id }),
+                        )
+                    }
+                />
+            </div>
             {(refreshFailed || !!props.data_unavailable?.length) && (
                 <Card role="alert" className="mb-5 border-status-warning/30">
                     <CardContent className="space-y-2 p-4">
@@ -795,6 +813,8 @@ export default function MyDay() {
                     </CardContent>
                 </Card>
             )}
+            {/* S&D Phase H (D15, pg-sdr-19g): a badge near their rostered start suggests the clock-in; they choose. */}
+            {props.door_clockin ? <DoorClockinBand data={props.door_clockin} /> : null}
             {props.active_lone_worker_session ? (
                 <LoneWorkerCheckInCard
                     session={props.active_lone_worker_session}
@@ -1012,6 +1032,7 @@ export default function MyDay() {
                     )}
                 </div>
                 <aside className="flex min-w-0 flex-col gap-5">
+                    {props.door_clockin ? <DoorClockinNotice data={props.door_clockin} /> : null}
                     {props.can_view_medications && (
                         <MedicinesCard
                             rows={visibleMeds}
@@ -1085,6 +1106,9 @@ export default function MyDay() {
                             </CardContent>
                         </Card>
                     )}
+                    {props.my_reports ? (
+                        <WhatYouReported reports={props.my_reports} />
+                    ) : null}
                     <RecordCareActions
                         people={people}
                         selectedPerson={
@@ -1099,38 +1123,10 @@ export default function MyDay() {
                         onNote={handleAddNote}
                         onMeal={() => setMealLogOpen(true)}
                         onObservation={() => setVitalsOpen(true)}
-                        onIncident={() =>
-                            router.visit(
-                                myDayIncidentHref({ shiftId: activeShift?.id }),
-                            )
-                        }
                     />
 
-                    {(props.own_open_injuries ?? 0) > 0 ? (
-                        <Card>
-                            <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
-                                <div className="flex min-w-0 items-start gap-3">
-                                    <HeartPulse
-                                        className="mt-0.5 size-5 shrink-0 text-status-warning"
-                                        aria-hidden="true"
-                                    />
-                                    <div>
-                                        <h2 className="text-section-title">
-                                            Your workplace injury
-                                        </h2>
-                                        <p className="text-subtle">
-                                            See your care and return-to-work
-                                            plan.
-                                        </p>
-                                    </div>
-                                </div>
-                                <Button variant="outline" asChild>
-                                    <Link href="/hr/my/injuries">
-                                        Open my injury
-                                    </Link>
-                                </Button>
-                            </CardContent>
-                        </Card>
+                    {props.own_injury ? (
+                        <YourWorkplaceInjury injury={props.own_injury} />
                     ) : null}
 
                     {props.first_aid_followups?.length ? (

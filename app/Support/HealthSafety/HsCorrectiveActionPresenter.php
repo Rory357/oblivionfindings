@@ -86,9 +86,25 @@ class HsCorrectiveActionPresenter
                 && (int) $action->completed_by_user_id !== (int) $viewer->id
                 && (int) $action->created_by !== (int) $viewer->id
                 && (int) $action->hsEvent?->created_by !== (int) $viewer->id,
+            // Q22 (MASTER for Stephan, 2 Nov): say why someone who could otherwise check it can't — separation of duties.
+            'verify_blocked_reason' => $canManage && $evidenceLoaded && $action->status === HsCorrectiveAction::STATUS_COMPLETED
+                ? match (true) {
+                    (int) $action->completed_by_user_id === (int) $viewer->id => 'You marked it done, so someone else checks it.',
+                    $action->hasBeenOwnedBy((int) $viewer->id) => 'You own or owned this action, so someone else checks it.',
+                    (int) $action->created_by === (int) $viewer->id => 'You added this action, so someone else checks it.',
+                    (int) $action->hsEvent?->created_by === (int) $viewer->id => 'You started this safety review, so someone else checks its actions.',
+                    default => null,
+                }
+                : null,
             'verified_at' => $action->verified_at?->toIso8601String(),
             'verified_by_name' => $action->verifiedBy?->name,
             'effectiveness_confirmed' => $action->effectiveness_confirmed,
+            // G3 board M5: the check's own words ("Check result: …"), under the same rule as the action's history,
+            // which already carries them.
+            'check_notes' => $evidenceLoaded && in_array($action->status, [
+                HsCorrectiveAction::STATUS_VERIFIED,
+                HsCorrectiveAction::STATUS_CLOSED,
+            ], true) ? $action->verification_notes : null,
             'hs_investigation_id' => $action->hs_investigation_id,
             'recommendation_index' => $action->recommendation_index,
             'recommendation' => $this->recommendation($action),

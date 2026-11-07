@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileDropzone, formatFileSize } from '@/components/ui/file-dropzone';
@@ -28,7 +29,7 @@ const FIELD_LABELS: Record<string, string> = { user_id: 'Worker', fit_test_compl
     result: 'Inspection result', findings: 'Inspection findings', action_taken: 'Action taken' };
 const friendly = (key: string) => FIELD_LABELS[key] ?? humaniseHsValue(key);
 /** Inspection results people choose from. */
-const RESULT_CHOICES: Record<string, string> = { pass: 'Pass', fail: 'Fail', needs_repair: 'Needs repair', condemned: 'Take out of use (condemned)' };
+const RESULT_CHOICES: Record<string, string> = { pass: 'Pass', needs_repair: 'Needs repair', fail: 'Fail', condemned: 'Take out of use' };
 /** Suggested file types; the stored value stays the short key. */
 const FILE_KINDS: Record<string, string> = { document: 'Document', photo: 'Photo', inspection_photo: 'Inspection photo', inspection_report: 'Inspection report' };
 const choiceLabel = (key: string, value: string) => key === 'result' ? RESULT_CHOICES[value] ?? humaniseHsValue(value) : key === 'kind' ? FILE_KINDS[value] ?? humaniseHsValue(value) : condLabel(value);
@@ -41,24 +42,26 @@ export function PpeCommandForm({ record, command, actorId, attachment, active = 
     const { form, change } = source; const f = form.data; const locked = source.busy || source.unresolved || !!source.receipt;
     const title = PPE_COMMAND_LABELS[command];
     const input = (key: keyof PpeFormValues, label: string, type = 'text', required = false, maxLength = 255) => <Field label={label} htmlFor={`${id}-${key}`} required={required} error={(form.errors as Record<string, string>)[key]}><Input id={`${id}-${key}`} className="frontline-tap" type={type} required={required} maxLength={maxLength} disabled={locked} value={String(f[key] ?? '')} onChange={(event) => change(key, event.target.value as never)} /></Field>;
+    // G4-11: dates use the approved calendar (Cancel and Use date), never a native date box.
+    const date = (key: 'purchase_date' | 'expiry_date' | 'next_inspection_due' | 'fit_test_date' | 'training_date', label: string, required = false) => <Field label={label} htmlFor={`${id}-${key}`} required={required} error={(form.errors as Record<string, string>)[key]}><DatePicker id={`${id}-${key}`} label={label} value={String(f[key] ?? '')} allowClear={!required} disabled={locked} invalid={!!(form.errors as Record<string, string>)[key]} onChange={(value) => change(key, value as never)} /></Field>;
     const area = (key: 'notes' | 'reason' | 'findings' | 'action_taken', label: string, required = false) => <Field label={label} htmlFor={`${id}-${key}`} required={required} error={form.errors[key]}><Textarea id={`${id}-${key}`} rows={3} className="frontline-tap" required={required} maxLength={key === 'notes' ? 1000 : 2000} disabled={locked} value={f[key]} onChange={(event) => change(key, event.target.value)} /></Field>;
     const select = (key: 'condition' | 'condition_after' | 'result' | 'kind', label: string, values: readonly string[], required = false) => <Field label={label} htmlFor={`${id}-${key}`} required={required} error={form.errors[key]}><SelectInput id={`${id}-${key}`} frontline disabled={locked} value={f[key]} placeholder={`Choose ${label.toLowerCase()}`} options={values.map((value) => ({ value, label: choiceLabel(key, value) }))} onChange={(value) => change(key, value)} /></Field>;
     const check = (key: 'fit_test_completed' | 'training_completed' | 'acknowledged', label: string) => <div className="flex items-center gap-3"><Checkbox id={`${id}-${key}`} className="frontline-hit" checked={f[key]} disabled={locked} onCheckedChange={(value) => change(key, value === true)} /><label htmlFor={`${id}-${key}`} className="frontline-hit text-subtle cursor-pointer">{label}</label></div>;
     const documents = <div className="space-y-3"><Field label="Files" error={form.errors.documents} labelId={`${id}-documents-label`}><FileDropzone multiple disabled={locked} aria-labelledby={`${id}-documents-label`} hint="Up to 20 files · 20 MB each" onFiles={(files) => change('documents', [...f.documents, ...files.map((file) => ({ file, kind: file.type.startsWith('image/') ? 'inspection_photo' : 'inspection_report', note: '' }))])} /></Field>{f.documents.map((doc, index) => <div key={index} className="space-y-3 rounded-xl border border-border p-4"><p className="text-subtle break-words">{doc.file.name} · {formatFileSize(doc.file.size)}</p><Field label="Type of file" htmlFor={`${id}-doc-kind-${index}`}><Input id={`${id}-doc-kind-${index}`} className="frontline-tap" value={doc.kind} maxLength={30} disabled={locked} onChange={(event) => change('documents', f.documents.map((item, pos) => pos === index ? { ...item, kind: event.target.value } : item))} /></Field><Field label="Note about this file" htmlFor={`${id}-doc-note-${index}`}><Textarea id={`${id}-doc-note-${index}`} className="frontline-tap" value={doc.note} maxLength={1000} disabled={locked} onChange={(event) => change('documents', f.documents.map((item, pos) => pos === index ? { ...item, note: event.target.value } : item))} /></Field><Button type="button" className="frontline-tap" variant="outline" disabled={locked} onClick={() => change('documents', f.documents.filter((_, pos) => pos !== index))}>Remove file</Button></div>)}</div>;
     const body = command === 'edit' ? <div className="grid gap-4 sm:grid-cols-2">
         {input('brand', 'Brand')}{input('model', 'Model')}{input('serial_number', 'Serial number')}{input('quantity', 'Quantity', 'number', true)}{input('location', 'Storage location')}{select('condition', 'Condition', CONDITION_OPTIONS, true)}
-        {input('purchase_date', 'Purchase date', 'date')}{input('expiry_date', 'Expiry date', 'date')}{input('next_inspection_due', 'Next inspection due', 'date')}
+        {date('purchase_date', 'Purchase date')}{date('expiry_date', 'Expiry date')}{date('next_inspection_due', 'Next inspection due')}
         <p className="text-subtle sm:col-span-2">Quantity is how many are in this batch. To change whether it can be used, use Place on hold, Issue PPE, Take out of use or Record disposal.</p>
     </div> : command === 'allocate' ? <>
         <Field label="Worker at this site" htmlFor={`${id}-worker`} required error={form.errors.user_id}><PpePeoplePicker id={`${id}-worker`} siteId={record.detail.command_context.site_id} value={f.user_id} disabled={locked} onValidity={setChoicesValid} onChange={(value, person) => { change('user_id', value); setWorkerName(person.name); }} /></Field>
         {workerName && <p className="text-subtle">Worker chosen: {workerName}</p>}
-        {check('fit_test_completed', 'Fit test done')}{f.fit_test_completed && <>{input('fit_test_date', 'Fit test date', 'date', true)}{input('fit_test_result', 'Fit test result')}</>}
-        {check('training_completed', 'Training done')}{f.training_completed && input('training_date', 'Training date', 'date', true)}
+        {check('fit_test_completed', 'Fit test done')}{f.fit_test_completed && <>{date('fit_test_date', 'Fit test date', true)}{input('fit_test_result', 'Fit test result')}</>}
+        {check('training_completed', 'Training done')}{f.training_completed && date('training_date', 'Training date', true)}
         {check('acknowledged', 'Worker confirmed they received it')}{area('notes', 'Issue notes')}
         <p className="text-subtle">This records what you were told. It doesn’t prove the worker is trained, that a mask fits, or that they’re fit for work.</p>
     </> : command === 'inspect' ? <>
-        {select('result', 'Inspection result', ['pass', 'fail', 'needs_repair', 'condemned'], true)}{select('condition_after', 'Condition after inspection', CONDITION_OPTIONS)}
-        {area('findings', 'Inspection findings')}{area('action_taken', 'Action taken')}{input('next_inspection_due', 'Next inspection due', 'date')}{documents}
+        {select('result', 'Inspection result', ['pass', 'needs_repair', 'fail', 'condemned'], true)}{select('condition_after', 'Condition after inspection', CONDITION_OPTIONS)}
+        {area('findings', 'Inspection findings')}{area('action_taken', 'Action taken')}{date('next_inspection_due', 'Next inspection due')}{documents}
         <p className="text-subtle">If it fails, it goes on hold. If it was on hold and now passes, use Return to use afterwards.</p>
     </> : command === 'upload_evidence' ? <>
         <Field label="File" required labelId={`${id}-file-label`} error={form.errors.file}><FileDropzone multiple={false} disabled={locked} aria-labelledby={`${id}-file-label`} hint="Up to 20 MB" onFiles={(files) => change('file', files[0] ?? null)} /></Field>

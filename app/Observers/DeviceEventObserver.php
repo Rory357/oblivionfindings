@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
+use App\Enums\AlertSeverity;
 use App\Exceptions\SafetySignalUnroutable;
 use App\Jobs\DispatchDeviceEventSignalOutbox;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
@@ -57,6 +58,55 @@ class DeviceEventObserver
         'signal' => 'device_signal_generic',
     ];
 
+    /**
+     * Safety events go to Control Room's own people-safety and home-facility types, never the
+     * generic catch-all, whose seeded rule reports them as "info" and merges repeats (safety fix
+     * round, 7 Nov 2026: a panic press, a duress code, a fall or a fire alarm reached Control Room
+     * as routine). Every spelling the device sources use is listed: the alarm receiver (panic,
+     * duress, alarm_triggered), Milesight sensors and webhooks (panic_alarm, water_leak, fall),
+     * Queclink and Milesight SOS (sos_triggered). The alarm receiver's alarm_triggered is a fire
+     * alarm for Contact ID 110–118 or SIA FA, otherwise an intruder alarm (see signalTypeFor()).
+     *
+     * @var array<string, string>
+     */
+    public const SAFETY_TYPE_MAP = [
+        'panic' => 'panic_sos_person',
+        'panic_alarm' => 'panic_sos_person',
+        'sos_triggered' => 'panic_sos_person',
+        'duress' => 'panic_sos_person',
+        'alarm_triggered' => 'intrusion_alarm',
+        'door_forced' => 'door_forced_open',
+        'water_leak_detected' => 'water_leak',
+        'water_leak' => 'water_leak',
+        'fall_detected' => 'fall_detected',
+    ];
+
+    /** The lowest Control Room severity for these types, whatever the device or the type row says. */
+    private const SAFETY_FLOOR = [
+        'panic_sos_person' => 'critical',
+        'fall_detected' => 'critical',
+        'fire_alarm' => 'critical',
+    ];
+
+    /** The Control Room signal type a device event goes to. */
+    public static function signalTypeFor(DeviceEvent $event): string
+    {
+        $type = (string) $event->event_type;
+        if ($type === 'alarm_triggered' && self::isFireAlarm($event)) {
+            return 'fire_alarm';
+        }
+
+        return self::SAFETY_TYPE_MAP[$type] ?? self::TYPE_MAP[$type] ?? 'device_signal_generic';
+    }
+
+    private static function isFireAlarm(DeviceEvent $event): bool
+    {
+        $cid = (int) data_get($event->payload, 'cid_code', 0);
+        $sia = strtoupper((string) data_get($event->payload, 'sia_code', ''));
+
+        return ($cid >= 110 && $cid <= 118) || $sia === 'FA';
+    }
+
     public function __construct(
         private readonly SignalProcessingService $processor,
         private readonly CanonicalDeviceSiteResolver $siteResolver,
@@ -99,7 +149,7 @@ class DeviceEventObserver
 
     public function deliver(DeviceEvent $event): void
     {
-        $signalTypeCode = self::TYPE_MAP[$event->event_type] ?? 'device_signal_generic';
+        $signalTypeCode = self::signalTypeFor($event);
 
         // Resolve the signal source once; cached by SignalSource singleton.
         $source = SignalSource::where('slug', 'security_devices')->first();
@@ -135,14 +185,29 @@ class DeviceEventObserver
             ? (int) $controlRoomDevices->first()->id
             : null;
 
-        $signalTypeId = SignalType::where('code', $signalTypeCode)->value('id');
+        $signalType = SignalType::where('code', $signalTypeCode)->first(['id', 'default_severity']);
+        $signalTypeId = $signalType?->id;
+        // A safety event is never quieter than its Control Room type says (a panic button is at
+        // least critical, a fall or a forced door at least high), whatever the device reported.
+        // A person in danger (panic, SOS, duress, a fall) and a fire alarm are always critical, even
+        // where an installation's type says less (.com's "Fall detected" type is "high").
+        $severityHint = $event->severity ?: 'info';
+        if (in_array($signalTypeCode, [...array_values(self::SAFETY_TYPE_MAP), 'fire_alarm'], true)) {
+            $severityHint = AlertSeverity::higher(
+                AlertSeverity::normalise($severityHint, AlertSeverity::HIGH),
+                AlertSeverity::normalise((string) ($signalType?->default_severity ?? self::SAFETY_FLOOR[$signalTypeCode] ?? 'high'), AlertSeverity::HIGH),
+            );
+            if (isset(self::SAFETY_FLOOR[$signalTypeCode])) {
+                $severityHint = AlertSeverity::higher($severityHint, AlertSeverity::normalise(self::SAFETY_FLOOR[$signalTypeCode], AlertSeverity::HIGH));
+            }
+        }
 
         $payload = [
             'signal_source_id' => $source->id,
             'signal_type_code' => $signalTypeCode,
             'signal_type_id' => $signalTypeId,
             'idempotency_key' => hash('sha256', 'safety-signal|device-event|'.$event->id),
-            'severity_hint' => $event->severity ?: 'info',
+            'severity_hint' => $severityHint,
             'external_ref' => 'device_event_'.$event->id,
             'payload' => $event->payload ?? [],
             'normalized_data' => array_filter([

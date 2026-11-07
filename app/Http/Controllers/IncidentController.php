@@ -8,6 +8,7 @@ use App\Http\Requests\HealthSafety\StoreHsCorrectiveActionRequest;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\ClientIncidentNote;
 use App\Models\ControlRoom\EvidenceItem;
 use App\Models\HsEvent;
 use App\Models\IncidentFollowup;
@@ -27,9 +28,9 @@ use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\Incidents\IncidentAccessService;
 use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use App\Services\Incidents\IncidentClosureService;
+use App\Services\Incidents\IncidentSafeguardingContent;
 use App\Services\Incidents\IncidentEvidenceReadService;
 use App\Services\Incidents\IncidentJourney;
-use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Incidents\IncidentOwnershipService;
 use App\Services\Incidents\IncidentRegisterReadService;
@@ -38,8 +39,10 @@ use App\Services\Incidents\IncidentResponseEscalationService;
 use App\Services\Medication\MedicationErrorSummary;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
+use App\Support\Incidents\ImmediateResponse;
 use App\Support\Incidents\IncidentOccurrencePeriod;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
+use App\Support\Inertia\SharedDeferredReload;
 use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -58,7 +61,6 @@ class IncidentController extends Controller
     public function __construct(
         private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
         private readonly IncidentJourneyService $journeys,
-        private readonly IncidentJourneyPresenter $journeyPresenter,
         private readonly IncidentAlertLifecycleSignalService $incidentAlertSignals,
         private readonly IncidentReportDraftService $incidentReportDrafts,
         private readonly IncidentOwnershipService $owners,
@@ -71,11 +73,29 @@ class IncidentController extends Controller
      */
     public function index(Request $request)
     {
+        // The header inbox's follow-up request (just after the page loaded) gets only the inbox. Every register prop
+        // is Inertia::always, so this request used to rebuild the whole register and send it again; the page now keeps
+        // the register it loaded a moment before (Stephan, 31 Oct: "Change it"). The route guard has already re-checked
+        // the viewer's current register access, and the query checks below refuse it exactly when the page is refused.
+        if (SharedDeferredReload::only($request, 'incidents/index')) {
+            abort_unless($request->user() instanceof User, 403);
+            $this->register->validatedQuery($request);
+
+            return $this->privateRegisterResponse($request, []);
+        }
+
         $props = $this->register->index($request,
             fn (Request $current, int $id, CurrentAuthorizationReads $reads): ?array => $this->buildIncidentDetail($current, $id, $reads));
         // Existing eager fanout is preserved; sensitive props replace stale partial values.
         $fresh = array_map(fn ($value) => Inertia::always($value), $props);
-        $response = Inertia::render('incidents/index', $fresh)->toResponse($request);
+
+        return $this->privateRegisterResponse($request, $fresh);
+    }
+
+    /** @param  array<string, mixed>  $props */
+    private function privateRegisterResponse(Request $request, array $props)
+    {
+        $response = Inertia::render('incidents/index', $props)->toResponse($request);
         $response->headers->set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         return $response;
@@ -307,6 +327,34 @@ class IncidentController extends Controller
                 ->map(fn ($e) => ['at' => $e->created_at?->toIso8601String()]))
             ->sortBy('at')->values()->all();
 
+        // Answer 20 / board M14: dated notes beside the reporter's words, for everyone who can open the incident.
+        // Adding one follows the note endpoint's own rule (incidents.approve + this view + not a draft).
+        $reportNotes = ClientIncidentNote::query()
+            ->where('client_incident_id', $incident->id)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get(['id', 'field', 'note', 'author_name', 'created_at'])
+            ->map(fn (ClientIncidentNote $note): array => [
+                'id' => $note->id,
+                'field' => $note->field,
+                'note' => $note->note,
+                'author_name' => $note->author_name,
+                'created_at' => $note->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+        // P4 (Stephan, 6 Nov 2026: "Safeguarding access only"): a safeguarding incident's words, notes on them and
+        // files show only to people with safeguarding access to it. Everyone else sees "Restricted".
+        $sgContent = app(IncidentSafeguardingContent::class);
+        $sgHidden = $sgContent->restricted($user, $incident);
+        $sgText = fn ($value) => $sgHidden && filled($value) ? $sgContent::RESTRICTED : $value;
+        if ($sgHidden) {
+            $reportNotes = [];
+        }
+        $canAddNote = $user->canDo('incidents.approve')
+            && ! $sgHidden
+            && ! in_array($incident->status, [null, '', 'draft'], true);
+
         return [
             'id' => $incident->id,
             'ref' => $incident->reference_number,
@@ -317,9 +365,12 @@ class IncidentController extends Controller
             'severity' => $incident->severity,
             'status' => $incident->status,
             'occurred_at' => $incident->occurred_at,
-            'description' => $incident->description,
-            'immediate_action_taken' => $incident->immediate_action_taken,
-            'witnesses' => $incident->witnesses,
+            'description' => $sgText($incident->description),
+            'immediate_action_taken' => $sgText($incident->immediate_action_taken),
+            // Decision 18: the reporter's timed ticks, shown under "Done straight away" on the incident page.
+            'immediate_response' => $sgHidden ? [] : array_values((array) ($incident->immediate_response ?? [])),
+            'witnesses' => $sgText($incident->witnesses),
+            'content_restricted' => $sgHidden,
             'is_notifiable' => $journeyRepairRequired || ($hsEvent && ! $canOpenHsEvent)
                 ? null
                 : ($hsEvent
@@ -363,7 +414,7 @@ class IncidentController extends Controller
             ] : null,
             'reporter' => $incident->reporter ? ['name' => $incident->reporter->name, 'email' => $incident->reporter->email] : null,
             'investigator' => $incident->investigator?->name,
-            'attachments' => $incident->attachments->map(fn (ClientIncidentAttachment $att) => [
+            'attachments' => ($sgHidden ? collect() : $incident->attachments)->map(fn (ClientIncidentAttachment $att) => [
                 'id' => $att->id,
                 'name' => $att->original_name,
                 'mime' => $att->mime ?? $att->mime_type,
@@ -411,7 +462,7 @@ class IncidentController extends Controller
             'close_gate' => $closeGatePayload,
             'journey_state' => $journeyRepairRequired
                 ? 'Journey repair required'
-                : $this->journeyPresenter->journeyState(
+                : $this->journeys->journeyState(
                     $incident,
                     $linkedControlRoomAlert,
                     $hsEvent,
@@ -454,7 +505,13 @@ class IncidentController extends Controller
             // First-aid treatments escalated to / linked with this incident — reciprocal
             // of the first-aid register's incident link (FirstAidRecord.related_incident_id).
             'first_aid_records' => $firstAidRecords,
+            'notes' => $reportNotes,
             'can' => [
+                'add_note' => $canAddNote,
+                // Board M5c note + answer 21: a closed incident's PDF is for whole-record viewers only (the incident
+                // register's managers and the incident's owner), never someone who sees only their own reports.
+                'download_pdf' => $incident->status === 'closed'
+                    && ($user->canDo('incidents.viewAny') || (int) $incident->incident_owner_user_id === (int) $user->id),
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),
                 'review' => $user->can('review', $incident),
@@ -630,6 +687,7 @@ class IncidentController extends Controller
     ) {
         $actor = $request->user();
         abort_unless($actor?->canDo('incidents.create'), 403);
+        $this->ensureSafeIncidentPreviousUrl($request, route('incidents.index'));
         $canManageFollowups = $actor->canDo('incidents.followups.manage');
 
         $data = $request->validate([
@@ -651,6 +709,7 @@ class IncidentController extends Controller
             'description' => ['nullable', 'string'],
             'requires_followup' => ['sometimes', 'boolean'],
             'immediate_action_taken' => [
+                // A serious report keeps its written immediate action; the timed ticks (decision 18) add to it.
                 Rule::requiredIf(fn () => $request->input('intent') === 'submit'
                     && (
                         $request->input('severity') === 'high'
@@ -661,6 +720,7 @@ class IncidentController extends Controller
                 'string',
                 'max:5000',
             ],
+            ...ImmediateResponse::rules(),
             'witnesses' => ['nullable', 'string'],
             'harm_or_injury' => ['nullable', 'string', 'max:2000'],
             'consequence' => ['nullable', 'string', 'max:2000'],
@@ -742,6 +802,8 @@ class IncidentController extends Controller
         $storedSeverity = ($data['reported_severity'] ?? null) === HsEvent::SEVERITY_CRITICAL
             ? 'high'
             : $data['severity'];
+        $occurredAt = WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now()->toImmutable();
+        $immediateResponse = ImmediateResponse::normalise($data['immediate_response'] ?? null, $occurredAt);
 
         $attributes = [
             'report_request_uuid' => $data['report_request_uuid'] ?? null,
@@ -755,12 +817,13 @@ class IncidentController extends Controller
             'status' => $isSubmit ? 'submitted' : 'draft',
             'submitted_at' => $isSubmit ? now() : null,
             'source' => 'manual',
-            'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
+            'occurred_at' => $occurredAt,
             'description' => $data['description'] ?? null,
             'requires_followup' => (bool) ($data['requires_followup'] ?? false) || ! empty($data['followups']),
             'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)
                 ? trim((string) $data['immediate_action_taken'])
                 : null,
+            'immediate_response' => $immediateResponse,
             'witnesses' => $data['witnesses'] ?? null,
             'title' => $data['type'].' incident',
             'metadata' => $metadata,
@@ -782,7 +845,10 @@ class IncidentController extends Controller
                 : null,
         ];
 
-        [$incident, $journey, $created, $submittedNow] = DB::transaction(
+        // #255: only a draft saved before this request survives a failed submit.
+        $draftAlreadySaved = ! empty($data['incident_id']) || (! empty($data['report_request_uuid'])
+            && ClientIncident::query()->where('report_request_uuid', $data['report_request_uuid'])->exists());
+        [$incident, $journey, $created, $submittedNow] = $this->withPlainSubmitFailure(fn () => DB::transaction(
             function () use ($actor, $attributes, $client, $data, $isSubmit, $journeys, $shift, $siteId): array {
                 $created = false;
                 $submittedNow = false;
@@ -912,7 +978,7 @@ class IncidentController extends Controller
                 return [$incident->fresh(), $journey, $created, $submittedNow];
             },
             3,
-        );
+        ), $isSubmit, keepsDraft: $draftAlreadySaved);
 
         if ($submittedNow) {
             $this->notifyIncidentSubmitted($request, $incident);
@@ -1060,6 +1126,36 @@ class IncidentController extends Controller
      *
      * @param  array<string, mixed>  $input
      */
+    /**
+     * #255: a submit that fails after its own retries rolls back to the draft and says so in plain words on the form,
+     * never a 500. Access refusals, validation and missing records keep their own responses.
+     *
+     * @template T
+     * @param  callable(): T  $submit
+     * @return T
+     */
+    private function withPlainSubmitFailure(callable $submit, bool $isSubmit = true, bool $keepsDraft = true): mixed
+    {
+        try {
+            return $submit();
+        } catch (\Throwable $error) {
+            if (! $isSubmit || $error instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
+                || $error instanceof ValidationException || $error instanceof \Illuminate\Auth\Access\AuthorizationException
+                || $error instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                throw $error;
+            }
+            \Illuminate\Support\Facades\Log::error('Incident submit failed and was rolled back', [
+                'reason' => class_basename($error).': '.mb_substr($error->getMessage(), 0, 300),
+            ]);
+            throw ValidationException::withMessages([
+                'incident' => ($keepsDraft
+                    ? 'This report couldn’t be submitted just now, so it is still saved as a draft. '
+                    : 'This report couldn’t be submitted just now. ')
+                    .'Please try again. If it keeps happening, tell your administrator.',
+            ]);
+        }
+    }
+
     private function recordMissingImmediateActionForSubmission(
         ClientIncident $incident,
         array $input = [],
@@ -1093,6 +1189,10 @@ class IncidentController extends Controller
             'result' => $incident->status === 'draft' ? 'draft' : 'submitted',
             'incident_reference' => (string) $incident->reference_number,
             'incident_url' => route('incidents.show', $incident),
+            // G4-3: the success pane says which Site's managers it went to (the reporter chose or was given it).
+            'site_name' => $incident->site_id
+                ? Site::query()->whereKey($incident->site_id)->value('name')
+                : null,
         ];
 
         if (! $journey?->hsEvent) {
@@ -1241,6 +1341,21 @@ class IncidentController extends Controller
         return $response;
     }
 
+    /**
+     * Board M5c note: a closed incident's final record as a PDF, built from the same admitted page payload as show().
+     */
+    public function pdf(Request $request, string $incident)
+    {
+        $id = $this->incidentRecordIdentity($incident);
+        $props = app(\App\Services\Incidents\IncidentEvidenceWindowPolicySettings::class)->withLockedPolicy(fn () =>
+            $this->register->show($request, $id,
+                fn (Request $current, int $id, CurrentAuthorizationReads $reads): ?array => $this->buildIncidentDetail($current, $id, $reads)));
+        $detail = $props['detail'];
+        abort_unless(($detail['can']['download_pdf'] ?? false) === true, 403);
+
+        return app(\App\Services\Incidents\IncidentPdfService::class)->download($id, $detail, $request->user());
+    }
+
     /** Bound raw route identities before integer conversion or private model hydration. */
     private function incidentRecordIdentity(string $identity): int
     {
@@ -1254,6 +1369,11 @@ class IncidentController extends Controller
     public function update(Request $request, ClientIncident $incident)
     {
         $this->authorize('update', $incident);
+        $this->ensureSafeIncidentPreviousUrl($request, url("/incidents/{$incident->id}"));
+        // P4: someone who sees "Restricted" can't change the words underneath it.
+        if ($request->hasAny([...IncidentSafeguardingContent::TEXT_FIELDS, 'immediate_response'])) {
+            app(IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
+        }
 
         $user = $request->user();
 
@@ -1353,6 +1473,7 @@ class IncidentController extends Controller
         abort_unless($request->user()?->canDo('incidents.portal.manage'), 403);
 
         abort_unless((int) $attachment->incident_id === (int) $incident->id, 404);
+        app(IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
 
         $data = $request->validate([
             'portal_visible' => ['required', 'boolean'],
@@ -1392,7 +1513,7 @@ class IncidentController extends Controller
         $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
         $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
 
-        [$incident, $journey, $submittedNow] = DB::transaction(
+        [$incident, $journey, $submittedNow] = $this->withPlainSubmitFailure(fn () => DB::transaction(
             function () use ($actor, $incident, $journeys, $siteAccess, $siteBypassPermissions, $submission): array {
                 $locked = ClientIncident::query()
                     ->whereKey($incident->id)
@@ -1439,7 +1560,7 @@ class IncidentController extends Controller
                 return [$journey->incident, $journey, true];
             },
             3,
-        );
+        ));
 
         if ($submittedNow) {
             $this->notifyIncidentSubmitted($request, $incident);
@@ -1453,6 +1574,7 @@ class IncidentController extends Controller
     public function review(Request $request, ClientIncident $incident)
     {
         $this->authorize('review', $incident);
+        $this->ensureSafeIncidentPreviousUrl($request, url("/incidents/{$incident->id}"));
 
         $data = $request->validate([
             'review_notes' => ['nullable', 'string'],
@@ -1514,6 +1636,7 @@ class IncidentController extends Controller
     public function close(Request $request, ClientIncident $incident)
     {
         $this->authorize('close', $incident);
+        $this->ensureSafeIncidentPreviousUrl($request, url("/incidents/{$incident->id}"));
 
         $data = $request->validate([
             'closed_outcome' => ['required', 'string', 'max:120'],
@@ -1566,6 +1689,7 @@ class IncidentController extends Controller
     public function reopen(Request $request, ClientIncident $incident)
     {
         $this->authorize('reopen', $incident);
+        $this->ensureSafeIncidentPreviousUrl($request, url("/incidents/{$incident->id}"));
 
         $data = $request->validate([
             'reopened_reason' => ['required', 'string', 'max:2000'],
@@ -1699,12 +1823,17 @@ class IncidentController extends Controller
     public function uploadAttachment(Request $request, ClientIncident $incident)
     {
         $this->authorize('update', $incident);
+        app(IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
 
         // Audit guardrail: attachments are only mutable while the incident is in draft.
         abort_unless($incident->status === 'draft', 403);
 
+        // The same file types as a safety review's files (HsEventFile::MIMES): photos, videos, PDFs and Word files.
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:10240'],
+            'file' => ['required', 'file', 'mimes:'.implode(',', array_merge(...array_values(\App\Models\HsEventFile::MIMES))), 'max:10240'],
+        ], [
+            'file.mimes' => 'Add photos, videos, PDFs or Word files.',
+            'file.max' => 'Files can be up to 10 MB.',
         ]);
 
         $file = $request->file('file');
@@ -1728,6 +1857,7 @@ class IncidentController extends Controller
     public function removeAttachment(Request $request, ClientIncident $incident, ClientIncidentAttachment $attachment)
     {
         $this->authorize('update', $incident);
+        app(IncidentSafeguardingContent::class)->assertCanSee($request->user(), $incident);
 
         // Audit guardrail: attachments are only mutable while the incident is in draft.
         abort_unless($incident->status === 'draft', 403);
@@ -1777,5 +1907,22 @@ class IncidentController extends Controller
             data_get($item->metadata, 'original_name') ?: basename($item->storage_path),
             $item->mime_type,
         );
+    }
+
+    private function ensureSafeIncidentPreviousUrl(Request $request, string $fallbackUrl): void
+    {
+        if (! $request->hasSession() || $request->headers->has('referer')) {
+            return;
+        }
+
+        $previousPath = (string) parse_url((string) $request->session()->previousUrl(), PHP_URL_PATH);
+        if (
+            $previousPath === ''
+            || $previousPath === '/health-safety/rail-counts'
+            || str_ends_with($previousPath, '/owners/options')
+            || str_starts_with($previousPath, '/incidents/drafts/')
+        ) {
+            $request->session()->setPreviousUrl($fallbackUrl);
+        }
     }
 }

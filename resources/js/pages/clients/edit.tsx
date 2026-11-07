@@ -1,3 +1,4 @@
+import { ClientGenderFields } from '@/components/clients/gender-fields';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 
@@ -23,6 +24,9 @@ type ClientRecord = {
     preferred_name: string | null;
     date_of_birth: string | null;
     gender: string | null;
+    gender_description?: string | null;
+    /** Text typed before Gender was a dropdown, waiting for a choice. */
+    gender_recorded_as?: string | null;
     status: string | null;
     phone: string | null;
     email: string | null;
@@ -61,6 +65,7 @@ export default function EditClient({
         preferred_name: client.preferred_name ?? '',
         date_of_birth: client.date_of_birth ?? '',
         gender: client.gender ?? '',
+        gender_description: client.gender_description ?? '',
         status: client.status ?? 'active',
         phone: client.phone ?? '',
         email: client.email ?? '',
@@ -259,23 +264,16 @@ export default function EditClient({
                                 </div>
                             )}
                         </div>
-                        <div>
-                            <label className="text-sm font-medium">
-                                Gender
-                            </label>
-                            <input
-                                className="mt-1 w-full rounded-md border bg-transparent p-2"
-                                value={data.gender}
-                                onChange={(e) =>
-                                    setData('gender', e.target.value)
-                                }
-                            />
-                            {errors.gender && (
-                                <div className="mt-1 text-xs text-status-critical">
-                                    {errors.gender}
-                                </div>
-                            )}
-                        </div>
+                        <ClientGenderFields
+                            gender={data.gender}
+                            description={data.gender_description}
+                            recordedAs={client.gender_recorded_as}
+                            onGenderChange={(v) => setData('gender', v)}
+                            onDescriptionChange={(v) =>
+                                setData('gender_description', v)
+                            }
+                            errors={errors}
+                        />
                     </div>
 
                     <div>

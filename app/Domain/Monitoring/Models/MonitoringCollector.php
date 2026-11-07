@@ -66,7 +66,28 @@ class MonitoringCollector extends Model
         'revoked_at' => 'immutable_datetime',
         'last_recovered_at' => 'immutable_datetime',
         'config' => 'array',
+        'approved_at' => 'immutable_datetime',
+        'vault_key_rotated_at' => 'immutable_datetime',
+        'update_state' => 'array',
+        'update_check_requested_at' => 'immutable_datetime',
     ];
+
+    /** The login-store key never leaves the model by accident. */
+    protected $hidden = ['vault_key_ciphertext'];
+
+    /**
+     * A hub may receive saved logins or any work only once an admin has
+     * approved it, and never after it has been removed (S&D Phase B).
+     */
+    public function isApprovedForWork(): bool
+    {
+        return $this->approved_at !== null && $this->revoked_at === null;
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'approved_by_user_id');
+    }
 
     public function site(): BelongsTo
     {

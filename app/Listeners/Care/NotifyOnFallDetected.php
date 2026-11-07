@@ -10,12 +10,13 @@ use Illuminate\Support\Facades\Log;
  * Care-side listener: log a structured signal when a device reports a fall.
  *
  * Milesight fall events arrive as DeviceEvent.event_type='fall_detected'.
- * The observer has no direct map for that key, so they route through to
- * `device_signal_generic`. We also future-proof for a dedicated
- * `device_fall` signal type code if that mapping is ever added.
+ * Since the safety fix round (7 Nov 2026) they go to Control Room's own
+ * `fall_detected` type (critical, DeviceEventObserver::SAFETY_TYPE_MAP),
+ * and SafetyEventObserver opens a "possible fall" alert for the staff on
+ * shift at the house. This listener only writes the care audit line; it
+ * still accepts the older `device_signal_generic` and `device_fall` codes.
  *
- * Does NOT dispatch notifications; that lives in the Care notification
- * stack (out of scope here). This is the audit / log handoff surface.
+ * Does NOT dispatch notifications itself.
  */
 class NotifyOnFallDetected
 {

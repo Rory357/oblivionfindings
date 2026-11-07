@@ -260,7 +260,7 @@ describe('app sidebar workforce navigation', () => {
         },
     );
 
-    it('uses the simplified five-item Security & Devices contract in application search', () => {
+    it('uses the simplified Security & Devices menu (Access only with door access) in application search', () => {
         const catalog = buildNavSearchCatalog({
             can: {
                 securityDevices: {
@@ -284,7 +284,7 @@ describe('app sidebar workforce navigation', () => {
             'Overview',
             'Devices',
             'Sites',
-            'Alerts & upkeep',
+            'Alerts',
             'Setup',
         ]);
         expect(catalog.map((item) => item.label)).not.toEqual(

@@ -67,6 +67,23 @@ vi.mock('./chat-update-watch', () => ({
         return () => undefined;
     },
 }));
+// Call status registers on the one sync loop; tests drive its refresh by hand.
+vi.mock('./live/sync', () => ({
+    chatSync: {
+        live: false,
+        watch: (options: {
+            refresh: () => Promise<boolean>;
+            topics?: readonly string[];
+        }) => {
+            if (options.topics?.includes('call.changed')) {
+                state.poll = options.refresh;
+                void options.refresh();
+            }
+            return () => undefined;
+        },
+        subscribe: () => () => undefined,
+    },
+}));
 vi.mock('./call-summary', () => ({
     CallSummary: ({ call }: { call: { id: string } | null }) =>
         call ? <div>Record for {call.id}</div> : null,

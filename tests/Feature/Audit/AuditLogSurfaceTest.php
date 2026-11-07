@@ -116,6 +116,27 @@ class AuditLogSurfaceTest extends TestCase
         $this->assertSame([$general->id], $defaultIds);
     }
 
+    public function test_hs_record_rows_never_name_or_match_the_client(): void
+    {
+        // Readiness audit P5 (6 Nov 2026): the audit page is organisation-wide, so an H&S record's row (a restraint,
+        // safeguarding concern, incident…) shows who changed what and when, never the client, for any viewer.
+        $client = Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Kingi']);
+        $viewer = $this->userWithPermissions(['audit.viewAny']);
+        AuditLog::query()->delete();
+        $restraint = AuditLog::create(['client_id' => $client->id, 'action' => 'restraintevent.update',
+            'auditable_type' => \App\Models\RestraintEvent::class, 'auditable_id' => 5, 'meta' => ['after' => ['status' => 'reviewed']]]);
+        $profile = AuditLog::create(['client_id' => $client->id, 'action' => 'clients.profile.updated']);
+
+        $rows = collect($this->actingAs($viewer)->get('/audit-logs')->assertOk()->inertiaProps('logs.data'))->keyBy('id');
+        $this->assertNull($rows[$restraint->id]['client']);
+        $this->assertSame('Aroha Kingi', $rows[$profile->id]['client']['name']);
+
+        $found = collect($this->actingAs($viewer)->get('/audit-logs?q=Kingi')->assertOk()->inertiaProps('logs.data'))->pluck('id')->all();
+        $this->assertSame([$profile->id], $found);
+        $filtered = collect($this->actingAs($viewer)->get('/audit-logs?client_id='.$client->id)->assertOk()->inertiaProps('logs.data'))->pluck('id')->all();
+        $this->assertSame([$profile->id], $filtered);
+    }
+
     public function test_settings_csv_uses_the_canonical_filter_and_neutralises_formula_cells_without_ip_or_meta(): void
     {
         $viewer = $this->userWithPermissions(['audit.viewAny'], ['name' => '=2+3']);

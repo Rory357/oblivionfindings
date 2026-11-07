@@ -13,6 +13,7 @@ export {
 } from './entity-card';
 export {
     CounterPill,
+    DayBars,
     EmptyValue,
     EntityChip,
     EntityStatusChip,

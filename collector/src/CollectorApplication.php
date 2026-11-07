@@ -4,22 +4,39 @@ namespace Oblivion\Collector;
 
 use DateTimeImmutable;
 use JsonException;
+use Oblivion\Collector\Access\AccessLane;
+use Oblivion\Collector\Access\UnifiAccessLane;
+use Oblivion\Collector\Access\UnifiAccessReader;
 use Oblivion\Collector\Config\SignedConfigLoader;
+use Oblivion\Collector\Data\CollectorConfig;
 use Oblivion\Collector\Discovery\LanDiscoveryScanner;
 use Oblivion\Collector\Enrollment\InstallationProfile;
 use Oblivion\Collector\Enrollment\RecoverableEnrollment;
 use Oblivion\Collector\Exceptions\CentralApiFailure;
 use Oblivion\Collector\Http\HttpsCentralApi;
+use Oblivion\Collector\Exceptions\SpoolFull;
 use Oblivion\Collector\Media\MediaLane;
+use Oblivion\Collector\NetworkChecks\NetworkCheckLane;
+use Oblivion\Collector\Mqtt\MqttRelayServer;
+use Oblivion\Collector\Mqtt\RelayInbox;
+use Oblivion\Collector\Mqtt\RelayTlsIdentity;
+use Oblivion\Collector\Terminal\TerminalLane;
+use Oblivion\Collector\WebPages\WebLane;
+use Oblivion\Collector\Runtime\CameraSnapshotRunner;
 use Oblivion\Collector\Runtime\CollectorCommandExecutor;
 use Oblivion\Collector\Runtime\CommandJournal;
 use Oblivion\Collector\Runtime\HeartbeatReporter;
 use Oblivion\Collector\Runtime\NativeCollectorCommandTransport;
 use Oblivion\Collector\Runtime\ProbeRunner;
 use Oblivion\Collector\Runtime\RemoteDiscoveryRunner;
+use Oblivion\Collector\Runtime\SshConfigBackupRunner;
+use Oblivion\Collector\Runtime\AlarmAreaCommandRunner;
+use Oblivion\Collector\Runtime\OnvifSnapshotRunner;
 use Oblivion\Collector\Runtime\UnifiAccessCommandRunner;
+use Oblivion\Collector\Runtime\UnifiAccessControlRunner;
 use Oblivion\Collector\Security\CredentialLeaseDecryptor;
 use Oblivion\Collector\Security\EnvelopeVerifier;
+use Oblivion\Collector\Security\HubVault;
 use Oblivion\Collector\Security\ScopeGuard;
 use Oblivion\Collector\Spool\CheckpointFile;
 use Oblivion\Collector\Spool\EncryptedSpool;
@@ -29,16 +46,21 @@ final class CollectorApplication
 {
     public const string VERSION = '0.2.0';
 
+    /** Largest release file a hub will download (matches the signed release list's limit). */
+    private const int MAX_UPDATE_BYTES = 536_870_912;
+
     /**
      * @param  null|\Closure(string, string, string, string, string): array<string, mixed>  $enrolmentTransport
      * @param  null|\Closure(string, string, int, string, string): array<string, mixed>  $transportEvidenceTransport
      * @param  null|\Closure(string, mixed): void  $output
+     * @param  null|\Closure(string, string, string, list<string>, bool): array{transport_ok: bool, status: int, body: string}  $updateTransport  test transport for update-fetch and update-report
      */
     public function __construct(
         private readonly ?\Closure $enrolmentTransport = null,
         private readonly ?\Closure $transportEvidenceTransport = null,
         private readonly ?\Closure $output = null,
         private readonly ?\Closure $recoverableEnrollmentTransport = null,
+        private readonly ?\Closure $updateTransport = null,
     ) {}
 
     /** @param list<string> $arguments */
@@ -57,6 +79,10 @@ final class CollectorApplication
                 'runtime-check' => $this->runtimeCheck($options),
                 'media-run' => $this->mediaRun($options),
                 'run' => $this->collect($options),
+                'update-fetch' => $this->updateFetch($options),
+                'update-report' => $this->updateReport($options),
+                'deregister' => $this->deregister($options),
+                'relay' => $this->relay($options),
                 'verify-transport' => $this->verifyTransport($options),
                 default => $this->usage(),
             };
@@ -86,7 +112,7 @@ final class CollectorApplication
 
     private function version(): int
     {
-        $this->write('Oblivion Collector '.self::VERSION.PHP_EOL);
+        $this->write('Oblivion Collector '.self::buildVersion().PHP_EOL);
 
         return 0;
     }
@@ -312,6 +338,20 @@ final class CollectorApplication
             $identity['client_certificate_file'],
             $identity['client_private_key_file'],
         );
+        // S&D Phase B: the login-store key. Handed out only to an approved hub that hasn't been
+        // removed; held in memory, never written down.
+        $vault = null;
+        $approval = 'approved';
+        try {
+            $vault = HubVault::fromSealed($this->hostSealedVaultKey($options) ?? $central->vaultKey($identity['collector_id']), $secretKey);
+        } catch (CentralApiFailure $exception) {
+            if ($exception->httpStatus() === 410) {
+                return $this->wipeRemovedHub($configPath, $stateDirectory, $secretKey);
+            }
+            if ($exception->httpStatus() === 409) {
+                $approval = 'waiting';
+            }
+        }
         $configurationError = null;
         $config = null;
         try {
@@ -320,16 +360,45 @@ final class CollectorApplication
                 $checkpoint->read()['config_sequence'],
             );
             $config = $loader->load($envelope);
-            $this->writePrivateFile($configPath, $envelope);
+            if ($vault !== null) {
+                $this->writePrivateFile($configPath, $vault->encrypt($envelope));
+            } elseif (is_file($configPath)) {
+                // Never keep saved logins on disk unless they're in the encrypted store.
+                @unlink($configPath);
+            }
         } catch (CentralApiFailure $exception) {
-            if (is_file($configPath)) {
+            if ($exception->httpStatus() === 410) {
+                return $this->wipeRemovedHub($configPath, $stateDirectory, $secretKey);
+            }
+            $stored = is_file($configPath) ? $this->readBounded($configPath) : null;
+            if ($stored !== null && ! HubVault::isSealed($stored)) {
+                // A work list from before the encrypted store: its logins go, a fresh one comes next.
+                @unlink($configPath);
+                $stored = null;
+            }
+            if ($stored !== null && $vault !== null && $exception->httpStatus() !== 409) {
                 $configurationError = $this->boundedMessage($exception);
-                $config = $loader->load($this->readBounded($configPath));
-            } elseif (! str_ends_with($exception->getMessage(), ': 409.')) {
+                $config = $loader->load($vault->decrypt($stored));
+            } elseif ($exception->httpStatus() !== 409 && $stored === null && $vault !== null) {
                 throw $exception;
             }
         }
+        $relayTls = new RelayTlsIdentity($stateDirectory, (string) $identity['collector_id']);
+        if ($config !== null) {
+            // S&D Phase B (D21): the relay works from this file, so it keeps taking readings offline.
+            $this->writeRelayLogins($stateDirectory, $config);
+            // S&D Phase E (E5): and the encrypted relay from this one, with this hub's certificate.
+            $this->writeRelayTls($stateDirectory, $config, $relayTls);
+            // S&D Phase I (pop-up 97): the network checks lane checks its targets against this.
+            $this->writeNetworkCheckScope($stateDirectory, $config);
+        }
         $spool = new EncryptedSpool($stateDirectory, $checkpoint);
+        $this->moveRelayedReadings($stateDirectory, $spool, $secretKey);
+        $this->requestRelayCertificate($relayTls, $spool);
+        if ($config !== null) {
+            // S&D Phase E (D21): once a day, check Oblivion's public address refuses MQTT.
+            $this->checkBrokerExposure($stateDirectory, $spool, (string) $identity['central_url']);
+        }
         $uploadError = $this->flush($central, $identity['collector_id'], $spool);
         $uploadError ??= $configurationError;
 
@@ -350,6 +419,15 @@ final class CollectorApplication
                     $credentialDecryptor,
                     new NativeCollectorCommandTransport,
                 ),
+                // S&D Phase B: settings backups and camera pictures run here, through the hub, not from the server.
+                new SshConfigBackupRunner($scope, $credentialDecryptor),
+                new CameraSnapshotRunner($scope, $credentialDecryptor),
+                // S&D Phase E (R6): arming and disarming Inception / Gallagher areas.
+                new AlarmAreaCommandRunner($scope, $credentialDecryptor),
+                // S&D Phase E (R5): pictures from standard ONVIF cameras.
+                new OnvifSnapshotRunner($scope, $credentialDecryptor),
+                // S&D Phase H: keep a door unlocked, and the Site emergency modes, in UniFi Access.
+                new UnifiAccessControlRunner($scope, $credentialDecryptor),
             );
             foreach ($config->commands as $command) {
                 if ($spool->status()['state'] === 'buffer_full') {
@@ -407,25 +485,675 @@ final class CollectorApplication
                 }
             }
 
+            // S&D Phase H (H0): each UniFi Access console, read when due. Read only.
+            (new UnifiAccessLane(
+                new UnifiAccessReader($credentialDecryptor),
+                $stateDirectory.DIRECTORY_SEPARATOR.'unifi-access.json',
+                static function (string $id, array $item, DateTimeImmutable $at) use ($spool): bool {
+                    try {
+                        return $spool->status()['state'] !== 'buffer_full'
+                            && $spool->append($id, $spool->nextSourceSequence(), $item, $at);
+                    } catch (SpoolFull) {
+                        return false;
+                    }
+                },
+            ))->run($config->unifiAccess, new DateTimeImmutable('now'));
         }
 
         $uploadError ??= $this->flush($central, $identity['collector_id'], $spool);
         try {
             (new HeartbeatReporter($central, $identity['collector_id'], $spool))->report([
-                'version' => self::VERSION,
+                'version' => self::buildVersion(),
+                'platform' => PHP_OS_FAMILY === 'Windows' ? 'windows' : 'linux',
                 'checks_executed' => $checksExecuted,
                 'discovery_targets_executed' => $discoveryTargetsExecuted,
                 'commands_executed' => $commandsExecuted,
+                // The job types (and newer config sections) this hub can run: the server sends a new
+                // kind only to hubs that list it.
+                'command_adapters' => implode(',', [...ScopeGuard::commandAdapters(), self::RELAY_TLS_FEATURE, self::TERMINAL_FEATURE, self::WEB_PAGE_FEATURE, self::UNIFI_ACCESS_FEATURE, self::UNIFI_ACCESS_ADMIN_FEATURE, self::NETWORK_CHECKS_FEATURE]),
                 'config_sequence' => $config !== null ? $config->sequence : (int) $checkpoint->read()['config_sequence'],
                 'upload_state' => $uploadError === null ? 'current' : 'deferred',
             ]);
+            $this->writeHostInstructions($stateDirectory, $central->lastHeartbeat());
         } catch (CentralApiFailure $exception) {
+            if ($exception->httpStatus() === 410) {
+                return $this->wipeRemovedHub($configPath, $stateDirectory, $secretKey);
+            }
             $uploadError ??= $this->boundedMessage($exception);
         }
         sodium_memzero($secretKey);
+        if ($approval === 'waiting') {
+            $this->write('collection: waiting for approval'.PHP_EOL);
+
+            return 4;
+        }
         $this->write('collection: '.($uploadError === null ? 'complete' : 'buffered').PHP_EOL);
 
         return $uploadError === null ? 0 : 2;
+    }
+
+    /**
+     * The hub has been removed in Oblivion: wipe the saved logins it held (the encrypted work
+     * list and anything the host keeps for it), leave a note, and stop.
+     */
+    /**
+     * S&D Phase B (D21): the sensor relay. A long-running process beside the normal cycle, kept
+     * running by the Windows service or the Linux launcher. It listens on the house network only
+     * while the signed config names gateway logins.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function relay(array $options): int
+    {
+        if (array_keys($options) !== ['identity']) {
+            throw new RuntimeException('Relay takes only --identity.');
+        }
+        $identityPath = $this->requiredPath($options, 'identity');
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $stateDirectory = $this->stateDirectory($identity, $identityPath);
+        $secretKey = base64_decode($identity['request_signing_secret_key'], true);
+        if (! is_string($secretKey) || strlen($secretKey) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
+            throw new RuntimeException('Collector request signing key is invalid.');
+        }
+        $inbox = new RelayInbox($stateDirectory.DIRECTORY_SEPARATOR.'relay-inbox', RelayInbox::keyFor($secretKey));
+        // S&D Phase G (D5): the Terminal tab's hub side lives in this always-on process.
+        $central = $this->central($identity, $secretKey);
+        $terminal = new TerminalLane(
+            fn (array $report): array => $central->terminalWork((string) $identity['collector_id'], bin2hex(random_bytes(16)), $report),
+            new CredentialLeaseDecryptor($secretKey),
+            new EnvelopeVerifier((string) $identity['central_signing_public_key']),
+            (string) $identity['collector_id'],
+        );
+        // S&D Phase G (pop-up 61): device web pages, in the same process.
+        $web = new WebLane(
+            fn (array $report): array => $central->webWork((string) $identity['collector_id'], bin2hex(random_bytes(16)), $report),
+            new EnvelopeVerifier((string) $identity['central_signing_public_key']),
+        );
+        // S&D Phase H (H1): UniFi Access changes (people, cards, visitor passes), in the same process.
+        $access = new AccessLane(
+            fn (array $report): array => $central->accessWork((string) $identity['collector_id'], bin2hex(random_bytes(16)), $report),
+            new EnvelopeVerifier((string) $identity['central_signing_public_key']),
+            new CredentialLeaseDecryptor($secretKey),
+            $stateDirectory.DIRECTORY_SEPARATOR.'access-jobs.json',
+        );
+        // S&D Phase I (pop-up 97): Obli's read-only network checks, in the same process.
+        $network = new NetworkCheckLane(
+            fn (array $report): array => $central->networkCheckWork((string) $identity['collector_id'], bin2hex(random_bytes(16)), $report),
+            new EnvelopeVerifier((string) $identity['central_signing_public_key']),
+            new CredentialLeaseDecryptor($secretKey),
+            $stateDirectory.DIRECTORY_SEPARATOR.self::NETWORK_CHECK_SCOPE_FILE,
+        );
+        sodium_memzero($secretKey);
+        $loginsFile = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE;
+        $relay = null;
+        $readAt = 0;
+        $logins = function () use (&$relay, &$readAt, $loginsFile): ?array {
+            if (time() - $readAt >= 30) {
+                $readAt = time();
+                $relay = $this->readRelayLogins($loginsFile);
+            }
+
+            return $relay;
+        };
+        $server = new MqttRelayServer($inbox, $logins, log: fn (string $line) => $this->write($line.PHP_EOL));
+        $listening = null;
+        // S&D Phase E (E5): the encrypted relay (TLS on 8883), from its own logins file and this hub's certificate.
+        $tlsFile = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_TLS_LOGINS_FILE;
+        $tlsRelay = null;
+        $tlsReadAt = 0;
+        $tlsLogins = function () use (&$tlsRelay, &$tlsReadAt, $tlsFile): ?array {
+            if (time() - $tlsReadAt >= 30) {
+                $tlsReadAt = time();
+                $tlsRelay = $this->readRelayLogins($tlsFile);
+            }
+
+            return $tlsRelay;
+        };
+        $relayTls = new RelayTlsIdentity($stateDirectory, (string) $identity['collector_id']);
+        $tlsServer = null;
+        $tlsListening = null;
+        while (! is_file($stateDirectory.DIRECTORY_SEPARATOR.'removed.json')) {
+            $tlsPort = $tlsLogins()['listen_port'] ?? null;
+            $certificate = $relayTls->certificateFile();
+            clearstatcache();
+            // A renewed certificate restarts the listener so new connections use it.
+            $wanted = is_int($tlsPort) && $certificate !== null ? $tlsPort.'|'.(int) @filemtime($certificate) : null;
+            if ($wanted !== $tlsListening) {
+                $tlsServer?->close();
+                $tlsServer = null;
+                $tlsListening = null;
+                if ($wanted !== null) {
+                    try {
+                        $tlsServer = new MqttRelayServer($inbox, $tlsLogins, log: fn (string $line) => $this->write($line.PHP_EOL), tls: [
+                            'certificate_file' => $certificate,
+                            'key_file' => $relayTls->keyFile(),
+                        ]);
+                        $tlsServer->listen('0.0.0.0', (int) $tlsPort);
+                        $tlsListening = $wanted;
+                        $this->write("relay: listening encrypted on {$tlsPort}".PHP_EOL);
+                    } catch (RuntimeException $exception) {
+                        $tlsServer = null;
+                        $this->write('relay: '.$exception->getMessage().PHP_EOL, STDERR);
+                    }
+                }
+            }
+            $tlsServer?->poll(0.2);
+            try {
+                $terminal->tick();
+            } catch (\Throwable $exception) {
+                $this->write('terminal: '.$exception->getMessage().PHP_EOL, STDERR);
+            }
+            try {
+                $web->tick();
+            } catch (\Throwable $exception) {
+                $this->write('web page: '.$exception->getMessage().PHP_EOL, STDERR);
+            }
+            try {
+                $access->tick();
+            } catch (\Throwable $exception) {
+                $this->write('access: '.$exception->getMessage().PHP_EOL, STDERR);
+            }
+            try {
+                $network->tick();
+            } catch (\Throwable $exception) {
+                $this->write('network checks: '.$exception->getMessage().PHP_EOL, STDERR);
+            }
+            $port = $logins()['listen_port'] ?? null;
+            if ($port !== $listening) {
+                $server->close();
+                $listening = null;
+                if (is_int($port)) {
+                    try {
+                        // The house network only reaches it through the installer's firewall rule.
+                        $server->listen('0.0.0.0', $port);
+                        $listening = $port;
+                        $this->write("relay: listening on {$port}".PHP_EOL);
+                    } catch (RuntimeException $exception) {
+                        $this->write('relay: '.$exception->getMessage().PHP_EOL, STDERR);
+                        sleep(10);
+                    }
+                }
+            }
+            // A live terminal wants a quick round; otherwise the relay's usual pace.
+            $server->poll($terminal->active() || $web->active() || $access->active() || $network->active() ? 0.1 : ($listening === null ? ($tlsServer === null ? 2.0 : 0.0) : 0.8));
+        }
+        $server->close();
+        $tlsServer?->close();
+        $terminal->closeAll();
+
+        return 3;
+    }
+
+    private const string RELAY_LOGINS_FILE = 'sensor-relay.json';
+
+    /** S&D Phase E (E5): the encrypted relay's logins (the certificate is in RelayTlsIdentity's files). */
+    private const string RELAY_TLS_LOGINS_FILE = 'sensor-relay-tls.json';
+
+    private const string RELAY_TLS_FEATURE = 'sensor_relay_tls_v1';
+
+    /** S&D Phase G (D5): this hub opens Terminal tabs (TerminalLane, inside the relay process). */
+    private const string TERMINAL_FEATURE = 'terminal_v1';
+
+    /** S&D Phase G (pop-up 61): this hub opens device web pages (WebLane, inside the relay process). */
+    private const string WEB_PAGE_FEATURE = 'web_page_v1';
+
+    /** S&D Phase H (H0): this hub reads UniFi Access consoles (the `unifi_access` config section). */
+    private const string UNIFI_ACCESS_FEATURE = 'unifi_access_v1';
+
+    /** S&D Phase H (H1): this hub makes UniFi Access changes for Oblivion (AccessLane, inside the relay process). */
+    private const string UNIFI_ACCESS_ADMIN_FEATURE = 'unifi_access_admin_v1';
+
+    /** S&D Phase I (pop-up 97): this hub runs Obli's read-only network checks (NetworkCheckLane, inside the relay process). */
+    private const string NETWORK_CHECKS_FEATURE = 'network_checks_v1';
+
+    /** The Sites, networks and device addresses from the verified work list, for NetworkCheckLane. */
+    private const string NETWORK_CHECK_SCOPE_FILE = 'network-checks-scope.json';
+
+    private function writeNetworkCheckScope(string $stateDirectory, CollectorConfig $config): void
+    {
+        $this->writePrivateFile($stateDirectory.DIRECTORY_SEPARATOR.self::NETWORK_CHECK_SCOPE_FILE, json_encode([
+            'version' => 1,
+            'written_at' => time(),
+            // The signed work's own end: past it (or revoked) the lane does nothing.
+            'expires_at' => $config->expiresAt->getTimestamp(),
+            'protocols' => array_values($config->scope['protocols'] ?? []),
+            'allowed_site_ids' => $config->allowedSiteIds(),
+            'cidrs' => array_values($config->scope['cidrs'] ?? []),
+            'devices' => (object) ($config->scope['devices'] ?? []),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+    }
+
+    private function writeRelayTls(string $stateDirectory, CollectorConfig $config, RelayTlsIdentity $relayTls): void
+    {
+        $path = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_TLS_LOGINS_FILE;
+        $tls = $config->sensorRelayTls;
+        if ($tls === null || ! $relayTls->install($tls['certificate'], $tls['ca_certificate'])) {
+            // No encrypted relay in the signed work, or a certificate that isn't for this hub's key.
+            if (is_file($path)) {
+                @unlink($path);
+            }
+
+            return;
+        }
+        $this->writePrivateFile($path, json_encode([
+            'version' => 1,
+            'allowed_site_ids' => $config->allowedSiteIds(),
+            'relay' => ['listen_port' => $tls['listen_port'], 'max_payload_bytes' => $tls['max_payload_bytes'], 'logins' => $tls['logins']],
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+    }
+
+    /** At most once a day, ask Oblivion to sign this hub's relay key when it has no current certificate. */
+    private function requestRelayCertificate(RelayTlsIdentity $relayTls, EncryptedSpool $spool): void
+    {
+        if ($spool->status()['state'] === 'buffer_full') {
+            return;
+        }
+        try {
+            $item = $relayTls->request(RelayTlsIdentity::localAddresses());
+            if ($item !== null) {
+                $now = new DateTimeImmutable('now');
+                $spool->append('relay-certificate-request:'.$now->format('YmdHis'), $spool->nextSourceSequence(), $item, $now);
+            }
+        } catch (\Throwable) {
+            // Asked again tomorrow; the plain relay (if allowed) keeps working meanwhile.
+        }
+    }
+
+    private function writeRelayLogins(string $stateDirectory, CollectorConfig $config): void
+    {
+        $path = $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE;
+        if ($config->sensorRelay === null) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+
+            return;
+        }
+        $this->writePrivateFile($path, json_encode([
+            'version' => 1,
+            'allowed_site_ids' => $config->allowedSiteIds(),
+            'relay' => $config->sensorRelay,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+    }
+
+    /** @return array{listen_port: int, max_payload_bytes: int, logins: list<array{username: string, password_hash: string, site_id: int, topic_prefix: string}>}|null */
+    private function readRelayLogins(string $path): ?array
+    {
+        try {
+            $stored = is_file($path) ? json_decode($this->readBounded($path), true, 16, JSON_THROW_ON_ERROR) : null;
+            if (! is_array($stored) || ($stored['version'] ?? null) !== 1 || ! is_array($stored['allowed_site_ids'] ?? null)) {
+                return null;
+            }
+
+            return CollectorConfig::sensorRelay($stored['relay'] ?? null, array_values(array_filter($stored['allowed_site_ids'], 'is_int')));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** Readings the relay took since the last cycle go into the upload spool, with their real times. */
+    private function moveRelayedReadings(string $stateDirectory, EncryptedSpool $spool, string $secretKey): void
+    {
+        $directory = $stateDirectory.DIRECTORY_SEPARATOR.'relay-inbox';
+        if (! is_dir($directory)) {
+            return;
+        }
+        $inbox = new RelayInbox($directory, RelayInbox::keyFor($secretKey));
+        for ($round = 0; $round < 20; $round++) {
+            $taken = $inbox->take(500);
+            if ($taken === []) {
+                return;
+            }
+            foreach ($taken as $held) {
+                if ($spool->status()['state'] === 'buffer_full') {
+                    return; // They stay in the inbox until there's room.
+                }
+                try {
+                    $receivedAt = new DateTimeImmutable((string) ($held['item']['received_at'] ?? 'now'));
+                    $spool->append('sensor-reading:'.$held['file'], $spool->nextSourceSequence(), $held['item'], $receivedAt);
+                } catch (SpoolFull) {
+                    return;
+                }
+                $inbox->remove($held['file']);
+            }
+        }
+    }
+
+    /**
+     * S&D Phase E (D21): sensor readings must never cross the public internet, so once a day the
+     * hub tries Oblivion's public address on ports 1883 and 8883. Both must refuse. The result goes
+     * up with the next batch; Setup › Sensor broker shows it and an answer alerts IT.
+     */
+    private function checkBrokerExposure(string $stateDirectory, EncryptedSpool $spool, string $centralUrl): void
+    {
+        $stamp = $stateDirectory.DIRECTORY_SEPARATOR.'broker-exposure-check.json';
+        $last = is_file($stamp) ? json_decode((string) file_get_contents($stamp), true) : null;
+        $now = new DateTimeImmutable('now');
+        if (is_array($last) && is_int($last['checked_at'] ?? null) && $last['checked_at'] > $now->getTimestamp() - 86_400) {
+            return;
+        }
+        $host = parse_url($centralUrl, PHP_URL_HOST);
+        if (! is_string($host) || $host === '' || $spool->status()['state'] === 'buffer_full') {
+            return;
+        }
+        $ports = [];
+        foreach ([1883, 8883] as $port) {
+            $target = 'tcp://'.(str_contains($host, ':') ? "[{$host}]" : $host).':'.$port;
+            $socket = @stream_socket_client($target, $errorNumber, $errorText, 3);
+            $ports[(string) $port] = is_resource($socket) ? 'answered' : 'refused';
+            if (is_resource($socket)) {
+                fclose($socket);
+            }
+        }
+        try {
+            $spool->append('broker-exposure:'.$now->format('Ymd'), $spool->nextSourceSequence(), [
+                'item_type' => 'broker_exposure_check',
+                'host' => substr($host, 0, 253),
+                'ports' => $ports,
+                'checked_at' => $now->format(DATE_ATOM),
+            ], $now);
+        } catch (SpoolFull) {
+            return;
+        }
+        $this->writePrivateFile($stamp, json_encode(['checked_at' => $now->getTimestamp()], JSON_THROW_ON_ERROR));
+    }
+
+    private function wipeRemovedHub(string $configPath, string $stateDirectory, string &$secretKey): int
+    {
+        (new RelayTlsIdentity($stateDirectory, ''))->forget();
+        foreach ([$configPath, $stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json', $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_LOGINS_FILE, $stateDirectory.DIRECTORY_SEPARATOR.self::RELAY_TLS_LOGINS_FILE] as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
+        // Sensor readings still waiting to upload go too: a removed hub keeps nothing.
+        foreach (glob($stateDirectory.DIRECTORY_SEPARATOR.'relay-inbox'.DIRECTORY_SEPARATOR.'*') ?: [] as $held) {
+            @unlink($held);
+        }
+        $this->writePrivateFile($stateDirectory.DIRECTORY_SEPARATOR.'removed.json', json_encode([
+            'removed' => true,
+            'noticed_at' => (new DateTimeImmutable('now'))->format(DATE_ATOM),
+            'message' => 'This hub was removed in Oblivion. Its saved logins have been wiped. Uninstall Oblivion from this computer.',
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+        sodium_memzero($secretKey);
+        $this->write('collection: removed'.PHP_EOL);
+
+        return 3;
+    }
+
+    /**
+     * What the Windows service or Linux launcher should do next: approval state and the update
+     * it was told to install (window, ring, hold, roll-back time).
+     *
+     * @param  array<string, mixed>|null  $heartbeat
+     */
+    private function writeHostInstructions(string $stateDirectory, ?array $heartbeat): void
+    {
+        if ($heartbeat === null) {
+            return;
+        }
+        $this->writePrivateFile($stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json', json_encode([
+            'approval' => in_array($heartbeat['approval'] ?? null, ['waiting', 'approved'], true) ? $heartbeat['approval'] : 'approved',
+            'update' => is_array($heartbeat['update'] ?? null) ? $heartbeat['update'] : null,
+            'received_at' => (new DateTimeImmutable('now'))->format(DATE_ATOM),
+            'running_version' => self::buildVersion(),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n");
+    }
+
+    /**
+     * The service hands over the sealed login-store key it fetched at start, on standard
+     * input, so a restart while offline doesn't need the server. --vault-stdin turns it on.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function hostSealedVaultKey(array $options): ?string
+    {
+        if (($options['vault-stdin'] ?? false) !== true) {
+            return null;
+        }
+        $line = fgets(STDIN, 1024);
+        $line = is_string($line) ? trim($line) : '';
+
+        return $line === '' ? null : $line;
+    }
+
+    /** The version stamped by the build (collector/VERSION), else the source default. */
+    public static function buildVersion(): string
+    {
+        $file = dirname(__DIR__).DIRECTORY_SEPARATOR.'VERSION';
+        $stamped = is_file($file) ? trim((string) file_get_contents($file, false, null, 0, 64)) : '';
+
+        return preg_match('/\A(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\z/', $stamped) === 1 ? $stamped : self::VERSION;
+    }
+
+    /**
+     * update-fetch (S&D Phase B, D3): downloads the release file this hub was told to install,
+     * on the signed mTLS path, into a file inside the state folder. It refuses any file not
+     * named in hub-instructions.json's current target, checks size and SHA-256 while it
+     * streams, and renames the file into place only once both match. The Go host then checks
+     * the package's own signature before it installs anything.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function updateFetch(array $options): int
+    {
+        if (array_diff(array_keys($options), ['identity', 'artifact', 'output']) !== []) {
+            throw new RuntimeException('Update download contains an unknown option.');
+        }
+        $identityPath = $this->requiredPath($options, 'identity');
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $stateDirectory = $this->stateDirectory($identity, $identityPath);
+        $artifact = $this->instructedArtifact($stateDirectory, $this->requiredString($options, 'artifact'));
+        $output = $this->updateOutputPath($stateDirectory, $this->requiredString($options, 'output'));
+        $secretKey = $this->requestSigningKey($identity);
+        $temporary = $output.'.part-'.bin2hex(random_bytes(8));
+        $handle = @fopen($temporary, 'xb');
+        try {
+            if ($handle === false) {
+                throw new RuntimeException('The update file could not be created.');
+            }
+            $hash = hash_init('sha256');
+            $size = 0;
+            $this->central($identity, $secretKey)->downloadUpdate(
+                $identity['collector_id'],
+                $artifact['id'],
+                $artifact['sha256'],
+                function (string $chunk) use ($handle, $hash, &$size, $artifact): bool {
+                    $size += strlen($chunk);
+                    if ($size > $artifact['size']) {
+                        return false;
+                    }
+                    hash_update($hash, $chunk);
+
+                    return $this->writeAll($handle, $chunk);
+                },
+            );
+            if ($size !== $artifact['size'] || ! hash_equals($artifact['sha256'], hash_final($hash))) {
+                throw new RuntimeException('The downloaded update does not match its size and SHA-256.');
+            }
+            $synced = fflush($handle) && fsync($handle);
+            $closed = fclose($handle);
+            $handle = null;
+            if (! $synced || ! $closed || ! rename($temporary, $output)) {
+                throw new RuntimeException('The update file could not be saved.');
+            }
+        } finally {
+            sodium_memzero($secretKey);
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            if (is_file($temporary)) {
+                @unlink($temporary);
+            }
+        }
+        $this->write("update-fetch: downloaded and checked\n");
+
+        return 0;
+    }
+
+    /**
+     * update-report (S&D Phase B, D3): tells Oblivion how an update went, so the Go host needs
+     * no signing code of its own. A roll-back or failure raises an alert for IT.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function updateReport(array $options): int
+    {
+        if (array_diff(array_keys($options), ['identity', 'outcome', 'from', 'to', 'detail']) !== []) {
+            throw new RuntimeException('Update report contains an unknown option.');
+        }
+        $version = '/\A(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\z/';
+        $outcome = $this->requiredString($options, 'outcome');
+        $to = $this->requiredString($options, 'to');
+        $from = $options['from'] ?? null;
+        $detail = $options['detail'] ?? null;
+        if (! in_array($outcome, ['installed', 'rolled_back', 'failed'], true) || preg_match($version, $to) !== 1
+            || ($from !== null && (! is_string($from) || preg_match($version, $from) !== 1))
+            || ($detail !== null && ! is_string($detail))) {
+            throw new RuntimeException('Update report options are invalid.');
+        }
+        if (is_string($detail)) {
+            // Plain text only, at most 500 characters (the server's limit).
+            $detail = substr(trim((string) preg_replace('/[^\x20-\x7e]+/', ' ', $detail)), 0, 500);
+        }
+        $identityPath = $this->requiredPath($options, 'identity');
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $secretKey = $this->requestSigningKey($identity);
+        try {
+            $this->central($identity, $secretKey)->updateReport($identity['collector_id'], [
+                'outcome' => $outcome,
+                'from_version' => $from,
+                'to_version' => $to,
+                'detail' => $detail === '' ? null : $detail,
+            ]);
+        } finally {
+            sodium_memzero($secretKey);
+        }
+        $this->write("update-report: recorded\n");
+
+        return 0;
+    }
+
+    /**
+     * Uninstalling the hub tells Oblivion, which removes it and stops trusting it (windows tab,
+     * E). Exit 0 when Oblivion confirms, or says the hub was already removed (410); 1 otherwise,
+     * so the uninstaller can say it couldn't tell Oblivion.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    private function deregister(array $options): int
+    {
+        if (array_keys($options) !== ['identity']) {
+            throw new RuntimeException('Deregister takes only --identity.');
+        }
+        $identityPath = $this->requiredPath($options, 'identity');
+        $identity = $this->identity($identityPath, requireRuntime: true);
+        $secretKey = $this->requestSigningKey($identity);
+        try {
+            $this->central($identity, $secretKey)->deregister($identity['collector_id']);
+        } catch (CentralApiFailure $failure) {
+            if ($failure->httpStatus() !== 410) {
+                $this->write("deregister: not confirmed\n");
+
+                return 1;
+            }
+        } finally {
+            sodium_memzero($secretKey);
+        }
+        $this->write("deregister: removed\n");
+
+        return 0;
+    }
+
+    /**
+     * The file named --artifact in the current update target of hub-instructions.json.
+     *
+     * @return array{id: string, size: int, sha256: string}
+     */
+    private function instructedArtifact(string $stateDirectory, string $artifactId): array
+    {
+        try {
+            $instructions = json_decode($this->readBounded($stateDirectory.DIRECTORY_SEPARATOR.'hub-instructions.json'), true, 16, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException('The hub update instructions are unreadable.', previous: $exception);
+        }
+        $update = is_array($instructions) ? ($instructions['update'] ?? null) : null;
+        $target = is_array($update) ? ($update['target'] ?? null) : null;
+        if (! is_array($update) || ($update['held'] ?? null) !== false || ! is_array($target) || ! is_array($target['artifacts'] ?? null)) {
+            throw new RuntimeException('No update is waiting for this hub.');
+        }
+        foreach ($target['artifacts'] as $artifact) {
+            if (! is_array($artifact) || ($artifact['id'] ?? null) !== $artifactId) {
+                continue;
+            }
+            if (preg_match('/\A[a-z0-9][a-z0-9-]{1,63}\z/', $artifactId) !== 1
+                || ! is_int($artifact['size'] ?? null) || $artifact['size'] < 1 || $artifact['size'] > self::MAX_UPDATE_BYTES
+                || ! is_string($artifact['sha256'] ?? null) || preg_match('/\A[a-f0-9]{64}\z/', $artifact['sha256']) !== 1) {
+                throw new RuntimeException('The update instructions for that file are invalid.');
+            }
+
+            return ['id' => $artifactId, 'size' => $artifact['size'], 'sha256' => $artifact['sha256']];
+        }
+        throw new RuntimeException('That file is not in this hub\'s update instructions.');
+    }
+
+    /** The update file goes straight into an existing folder inside the state folder. */
+    private function updateOutputPath(string $stateDirectory, string $output): string
+    {
+        $fold = fn (string $path): string => PHP_OS_FAMILY === 'Windows' ? strtolower($path) : $path;
+        $state = realpath($stateDirectory);
+        $folder = realpath(dirname($output));
+        $name = basename($output);
+        if ($state === false || $folder === false || ! is_dir($folder)
+            || ($fold($folder) !== $fold($state) && ! str_starts_with($fold($folder), $fold(rtrim($state, '\\/').DIRECTORY_SEPARATOR)))
+            || preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,100}\z/', $name) !== 1) {
+            throw new RuntimeException('The update file must be saved inside the hub\'s state folder.');
+        }
+        $target = $folder.DIRECTORY_SEPARATOR.$name;
+        if (is_link($target) || is_dir($target)) {
+            throw new RuntimeException('The update file must be saved inside the hub\'s state folder.');
+        }
+
+        return $target;
+    }
+
+    /** @param resource $handle */
+    private function writeAll($handle, string $chunk): bool
+    {
+        $offset = 0;
+        while ($offset < strlen($chunk)) {
+            $written = fwrite($handle, substr($chunk, $offset));
+            if (! is_int($written) || $written < 1) {
+                return false;
+            }
+            $offset += $written;
+        }
+
+        return true;
+    }
+
+    /** @param array<string, mixed> $identity */
+    private function requestSigningKey(array $identity): string
+    {
+        $secretKey = base64_decode($identity['request_signing_secret_key'], true);
+        if (! is_string($secretKey) || strlen($secretKey) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
+            throw new RuntimeException('Collector request signing key is invalid.');
+        }
+
+        return $secretKey;
+    }
+
+    /** @param array<string, mixed> $identity */
+    private function central(array $identity, string $secretKey): HttpsCentralApi
+    {
+        return new HttpsCentralApi(
+            $identity['central_url'],
+            $identity['tls_public_key_pin'],
+            $secretKey,
+            $identity['client_certificate_file'],
+            $identity['client_private_key_file'],
+            $this->updateTransport,
+        );
     }
 
     /** @param array<string, string|bool> $options */
@@ -674,7 +1402,7 @@ final class CollectorApplication
 
     private function usage(): int
     {
-        $this->write("Usage: oblivion-collector enrol|enrol-profile|enrol-recoverable|runtime-check|run|doctor|verify-transport|version [--name=value]\n", STDERR);
+        $this->write("Usage: oblivion-collector enrol|enrol-profile|enrol-recoverable|runtime-check|run|update-fetch|update-report|deregister|doctor|verify-transport|version [--name=value]\n", STDERR);
 
         return 64;
     }

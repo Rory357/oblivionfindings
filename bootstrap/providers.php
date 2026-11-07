@@ -3,6 +3,7 @@
 use App\Domain\Referrals\ReferralSearchServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\AuthServiceProvider;
+use App\Providers\ChatCallingServiceProvider;
 use App\Providers\EventServiceProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Providers\LlmServiceProvider;
@@ -15,6 +16,7 @@ return [
     AppServiceProvider::class,
     AuthServiceProvider::class,
     EventServiceProvider::class,
+    ChatCallingServiceProvider::class,
     MedicationSupportServiceProvider::class,
     WorkforceEligibilityServiceProvider::class,
     FortifyServiceProvider::class,

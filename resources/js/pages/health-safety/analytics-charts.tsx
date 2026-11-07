@@ -244,7 +244,7 @@ export function LtifrTrifrChart({
         );
     }
     return (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={height} initialDimension={{ width: 600, height: typeof height === 'number' ? height : 240 }}>
             <ComposedChart
                 data={trends}
                 margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
@@ -329,7 +329,7 @@ export function SingleAreaChart({
 }) {
     const gradId = `area-${String(dataKey)}`;
     return (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={height} initialDimension={{ width: 600, height: typeof height === 'number' ? height : 240 }}>
             <ComposedChart
                 data={trends}
                 margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
@@ -393,7 +393,7 @@ export function HazardBurndownChart({
     height?: number;
 }) {
     return (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={height} initialDimension={{ width: 600, height: typeof height === 'number' ? height : 240 }}>
             <ComposedChart
                 data={trends}
                 margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
@@ -461,7 +461,7 @@ export function CaClosureChart({
     height?: number;
 }) {
     return (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={height} initialDimension={{ width: 600, height: typeof height === 'number' ? height : 240 }}>
             <ComposedChart
                 data={trends}
                 margin={{ top: 8, right: 6, left: -14, bottom: 0 }}
@@ -533,7 +533,7 @@ export function WorksafeNotifiableChart({
     height?: number;
 }) {
     return (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={height} initialDimension={{ width: 600, height: typeof height === 'number' ? height : 240 }}>
             <BarChart
                 data={trends}
                 margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
@@ -644,7 +644,7 @@ export function WorkerParticipationChart({
         );
     }
     return (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={height} initialDimension={{ width: 600, height: typeof height === 'number' ? height : 240 }}>
             <LineChart
                 data={points}
                 margin={{ top: 8, right: 12, left: -14, bottom: 0 }}
@@ -730,7 +730,7 @@ export function RootCausePareto({
     const barColor = (i: number) =>
         i === 0 ? TOKEN.critical : i <= 2 ? TOKEN.warning : TOKEN.primary;
     return (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={height} initialDimension={{ width: 600, height: typeof height === 'number' ? height : 240 }}>
             <ComposedChart
                 data={data}
                 margin={{ top: 16, right: 8, left: -14, bottom: 0 }}
@@ -859,9 +859,10 @@ export function FocusDonut({
                 style={{ width: 168, height: 168 }}
                 aria-hidden="true"
             >
-                <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 240, height: 225 }}>
+                    <PieChart accessibilityLayer={false}>
                         <Pie
+                            rootTabIndex={-1}
                             data={segments}
                             dataKey="value"
                             nameKey="label"
@@ -953,7 +954,7 @@ export function HorizontalBars({
         return <EmptyState height={height} />;
     }
     return (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={height} initialDimension={{ width: 600, height: typeof height === 'number' ? height : 240 }}>
             <BarChart
                 data={data}
                 layout="vertical"

@@ -6,7 +6,10 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
+use App\Domain\SecurityDevices\Setup\SecurityDevicesSettings;
 use App\Notifications\MonitoringCheckAlertNotification;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Throwable;
@@ -17,25 +20,41 @@ final class MonitoringAlertNotificationDispatcher
         private readonly EffectiveMonitoringPolicyResolver $policies,
     ) {}
 
+    /**
+     * Tell the people the alert route names. Returns who was told and how, for the alert timeline
+     * (S&D Phase D), or null when nobody was.
+     *
+     * @return array{names: list<string>, channels: list<string>}|null
+     */
     public function dispatchTransition(
         Monitor $monitor,
         MonitorObservation $observation,
         int $siteId,
         MonitorState $from,
         MonitorState $to,
-    ): void {
+    ): ?array {
         $monitor->loadMissing('device');
         $device = $monitor->device;
         if ($device === null || (string) $device->domain !== 'it_infrastructure') {
-            return;
+            return null;
         }
 
         if ($to === MonitorState::Suppressed || $to === $from) {
-            return;
+            return null;
         }
 
         if (! in_array($to, [MonitorState::Degraded, MonitorState::Failed], true)) {
-            return;
+            return null;
+        }
+
+        $observedAt = $observation->observed_at !== null
+            ? CarbonImmutable::parse($observation->observed_at)->utc()
+            : CarbonImmutable::now('UTC');
+        // Quiet hours hold IT check notices for the 6:00 am summary, except a router, gateway or hub
+        // that stops answering: the person on call hears straight away (Stephan, 6 Nov).
+        if (app(SecurityDevicesSettings::class)->isQuietHours($observedAt)
+            && ! DeviceAlertEngine::passesQuietHours($device, DeviceAlertEngine::checkKind($monitor, $to))) {
+            return null;
         }
 
         $route = $this->policies->resolveAlertRoute($device, $monitor, $siteId);
@@ -50,14 +69,18 @@ final class MonitoringAlertNotificationDispatcher
         if ($notifyEmail) {
             $channels[] = 'mail';
         }
-
-        if ($channels === []) {
-            return;
+        if ($isCritical && (bool) ($route['critical_notify_push'] ?? false)) {
+            $channels[] = 'push';
         }
 
-        $recipients = $this->policies->resolveItRecipients($siteId, $route['recipient_role']);
+        if ($channels === []) {
+            return null;
+        }
+
+        // S&D 13d: the IT person on call (Rostering) is told first; the rest hear at the one-hour reminder.
+        $recipients = app(\App\Domain\SecurityDevices\Alerts\ItOnCall::class)->first($this->policies->resolveItRecipients($siteId, $route['recipient_role']), $observedAt);
         if ($recipients->isEmpty()) {
-            return;
+            return null;
         }
 
         $severity = $isCritical ? 'critical' : 'warning';
@@ -88,6 +111,8 @@ final class MonitoringAlertNotificationDispatcher
                     'alert_route_id' => $route['rule_id'],
                 ],
             ));
+
+            return ['names' => $recipients->pluck('name')->map(fn (mixed $name): string => (string) $name)->values()->all(), 'channels' => $channels];
         } catch (Throwable $exception) {
             Log::warning('Technical monitoring alert notification could not be dispatched', [
                 'monitor_id' => $monitor->id,
@@ -96,6 +121,8 @@ final class MonitoringAlertNotificationDispatcher
                 'state' => $to->value,
                 'error' => $exception->getMessage(),
             ]);
+
+            return null;
         }
     }
 }

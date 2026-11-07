@@ -13,18 +13,19 @@ use App\Http\Controllers\Chat\ChatFamilyFollowupController;
 use App\Http\Controllers\Chat\ChatFamilyHomeController;
 use App\Http\Controllers\Chat\ChatFamilyInboxController;
 use App\Http\Controllers\Chat\ChatFamilyWorkController;
+use App\Http\Controllers\Chat\ChatLiveController;
 use App\Http\Controllers\Chat\ChatMessageAlertController;
 use App\Http\Controllers\Chat\ChatMessageEditController;
 use App\Http\Controllers\Chat\ChatNotificationController;
 use App\Http\Controllers\Chat\ChatParticipantController;
 use App\Http\Controllers\Chat\ChatPersonalPreferencesController;
 use App\Http\Controllers\Chat\ChatPrivateDraftController;
-use App\Http\Controllers\Chat\ChatRealtimeController;
 use App\Http\Controllers\Chat\ChatSearchController;
 use App\Http\Controllers\Chat\ChatSendAttemptController;
 use App\Http\Controllers\Chat\ChatUploadController;
 use App\Http\Controllers\Chat\ChatUrgentContactController;
 use App\Http\Controllers\Settings\ChatAdministrationController;
+use App\Http\Controllers\Settings\ChatCallingSettingsController;
 use App\Http\Controllers\Settings\ChatInvestigationController;
 use App\Http\Controllers\Settings\ChatSettingsController;
 use App\Http\Middleware\EnsureChatActor;
@@ -37,6 +38,9 @@ Route::middleware(['auth'])->group(function (): void {
     Route::post('/settings/chat/service-health', [ChatSettingsController::class, 'serviceHealth'])->middleware('throttle:6,1,chat-health:')->middleware(EnsureChatActor::class)->name('settings.chat.service-health');
     Route::post('/settings/chat/calling-health', [ChatSettingsController::class, 'callingHealth'])->middleware('throttle:6,1,chat-health:')->middleware(EnsureChatActor::class)->name('settings.chat.calling-health');
     Route::put('/settings/chat', [ChatSettingsController::class, 'update'])->middleware('throttle:20,1,chat-settings:')->middleware(EnsureChatActor::class)->name('settings.chat.update');
+    // Calling settings: the relay and voice-call server, kept here instead of .env (administrators, password on save).
+    Route::get('/settings/chat/calling', [ChatCallingSettingsController::class, 'show'])->middleware(EnsureChatActor::class)->name('settings.chat.calling');
+    Route::put('/settings/chat/calling', [ChatCallingSettingsController::class, 'update'])->middleware('throttle:10,1,chat-calling-settings:')->middleware(EnsureChatActor::class)->name('settings.chat.calling.update');
     // Settings audit, offboarding and client relationships (settings administrators; never private content).
     Route::prefix('settings/chat/administration')->name('settings.chat.administration.')->middleware([EnsureChatActor::class, 'throttle:60,1,chat-administration:'])->group(function (): void {
         Route::get('/audit', [ChatAdministrationController::class, 'audit'])->name('audit');
@@ -55,6 +59,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/grants', [ChatInvestigationController::class, 'store'])->name('store');
         Route::get('/grants/{grant}/messages', [ChatInvestigationController::class, 'messages'])->whereNumber('grant')->name('messages');
         Route::post('/grants/{grant}/end', [ChatInvestigationController::class, 'end'])->whereNumber('grant')->name('end');
+        // Controlled export: an active grant only, a few per investigator at a time.
+        Route::post('/grants/{grant}/export', [ChatInvestigationController::class, 'export'])->whereNumber('grant')->middleware('throttle:5,10,chat-investigation-export:')->name('export');
         Route::post('/holds', [ChatInvestigationController::class, 'placeHold'])->name('holds.store');
         Route::post('/holds/{hold}/release', [ChatInvestigationController::class, 'releaseHold'])->whereNumber('hold')->name('holds.release');
     });
@@ -73,8 +79,9 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/clients/{client}/urgent-contact', ChatUrgentContactController::class)->whereNumber('client')->middleware(EnsureChatActor::class)->name('urgent-contact');
         Route::get('/clients/{client}/home', ChatFamilyHomeController::class)->whereNumber('client')->middleware(EnsureChatActor::class)->name('family-home');
         Route::get('/clients/{client}/home/conversations/{conversation}', [ChatFamilyHomeController::class, 'conversation'])->whereNumber(['client', 'conversation'])->middleware(EnsureChatActor::class)->name('family-home.conversation');
-        Route::get('/realtime', [ChatRealtimeController::class, 'configuration'])->middleware(EnsureChatActor::class)->name('realtime');
-        Route::post('/realtime/auth', [ChatRealtimeController::class, 'authorizeChannel'])->middleware(EnsureChatActor::class)->name('realtime.auth');
+        // Oblivion Live: a short-lived connection ticket, and typing signals (never stored).
+        Route::post('/live/ticket', [ChatLiveController::class, 'ticket'])->middleware(['throttle:30,1,chat-live-ticket:', EnsureChatActor::class])->name('live.ticket');
+        Route::post('/conversations/{conversation}/typing', [ChatLiveController::class, 'typing'])->middleware(['throttle:60,1,chat-typing:', EnsureChatActor::class])->name('typing');
         Route::get('/calls', [ChatCallController::class, 'status'])->withoutMiddleware('throttle:120,1,chat-api:')->middleware(['throttle:180,1,chat-poll-calls:', EnsureChatActor::class])->name('calls.status');
         Route::get('/conversations/{conversation}/draft', [ChatPrivateDraftController::class, 'show'])->middleware(EnsureChatActor::class)->name('draft.show');
         Route::put('/conversations/{conversation}/draft', [ChatPrivateDraftController::class, 'update'])->middleware(EnsureChatActor::class)->name('draft.update');

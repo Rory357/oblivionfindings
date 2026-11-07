@@ -287,7 +287,17 @@ final class FirstAidAccessService
             $staff = [];
             $firstAiders = [];
             $assignees = [];
-            foreach ($reads->query($this->staff->currentUsersQuery())->orderBy('name')->get() as $candidate) {
+            // O6 (readiness audit, 6 Nov 2026): only staff whose HR profile names a chosen Site can pass the per-person
+            // check, so the rest are left out in SQL first (it checked every staff member at every Site, one at a time).
+            $candidates = $reads->query($this->staff->currentUsersQuery())->whereHas('hrEmployeeProfile', function ($profile) use ($selectedSites): void {
+                $profile->where(function ($at) use ($selectedSites): void {
+                    $at->whereIn('primary_site_id', $selectedSites === [] ? [0] : array_map('intval', $selectedSites));
+                    foreach ($selectedSites as $siteId) {
+                        $at->orWhereJsonContains('secondary_site_ids', (int) $siteId)->orWhereJsonContains('secondary_site_ids', (string) $siteId);
+                    }
+                });
+            });
+            foreach ($candidates->orderBy('name')->get() as $candidate) {
                 foreach ($selectedSites as $selectedSite) {
                     try {
                         $person = $this->eligibleStaff((int) $candidate->id, (int) $selectedSite, $reads);

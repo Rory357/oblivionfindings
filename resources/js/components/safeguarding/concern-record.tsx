@@ -52,6 +52,7 @@ import {
     InvestigationPane,
     ReportAckForm,
     ReportPane,
+    ReporterView,
     RiskPane,
     TriagePane,
     type ActionKey,
@@ -600,6 +601,7 @@ export function SafeguardingConcernRecord({
     onSectionChange?: (section: SectionKey) => void;
 }) {
     if (d.restricted) return <RestrictedConcern d={d} returnUrl={returnUrl} />;
+    if (d.reporter_view) return <ReportedConcern d={d} returnUrl={returnUrl} />;
     return (
         <ConcernWorkspace
             d={d}
@@ -639,6 +641,35 @@ function RestrictedConcern({ d, returnUrl }: { d: ConcernDetail; returnUrl: stri
                         visible only to the assigned lead, the reporter, and
                         staff cleared to view sensitive concerns.
                     </p>
+                </div>
+            </Surface>
+        </PageLayout>
+    );
+}
+
+/** P3: the reporter's own view: their report and where it's up to. */
+function ReportedConcern({ d, returnUrl }: { d: ConcernDetail; returnUrl: string }) {
+    return (
+        <PageLayout
+            hero={
+                <PageHeader
+                    variant="profile"
+                    wrapTitle
+                    backHref={returnUrl}
+                    icon={FileText}
+                    title="Your safeguarding report"
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral" icon={FileText}>
+                            {d.status_label}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={`${d.reference_number} · ${d.status_label}`}
+                />
+            }
+        >
+            <Surface aria-label="Your report">
+                <div className="p-6">
+                    <ReporterView d={d} />
                 </div>
             </Surface>
         </PageLayout>

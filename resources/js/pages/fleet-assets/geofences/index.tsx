@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     Archive,
@@ -97,8 +97,15 @@ export default function MapsBoundaries({
     mapProvider: MapProvider;
     googleMaps?: MapSnapshot | null;
 }) {
+    const pageUrl = usePage().url;
     const [nav, setNav] = useState(
-            () => new URLSearchParams(window.location.search),
+            // The server render has no window; the page URL carries the same query.
+            () =>
+                new URLSearchParams(
+                    typeof window === 'undefined'
+                        ? (pageUrl.split('?')[1] ?? '')
+                        : window.location.search,
+                ),
         ),
         [refresh, setRefresh] = useState(0),
         [search, setSearch] = useState(nav.get('q') ?? ''),

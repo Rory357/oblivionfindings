@@ -1,6 +1,6 @@
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { formatDateOnly, toDateInput } from '@/lib/datetime';
-import { Archive, CheckCircle2, Clock, FileEdit } from 'lucide-react';
+import { Archive, CheckCircle2, Clock, FileEdit, FileX2 } from 'lucide-react';
 
 export function procedureStatus(status: string, legacy = false) {
     if (legacy && status === 'approved')
@@ -29,6 +29,11 @@ export function procedureStatus(status: string, legacy = false) {
             label: 'Archived',
             variant: 'neutral' as StatusVariant,
             icon: Archive,
+        },
+        withdrawn: {
+            label: 'Withdrawn',
+            variant: 'neutral' as StatusVariant,
+            icon: FileX2,
         },
     };
     return (

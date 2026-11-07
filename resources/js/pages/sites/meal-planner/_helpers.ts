@@ -292,6 +292,18 @@ export function toIsoDate(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** "2026-11-02" → that day at local midnight (`new Date()` would read it as UTC). Null when unreadable. */
+export function fromIsoDate(value: string | null | undefined): Date | null {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? '');
+    if (!match) return null;
+    const d = new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+    );
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function isoWeekNo(d: Date): number {
     const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     const dayNum = date.getUTCDay() || 7;

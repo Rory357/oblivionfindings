@@ -30,14 +30,14 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
         $this->assertSame('testing', app()->environment());
         $this->assertSame('mysql', DB::connection()->getDriverName());
         $database = DB::connection()->getDatabaseName();
-        $this->assertMatchesRegularExpression('/^(oblivion_hs_goal_test_[0-9]+|oblivion_findings_codex_test_[0-9]+)$/D', $database);
+        // A throwaway `<base>_<pid>` schema or a kept `<base>_k<checkout>_<slot>` one.
+        $this->assertMatchesRegularExpression('/^(oblivion_hs_goal_test_[0-9]+|oblivion_findings_codex_test_(?:k[0-9a-f]{6}_)?[0-9]+)$/D', $database);
         $this->assertSame($database, getenv('DB_DATABASE'));
         Queue::fake();
     }
 
     public function test_two_same_uuid_deliveries_block_on_source_then_converge_to_one_alert_receipt_and_audit(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::UNMET_CHECK, 'the harness waits until both workers are blocked on the restraint event row lock; with the same delivery UUID they never both show there, so the test stops before its one-alert checks. It fails the same way on Codex\'s snapshot. The distinct-UUID race in this file needs the same lock and passes with one alert and both acceptances.', 'find where the second same-UUID worker waits and assert on that lock.'));
         $event = $this->event();
         $payload = $this->payload($event);
         $results = $this->race($event, [$payload, $payload]);
@@ -148,8 +148,6 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
         $go = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-restraint-go-'.$token;
         $ready = $attempt = $processes = [];
         try {
-            $connection->beginTransaction();
-            RestraintEvent::whereKey($event->id)->lockForUpdate()->firstOrFail();
             foreach ($payloads as $index => $payload) {
                 $ready[] = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-restraint-ready-'.$token.'-'.$index;
                 $attempt[] = sys_get_temp_dir().DIRECTORY_SEPARATOR.'hs-restraint-attempt-'.$token.'-'.$index;
@@ -174,6 +172,8 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
             $connectionIds = array_column($workers, 'connection_id');
             $this->assertCount(2, array_unique($connectionIds));
             $this->assertNotContains((int) $connection->selectOne('SELECT CONNECTION_ID() AS id')->id, $connectionIds);
+            $connection->beginTransaction();
+            RestraintEvent::whereKey($event->id)->lockForUpdate()->firstOrFail();
             touch($go);
             $this->waitForFiles($attempt, $processes);
             $this->waitForSourceLocks($connectionIds, $processes);
@@ -211,7 +211,7 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
 
     private function waitForFiles(array $paths, array $processes): void
     {
-        $deadline = microtime(true) + 30;
+        $deadline = microtime(true) + 60;
         while (count(array_filter($paths, 'is_file')) !== count($paths)) {
             $this->assertWorkersAlive($processes);
             if (microtime(true) >= $deadline) {
@@ -223,7 +223,18 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
 
     private function waitForSourceLocks(array $connectionIds, array $processes): void
     {
-        $deadline = microtime(true) + 30;
+        $holder = (int) DB::selectOne('SELECT CONNECTION_ID() AS id')->id;
+        // The lock system's own wait graph: each worker waiting on a restraint_events row lock held by this test's
+        // connection. innodb_trx can omit a session that waits while its first statement is still in the optimizer's
+        // const-row read ("statistics"), which is where the same-UUID workers wait (R3, 31 Oct).
+        $lockWaiters = fn (): array => array_map('intval', array_column(DB::select("SELECT DISTINCT rt.PROCESSLIST_ID AS waiter
+            FROM performance_schema.data_lock_waits w
+            JOIN performance_schema.threads rt ON rt.THREAD_ID = w.REQUESTING_THREAD_ID
+            JOIN performance_schema.threads bt ON bt.THREAD_ID = w.BLOCKING_THREAD_ID
+            JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID
+            WHERE l.OBJECT_SCHEMA = DATABASE() AND l.OBJECT_NAME = 'restraint_events' AND l.LOCK_MODE LIKE 'X%'
+                AND bt.PROCESSLIST_ID = ? AND rt.PROCESSLIST_ID IN (?, ?)", [$holder, ...$connectionIds]), 'waiter'));
+        $deadline = microtime(true) + 45;
         do {
             $this->assertWorkersAlive($processes);
             $waiters = DB::select("SELECT trx_mysql_thread_id, trx_state, trx_query FROM information_schema.innodb_trx
@@ -237,9 +248,21 @@ final class RestraintOperationalAlertBridgeConcurrencyTest extends TestCase
 
                 return;
             }
+            $graph = $lockWaiters();
+            sort($graph);
+            $expected = array_map('intval', $connectionIds);
+            sort($expected);
+            if ($graph === $expected) {
+                return;
+            }
             usleep(20000);
         } while (microtime(true) < $deadline);
-        throw new RuntimeException('Both native worker sessions must wait on the canonical restraint event row.');
+        // Say where each worker actually is, so a failure names the lock (or step) it is stuck on.
+        $where = collect(DB::select('SELECT p.ID, p.STATE, p.TIME, LEFT(p.INFO, 160) AS info, t.trx_state, LEFT(t.trx_query, 160) AS trx_query
+            FROM information_schema.PROCESSLIST p LEFT JOIN information_schema.innodb_trx t ON t.trx_mysql_thread_id = p.ID
+            WHERE p.ID IN (?, ?)', $connectionIds))->map(fn ($row) => json_encode((array) $row))->implode(' | ');
+        throw new RuntimeException('Both native worker sessions must wait on the canonical restraint event row. Workers: '.$where
+            .' | lock-wait graph waiters: '.json_encode($lockWaiters()));
     }
 
     private function assertWorkersAlive(array $processes): void

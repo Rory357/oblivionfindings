@@ -25,6 +25,8 @@ use Tests\Support\NotInThisBuild;
 /** Whole real HTTP/source suite. Canonical Policy is never mocked; native execution remains UNRUN. */
 final class HsDashboardClientOptionsSourceReadTest extends RestraintEventCommandTestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     protected function setUp(): void
     {
         parent::setUp(); $this->withoutVite();
@@ -344,7 +346,7 @@ final class HsDashboardClientOptionsSourceReadTest extends RestraintEventCommand
     }
     private function overview(?int $site = null)
     {
-        return $this->actingAs($this->actor)->get('/health-safety'.($site === null ? '' : '?site='.$site), ['X-Inertia' => 'true']);
+        return $this->actingAs($this->actor)->getOverview('/health-safety'.($site === null ? '' : '?site='.$site), ['X-Inertia' => 'true']);
     }
     private function sourceHttp(User $viewer) { return $this->actingAs($viewer)->getJson('/_test/hs-client-options/'.$this->site->id); }
     private function grant(User $viewer, string $key, bool $allowed): void

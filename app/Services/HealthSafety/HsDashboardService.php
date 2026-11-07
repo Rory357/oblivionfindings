@@ -261,9 +261,9 @@ class HsDashboardService
                     ->map(fn (HsEvent $event) => [
                         'id' => $event->id,
                         'event_reference' => $event->reference_number,
-                        'title' => $event->clientIncident?->title
-                            ?: $event->clientIncident?->description
-                            ?: ucfirst(str_replace('_', ' ', $event->event_category)).' event',
+                        // B1.1/B7: the record's title. protectIncidentEagerLoads() leaves the incident out for a viewer
+                        // who can't read it, so they get kind and person, never the incident's words.
+                        'title' => $this->reviewTitle($event),
                         'severity' => $event->severity,
                         'reported_at' => $event->reported_at?->toIso8601String(),
                         'site' => $event->site?->name,
@@ -370,8 +370,7 @@ class HsDashboardService
                 ->map(fn (HsEvent $event) => [
                     'id' => $event->id,
                     'event_reference' => $event->reference_number,
-                    'title' => $event->clientIncident?->title
-                        ?: $event->clientIncident?->description,
+                    'title' => $this->reviewTitle($event),
                     'incident_type' => $event->clientIncident?->type
                         ?: $event->event_category,
                     'status' => $event->worksafe_status,
@@ -385,6 +384,88 @@ class HsDashboardService
                         ?? ($event->source_type === ClientIncident::class ? $event->source_id : null),
                 ])
                 ->all();
+        });
+    }
+
+    /**
+     * G2 (B2.2, IR10) "WorkSafe: decide or tell": open reviews still needing the WorkSafe decision, or decided notifiable
+     * and not yet told, most severe first. The count is the whole list; rows are the first $limit.
+     *
+     * @return array{count: int, rows: list<array<string, mixed>>}
+     */
+    public function worksafeQueue(int|array|null $siteId, ?User $viewer, int $limit = 10, ?HealthSafetyReadContext $context = null): array
+    {
+        return $this->withSourceRead($viewer, $context, function (?User $viewer, ?HealthSafetyReadContext $context) use ($siteId, $limit) {
+            $query = $this->hsEventQuery($siteId, $viewer, $context)->worksafeDecideOrTell()
+                ->with(['clientIncident:id,hs_event_id,title,description,type', 'client:id,first_name,last_name', 'site:id,name', 'owner:id,name'])
+                ->tap(fn (Builder $q) => $this->protectIncidentEagerLoads($q, $viewer, $context))
+                ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")->orderBy('reported_at');
+            $count = (clone $query)->count();
+
+            return ['count' => $count, 'rows' => $query->limit($limit)->get()->map(fn (HsEvent $event) => [
+                'id' => $event->id,
+                'reference' => $event->reference_number,
+                'title' => $this->reviewTitle($event),
+                'severity' => $event->severity,
+                'site' => $event->site?->name,
+                'owner' => $event->owner?->name,
+                'reported_at' => $event->reported_at?->toIso8601String(),
+                // Decided notifiable but WorkSafe not told yet, or still to decide.
+                'step' => $event->hasSignedWorksafeDecision() ? 'tell' : 'decide',
+                'awaiting_owner' => $event->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+            ])->values()->all()];
+        });
+    }
+
+    /**
+     * G2 (B2.2/B2.3) "Actions to check": actions marked done that this viewer may check (not one they added, own or did),
+     * oldest first. The count is the whole list; rows are the first $limit.
+     *
+     * @return array{count: int, rows: list<array<string, mixed>>}
+     */
+    public function checkQueue(int|array|null $siteId, User $viewer, int $limit = 10, ?HealthSafetyReadContext $context = null): array
+    {
+        return $this->withSourceRead($viewer, $context, function (?User $viewer, ?HealthSafetyReadContext $context) use ($siteId, $limit) {
+            $query = HsCorrectiveAction::query()->where('hs_corrective_actions.status', HsCorrectiveAction::STATUS_COMPLETED)
+                ->with(['completedBy:id,name', 'hsEvent:id,site_id,reference_number']);
+            // The server's separation-of-duties rule, shared with the header box (HsOverviewHeaderReadService::checkableBy).
+            HsOverviewHeaderReadService::checkableBy($query, $viewer);
+            $this->applyRelatedSiteScope($query, 'hsEvent', $siteId);
+            $this->applyRelatedSourceScope($query, $viewer, $context);
+            $query = $this->protectSourceEagerLoads($query)->orderBy('completed_at');
+            $count = (clone $query)->count();
+
+            return ['count' => $count, 'rows' => $query->limit($limit)->get()->map(fn (HsCorrectiveAction $action) => [
+                'id' => $action->id,
+                'reference' => $action->reference_number,
+                'title' => $action->title,
+                'completed_by' => $action->completedBy?->name,
+                'completed_at' => $action->completed_at?->toIso8601String(),
+                'event_reference' => $action->hsEvent?->reference_number,
+            ])->values()->all()];
+        });
+    }
+
+    /**
+     * G2 (B2.2) "Where safety reviews are up to": open reviews by stage now, and reviews closed in the last 30 days.
+     *
+     * @return array<string, int>
+     */
+    public function reviewStages(int|array|null $siteId, ?User $viewer, ?HealthSafetyReadContext $context = null): array
+    {
+        return $this->withSourceRead($viewer, $context, function (?User $viewer, ?HealthSafetyReadContext $context) use ($siteId) {
+            $byStatus = $this->hsEventQuery($siteId, $viewer, $context)->where('hs_events.status', '!=', HsEvent::STATUS_CLOSED)
+                ->toBase()->selectRaw('hs_events.status AS s, COUNT(*) AS n')->groupBy('s')->pluck('n', 's')->all();
+            $closed = $this->hsEventQuery($siteId, $viewer, $context)->where('hs_events.status', HsEvent::STATUS_CLOSED)
+                ->where('hs_events.closed_at', '>=', now()->subDays(30))->count();
+
+            return [
+                'open' => (int) ($byStatus[HsEvent::STATUS_OPEN] ?? 0),
+                'investigating' => (int) ($byStatus[HsEvent::STATUS_INVESTIGATING] ?? 0),
+                'corrective_action' => (int) ($byStatus[HsEvent::STATUS_CORRECTIVE_ACTION] ?? 0),
+                'monitoring' => (int) ($byStatus[HsEvent::STATUS_MONITORING] ?? 0),
+                'closed_30d' => $closed,
+            ];
         });
     }
 
@@ -454,7 +535,8 @@ class HsDashboardService
                 ->orderBy('scheduled_at')
                 ->limit($limit)
                 ->get() as $drill) {
-                $label = trim(ucfirst((string) $drill->drill_type).' drill — '.($drill->site?->name ?? ''), ' —');
+                $drillType = ucfirst(str_replace('_', ' ', (string) $drill->drill_type));
+                $label = trim($drillType.' drill — '.($drill->site?->name ?? ''), ' —');
                 $items[] = $this->expiringItem('drill', 'Emergency drill', $label, $drill->scheduled_at, '/health-safety/drills', $drill->site?->name);
             }
 
@@ -794,6 +876,17 @@ class HsDashboardService
     }
 
     /** Prepare the original incident/HSE parent before either the event or copied incident body SELECT. */
+    /** The record's title from what this list already loaded (no extra reads); the incident is only there for readers. */
+    private function reviewTitle(HsEvent $event): string
+    {
+        $incident = $event->relationLoaded('clientIncident') ? $event->clientIncident : null;
+        $client = $event->relationLoaded('client') ? $event->client : null;
+        $site = $event->relationLoaded('site') ? $event->site : null;
+
+        return \App\Support\HealthSafety\HsReviewTitle::make((string) $event->event_category, $incident !== null, $incident?->title,
+            $client ? trim($client->first_name.' '.$client->last_name) : null, null, $site?->name);
+    }
+
     private function protectIncidentEagerLoads(Builder $events, ?User $viewer, ?HealthSafetyReadContext $context): Builder
     {
         $original = $events->getEagerLoads()['clientIncident'];

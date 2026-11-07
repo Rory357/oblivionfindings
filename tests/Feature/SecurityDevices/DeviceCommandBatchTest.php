@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Jobs\DispatchDeviceCommand;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandBatch;
+use App\Domain\SecurityDevices\Management\Services\DeviceCommandBatchPresenter;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandIntakeAudit;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
 use App\Domain\SecurityDevices\Management\Services\CommandExecutionAdapterRegistry;
@@ -210,25 +211,20 @@ it('creates one immutable parent and one signed governed child per included Devi
         ->and(DeviceCommandRequest::query()->count())->toBe(2)
         ->and(DeviceCommandIntakeAudit::query()->where('outcome', 'allowed')->count())->toBe(2);
 
+    // S&D rebuild C6: the batch page and the workspaces' bulk tab are gone (results are in each
+    // device's logbook); the batch itself, its approval, dispatch and export stay.
     $this->actingAs($requester)
         ->get("/security-devices/command-batches/{$batch->id}")
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('security-devices/command-batches/show')
-            ->where('batch.summary.selected', 2)
-            ->where('batch.summary.included', 2)
-            ->where('batch.summary.awaitingApproval', 2)
-            ->has('batch.targets', 2));
+        ->assertRedirect('/security-devices/devices');
+    $presented = json_decode(json_encode(app(DeviceCommandBatchPresenter::class)->present($requester, $batch), JSON_THROW_ON_ERROR), true);
+    expect($presented['summary']['selected'])->toBe(2)
+        ->and($presented['summary']['included'])->toBe(2)
+        ->and($presented['summary']['awaitingApproval'])->toBe(2)
+        ->and($presented['targets'])->toHaveCount(2);
 
     $this->actingAs($requester)
         ->get('/security-devices/security?tab=management')
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('security-devices/category')
-            ->where('workspace.activeTab', 'management')
-            ->where('bulkManagement.workspace', 'security')
-            ->where('bulkManagement.recentBatches.0.id', $batch->id)
-            ->has('bulkManagement.devices', 2));
+        ->assertRedirect('/security-devices/devices?tab=alarms_doors');
 
     $export = $this->actingAs($requester)
         ->get("/security-devices/command-batches/{$batch->id}/export")
@@ -466,9 +462,10 @@ it('conceals a retained batch and its export when the viewer loses any target Si
 
     $restrictedViewer = bulkCommandActor('coordinator', $firstSite);
     bulkCommandGrant($restrictedViewer, 'securityDevices.commands.observe');
+    // The retired batch page redirects for everyone alike, so it reveals nothing; the export stays concealed.
     $this->actingAs($restrictedViewer)
         ->get("/security-devices/command-batches/{$batch->id}")
-        ->assertNotFound();
+        ->assertRedirect('/security-devices/devices');
     $this->actingAs($restrictedViewer)
         ->get("/security-devices/command-batches/{$batch->id}/export")
         ->assertNotFound();

@@ -59,6 +59,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/incidents/{incident}', [IncidentController::class, 'show'])
         ->middleware(\App\Http\Middleware\CurrentIncidentRegisterAccess::class)
         ->whereNumber('incident')->name('incidents.show');
+    Route::get('/incidents/{incident}/pdf', [IncidentController::class, 'pdf'])
+        ->middleware(\App\Http\Middleware\CurrentIncidentRegisterAccess::class)
+        ->whereNumber('incident')->name('incidents.pdf');
     Route::get('/incidents/{incident}/attachments/{attachment}/download', [IncidentController::class, 'downloadAttachment'])
         ->middleware(\App\Http\Middleware\CurrentIncidentRegisterAccess::class)
         ->whereNumber(['incident', 'attachment'])->name('incidents.attachments.download');
@@ -106,6 +109,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereNumber(['incident', 'attachment'])
         ->middleware('permission:incidents.portal.manage')
         ->name('incidents.attachments.update');
+
+    // Answer 20 (G3): a dated note beside a submitted report's words (never an edit).
+    Route::post('/incidents/{incident}/notes', [\App\Http\Controllers\IncidentNoteController::class, 'store'])
+        ->whereNumber('incident')
+        ->middleware('permission:incidents.approve')
+        ->name('incidents.notes.store');
 
     // Workflow actions
     Route::post('/incidents/{incident}/submit', [IncidentController::class, 'submit'])

@@ -60,9 +60,10 @@ final class ChatSettings
         return $this->read($conversation->client?->site_id ?? $conversation->channel_site_id);
     }
 
-    public function publicPolicy(OpsConversation $conversation): array
+    /** $policy: the conversation's settings when the caller has already read them. */
+    public function publicPolicy(OpsConversation $conversation, ?array $policy = null): array
     {
-        return array_intersect_key($this->forConversation($conversation), array_flip([
+        return array_intersect_key($policy ?? $this->forConversation($conversation), array_flip([
             'enabled', 'family_enabled', 'files_enabled', 'voice_notes_enabled', 'max_file_mb', 'max_files', 'response_expectation',
         ])) + ['max_voice_note_seconds' => ChatVoiceInspector::MAX_SECONDS, 'voice_notes_available' => app(ChatVoiceInspector::class)->configured(), 'draft_recovery_enabled' => (bool) config('chat.draft_recovery', false)];
     }

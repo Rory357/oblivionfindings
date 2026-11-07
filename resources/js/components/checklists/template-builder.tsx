@@ -206,8 +206,13 @@ export function TemplateBuilderModal({
             >
                 {!ready ? (
                     <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
+                        {/* The body's visible title arrives with the template;
+                            until then screen readers still get the editor's name. */}
+                        <DialogTitle className="sr-only">
+                            Edit checklist template
+                        </DialogTitle>
                         <Loader2 className="h-6 w-6 animate-spin" />
-                        <span className="text-sm">Loading template…</span>
+                        <DialogDescription>Loading template…</DialogDescription>
                     </div>
                 ) : (
                     <TemplateBuilderBody

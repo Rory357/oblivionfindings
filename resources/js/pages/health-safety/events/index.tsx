@@ -36,6 +36,7 @@ import {
     StageDots,
     Surface,
 } from '@/components/signature/blocks';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -55,6 +56,7 @@ import {
 } from '@/components/ui/table';
 import { Field, SelectInput } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import {
     formatDateOnly,
     formatDateTime,
@@ -125,6 +127,12 @@ export type EventRow = {
     };
     has_investigation: boolean;
     has_open_actions: boolean;
+    /** G3 board M6: where it's up to, in one line. */
+    summary?: string;
+    /** The one next step; `who` says who does it when this viewer can't. */
+    next?: { key: string; label: string; can: boolean; who: string | null; href: string } | null;
+    /** Decision 17: why it can't move, for this viewer ("Owner still needed — …"). */
+    blocked?: string | null;
 };
 
 type Paginated<T> = {
@@ -309,63 +317,15 @@ export default function HsEventsIndex({
         filters.records === 'all'
     );
 
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'all',
-            label: 'All',
-            icon: LayoutList,
-            tone: 'primary',
-            badge: tabCounts.all || undefined,
-        },
-        {
-            id: 'open',
-            label: 'Open',
-            icon: AlertTriangle,
-            tone: 'info',
-            badge: tabCounts.open || undefined,
-        },
-        {
-            id: 'investigating',
-            label: 'Investigating',
-            icon: Search,
-            tone: 'primary',
-            badge: tabCounts.investigating || undefined,
-        },
-        {
-            id: 'corrective_actions',
-            label: 'Corrective actions',
-            icon: ListChecks,
-            tone: 'warning',
-            badge: tabCounts.corrective_actions || undefined,
-        },
-        {
-            id: 'handover',
-            label: 'Awaiting handover',
-            icon: ShieldCheck,
-            tone: 'warning',
-            badge: tabCounts.handover || undefined,
-        },
-        {
-            id: 'worksafe',
-            label: 'WorkSafe-notifiable',
-            icon: ShieldAlert,
-            tone: 'critical',
-            badge: tabCounts.worksafe || undefined,
-        },
-        {
-            id: 'monitoring',
-            label: 'Monitoring',
-            icon: Activity,
-            tone: 'success',
-            badge: tabCounts.monitoring || undefined,
-        },
-        {
-            id: 'closed',
-            label: 'Closed',
-            icon: CheckCircle2,
-            tone: 'success',
-            badge: tabCounts.closed || undefined,
-        },
+    // G3 board M6: the status views under the header, as the built tier-2 tabs (never bordered pills).
+    const STATUS_TABS = [
+        { key: 'all', label: 'All', icon: LayoutList, count: tabCounts.all ?? 0 },
+        { key: 'open', label: 'Open', icon: AlertTriangle, count: tabCounts.open ?? 0 },
+        { key: 'investigating', label: hsLabel('review_status', 'investigating'), icon: Search, count: tabCounts.investigating ?? 0 },
+        { key: 'corrective_actions', label: hsLabel('review_status', 'corrective_action'), icon: ListChecks, count: tabCounts.corrective_actions ?? 0 },
+        { key: 'monitoring', label: hsLabel('review_status', 'monitoring'), icon: Activity, count: tabCounts.monitoring ?? 0 },
+        { key: 'blocked', label: 'Blocked', icon: ShieldAlert, count: tabCounts.blocked ?? 0 },
+        { key: 'closed', label: 'Closed', icon: CheckCircle2, count: tabCounts.closed ?? 0 },
     ];
 
     /* ---- right-click context menu (mirrors the dialog Options bar) ---- */
@@ -507,7 +467,8 @@ export default function HsEventsIndex({
         filters.worksafe,
         filters.records === 'all',
     ].filter(Boolean).length;
-    // Four numbers that double as lenses; Open and Monitoring stay in the Review view filter.
+    // Four numbers that double as lenses (G3 board M6); the status views are the tier-2 tabs under the header.
+    // G3 board M6: four boxes, each a list the columns don't already show (the same lists as the G2 Overview boxes).
     const numbers: {
         key: string;
         label: string;
@@ -516,45 +477,49 @@ export default function HsEventsIndex({
         tone?: 'critical' | 'warning';
     }[] = [
         {
-            key: 'investigation_due',
-            label: 'Investigation needed',
-            value: at.investigation_due,
-            caption: 'Required, not finished',
-            tone: at.investigation_due ? 'warning' : undefined,
+            key: 'needs_owner',
+            label: 'Need an owner',
+            value: tabCounts.needs_owner ?? 0,
+            caption: 'Incidents waiting to be taken on',
+            tone: tabCounts.needs_owner ? 'warning' : undefined,
+        },
+        {
+            key: 'decide_or_tell',
+            label: 'WorkSafe decision due',
+            value: tabCounts.decide_or_tell ?? 0,
+            caption: 'High, Critical or notifiable',
+            tone: tabCounts.decide_or_tell ? 'critical' : undefined,
+        },
+        {
+            key: 'not_closed',
+            label: 'Safety reviews not closed',
+            value: tabCounts.not_closed ?? 0,
+            caption: 'Open now',
         },
         {
             key: 'awaiting_verification',
-            label: 'Waiting to be checked',
-            value: at.awaiting_verification,
-            caption: 'Actions done, not yet checked',
-        },
-        {
-            key: 'worksafe_pending',
-            label: 'WorkSafe to notify',
-            value: at.worksafe_due,
-            caption: 'Notification due',
-            tone: at.worksafe_due ? 'warning' : undefined,
-        },
-        {
-            key: 'handover',
-            label: 'Handover to accept',
-            value: at.handover_due,
-            caption: 'Waiting for Health & safety',
+            label: 'Actions to check',
+            value: tabCounts.awaiting_verification ?? 0,
+            caption: 'Done, waiting for a check',
         },
     ];
     const tableTitle =
         {
             all: 'All safety reviews',
             open: 'Open safety reviews',
-            investigating: 'Under investigation',
-            corrective_actions: 'In corrective action',
-            handover: 'Awaiting H&S acceptance',
+            investigating: hsLabel('review_status', 'investigating'),
+            corrective_actions: hsLabel('review_status', 'corrective_action'),
+            handover: hsLabel('handover_status', 'awaiting_acceptance'),
             worksafe: 'WorkSafe-notifiable',
-            monitoring: 'Monitoring',
+            monitoring: hsLabel('review_status', 'monitoring'),
             closed: 'Closed safety reviews',
             investigation_due: 'Investigation needed',
-            awaiting_verification: 'Actions awaiting verification',
+            awaiting_verification: 'Actions waiting to be checked',
             worksafe_pending: 'WorkSafe pending',
+            needs_owner: 'Need an owner',
+            decide_or_tell: 'WorkSafe decision due',
+            not_closed: 'Safety reviews not closed',
+            blocked: 'Blocked — can’t move until someone else acts',
         }[tab] ?? 'Safety reviews';
     const showOrphanNote =
         (tab === 'all' || tab === 'open') &&
@@ -564,7 +529,7 @@ export default function HsEventsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Health and safety', href: '/health-safety' },
                 { title: 'Safety reviews', href: '/health-safety/events' },
             ]}
         >
@@ -649,29 +614,6 @@ export default function HsEventsIndex({
                                     onDark
                                 />
                             )}
-                            <PageHeaderFilterSelect
-                                label="Review view"
-                                value={tab}
-                                options={[
-                                    ...TABS,
-                                    {
-                                        id: 'investigation_due',
-                                        label: 'Investigation needed',
-                                    },
-                                    {
-                                        id: 'awaiting_verification',
-                                        label: 'Actions awaiting verification',
-                                    },
-                                    {
-                                        id: 'worksafe_pending',
-                                        label: 'WorkSafe pending',
-                                    },
-                                ].map((item) => ({
-                                    value: item.id,
-                                    label: `${item.label} (${tabCounts[item.id] ?? 0})`,
-                                }))}
-                                onChange={setTab}
-                            />
                             <SafetyDateFilter
                                 label="Occurred"
                                 from={filters.from}
@@ -919,6 +861,15 @@ export default function HsEventsIndex({
                     </Note>
                 ) : null}
 
+                <TierTwoTabs
+                    tabs={STATUS_TABS}
+                    activeTab={tab}
+                    onTab={setTab}
+                    testIdPrefix="safety-reviews"
+                    ariaLabel="Safety review status"
+                    renderLink={() => null}
+                />
+
                 {/* ---- The register (pg-hsn-40) ---- */}
                 <Surface
                     title={tableTitle}
@@ -1002,7 +953,7 @@ function reviewWhere(ev: EventRow): {
     const worksafe = worksafeState(ev);
     const waits: string[] = [];
     if (ev.handover.status === 'awaiting_acceptance')
-        waits.push('Waiting for Health & safety');
+        waits.push(hsLabel('handover_status', 'awaiting_acceptance'));
     if (ev.status !== 'closed')
         waits.push(`WorkSafe: ${worksafeLabel(worksafe)}`);
     if (ev.flags.investigation_overdue) waits.push('Investigation overdue');
@@ -1211,10 +1162,10 @@ export function EventTable({
                                 <FlagBadge
                                     icon={ShieldCheck}
                                     tone="warning"
-                                    title="Actions awaiting verification"
+                                    title="Actions waiting to be checked"
                                 >
-                                    {ev.flags.awaiting_verification} awaiting
-                                    verification
+                                    {ev.flags.awaiting_verification} waiting to
+                                    be checked
                                 </FlagBadge>
                             )}
                             {ev.has_open_actions && (
@@ -1244,24 +1195,19 @@ export function EventTable({
                 aria-label="Safety reviews table"
                 className="hidden max-w-full md:block"
             >
-                <Table className="min-w-[1040px]">
+                <Table className="min-w-[1180px]">
                     <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                            {[
-                                'When',
-                                'Type',
-                                'Owner',
-                                'Site / client',
-                                'Severity',
-                                'Where it’s up to',
-                            ].map((label) => (
-                                <TableHead
-                                    key={label}
-                                    className="h-auto bg-muted/60 px-4 py-2.5 font-semibold tracking-wide text-muted-foreground uppercase"
-                                >
-                                    <span className="text-caption">{label}</span>
-                                </TableHead>
-                            ))}
+                            {['Safety review', 'When', 'Site', 'Owner', 'Status', 'Summary / where it’s up to', 'Next step'].map(
+                                (label) => (
+                                    <TableHead
+                                        key={label}
+                                        className="h-auto bg-muted/60 px-4 py-2.5 font-semibold tracking-wide text-muted-foreground uppercase"
+                                    >
+                                        <span className="text-caption">{label}</span>
+                                    </TableHead>
+                                ),
+                            )}
                             <TableHead className="h-auto w-12 bg-muted/60 px-2 py-2.5">
                                 <span className="sr-only">Options</span>
                             </TableHead>
@@ -1270,102 +1216,125 @@ export function EventTable({
                     <TableBody>
                         {rows.map((ev) => {
                             const when = ev.occurred_at ?? ev.reported_at;
-                            const category =
-                                hsLabel('review_category', ev.event_category);
-                            const place = ev.client_name ?? ev.site_name;
-                            const placeSub = ev.client_name
-                                ? ev.site_name
-                                : ev.staff_name;
-                            const where = reviewWhere(ev);
+                            const category = hsLabel('review_category', ev.event_category);
+                            const who = ev.client_name ?? ev.staff_name ?? ev.site_name;
+                            const title = who ? `${category} — ${who}` : category;
+                            const from = ev.source?.type
+                                ? ev.source.type === 'ClientIncident'
+                                    ? 'from an incident'
+                                    : `from ${ev.source.label.charAt(0).toLowerCase()}${ev.source.label.slice(1)}`
+                                : null;
+                            const open = ev.status !== 'closed';
+                            const urgent =
+                                open &&
+                                ['high', 'critical'].includes(ev.severity) &&
+                                (!ev.worksafe_decision_signed || ev.flags.worksafe_pending);
+                            // Muted text fails contrast on the tinted rows in dark mode; a softened foreground reads in
+                            // both modes without dark: colour pairs (DESIGN.md anti-pattern).
+                            const captionClass = urgent || ev.blocked ? 'text-xs text-foreground/75' : 'text-caption';
+                            const next = ev.next ?? null;
                             return (
                                 <TableRow
                                     key={ev.id}
                                     onClick={() => onOpen(ev.id)}
                                     onContextMenu={(e) => onRowCtx(e, ev)}
                                     tabIndex={0}
-                                    aria-label={`Open event ${ev.reference_number}`}
+                                    aria-label={`Open safety review ${ev.reference_number}`}
                                     onKeyDown={(e) => {
-                                        if (
-                                            e.target === e.currentTarget &&
-                                            (e.key === 'Enter' || e.key === ' ')
-                                        ) {
+                                        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
                                             e.preventDefault();
                                             e.stopPropagation();
                                             onOpen(ev.id);
                                         }
                                     }}
-                                    className="cursor-pointer align-top focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                    className={cn(
+                                        'cursor-pointer align-top focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                                        // Board M6: the urgent row tinted red, the blocked row tinted purple — never a coloured edge line.
+                                        urgent
+                                            ? 'bg-status-critical-bg/60 hover:bg-status-critical-bg'
+                                            : ev.blocked
+                                              ? 'bg-accent/60 hover:bg-accent'
+                                              : '',
+                                    )}
                                 >
+                                    <TableCell className="max-w-[18rem] px-4 py-3 whitespace-normal">
+                                        <p className="font-semibold [overflow-wrap:anywhere] text-foreground">{title}</p>
+                                        <p className={cn('mt-0.5', captionClass)}>
+                                            Safety review {ev.reference_number}
+                                            {from ? ` · ${from}` : ''}
+                                        </p>
+                                    </TableCell>
                                     <TableCell className="px-4 py-3">
                                         <p
                                             className="font-semibold text-foreground"
-                                            title={
-                                                when
-                                                    ? formatDateTime(when)
-                                                    : 'No occurrence time recorded'
-                                            }
+                                            title={when ? formatDateTime(when) : 'No occurrence time recorded'}
                                         >
-                                            {when
-                                                ? formatDateOnly(
-                                                      toDateInput(when),
-                                                  )
-                                                : 'Not recorded'}
+                                            {when ? formatDateOnly(toDateInput(when)) : 'Not recorded'}
                                         </p>
-                                        <p className="mt-0.5 text-caption text-muted-foreground">
-                                            {when ? `${formatTime(when)} · ` : ''}
-                                            {ev.reference_number}
-                                        </p>
+                                        {when ? <p className={cn('mt-0.5', captionClass)}>{formatTime(when)}</p> : null}
                                     </TableCell>
-                                    <TableCell className="max-w-[18rem] px-4 py-3 whitespace-normal">
-                                        <p className="font-semibold text-foreground">
-                                            {category}
-                                        </p>
-                                        <p className="mt-0.5 text-caption [overflow-wrap:anywhere] text-muted-foreground">
-                                            {eventContext(ev)}
-                                        </p>
-                                    </TableCell>
+                                    <TableCell className="px-4 py-3">{ev.site_name ?? 'No site recorded'}</TableCell>
                                     <TableCell className="px-4 py-3">
                                         {ev.handover.owner ? (
-                                            <PersonChip
-                                                name={ev.handover.owner.name}
-                                            />
+                                            <PersonChip name={ev.handover.owner.name} />
                                         ) : (
-                                            <StatusBadge variant="warning">
-                                                Needs an owner
-                                            </StatusBadge>
+                                            <span className={captionClass}>No owner yet</span>
                                         )}
                                     </TableCell>
-                                    <TableCell className="px-4 py-3">
-                                        <p className="font-semibold text-foreground">
-                                            {place ?? 'No site recorded'}
-                                        </p>
-                                        {placeSub ? (
-                                            <p className="mt-0.5 text-caption text-muted-foreground">
-                                                {placeSub}
-                                            </p>
-                                        ) : null}
-                                    </TableCell>
-                                    <TableCell className="px-4 py-3">
-                                        <StatusBadge
-                                            variant={hsVariant('severity', ev.severity)}
-                                        >
-                                            {hsLabel('severity', ev.severity)}
-                                        </StatusBadge>
-                                    </TableCell>
                                     <TableCell className="px-4 py-3 whitespace-normal">
-                                        <StageDots
-                                            stage={where.stage}
-                                            of={STAGE_ORDER.length}
-                                            label={where.label}
-                                            note={
-                                                where.note ? (
-                                                    <span className="whitespace-normal">
-                                                        {where.note}
-                                                    </span>
-                                                ) : undefined
-                                            }
-                                            tone={where.tone}
-                                        />
+                                        <div className="flex flex-wrap gap-1.5">
+                                            <StatusBadge status={ev.status} label={hsLabel('review_status', ev.status)} size="sm" />
+                                            {open && ['high', 'critical'].includes(ev.severity) ? (
+                                                <StatusBadge variant={hsVariant('severity', ev.severity)} size="sm">
+                                                    {hsLabel('severity', ev.severity)}
+                                                </StatusBadge>
+                                            ) : null}
+                                            {open && !ev.worksafe_decision_signed ? (
+                                                <StatusBadge variant="warning" size="sm">
+                                                    WorkSafe: decide
+                                                </StatusBadge>
+                                            ) : null}
+                                            {open && ev.flags.worksafe_pending ? (
+                                                <StatusBadge variant="critical" size="sm">
+                                                    Tell WorkSafe
+                                                </StatusBadge>
+                                            ) : null}
+                                            {ev.next?.key === 'revised_action' ? (
+                                                <StatusBadge variant="warning" size="sm">
+                                                    Revised action needed
+                                                </StatusBadge>
+                                            ) : null}
+                                            {ev.blocked ? (
+                                                <StatusBadge variant="info" size="sm">
+                                                    Blocked
+                                                </StatusBadge>
+                                            ) : null}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="max-w-[16rem] px-4 py-3 whitespace-normal">
+                                        <p className="text-sm">{ev.summary ?? hsLabel('review_status', ev.status)}</p>
+                                        {ev.blocked ? <p className={cn('mt-0.5', captionClass)}>{ev.blocked}</p> : null}
+                                    </TableCell>
+                                    <TableCell className="max-w-[14rem] px-4 py-3 whitespace-normal">
+                                        {next ? (
+                                            next.can ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        router.visit(next.href);
+                                                    }}
+                                                >
+                                                    {next.label}
+                                                </Button>
+                                            ) : (
+                                                <span className={captionClass}>{next.who}</span>
+                                            )
+                                        ) : (
+                                            <span className={captionClass}>Nothing left to do</span>
+                                        )}
                                     </TableCell>
                                     <TableCell className="px-2 py-3 text-right">
                                         <Button
@@ -1378,10 +1347,7 @@ export function EventTable({
                                                 onRowCtx(event, ev);
                                             }}
                                         >
-                                            <MoreVertical
-                                                aria-hidden
-                                                className="size-4"
-                                            />
+                                            <MoreVertical aria-hidden className="size-4" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>

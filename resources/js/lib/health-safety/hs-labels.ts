@@ -109,6 +109,15 @@ export const HS_LABELS = {
         original_context_restricted: 'Hidden — you don’t have access',
         unavailable: 'Not available',
     },
+    // B1/B7 (31 Oct 2026): the check result, the owner state and the handover, one set of words everywhere.
+    action_check: { worked: 'Checked — it worked', not_worked: 'Checked — it didn’t work' },
+    owner_state: { unassigned: 'No owner yet', replacement_needed: 'Owner needs replacing' },
+    handover_status: {
+        not_ready: 'Not passed on yet',
+        awaiting_acceptance: 'Waiting for Health and safety to take it on',
+        accepted: 'Taken on by Health and safety',
+        not_required: 'Not needed',
+    },
 } as const;
 
 export type HsLabelDomain = keyof typeof HS_LABELS;
@@ -173,6 +182,20 @@ const VARIANTS: Partial<Record<HsLabelDomain, Record<string, StatusVariant>>> = 
 export function hsVariant(domain: HsLabelDomain, value: Maybe<string>): StatusVariant {
     const key = String(value ?? '').trim().toLowerCase();
     return VARIANTS[domain]?.[key] ?? 'neutral';
+}
+
+/** An action's one status on every surface: a checked action says whether it worked (mirrors HsLabels::actionStatus). */
+export function hsActionStatus(action: {
+    status: Maybe<string>;
+    effectiveness_confirmed?: boolean | null;
+}): { label: string; variant: StatusVariant } {
+    const verified = String(action.status ?? '').trim().toLowerCase() === 'verified';
+    if (verified && typeof action.effectiveness_confirmed === 'boolean') {
+        return action.effectiveness_confirmed
+            ? { label: HS_LABELS.action_check.worked, variant: 'success' }
+            : { label: HS_LABELS.action_check.not_worked, variant: 'critical' };
+    }
+    return hsBadge('action_status', action.status);
 }
 
 /** `{ label, variant }` ready for `<StatusBadge variant={…}>{label}</StatusBadge>`. */

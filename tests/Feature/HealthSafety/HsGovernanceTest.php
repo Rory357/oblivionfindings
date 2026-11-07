@@ -397,6 +397,29 @@ class HsGovernanceTest extends TestCase
     }
 
     /** @param list<string> $permissionKeys */
+    public function test_report_dates_are_checked_and_default_to_the_last_twelve_months(): void
+    {
+        // Readiness audit O4 (6 Nov 2026): a bad date is a plain answer, not a server error, and no dates means 12 months.
+        $site = Site::factory()->create();
+        Permission::query()->firstOrCreate(['key' => 'governance.view'], ['description' => 'View governance', 'group' => 'governance']);
+        $viewer = $this->siteBoundViewer($site, ['governance.view', 'hazards.view', 'healthSafety.viewAllSites']);
+        $this->assertTrue($viewer->canDo('governance.view'));
+        HsEvent::factory()->create(['site_id' => $site->id, 'worksafe_notifiable' => true, 'worksafe_status' => 'pending', 'reported_at' => now()->subMonths(2)]);
+        HsEvent::factory()->create(['site_id' => $site->id, 'worksafe_notifiable' => true, 'worksafe_status' => 'pending', 'reported_at' => now()->subYears(2)]);
+
+        $this->actingAs($viewer)->getJson('/health-safety/reports/worksafe-register?from=not-a-date')
+            ->assertUnprocessable()->assertJsonValidationErrors(['from' => 'Choose a real start date.']);
+        $this->actingAs($viewer)->getJson('/health-safety/reports/worksafe-register?from=2026-05-01&to=2026-04-01')
+            ->assertUnprocessable()->assertJsonValidationErrors(['to']);
+
+        $this->actingAs($viewer)->getJson('/health-safety/reports/worksafe-register')->assertOk()->assertJsonPath('summary.total', 1);
+        $this->actingAs($viewer)->getJson('/health-safety/reports/worksafe-register?from='.now()->subYears(3)->toDateString())
+            ->assertOk()->assertJsonPath('summary.total', 2);
+        // The end day counts in full.
+        $this->actingAs($viewer)->getJson('/health-safety/reports/worksafe-register?from='.now()->subMonths(3)->toDateString().'&to='.now()->subMonths(2)->toDateString())
+            ->assertOk()->assertJsonPath('summary.total', 1);
+    }
+
     private function siteBoundViewer(Site $site, array $permissionKeys = []): User
     {
         $viewer = User::factory()->create(['approved_at' => now()]);

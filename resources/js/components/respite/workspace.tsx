@@ -1,37 +1,17 @@
 /**
- * The Respite workspace orchestrator: a rostering-style ops hero, the reused
- * rostering TabStrip, URL-synced tabs (?tab=), and the active pane. Detail
- * views open in a pop-up; nothing in here navigates to another page.
+ * The Respite workspace orchestrator: the Event Horizon header with the
+ * workspace's views on its rail, URL-synced tabs (?tab=), and the active
+ * pane. Detail views open in a pop-up; nothing in here navigates to another
+ * page.
  */
 import {
     AddClientDialog,
     type ClientWizardForm,
 } from '@/components/clients/add-client-dialog';
 import { RestraintEventWizard } from '@/components/health-safety/restraint-event-wizard';
-import {
-    PageHero,
-    type PageHeroBadge,
-    type PageHeroMetaItem,
-    type PageHeroStat,
-} from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+import { PageLayout } from '@/components/page';
 import { ReasonDialog } from '@/components/reason-dialog';
-import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
-import { router, usePage } from '@inertiajs/react';
-import {
-    BedDouble,
-    CalendarCheck,
-    CalendarDays,
-    ClipboardCheck,
-    Clock,
-    Home,
-    Inbox,
-    LayoutDashboard,
-    ListChecks,
-    Plus,
-    Users,
-    Zap,
-} from 'lucide-react';
+import { router } from '@inertiajs/react';
 import { useCallback, useEffect, useState } from 'react';
 import { respiteActions } from './actions';
 import { RespiteDetailModal, type RespiteDetail } from './detail-modal';
@@ -53,6 +33,7 @@ import { ReferralsPane } from './panes/referrals';
 import { RequestsPane } from './panes/requests';
 import { StaysPane } from './panes/stays';
 import { TasksPane } from './panes/tasks';
+import { RespiteHeader } from './respite-header';
 import {
     RESPITE_TABS,
     type RespiteBookingRow,
@@ -112,10 +93,6 @@ export function RespiteWorkspace({
     data: RespiteWorkspaceData;
     can: RespiteCan;
 }) {
-    const page = usePage<{ auth?: { user?: { name?: string } } }>();
-    const firstName =
-        (page.props.auth?.user?.name ?? '').split(' ')[0] || 'there';
-
     const [tab, setTab] = useState<RespiteTab>(() => readTab());
     const [detail, setDetail] = useState<RespiteDetail | null>(null);
     const [intakeOpen, setIntakeOpen] = useState(false);
@@ -206,7 +183,6 @@ export function RespiteWorkspace({
         });
     };
 
-    const stats = data.stats;
     const openTasks = data.tasks.filter(
         (t) =>
             !['completed', 'approved', 'skipped', 'rejected'].includes(
@@ -214,121 +190,21 @@ export function RespiteWorkspace({
             ),
     ).length;
 
-    const meta: PageHeroMetaItem[] = [
-        {
-            icon: Home,
-            label: `${data.homes.length} home${data.homes.length === 1 ? '' : 's'}`,
-        },
-        {
-            icon: BedDouble,
-            label: `${stats.bedsOccupied}/${stats.bedsTotal} respite beds`,
-        },
-        { icon: Users, label: `${stats.inHouse} in house` },
-    ];
-
-    const badges: PageHeroBadge[] = [];
-    if (stats.crisisOpen > 0)
-        badges.push({
-            icon: Zap,
-            tone: 'critical',
-            label: `${stats.crisisOpen} crisis`,
-            onClick: () => goTab('referrals'),
-        });
-    if (stats.awaitingReview > 0)
-        badges.push({
-            icon: Clock,
-            tone: 'warning',
-            label: `${stats.awaitingReview} awaiting review`,
-            onClick: () => goTab('requests'),
-        });
-    if (stats.newReferrals > 0)
-        badges.push({
-            icon: Inbox,
-            tone: 'info',
-            label: `${stats.newReferrals} new today`,
-            onClick: () => goTab('referrals'),
-        });
-
-    const heroStats: PageHeroStat[] = [
-        { label: 'New referrals', value: stats.newReferrals },
-        { label: 'Awaiting review', value: stats.awaitingReview },
-        { label: 'Confirmed', value: stats.confirmedUpcoming },
-        { label: 'In house', value: stats.inHouse },
-    ];
-
-    const tabs: RosterTabItem[] = [
-        {
-            id: 'overview',
-            label: 'Overview',
-            icon: LayoutDashboard,
-            tone: 'primary',
-        },
-        {
-            id: 'referrals',
-            label: 'Referrals',
-            icon: Inbox,
-            tone: 'info',
-            badge: stats.newReferrals || undefined,
-        },
-        {
-            id: 'requests',
-            label: 'Booking Requests',
-            icon: ClipboardCheck,
-            tone: 'warning',
-            badge: stats.awaitingReview || undefined,
-        },
-        {
-            id: 'bookings',
-            label: 'Approved Bookings',
-            icon: CalendarCheck,
-            tone: 'primary',
-            badge: stats.confirmedUpcoming || undefined,
-        },
-        { id: 'calendar', label: 'Calendar', icon: CalendarDays, tone: 'info' },
-        {
-            id: 'stays',
-            label: 'Stays',
-            icon: Home,
-            tone: 'success',
-            badge: stats.inHouse || undefined,
-        },
-        {
-            id: 'tasks',
-            label: 'Tasks',
-            icon: ListChecks,
-            tone: 'violet',
-            badge: openTasks || undefined,
-        },
-    ];
-
     return (
-        <div className="flex flex-col gap-4 p-4 md:p-6">
-            <PageHero
-                category="ops"
-                icon={Home}
-                title={`Kia ora, ${firstName}`}
-                description={`${stats.toTriage} referral${stats.toTriage === 1 ? '' : 's'} to triage, ${stats.awaitingReview} request${stats.awaitingReview === 1 ? '' : 's'} awaiting sign-off, and ${stats.inHouse} guest${stats.inHouse === 1 ? '' : 's'} in house.`}
-                meta={meta}
-                badges={badges}
-                stats={heroStats}
-                actions={
-                    can.create ? (
-                        <PageHeaderPrimaryButton
-                            icon={Plus}
-                            onClick={() => setIntakeOpen(true)}
-                        >
-                            New referral
-                        </PageHeaderPrimaryButton>
-                    ) : undefined
-                }
-            />
-
-            <TabStrip
-                items={tabs}
-                value={tab}
-                onChange={(v) => goTab(v as RespiteTab)}
-            />
-
+        <PageLayout
+            hero={
+                <RespiteHeader
+                    stats={data.stats}
+                    homeCount={data.homes.length}
+                    openTasks={openTasks}
+                    tab={tab}
+                    onTab={goTab}
+                    onAddReferral={
+                        can.create ? () => setIntakeOpen(true) : undefined
+                    }
+                />
+            }
+        >
             <div>
                 {tab === 'overview' && (
                     <OverviewPane data={data} goTab={goTab} />
@@ -520,6 +396,6 @@ export function RespiteWorkspace({
                     onConfirm={runReason}
                 />
             ) : null}
-        </div>
+        </PageLayout>
     );
 }

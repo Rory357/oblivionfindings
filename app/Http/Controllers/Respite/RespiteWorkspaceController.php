@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Respite;
 
 use App\Domain\Governance\Models\NotifiableIncident;
+use App\Enums\ClientGender;
 use App\Http\Controllers\Controller;
 use App\Models\AssetGeofence;
 use App\Models\BehaviourSupportPlan;
@@ -24,6 +25,8 @@ use App\Services\Respite\RespiteMedicalDisclosure;
 use App\Services\Respite\RespiteStayScope;
 use App\Services\UserSiteAccessService;
 use App\Support\Respite\RespiteFundingSource;
+use App\Support\Respite\RespiteWallClock;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
@@ -212,7 +215,7 @@ class RespiteWorkspaceController extends Controller
                         'id' => $i->id,
                         'client_id' => $i->client_id,
                         'reference' => $ref,
-                        'label' => $ref.' · '.ucfirst(str_replace('_', ' ', (string) $i->type)).' · '.optional($i->occurred_at)->format('d M Y'),
+                        'label' => $ref.' · '.ucfirst(str_replace('_', ' ', (string) $i->type)).' · '.($i->occurred_at ? WorkerClock::display($i->occurred_at, 'd M Y') : ''),
                     ];
                 })
                 ->all(),
@@ -269,6 +272,8 @@ class RespiteWorkspaceController extends Controller
             'preferred_name',
             'date_of_birth',
             'gender',
+            'gender_description',
+            'gender_recorded_as',
             'preferred_pronouns',
             'status',
             'phone',
@@ -409,7 +414,8 @@ class RespiteWorkspaceController extends Controller
             'last_name' => $client->last_name ?? '',
             'preferred_name' => $client->preferred_name ?? '',
             'date_of_birth' => $client->date_of_birth?->toDateString() ?? '',
-            'gender' => $client->gender ?? '',
+            // gender_recorded_as is shown as a "please choose" notice; the wizard never sends it back.
+            ...ClientGender::wizardValues($client->gender, $client->gender_description, $client->gender_recorded_as),
             'preferred_pronouns' => $client->preferred_pronouns ?? '',
             'nhi_number' => $client->nhi_number ?? '',
             'phone' => $client->phone ?? '',
@@ -879,7 +885,7 @@ class RespiteWorkspaceController extends Controller
             return null;
         }
 
-        return Carbon::parse($start)->startOfDay()->diffInDays(Carbon::parse($end)->startOfDay());
+        return RespiteWallClock::nights(Carbon::parse($start), Carbon::parse($end));
     }
 
     private function fundingLabel(?string $source, ?string $reference): ?string

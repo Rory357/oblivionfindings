@@ -52,7 +52,12 @@ class SafeguardingAttachmentController extends Controller
     {
         $actualConcern = $attachment->concern()->firstOrFail();
         abort_unless($actualConcern->is($concern), 404);
-        $this->authorize('view', $actualConcern);
+        // A need-to-know concern's files follow its page: someone who sees only its locked shell gets none of them.
+        $this->authorize('viewDetail', $actualConcern);
+        // P3: someone who sees the concern only as its reporter gets only the files they added themselves.
+        if (app(\App\Policies\SafeguardingConcernPolicy::class)->isReporterOnly($request->user(), $actualConcern)) {
+            abort_unless((int) $attachment->uploaded_by === (int) $request->user()->id, 403);
+        }
 
         // Sensitive evidence is need-to-know.
         if ($attachment->is_sensitive) {

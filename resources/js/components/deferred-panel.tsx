@@ -82,7 +82,11 @@ export function DeferredPanel<T extends Values>({
         const offFinish = router.on('finish', (event) => {
             const visit = event.detail.visit;
             if (!ours(visit.only) || visit.cancelled || visit.interrupted) return;
-            if (!hasAll(answered ?? latestProps.current, keys)) setMissing(true);
+            // Only the keys this visit asked for. A panel whose props load in two background groups must not
+            // fail when the faster group lands first; the slower group's own visit (or the give-up timer) decides
+            // its keys.
+            const asked = keys.filter((key) => (visit.only ?? []).includes(key));
+            if (!hasAll(answered ?? latestProps.current, asked)) setMissing(true);
         });
 
         return () => {

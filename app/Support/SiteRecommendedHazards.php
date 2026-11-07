@@ -17,13 +17,13 @@ class SiteRecommendedHazards
     {
         return [
             self::item('slip_trip_fall', 'Slip / trip hazards', 'Loose mats, wet floors, cluttered walkways.'),
-            self::item('hot_water_temperature', 'Hot water temperature', 'Scald risk above 50C in bathrooms or kitchens.'),
+            self::item('hot_water_temperature', 'Hot water temperature', 'Scald risk if hot water at the tap is above 45 °C, the limit for care settings, in bathrooms or kitchens.'),
             self::item('medication_storage_access', 'Medication storage access', 'Unlocked cabinet, key control, or access concern.'),
             self::item('fire_electrical', 'Fire / electrical', 'Overloaded sockets, damaged leads, expired alarms.'),
             self::item('manual_handling', 'Manual handling', 'Transfers, lifting, equipment, or room layout risk.'),
             self::item('security_behaviour', 'Behavioural / security', 'Entry, privacy, aggression, or lone-worker concerns.'),
             self::item('outdoor_garden', 'Outdoor / gardening hazards', 'Uneven paths, tools, weeds, or poor lighting.'),
-            self::item('cleaning_chemicals', 'Cleaning chemicals storage', 'COSHH-style storage, labels, and locked access.'),
+            self::item('cleaning_chemicals', 'Cleaning chemicals storage', 'Hazardous substances stored, labelled and locked away as the Hazardous Substances Regulations (HSWA and HSNO) require, with safety data sheets to hand.'),
             self::item('bathroom_safety', 'Bathroom safety', 'Grab rails, non-slip surfaces, shower access.'),
         ];
     }
@@ -46,7 +46,7 @@ class SiteRecommendedHazards
             self::item('fire_electrical', 'Fire / electrical', 'Overloaded sockets, damaged leads, expired alarms.'),
             self::item('manual_handling', 'Manual handling', 'Transfers, lifting, equipment, or room layout risk.'),
             self::item('equipment_guarding', 'Equipment guarding', 'Missing guards, lockout gaps, or damaged safety controls.'),
-            self::item('cleaning_chemicals', 'Cleaning chemicals storage', 'COSHH-style storage, labels, and locked access.'),
+            self::item('cleaning_chemicals', 'Cleaning chemicals storage', 'Hazardous substances stored, labelled and locked away as the Hazardous Substances Regulations (HSWA and HSNO) require, with safety data sheets to hand.'),
             self::item('ppe_availability', 'PPE availability', 'Missing, expired, or unsuitable PPE for facility tasks.'),
         ];
     }

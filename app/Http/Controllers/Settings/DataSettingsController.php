@@ -29,17 +29,15 @@ class DataSettingsController extends Controller
     private const PROCESSORS_KEY = 'settings.data.processors';
 
     /**
-     * @var array<string, array{label: string, model_type: string, default: string}>
+     * Only what the weekly clean-up (oblivion:prune-retention) actually enforces. Rows for timesheets, closed incidents,
+     * archived clients, notifications, session logs and trash were removed (readiness audit F7, 6 Nov 2026): nothing
+     * acted on them, and "Closed incidents: 2 years" was below the 5-year HSWA duty. Records are never deleted here.
+     *
+     * @var array<string, array{label: string, model_type: string, default: string, options: list<string>}>
      */
     private const RETENTION_ROWS = [
-        'audit-logs' => ['label' => 'Audit logs', 'model_type' => 'audit_logs', 'default' => '5yr'],
-        'timeline-events' => ['label' => 'Timeline events', 'model_type' => 'timeline_events', 'default' => '5yr'],
-        'timesheets' => ['label' => 'Completed timesheets', 'model_type' => 'timesheets', 'default' => '7yr'],
-        'incidents' => ['label' => 'Closed incidents', 'model_type' => 'incidents', 'default' => '5yr'],
-        'archived-clients' => ['label' => 'Archived clients', 'model_type' => 'archived_clients', 'default' => 'never'],
-        'notifications' => ['label' => 'Old notifications', 'model_type' => 'notifications', 'default' => '90d'],
-        'session-logs' => ['label' => 'Session logs', 'model_type' => 'session_logs', 'default' => '90d'],
-        'deleted-docs' => ['label' => 'Deleted documents (trash)', 'model_type' => 'deleted_documents', 'default' => '30d'],
+        'audit-logs' => ['label' => 'Audit logs', 'model_type' => 'audit_logs', 'default' => '5yr', 'options' => ['1yr', '2yr', '5yr', '7yr', 'forever']],
+        'timeline-events' => ['label' => 'Timeline events', 'model_type' => 'timeline_events', 'default' => '5yr', 'options' => ['2yr', '5yr', '7yr', 'forever']],
     ];
 
     /**
@@ -143,7 +141,8 @@ class DataSettingsController extends Controller
         $values = is_array($validated['values']) ? $validated['values'] : [];
 
         foreach (self::RETENTION_ROWS as $id => $config) {
-            $selectedValue = isset($values[$id]) && is_string($values[$id]) ? $values[$id] : $config['default'];
+            $selectedValue = isset($values[$id]) && is_string($values[$id]) && in_array($values[$id], $config['options'], true)
+                ? $values[$id] : $config['default'];
 
             DataRetentionPolicy::updateOrCreate(
                 ['model_type' => $config['model_type']],

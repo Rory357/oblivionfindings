@@ -102,23 +102,38 @@ final class ChatSearchController extends Controller
             ->with(['conversation.client', 'conversation.participants.user', 'sender', 'reactions'])->orderByDesc('ops_messages.id')->limit(501)->get();
         $items = [];
         $floor = null;
-        $allowed = [];
-        foreach ($rows->take(500) as $message) {
-            $floor = $message->id;
-            // Recheck current membership before projecting any result content (once per conversation).
-            if (! ($allowed[$message->conversation_id] ??= $this->access->allows($viewer, $message->conversation)) || ! $this->access->messages($message->conversation, $viewer)->whereKey($message->id)->exists()) {
-                continue;
-            }
-            $projection = $this->projection->message($message, $viewer);
-            if ($term !== '') {
-                $searchable = collect($projection['attachments'])->pluck('name')->concat(collect($projection['legacy_attachments'])->pluck('name'))->prepend($projection['content']);
-                if (! $searchable->contains(fn ($text) => mb_stripos($text ?? '', $term) !== false)) {
-                    continue;
+        $candidates = $rows->take(500);
+        // Recheck current membership and each message's history boundary before projecting any result
+        // content: one allows() and one boundary query per conversation instead of per row.
+        $visibleIds = [];
+        foreach ($candidates->groupBy('conversation_id') as $group) {
+            $conversation = $group->first()->conversation;
+            if ($this->access->allows($viewer, $conversation)) {
+                foreach ($this->access->messages($conversation, $viewer)->whereIn('id', $group->pluck('id'))->pluck('id') as $id) {
+                    $visibleIds[(int) $id] = true;
                 }
             }
-            $items[] = ['id' => $message->id, 'kind' => $data['kind'] === 'files' ? 'file' : 'message', 'conversation' => $labels[$message->conversation_id], 'message' => $projection];
-            if (count($items) === 50) {
-                break;
+        }
+        // Projected in batches (same output as one message at a time), in scan order.
+        foreach ($candidates->chunk(100) as $chunk) {
+            $visible = $chunk->filter(fn ($message) => isset($visibleIds[$message->id]))->values();
+            $projected = $visible->isEmpty() ? collect() : $this->projection->messages($visible, $viewer)->keyBy('id');
+            foreach ($chunk as $message) {
+                $floor = $message->id;
+                if (! isset($visibleIds[$message->id])) {
+                    continue;
+                }
+                $projection = $projected[$message->id];
+                if ($term !== '') {
+                    $searchable = collect($projection['attachments'])->pluck('name')->concat(collect($projection['legacy_attachments'])->pluck('name'))->prepend($projection['content']);
+                    if (! $searchable->contains(fn ($text) => mb_stripos($text ?? '', $term) !== false)) {
+                        continue;
+                    }
+                }
+                $items[] = ['id' => $message->id, 'kind' => $data['kind'] === 'files' ? 'file' : 'message', 'conversation' => $labels[$message->conversation_id], 'message' => $projection];
+                if (count($items) === 50) {
+                    break 2;
+                }
             }
         }
 

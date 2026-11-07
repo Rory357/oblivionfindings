@@ -16,6 +16,9 @@ use App\Services\Clients\ClientProfileSectionAccess;
 use App\Services\Medication\MarLinkService;
 use App\Services\Tasks\Providers\MedicationReviewChangeProvider;
 use App\Services\Tasks\Providers\MedicationReviewProvider;
+use Carbon\Exceptions\InvalidFormatException;
+use DateTimeInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class ActionsAggregator
@@ -330,11 +333,32 @@ class ActionsAggregator
                 'info' => 2,
                 default => 3,
             },
-            'due_at' => $dueAt?->toISOString(),
+            'due_at' => $this->isoInstant($dueAt),
             'summary' => $summary,
             'deep_link' => $deepLink,
             'source_id' => $sourceId,
         ];
+    }
+
+    /**
+     * Model fields arrive as Carbon, but All Tasks rows (medication reviews)
+     * carry their due time as an ISO string. Both become one ISO instant, so a
+     * medication review no longer turns the person's profile into a 500.
+     */
+    private function isoInstant(mixed $value): ?string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return Carbon::instance($value)->toISOString();
+        }
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->toISOString();
+        } catch (InvalidFormatException) {
+            return null;
+        }
     }
 
     private function cap(Collection $items, int $limit): Collection

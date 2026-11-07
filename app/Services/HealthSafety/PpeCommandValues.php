@@ -57,7 +57,7 @@ final class PpeCommandValues
             self::invalid($field, 'Use a real YYYY-MM-DD calendar date.');
         }
         if ($past && $value > now(config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC')->toDateString()) {
-            self::invalid($field, 'A completed fact cannot be dated in the future.');
+            self::invalid($field, 'This date is in the future. Enter the day it actually happened.');
         }
         return $value;
     }

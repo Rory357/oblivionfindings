@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Sites\SiteContactRules;
 use App\Models\Site;
 use App\Models\SiteContact;
 use App\Services\Eligibility\WorkforceRequirementMapping;
+use App\Support\SiteGeofenceLimits;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -13,6 +15,16 @@ use Illuminate\Validation\Validator;
 
 class UpdateSiteRequest extends FormRequest
 {
+    /** The lists update() can replace (see the `collections` rule). */
+    public const COLLECTIONS = ['contacts', 'rooms', 'resources', 'zones', 'assets', 'checklists'];
+
+    protected function prepareForValidation(): void
+    {
+        if (is_array($this->input('contacts'))) {
+            $this->merge(['contacts' => SiteContactRules::withoutLinkedDetails($this->input('contacts'))]);
+        }
+    }
+
     public function authorize(): bool|Response
     {
         $user = $this->user();
@@ -53,14 +65,14 @@ class UpdateSiteRequest extends FormRequest
             'risk_review_date' => ['nullable', 'date'],
             'primary_contact_user_id' => ['nullable', 'exists:users,id'],
             'contacts' => ['nullable', 'array'],
-            'contacts.*.id' => ['nullable', 'integer'],
-            'contacts.*.type' => ['required_with:contacts.*', 'string', Rule::in(SiteContact::TYPES)],
-            'contacts.*.name' => ['required_with:contacts.*', 'string', 'max:255'],
-            'contacts.*.role' => ['nullable', 'string', 'max:255'],
-            'contacts.*.phone' => ['nullable', 'string', 'max:60'],
-            'contacts.*.email' => ['nullable', 'string', 'email', 'max:255'],
-            'contacts.*.is_primary' => ['nullable', 'boolean'],
-            'contacts.*.notes' => ['nullable', 'string', 'max:5000'],
+            ...SiteContactRules::rows('contacts.*'),
+
+            // Lists the Edit site pop-up replaces. A list it sends is synced
+            // in full; one named here but sent empty is cleared (a multipart
+            // form drops empty arrays). A list neither sent nor named is left
+            // exactly as it is, so an edit never blanks what it didn't load.
+            'collections' => ['nullable', 'array'],
+            'collections.*' => ['string', Rule::in(self::COLLECTIONS)],
 
             'rooms' => ['nullable', 'array'],
             'rooms.*.id' => ['nullable', 'integer'],
@@ -71,7 +83,7 @@ class UpdateSiteRequest extends FormRequest
             'resources' => ['nullable', 'array'],
             'resources.*.id' => ['nullable', 'integer'],
             'resources.*.name' => ['required_with:resources.*', 'string', 'max:255'],
-            'resources.*.resource_type' => ['nullable', 'string', 'max:60'],
+            'resources.*.resource_type' => ['nullable', 'string', 'in:boardroom,training_room,meeting_room,other'],
             'resources.*.capacity' => ['nullable', 'integer', 'min:0'],
 
             'zones' => ['nullable', 'array'],
@@ -88,11 +100,25 @@ class UpdateSiteRequest extends FormRequest
             'checklists.*.frequency' => ['nullable', 'string', 'max:30'],
             'checklists.*.assigned_to_user_id' => ['nullable', 'exists:users,id'],
 
+            // New files from the pop-up's Documents step (added to the Site's
+            // documents; existing files are managed on the Documents tab).
+            'documents' => ['nullable', 'array'],
+            'documents.*.file' => ['required_with:documents.*', 'file', 'max:51200', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'],
+            'documents.*.title' => ['nullable', 'string', 'max:200'],
+            'documents.*.category' => ['nullable', 'string', 'max:60'],
+            'documents.*.folder' => ['nullable', 'string', 'max:255'],
+            'documents.*.version' => ['nullable', 'string', 'max:30'],
+            'documents.*.effective_date' => ['nullable', 'date'],
+            'documents.*.expiry_date' => ['nullable', 'date'],
+            'documents.*.notes' => ['nullable', 'string', 'max:2000'],
+
             // Site capacity (column already exists on sites)
             'total_capacity' => ['nullable', 'integer', 'min:0'],
 
-            // Rostering — coverage rules (each card fans out to one
-            // SiteCoverageRequirement row per selected day on store).
+            // Rostering — accepted for the shared payload shape, never saved
+            // here: coverage and staff requirements are edited on the Site's
+            // Shift coverage and Staff requirements tabs, which keep their
+            // own checks (eligibility rechecks, identity, service contexts).
             'coverage' => ['nullable', 'array'],
             'coverage.*.name' => ['required_with:coverage', 'string', 'max:255'],
             'coverage.*.coverage_type' => ['required_with:coverage', 'in:day,evening,overnight,custom'],
@@ -119,10 +145,11 @@ class UpdateSiteRequest extends FormRequest
             'credentials.*.applicability_mode' => ['nullable', 'in:all_workers,minimum_staff'],
             'credentials.*.minimum_qualified_staff' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
 
-            // Geofence — circle seeded into the shared AssetGeofence
+            // Geofence — a circle added when the Site has none yet. An existing
+            // boundary keeps its versioned Shared boundaries workflow.
             'geofence' => ['nullable', 'array'],
             'geofence.mode' => ['nullable', 'in:radius,draw'],
-            'geofence.radius_m' => ['nullable', 'integer', 'min:25', 'max:2000'],
+            'geofence.radius_m' => SiteGeofenceLimits::radiusRules(),
             'geofence.breach_type' => ['nullable', 'in:enter,exit,both'],
             'geofence.is_active' => ['nullable', 'boolean'],
 

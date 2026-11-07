@@ -274,14 +274,14 @@
       "id": 39,
       "description": "Separate investigation access and settings audits, holds and offboarding.",
       "design_status": "approved",
-      "implementation_status": "Partial: built 20 October (uncommitted) - chat.investigate restricted key (no role grants), case/reason/expiry-limited read-only investigation view with separate investigation audit, preservation holds blocking edit/removal/disposal, offboarding of expired access with ownership/work reassignment, settings audit. 21 Oct: 9 Pest tests/176 assertions and 15 vitest checks pass; full tsc ran out of memory (not a type error) and remains unverified; browser walk vs mockup outstanding.",
+      "implementation_status": "Partial: built 20 October (uncommitted) - chat.investigate restricted key (no role grants), case/reason/expiry-limited read-only investigation view with separate investigation audit, preservation holds blocking edit/removal/disposal, offboarding of expired access with ownership/work reassignment, settings audit. 21 Oct: 9 Pest tests/176 assertions and 15 vitest checks pass; full tsc ran out of memory (not a type error) and remains unverified; browser walk vs mockup outstanding. 22 Oct (Stephan approved): investigators keep their own page; access stays per conversation and time-limited; one case may now grant several of a person’s private staff conversations in one atomic step (one grant row per conversation, linked by case_batch, max 20, family refused); an active case exports as a PDF watermarked on every page with case reference, investigator, NZ export time and ‘Confidential — investigation record’, including removed messages and edit history with attachment names only, logged per conversation with the SHA-256 hash, refused after expiry/ending and rate-limited 5 per 10 minutes. Covered by ChatInvestigationCaseExportTest (Pest) and investigation-case-export.test.tsx (vitest).",
       "mockup_evidence": "M22/investigator, audit, holds, offboarding; case/reason gate, separate audit domains, preservation and access expiry"
     },
     {
       "id": 40,
       "description": "Connect portal administration to approved relationships and effective policy.",
       "design_status": "approved",
-      "implementation_status": "Partial: built 20 October (uncommitted) - read-only client relationship view (approved relatives, named workers, authorised cover, effective policy) for settings admins who can view the client, linking to portal-users and family-portal administration. 21 Oct: covered by the passing governance Pest/vitest runs; browser walk outstanding.",
+      "implementation_status": "Partial: built 20 October (uncommitted) - read-only client relationship view (approved relatives, named workers, authorised cover, effective policy) for settings admins who can view the client, linking to portal-users and family-portal administration. 21 Oct: covered by the passing governance Pest/vitest runs; browser walk outstanding. 22 Oct: unchanged by the approved investigator follow-ups (multi-conversation case grants, controlled export; see item 39); portal administration still never reaches private staff content.",
       "mockup_evidence": "M22/relationships; approved relatives, named workers/cover, effective Chat policy link"
     },
     {

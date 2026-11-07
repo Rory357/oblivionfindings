@@ -210,6 +210,8 @@ test('foreign and unassigned direct Site routes are concealed before validation 
 
     $routes = [
         ['GET', 'sites.edit', []],
+        ['GET', 'sites.edit-details', []],
+        ['GET', 'sites.contacts.staff', []],
         // Deliberately invalid: object concealment must precede FormRequest validation.
         ['PUT', 'sites.update', []],
         ['PATCH', 'sites.contact-info.update', ['phone' => 'PRIVATE-FOREIGN-PHONE']],
@@ -412,10 +414,11 @@ test('Site Profile exposes only current visible staff and separates responsible 
         ['approved_at' => null],
     );
 
+    // The Edit site pop-up's staff list (to-do #11 retired the edit page).
     $response = $this->actingAs($manager)
-        ->get(route('sites.edit', $this->visibleSite))
+        ->getJson(route('sites.edit-details', $this->visibleSite))
         ->assertOk();
-    $userIds = collect($response->inertiaProps('users'))->pluck('id');
+    $userIds = collect($response->json('reference.users'))->pluck('id');
     expect($userIds)
         ->toContain($manager->id, $visibleStaff->id)
         ->not->toContain($hiddenStaff->id, $formerStaff->id, $unapprovedStaff->id);

@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\CurrentAuthorizationReads;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -60,8 +61,26 @@ class LoneWorkerSessionService
                 abort_unless(in_array((int) $shift->site_id, $sites, true) && in_array((int) $shiftClient->site_id, $sites, true), 403);
                 throw ValidationException::withMessages(['shift_id' => 'The rostered Shift has conflicting Site and Client provenance.']);
             }
-            if ($shift && ! $own && ($shift->client_id === null ? $clientId !== null : (int) $shift->client_id !== (int) $clientId)) {
-                throw ValidationException::withMessages(['client_id' => 'The selected Client must exactly match the rostered Shift.']);
+            if (isset($validated['site_id']) && ! in_array((int) $validated['site_id'], $sites, true)) {
+                abort(403, UserSiteAccessService::DEFAULT_MESSAGE);
+            }
+            if ($client && ($client->site_id === null || ! in_array((int) $client->site_id, $sites, true))) {
+                abort(403, UserSiteAccessService::DEFAULT_MESSAGE);
+            }
+            $shiftSiteId = $shift?->site_id ?? $shiftClient?->site_id;
+            if ($shift && ($shiftSiteId === null || ! in_array((int) $shiftSiteId, $sites, true))) {
+                abort(403, UserSiteAccessService::DEFAULT_MESSAGE);
+            }
+            if ($shift && ! $own) {
+                if ($shift->client_id === null ? $clientId !== null : (int) $shift->client_id !== (int) $clientId) {
+                    throw ValidationException::withMessages(['client_id' => 'The selected Client must exactly match the rostered Shift.']);
+                }
+                if ((int) $shift->user_id !== $workerId) {
+                    throw ValidationException::withMessages(['user_id' => 'The selected staff member must match the rostered Shift.']);
+                }
+                if (isset($validated['site_id']) && (int) $validated['site_id'] !== (int) $shiftSiteId) {
+                    throw ValidationException::withMessages(['site_id' => 'The selected Site must match the rostered Shift.']);
+                }
             }
             $siteId = $validated['site_id'] ?? $shift?->site_id ?? $shiftClient?->site_id ?? $client?->site_id;
             if (! $siteId) {

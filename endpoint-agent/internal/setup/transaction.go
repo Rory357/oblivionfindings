@@ -27,7 +27,26 @@ type Journal struct {
 	FailedStep           string `json:"failed_step,omitempty"`
 	RecoveryRequired     bool   `json:"recovery_required"`
 	UpdatedAt            string `json:"updated_at"`
+
+	// siteStage is the release folder the hub service runs from when the hub has updated
+	// itself since setup (internal/hubupdate). Repair works it out each time; it's never saved.
+	siteStage string
 }
+
+// collectorStage is the release folder for the hub service: the live one after a self-update,
+// otherwise the folder this record names.
+func (j *Journal) collectorStage() string {
+	if j.siteStage != "" {
+		return j.siteStage
+	}
+	return j.Stage
+}
+
+// Progress, when set, hears each install step ("staging", "enrolment", ...) start, finish or
+// fail, so the installer can show plain steps and save the reason for IT. status is
+// "started", "done" or "failed"; detail is the error for a failed step (never a secret).
+type Progress func(step, status, detail string)
+
 type Host interface {
 	Persist(*Journal) error
 	Stage(context.Context, *Journal) error
@@ -41,6 +60,14 @@ type Host interface {
 // Run repeats idempotent steps against the same bound journal. A completed
 // installation needs an explicit repair/update flow rather than replacement.
 func Run(ctx context.Context, journal *Journal, host Host) error {
+	return RunWithProgress(ctx, journal, host, nil)
+}
+
+// RunWithProgress is Run, telling progress about each step.
+func RunWithProgress(ctx context.Context, journal *Journal, host Host, progress Progress) error {
+	if progress == nil {
+		progress = func(string, string, string) {}
+	}
 	if journal == nil || host == nil {
 		return errors.New("installation transaction is not initialized")
 	}
@@ -64,12 +91,15 @@ func Run(ctx context.Context, journal *Journal, host Host) error {
 		if err := ctx.Err(); err != nil {
 			return fail(journal, host, "interrupted")
 		}
+		progress(step.name, "started", "")
 		if err := step.run(ctx, journal); err != nil {
+			progress(step.name, "failed", err.Error())
 			return fail(journal, host, step.name)
 		}
 		if ctx.Err() != nil {
 			return fail(journal, host, "interrupted")
 		}
+		progress(step.name, "done", "")
 		journal.Phase = step.phase
 		journal.FailedStep = ""
 		journal.UpdatedAt = time.Now().UTC().Format(time.RFC3339)

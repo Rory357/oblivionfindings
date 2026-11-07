@@ -346,7 +346,7 @@ final class HikvisionLiveSessionTest extends TestCase
         $viewer = User::factory()->create();
         HrEmployeeProfile::factory()->create(['user_id' => $viewer->id, 'primary_site_id' => $this->site->id, 'is_active' => true]);
         $role = Role::query()->create(['name' => 'synthetic_hik_media_viewer', 'label' => 'Camera viewer', 'level' => 20, 'type' => 'custom']);
-        $role->permissions()->sync(Permission::query()->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.cctv.media.view'])->pluck('id')->all());
+        $role->permissions()->sync(Permission::query()->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.cctv.media.view', 'securityDevices.cctv.live.watch'])->pluck('id')->all());
         $viewer->roles()->attach($role);
         $this->actor = $viewer;
         $this->actingAs($viewer);

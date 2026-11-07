@@ -451,7 +451,7 @@ it('exposes a categorised relationship for each next-of-kin via the enum', funct
 it('honours DataRetentionPolicy overrides when pruning audit logs and timeline events', function () {
     $client = makePhaseTwoThreeClient();
 
-    // Stored retention policies override the config defaults of 2 yrs audit /
+    // Stored retention policies override the config defaults of 5 yrs audit /
     // 5 yrs timeline. Bumping audit to 7 yrs should spare a 3-year-old log;
     // shrinking timeline to 1 yr should sweep a 2-year-old event.
     DataRetentionPolicy::query()->create([

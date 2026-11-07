@@ -33,8 +33,7 @@ class HsGovernanceReportController extends Controller
     public function boardSummary(Request $request): JsonResponse
     {
         $siteId = $this->requestedSiteId($request);
-        $from = $request->input('from') ? Carbon::parse($request->input('from')) : null;
-        $to = $request->input('to') ? Carbon::parse($request->input('to')) : null;
+        [$from, $to] = self::period($request);
 
         return response()->json(
             $this->governanceService->getBoardSummary($from, $to, $request->user(), $siteId)
@@ -47,8 +46,7 @@ class HsGovernanceReportController extends Controller
     public function worksafeRegister(Request $request): JsonResponse
     {
         $siteId = $this->requestedSiteId($request);
-        $from = $request->input('from') ? Carbon::parse($request->input('from')) : null;
-        $to = $request->input('to') ? Carbon::parse($request->input('to')) : null;
+        [$from, $to] = self::period($request);
 
         return response()->json(
             $this->complianceService->worksafeRegister($from, $to, $request->user(), $siteId)
@@ -61,8 +59,7 @@ class HsGovernanceReportController extends Controller
     public function investigationOutcomes(Request $request): JsonResponse
     {
         $siteId = $this->requestedSiteId($request);
-        $from = $request->input('from') ? Carbon::parse($request->input('from')) : null;
-        $to = $request->input('to') ? Carbon::parse($request->input('to')) : null;
+        [$from, $to] = self::period($request);
 
         return response()->json(
             $this->complianceService->investigationOutcomes($from, $to, $request->user(), $siteId)
@@ -75,8 +72,7 @@ class HsGovernanceReportController extends Controller
     public function correctiveActionTraceability(Request $request): JsonResponse
     {
         $siteId = $this->requestedSiteId($request);
-        $from = $request->input('from') ? Carbon::parse($request->input('from')) : null;
-        $to = $request->input('to') ? Carbon::parse($request->input('to')) : null;
+        [$from, $to] = self::period($request);
 
         return response()->json(
             $this->complianceService->correctiveActionTraceability(
@@ -110,6 +106,40 @@ class HsGovernanceReportController extends Controller
         return response()->json(
             $this->complianceService->riskAssessmentRegister($request->user(), $siteId, $filters)
         );
+    }
+
+    /**
+     * O4 (readiness audit, 6 Nov 2026): the reporting period. Dates must be real calendar days (a bad one is a plain
+     * "check the date" answer, not a server error), and with none chosen a report covers the last 12 months instead of
+     * the whole history at once.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    public static function period(Request $request): array
+    {
+        $validated = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
+        ], [
+            'from.date_format' => 'Choose a real start date.',
+            'to.date_format' => 'Choose a real end date.',
+            'to.after_or_equal' => 'The end date must be on or after the start date.',
+        ]);
+        [$from, $to] = self::defaultPeriod();
+
+        // The end day counts in full (it used to stop at its midnight, leaving that day out).
+        return [
+            isset($validated['from']) ? Carbon::parse($validated['from'])->startOfDay() : $from,
+            isset($validated['to']) ? Carbon::parse($validated['to'])->endOfDay() : $to,
+        ];
+    }
+
+    /** The last 12 months, as calendar days. @return array{0: Carbon, 1: Carbon} */
+    public static function defaultPeriod(): array
+    {
+        $today = Carbon::parse(now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'))->toDateString());
+
+        return [$today->copy()->subYear()->addDay()->startOfDay(), $today->copy()->endOfDay()];
     }
 
     private function requestedSiteId(Request $request): ?int

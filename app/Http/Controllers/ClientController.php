@@ -23,6 +23,7 @@ use App\Domain\SecurityDevices\Presenters\ClientProfileHealthcareDevicesPresente
 use App\Domain\SecurityDevices\Services\PersonalTrackingLocationExportService;
 use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Enums\ClientGender;
 use App\Enums\NextOfKinRelationship;
 use App\Http\Controllers\Operations\ClientLocationLocateController;
 use App\Http\Requests\Operations\StoreClientLocateRequest;
@@ -798,6 +799,10 @@ class ClientController extends Controller
                 'preferred_name' => $client->preferred_name,
                 'date_of_birth' => optional($client->date_of_birth)->toDateString(),
                 'gender' => $client->gender,
+                'gender_description' => $client->gender_description,
+                'gender_label' => ClientGender::displayLabel($client->gender, $client->gender_description),
+                // Typed before Gender became a dropdown and not yet replaced by a choice.
+                'gender_recorded_as' => ClientGender::waitingForChoice($client->gender, $client->gender_recorded_as),
                 'status' => $client->status,
                 'phone' => $client->phone,
                 'email' => $client->email,
@@ -1329,21 +1334,8 @@ class ClientController extends Controller
             // care-risk list above — shown as a separate section in the same tab).
             // One H&S read for the whole list (Codex's port): only risks this viewer may read are listed, so a risk
             // copied from someone else's private treatment is left out instead of failing the whole profile.
-            'hs_risk_assessments' => $sectionAccess['first_aid']
-                ? RiskAssessmentPresenter::materialise($request->user(), null, function ($current, $reads, $context) use ($client): array {
-                    $query = HsRiskAssessment::forAssessable(Client::class, $client->id)
-                        ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])->withCount('attachments');
-
-                    $original = RiskAssessmentPresenter::guardEagerQuery($query, $current, $context);
-
-                    return (clone $original)
-                        ->orderByDesc('created_at')->orderByDesc('id')->limit(100)->get()
-                        ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra, $current, $context, $original))->values()->all();
-                })
-                : [],
-            'ra_pickers' => $sectionAccess['first_aid_manage']
-                ? RiskAssessmentPresenter::pickers()
-                : ['sites' => [], 'clients' => [], 'events' => []],
+            'hs_risk_assessments' => ($hsRiskPanel = $this->clientHsRiskPanel($request->user(), $client, $sectionAccess))['rows'],
+            'ra_pickers' => $hsRiskPanel['pickers'],
 
             // Recent incidents (last 5)
             // Recent incidents (last 5) the viewer may read through the incident source rules: their Sites,
@@ -2714,7 +2706,7 @@ class ClientController extends Controller
             // hydrate the canonical Add Client completion wizard from one full
             // round-trippable shape.
             'client' => $client->only([
-                'id', 'site_id', 'room_id', 'service_context_id', 'nhi_number', 'first_name', 'last_name', 'preferred_name', 'date_of_birth', 'gender', 'status',
+                'id', 'site_id', 'room_id', 'service_context_id', 'nhi_number', 'first_name', 'last_name', 'preferred_name', 'date_of_birth', 'gender', 'gender_description', 'status',
                 'phone', 'email', 'address_line_1', 'address_line_2', 'suburb', 'city', 'postcode',
                 'profile_photo_path', 'funding_type', 'funding_notes',
             ]),
@@ -2763,7 +2755,8 @@ class ClientController extends Controller
             'last_name' => $client->last_name ?? '',
             'preferred_name' => $client->preferred_name ?? '',
             'date_of_birth' => $client->date_of_birth?->toDateString() ?? '',
-            'gender' => $client->gender ?? '',
+            // gender_recorded_as is shown as a "please choose" notice; the wizard never sends it back.
+            ...ClientGender::wizardValues($client->gender, $client->gender_description, $client->gender_recorded_as),
             'preferred_pronouns' => $client->preferred_pronouns ?? '',
             'nhi_number' => $client->nhi_number ?? '',
             'phone' => $client->phone ?? '',
@@ -3476,7 +3469,7 @@ class ClientController extends Controller
                 'fleet_dashboard_url' => '/fleet-assets/resident-tracking?focus='.$client->id,
                 'history_url' => "/fleet-assets/resident-tracking/history/{$client->id}",
                 'tracking_workspace_url' => $canonicalDeviceAvailable
-                    ? '/security-devices/tracking?tab=personal-safety'
+                    ? '/security-devices/devices?tab=trackers'
                     : null,
                 'tracking_workspace_access' => [
                     'state' => $canonicalDeviceAvailable ? 'available' : 'restricted',
@@ -3735,6 +3728,43 @@ class ClientController extends Controller
         }
 
         return back()->with('success', 'Panic acknowledged.');
+    }
+
+    /**
+     * The risk-management tab's H&S risk panel and its pickers, read in ONE H&S read. Its final check then replays
+     * the panel's rows after the picker read, so a permission withdrawn part-way through the request withholds the
+     * page instead of returning the panel as first read (Stephan, 31 Oct: fix the logged race limits).
+     *
+     * @param  array<string, bool>  $sectionAccess
+     * @return array{rows: array<int, array<string, mixed>>, pickers: array<string, mixed>}
+     */
+    private function clientHsRiskPanel(User $viewer, Client $client, array $sectionAccess): array
+    {
+        $noPickers = ['sites' => [], 'clients' => [], 'events' => []];
+        if (! $sectionAccess['first_aid'] && ! $sectionAccess['first_aid_manage']) {
+            return ['rows' => [], 'pickers' => $noPickers];
+        }
+
+        return RiskAssessmentPresenter::materialise($viewer, null, function ($current, $reads, $context) use ($client, $sectionAccess, $noPickers): array {
+            $rows = [];
+            if ($sectionAccess['first_aid']) {
+                // Only risks this viewer may read are listed, so a risk copied from someone else's private treatment
+                // is left out instead of failing the whole profile.
+                $query = HsRiskAssessment::forAssessable(Client::class, $client->id)
+                    ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])->withCount('attachments');
+                $original = RiskAssessmentPresenter::guardEagerQuery($query, $current, $context);
+                $rows = (clone $original)
+                    ->orderByDesc('created_at')->orderByDesc('id')->limit(100)->get()
+                    ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra, $current, $context, $original))->values()->all();
+            }
+            // Plain arrays (the read refuses to hand out collections); the page receives the same JSON as before.
+            $pickers = $sectionAccess['first_aid_manage']
+                ? RiskAssessmentPresenter::pickerRowsInContext($current,
+                    app(UserSiteAccessService::class)->accessibleSiteIds($current, ['healthSafety.viewAllSites'], $reads), $context)
+                : $noPickers;
+
+            return ['rows' => $rows, 'pickers' => $pickers];
+        });
     }
 
     /** The profile's recent incidents, read through the incident source rules (Codex's narrowing). */

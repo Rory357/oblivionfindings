@@ -46,6 +46,7 @@ import {
     conflictsFor,
     CORE_SLOTS,
     entryTextureResidents,
+    fromIsoDate,
     isoWeekNo,
     startOfWeek,
     toIsoDate,
@@ -99,6 +100,14 @@ type Props = {
     mode?: 'standalone' | 'embedded';
     /** Initial site for standalone mode (the /catering page). */
     defaultSiteId?: number;
+    /** Standalone: a day (Y-m-d) in the week to open on; this week when absent. */
+    defaultWeek?: string;
+    /**
+     * Standalone: called when the site switcher picks another site, so the
+     * page can update its URL and breadcrumb. Without it the URL is replaced
+     * in place.
+     */
+    onSiteChange?: (site: { id: number; name: string }) => void;
 };
 
 type SubTab = 'calendar' | 'inventory' | 'shopping' | 'recipes' | 'templates';
@@ -107,6 +116,8 @@ export default function MealPlannerSubTabs({
     site: siteProp,
     mode = 'embedded',
     defaultSiteId,
+    defaultWeek,
+    onSiteChange,
 }: Props) {
     const standalone = mode === 'standalone';
 
@@ -157,7 +168,9 @@ export default function MealPlannerSubTabs({
     const [tab, setTab] = useState<SubTab>(
         (siteProp?.type ?? 'house') === 'house' ? 'calendar' : 'inventory',
     );
-    const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date()));
+    const [weekStart, setWeekStart] = useState<Date>(() =>
+        startOfWeek(fromIsoDate(defaultWeek) ?? new Date()),
+    );
 
     const [entries, setEntries] = useState<PlanEntry[]>([]);
     const [weekTotalCents, setWeekTotalCents] = useState(0);
@@ -535,7 +548,9 @@ export default function MealPlannerSubTabs({
         if (standalone) {
             // Switch in place on the /catering page and keep the URL shareable.
             setCurrentSiteId(id);
-            if (typeof window !== 'undefined')
+            const picked = sites.find((s) => s.id === id);
+            if (onSiteChange) onSiteChange({ id, name: picked?.name ?? '' });
+            else if (typeof window !== 'undefined')
                 window.history.replaceState({}, '', `/catering?site=${id}`);
         } else {
             router.visit(`/sites/${id}`, { data: { tab: 'meal-planner' } });

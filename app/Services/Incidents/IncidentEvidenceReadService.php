@@ -21,6 +21,10 @@ final class IncidentEvidenceReadService
     public function download(Request $request, int $incidentId, int $attachmentId): StreamedResponse
     {
         abort_unless($attachmentId > 0, 404);
+        // P4: a safeguarding incident's files open only for people with safeguarding access to it.
+        if ($root = \App\Models\ClientIncident::query()->find($incidentId)) {
+            app(IncidentSafeguardingContent::class)->assertCanSee($request->user(), $root);
+        }
         $prepared = $this->sources->consumeSource($request, $incidentId,
             function ($working, $id, $reads, $parent) use ($attachmentId): array {
                 $descriptor = $this->descriptorInReads($working, $id, $attachmentId, $reads, $parent);

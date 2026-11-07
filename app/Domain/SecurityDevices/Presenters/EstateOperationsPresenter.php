@@ -343,7 +343,8 @@ class EstateOperationsPresenter
                     'name' => $group->name,
                     'type' => $group->type,
                     'device_count' => (int) $group->devices_count,
-                    'href' => "/security-devices/device-groups/{$group->id}",
+                    // S&D rebuild C6 (D8): a group is a Devices filter now.
+                    'href' => "/security-devices/devices?group={$group->id}",
                 ]);
 
         $monitors = $devices
@@ -483,11 +484,11 @@ class EstateOperationsPresenter
                     ->all(),
             ] : null,
             'changes' => $this->recentChanges($context, (int) $site->id),
-            'contacts' => SiteContact::query()
+            'contacts' => SiteContact::primeLinkedStaff(SiteContact::query()
                 ->where('site_id', $site->id)
                 ->orderByDesc('is_primary')
                 ->orderBy('name')
-                ->get()
+                ->get())
                 ->map(fn (SiteContact $contact) => [
                     'id' => $contact->id,
                     'type' => $contact->type,

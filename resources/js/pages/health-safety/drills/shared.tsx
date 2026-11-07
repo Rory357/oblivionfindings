@@ -40,6 +40,10 @@ export type DrillRow = {
     people_label: string | null;
     findings_open: number;
     findings_count: number;
+    /** G4-12: the who-line facts for "Where it's up to". */
+    coordinator_name?: string | null;
+    findings_owner?: string | null;
+    site_last_run_at?: string | null;
     flags: {
         overdue: boolean;
         running: boolean;
@@ -238,7 +242,7 @@ export function typeMeta(type: string): DrillTypeMeta {
 export type StatusMeta = { label: string; icon: LucideIcon; tone: ChipTone };
 
 export const STATUS_META: Record<string, StatusMeta> = {
-    scheduled: { label: 'Scheduled', icon: CalendarClock, tone: 'info' },
+    scheduled: { label: 'Planned', icon: CalendarClock, tone: 'info' },
     overdue: { label: 'Overdue', icon: AlarmClock, tone: 'critical' },
     in_progress: { label: 'In progress', icon: Loader, tone: 'warning' },
     completed: { label: 'Completed', icon: CheckCircle2, tone: 'success' },
@@ -303,6 +307,36 @@ export function drillStage(row: {
                 : { stage: 5, label: 'Completed' };
         default:
             return { stage: 1, label: statusMeta(row.status).label };
+    }
+}
+
+/**
+ * "Where it's up to" (G4-12, the shared stage cell): one status chip and who does it, no dots. Planned drills say who
+ * runs them; things to fix say who has them; an overdue drill says when its site last ran one.
+ */
+export function drillWhereUpTo(
+    row: Pick<DrillRow, 'status' | 'findings_open' | 'participants_count' | 'coordinator_name' | 'findings_owner' | 'site_last_run_at'> & {
+        flags?: { finding_overdue?: boolean };
+    },
+    lastRunLabel: (iso: string) => string,
+): { label: string; tone: ChipTone; who: string | null } {
+    switch (row.status) {
+        case 'overdue':
+            return { label: 'Overdue', tone: 'critical', who: row.site_last_run_at ? `Not run since ${lastRunLabel(row.site_last_run_at)}` : 'Not run yet' };
+        case 'scheduled': {
+            const assigned = `${row.participants_count} assigned`;
+            return { label: 'Planned', tone: 'info', who: row.coordinator_name ? `${row.coordinator_name} runs it — ${assigned}` : assigned };
+        }
+        case 'in_progress':
+            return { label: 'In progress', tone: 'warning', who: row.coordinator_name ? `${row.coordinator_name} runs it` : null };
+        case 'completed':
+            return row.findings_open > 0
+                ? { label: 'Things to fix', tone: row.flags?.finding_overdue ? 'critical' : 'warning', who: row.findings_owner ? `${row.findings_owner} has them` : 'No owner yet' }
+                : { label: 'Completed', tone: 'success', who: null };
+        case 'cancelled':
+            return { label: 'Cancelled', tone: 'neutral', who: null };
+        default:
+            return { label: statusMeta(row.status).label, tone: statusMeta(row.status).tone, who: null };
     }
 }
 

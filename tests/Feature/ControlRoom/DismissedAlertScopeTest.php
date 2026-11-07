@@ -14,6 +14,8 @@ use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
+use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
@@ -38,6 +40,8 @@ use Tests\TestCase;
 class DismissedAlertScopeTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Support\LoadsHealthSafetyOverview;
+    use \Tests\Support\LoneWorkerReviewedCommandFixtures;
 
     private User $admin;
 
@@ -71,7 +75,7 @@ class DismissedAlertScopeTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-safety/dashboard')
@@ -232,46 +236,27 @@ class DismissedAlertScopeTest extends TestCase
     public function test_lone_worker_panic_acknowledgement_only_transitions_open_alerts(): void
     {
         $session = $this->makeLoneWorkerSession();
-        $context = [
-            'normalized_data' => [
-                'lone_worker_session_id' => $session->id,
-            ],
-        ];
 
-        $open = $this->makeAlert([
-            'source' => 'lone_worker',
-            'alert_type' => LoneWorkerSignalService::canonicalAlertType(
-                LoneWorkerSignalService::TYPE_EMERGENCY,
-            ),
+        $open = $this->makeCanonicalLoneWorkerAlert($session, [
             'status' => ControlRoomAlert::STATUS_OPEN,
-            'context' => $context,
         ]);
         $openSla = $this->attachSla($open);
         $triageActor = User::factory()->create();
         $triageAcknowledgedAt = now()->subHour()->startOfSecond();
-        $triaging = $this->makeAlert([
-            'source' => 'lone_worker',
-            'alert_type' => LoneWorkerSignalService::canonicalAlertType(
-                LoneWorkerSignalService::TYPE_EMERGENCY,
-            ),
+        $triaging = $this->makeCanonicalLoneWorkerAlert($session, [
             'status' => ControlRoomAlert::STATUS_TRIAGING,
-            'context' => $context,
             'acknowledged_at' => $triageAcknowledgedAt,
             'acknowledged_by_user_id' => $triageActor->id,
         ]);
-        $dismissed = $this->makeAlert([
-            'source' => 'lone_worker',
-            'alert_type' => LoneWorkerSignalService::canonicalAlertType(
-                LoneWorkerSignalService::TYPE_EMERGENCY,
-            ),
+        $dismissed = $this->makeCanonicalLoneWorkerAlert($session, [
             'status' => ControlRoomAlert::STATUS_DISMISSED,
-            'context' => $context,
         ]);
 
         $this->actingAs($this->admin)
             ->from('/health-safety/lone-workers')
             ->post("/health-safety/lone-workers/sessions/{$session->id}/acknowledge-panic")
-            ->assertRedirect('/health-safety/lone-workers');
+            ->assertRedirect("/health-safety/lone-workers/sessions/{$session->id}")
+            ->assertSessionHasNoErrors();
 
         $this->assertCanonicalAcknowledgement($open, $openSla);
         $this->assertAlertWasNotReAcknowledged(
@@ -349,7 +334,7 @@ class DismissedAlertScopeTest extends TestCase
         ]);
 
         $this->actingAs($officer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('kpis.active_alerts', 1));
 
@@ -361,7 +346,7 @@ class DismissedAlertScopeTest extends TestCase
     public function test_lone_worker_live_register_and_alert_counts_are_limited_to_accessible_sites(): void
     {
         [$visibleSite, $hiddenSite] = [Site::factory()->create(), Site::factory()->create()];
-        $officer = $this->siteScopedUser($visibleSite, ['hazards.view']);
+        $officer = $this->siteScopedUser($visibleSite, ['hazards.view', 'controlRoom.alerts.view']);
         $visibleAlert = $this->makeAlert([
             'site_id' => $visibleSite->id,
             'source' => 'lone_worker',
@@ -514,7 +499,7 @@ class DismissedAlertScopeTest extends TestCase
     public function test_lone_worker_options_only_include_accessible_sites_staff_clients_and_shifts(): void
     {
         [$visibleSite, $hiddenSite] = [Site::factory()->create(), Site::factory()->create()];
-        $officer = $this->siteScopedUser($visibleSite, ['hazards.view']);
+        $officer = $this->siteScopedUser($visibleSite, ['hazards.view', 'clients.viewAny']);
         $visibleWorker = $this->siteScopedUser($visibleSite, []);
         $hiddenWorker = $this->siteScopedUser($hiddenSite, []);
         $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id, 'status' => 'active']);
@@ -537,11 +522,9 @@ class DismissedAlertScopeTest extends TestCase
     public function test_lone_worker_detail_does_not_expose_cross_site_sessions_or_alerts(): void
     {
         [$visibleSite, $hiddenSite] = [Site::factory()->create(), Site::factory()->create()];
-        $officer = $this->siteScopedUser($visibleSite, ['hazards.view']);
+        $officer = $this->siteScopedUser($visibleSite, ['hazards.view', 'controlRoom.alerts.view']);
         $hiddenSession = $this->makeLoneWorkerSession(['site_id' => $hiddenSite->id]);
-        $hiddenCanonicalAlert = $this->makeAlert([
-            'site_id' => $hiddenSite->id,
-            'source' => 'lone_worker',
+        $hiddenCanonicalAlert = $this->makeCanonicalLoneWorkerAlert($hiddenSession, [
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
         $hiddenLegacyAlert = $hiddenSession->alerts()->create([
@@ -550,15 +533,30 @@ class DismissedAlertScopeTest extends TestCase
             'status' => 'active',
         ]);
 
+        // Full-page session and canonical alert deep links conceal cross-Site records with 404.
+        foreach ([
+            'session='.$hiddenSession->id,
+            'alert=cr_'.$hiddenCanonicalAlert->id,
+        ] as $query) {
+            $this->actingAs($officer)
+                ->get('/health-safety/lone-workers?'.$query)
+                ->assertNotFound();
+        }
+
+        $this->actingAs($officer)
+            ->get('/health-safety/lone-workers?alert=legacy_'.$hiddenLegacyAlert->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('detail', null));
+
         foreach ([
             'session='.$hiddenSession->id,
             'alert=cr_'.$hiddenCanonicalAlert->id,
             'alert=legacy_'.$hiddenLegacyAlert->id,
         ] as $query) {
             $this->actingAs($officer)
-                ->get('/health-safety/lone-workers?'.$query)
+                ->getJson('/health-safety/lone-workers?'.$query)
                 ->assertOk()
-                ->assertInertia(fn (Assert $page) => $page->where('detail', null));
+                ->assertJsonPath('detail', null);
         }
     }
 
@@ -571,7 +569,7 @@ class DismissedAlertScopeTest extends TestCase
         $cases = [
             'update' => function (LoneWorkerSession $session) {
                 return $this->patch("/health-safety/lone-workers/sessions/{$session->id}", [
-                    'expected_end_at' => now()->addHours(3)->toDateTimeString(),
+                    'expected_end_at' => now()->addHours(3)->toIso8601String(),
                 ]);
             },
             'end' => fn (LoneWorkerSession $session) => $this->post("/health-safety/lone-workers/sessions/{$session->id}/end"),
@@ -639,7 +637,7 @@ class DismissedAlertScopeTest extends TestCase
     public function test_lone_worker_coordinator_check_in_rejects_another_site(): void
     {
         [$visibleSite, $hiddenSite] = [Site::factory()->create(), Site::factory()->create()];
-        $officer = $this->siteScopedUser($visibleSite, ['hazards.manage']);
+        $officer = $this->siteScopedUser($visibleSite, ['hazards.view', 'hazards.manage']);
         $hiddenSession = $this->makeLoneWorkerSession(['site_id' => $hiddenSite->id]);
 
         $this->actingAs($officer)
@@ -668,13 +666,13 @@ class DismissedAlertScopeTest extends TestCase
     public function test_start_lone_worker_session_rejects_inaccessible_site_client_and_shift(): void
     {
         [$visibleSite, $hiddenSite] = [Site::factory()->create(), Site::factory()->create()];
-        $officer = $this->siteScopedUser($visibleSite, ['hazards.manage']);
+        $officer = $this->siteScopedUser($visibleSite, ['hazards.view', 'hazards.manage']);
         $worker = $this->siteScopedUser($visibleSite, []);
         $hiddenClient = Client::factory()->create(['site_id' => $hiddenSite->id, 'status' => 'active']);
         $hiddenShift = $this->monitorableShift($hiddenSite, $hiddenClient, $worker);
         $base = [
             'user_id' => $worker->id,
-            'expected_end_at' => now()->addHours(2)->toDateTimeString(),
+            'expected_end_at' => now()->addHours(2)->toIso8601String(),
         ];
 
         foreach ([
@@ -692,8 +690,11 @@ class DismissedAlertScopeTest extends TestCase
 
     public function test_start_lone_worker_session_requires_selected_shift_worker_client_and_site_to_agree(): void
     {
-        $site = Site::factory()->create();
-        $officer = $this->siteScopedUser($site, ['hazards.manage']);
+        [$site, $otherAccessibleSite] = [Site::factory()->create(), Site::factory()->create()];
+        $officer = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
+        HrEmployeeProfile::query()->where('user_id', $officer->id)->update([
+            'secondary_site_ids' => [$otherAccessibleSite->id],
+        ]);
         $shiftWorker = $this->siteScopedUser($site, []);
         $otherWorker = $this->siteScopedUser($site, []);
         $shiftClient = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
@@ -702,7 +703,7 @@ class DismissedAlertScopeTest extends TestCase
         $base = [
             'site_id' => $site->id,
             'shift_id' => $shift->id,
-            'expected_end_at' => now()->addHours(2)->toDateTimeString(),
+            'expected_end_at' => now()->addHours(2)->toIso8601String(),
         ];
 
         $this->actingAs($officer)
@@ -717,6 +718,13 @@ class DismissedAlertScopeTest extends TestCase
                 'client_id' => $shiftClient->id,
             ]))
             ->assertSessionHasErrors('user_id');
+        $this->actingAs($officer)
+            ->post('/health-safety/lone-workers/sessions', array_merge($base, [
+                'site_id' => $otherAccessibleSite->id,
+                'user_id' => $shiftWorker->id,
+                'client_id' => $shiftClient->id,
+            ]))
+            ->assertSessionHasErrors('site_id');
 
         $this->assertSame(0, LoneWorkerSession::query()->count());
     }
@@ -784,7 +792,7 @@ class DismissedAlertScopeTest extends TestCase
             'healthSafety.viewAllSites',
         ]);
         $this->actingAs($globalHsOfficer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('kpis.active_alerts', 2));
 
@@ -830,6 +838,60 @@ class DismissedAlertScopeTest extends TestCase
             'status' => ControlRoomAlert::STATUS_OPEN,
             'triggered_at' => now(),
         ], $overrides));
+    }
+
+    private function makeCanonicalLoneWorkerAlert(LoneWorkerSession $session, array $overrides = []): ControlRoomAlert
+    {
+        $siteId = (int) ($session->site_id ?? $this->site->id);
+        $normalized = [
+            'source_module' => 'lone_worker',
+            'signal_type' => LoneWorkerSignalService::TYPE_EMERGENCY,
+            'lone_worker_session_id' => $session->id,
+            'worker_user_id' => $session->user_id,
+            'site_id' => $siteId,
+            'client_id' => $session->client_id,
+            'location' => $session->location,
+        ];
+        $source = SignalSource::firstOrCreate(
+            ['slug' => 'lone_worker'],
+            [
+                'name' => 'Lone Worker Safety',
+                'vendor' => 'internal',
+                'status' => 'active',
+                'config' => [],
+                'capabilities' => ['manual_trigger'],
+            ],
+        );
+        $signal = Signal::create([
+            'signal_source_id' => $source->id,
+            'signal_type_code' => LoneWorkerSignalService::TYPE_EMERGENCY,
+            'idempotency_key' => hash('sha256', 'dismissed-alert-scope:'.Str::uuid()),
+            'site_id' => $siteId,
+            'client_id' => $session->client_id,
+            'severity_hint' => 'critical',
+            'occurred_at' => now(),
+            'received_at' => now(),
+            'status' => 'processed',
+            'payload' => [],
+            'normalized_data' => $normalized,
+        ]);
+        $alert = $this->makeAlert(array_merge([
+            'site_id' => $siteId,
+            'client_id' => $session->client_id,
+            'source' => 'lone_worker',
+            'alert_type' => LoneWorkerSignalService::canonicalAlertType(LoneWorkerSignalService::TYPE_EMERGENCY),
+            'severity' => 'critical',
+            'status' => ControlRoomAlert::STATUS_OPEN,
+            'origin_signal_id' => $signal->id,
+            'context' => [
+                'signal_id' => $signal->id,
+                'signal_type_code' => LoneWorkerSignalService::TYPE_EMERGENCY,
+                'normalized_data' => $normalized,
+            ],
+        ], $overrides));
+        $signal->forceFill(['alert_id' => $alert->id, 'processed_at' => now()])->save();
+
+        return $alert;
     }
 
     private function makeLoneWorkerSession(array $overrides = []): LoneWorkerSession

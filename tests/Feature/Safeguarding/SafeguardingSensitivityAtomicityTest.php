@@ -78,7 +78,7 @@ class SafeguardingSensitivityAtomicityTest extends TestCase
         $approver = $this->userWith([
             'safeguarding.viewAny',
             'safeguarding.declassification.approve',
-            'reports.viewAny',
+            'safeguarding.viewAllSites',
         ]);
         $service = app(SafeguardingSensitivityService::class);
         $preview = $service->audiencePreview($concern);
@@ -136,7 +136,7 @@ class SafeguardingSensitivityAtomicityTest extends TestCase
         $approver = $this->userWith([
             'safeguarding.viewAny',
             'safeguarding.declassification.approve',
-            'reports.viewAny',
+            'safeguarding.viewAllSites',
         ]);
         $service = app(SafeguardingSensitivityService::class);
         $preview = $service->audiencePreview($concern);

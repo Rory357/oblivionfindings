@@ -1,4 +1,10 @@
 import {
+    chatCallingLabels,
+    describeChatCallingValue,
+    type ChatCallingPlainField,
+    type ChatCallingSecretField,
+} from '@/components/chat/chat-calling-settings';
+import {
     chatSettingLabels,
     describeChatSetting,
 } from '@/components/chat/chat-settings-policy';
@@ -8,9 +14,16 @@ import { Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ADMINISTRATION_API, governanceRequest } from './types';
 
+type CallingChange = {
+    field: ChatCallingPlainField | ChatCallingSecretField;
+    before?: string | string[] | number | null;
+    after?: string | string[] | number | null;
+    change?: 'added' | 'replaced' | 'removed';
+};
+
 type Entry = {
     id: number;
-    kind: 'policy' | 'offboarding';
+    kind: 'policy' | 'offboarding' | 'calling';
     actor: string;
     created_at: string;
     changes: {
@@ -24,12 +37,32 @@ type Entry = {
         memberships_ended: number;
         work_moved: number;
     } | null;
+    calling_changes?: CallingChange[];
 };
 
 function describe(value: unknown) {
     if (value === '(inherited)') return 'Inherited';
     if (value !== null && typeof value === 'object') return 'Configured';
     return describeChatSetting(value);
+}
+
+const keyChanges = {
+    added: 'added',
+    replaced: 'replaced',
+    removed: 'removed, now uses the server’s key',
+} as const;
+
+/** Calling changes name each key that changed, never its value. */
+function describeCalling(change: CallingChange) {
+    const label = chatCallingLabels[change.field] ?? 'A calling setting';
+    if (change.change) return `${label}: ${keyChanges[change.change]}`;
+    if (!('before' in change)) return label;
+    const value = (raw: CallingChange['before']) =>
+        describeChatCallingValue(
+            change.field as ChatCallingPlainField,
+            raw ?? null,
+        ) || 'The server’s setting';
+    return `${label}: ${value(change.before)} → ${value(change.after)}`;
 }
 
 /** Mockup M22 "Settings audit": policy changes only, never investigation records or chat content. */
@@ -108,10 +141,20 @@ export function SettingsAudit({
                                               ),
                                           ),
                                       ].join(', ') || 'Organisation defaults'
-                                    : 'Offboarding'}{' '}
+                                    : entry.kind === 'calling'
+                                      ? 'Chat calling settings'
+                                      : 'Offboarding'}{' '}
                                 · {formatDateTime(entry.created_at)}
                             </p>
-                            {entry.kind === 'policy' ? (
+                            {entry.kind === 'calling' ? (
+                                <p className="mt-1 break-words">
+                                    {entry.calling_changes?.length
+                                        ? entry.calling_changes
+                                              .map(describeCalling)
+                                              .join('; ')
+                                        : 'Saved without changing a value'}
+                                </p>
+                            ) : entry.kind === 'policy' ? (
                                 <p className="mt-1 break-words">
                                     {entry.changes.length
                                         ? entry.changes

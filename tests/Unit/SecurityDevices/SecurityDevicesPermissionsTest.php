@@ -8,6 +8,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class SecurityDevicesPermissionsTest extends TestCase
@@ -37,6 +38,8 @@ class SecurityDevicesPermissionsTest extends TestCase
         'securityDevices.integrations.manage',
         'securityDevices.monitoring.manage',
         'securityDevices.reports.view',
+        // Safety fix round (7 Nov 2026): open and attend only the care and safety alerts sent to you.
+        'securityDevices.careAlerts.attend',
         'securityDevices.commands.observe',
         'securityDevices.commands.operate',
         'securityDevices.commands.manage',
@@ -75,11 +78,14 @@ class SecurityDevicesPermissionsTest extends TestCase
         }
     }
 
-    public function test_exactly_50_security_devices_permissions(): void
+    public function test_exactly_67_security_devices_permissions(): void
     {
         $count = Permission::where('key', 'like', 'securityDevices.%')->count();
 
-        $this->assertEquals(50, $count);
+        // 50 before the S&D rebuild, plus its 16 new securityDevices.* keys (SecurityDevicesRebuildPermissions,
+        // granted by 2026_11_01_000100_grant_security_devices_rebuild_permissions), plus the safety fix round's
+        // securityDevices.careAlerts.attend (2026_11_07_100100_grant_care_alerts_attend).
+        $this->assertEquals(67, $count);
     }
 
     public function test_permissions_have_correct_group_and_module(): void
@@ -179,8 +185,12 @@ class SecurityDevicesPermissionsTest extends TestCase
         $expected = [
             'securityDevices.viewAny',
             'securityDevices.devices.view',
+            // Safety fix round: only the care and safety alerts sent to them, at their own Sites.
+            'securityDevices.careAlerts.attend',
         ];
         $denied = [
+            // ...and nothing that works the Alerts page: no acknowledge, assign or snooze.
+            'securityDevices.alerts.acknowledge',
             'securityDevices.devices.create',
             'securityDevices.devices.update',
             'securityDevices.devices.delete',
@@ -326,6 +336,41 @@ class SecurityDevicesPermissionsTest extends TestCase
         foreach ($denied as $key) {
             $this->assertFalse($user->canDo($key), "Auditor should NOT have '{$key}'.");
         }
+    }
+
+    // ── Auditors read alerts but never act on them (Stephan, 2 Nov: "Leave auditors out") ──
+
+    public function test_alerts_acknowledge_leaves_auditors_out_in_the_seeder_and_the_grant_migration(): void
+    {
+        $acknowledge = 'securityDevices.alerts.acknowledge';
+        $auditorRole = Role::where('name', 'auditor')->firstOrFail();
+        $auditor = User::factory()->create();
+        $auditor->roles()->attach($auditorRole);
+        $coordinator = User::factory()->create();
+        $coordinator->roles()->attach(Role::where('name', 'coordinator')->firstOrFail());
+
+        $this->assertTrue($auditor->fresh()->canDo('securityDevices.events.view'));
+        $this->assertFalse($auditor->fresh()->canDo($acknowledge), 'The seeder gave auditors alerts.acknowledge.');
+        $this->assertTrue($coordinator->fresh()->canDo($acknowledge), 'Coordinators keep alerts.acknowledge.');
+
+        // The deploy path: the grant migration on a database that has no acknowledge grants yet.
+        $permissionId = Permission::where('key', $acknowledge)->value('id');
+        DB::table('role_permission')->where('permission_id', $permissionId)->delete();
+        $eventsView = Permission::where('key', 'securityDevices.events.view')->value('id');
+        $auditorWithOverride = User::factory()->create();
+        $auditorWithOverride->roles()->attach($auditorRole);
+        $plainWithOverride = User::factory()->create();
+        foreach ([$auditorWithOverride, $plainWithOverride] as $person) {
+            DB::table('permission_user')->insert(['user_id' => $person->id, 'permission_id' => $eventsView, 'allowed' => true]);
+        }
+
+        (require base_path('database/migrations/2026_11_01_000100_grant_security_devices_rebuild_permissions.php'))->up();
+
+        $this->assertFalse(DB::table('role_permission')->where('role_id', $auditorRole->id)->where('permission_id', $permissionId)->exists());
+        $this->assertFalse($auditor->fresh()->canDo($acknowledge), 'The grant migration gave the auditor role alerts.acknowledge.');
+        $this->assertFalse($auditorWithOverride->fresh()->canDo($acknowledge), 'An auditor got alerts.acknowledge through a copied override.');
+        $this->assertTrue($coordinator->fresh()->canDo($acknowledge), 'The grant migration left coordinators out.');
+        $this->assertTrue($plainWithOverride->fresh()->canDo($acknowledge), 'A personal events.view allow should still be copied.');
     }
 
     // ── Idempotent re-run ─────────────────────────────────────────

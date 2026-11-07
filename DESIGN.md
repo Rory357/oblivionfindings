@@ -60,6 +60,19 @@ lucide-react icons, Recharts.
    - every word follows `design_styles/WRITING_STYLE_GUIDE.md`;
    - before shipping, run the page kit's checklist (§12) and compare the new
      pages with an existing module's pages of the same template.
+8. **No coloured edge lines on boxes — hard rule** (Stephan, 31 Oct 2026:
+   "never look like this it is obvious a AI thing"). Cards, surfaces,
+   panels, strips, list blocks, pop-ups and toasts never carry a coloured
+   line, bar or gradient on any edge: no brand or status-tinted top border
+   (`border-t-2/3/4` + a colour, a `::before`/`::after` bar, an "accent" or
+   "horizon" line), and no coloured side or bottom border either. A box is a
+   plain card: the neutral 1px `--border`, the soft shadow, white on the page
+   ground. What a box means is said by its title, a `<StatusBadge>`, a ring
+   or an icon, never by a coloured edge. Neutral dividers *inside* a box
+   (row rules, the dashed list rule) and table total rules are fine.
+   Enforced: ESLint `design/no-edge-accent-line` (coloured `border-t-*`,
+   `border-l-*`, `border-r-*`, `border-b-*` widths with a colour class on the
+   same element). See the named anti-pattern "Coloured edge lines".
 
 ---
 
@@ -294,8 +307,9 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
   draft?" · Keep editing · Discard draft) that Esc, ✕ and Cancel all ask
   when typing would be lost. Wizards stay on `WizardShell` (1100). Every
   pop-up has the same top: a round icon **lens** (`.popup-lens`, never a
-  rounded square), the title, one line, ✕; a 2px **horizon** line on its top
-  edge (`.popup-horizon`); the record it came from as a plain context line;
+  rounded square), the title, one line, ✕; no coloured line on its top edge
+  (the `.popup-horizon` line was removed 31 Oct 2026, non-negotiable 8); the
+  record it came from as a plain context line;
   a grey footer band with Cancel first and the main button last, named for
   what it does. Red only when data is destroyed or a safety check is
   loosened. Consequential actions keep a review step (Control Room: resolve,
@@ -475,7 +489,12 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
 - **Icons** — lucide-react only, no second icon set and no emoji-as-icon.
   Sizes: `size-4` (16px) in buttons/menus/inputs, 15px in nav pills,
   `size-3.5` in dense chrome; default stroke. Icon-only controls always
-  carry an `aria-label`.
+  carry an `aria-label`. **Emoji are content, not icons** (clarified
+  2026-10-22, Chat): they belong in messages, reactions, the emoji picker
+  and stickers, drawn with the computer's own emoji font, and never as a
+  button label, menu icon, status marker or decoration ("👍 Acknowledge",
+  "🎙️ Voice note" are the anti-pattern). ESLint `design/no-emoji-icon`
+  checks the chat folders.
 - **Stat/KPI cards** — `components/ops-stat-card.tsx` / `fleet-stat-card.tsx`.
 - **Health & safety pages: one strip and signature blocks (approved by
   Stephan 2026-10-23 with the H&S drawings, design viewer v35).** The
@@ -484,11 +503,26 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
   four equal number boxes, number first, every box a link — for hubs and
   lists, or `<PageHeaderStages>` — a record's stage line with its next step
   ("who does what next") on top — for records with a lifecycle; record facts
-  sit above it as `<PageHeaderFacts>` chips. One banner: a record's next step
-  lives in the header, never in a second band under it; a fifth number goes
-  in the page body (a `Tally`), never a fifth box. Page bodies use the
+  sit above it as `<PageHeaderFacts>` chips. A fifth number goes in the page
+  body (a `Tally`), never a fifth box.
+  **Records: status steps in the header, the Progress card under it
+  (approved by Stephan 2026-11-01, H&S G3/G4 boards, decision 26 —
+  supersedes "the next step lives in the header").** A record with a
+  lifecycle shows its round status steps in the header, and those steps are
+  the step picker (the step the record is on is picked when the page opens).
+  Directly under the header sits one Progress card: a fixed "Next step" bar
+  holding the record's only filled button for that step (it stays put
+  whichever step is picked), then the picked step's pane — what was added at
+  that step, "Edit" where the server allows a correction (a correction keeps
+  the original and needs a reason; checks are never edited), and "Activity at
+  this step" with a link to the full log on the History tab. No "Your part"
+  card and no second next-step banner; closure readiness is one line that
+  opens its list. Every H&S record follows it: safety reviews, incidents,
+  restraints, workplace injuries, corrective actions, first aid and chemical
+  exposure. Page bodies use the
   signature blocks (`components/signature/blocks.tsx`,
-  `resources/css/signature-blocks.css`): the surface with its horizon line,
+  `resources/css/signature-blocks.css`): the plain surface (no coloured edge
+  line, non-negotiable 8),
   rings read as state (`Ring`, `RingCard`, `Checks`), the Journey line,
   `Story`, `Log` (time first), `PeopleCards`/`PlaceCards`, `Tally` (zeros
   fold into one sentence), `Flow`, `RiskMap` (the H&S bands), `DutyClock`
@@ -516,6 +550,39 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
   the overview is whole NZ dollars: charts set `unit: 'NZD'` (monthly
   series add `interval: 'month'`), and rows, breakdowns and bars carry a
   formatted `display` value such as "$1,960" instead of a raw number.
+- **Chat — the Chat v3 boards (approved by Stephan 2026-10-22).** Chat,
+  the family portal conversation, calls and every place chat appears are
+  built to the six boards in `docs/chat-experience/v3/` (the "Chat v3 —
+  proposed rebuild" page of the design viewer), view for view. The rules
+  behind them:
+  - `/chat` is the page kit's **Workspace** template at full height with
+    the breadcrumb strip only: no Event Horizon band (a deliberate
+    exception to the page header contract, decision D14). Side sheets and
+    drawers show **one** conversation, never the two-pane workspace.
+  - **Messages own the screen.** Above them sit the conversation header
+    (photo with ring, name, one status line, Chat · Files · Pinned · Notes
+    tabs, call, video, search, people) and at most one slim context bar
+    (family: who can read it, owner, reply due, hand over). Status notices
+    share one slot; nothing else stacks above the messages.
+  - **Bubbles:** your own on the right in the brand-fill tint, others on
+    the left on the card surface; consecutive messages from one sender
+    grouped under one photo and name; time inline; reactions under the
+    bubble; photos as pictures (grid with "+N"); voice notes as a waveform
+    player; Oblivion links as care cards.
+  - **Message actions** come from one `MenuItem` set offered by a hover
+    bar, the ⋯ button, right-click and Shift+F10, never a pop-up per
+    action. Destructive items use the destructive tone.
+  - **Composer:** one auto-growing line with + (attach menu), emoji,
+    stickers and GIFs, "Aa" formatting, and a microphone that turns into
+    Send; voice notes record inline. Compact desktop controls, with
+    `.frontline-hit` where a bigger target is needed.
+  - **Read status:** staff see per-person read rings and Message info;
+    family see only "Seen by care team" (D8). Delivery rings always carry
+    a word (Sending, Sent, Delivered, Read).
+  - **Calls:** one click to start; Answer in the primary colour with a
+    phone icon, Decline in the destructive red (D13, D15).
+  - Plain NZ English everywhere: no "audience", "publication",
+    "eligible", "policy scope" or send-checking jargon on screen.
 - **Multi-step flows** — `WizardShell` (see entity add/edit above).
   `components/wizard-stepper.tsx` is **legacy** — do not use it in new work.
 - **Forms** — shadcn `<Input>`/`<Select>`/`<Textarea>`; dense native-element
@@ -534,6 +601,28 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
 
 These are recurring mistakes. Recognise and avoid them; each has burned us
 before.
+
+- **Coloured edge lines** (corrected 2026-10-31, Stephan on the H&S Overview:
+  "remove these lines everywhere … never look like this it is obvious a AI
+  thing") — a thin brand or status-coloured line on the top edge of a card,
+  surface, strip, panel or pop-up (the old `.sg-surface` "horizon line", the
+  `.popup-horizon` gradient, `border-t-4 border-t-primary-fill`,
+  `border-t-[3px] border-t-primary`), or the same trick on a side or bottom
+  edge. All removed 31 Oct 2026; never add one back, in any colour, on any
+  box. Non-negotiable 8; ESLint `design/no-edge-accent-line`.
+
+- **Bordered status pills as list filters or tab strips** (corrected
+  2026-11-01, Stephan on the H&S Safety reviews board: "i see you not
+  following the rules here") — a row of white, bordered, rounded pills with
+  counts used as a list's status views (All · Open · Being investigated …)
+  or as any tab strip under a header, even when an example image draws
+  them that way. Status views under a header are the built tier-2 tabs
+  (`TierTwoTabs`, `components/page/grouped-profile-nav.tsx`): neutral at
+  rest, toned only when picked (positional tone), counters in the grey
+  `CountPill`, one line. Too many views for one line: first drop any view
+  that repeats a header number box (each number once), never wrap. Not
+  machine-checked: header filter chips are legitimately rounded and
+  bordered, so a lint rule can't tell the two apart.
 
 - **Generic sign-in screens** (corrected 2026-10-13: "this does not look
   unique to us") — sign-in or account pages built from stock auth layouts, a
@@ -854,7 +943,8 @@ before.
   search/filter bar sitting BELOW the header, instead of the fixed
   contract in `design_styles/PAGE_HEADER_STYLE_GUIDE.md` (search and
   filters live in the header; lists get no sub-bar; individuals add
-  the tier-2 sub-nav strip).
+  the tier-2 sub-nav strip). The one exception is `/chat`, a full-height
+  Workspace (see "Chat — the Chat v3 boards").
 - **Bespoke entity cards or list tables** — hand-rolled card
   anatomies, per-page table styling, or invented table cells instead
   of the contracts in `design_styles/LIST_STYLE_GUIDE.md` (status
@@ -1079,11 +1169,58 @@ before.
   (`work_email` is nullable): a recruitment hire whose offer has no work
   email signs in with their personal address but gets no work email, and
   any page showing `work_email` renders nothing when it is null.
+- **Retyping a staff member's details** (corrected 2026-11-04, Add site
+  contacts: "pick staff as contacts instead of retyping their details"). A
+  contact or person field where someone who works here is typed in by hand
+  goes stale and invites personal numbers. Offer "Someone who works here"
+  (the scoped staff picker, `components/sites/site-contact-fields.tsx` for
+  Site contacts) beside "Someone outside the organisation"; store the link
+  (`user_id`) and show the HR work details live — job title, `work_phone`,
+  `work_email`. A missing work phone or email shows as missing, never a
+  personal one. Typing is for people outside the organisation.
+- **Field rows stretched by a taller column beside them** (corrected
+  2026-11-04, Add site › Location: the address fields "spread out with big
+  gaps" next to the map). A CSS grid column of fields next to a taller
+  column (a map, a preview) stretches its rows to fill the height. Give the
+  field column `content-start` (or make it a flex column), as both Location
+  columns now are.
 - **Bare `<Deferred>` from `@inertiajs/react`** (decided 2026-10-30 with the
   background-loading work). Inertia's own `<Deferred>` shows its fallback
   forever when the load fails, and drops back to the fallback on every full
   refresh (My Day refreshes every 60 s). Use `<DeferredPanel>` (see "Skeleton
   vs loader"). ESLint blocks importing `Deferred` from `@inertiajs/react`.
+
+- **A conversation buried under its own chrome** (corrected 2026-10-22,
+  Chat: "the UI looks really bad"). On a 1440 × 900 screen the family
+  conversation gave its messages 191 px: a privacy banner, an owner row
+  with three buttons, a reply-status row and a floating Callbacks button
+  stacked above them, a 200 px composer below, and each one-line message
+  took about 150 px (name row, bordered bubble, time row, an always-shown
+  ⋯ row). Follow "Chat — the Chat v3 boards": one slim context bar, one
+  notice slot, grouped bubbles with inline times, a one-line composer.
+- **A pop-up for every message action** (corrected 2026-10-22, Chat).
+  Reacting, replying, pinning and saving each opened a 480 px dialog of
+  outline buttons. Message actions are a hover bar plus one menu
+  (⋯, right-click, Shift+F10) fed by one `MenuItem` set; pop-ups are for
+  work that needs a form (share, turn into a task, report a concern).
+- **A fake emoji button** (corrected 2026-10-22, Chat: "limited
+  emoticons"). The composer's smiley appended " 🙂" and the only
+  reaction was 👍. An emoji control opens the shared emoji picker (search,
+  categories, recent, skin tones); reactions take any emoji, with a quick
+  bar of six.
+- **Blanket descendant tap sizes in chat dialogs** — `[&_button]:min-h-[44px]`
+  on a dialog (non-negotiable 5) turned every control, including
+  switches, into 44 px blocks on a desktop-only screen. ESLint
+  `design/no-blanket-descendant-size` checks the chat folders; the three
+  existing chat dialogs are rebuilt in the Chat rebuild.
+- **Content placed straight in a `Surface` without inner padding** (corrected
+  2026-11-03, Security & Devices). `.sg-surface` intentionally has no outer
+  padding so full-bleed `<Table>`, `.sg-list` and `border-t` footers span edge
+  to edge while `.sg-head` pads its heading by `14px 18px 0`. Placing custom
+  body content (controls, filter rows above tables, charts, donuts, plain lists)
+  directly inside `<Surface>` leaves it hard against the 1 px card border. Wrap
+  custom body content in `px-[18px] pt-2 pb-4` (or `px-[18px] pt-2` for a
+  toolbar row above a full-bleed `<Table>`).
 
 ## File viewing and downloading (approved by Stephan 2026-09-27)
 

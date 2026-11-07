@@ -38,7 +38,7 @@ final class DahuaOnvifCameraDriver extends AbstractOnvifCameraDriver
                 ['label' => 'Dahua Wiki & ONVIF Setup', 'url' => 'https://dahuawiki.com/'],
             ],
             limitationsNote: 'Built from ONVIF Profile S/T specifications; verify ONVIF authentication is enabled under Network › Access Platform › ONVIF.',
-            setupHref: '/security-devices/discovery',
+            setupHref: '/security-devices/setup/hubs?tab=networks',
         );
     }
 

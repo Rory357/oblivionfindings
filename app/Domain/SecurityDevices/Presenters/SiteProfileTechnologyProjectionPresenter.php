@@ -117,10 +117,10 @@ final class SiteProfileTechnologyProjectionPresenter
                 'full' => "/security-devices/sites/{$site->id}",
                 'devices' => "/security-devices/devices?site_id={$site->id}",
                 'monitoring' => $canViewMonitoring
-                    ? "/security-devices/monitoring?site_id={$site->id}"
+                    ? "/security-devices/alerts?site={$site->id}"
                     : null,
                 'maintenance' => $canViewMaintenance
-                    ? "/security-devices/maintenance?site_id={$site->id}"
+                    ? "/security-devices/devices?tab=upkeep&site={$site->id}"
                     : null,
             ],
             'can' => [
@@ -186,7 +186,7 @@ final class SiteProfileTechnologyProjectionPresenter
             'changed_devices' => $changed,
             'total_devices' => $total,
             'observed_at' => $snapshots->max('captured_at')?->toISOString(),
-            'href' => '/security-devices/network-it?tab=configuration-firmware',
+            'href' => '/security-devices/devices?tab=upkeep&upkeep=updates',
         ];
     }
 

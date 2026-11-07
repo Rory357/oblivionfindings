@@ -746,7 +746,17 @@ function TreatmentEntry({
                             ) : (
                                 <>
                                     {data.treated_person_type === 'staff' && (
-                                        <Field label="Staff member">
+                                        <Field
+                                            label="Staff member"
+                                            hint={
+                                                data.site_id &&
+                                                !loading &&
+                                                !optionsError &&
+                                                staffOptions.length === 0
+                                                    ? 'No staff are listed at this Site. Type their name, and ask HR to add this Site to their staff profile.'
+                                                    : undefined
+                                            }
+                                        >
                                             <SelectInput
                                                 frontline
                                                 placeholder="Choose a staff member or type a name"
@@ -807,7 +817,15 @@ function TreatmentEntry({
                                 label="First aider"
                                 required
                                 error={errors.first_aider_id}
-                                hint="This records who gave treatment."
+                                hint={
+                                    // F1 (readiness audit, 6 Nov 2026): an empty list says why, instead of a dead end.
+                                    data.site_id &&
+                                    !loading &&
+                                    !optionsError &&
+                                    firstAiderOptions.length === 0
+                                        ? 'No first aider is listed at this Site. Ask HR to tick “First aider” on the staff profiles of the people trained.'
+                                        : 'This records who gave treatment.'
+                                }
                             >
                                 <SelectInput
                                     frontline

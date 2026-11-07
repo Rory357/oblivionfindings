@@ -9,11 +9,50 @@ use Illuminate\Database\Eloquent\Builder;
 
 class SafeguardingConcernPolicy
 {
-    private const SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
+    private const SITE_BYPASS_PERMISSIONS = UserSiteAccessService::SAFEGUARDING_SITE_BYPASS_PERMISSIONS;
+
+    /** P2: the morph types a concern uses when its alleged perpetrator is a staff member. */
+    public const STAFF_PERPETRATOR_TYPES = ['staff', User::class];
+
+    /** P2: what someone named as the alleged perpetrator sees. It doesn't say why, so it doesn't tell them. */
+    public const NAMED_PERSON_MESSAGE = "You can't open this safeguarding concern. If you think you need to, ask your safeguarding lead.";
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
     ) {}
+
+    /**
+     * P2 (Stephan, 6 Nov 2026: "Block them"): the staff member a concern names as the alleged perpetrator never opens
+     * it, whatever access they hold. Mirrors the incident owner check (IncidentOwnerEligibility).
+     */
+    public function namesAsAllegedPerpetrator(User $user, SafeguardingConcern $concern): bool
+    {
+        return $concern->alleged_perpetrator_id !== null
+            && (int) $concern->alleged_perpetrator_id === (int) $user->id
+            && in_array($concern->alleged_perpetrator_type, [...self::STAFF_PERPETRATOR_TYPES, $user->getMorphClass()], true);
+    }
+
+    /**
+     * P3 (Stephan, 6 Nov 2026: "Their report + status only"): someone who can open a concern only because they
+     * reported it sees what they reported and where it's up to, not the investigation, plans or later notes.
+     */
+    public function isReporterOnly(User $user, SafeguardingConcern $concern): bool
+    {
+        return (int) $concern->reported_by_user_id === (int) $user->id
+            && (int) $concern->assigned_to_user_id !== (int) $user->id
+            && ! $user->canDo('safeguarding.viewAny');
+    }
+
+    /** P2: keeps concerns that name the reader as the alleged perpetrator out of any list query. */
+    public function excludeNamedPerpetrator(Builder $query, User $user): Builder
+    {
+        return $query->where(function (Builder $named) use ($user): void {
+            $named->whereNull('alleged_perpetrator_id')
+                ->orWhere('alleged_perpetrator_id', '!=', $user->id)
+                ->orWhereNull('alleged_perpetrator_type')
+                ->orWhereNotIn('alleged_perpetrator_type', [...self::STAFF_PERPETRATOR_TYPES, $user->getMorphClass()]);
+        });
+    }
 
     /**
      * Determine if the user can view any safeguarding concerns.
@@ -48,6 +87,15 @@ class SafeguardingConcernPolicy
         }
 
         return false;
+    }
+
+    /**
+     * Whether the user may see what the concern says, not only that it exists: view() plus the need-to-know rule the
+     * concern page uses for its locked shell. Attachments, and the person named on its H&S safety review, follow this.
+     */
+    public function viewDetail(User $user, SafeguardingConcern $concern): bool
+    {
+        return $this->view($user, $concern) && $this->canAccessSensitiveConcern($user, $concern);
     }
 
     /**
@@ -129,6 +177,16 @@ class SafeguardingConcernPolicy
      */
     public function applyVisibleScope(Builder $query, User $user): Builder
     {
+        // P2: a concern naming the reader as the alleged perpetrator is never in their lists, counts or tasks.
+        return $this->excludeNamedPerpetrator($this->applySiteScope($query, $user), $user);
+    }
+
+    /**
+     * The Site boundary alone. The concern page uses it to answer "not found" for a concern at someone else's Site
+     * before it gives the alleged perpetrator their plain refusal.
+     */
+    public function applySiteScope(Builder $query, User $user): Builder
+    {
         if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
             return $query;
         }
@@ -157,6 +215,11 @@ class SafeguardingConcernPolicy
 
     private function canAccessConcernSite(User $user, SafeguardingConcern $concern): bool
     {
+        // P2: every check runs through here, so the alleged perpetrator is refused everything.
+        if ($this->namesAsAllegedPerpetrator($user, $concern)) {
+            return false;
+        }
+
         $siteId = is_numeric($concern->site_id) && (int) $concern->site_id > 0
             ? (int) $concern->site_id
             : null;

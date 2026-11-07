@@ -110,20 +110,33 @@ final class EncryptedSpool
         return true;
     }
 
-    /** @return list<array{id: string, source_sequence: int, created_at: string, payload: array<string, mixed>}> */
-    public function readBatch(int $limit, ?DateTimeImmutable $at = null): array
+    /**
+     * The oldest items not yet acknowledged, in order. A batch also stops at about 4 MB, so a few
+     * large items (a settings backup through the hub) never push one upload past the server's
+     * 8 MB request limit; it always carries at least one item.
+     *
+     * @return list<array{id: string, source_sequence: int, created_at: string, payload: array<string, mixed>}>
+     */
+    public function readBatch(int $limit, ?DateTimeImmutable $at = null, int $maxBytes = 4_194_304): array
     {
         $at ??= new DateTimeImmutable('now');
         $limit = max(1, min(1000, $limit));
         $acknowledged = $this->checkpoint->read()['acknowledged_ids'];
+        $batch = [];
+        $bytes = 0;
+        foreach ($this->readFrames() as $frame) {
+            if (in_array($frame['item']['id'], $acknowledged, true)) {
+                continue;
+            }
+            $size = strlen((string) json_encode($frame['item']));
+            if ($batch !== [] && ($bytes + $size > $maxBytes || count($batch) >= $limit)) {
+                break;
+            }
+            $batch[] = $frame['item'];
+            $bytes += $size;
+        }
 
-        return array_values(array_map(
-            fn (array $frame): array => $frame['item'],
-            array_slice(array_filter(
-                $this->readFrames(),
-                fn (array $frame): bool => ! in_array($frame['item']['id'], $acknowledged, true),
-            ), 0, $limit),
-        ));
+        return $batch;
     }
 
     /** @param list<string> $ids */
@@ -159,7 +172,7 @@ final class EncryptedSpool
 
     public function count(?DateTimeImmutable $at = null): int
     {
-        return count($this->readBatch($this->maxItems, $at));
+        return count($this->readBatch($this->maxItems, $at, PHP_INT_MAX));
     }
 
     public function nextSourceSequence(): int

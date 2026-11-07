@@ -54,7 +54,12 @@ class IncidentReportController extends Controller
 
         $filename = 'incident_report_'.now()->format('Ymd_His').'.csv';
 
-        return response()->streamDownload(function () use ($q) {
+        // P4 (Stephan, 6 Nov 2026: "Safeguarding access only"): a safeguarding incident's description, actions,
+        // witnesses and review notes read "Restricted" for anyone without safeguarding access to it, Finance included.
+        $user = $request->user();
+        $sgContent = app(\App\Services\Incidents\IncidentSafeguardingContent::class);
+
+        return response()->streamDownload(function () use ($q, $user, $sgContent) {
             $out = fopen('php://output', 'w');
             $this->putCsv($out, [
                 'Incident ID',
@@ -74,8 +79,11 @@ class IncidentReportController extends Controller
                 'Review Notes',
             ]);
 
-            $q->chunk(500, function ($rows) use ($out) {
+            $q->chunk(500, function ($rows) use ($out, $user, $sgContent) {
+                $sgContent->prime($rows);
                 foreach ($rows as $i) {
+                    $hidden = $sgContent->restricted($user, $i);
+                    $text = fn ($value) => $hidden && filled($value) ? $sgContent::RESTRICTED : $value;
                     $this->putCsv($out, [
                         $i->id,
                         ($i->client?->first_name.' '.$i->client?->last_name),
@@ -83,15 +91,15 @@ class IncidentReportController extends Controller
                         $i->type,
                         $i->severity,
                         $i->occurred_at?->copy()->setTimezone(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
-                        $i->description,
+                        $text($i->description),
                         $i->requires_followup ? 'yes' : 'no',
-                        $i->immediate_action_taken,
-                        $i->witnesses,
+                        $text($i->immediate_action_taken),
+                        $text($i->witnesses),
                         $i->reporter?->name,
                         optional($i->submitted_at)->toDateTimeString(),
                         optional($i->reviewed_at)->toDateTimeString(),
                         $i->reviewed_by,
-                        $i->review_notes,
+                        $text($i->review_notes),
                     ]);
                 }
             });

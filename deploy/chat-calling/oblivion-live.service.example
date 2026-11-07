@@ -1,0 +1,24 @@
+# systemd unit example for Oblivion Live. Unactivated: adjust paths and user on the target host.
+# The gateway keeps no data, so a restart only makes browsers reconnect and catch up.
+[Unit]
+Description=Oblivion Live (Chat live updates)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/oblivion/current
+EnvironmentFile=/etc/oblivion/live.env
+ExecStart=/usr/bin/node live/server.mjs
+Restart=always
+RestartSec=2
+KillSignal=SIGTERM
+TimeoutStopSec=10
+LimitNOFILE=65536
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

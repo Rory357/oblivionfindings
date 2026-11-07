@@ -17,6 +17,7 @@ use App\Services\CurrentAuthorizationReads;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
@@ -36,18 +37,32 @@ final class PpeAccessService
     public function __construct(private readonly AuthorizationEvidenceLockService $authorization,
         private readonly HrCurrentStaffService $staff, private readonly UserSiteAccessService $sites) {}
 
-    public function withCurrentViewer(User $viewer, callable $operation): mixed
+    /**
+     * $retryDeadlocks: a command whose whole effect is this one transaction (no file bytes written inside it) may be
+     * re-run after a MySQL deadlock (1213), when every write rolled back. Only the outermost transaction retries, and
+     * never on a lock-wait timeout, so a busy page doesn't wait several timeouts.
+     */
+    public function withCurrentViewer(User $viewer, callable $operation, bool $retryDeadlocks = false): mixed
     {
-        return DB::transaction(fn () => CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($viewer, $operation) {
-            abort_unless($reads->query(User::query())->whereKey($viewer->id)->exists(), 404);
-            $current = $this->authorization->lockForUserWithoutWaiting($viewer, self::PERMISSIONS);
-            abort_unless($reads->query($this->staff->currentUsersQuery())->whereKey($current->id)->exists(), 403);
-            $current->setRelation('hrEmployeeProfile', $reads->query(HrEmployeeProfile::query())->where('user_id', $current->id)->first());
-            $sites = $this->sites->accessibleSiteIds($current, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, $reads);
-            $result = $operation($current, $reads, $sites);
-            $this->assertDetached($result);
-            return $result;
-        }));
+        $attempts = $retryDeadlocks && DB::transactionLevel() === 0 ? 3 : 1;
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return DB::transaction(fn () => CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($viewer, $operation) {
+                    abort_unless($reads->query(User::query())->whereKey($viewer->id)->exists(), 404);
+                    $current = $this->authorization->lockForUserWithoutWaiting($viewer, self::PERMISSIONS);
+                    abort_unless($reads->query($this->staff->currentUsersQuery())->whereKey($current->id)->exists(), 403);
+                    $current->setRelation('hrEmployeeProfile', $reads->query(HrEmployeeProfile::query())->where('user_id', $current->id)->first());
+                    $sites = $this->sites->accessibleSiteIds($current, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS, $reads);
+                    $result = $operation($current, $reads, $sites);
+                    $this->assertDetached($result);
+                    return $result;
+                }));
+            } catch (QueryException $failure) {
+                if ($attempt >= $attempts || (int) ($failure->errorInfo[1] ?? 0) !== 1213) {
+                    throw $failure;
+                }
+            }
+        }
     }
 
     public function assertOperation(User $current, string $operation): void

@@ -4,6 +4,7 @@ namespace App\Services\Sites\Calendar\Providers;
 
 use App\Models\RespiteBooking;
 use App\Services\Sites\Calendar\CalendarItem;
+use App\Support\WorkerClock;
 use Illuminate\Support\Carbon;
 
 /**
@@ -57,8 +58,10 @@ class RespiteObligationProvider extends ObligationProvider
                     source: 'respite',
                     group: 'auto',
                     title: $name !== '' ? "Respite — {$name}" : 'Respite booking',
-                    start: $this->isoDate($booking->start_at),
-                    end: $this->isoDate($booking->end_at),
+                    // NZ offset, so the .ics all-day DATE is the NZ day (the
+                    // UTC date of a morning arrival is the day before).
+                    start: $this->isoDate($booking->start_at->copy()->setTimezone(WorkerClock::timezone())),
+                    end: $this->isoDate($booking->end_at->copy()->setTimezone(WorkerClock::timezone())),
                     allDay: true,
                     status: $this->bookingStatus($booking->status),
                     owner: $this->ownerArray($booking->coordinator),

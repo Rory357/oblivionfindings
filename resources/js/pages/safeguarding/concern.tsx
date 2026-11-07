@@ -45,12 +45,14 @@ export default function SafeguardingConcernPage({
     }, []);
     const title = detail.restricted
         ? 'Restricted concern'
-        : `${titleCase(detail.concern_type)} — ${detail.people?.subject?.name ?? 'Subject withheld'}`;
+        : detail.reporter_view
+          ? 'Your safeguarding report'
+          : `${titleCase(detail.concern_type)} — ${detail.people?.subject?.name ?? 'Subject withheld'}`;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Home', href: '/dashboard' },
         ...(canSeeRegister
             ? [
-                  { title: 'Health & safety', href: '/health-safety' },
+                  { title: 'Health and safety', href: '/health-safety' },
                   { title: 'Safeguarding', href: '/safeguarding' },
               ]
             : []),

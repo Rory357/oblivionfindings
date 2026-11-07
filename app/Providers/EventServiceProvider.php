@@ -10,6 +10,8 @@ use App\Listeners\AuthEventSubscriber;
 use App\Listeners\Care\NotifyOnBedExit;
 use App\Listeners\Care\NotifyOnFallDetected;
 use App\Listeners\Care\NotifyOnMedicationCabinetOpen;
+use App\Listeners\Chat\CloseChatLiveConnections;
+use App\Listeners\Chat\RevokeChatRelayUse;
 use App\Listeners\It\CreateOrUpdateMonitoringTicket;
 use App\Listeners\It\RecordItEmailDelivery;
 use App\Listeners\ResolveCoverageAlertForAddedSupply;
@@ -86,6 +88,8 @@ class EventServiceProvider extends ServiceProvider
      */
     protected $subscribe = [
         AuthEventSubscriber::class,
+        CloseChatLiveConnections::class,
+        RevokeChatRelayUse::class,
     ];
 
     /**

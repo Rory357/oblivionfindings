@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { FileDropzone, formatFileSize } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -53,9 +54,17 @@ export function PpeCatalogueForm({ command, actorId, type, onClose, onDone }: {
     useEffect(() => { void checkOnMount.current(); }, []);
     const { form, change } = source; const f = form.data;
     const locked = source.busy || source.unresolved || !!source.receipt;
+    // A brand-new record has nothing to have changed: "Check for changes" only appears with a problem notice (decided 6 Nov 2026).
+    const fresh = !type;
+    const loading = fresh && !source.options && !source.checkFailed;
+    const showCheck = !fresh || source.stale || source.checkFailed || source.unresolved || !!source.failure;
     const input = (key: keyof Omit<Values, 'documents'>, label: string, inputType = 'text', required = false, maxLength = 255) =>
         <Field label={label} htmlFor={`${id}-${key}`} required={required} error={form.errors[key]}><Input id={`${id}-${key}`} className="frontline-tap" disabled={locked}
             type={inputType} required={required} maxLength={maxLength} value={f[key]} onChange={(event) => change(key, event.target.value)} /></Field>;
+    // G4-11: dates use the approved calendar (Cancel and Use date), never a native date box.
+    const date = (key: 'purchase_date' | 'expiry_date' | 'next_inspection_due', label: string) =>
+        <Field label={label} htmlFor={`${id}-${key}`} error={form.errors[key]}><DatePicker id={`${id}-${key}`} label={label} value={f[key]} allowClear disabled={locked}
+            invalid={!!form.errors[key]} onChange={(value) => change(key, value)} /></Field>;
     const area = (key: 'description' | 'hazards_addressed', label: string) => <Field label={label} htmlFor={`${id}-${key}`} error={form.errors[key]}><Textarea id={`${id}-${key}`} className="frontline-tap" rows={3} maxLength={2000} value={f[key]} disabled={locked} onChange={(event) => change(key, event.target.value)} /></Field>;
     const select = (key: 'category' | 'ppe_type_id' | 'site_id' | 'condition' | 'inspection_frequency', label: string, choices: { value: string; label: string }[], required = false) =>
         <Field label={label} htmlFor={`${id}-${key}`} required={required} error={form.errors[key]}><SelectInput id={`${id}-${key}`} frontline disabled={locked}
@@ -66,7 +75,7 @@ export function PpeCatalogueForm({ command, actorId, type, onClose, onDone }: {
         {select('site_id', 'Site', (source.options?.sites ?? []).map((row) => ({ value: String(row.id), label: row.name })), true)}
         {input('brand', 'Brand')}{input('model', 'Model')}{input('serial_number', 'Serial number')}{input('quantity', 'Quantity', 'number', true)}
         {input('location', 'Storage location')}{select('condition', 'Condition', CONDITION_OPTIONS.map((value) => ({ value, label: condLabel(value) })), true)}
-        {input('purchase_date', 'Purchase date', 'date')}{input('expiry_date', 'Expiry date', 'date')}{input('next_inspection_due', 'Next inspection due', 'date')}
+        {date('purchase_date', 'Purchase date')}{date('expiry_date', 'Expiry date')}{date('next_inspection_due', 'Next inspection due')}
     </div><p className="text-subtle">Quantity is how many are in this batch. If you choose Unsafe to use, the stock goes on hold until someone decides what to do with it.</p>
         <Field label="Files" labelId={`${id}-evidence`} error={form.errors.documents}><FileDropzone multiple disabled={locked} aria-labelledby={`${id}-evidence`} hint="Up to 20 files · 20 MB each"
             onFiles={(files) => change('documents', [...f.documents, ...files.map((file) => ({ file, kind: file.type.startsWith('image/') ? 'photo' : 'document', note: '' }))])} /></Field>
@@ -97,11 +106,11 @@ export function PpeCatalogueForm({ command, actorId, type, onClose, onDone }: {
         <div className="space-y-5">
             {Object.keys(form.errors).length > 0 && <div role="alert" className="space-y-2 rounded-xl border border-status-critical bg-status-critical-bg p-4"><p className="font-medium">Check these entries</p><ul className="list-inside list-disc text-subtle">{Object.entries(form.errors).map(([key, value]) => <li key={key}>{String(value)}</li>)}</ul></div>}
             {!source.receipt && <><div className="space-y-3">
-                {!source.allowed && <p role="status" className="text-subtle">Select Check for changes before saving. Your entries are kept. Only people who manage PPE can add or change equipment and equipment types — ask your health and safety manager if you need to.</p>}
+                {!source.allowed && !(fresh && (loading || source.checkFailed)) && <p role="status" className="text-subtle">{fresh ? '' : 'Select Check for changes before saving. Your entries are kept. '}Only people who manage PPE can add or change equipment and equipment types — ask your health and safety manager if you need to.</p>}
                 {source.failure && <p role="alert" className="text-subtle text-status-critical">{source.failure}</p>}
                 {source.stale && <p role="alert" className="text-subtle text-status-warning">Someone else changed this while you were working. Check the latest details, then choose Use latest details to save your changes.</p>}
-                <div className="flex flex-wrap gap-3"><Button type="button" className="frontline-tap" variant="outline" disabled={source.busy} onClick={() => void source.checkCurrent()}>{source.checking ? 'Checking…' : 'Check for changes'}</Button>
-                    {source.stale && <Button type="button" className="frontline-tap" variant="outline" disabled={source.busy || !source.reviewAvailable} onClick={() => { source.useCurrent(); setStep(1); }}>Use latest details</Button>}</div>
+                {showCheck && <div className="flex flex-wrap gap-3"><Button type="button" className="frontline-tap" variant="outline" disabled={source.busy} onClick={() => void source.checkCurrent()}>{source.checking ? 'Checking…' : 'Check for changes'}</Button>
+                    {source.stale && <Button type="button" className="frontline-tap" variant="outline" disabled={source.busy || !source.reviewAvailable} onClick={() => { source.useCurrent(); setStep(1); }}>Use latest details</Button>}</div>}
                 {source.reviewAvailable && source.currentType && <ReviewCard icon={ClipboardCheck} title="Latest saved details"><ReviewRow label="Name" value={source.currentType.name} /><ReviewRow label="Category" value={catLabel(source.currentType.category)} /><ReviewRow label="Description" value={source.currentType.description ?? 'Not recorded'} /><ReviewRow label="Hazards it protects against" value={source.currentType.hazards_addressed ?? 'Not recorded'} /><ReviewRow label="Standard it meets" value={source.currentType.standards_reference ?? 'Not recorded'} /><ReviewRow label="How often to inspect" value={source.currentType.inspection_frequency ? FREQUENCY_LABEL(source.currentType.inspection_frequency) : 'Not recorded'} /><ReviewRow label="Typical lifespan" value={source.currentType.typical_lifespan_months == null ? 'Not recorded' : `${source.currentType.typical_lifespan_months} months`} /><ReviewRow label="Status" value={source.currentType.is_active ? 'In use' : 'No longer used'} /></ReviewCard>}
             </div>{source.allowed && !source.checkFailed && (step === 0 ? fields : <ReviewCard icon={ClipboardCheck} title="Your changes" onEdit={() => setStep(0)}>{Object.entries(payload).map(([key, value]) => <ReviewRow key={key} label={FIELD_LABELS[key] ?? humaniseHsValue(key)} value={valueLabel(key, value)} />)}</ReviewCard>)}</>}
             {saved}

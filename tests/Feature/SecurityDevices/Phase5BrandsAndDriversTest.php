@@ -45,6 +45,8 @@ use App\Domain\SecurityDevices\Drivers\Network\CiscoIosConfigDriver;
 use App\Domain\SecurityDevices\Drivers\Network\FortinetFortiOsConfigDriver;
 use App\Domain\SecurityDevices\Drivers\Network\MikroTikRouterOsConfigDriver;
 use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
+use App\Domain\SecurityDevices\Drivers\Telemetry\HubNetflowTelemetryDriver;
+use App\Domain\SecurityDevices\Drivers\Telemetry\HubSyslogTelemetryDriver;
 use App\Domain\SecurityDevices\Iot\Milesight\MilesightLorawanPayloadDecoder;
 use App\Domain\SecurityDevices\Iot\Mqtt\MqttSensorIntakeService;
 use App\Domain\SecurityDevices\Iot\Mqtt\MqttV311Client;
@@ -135,19 +137,31 @@ class Phase5BrandsAndDriversTest extends TestCase
             }
         }
 
+        // S&D rebuild C5: the catalogue lives in Setup › Services & logins › Supported devices.
         $this->actingAs($this->worker)
-            ->get('/security-devices/supported-devices')
+            ->get('/security-devices/setup/services?tab=supported')
             ->assertForbidden();
-
         $this->actingAs($this->admin)
             ->get('/security-devices/supported-devices')
+            ->assertRedirect('/security-devices/setup/services?tab=supported');
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/setup/services?tab=supported')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('security-devices/supported-devices')
-                ->where('summary.total_drivers', count($all))
-                ->where('summary.tested_on_hardware', fn (int $count): bool => $count >= 2)
-                ->where('summary.built_from_docs', fn (int $count): bool => $count >= 16)
-                ->where('summary.planned', fn (int $count): bool => $count >= 7));
+                ->component('security-devices/setup/index')
+                ->where('supported.tables', function ($tables) use ($all): bool {
+                    $rows = collect($tables)->flatMap(fn (array $table): array => $table['rows']);
+                    $levels = $rows->countBy(fn (array $row): string => $row['level']['text']);
+
+                    return $rows->count() === count($all)
+                        // Phase A: nothing is walked on real hardware yet (docs/security-devices/HARDWARE-WALKS.md).
+                        && ($levels['Tested on real hardware'] ?? 0) === 0
+                        && ($levels['Built from vendor docs'] ?? 0) >= 16
+                        && ($levels['Planned'] ?? 0) >= 7
+                        // How we know: every row cites the maker's or the standard's documents.
+                        && $rows->every(fn (array $row): bool => $row['docs'] !== [] && str_starts_with($row['docs'][0]['url'], 'https://'));
+                }));
     }
 
     public function test_camera_drivers_match_brands_and_probe_onvif_profile_t_media2_streams_with_rfc7616_digest_auth_and_sanitised_uris(): void
@@ -301,34 +315,14 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
         $this->assertStringNotContainsString('MUST_STRIP', json_encode($json));
     }
 
-    public function test_sia_dc09_decoder_aes_encryption_and_live_tcp_listener_ingest_contact_id_events_into_alarm_profile(): void
+    /**
+     * Phase A: the decoder and socket checks moved to tests/Unit/SecurityDevices/SiaDc09FrameDecoderTest.php
+     * and tests/Feature/SecurityDevices/SiaDc09ReceiverTest.php, which use reference frames from outside
+     * this codebase. The frames built with our own encoder used the wrong encrypted layout. This test keeps
+     * the panel-state checks on the alarm page.
+     */
+    public function test_sia_dc09_contact_id_events_set_the_alarm_profile_panel_state(): void
     {
-        $decoder = new SiaDc09FrameDecoder;
-
-        // 1. Plaintext ADM-CID frame + tamper rejection
-        $plainFrame = SiaDc09FrameDecoder::wrapBody('"ADM-CID"0042R1L0#1234[#1234|3401 01 005]_10:15:00,10-28-2026');
-        $decoded = $decoder->decode($plainFrame);
-        $this->assertTrue($decoded['ok']);
-        $this->assertSame('ADM-CID', $decoded['token']);
-        $this->assertSame('1234', $decoded['account']);
-
-        $tamperedFrame = str_replace('3401', '1401', $plainFrame);
-        $this->assertSame('crc_mismatch', $decoder->decode($tamperedFrame)['reason_code']);
-
-        // 2. AES-128-CBC encrypted *ADM-CID frame (ANSI/SIA DC-09 §5.4.1 zero IV + random pad + `|`)
-        $aesKey = str_repeat("\x4B", 16);
-        $zeroIv = str_repeat("\x00", 16);
-        $plaintextBlock = str_pad('A1B2C3|#1234|1130 01 003]_10:16:00,10-28-2026', 48, "\x00");
-        $cipherHex = strtoupper(bin2hex((string) openssl_encrypt($plaintextBlock, 'aes-128-cbc', $aesKey, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $zeroIv)));
-        $encryptedFrame = SiaDc09FrameDecoder::wrapBody('"*ADM-CID"0043R1L0#1234['.$cipherHex.']');
-
-        $this->assertSame('encryption_key_required', $decoder->decode($encryptedFrame)['reason_code']);
-        $decrypted = $decoder->decode($encryptedFrame, $aesKey);
-        $this->assertTrue($decrypted['ok']);
-        $this->assertTrue($decrypted['encrypted']);
-        $this->assertStringContainsString('1130 01 003', (string) $decrypted['data']);
-
-        // 3. End-to-end TCP socket listener (`security-devices:sia-dc09-listen --once`) -> DeviceEvent + Alarm profile
         $site = $this->createActiveSite('Kauri House');
         DiscoveryScope::factory()->create([
             'site_id' => $site->id,
@@ -359,12 +353,7 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
         $this->assertFalse($unauth['accepted']);
         $this->assertSame('sender_out_of_scope', $unauth['reason_code']);
 
-        // Authorised closing (arm) followed by burglary alarm over live loopback TCP
-        $probeSock = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
-        $this->assertIsResource($probeSock);
-        $addr = stream_socket_get_name($probeSock, false);
-        $port = (int) substr((string) $addr, (int) strrpos((string) $addr, ':') + 1);
-        fclose($probeSock);
+        // Authorised closing (arm) followed by a burglary alarm
 
         // Ingest arm via service, then burglary via SIA DC-09 intake
         $armFrame = SiaDc09FrameDecoder::wrapBody('"ADM-CID"0007R1L0#4815[#4815|3401 01 002]');
@@ -402,7 +391,6 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
         ]);
         $presentedTriggered = app(DeviceProfilePresenter::class)->present($this->admin, $panelTriggered, $panelTriggered->assignments->first());
         $this->assertSame('triggered', $presentedTriggered['typeProfile']['panelState']);
-        $this->assertGreaterThan(0, $port);
     }
 
     public function test_gallagher_and_inception_alarm_drivers_execute_and_reconcile_governed_arm_and_disarm_commands(): void
@@ -617,28 +605,32 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
             'data' => base64_encode((string) hex2bin('01755c0367ec0004686e077d5802')),
         ], JSON_THROW_ON_ERROR);
 
-        // Invalid signature rejected with 401
+        // Phase A, item A8: Milesight gateways don't sign requests, so the invented X-Milesight-Signature
+        // header is no longer accepted, even with a "correct" HMAC. A wrong secret is refused too.
+        $this->call('POST', "/webhooks/milesight-gateway/{$siteA->id}", [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_X_MILESIGHT_SIGNATURE' => 'sha256='.hash_hmac('sha256', $uplinkBody, $webhookSecret),
+        ], $uplinkBody)->assertStatus(401);
+
         $this->postJson(
             "/webhooks/milesight-gateway/{$siteA->id}",
             json_decode($uplinkBody, true),
-            ['X-Milesight-Signature' => 'sha256=deadbeef'],
+            ['Authorization' => 'Bearer not-the-site-secret'],
         )->assertStatus(401);
 
-        // Valid HMAC-SHA256 signature accepted and updates Sensor profile readings
-        $validSig = 'sha256='.hash_hmac('sha256', $uplinkBody, $webhookSecret);
-        $this->call(
-            'POST',
-            "/webhooks/milesight-gateway/{$siteA->id}",
-            [],
-            [],
-            [],
-            [
+        // The Site's secret, typed into the gateway's HTTP header settings, in each accepted form.
+        foreach ([
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$webhookSecret],
+            ['HTTP_X_OBLIVION_WEBHOOK_TOKEN' => $webhookSecret],
+            ['PHP_AUTH_USER' => 'gateway', 'PHP_AUTH_PW' => $webhookSecret],
+        ] as $credential) {
+            $this->call('POST', "/webhooks/milesight-gateway/{$siteA->id}", [], [], [], [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_ACCEPT' => 'application/json',
-                'HTTP_X_MILESIGHT_SIGNATURE' => $validSig,
-            ],
-            $uplinkBody,
-        )->assertOk()->assertJsonPath('accepted', true);
+                ...$credential,
+            ], $uplinkBody)->assertOk()->assertJsonPath('accepted', true);
+        }
 
         $sensorFresh = $lorawanSensor->fresh()->load([
             'monitors.profile',
@@ -851,7 +843,29 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
         $this->assertStringContainsString('vlan20-guest', $diffText);
     }
 
-    public function test_collector_ingest_isolates_site_hub_syslog_and_netflow_across_overlapping_private_lan_subnets(): void
+    /**
+     * S&D Phase B: the hub-side receiver was removed (no hub sends Syslog or flows yet), so
+     * the hub drivers must say "not built yet" and offer no setup link.
+     */
+    public function test_hub_syslog_and_netflow_drivers_are_listed_as_not_built_yet(): void
+    {
+        $registry = app(DeviceDriverRegistry::class);
+
+        foreach ([HubSyslogTelemetryDriver::KEY, HubNetflowTelemetryDriver::KEY] as $key) {
+            $meta = $registry->find($key)?->metadata();
+            $this->assertNotNull($meta, "Driver {$key} is still listed.");
+            $this->assertSame(DriverSupportLevel::Planned, $meta->supportLevel);
+            $this->assertNull($meta->setupHref);
+            $this->assertStringStartsWith('Not built yet', $meta->summary);
+            $this->assertStringNotContainsString('/security-devices/collectors', json_encode($meta->toArray(), JSON_THROW_ON_ERROR));
+        }
+    }
+
+    /**
+     * The server still accepts Syslog and flow items in a hub upload. No hub sends them today
+     * (Phase B removed the unused hub receiver); this guards the server side's Site isolation.
+     */
+    public function test_collector_ingest_isolates_uploaded_syslog_and_netflow_items_across_overlapping_private_lan_subnets(): void
     {
         $recordedMetrics = [];
         $this->app->instance(TimeSeriesStore::class, new class($recordedMetrics) implements TimeSeriesStore
@@ -958,8 +972,9 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
             'status' => 'active',
         ]);
 
-        $syslogAlpha = '<131>1 2026-10-28T08:00:00Z alpha-gw firewalld 100 - - WAN failover activated on Alpha';
-        $syslogBravo = '<130>1 2026-10-28T08:01:00Z bravo-gw firewalld 101 - - PSU fault detected on Bravo';
+        // Relative times: SyslogDecoder refuses messages more than 24 hours old, so fixed dates rot.
+        $syslogAlpha = '<131>1 '.CarbonImmutable::now('UTC')->subMinutes(2)->format('Y-m-d\TH:i:s\Z').' alpha-gw firewalld 100 - - WAN failover activated on Alpha';
+        $syslogBravo = '<130>1 '.CarbonImmutable::now('UTC')->subMinute()->format('Y-m-d\TH:i:s\Z').' bravo-gw firewalld 101 - - PSU fault detected on Bravo';
 
         // Build 1-record NetFlow v5 packet (24-byte header + 48-byte record = 72 bytes)
         $nowUnix = CarbonImmutable::now('UTC')->timestamp;

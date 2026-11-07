@@ -1,9 +1,11 @@
 /**
  * The incident page (approved H&S drawings pg-hsn-2 … 2j, Stephan 23 Oct
- * 2026): one record header with the facts, the six-stage line and who does
- * what next; one row of tabs (Overview, Follow-ups, Safety review, Evidence,
- * History); the owner, the closing checks and the linked records in the side
- * column. Every command keeps its own guarded dialog.
+ * 2026; board M14, Stephan 1 Nov 2026): one record header with the facts and
+ * the round status steps (Reported › Assigned › Manager review › Closed),
+ * which pick the step shown in the Progress card under the header — its fixed
+ * next-step bar holds the page's only filled button. One row of tabs; the
+ * owner, closure readiness (one line) and the linked safety review in the
+ * side column. Every command keeps its own guarded dialog.
  */
 import {
     ACTION_META,
@@ -16,21 +18,30 @@ import {
     safeguardingEscalation,
     SafeguardingEscalationText,
     TimelineSection,
-    type IncidentDetail,
     type LifecycleAction,
 } from '@/components/incidents/incident-detail-dialog';
 import {
     IncidentOwnershipPanel,
     incidentAssignLabel,
 } from '@/components/incidents/incident-ownership-panel';
+import { IncidentNotePopup } from '@/components/incidents/incident-note-popup';
+import {
+    currentIncidentStep,
+    IncidentClosureReadiness,
+    incidentNextBar,
+    incidentRoundSteps,
+    incidentStepPane,
+    LinkedSafetyReviewCard,
+    type IncidentNoteField,
+    type IncidentProgressDetail,
+    type IncidentStepKey,
+} from '@/components/incidents/incident-progress';
 import { IncidentRecordActionDialog } from '@/components/incidents/incident-record-action-dialog';
 import { IncidentResponseRequestDialog } from '@/components/incidents/incident-response-request-dialog';
 import {
     dateTimeWithYear,
     dateWithYear,
     daysSince,
-    incidentNextStep,
-    incidentStageLine,
     incidentTypeLabel,
     ownerNeeded,
     plural,
@@ -64,7 +75,7 @@ import {
 } from '@/components/page/grouped-profile-nav';
 import {
     PageHeaderFacts,
-    PageHeaderStages,
+    PageHeaderSteps,
     type PageHeaderFact,
 } from '@/components/page/page-header-strip';
 import {
@@ -73,14 +84,13 @@ import {
     Note,
     PeopleCards,
     Ring,
-    RingCard,
     RowList,
     SideColumn,
-    Story,
     Surface,
     type LogItem,
     type PersonCardItem,
 } from '@/components/signature/blocks';
+import { RecordProgress } from '@/components/signature/record-progress';
 import { Button } from '@/components/ui/button';
 import {
     Popover,
@@ -89,7 +99,6 @@ import {
 } from '@/components/ui/popover';
 import { useIncidentWorkspaceDrafts } from '@/hooks/use-incident-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatTime } from '@/lib/datetime';
 import { incidentRegisterReturn, incidentReturnLabel } from '@/lib/incidents/navigation';
 import { JOURNEY_TERM_DEFINITIONS } from '@/lib/journey-labels';
 import type { SharedData } from '@/types';
@@ -102,8 +111,8 @@ import {
     HeartPulse,
     LinkIcon,
     ListTodo,
-    MapPin,
     Paperclip,
+    FileDown,
     Pencil,
     RadioTower,
     RotateCw,
@@ -113,7 +122,7 @@ import {
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 
 type Section = 'overview' | 'care' | 'followups' | 'investigation' | 'evidence' | 'history' | 'linked';
-type IncidentWorkspaceDetail = IncidentDetail & {
+type IncidentWorkspaceDetail = IncidentProgressDetail & {
     recording_evidence?: RecordingReferenceEvidenceData;
     recording_preview?: RecordingPreview;
 };
@@ -132,16 +141,9 @@ const SECTIONS: (PageHeaderRailItem<Section> & { icon: typeof FileText })[] = [
 /** Older deep links. */
 const LEGACY_SECTIONS: Record<string, Section> = {};
 
-const SOURCE_STORY: Record<string, string> = {
-    manual: 'Staff report',
-    control_room: 'Control room',
-    sensor: 'Sensor',
-    automated: 'Automated',
-};
-
 const BREADCRUMB_ROOT = [
     { title: 'Home', href: '/dashboard' },
-    { title: 'Health & safety', href: '/health-safety' },
+    { title: 'Health and safety', href: '/health-safety' },
 ];
 
 /** Permanent record workspace; only bounded edits and decisions open a dialog. */
@@ -256,11 +258,14 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
     const [requestResponse, setRequestResponse] = useState(false);
     const [assignOpen, setAssignOpen] = useState(false);
     const [findOpen, setFindOpen] = useState(false);
+    const [noteField, setNoteField] = useState<IncidentNoteField | null>(null);
+    // The picked step (null: the step the incident is on).
+    const [picked, setPicked] = useState<IncidentStepKey | null>(null);
     const [recordingsLoading, setRecordingsLoading] = useState(false);
     const recordingVisitPending = useRef(false);
     const openFind = useCallback(() => {
-        if (!action && !requestResponse && !assignOpen) setFindOpen(true);
-    }, [action, requestResponse, assignOpen]);
+        if (!action && !requestResponse && !assignOpen && !noteField) setFindOpen(true);
+    }, [action, requestResponse, assignOpen, noteField]);
     useGroupedProfileSearchShortcut(openFind);
 
     const reference = d.ref ?? `INC-${d.id}`;
@@ -304,25 +309,22 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                   : null;
     const responseActive = d.journey_state === 'Operational response active';
     const responseHref = responseActive ? d.control_room_alert?.url : null;
-    const canEditDraft = d.can.update && d.status === 'draft';
-    const primary = responseHref
-        ? 'response'
-        : needed && canAssign
-          ? 'assign'
-          : recordAction
-            ? 'record'
-            : canEditDraft
-              ? 'edit'
-              : d.can.requestResponse
-                ? 'request'
-                : null;
+    const canEditDraft = d.can.update && d.status === 'draft' && !d.content_restricted;
 
-    const line = incidentStageLine(d);
-    const next = incidentNextStep(d, line, {
-        readOnly,
+    // The Progress card's fixed next-step bar holds the page's only filled button; the header keeps the rest as
+    // glass buttons, never offering the bar's action a second time.
+    const nextBar = incidentNextBar(d, {
+        onRecord: setAction,
+        onAssign: () => setAssignOpen(true),
         responseActive,
         responseHref,
     });
+    const currentStep = currentIncidentStep(d);
+    const selectedStep = picked ?? currentStep;
+    const pickStep = (key: string) => {
+        const step = (['reported', 'assigned', 'review', 'closed'] as const).find((item) => item === key);
+        if (step) setPicked(step === currentStep ? null : step);
+    };
 
     const onSection = (nextSection: Section) =>
         router.get(
@@ -406,14 +408,17 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                   label: 'Owner',
                   tone: 'warning' as const,
               }
-            : d.status === 'closed'
-              ? { value: dateWithYear(d.closed_at, ''), label: 'Closed' }
-              : (() => {
-                    const days = daysSince(d.occurred_at);
-                    return days === null
-                        ? { value: '' }
-                        : { value: plural(days, 'day'), label: 'Open for' };
-                })(),
+            : ownership?.state === 'assigned' && ownership.owner
+              ? { value: ownership.owner.name, label: 'Incident owner' }
+              : { value: '' },
+        d.status === 'closed'
+            ? { value: dateWithYear(d.closed_at, ''), label: 'Closed' }
+            : (() => {
+                  const days = daysSince(d.occurred_at);
+                  return days === null
+                      ? { value: '' }
+                      : { value: plural(days, 'day'), label: 'Open for' };
+              })(),
         ...(worksafePending(worksafe.notifiable, worksafe.status)
             ? [{ value: 'To notify', label: 'WorkSafe', tone: 'warning' as const }]
             : []),
@@ -428,74 +433,65 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
             : []),
     ];
 
-    const recordButton = (glass: boolean) => {
-        if (!recordAction) return null;
-        const Comp = glass ? PageHeaderGlassButton : PageHeaderPrimaryButton;
-        return (
-            <Comp
-                onClick={() => setAction(recordAction)}
-                disabled={recordAction === 'close' && !d.close_gate.allowed}
-            >
-                {ACTION_META[recordAction].title}
-            </Comp>
-        );
-    };
+    // A record action the bar isn't offering stays reachable as a glass header button, and only when it can be done
+    // now (no disabled buttons: the bar says what is left).
+    const headerRecordAction =
+        recordAction &&
+        nextBar.owns !== recordAction &&
+        !(recordAction === 'close' && !d.close_gate.allowed)
+            ? recordAction
+            : null;
     const actions = (
         <>
-            {canAssign && primary !== 'assign' ? (
+            {canAssign && nextBar.owns !== 'assign' ? (
                 <PageHeaderGlassButton onClick={() => setAssignOpen(true)}>
                     {incidentAssignLabel(ownership!)}
                 </PageHeaderGlassButton>
             ) : null}
-            {recordAction && primary !== 'record' ? recordButton(true) : null}
-            {canEditDraft && primary !== 'edit' ? (
+            {headerRecordAction ? (
+                <PageHeaderGlassButton onClick={() => setAction(headerRecordAction)}>
+                    {ACTION_META[headerRecordAction].title}
+                </PageHeaderGlassButton>
+            ) : null}
+            {canEditDraft ? (
                 <PageHeaderGlassButton icon={Pencil} onClick={() => setAction('edit')}>
                     Edit draft
                 </PageHeaderGlassButton>
             ) : null}
-            {d.can.requestResponse && primary !== 'request' ? (
+            {d.can.download_pdf ? (
+                // Board M5c note: the closed incident's final record, for whole-record viewers (answer 21).
+                <PageHeaderGlassButton icon={FileDown} onClick={() => window.location.assign(`/incidents/${d.id}/pdf`)}>
+                    Download PDF
+                </PageHeaderGlassButton>
+            ) : null}
+            {d.can.requestResponse ? (
                 <PageHeaderGlassButton icon={RadioTower} onClick={() => setRequestResponse(true)}>
                     Request Control Room response
                 </PageHeaderGlassButton>
             ) : null}
             <StatusGuide />
-            {primary === 'response' && responseHref ? (
-                <PageHeaderPrimaryButton asChild icon={RadioTower}>
-                    <Link href={responseHref}>Open response</Link>
-                </PageHeaderPrimaryButton>
-            ) : primary === 'assign' ? (
-                <PageHeaderPrimaryButton onClick={() => setAssignOpen(true)}>
-                    {incidentAssignLabel(ownership!)}
-                </PageHeaderPrimaryButton>
-            ) : primary === 'record' ? (
-                recordButton(false)
-            ) : primary === 'edit' ? (
-                <PageHeaderPrimaryButton icon={Pencil} onClick={() => setAction('edit')}>
-                    Edit draft
-                </PageHeaderPrimaryButton>
-            ) : primary === 'request' ? (
-                <PageHeaderPrimaryButton icon={RadioTower} onClick={() => setRequestResponse(true)}>
-                    Request Control Room response
-                </PageHeaderPrimaryButton>
-            ) : null}
         </>
     );
 
     const occurred = d.occurred_at ? dateTimeWithYear(d.occurred_at) : 'Occurrence time not recorded';
     const subline = [
-        reference,
+        `Incident ${reference}`,
         d.client ? (d.client.site ?? person) : 'No person linked',
         occurred,
-        ownership?.state === 'assigned' && ownership.owner ? `Owner ${ownership.owner.name}` : null,
     ]
         .filter(Boolean)
         .join(' · ');
 
     const linkedItems = linkedRecordItems(d, person);
-    const linkedList = linkedItems.length ? (
-        <RowList title={readOnly ? 'Other linked records' : 'Linked records'} items={linkedItems} />
-    ) : null;
+    const linkedList = linkedItems.length ? <RowList title="Associated records" items={linkedItems} /> : null;
     const showGate = !readOnly && d.status !== 'closed' && d.close_gate.requirements.length > 0;
+    const stepPane = incidentStepPane(d, selectedStep, {
+        onBack: selectedStep !== currentStep ? () => setPicked(null) : undefined,
+        onHistory: () => onSection('history'),
+        onSection,
+        onAssign: () => setAssignOpen(true),
+        onAddNote: setNoteField,
+    });
 
     return (
         <AppLayout
@@ -531,9 +527,10 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                         actions={actions}
                         facts={<PageHeaderFacts items={facts} />}
                         strip={
-                            <PageHeaderStages
-                                steps={line.steps}
-                                next={next}
+                            <PageHeaderSteps
+                                steps={incidentRoundSteps(d)}
+                                selected={selectedStep}
+                                onSelect={pickStep}
                                 ariaLabel="Where the incident is up to"
                             />
                         }
@@ -550,109 +547,112 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                     />
                 }
             >
-                <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-                    <div
-                        id="incident-workspace-panel"
-                        role="tabpanel"
-                        aria-label={SECTIONS.find((item) => item.key === section)?.label}
-                        className="grid min-w-0 gap-5"
-                    >
-                        {/* Keep entered follow-up/action text mounted when changing sections. */}
-                        <section hidden={section !== 'overview'} aria-label="Incident summary" className="grid min-w-0 gap-5">
-                            <OverviewMain
-                                d={d}
-                                person={person}
-                                readOnly={readOnly}
-                                linkedList={readOnly ? linkedList : null}
-                                onHistory={() => onSection('history')}
-                            />
-                        </section>
-                        <section hidden={section !== 'care'} aria-label="Injury and first aid" className="grid min-w-0 gap-5">
-                            <RowList
-                                title="Injury and first aid"
-                                sub="First aid, restraints and other health records linked to this incident. Each keeps its own record and who can see it."
-                                items={careItems}
-                                empty="No first aid, restraint or other health record is linked to this incident."
-                            />
-                        </section>
-                        <section hidden={section !== 'followups'} aria-label="Incident follow-ups">
-                            <FollowupsSection
-                                d={d}
-                                onComplete={completeFollowup}
-                                onDraftStateChange={drafts.onFollowupDraft}
-                            />
-                        </section>
-                        <section hidden={section !== 'investigation'} aria-label="Incident safety review" className="grid min-w-0 gap-5">
-                            <InvestigationSection
-                                d={d}
-                                onDraftStateChange={drafts.onCorrectiveActionDraft}
-                            />
-                            {d.linked_operational_evidence?.access !== 'restricted' ? (
-                                <LinkedOperationalEvidence
-                                    evidence={d.linked_operational_evidence}
-                                    showSource={false}
+                <div className="grid min-w-0 gap-5">
+                    <RecordProgress next={nextBar} pane={stepPane} />
+                    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                        <div
+                            id="incident-workspace-panel"
+                            role="tabpanel"
+                            aria-label={SECTIONS.find((item) => item.key === section)?.label}
+                            className="grid min-w-0 gap-5"
+                        >
+                            {/* Keep entered follow-up/action text mounted when changing sections. */}
+                            <section hidden={section !== 'overview'} aria-label="Incident overview" className="grid min-w-0 gap-5">
+                                <OverviewMain
+                                    d={d}
+                                    person={person}
+                                    readOnly={readOnly}
+                                    linkedList={linkedList}
+                                    onHistory={() => onSection('history')}
                                 />
-                            ) : null}
-                        </section>
-                        <section hidden={section !== 'evidence'} aria-label="Incident evidence" className="grid min-w-0 gap-5">
-                            <PhotosSection d={d} />
-                            <RecordingWindowEditor
-                                preview={d.recording_preview}
-                                actorId={props.auth.user.id}
-                                incidentId={d.id}
-                                refreshing={recordingsLoading}
-                                onDraftStateChange={drafts.onRecordingWindowDraft}
-                                requestDiscard={drafts.request}
-                                onSaved={() => onRecordingPageChange(1)}
-                                onRefresh={() => onRecordingPageChange(d.recording_evidence?.references.page ?? 1)}
-                            />
-                            <RecordingReferenceChooser
-                                actorId={props.auth.user.id}
-                                incidentId={d.id}
-                                preview={d.recording_preview}
-                                evidence={d.recording_evidence}
-                                refreshing={recordingsLoading}
-                                onDraftStateChange={drafts.onRecordingReferenceDraft}
-                                requestDiscard={drafts.request}
-                                onSaved={() => onRecordingPageChange(1)}
-                                onRefresh={() => onRecordingPageChange(d.recording_evidence?.references.page ?? 1)}
-                            />
-                            {d.recording_evidence ? (
-                                <RecordingReferenceEvidence
+                            </section>
+                            <section hidden={section !== 'care'} aria-label="Injury and first aid" className="grid min-w-0 gap-5">
+                                <RowList
+                                    title="Injury and first aid"
+                                    sub="First aid, restraints and other health records linked to this incident. Each keeps its own record and who can see it."
+                                    items={careItems}
+                                    empty="No first aid, restraint or other health record is linked to this incident."
+                                />
+                            </section>
+                            <section hidden={section !== 'followups'} aria-label="Incident follow-ups">
+                                <FollowupsSection
+                                    d={d}
+                                    onComplete={completeFollowup}
+                                    onDraftStateChange={drafts.onFollowupDraft}
+                                />
+                            </section>
+                            <section hidden={section !== 'investigation'} aria-label="Incident safety review" className="grid min-w-0 gap-5">
+                                <InvestigationSection
+                                    d={d}
+                                    onDraftStateChange={drafts.onCorrectiveActionDraft}
+                                />
+                                {d.linked_operational_evidence?.access !== 'restricted' ? (
+                                    <LinkedOperationalEvidence
+                                        evidence={d.linked_operational_evidence}
+                                        showSource={false}
+                                    />
+                                ) : null}
+                            </section>
+                            <section hidden={section !== 'evidence'} aria-label="Incident evidence" className="grid min-w-0 gap-5">
+                                <PhotosSection d={d} />
+                                <RecordingWindowEditor
+                                    preview={d.recording_preview}
+                                    actorId={props.auth.user.id}
                                     incidentId={d.id}
+                                    refreshing={recordingsLoading}
+                                    onDraftStateChange={drafts.onRecordingWindowDraft}
+                                    requestDiscard={drafts.request}
+                                    onSaved={() => onRecordingPageChange(1)}
+                                    onRefresh={() => onRecordingPageChange(d.recording_evidence?.references.page ?? 1)}
+                                />
+                                <RecordingReferenceChooser
+                                    actorId={props.auth.user.id}
+                                    incidentId={d.id}
+                                    preview={d.recording_preview}
                                     evidence={d.recording_evidence}
-                                    onPageChange={onRecordingPageChange}
-                                    loading={recordingsLoading}
+                                    refreshing={recordingsLoading}
+                                    onDraftStateChange={drafts.onRecordingReferenceDraft}
+                                    requestDiscard={drafts.request}
+                                    onSaved={() => onRecordingPageChange(1)}
+                                    onRefresh={() => onRecordingPageChange(d.recording_evidence?.references.page ?? 1)}
                                 />
-                            ) : (
-                                <p role="status" className="text-subtle">
-                                    Recording reference information is unavailable. Reload the incident to check current access.
-                                </p>
-                            )}
-                        </section>
-                        <section hidden={section !== 'history'} aria-label="Incident history">
-                            <TimelineSection d={d} />
-                        </section>
-                        <section hidden={section !== 'linked'} aria-label="Linked records">
-                            <LinkedSection d={d} clientName={person} />
-                        </section>
+                                {d.recording_evidence ? (
+                                    <RecordingReferenceEvidence
+                                        incidentId={d.id}
+                                        evidence={d.recording_evidence}
+                                        onPageChange={onRecordingPageChange}
+                                        loading={recordingsLoading}
+                                    />
+                                ) : (
+                                    <p role="status" className="text-subtle">
+                                        Recording reference information is unavailable. Reload the incident to check current access.
+                                    </p>
+                                )}
+                            </section>
+                            <section hidden={section !== 'history'} aria-label="Incident history">
+                                <TimelineSection d={d} />
+                            </section>
+                            <section hidden={section !== 'linked'} aria-label="Linked records">
+                                <LinkedSection d={d} clientName={person} />
+                            </section>
+                        </div>
+                        <aside aria-label="Incident owner, closure readiness and the linked safety review">
+                            <SideColumn>
+                                {ownership ? (
+                                    <IncidentOwnershipPanel
+                                        incidentId={d.id}
+                                        reference={reference}
+                                        ownership={ownership}
+                                        assignOpen={assignOpen}
+                                        onAssignOpenChange={setAssignOpen}
+                                        showAssign={false}
+                                    />
+                                ) : null}
+                                {showGate ? <IncidentClosureReadiness d={d} /> : null}
+                                <LinkedSafetyReviewCard d={d} />
+                            </SideColumn>
+                        </aside>
                     </div>
-                    <aside aria-label="Incident owner, closing checks and linked records">
-                        <SideColumn>
-                            {ownership ? (
-                                <IncidentOwnershipPanel
-                                    incidentId={d.id}
-                                    reference={reference}
-                                    ownership={ownership}
-                                    assignOpen={assignOpen}
-                                    onAssignOpenChange={setAssignOpen}
-                                    showAssign={false}
-                                />
-                            ) : null}
-                            {showGate ? <ClosingChecks d={d} /> : null}
-                            {readOnly ? null : linkedList}
-                        </SideColumn>
-                    </aside>
                 </div>
             </PageLayout>
             <TabSearchPalette
@@ -676,6 +676,17 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                 <IncidentResponseRequestDialog
                     detail={d}
                     onClose={() => setRequestResponse(false)}
+                />
+            ) : null}
+            {noteField && d.can.add_note ? (
+                <IncidentNotePopup
+                    key={noteField}
+                    incidentId={d.id}
+                    reference={reference}
+                    reporter={d.reporter?.name ?? null}
+                    field={noteField}
+                    words={noteField === 'what_happened' ? d.description : d.immediate_action_taken}
+                    onClose={() => setNoteField(null)}
                 />
             ) : null}
         </AppLayout>
@@ -704,42 +715,7 @@ function OverviewMain({
     const crRestricted =
         evidence?.access === 'restricted' ||
         (!evidence?.source && d.linked_access?.control_room === 'restricted');
-    const isNearMiss = d.type === 'near_miss';
-    const story = (
-        <Story
-            title="What happened"
-            sub={
-                d.reporter?.name
-                    ? `From ${d.reporter.name}’s report${d.submitted_at ? ` · ${dateTimeWithYear(d.submitted_at)}` : ''}`
-                    : undefined
-            }
-            facts={[
-                ...(d.client?.site ? [{ icon: MapPin, text: d.client.site }] : []),
-                ...(d.occurred_at
-                    ? [
-                          {
-                              icon: Clock,
-                              text: (
-                                  <>
-                                      <b>{formatDate(d.occurred_at)}</b>, {formatTime(d.occurred_at)}
-                                  </>
-                              ),
-                          },
-                      ]
-                    : []),
-                { icon: FileText, text: SOURCE_STORY[d.source] ?? incidentTypeLabel(d.source) },
-                ...(isNearMiss && d.potential_severity
-                    ? [{ icon: ShieldAlert, text: `Could have been ${(SEVERITY_LABELS[d.potential_severity] ?? d.potential_severity).toLowerCase()}` }]
-                    : []),
-            ]}
-            paras={[
-                { h: 'What happened', t: d.description || 'Not recorded' },
-                { h: 'What staff did straight away', t: d.immediate_action_taken || 'Not recorded' },
-                ...(d.witnesses ? [{ h: 'Witnesses', t: d.witnesses }] : []),
-                ...(isNearMiss && d.potential_consequence ? [{ h: 'Could have caused', t: d.potential_consequence }] : []),
-            ]}
-        />
-    );
+    // Board M14: no "Incident summary" card here — the report's words are the Progress card's "Reported" step.
     const timeline = minuteByMinute(d);
     const people = peopleInvolved(d, person);
     return (
@@ -749,8 +725,14 @@ function OverviewMain({
                     <SafeguardingEscalationText d={d} />
                 </Note>
             ) : null}
+            {d.content_restricted ? (
+                <Note icon={ShieldAlert}>
+                    This is a safeguarding incident. What happened, what was
+                    done, who saw it and its files show only to people with
+                    safeguarding access.
+                </Note>
+            ) : null}
             {worksafe.notifiable ? <WorksafeClock d={d} /> : null}
-            {story}
             {!readOnly && timeline.items.length > 2 ? (
                 <Log
                     title="Minute by minute"
@@ -805,7 +787,7 @@ function WorksafeClock({ d }: { d: IncidentWorkspaceDetail }) {
             }
             actions={
                 d.hs_event?.url ? (
-                    <Button asChild size="sm">
+                    <Button asChild size="sm" variant="outline">
                         <Link href={d.hs_event.url}>Open safety review</Link>
                     </Button>
                 ) : undefined
@@ -887,51 +869,4 @@ function peopleInvolved(d: IncidentWorkspaceDetail, person: string): PersonCardI
         }
     }
     return people;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Side column                                                        */
-/* ------------------------------------------------------------------ */
-
-const GATE_LABELS: Record<string, string> = {
-    incident_review: 'Finish the manager review',
-    incident_followups: 'Finish all follow-ups',
-    incident_investigation: 'Finish the investigation',
-};
-
-/** The server's closing checks, read by their rings; unmet ones link to where they're finished. */
-function ClosingChecks({ d }: { d: IncidentWorkspaceDetail }) {
-    const done = d.close_gate.requirements.filter((item) => item.complete).length;
-    return (
-        <section aria-label="Transition requirements">
-            <RingCard
-                value={done}
-                of={d.close_gate.requirements.length}
-                label={d.close_gate.allowed ? 'Ready to close' : 'Not closed yet'}
-                sub={d.close_gate.allowed ? 'Everything needed to close is done' : 'Finish these before you close it'}
-                checks={d.close_gate.requirements.map((item) => {
-                    const label = item.complete
-                        ? item.label
-                        : item.key === 'health_safety_governance' && item.href && d.hs_event
-                          ? `Close safety review ${d.hs_event.reference_number}`
-                          : (GATE_LABELS[item.key] ?? item.label);
-                    return {
-                        state: item.complete ? ('success' as const) : ('warning' as const),
-                        label:
-                            !item.complete && item.href ? (
-                                <Link
-                                    href={item.href}
-                                    aria-label={label}
-                                    className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                                >
-                                    {label}
-                                </Link>
-                            ) : (
-                                label
-                            ),
-                    };
-                })}
-            />
-        </section>
-    );
 }

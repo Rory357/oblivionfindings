@@ -135,6 +135,12 @@ export type ProcedureWorkspaceDetail = Omit<
         snapshot?: Record<string, unknown> | null;
     }[];
     review_requests: ProcedureRequest[];
+    /** Set once a never-published draft is withdrawn (6 Nov 2026). */
+    withdrawal?: {
+        reason: string | null;
+        by: Actor | null;
+        at: string | null;
+    } | null;
     can: {
         view: boolean;
         create: boolean;
@@ -144,6 +150,7 @@ export type ProcedureWorkspaceDetail = Omit<
         approve: boolean;
         request_changes: boolean;
         record_review: boolean;
+        withdraw?: boolean;
         archive: boolean;
         restore: boolean;
         add_evidence: boolean;

@@ -116,6 +116,8 @@ export interface RaDetail extends RaRow {
     };
     review_completion_gate?: { eligible: boolean; reasons: string[] };
     history?: RaHistoryEntry[];
+    /** #13: whether the sealed change history checks out ('broken' hides the history and the change buttons). */
+    history_integrity?: { state: 'checked' | 'unsealed' | 'unavailable' | 'broken'; sealed_count: number; sealed_since: string | null };
     connections?: RaConnections;
     form: RaFormPrefill;
 }
@@ -129,6 +131,8 @@ export interface RaHistoryEntry {
     note: string | null;
     snapshot: Record<string, string | number | boolean | null | string[]>;
     legacy: boolean;
+    /** #13: a sealed change: its number in the chain and what it changed against the sealed change before it. */
+    sealed?: { change: number; changes: { field: string; before: string | number | boolean | null; after: string | number | boolean | null }[] } | null;
 }
 
 export interface RaConnectedWork {

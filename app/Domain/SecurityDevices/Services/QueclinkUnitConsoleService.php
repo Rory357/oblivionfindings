@@ -312,7 +312,7 @@ final class QueclinkUnitConsoleService
             ->first();
     }
 
-    private function resolveFamily(?QueclinkDevice $tracker, Device $device): string
+    public function resolveFamily(?QueclinkDevice $tracker, Device $device): string
     {
         $haystack = strtolower(implode(' ', array_filter([
             $tracker?->model_hint,

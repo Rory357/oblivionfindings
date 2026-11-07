@@ -65,13 +65,12 @@ import {
 import { useEffect, useState } from 'react';
 
 // ---------------------------------------------------------------------------
-// Static data -- Export modules grouped by category
+// Static data -- Export modules grouped by category (no record counts: they were placeholders, F7 6 Nov 2026)
 // ---------------------------------------------------------------------------
 
 interface ExportModule {
     id: string;
     label: string;
-    count: number;
     encrypted?: boolean;
 }
 
@@ -88,24 +87,20 @@ const exportCategories: ExportCategory[] = [
             {
                 id: 'clients',
                 label: 'Clients & Personal Information',
-                count: 342,
             },
-            { id: 'care-plans', label: 'Care Plans & Goals', count: 289 },
+            { id: 'care-plans', label: 'Care Plans & Goals' },
             {
                 id: 'service-agreements',
                 label: 'Service Agreements & Funding',
-                count: 156,
             },
-            { id: 'progress-notes', label: 'Progress Notes', count: 8430 },
+            { id: 'progress-notes', label: 'Progress Notes' },
             {
                 id: 'client-consents',
                 label: 'Client Consents & Withdrawals',
-                count: 412,
             },
             {
                 id: 'client-funds',
                 label: 'Client Funds & Transactions',
-                count: 1870,
             },
         ],
     },
@@ -116,25 +111,21 @@ const exportCategories: ExportCategory[] = [
             {
                 id: 'medical-profiles',
                 label: 'Medical Profiles & Conditions',
-                count: 318,
                 encrypted: true,
             },
             {
                 id: 'medications',
                 label: 'Medications & MAR Records',
-                count: 2640,
                 encrypted: true,
             },
             {
                 id: 'emergency-contacts',
                 label: 'Emergency Contacts',
-                count: 685,
                 encrypted: true,
             },
             {
                 id: 'risk-assessments',
                 label: 'Risk Assessments',
-                count: 198,
                 encrypted: true,
             },
         ],
@@ -142,11 +133,11 @@ const exportCategories: ExportCategory[] = [
     {
         name: 'Operations',
         modules: [
-            { id: 'shifts', label: 'Shifts & Timesheets', count: 12840 },
-            { id: 'rostering', label: 'Rostering & Availability', count: 3200 },
-            { id: 'incidents', label: 'Incidents & Investigations', count: 67 },
-            { id: 'safeguarding', label: 'Safeguarding Records', count: 23 },
-            { id: 'documents', label: 'Documents & Files', count: 1205 },
+            { id: 'shifts', label: 'Shifts & Timesheets' },
+            { id: 'rostering', label: 'Rostering & Availability' },
+            { id: 'incidents', label: 'Incidents & Investigations' },
+            { id: 'safeguarding', label: 'Safeguarding Records' },
+            { id: 'documents', label: 'Documents & Files' },
         ],
     },
     {
@@ -155,37 +146,34 @@ const exportCategories: ExportCategory[] = [
             {
                 id: 'staff-records',
                 label: 'Staff Records & Credentials',
-                count: 920,
             },
             {
                 id: 'leave-attendance',
                 label: 'Leave & Attendance',
-                count: 4100,
             },
-            { id: 'training', label: 'Training & Compliance', count: 1560 },
-            { id: 'payroll', label: 'Payroll & Expenses', count: 7300 },
+            { id: 'training', label: 'Training & Compliance' },
+            { id: 'payroll', label: 'Payroll & Expenses' },
         ],
     },
     {
         name: 'Sites & Compliance',
         modules: [
-            { id: 'sites', label: 'Sites & Locations', count: 18 },
+            { id: 'sites', label: 'Sites & Locations' },
             {
                 id: 'certifications',
                 label: 'Certifications & Compliance Checks',
-                count: 42,
             },
-            { id: 'respite', label: 'Respite Bookings', count: 156 },
+            { id: 'respite', label: 'Respite Bookings' },
         ],
     },
     {
         name: 'Other',
         modules: [
-            { id: 'fleet', label: 'Fleet & Assets', count: 34 },
-            { id: 'governance', label: 'Governance & Board', count: 45 },
-            { id: 'audit-logs', label: 'Audit Logs', count: 54200 },
-            { id: 'notifications', label: 'Notifications', count: 31000 },
-            { id: 'control-room', label: 'Control Room Logs', count: 2890 },
+            { id: 'fleet', label: 'Fleet & Assets' },
+            { id: 'governance', label: 'Governance & Board' },
+            { id: 'audit-logs', label: 'Audit Logs' },
+            { id: 'notifications', label: 'Notifications' },
+            { id: 'control-room', label: 'Control Room Logs' },
         ],
     },
 ];
@@ -557,9 +545,10 @@ interface RetentionRow {
     label: string;
     options: { value: string; label: string }[];
     defaultValue: string;
-    count: string;
 }
 
+// Only what the weekly clean-up enforces (readiness audit F7, 6 Nov 2026). The other rows and the record counts were
+// placeholders: nothing acted on them, and the counts were made up.
 const retentionRows: RetentionRow[] = [
     {
         id: 'audit-logs',
@@ -572,7 +561,6 @@ const retentionRows: RetentionRow[] = [
             { value: 'forever', label: 'Forever' },
         ],
         defaultValue: '5yr',
-        count: '54,200',
     },
     {
         id: 'timeline-events',
@@ -584,77 +572,6 @@ const retentionRows: RetentionRow[] = [
             { value: 'forever', label: 'Forever' },
         ],
         defaultValue: '5yr',
-        count: '—',
-    },
-    {
-        id: 'timesheets',
-        label: 'Completed timesheets',
-        options: [
-            { value: '2yr', label: '2 years' },
-            { value: '5yr', label: '5 years' },
-            { value: '7yr', label: '7 years' },
-            { value: 'forever', label: 'Forever' },
-        ],
-        defaultValue: '7yr',
-        count: '12,840',
-    },
-    {
-        id: 'incidents',
-        label: 'Closed incidents',
-        options: [
-            { value: '2yr', label: '2 years' },
-            { value: '5yr', label: '5 years' },
-            { value: '7yr', label: '7 years' },
-            { value: 'forever', label: 'Forever' },
-        ],
-        defaultValue: '5yr',
-        count: '67',
-    },
-    {
-        id: 'archived-clients',
-        label: 'Archived clients',
-        options: [
-            { value: '1yr', label: '1 year' },
-            { value: '2yr', label: '2 years' },
-            { value: '5yr', label: '5 years' },
-            { value: 'never', label: 'Never auto-delete' },
-        ],
-        defaultValue: 'never',
-        count: '23',
-    },
-    {
-        id: 'notifications',
-        label: 'Old notifications',
-        options: [
-            { value: '30d', label: '30 days' },
-            { value: '90d', label: '90 days' },
-            { value: '1yr', label: '1 year' },
-            { value: 'forever', label: 'Forever' },
-        ],
-        defaultValue: '90d',
-        count: '31,000',
-    },
-    {
-        id: 'session-logs',
-        label: 'Session logs',
-        options: [
-            { value: '30d', label: '30 days' },
-            { value: '90d', label: '90 days' },
-            { value: '1yr', label: '1 year' },
-        ],
-        defaultValue: '90d',
-        count: '18,430',
-    },
-    {
-        id: 'deleted-docs',
-        label: 'Deleted documents (trash)',
-        options: [
-            { value: '30d', label: '30 days' },
-            { value: '90d', label: '90 days' },
-            { value: 'never', label: 'Never' },
-        ],
-        defaultValue: '30d',
-        count: '14',
     },
 ];
 
@@ -1588,12 +1505,6 @@ export default function Data() {
                                                                     )}
                                                                     {mod.label}
                                                                 </span>
-                                                                <Badge
-                                                                    variant="secondary"
-                                                                    className="text-xs tabular-nums"
-                                                                >
-                                                                    {mod.count.toLocaleString()}
-                                                                </Badge>
                                                             </label>
                                                         ),
                                                     )}
@@ -2240,9 +2151,10 @@ export default function Data() {
                                     <div>
                                         <CardTitle>Data Retention</CardTitle>
                                         <CardDescription>
-                                            Configure automatic data cleanup
-                                            policies to manage storage and
-                                            comply with regulations
+                                            How long change history is kept
+                                            before the weekly clean-up removes
+                                            it. Records themselves are never
+                                            deleted here.
                                         </CardDescription>
                                     </div>
                                 </div>
@@ -2257,9 +2169,6 @@ export default function Data() {
                                                 </th>
                                                 <th className="px-4 py-2.5 text-left font-medium">
                                                     Current Policy
-                                                </th>
-                                                <th className="px-4 py-2.5 text-right font-medium">
-                                                    Records
                                                 </th>
                                             </tr>
                                         </thead>
@@ -2318,14 +2227,23 @@ export default function Data() {
                                                             </SelectContent>
                                                         </Select>
                                                     </td>
-                                                    <td className="px-4 py-2.5 text-right text-muted-foreground tabular-nums">
-                                                        {row.count}
-                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
+
+                                <p
+                                    className="text-sm text-muted-foreground"
+                                    dusk="data-retention-kept-longer"
+                                >
+                                    Health and safety history (incidents,
+                                    restraints, safeguarding, hazards, first
+                                    aid, injuries, exposures and safety reviews)
+                                    is always kept at least 10 years, and
+                                    medication history follows its own policy,
+                                    whatever you choose for audit logs.
+                                </p>
 
                                 <Button
                                     dusk="data-save-retention"

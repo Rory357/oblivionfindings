@@ -5,6 +5,7 @@ namespace App\Services\Safeguarding;
 use App\Models\Client;
 use App\Models\SafeguardingConcern;
 use App\Models\User;
+use App\Policies\SafeguardingConcernPolicy;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\HealthSafety\HealthSafetyReadContext;
@@ -18,7 +19,8 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 /** Unmounted reader proposal matching SafeguardingConcernPolicy, without a new sensitive count gate. */
 final class SafeguardingConcernReadScope
 {
-    public const PERMISSIONS = ['safeguarding.viewAny', 'reports.viewAny'];
+    // P6 (Stephan, 6 Nov 2026): every-Site safeguarding needs safeguarding.viewAllSites, not reports.viewAny.
+    public const PERMISSIONS = ['safeguarding.viewAny', 'safeguarding.viewAllSites'];
     public const DISPLAY_PERMISSIONS = ['safeguarding.viewSensitive', 'safeguarding.declassification.approve',
         'safeguarding.create', 'safeguarding.update', 'safeguarding.investigate', 'safeguarding.report.external',
         'incidents.viewAny', 'incidents.viewAssigned'];
@@ -30,6 +32,7 @@ final class SafeguardingConcernReadScope
     private array $sites = [];
     private bool $globalSites = false;
     private bool $registerRead = false;
+    private ?int $actorId = null;
 
     public function __construct(private readonly UserSiteAccessService $siteAccess) {}
 
@@ -58,13 +61,14 @@ final class SafeguardingConcernReadScope
         abort_unless($current->approved_at !== null && ! $current->isExternalClinicianAccount(), 403);
         $this->activeReads = $reads; $this->invocation = new \stdClass; $this->actorObject = spl_object_id($current);
         try {
-            $this->globalSites = $current->canDo('reports.viewAny');
+            $this->globalSites = $current->canDo('safeguarding.viewAllSites');
+            $this->actorId = (int) $current->id;
             $this->registerRead = $current->canDo('safeguarding.viewAny');
             $this->sites = $this->siteAccess->accessibleSiteIds($current, [], $reads);
             $result = $operation($current, $reads); $reads->assertActive(); $this->detached($result);
             return $result;
         } finally {
-            $this->activeReads = null; $this->invocation = null; $this->actorObject = null; $this->sites = []; $this->globalSites = $this->registerRead = false;
+            $this->activeReads = null; $this->invocation = null; $this->actorObject = null; $this->sites = []; $this->globalSites = $this->registerRead = false; $this->actorId = null;
         }
     }
 
@@ -76,6 +80,14 @@ final class SafeguardingConcernReadScope
                 $scope->whereNull('site_id');
                 if ($this->sites !== []) { $scope->orWhereIn('site_id', $this->sites); }
             });
+        }
+        // P2: never the concerns that name the reader as the alleged perpetrator (policy parity).
+        if ($this->actorId !== null) {
+            $actorId = $this->actorId;
+            $query->where(fn (Builder $named) => $named->whereNull('alleged_perpetrator_id')
+                ->orWhere('alleged_perpetrator_id', '!=', $actorId)
+                ->orWhereNull('alleged_perpetrator_type')
+                ->orWhereNotIn('alleged_perpetrator_type', [...SafeguardingConcernPolicy::STAFF_PERPETRATOR_TYPES, (new User)->getMorphClass()]));
         }
         return $query;
     }

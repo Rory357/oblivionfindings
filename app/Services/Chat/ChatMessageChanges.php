@@ -14,8 +14,11 @@ final class ChatMessageChanges
 {
     public function __construct(private readonly ChatAccess $access, private readonly ChatProjection $projection) {}
 
-    /** The caller must hold the conversation lock until its message transaction commits. */
-    public function record(OpsMessage $message, ?int $onlyUserId = null, bool $created = false): void
+    /**
+     * The caller must hold the conversation lock until its message transaction commits.
+     * $kind says what changed for live updates (message, edit, removal, reaction, pin, save).
+     */
+    public function record(OpsMessage $message, ?int $onlyUserId = null, bool $created = false, ?string $kind = null): void
     {
         if (DB::transactionLevel() < 1) {
             throw new \LogicException('Chat changes must commit with their message.');
@@ -25,25 +28,35 @@ final class ChatMessageChanges
             'kind' => $created ? 'created' : 'updated',
             'only_user_id' => $onlyUserId, 'created_at' => now(),
         ]);
-        app(ChatRealtime::class)->queueConversation($message->conversation_id, $onlyUserId);
+        app(ChatRealtime::class)->queueConversation($message->conversation_id, $onlyUserId, $kind ?? ($created ? 'message' : 'update'));
     }
 
     private function scope(OpsConversation $conversation, User $viewer): string
     {
-        $member = $conversation->participants()->where('user_id', $viewer->id)->first();
+        // A re-hire gap opening or closing changes the history too.
+        $gaps = fn (bool $open) => DB::table('chat_membership_gaps')->selectRaw('count(*)')
+            ->whereColumn('participant_id', 'ops_conversation_participants.id')->when($open, fn ($rows) => $rows->whereNull('returned_at'));
+        $member = $conversation->participants()->where('user_id', $viewer->id)
+            ->addSelect(['gaps' => $gaps(false), 'open_gaps' => $gaps(true)])->first();
         $grants = $member ? DB::table('chat_history_grants')->where('participant_id', $member->id)->orderBy('message_id')->pluck('message_id')->all() : [];
 
         // chat_version also changes on ordinary sends; only history/authority changes
         // invalidate the recovery window. Current access is checked separately per page.
         return hash('sha256', json_encode([$conversation->client_id, $conversation->conversation_type, $conversation->channel_site_id,
             $conversation->client ? $viewer->canAccessClientPortal($conversation->client) : false,
-            $member?->id, $member?->history_after_id, $grants], JSON_THROW_ON_ERROR));
+            $member?->id, $member?->history_after_id, $grants, (int) $member?->gaps, (int) $member?->open_gaps], JSON_THROW_ON_ERROR));
+    }
+
+    /** The newest change ID; live events name it so a tab can skip what its cursor has passed. */
+    public function latestId(OpsConversation $conversation): int
+    {
+        return (int) DB::table('chat_message_changes')->where('conversation_id', $conversation->id)->max('id');
     }
 
     /** Read under the same conversation lock as the initial message snapshot. */
     public function cursor(OpsConversation $conversation, User $viewer, ?int $after = null): string
     {
-        $after ??= (int) DB::table('chat_message_changes')->where('conversation_id', $conversation->id)->max('id');
+        $after ??= $this->latestId($conversation);
 
         return Crypt::encryptString(json_encode(['v' => 1, 'user' => $viewer->id, 'conversation' => $conversation->id,
             'scope' => $this->scope($conversation, $viewer), 'after' => $after], JSON_THROW_ON_ERROR));
@@ -52,7 +65,8 @@ final class ChatMessageChanges
     public function read(OpsConversation $conversation, User $viewer, string $cursor): array
     {
         return DB::transaction(function () use ($conversation, $viewer, $cursor): array {
-            $conversation = OpsConversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
+            // Shared: readers wait for writers still allocating change IDs, but not for each other.
+            $conversation = OpsConversation::whereKey($conversation->id)->sharedLock()->firstOrFail();
             $this->access->authorize($viewer, $conversation);
             // Disabling new messages must not revoke authorised history or its refresh stream.
             try {
@@ -77,11 +91,14 @@ final class ChatMessageChanges
             $messages = $this->access->messages($conversation, $viewer, true)->whereIn('id', $ids)
                 ->with(['sender:id,name', 'reactions.user:id,name'])->orderBy('id')->get();
 
+            $position = (int) ($page->last()?->id ?? $token['after']);
+
             return [
                 'conversation' => $this->projection->conversation($conversation, $viewer),
                 'messages' => $this->projection->messages($messages, $viewer, $conversation),
                 'new_message_ids' => $page->where('kind', 'created')->pluck('message_id')->intersect($messages->pluck('id'))->unique()->values(),
-                'sync_cursor' => $this->cursor($conversation, $viewer, (int) ($page->last()?->id ?? $token['after'])),
+                'sync_cursor' => $this->cursor($conversation, $viewer, $position),
+                'sync_change_id' => $position,
                 'has_more_changes' => $rows->count() > 100,
             ];
         });

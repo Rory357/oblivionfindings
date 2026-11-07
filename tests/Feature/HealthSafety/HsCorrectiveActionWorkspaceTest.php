@@ -81,11 +81,60 @@ class HsCorrectiveActionWorkspaceTest extends TestCase
         $this->actingAs($other)->get($this->url($action))->assertNotFound();
         $this->grant($other, 'healthSafety.viewAllSites');
         $this->actingAs($other->fresh())->get($this->url($action))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('workspace.history_state', 'restricted')
             ->where('workspace.can.complete', false)
             ->where('workspace.action.evidence.can_upload', false)
-            ->where('workspace.action.evidence.completion_notes', null));
+            ->where('workspace.action.evidence.completion_notes', null)
+            ->where('workspace.action.created_at', $action->created_at?->toIso8601String()));
         $worker = $this->staff($site);
         $this->actingAs($worker)->get($this->url($action))->assertForbidden();
+    }
+
+    public function test_cross_site_admin_read_keeps_evidence_private_without_reporting_a_history_load_error(): void
+    {
+        $site = Site::factory()->create();
+        $owner = $this->staff($site, ['hazards.view', 'hazards.manage']);
+        $verifier = $this->staff($site, ['hazards.view', 'hazards.manage']);
+        $admin = $this->staff(Site::factory()->create(), ['hazards.view', 'hazards.manage', 'healthSafety.viewAllSites']);
+        $event = HsEvent::factory()->create(['site_id' => $site->id, 'created_by' => $owner->id]);
+        $action = HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $event->id,
+            'status' => HsCorrectiveAction::STATUS_VERIFIED,
+            'assigned_to_user_id' => $owner->id,
+            'assigned_by_user_id' => $owner->id,
+            'assigned_at' => now()->subDays(2),
+            'completed_by_user_id' => $owner->id,
+            'completed_at' => now()->subDay(),
+            'completion_notes' => 'Participant-only completion detail',
+            'verified_by_user_id' => $verifier->id,
+            'verified_at' => now(),
+            'effectiveness_confirmed' => false,
+            'verification_notes' => 'Participant-only check note',
+            'created_by' => $owner->id,
+        ]);
+
+        $this->actingAs($siteManager = $this->staff($site, ['hazards.view', 'hazards.manage']))
+            ->get($this->url($action))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('workspace.history_state', 'loaded')
+                ->where('workspace.action.evidence.load_state', 'loaded'));
+
+        $this->actingAs($admin)
+            ->get($this->url($action))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('workspace.history_state', 'restricted')
+                ->where('workspace.action.evidence.load_state', 'unavailable')
+                ->where('workspace.action.evidence.completion_notes', null)
+                ->where('workspace.action.completed_at', null)
+                ->where('workspace.action.completed_by_name', null)
+                ->where('workspace.action.check_notes', null)
+                ->has('workspace.action.history', 0)
+                ->where('workspace.action.created_by_name', $owner->name)
+                ->where('workspace.action.verified_by_name', $verifier->name)
+                ->where('workspace.action.effectiveness_confirmed', false));
+        unset($siteManager);
     }
 
     public function test_mismatched_source_identity_withholds_the_link_without_repairing_history(): void
@@ -133,9 +182,11 @@ class HsCorrectiveActionWorkspaceTest extends TestCase
         $this->actingAs($owner)->from($url)->post("{$base}/start")->assertRedirect($url)->assertSessionHas('success');
         $this->from($url)->post("{$base}/complete", ['completion_notes' => 'Completed repair, with recorded evidence.'])->assertRedirect($url)->assertSessionHas('success');
         $this->get($url)->assertInertia(fn (Assert $page) => $page->where('workspace.can.verify', false)->where('workspace.action.status', 'completed'));
-        $this->assertSame('corrective_action', $event->fresh()->status);
+        // Decision 2 (1 Nov 2026): every action done → the review is "Checking it worked" (monitoring).
+        $this->assertSame('monitoring', $event->fresh()->status);
         $this->actingAs($verifier)->get($url)->assertInertia(fn (Assert $page) => $page->where('workspace.can.verify', true));
         $this->from($url)->post("{$base}/return", ['reason' => 'Add the inspection outcome.'])->assertRedirect($url)->assertSessionHas('success');
+        $this->assertSame('corrective_action', $event->fresh()->status, 'Sent back: actions under way again.');
         $this->actingAs($owner)->get($url)->assertInertia(fn (Assert $page) => $page->where('workspace.can.complete', true)->where('workspace.action.rework.latest_reason', 'Add the inspection outcome.'));
         $this->from($url)->post("{$base}/complete", ['completion_notes' => 'Repair and inspection completed.'])->assertSessionHas('success');
         $this->actingAs($verifier)->from($url)->post("{$base}/verify", ['evidence_reviewed' => true, 'effective' => true, 'verification_notes' => 'Control is effective.'])->assertRedirect($url)->assertSessionHas('success');

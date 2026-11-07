@@ -9,6 +9,7 @@ import {
     connectChatRealtime,
     type ChatLiveState,
 } from './chat-realtime-connection';
+import { chatSync } from './live/sync';
 
 const Context = createContext<ChatLiveState>('off');
 export const useChatRealtime = () => useContext(Context);
@@ -27,10 +28,22 @@ function RealtimeSession({ actorId, enabled, children }: ProviderProps) {
     const [state, setState] = useState<ChatLiveState>('off');
     useEffect(() => {
         if (!enabled || !actorId) return;
-        return connectChatRealtime(actorId, setState, () => {
-            window.dispatchEvent(new Event('oblivion:chat-refresh'));
-            window.dispatchEvent(new Event('oblivion:chat-unread-changed'));
-        });
+        const stop = connectChatRealtime(
+            actorId,
+            (next) => {
+                setState(next);
+                // The one sync loop polls only while live updates are down.
+                chatSync.setState(next);
+            },
+            () => {
+                window.dispatchEvent(new Event('oblivion:chat-refresh'));
+                window.dispatchEvent(new Event('oblivion:chat-unread-changed'));
+            },
+        );
+        return () => {
+            stop();
+            chatSync.setState('off');
+        };
     }, [actorId, enabled]);
     return <Context.Provider value={state}>{children}</Context.Provider>;
 }

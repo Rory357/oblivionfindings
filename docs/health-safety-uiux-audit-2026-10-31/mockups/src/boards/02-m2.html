@@ -1,0 +1,79 @@
+<section class="board" id="m2"><div class="wide">
+  <div class="board-head"><span class="tag">M2 · package B2</span><h3>Overview while it loads (6 seconds in, still counting)</h3></div>
+  <div class="board-notes">
+    <ul>
+      <li>Order of arrival: the page, the start and the WorkSafe facts (first response, under 0.5 s) → the rest of the queue (about 2–3 s) → the other three numbers (4–5 s today for admin and manager, about 2 s after the next speed round).</li>
+      <li>The WorkSafe box is filled from the first response (urgent safety facts first, DESIGN.md). The other boxes keep their labels and show a counting bar, never "0", "—" or an empty list.</li>
+      <li>Block titles show their counts only once the numbers have arrived, so nothing on screen disagrees while it fills.</li>
+    </ul>
+    <ul>
+      <li>After 6 s, one calm line appears under the header. Nothing says "could not be loaded" while a part is still on its way (that false error is being fixed separately by the H&amp;S session).</li>
+      <li>A part that really fails shows the standard panel error card with "Try again" in its own place (inset). Other parts keep working.</li>
+      <li>Built with the existing <code>DeferredPanel</code>; no shared component changes.</li>
+    </ul>
+  </div>
+  <div class="stage-frame" id="f-m2"><div class="scaler"><div class="m">
+    {{TOP DH}}
+    <div class="body">
+      {{SIDE full hs:Overview}}
+      <main class="main">
+        <div class="crumbs">Home {{I right}} <b>Health and safety</b></div>
+        <div class="sky">
+          <div class="idrow">
+            <div class="ring">{{I shield}}</div>
+            <div><div class="title">Health and safety</div><div class="subline">All sites · counts only records you can open</div></div>
+            <div class="cluster"><span class="glass search">{{I search}} Search health and safety</span><span class="white">{{I plus}} Report something</span></div>
+          </div>
+          <div class="nums" aria-busy="true">
+            <div class="num"><span class="bar"></span><div><div class="l">Need an owner</div><div class="c">Counting…</div></div></div>
+            <div class="num crit"><span class="v">3</span><div><div class="l">WorkSafe: decide or tell</div><div class="c">Now · first in your queue</div></div></div>
+            <div class="num"><span class="bar"></span><div><div class="l">Actions overdue</div><div class="c">Counting…</div></div></div>
+            <div class="num"><span class="bar"></span><div><div class="l">Actions to check</div><div class="c">Counting…</div></div></div>
+          </div>
+          <div class="filters"><span class="fchip">{{I cal}} Period: <b>last 30 days</b> {{I down}}</span><span class="fchip">All sites · 12 {{I down}}</span></div>
+          <div class="rail"><span class="tab on">Overview</span><span class="tab">Prevention <span class="cnt">7 due</span></span><span class="tab">Harm and injuries</span><span class="tab">Legal duties</span><span class="tab find">{{I search}} Find</span></div>
+        </div>
+        <div class="note" style="margin:10px 2px 0">{{I clock}} Still counting the numbers — they'll appear here in a few seconds. You can start on the list below.</div>
+
+        <div class="grid g-main" style="margin-top:12px">
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="surface lead">
+              <div class="sh"><h4>Your queue</h4><span class="s">Most urgent first</span><span class="r">All tasks {{I arrow}}</span></div>
+              <div class="sec-title" style="padding:4px 18px 6px;margin:0;border-top:1px solid var(--m-border)">{{I flag}} WorkSafe: decide or tell</div>
+              <div class="row"><div class="when"><b>Today</b>7:40 am</div><div class="what"><b>Fall in the shower — Amelia Wilson</b><span>Nobody has taken it on yet · Harbour Respite · <span class="ref">HS-2026-0091</span></span></div><span style="display:flex;gap:6px"><span class="badge b-crit">High</span><span class="badge b-crit">WorkSafe: decide</span></span><span class="btn pri sm">Take it on</span><span class="kebab">{{I more}}</span></div>
+              <div class="row"><div class="when"><b>Today</b>8:20 am</div><div class="what"><b>Bruised wrist during a transfer — Sofia Brown</b><span>Hemi Walker took it on · Kauri House · <span class="ref">HS-2026-0095</span></span></div><span style="display:flex;gap:6px"><span class="badge b-crit">High</span><span class="badge b-crit">WorkSafe: decide</span></span><span class="btn pri sm">Record WorkSafe decision</span><span class="kebab">{{I more}}</span></div>
+              <div class="row"><div class="when"><b>30 Oct</b>decided</div><div class="what"><b>Burn from the kettle — Liam Davis</b><span>Notifiable, decided by Jordan Peri · Harbour Respite · <span class="ref">HS-2026-0096</span></span></div><span class="badge b-crit">Tell WorkSafe</span><span class="btn pri sm">Record that WorkSafe was told</span><span class="kebab">{{I more}}</span></div>
+              <div class="sec-title" style="padding:10px 18px 6px;margin:0;border-top:1px solid var(--m-border)">{{I userplus}} Need an owner</div>
+              <div class="row"><div class="when"><b>30 Apr</b>6 months</div><div class="what"><b>Medication given twice — Oliver Chen</b><span>Waiting for Health and safety to take it on · Kauri House · <span class="ref">HS-2026-0023</span></span></div><span class="badge b-warn">Waiting 6 months</span><span class="btn pri sm">Take it on</span><span class="kebab">{{I more}}</span></div>
+              <div style="padding:12px 18px;display:grid;gap:10px;border-top:1px solid var(--m-border)"><div class="skel" style="width:72%"></div><div class="skel" style="width:58%"></div></div>
+            </section>
+            <section class="surface">
+              <div class="sh"><h4>Where safety reviews are up to</h4></div>
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--m-border)">
+                <div style="padding:16px 18px;display:grid;gap:8px"><div class="skel" style="width:30px;height:20px"></div><div class="skel" style="width:60px"></div></div>
+                <div style="padding:16px 18px;display:grid;gap:8px"><div class="skel" style="width:30px;height:20px"></div><div class="skel" style="width:110px"></div></div>
+                <div style="padding:16px 18px;display:grid;gap:8px"><div class="skel" style="width:30px;height:20px"></div><div class="skel" style="width:100px"></div></div>
+                <div style="padding:16px 18px;display:grid;gap:8px"><div class="skel" style="width:30px;height:20px"></div><div class="skel" style="width:110px"></div></div>
+                <div style="padding:16px 18px;display:grid;gap:8px"><div class="skel" style="width:30px;height:20px"></div><div class="skel" style="width:60px"></div></div>
+              </div>
+            </section>
+          </div>
+          <div style="display:grid;gap:20px;align-content:start">
+            <section class="surface"><div class="sh"><h4>Checks due</h4></div>
+              <div style="padding:6px 18px 16px;display:grid;gap:12px"><div class="skel" style="width:70%"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:60%"></div></div></section>
+            <section class="surface"><div class="sh"><h4>Sites</h4></div>
+              <div style="padding:6px 18px 16px;display:grid;gap:12px"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div></section>
+            <section class="surface" style="border-style:dashed">
+              <div class="sh"><h4>Inset · if the numbers really fail</h4></div>
+              <div style="padding:2px 18px 16px;display:grid;gap:10px">
+                <div style="border-radius:11px;background:oklch(0.4 0.22 293);padding:10px"><div style="background:#fff;border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center"><span style="color:var(--m-crit)">{{I alert}}</span><div class="small"><b>Safety measures could not be loaded</b><br><span class="muted">This does not mean there is nothing here.</span></div><span class="btn out sm" style="margin-left:auto">{{I refresh}} Try again</span></div></div>
+                <div class="small muted">The standard panel error, in the header's number slot. The WorkSafe box is not part of it and stays.</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div></div></div>
+  <div class="frame-tools"><button type="button" data-full="f-m2">Full size</button><span>Health and safety officer · the admin and manager pages wait the same way</span></div>
+</div></section>

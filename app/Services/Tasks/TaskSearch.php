@@ -89,13 +89,8 @@ final class TaskSearch
             preg_split('/\s+/', $needle) ?: [],
             fn (string $word) => $word !== '',
         ));
-        $correctiveActionStatuses = self::matchingStatuses($needle, [
-            'open' => 'Not started',
-            'in_progress' => 'In progress',
-            'completed' => 'Awaiting independent verification',
-            'verified' => 'Verified — ready to close',
-            'closed' => 'Closed',
-        ]);
+        // B1.1: the action words the rows show (HsLabels), so a search for "waiting to be checked" finds those actions.
+        $correctiveActionStatuses = self::matchingStatuses($needle, \App\Support\HealthSafety\HsLabels::LABELS['action_status']);
         $alertStatuses = self::matchingStatuses($needle, [
             'open' => 'Awaiting response',
             'ack' => 'Acknowledged',
@@ -112,14 +107,20 @@ final class TaskSearch
             $like,
             $words,
         ): void {
+            $table = $match->getModel()->getTable();
             $match
                 ->whereLike('reference_number', $like)
-                ->orWhereLike('title', $like)
-                ->orWhereLike('description', $like)
-                ->orWhereLike('immediate_action_taken', $like)
-                ->orWhereLike('immediate_action', $like)
-                ->orWhereLike('witnesses', $like)
-                ->orWhereLike('potential_consequence', $like)
+                // P4 (Stephan, 6 Nov 2026): a safeguarding incident's own words are never searched from /tasks.
+                ->orWhere(fn (Builder $words) => $words
+                    ->where(fn (Builder $text) => $text->whereLike('title', $like)
+                        ->orWhereLike('description', $like)
+                        ->orWhereLike('immediate_action_taken', $like)
+                        ->orWhereLike('immediate_action', $like)
+                        ->orWhereLike('witnesses', $like)
+                        ->orWhereLike('potential_consequence', $like))
+                    ->where(fn (Builder $kind) => $kind->where($table.'.type', '!=', 'safeguarding')->orWhereNull($table.'.type'))
+                    ->whereNotExists(fn ($linked) => $linked->selectRaw('1')->from('safeguarding_concerns')
+                        ->whereColumn('safeguarding_concerns.related_incident_id', $table.'.id')))
                 ->orWhereLike('source', $like)
                 ->orWhereLike('status', $like)
                 ->orWhereHas('client', function (Builder $client) use ($like, $words): void {

@@ -70,49 +70,86 @@ class DeviceControllerTest extends TestCase
             ->assertOk();
     }
 
+    // S&D rebuild C1: the old devices list became the Devices page (pg-sdr-2). Its saved views,
+    // provider options, "unassigned" and serial-number searches went with it; the list's scope,
+    // filters and permission flags are checked here against the new page (the list layout).
+
+    private function monitored(Device $device, MonitorState $state): void
+    {
+        Monitor::factory()->create([
+            'profile_id' => MonitoringProfile::factory()->create()->id,
+            'device_id' => $device->id,
+            'current_state' => $state,
+            'is_enabled' => true,
+            'last_observation_at' => now()->subMinute(),
+            'last_state_changed_at' => now()->subHour(),
+        ]);
+    }
+
+    /** @return list<int> */
+    private static function rowIds(array $props): array
+    {
+        return collect($props['list']['rows'])->pluck('id')->map(fn ($id): int => (int) $id)->all();
+    }
+
     public function test_index_returns_paginated_devices(): void
     {
         Device::factory()->count(5)->create();
 
         $response = $this->actingAs($this->admin)
-            ->get('/security-devices/devices');
+            ->get('/security-devices/devices?layout=list');
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->component('security-devices/devices/index')
-            ->has('devices.data', 5)
-            ->has('devices.meta')
-            ->has('stats')
+            ->has('list.rows', 5)
+            ->where('list.meta.total', 5)
+            ->where('list.meta.page', 1)
+            ->has('meters')
+            ->has('tabs')
             ->has('filters')
-            ->has('filterOptions')
+            ->has('statuses')
         );
     }
 
-    public function test_index_filters_by_domain(): void
+    public function test_index_filters_by_kind_tab_including_old_domain_links(): void
     {
-        Device::factory()->security()->create();
-        Device::factory()->itInfrastructure()->create();
+        $camera = Device::factory()->security()->create();
+        $accessPoint = Device::factory()->itInfrastructure()->create();
 
-        $response = $this->actingAs($this->admin)
-            ->get('/security-devices/devices?domain=security');
+        $this->actingAs($this->admin)
+            ->get('/security-devices/devices?tab=cameras&layout=list')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('tab', 'cameras')
+                ->has('list.rows', 1)
+                ->where('list.rows.0.id', $camera->id));
 
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->has('devices.data', 1)
-        );
+        // An old ?domain= link lands on the matching tab.
+        $this->actingAs($this->admin)
+            ->get('/security-devices/devices?domain=it_infrastructure&layout=list')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('tab', 'network')
+                ->has('list.rows', 1)
+                ->where('list.rows.0.id', $accessPoint->id));
     }
 
     public function test_index_filters_by_status(): void
     {
-        Device::factory()->create(['status' => DeviceStatus::Active]);
-        Device::factory()->create(['status' => DeviceStatus::Offline]);
+        $online = Device::factory()->itInfrastructure()->create();
+        $offline = Device::factory()->itInfrastructure()->create();
+        $this->monitored($online, MonitorState::Healthy);
+        $this->monitored($offline, MonitorState::Failed);
 
         $response = $this->actingAs($this->admin)
-            ->get('/security-devices/devices?status=offline');
+            ->get('/security-devices/devices?status=offline&layout=list');
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('devices.data', 1)
+            ->where('filters.status', 'offline')
+            ->has('list.rows', 1)
+            ->where('list.rows.0.id', $offline->id)
         );
     }
 
@@ -121,48 +158,15 @@ class DeviceControllerTest extends TestCase
         Device::factory()->create(['name' => 'Lobby Camera Alpha']);
         Device::factory()->create(['name' => 'Server Room Switch']);
 
+        // The old ?search= link still searches.
         $response = $this->actingAs($this->admin)
-            ->get('/security-devices/devices?search=Lobby');
+            ->get('/security-devices/devices?search=Lobby&layout=list');
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('devices.data', 1)
-        );
-    }
-
-    public function test_index_search_by_serial(): void
-    {
-        Device::factory()->create(['serial_number' => 'XYZ-999-UNIQUE']);
-        Device::factory()->create(['serial_number' => 'ABC-111']);
-
-        $response = $this->actingAs($this->admin)
-            ->get('/security-devices/devices?search=XYZ-999');
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->has('devices.data', 1)
-        );
-    }
-
-    public function test_index_filters_by_assignment_state(): void
-    {
-        $assigned = Device::factory()->create();
-        $unassigned = Device::factory()->create();
-
-        DeviceAssignment::create([
-            'device_id' => $assigned->id,
-            'assignable_type' => 'site',
-            'assignable_id' => 1,
-            'assigned_at' => now(),
-        ]);
-
-        $response = $this->actingAs($this->admin)
-            ->get('/security-devices/devices?assigned=no');
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->has('devices.data', 1)
-            ->where('devices.data.0.id', $unassigned->id)
+            ->where('filters.q', 'Lobby')
+            ->has('list.rows', 1)
+            ->where('list.rows.0.name', 'Lobby Camera Alpha')
         );
     }
 
@@ -227,8 +231,9 @@ class DeviceControllerTest extends TestCase
             'linked_by_user_id' => $this->admin->id,
         ]);
 
+        // The Site profile's old ?site_id= hand-off still filters Devices to that Site.
         $this->actingAs($this->admin)
-            ->get("/security-devices/devices?site_id={$selectedSite->id}")
+            ->get("/security-devices/devices?site_id={$selectedSite->id}&layout=list")
             ->assertOk()
             ->assertInertia(function ($page) use (
                 $selected,
@@ -248,50 +253,30 @@ class DeviceControllerTest extends TestCase
                     $staffDevice->id,
                     $vehicleDevice->id,
                     $assetDevice->id,
-                ], collect($props['devices']['data'])->pluck('id')->all());
-                $this->assertSame(6, $props['stats']['total']);
-                $this->assertSame($selectedSite->name, $props['scopeLabel']);
+                ], self::rowIds($props));
+                $this->assertSame(6, $props['list']['meta']['total']);
+                $this->assertSame((string) $selectedSite->id, $props['filters']['site']);
             });
     }
 
-    public function test_index_stats_saved_views_and_provider_options_cover_the_single_application_registry(): void
+    public function test_index_status_filter_and_counts_cover_the_single_application_registry(): void
     {
+        $monitored = Device::factory()->itInfrastructure()->create(['name' => 'Monitored device']);
+        $unmonitored = Device::factory()->itInfrastructure()->create(['name' => 'Unmonitored device']);
+        $unassignedDevice = Device::factory()->itInfrastructure()->create(['name' => 'Unassigned device']);
+        $this->monitored($monitored, MonitorState::Healthy);
 
-        $profile = MonitoringProfile::factory()->create([]);
-        $monitored = Device::factory()->create([
-            'name' => 'Monitored device',
-            'provider' => 'primary-provider',
-        ]);
-        $unmonitored = Device::factory()->create([
-            'name' => 'Unmonitored device',
-            'provider' => 'primary-provider',
-        ]);
-        $unassignedDevice = Device::factory()->create([
-            'name' => 'Unassigned device',
-            'provider' => 'legacy-provider',
-        ]);
-        Monitor::factory()->create([
-            'profile_id' => $profile->id,
-            'device_id' => $monitored->id,
-            'current_state' => MonitorState::Healthy,
-            'is_enabled' => true,
-        ]);
-
+        // The old "unmonitored" saved view lands on the "Not watched" status.
         $response = $this->actingAs($this->admin)
-            ->get('/security-devices/devices?view=unmonitored');
+            ->get('/security-devices/devices?view=unmonitored&layout=list');
 
         $response->assertOk()->assertInertia(function ($page) use ($unassignedDevice, $unmonitored): void {
             $props = $page->toArray()['props'];
 
-            $this->assertEqualsCanonicalizing(
-                [$unmonitored->id, $unassignedDevice->id],
-                collect($props['devices']['data'])->pluck('id')->all(),
-            );
-            $this->assertSame(3, $props['stats']['total']);
-            $this->assertSame(2, collect($props['savedViews'])->firstWhere('key', 'unmonitored')['count']);
-            $this->assertSame(['legacy-provider', 'primary-provider'], $props['filterOptions']['providers']);
+            $this->assertEqualsCanonicalizing([$unmonitored->id, $unassignedDevice->id], self::rowIds($props));
+            $this->assertSame('not_watched', $props['filters']['status']);
+            $this->assertSame(1, $props['meters']['online']['count']);
             $this->assertTrue($props['can']['export']);
-            $this->assertSame('unmonitored', $props['filters']['view']);
         });
     }
 
@@ -316,13 +301,18 @@ class DeviceControllerTest extends TestCase
             ]);
         }
 
-        $this->actingAs($this->viewer)
-            ->get('/security-devices/devices')
-            ->assertOk()
+        $index = $this->actingAs($this->viewer)->get('/security-devices/devices?layout=list');
+        $index->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('devices.data', 1)
-                ->where('devices.data.0.id', $allowed->id)
+                ->has('list.rows', 1)
+                ->where('list.rows.0.id', $allowed->id)
                 ->where('can.export', false));
+        $this->assertStringNotContainsString('Hidden device', $index->getContent());
+
+        // Another Site's filter is refused rather than shown empty.
+        $this->actingAs($this->viewer)
+            ->get("/security-devices/devices?site={$hiddenSite->id}")
+            ->assertNotFound();
 
         $this->actingAs($this->viewer)
             ->get("/security-devices/devices/{$allowed->id}")
@@ -363,8 +353,9 @@ class DeviceControllerTest extends TestCase
     {
         $device = Device::factory()->security()->create(['name' => 'Dome Camera 1']);
 
+        // A camera opens its own page (S&D Phase E); today's profile is still reached with ?section=.
         $response = $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$device->id}");
+            ->get("/security-devices/devices/{$device->id}?section=overview");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -391,7 +382,7 @@ class DeviceControllerTest extends TestCase
             'end_date' => null,
             'is_active' => true,
         ]);
-        $device = Device::factory()->create();
+        $device = Device::factory()->itInfrastructure()->create(['subcategory' => 'switch']);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_STAFF,
@@ -399,16 +390,27 @@ class DeviceControllerTest extends TestCase
             'assigned_at' => now(),
         ]);
 
-        // Viewer (support_worker) should not have update/delete/assign.
-        $response = $this->actingAs($this->viewer)
-            ->get("/security-devices/devices/{$device->id}");
+        // Viewer (support_worker) should not have update/delete/assign, on the device page or today's profile.
+        $this->actingAs($this->viewer)
+            ->get("/security-devices/devices/{$device->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('security-devices/devices/device')
+                ->where('can.edit', false)
+                ->where('can.retire', false)
+                ->where('can.assign', false)
+                ->where('can.move', false)
+                ->where('can.upload', false)
+            );
 
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->where('can.update', false)
-            ->where('can.delete', false)
-            ->where('can.assign', false)
-        );
+        $this->actingAs($this->viewer)
+            ->get("/security-devices/devices/{$device->id}?section=health")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can.update', false)
+                ->where('can.delete', false)
+                ->where('can.assign', false)
+            );
     }
 
     // ── Create / Store ────────────────────────────────────────────

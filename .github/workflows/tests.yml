@@ -200,7 +200,7 @@ jobs:
           tests/Feature/Emar/UnifiedMedicationReportsTest.php
           tests/Feature/Emar/PrescriptionsPageTest.php
           tests/Feature/It/ItTicketTriageTest.php
-          tests/Feature/Incidents/IncidentJourneyPresenterTest.php
+          tests/Feature/Incidents/IncidentJourneyStateTest.php
           tests/Feature/FrontlineLifecycleDemoSeederReplayTest.php
           tests/Feature/Emar/ConnectedMedicationPermissionSeedingTest.php
           tests/Feature/Emar/PharmacyConnectionTest.php

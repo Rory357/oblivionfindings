@@ -34,7 +34,8 @@ final class HsCorrectiveActionWorkspace
                     ->whereKey($record->id)->select('hs_event_id')), UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
                 $action = HsCorrectiveAction::query()
                     ->whereHas('hsEvent', fn ($query) => $this->events->applyReadableScope($query, $viewer, $context, $sourceCandidates))
-                    ->with(['hsEvent.site:id,name', 'assignedTo:id,name', 'completedBy:id,name', 'verifiedBy:id,name',
+                    ->with(['hsEvent.site:id,name', 'creator:id,name', 'assignedTo:id,name', 'assignedBy:id,name',
+                        'completedBy:id,name', 'verifiedBy:id,name', 'closedBy:id,name',
                         'hsInvestigation', 'sourceControlRoomTask.alert'])
                     ->findOrFail($record->id);
                 $event = $action->hsEvent;
@@ -79,11 +80,24 @@ final class HsCorrectiveActionWorkspace
                     $detail['source'] = ['type' => $sourceConsistent ? 'restricted' : 'unavailable'];
                 }
 
+                $ownership = $this->ownership->present($viewer, $action, $participant);
+                // K1a (B1.5/B1.6): an owner who can no longer own the action blocks Start until a new owner is chosen.
+                $replacementNeeded = ($ownership['state'] ?? null) === 'replacement_needed';
+                $mayStart = $manager && $action->assigned_to_user_id !== null && $action->status === HsCorrectiveAction::STATUS_OPEN;
+
                 return [
-                    'ownership' => $this->ownership->present($viewer, $action, $participant),
+                    'ownership' => $ownership,
+                    'history_state' => ! $participant
+                        ? 'restricted'
+                        : ($evidenceState === HsCorrectiveActionPresenter::EVIDENCE_LOADED ? 'loaded' : 'error'),
                     'action' => [...$detail,
                         'description' => $hasSource && ! $sourceReadable ? null : $action->description,
+                        'created_at' => $action->created_at?->toIso8601String(),
+                        'created_by_name' => $action->creator?->name,
+                        'assigned_at' => $action->assigned_at?->toIso8601String(),
+                        'assigned_by_name' => $action->assignedBy?->name,
                         'closed_at' => $action->closed_at?->toIso8601String(),
+                        'closed_by_name' => $action->closedBy?->name,
                     ],
                     'review' => [
                         'id' => $event->id,
@@ -96,12 +110,19 @@ final class HsCorrectiveActionWorkspace
                     'can' => [
                         // Review closure preserves independently owned action work, including
                         // a verified action or work covered by a controlled closure exception.
-                        'start' => $manager && $action->assigned_to_user_id !== null && $action->status === HsCorrectiveAction::STATUS_OPEN,
+                        'start' => $mayStart && ! $replacementNeeded,
                         'complete' => $manager && $strict && $action->status === HsCorrectiveAction::STATUS_IN_PROGRESS,
                         'verify' => $detail['can_verify'],
                         'return' => $manager && $strict && $action->status === HsCorrectiveAction::STATUS_COMPLETED,
                         'close' => $manager && $strict && $action->status === HsCorrectiveAction::STATUS_VERIFIED,
                     ],
+                    // Blocked for now, with the reason and who unblocks it; only for viewers who could otherwise start (IR3a).
+                    'blocked' => $mayStart && $replacementNeeded
+                        ? ['start' => ['reason' => HsCorrectiveActionService::START_NEEDS_NEW_OWNER, 'unblock' => 'Someone who manages health and safety at this site chooses a new owner.']]
+                        : [],
+                    'next_step' => $replacementNeeded && $action->status !== HsCorrectiveAction::STATUS_CLOSED
+                        ? ['key' => 'choose_owner', 'can' => (bool) ($ownership['can_assign'] ?? false)]
+                        : null,
                 ];
             }));
     }

@@ -59,7 +59,7 @@ final class ItModuleNavigation
                     self::item('Changes', '/it/changes', 'calendar-clock'),
                     self::item('Major incidents', '/it/major-incidents', 'siren'),
                     $canOpenMonitoring
-                        ? self::item('Monitoring', '/security-devices/monitoring', 'activity')
+                        ? self::item('Monitoring', '/security-devices/alerts', 'activity')
                         : null,
                 ])),
             ];
@@ -73,7 +73,7 @@ final class ItModuleNavigation
                         ? self::item('SLA policies', '/it?tab=tickets&action=sla', 'timer')
                         : null,
                     $canOpenIntegrations
-                        ? self::item('Integrations & API', '/security-devices/integrations', 'plug')
+                        ? self::item('Integrations & API', '/security-devices/setup/services?tab=connected', 'plug')
                         : null,
                 ])),
             ];

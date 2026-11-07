@@ -1,9 +1,9 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import {
     DateTimeField,
     validLocalDateTime,
 } from '@/components/fleet-assets/maintenance/date-time-field';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import { JourneyTermHelp } from '@/components/journey-term-help';
 import { compactMenu } from '@/components/lists/entity-menu';
 import {
@@ -111,6 +111,8 @@ export type IncidentDetail = {
     description: string | null;
     immediate_action_taken: string | null;
     witnesses: string | null;
+    // P4: true when this is a safeguarding incident whose words, witnesses and files the viewer may not see.
+    content_restricted?: boolean;
     is_notifiable: boolean | null;
     worksafe_notification_status: string | null;
     worksafe_notified_at: string | null;
@@ -211,6 +213,8 @@ export type IncidentDetail = {
         }>;
     } | null;
     can: {
+        /** Board M5c note: a closed incident's PDF, for whole-record viewers only. */
+        download_pdf?: boolean;
         update: boolean;
         submit: boolean;
         review: boolean;
@@ -416,7 +420,7 @@ export function IncidentDetailDialog({
                 >
                     <ExternalLink className="h-4 w-4" /> Open full page
                 </Link>
-                {d.can.update && d.status === 'draft' ? (
+                {d.can.update && d.status === 'draft' && !d.content_restricted ? (
                     <Button
                         size="sm"
                         variant="outline"
@@ -564,6 +568,7 @@ export function ActionPane({
     onCancel = onDone,
     onDraftStateChange,
     confirmCurrentIncident = false,
+    hideHead = false,
 }: {
     d: IncidentDetail;
     action: LifecycleAction;
@@ -571,6 +576,8 @@ export function ActionPane({
     onCancel?: () => void;
     onDraftStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
     confirmCurrentIncident?: boolean;
+    /** The pop-up header already names the action (pop-up kit). */
+    hideHead?: boolean;
 }) {
     const [incidentId] = useState(d.id);
     const meta = ACTION_META[action];
@@ -691,7 +698,13 @@ export function ActionPane({
             aria-busy={busy}
             className="flex flex-col gap-4"
         >
-            <StepHead icon={meta.icon} title={meta.title} blurb={meta.blurb} />
+            {hideHead ? null : (
+                <StepHead
+                    icon={meta.icon}
+                    title={meta.title}
+                    blurb={meta.blurb}
+                />
+            )}
 
             {confirmationError ? (
                 <InfoCard icon={AlertTriangle} tone="crit">
@@ -1498,7 +1511,8 @@ export function OverviewSection({
 
 /** Every dated change to the incident, oldest first (drawing pg-hsn-2f). */
 /** What a viewer without access sees of a linked health record (approved drawing D3, MASTER, 30 Oct). */
-export const HIDDEN_HEALTH_RECORD = 'A health record — hidden, you don’t have access';
+export const HIDDEN_HEALTH_RECORD =
+    'A health record — hidden, you don’t have access';
 export const HIDDEN_HEALTH_RECORD_ADDED = 'Health record added — hidden';
 
 export function incidentHistoryItems(d: IncidentDetail): (LogItem & {
@@ -1598,9 +1612,7 @@ export function TimelineSection({ d }: { d: IncidentDetail }) {
     const first = items[0]?.at;
     const last = items.at(-1)?.at;
     if (!items.length)
-        return (
-            <QuietLine title="History" text="No timeline events yet." />
-        );
+        return <QuietLine title="History" text="No timeline events yet." />;
     return (
         <Log
             title="History"
@@ -1617,7 +1629,7 @@ export function TimelineSection({ d }: { d: IncidentDetail }) {
 
 export function PhotosSection({ d }: { d: IncidentDetail }) {
     // Attachments are only mutable while the incident is a draft (server guardrail).
-    const canEdit = d.status === 'draft' && d.can.update;
+    const canEdit = d.status === 'draft' && d.can.update && !d.content_restricted;
     const canPortal = d.can.portalManage;
     const [removing, setRemoving] = useState<
         IncidentDetail['attachments'][number] | null
@@ -1647,7 +1659,8 @@ export function PhotosSection({ d }: { d: IncidentDetail }) {
                         {
                             label: 'Download',
                             icon: Download,
-                            onClick: () => window.location.assign(a.download_url),
+                            onClick: () =>
+                                window.location.assign(a.download_url),
                         },
                         canPortal && {
                             label: a.portal_visible ? 'Unshare' : 'Share',
@@ -1737,7 +1750,8 @@ export function PhotosSection({ d }: { d: IncidentDetail }) {
                     <div className="border-b border-border p-4">
                         <AttachmentUploader
                             endpoint={`/incidents/${d.id}/attachments`}
-                            hint="PDF, Word, images — up to 10 MB each"
+                            accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx"
+                            hint="Photos, videos, PDFs or Word files — up to 10 MB each"
                         />
                     </div>
                 ) : null}
@@ -2152,7 +2166,8 @@ export function HandoverFacts({ d }: { d: IncidentDetail }) {
         ['Status', handoverStatusLabel(handover.status)],
         ['H&S owner', handover.owner?.name ?? 'No H&S owner assigned'],
     ];
-    if (handover.accepted_by) rows.push(['Accepted by', handover.accepted_by.name]);
+    if (handover.accepted_by)
+        rows.push(['Accepted by', handover.accepted_by.name]);
     if (handover.accepted_at)
         rows.push(['Accepted at', formatDateTime(handover.accepted_at)]);
     if (handover.notes) rows.push(['Acceptance notes', handover.notes]);
@@ -2218,7 +2233,9 @@ export function InvestigationSection({
                     .filter(Boolean)
                     .join(' · ')}
                 action={
-                    ev.url ? { label: 'Open safety review', href: ev.url } : null
+                    ev.url
+                        ? { label: 'Open safety review', href: ev.url }
+                        : null
                 }
                 steps={steps}
                 caption={

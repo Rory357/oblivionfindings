@@ -25,6 +25,11 @@ func InstallComputer(ctx context.Context, pack *release.Package, profile agent.B
 	return Install(ctx, pack, Profiles{Role: "computer", Computer: &profile}, confirmedServer, "")
 }
 func Install(ctx context.Context, pack *release.Package, profiles Profiles, confirmedServer, confirmedCollector string) (Journal, error) {
+	return InstallWithProgress(ctx, pack, profiles, confirmedServer, confirmedCollector, nil)
+}
+
+// InstallWithProgress is Install, telling progress about each step for the installer's screen.
+func InstallWithProgress(ctx context.Context, pack *release.Package, profiles Profiles, confirmedServer, confirmedCollector string, progress Progress) (Journal, error) {
 	var zero Journal
 	if err := profiles.Validate(confirmedServer, confirmedCollector, time.Now()); err != nil {
 		return zero, err
@@ -110,7 +115,7 @@ func Install(ctx context.Context, pack *release.Package, profiles Profiles, conf
 	if err = host.Persist(&journal); err != nil {
 		return journal, err
 	}
-	err = Run(ctx, &journal, host)
+	err = RunWithProgress(ctx, &journal, host, progress)
 	return journal, err
 }
 

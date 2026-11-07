@@ -52,6 +52,8 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware('api')->prefix('api')->group(base_path('routes/endpoint-agent.php'));
             Route::middleware('api')->prefix('api')->group(base_path('routes/obli-api.php'));
             Route::middleware('api')->prefix('api')->group(base_path('routes/chat-media.php'));
+            // Oblivion Live's gateway reports presence here (signed, server to server).
+            Route::middleware('api')->group(base_path('routes/chat-live.php'));
         },
     )
     ->withBroadcasting(

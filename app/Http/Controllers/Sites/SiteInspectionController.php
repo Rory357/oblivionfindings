@@ -9,6 +9,7 @@ use App\Models\SiteCalendarEvent;
 use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
 use App\Services\Facility\FacilitySignalService;
+use App\Services\Sites\SiteWorkQueue;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -47,6 +48,10 @@ class SiteInspectionController extends Controller
             ],
             'schedules' => $schedules,
             'records' => $records,
+            'can' => [
+                'schedule' => $request->user()->canDo('checklists.schedule')
+                    && $request->user()->can('update', $site),
+            ],
         ]);
     }
 
@@ -88,15 +93,13 @@ class SiteInspectionController extends Controller
             ]);
         }
 
-        return redirect()
-            ->route('sites.inspections.index', $site)
-            ->with('success', 'Inspection schedule created.');
+        return $this->redirectAfterWrite($request, $site, 'Inspection schedule created.');
     }
 
     public function complete(Request $request, Site $site, SiteInspectionSchedule $schedule)
     {
         $this->authorize('update', $site);
-        abort_unless($schedule->site_id === $site->id, 404);
+        abort_unless((int) $schedule->site_id === (int) $site->id, 404);
 
         $validated = $request->validate([
             'result' => 'required|in:pass,fail,partial,na',
@@ -144,15 +147,37 @@ class SiteInspectionController extends Controller
             ]);
         }, 3);
 
-        return redirect()
-            ->route('sites.inspections.index', $site)
-            ->with('success', 'Inspection recorded successfully.');
+        return $this->redirectAfterWrite($request, $site, 'Inspection recorded successfully.');
+    }
+
+    /**
+     * Where a schedule or result save lands. The Sites list and the cross-site
+     * Inspections & Maintenance page open these forms in a pop-up and send
+     * `redirect_back`, so the save returns to the page that asked (Laravel's
+     * own previous URL, falling back to this Site's inspections) and Inertia
+     * reloads that page's counts. The flag is a plain boolean, never a URL, and
+     * a previous URL on another host is ignored, so it cannot send anyone
+     * off-site.
+     */
+    private function redirectAfterWrite(Request $request, Site $site, string $message)
+    {
+        $fallback = route('sites.inspections.index', $site);
+        $target = $fallback;
+
+        if ($request->boolean('redirect_back')) {
+            $previous = url()->previous($fallback);
+            if (parse_url($previous, PHP_URL_HOST) === $request->getHost()) {
+                $target = $previous;
+            }
+        }
+
+        return redirect()->to($target)->with('success', $message);
     }
 
     public function destroy(Request $request, Site $site, SiteInspectionSchedule $schedule)
     {
         $this->authorize('update', $site);
-        abort_unless($schedule->site_id === $site->id, 404);
+        abort_unless((int) $schedule->site_id === (int) $site->id, 404);
 
         $schedule->delete();
 
@@ -179,8 +204,16 @@ class SiteInspectionController extends Controller
             self::SITE_BYPASS_PERMISSIONS,
         );
 
+        $user = $request->user();
+        $can = [
+            'schedule' => $user->canDo('checklists.schedule') && $user->canDo('sites.update'),
+            'record' => $user->canDo('checklists.run') && $user->canDo('sites.update'),
+            'maintenance' => $user->canDo('assets.maintenance.record'),
+            'runChecklists' => $user->canDo('checklists.run'),
+        ];
+
         $schedules = SiteInspectionSchedule::query()
-            ->with(['site:id,name,type', 'assignedTo:id,name'])
+            ->with(['site:id,name,type,archived', 'assignedTo:id,name'])
             ->whereIn('site_id', $accessibleSiteIds)
             ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
             ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
@@ -203,6 +236,9 @@ class SiteInspectionController extends Controller
                 'next_due_date' => $schedule->next_due_date?->toDateString(),
                 'is_active' => (bool) $schedule->is_active,
                 'assigned_to_name' => $schedule->assignedTo?->name,
+                // Recording a result needs SitePolicy::update, which refuses
+                // archived Sites; the Site is already in the viewer's scope.
+                'can_record' => $can['record'] && $schedule->is_active && ! $schedule->site?->archived,
             ])
             ->values();
 
@@ -250,12 +286,19 @@ class SiteInspectionController extends Controller
             ->pluck('inspection_type')
             ->values();
 
+        // Maintenance due per Site, counted exactly as the Sites list and its
+        // Overdue list count it, so the page's maintenance number and the
+        // pop-up it opens agree.
+        $workQueue = app(SiteWorkQueue::class);
+
         return inertia('sites/inspections/global', [
             'schedules' => $schedules,
             'records' => $records,
             'sites' => $sites->get(),
             'inspectionTypes' => $inspectionTypes,
             'filters' => $request->only(['site_id', 'inspection_type', 'status', 'due_state', 'result']),
+            'can' => $can,
+            'maintenanceDue' => $workQueue->maintenanceDueBySite($workQueue->siteIds($user)),
         ]);
     }
 

@@ -29,8 +29,8 @@ use App\Services\HealthSafety\RestraintKpiService;
 use App\Services\Incidents\IncidentAccessService;
 use App\Services\UserSiteAccessService;
 use App\Support\Incidents\IncidentOccurrencePeriod;
-use App\Support\Inertia\SharedDeferredReload;
 use Carbon\Carbon;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use App\Services\Safeguarding\SafeguardingConcernReadScope;
@@ -38,6 +38,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Inertia\Support\Header;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -77,24 +78,96 @@ class HealthSafetyDashboardController extends Controller
      */
     public function index(Request $request): Response
     {
-        // The header inbox's follow-up request only gets the inbox plus the always props below, so build just those:
-        // the same read, Site checks and values as the full page, without the rest of the page (Speed, 30 Oct).
-        if (SharedDeferredReload::only($request, 'health-safety/dashboard')) {
-            $props = HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
-                fn (HealthSafetyReadContext $context): array => $this->overviewProps($request, $context, null));
-        } else {
-            $props = HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
-                fn (HealthSafetyReadContext $context): array => HealthSafetyReadMaterialisationProof::within($context->provePageWideAnd(),
-                    fn (HealthSafetyReadMaterialisationProof $proof): array => $this->overviewProps($request, $context, $proof)));
-        }
+        // Step C (MASTER, 31 Oct): the page shows first and the heavy parts fill in from background requests. Every request
+        // is still ONE locked read with its Site checks and final proof, building only what it was asked for: the first
+        // response builds the always props and the first-paint props; a background request builds the always props and its
+        // part(s), with speed B's page-wide proofs. Nothing is carried between requests, and one response never mixes reads.
+        $partial = $request->header(Header::PARTIAL_COMPONENT) === 'health-safety/dashboard';
+        $only = array_filter(explode(',', (string) $request->header(Header::PARTIAL_ONLY, '')));
+        $wants = fn (array $keys): bool => ! $partial || $request->header(Header::PARTIAL_EXCEPT) !== null || $only === []
+            || array_intersect($only, $keys) !== [];
+        $firstPaint = $wants(self::OVERVIEW_FIRST_PAINT);
+        $groups = $partial ? array_keys(array_filter(self::OVERVIEW_DEFERRED, $wants)) : [];
 
-        // These already materialised operands must refresh together even on an
-        // auth-only partial response; identity alone cannot prove Site access.
-        foreach (['worker_participation', 'filters', 'sites'] as $key) {
-            $props[$key] = Inertia::always($props[$key]);
+        $page = self::once(fn (): array => HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
+            fn (HealthSafetyReadContext $context): array => HealthSafetyReadMaterialisationProof::within(
+                $groups !== [] ? $context->provePageWideAnd() : $context,
+                function (HealthSafetyReadMaterialisationProof $proof) use ($request, $context, $firstPaint, $groups): array {
+                    $parts = function () use ($request, $context, $proof, $groups): array {
+                        $values = [];
+                        foreach ($groups as $group) {
+                            $values += match ($group) {
+                                'headline' => $this->overviewHeadline($request, $context),
+                                'work' => $this->overviewWork($request, $context),
+                                'detail' => $this->overviewDetail($request, $context, $proof),
+                                'boxes' => $this->overviewBoxes($request, $context),
+                                'queue' => $this->overviewQueue($request, $context),
+                                'chart_severity', 'chart_over_time', 'chart_due', 'chart_types' => $this->overviewChart($group, $request, $context),
+                            };
+                        }
+
+                        return $values;
+                    };
+
+                    return $firstPaint
+                        ? $this->overviewFirstPaint($request, $context, $parts)
+                        : [...$this->overviewAlwaysOnly($request, $context), ...$parts()];
+                })));
+        $pick = fn (string $key): Closure => fn () => $page()[$key];
+
+        $props = [];
+        // These must refresh together on every response, background ones included; identity alone cannot prove Site access.
+        foreach (self::OVERVIEW_ALWAYS as $key) {
+            $props[$key] = Inertia::always($pick($key));
+        }
+        foreach (self::OVERVIEW_FIRST_PAINT as $key) {
+            $props[$key] = $pick($key);
+        }
+        foreach (self::OVERVIEW_DEFERRED as $group => $keys) {
+            foreach ($keys as $key) {
+                $props[$key] = Inertia::defer($pick($key), $group);
+            }
         }
 
         return Inertia::render('health-safety/dashboard', $props);
+    }
+
+    /** Sent with every Overview response (see index()). */
+    public const OVERVIEW_ALWAYS = ['worker_participation', 'filters', 'sites'];
+
+    /** Cheap and needed to draw the page: in the first response. */
+    public const OVERVIEW_FIRST_PAINT = ['lens', 'header_box_set', 'close_anyway_decider', 'header_chart_kind', 'org_name', 'source_scope', 'source_completeness', 'clients', 'staff', 'procedures'];
+
+    /** Loaded after the page shows, one background request per group. */
+    public const OVERVIEW_DEFERRED = [
+        'headline' => ['kpis', 'incident_trends', 'safeguarding_source', 'workplace_injury_state', 'ppe_kpi_state', 'leading_lagging', 'frequency_trends'],
+        'work' => ['worklists', 'backbone', 'exposure_delivery_problems'],
+        'detail' => ['incidents_by_category', 'site_league', 'frequency_operands', 'hazard_burndown', 'open_hazards_list', 'first_aid', 'restraints'],
+        // G2 (Stephan's header): the four boxes, with their trend and weekly bars, in their own background request.
+        'boxes' => ['header_boxes'],
+        // G2 (B2.2, M1/M3): the blocks of "Your queue" that the work lists don't carry, and where reviews are up to.
+        'queue' => ['queue'],
+        // G2: each header chart in its own background request, so a slow chart never holds up the others.
+        'chart_severity' => ['header_chart_severity'],
+        'chart_over_time' => ['header_chart_over_time'],
+        'chart_due' => ['header_chart_due'],
+        'chart_types' => ['header_chart_types'],
+    ];
+
+    /** Runs $build at most once per request (the parts above are shared by several props). */
+    private static function once(Closure $build): Closure
+    {
+        $done = false;
+        $value = null;
+
+        return function () use (&$done, &$value, $build) {
+            if (! $done) {
+                $value = $build();
+                $done = true;
+            }
+
+            return $value;
+        };
     }
 
     /**
@@ -135,15 +208,18 @@ class HealthSafetyDashboardController extends Controller
         }
     }
 
-    /** Without a proof, only the always props (worker_participation, filters, sites) are built; see index(). */
-    private function overviewProps(Request $request, HealthSafetyReadContext $context, ?HealthSafetyReadMaterialisationProof $proof): array
+    /**
+     * What every Overview part reads first, inside its own locked read: the viewer, the Sites they may see (403/404 as
+     * before), the validated period and the start (lens).
+     *
+     * @return array<string, mixed>
+     */
+    private function overviewFrame(Request $request, HealthSafetyReadContext $context): array
     {
         $user = $context->consumeSourceViewer([], fn (User $current): User => $current);
         [$siteId, $siteIds] = $this->resolveSiteContext($request, 'site', $user);
         $now = Carbon::now();
         $thirtyDaysAgo = $now->copy()->subDays(30);
-        $startOfYear = $now->copy()->startOfYear();
-        $sixMonthsAgo = $now->copy()->subMonths(6);
 
         $selectedIncidentDates = $request->validate([
             'from' => ['nullable', 'date_format:Y-m-d'],
@@ -164,24 +240,89 @@ class HealthSafetyDashboardController extends Controller
             'to' => $incidentTo,
         ];
         validator($incidentPeriod, ['to' => ['after_or_equal:from']])->validate();
-        $siteScope = $siteId ?? $siteIds;
         // The start follows the person's role (approved drawing D1, 30 Oct) instead of a "Lens" switch; an explicit
         // ?lens= from an old link still works.
         $lens = in_array($request->input('lens'), ['governance', 'manager', 'frontline'], true)
             ? $request->input('lens')
             : self::startFor($user);
-        if ($proof === null) {
-            return $this->overviewAlwaysProps($user, $context, $siteId, $siteScope, $incidentPeriod, $lens);
-        }
+
+        return [
+            'user' => $user, 'siteId' => $siteId, 'siteIds' => $siteIds, 'siteScope' => $siteId ?? $siteIds,
+            'now' => $now, 'thirtyDaysAgo' => $thirtyDaysAgo, 'startOfYear' => $now->copy()->startOfYear(),
+            'from' => $from, 'to' => $to, 'incidentPeriod' => $incidentPeriod,
+            'incidentFilters' => [...$incidentPeriod, 'site_id' => $siteId], 'lens' => $lens,
+        ];
+    }
+
+    /** The always props alone, for background and inbox requests. */
+    private function overviewAlwaysOnly(Request $request, HealthSafetyReadContext $context): array
+    {
+        $f = $this->overviewFrame($request, $context);
+
+        return $this->overviewAlwaysProps($f['user'], $context, $f['siteId'], $f['siteScope'], $f['incidentPeriod'], $f['lens']);
+    }
+
+    /**
+     * The first response: the always props plus what the page needs to draw itself and open its report forms. $parts
+     * (any background parts asked for in the same request) runs between preparing the client options and reading their
+     * names, as on the whole page before step C, so a name is never read ahead of the counts that can withdraw it.
+     */
+    private function overviewFirstPaint(Request $request, HealthSafetyReadContext $context, Closure $parts): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        [$user, $siteId, $siteScope] = [$f['user'], $f['siteId'], $f['siteScope']];
         $clientOptionsRead = app(DashboardClientOptionsReadService::class);
-        $clientOptionsRead->prepare($context, $siteId, $siteIds);
-        $incidentFilters = [...$incidentPeriod, 'site_id' => $siteId];
-        $incidentCategories = IncidentOccurrencePeriod::apply(ClientIncident::query(), $incidentPeriod['from'], $incidentPeriod['to'])
-            ->where('type', '!=', 'near_miss');
-        if ($siteId !== null) {
-            app(IncidentAccessService::class)->forSiteIds($incidentCategories, [$siteId]);
-        }
-        $incidentCategories = $proof->protect($context->applyIncidentSourceScope($incidentCategories));
+        $clientOptionsRead->prepare($context, $siteId, $f['siteIds']);
+        $partValues = $parts();
+        $clientOptions = $this->readableClientOptions($clientOptionsRead, $context, $siteId);
+
+        $staffQuery = User::query()
+            ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin']))
+            ->orderBy('name');
+        $this->siteAccess->applyStaffScope($staffQuery, $user, self::HS_SITE_BYPASS_PERMISSIONS);
+        $this->applyStaffSiteFilter($staffQuery, $siteId);
+
+        return [
+            ...$partValues,
+            ...$this->overviewAlwaysProps($user, $context, $siteId, $siteScope, $f['incidentPeriod'], $f['lens']),
+            'lens' => $f['lens'],
+            // G2: which four header boxes this person gets, so the waiting state can name them (permissions only, no reads).
+            'header_box_set' => \App\Services\HealthSafety\HsOverviewHeaderReadService::setFor($user),
+            // Board M11: people who decide close-anyway requests get the worklist (permissions only; the list reads later).
+            'close_anyway_decider' => $user->canDo('hazards.view') && $user->canDo('healthSafety.closureExceptions.approve'),
+            // Incident charts need incident read; without it the chart row is the hazard version (never zero incident charts).
+            'header_chart_kind' => \App\Services\HealthSafety\HsOverviewHeaderReadService::chartKindFor($user),
+            'source_scope' => 'readable_subset',
+            'source_completeness' => 'unknown',
+            // Org/brand name comes from Settings → Branding (AppSetting `branding.name`), the
+            // same source the rest of the app reads — set it there, not on the organizations row.
+            'org_name' => rescue(fn () => AppSetting::query()->where('key', 'branding.name')->value('value') ?? config('app.name'), null, false),
+            'clients' => $clientOptions,
+            'staff' => $staffQuery->get(['id', 'name'])->toArray(),
+
+            // Safe Work Procedures hub card — approved count + review-due + high-risk coverage gaps.
+            'procedures' => rescue(function () use ($siteScope) {
+                $highRisk = ['manual_handling', 'challenging_behaviour', 'lone_working', 'medication'];
+                $approvedQuery = $this->applicableProcedureQuery($siteScope);
+                $covered = (clone $approvedQuery)
+                    ->with('publishedVersion')->get()->map(fn ($procedure) => $procedure->publishedValue('category'))->filter(fn ($category) => in_array($category, $highRisk, true))->unique()
+                    ->all();
+
+                return [
+                    'approved' => (clone $approvedQuery)->count(),
+                    'review_due' => (clone $approvedQuery)
+                        ->whereNotNull('published_review_date')->where('published_review_date', '<=', now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays(30)->toDateString())->count(),
+                    'coverage_gap_categories' => count(array_diff($highRisk, $covered)),
+                ];
+            }, ['approved' => 0, 'review_due' => 0, 'coverage_gap_categories' => 0], false),
+        ];
+    }
+
+    /** Background part "headline": the header numbers, the measures and the incident trend. */
+    private function overviewHeadline(Request $request, HealthSafetyReadContext $context): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        [$user, $siteIds, $siteScope, $now, $thirtyDaysAgo] = [$f['user'], $f['siteIds'], $f['siteScope'], $f['now'], $f['thirtyDaysAgo']];
         $hsSiteBypass = self::HS_SITE_BYPASS_PERMISSIONS;
 
         // -- KPIs --
@@ -199,7 +340,7 @@ class HealthSafetyDashboardController extends Controller
             ->where('due_date', '<', $now)
             ->count();
 
-        $injuryOperands = $this->kpiService->workplaceInjuryOperands($startOfYear, $now, $siteScope, $user, $context);
+        $injuryOperands = $this->kpiService->workplaceInjuryOperands($f['startOfYear'], $now, $siteScope, $user, $context);
         $workplaceInjuriesYtd = $injuryOperands['injuries'];
         $lostTimeDaysYtd = $injuryOperands['lost_time_days'];
 
@@ -268,50 +409,30 @@ class HealthSafetyDashboardController extends Controller
             ...$ppeKpis['counts'],
         ];
 
-        // -- Incident Trends (12 months) --
-        $incidentTrends = $incidentSnapshot['trends'];
-
-        // ── H&S Backbone summary (PR5 addition — additive) ──
-        $backboneSummary = $this->dashboardService->getDashboardSummary(
-            $thirtyDaysAgo,
-            $siteScope,
-            $user,
-            $context,
-        );
-        $clientOptions = $this->readableClientOptions($clientOptionsRead, $context, $siteId);
-
-        $staffQuery = User::query()
-            ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin']))
-            ->orderBy('name');
-        $this->siteAccess->applyStaffScope($staffQuery, $user, $hsSiteBypass);
-        $this->applyStaffSiteFilter($staffQuery, $siteId);
-
-        $expiringProjection = $this->dashboardService->expiringFeedProjection($siteScope, viewer: $user, context: $context);
-        $always = $this->overviewAlwaysProps($user, $context, $siteId, $siteScope, $incidentPeriod, $lens);
-
         return [
             'kpis' => $kpis,
             'safeguarding_source' => ['access' => $safeguarding['access'], 'href' => $safeguarding['href']],
-            // Exposure managers only: a count of exposures not on the H&S register yet, no details (job 3).
-            'exposure_delivery_problems' => app(\App\Services\HealthSafety\ChemicalExposureDeliveryProblems::class)->countFor($user, $context),
-            'source_scope' => 'readable_subset',
-            'source_completeness' => 'unknown',
             'workplace_injury_state' => array_diff_key($injuryOperands, ['injuries' => true, 'lost_time_days' => true]),
             'ppe_kpi_state' => array_diff_key($ppeKpis, ['counts' => true]),
-            'incident_trends' => $incidentTrends,
-            'backbone' => $backboneSummary,
-
-            // ── Command-centre additions — period/site/lens-aware (G3/G4/G5/G6) ──
-            'filters' => $always['filters'],
-            'lens' => $lens,
-            'sites' => $always['sites'],
-            // Org/brand name comes from Settings → Branding (AppSetting `branding.name`), the
-            // same source the rest of the app reads — set it there, not on the organizations row.
-            'org_name' => rescue(fn () => AppSetting::query()->where('key', 'branding.name')->value('value') ?? config('app.name'), null, false),
-            'clients' => $clientOptions,
-            'staff' => $staffQuery->get(['id', 'name'])->toArray(),
-            'leading_lagging' => $this->kpiService->leadingLagging($from, $to, $siteScope, $user, $context, $incidentFilters),
+            // -- Incident Trends (12 months) --
+            'incident_trends' => $incidentSnapshot['trends'],
+            'leading_lagging' => $this->kpiService->leadingLagging($f['from'], $f['to'], $siteScope, $user, $context, $f['incidentFilters']),
             'frequency_trends' => $this->kpiService->monthlyFrequencyRates(12, $siteScope, $user, $context),
+        ];
+    }
+
+    /** Background part "work": the worklists, the H&S backbone counts and exposure delivery problems. */
+    private function overviewWork(Request $request, HealthSafetyReadContext $context): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        [$user, $siteScope] = [$f['user'], $f['siteScope']];
+        $expiringProjection = $this->dashboardService->expiringFeedProjection($siteScope, viewer: $user, context: $context);
+
+        return [
+            // ── H&S Backbone summary (PR5 addition — additive) ──
+            'backbone' => $this->dashboardService->getDashboardSummary($f['thirtyDaysAgo'], $siteScope, $user, $context),
+            // Exposure managers only: a count of exposures not on the H&S register yet, no details (job 3).
+            'exposure_delivery_problems' => app(\App\Services\HealthSafety\ChemicalExposureDeliveryProblems::class)->countFor($user, $context),
             'worklists' => [
                 'attention' => $this->dashboardService->attentionWorklists($siteScope, $user, context: $context),
                 'overdue_corrective_actions' => $this->dashboardService->overdueCorrectiveActions($siteScope, viewer: $user, context: $context),
@@ -320,6 +441,86 @@ class HealthSafetyDashboardController extends Controller
                 'expiring' => $expiringProjection['items'],
                 'ppe_expiring_state' => $expiringProjection['ppe'],
             ],
+        ];
+    }
+
+    /** Background part "boxes" (G2): the header's four boxes for this viewer, counted like the lists, with proven history. */
+    private function overviewBoxes(Request $request, HealthSafetyReadContext $context): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        $user = $f['user'];
+        [$checksDue, $drillsDue] = [0, 0];
+        if (\App\Services\HealthSafety\HsOverviewHeaderReadService::setFor($user) === \App\Services\HealthSafety\HsOverviewHeaderReadService::SET_HAZARDS) {
+            $due = collect($this->dashboardService->expiringFeedProjection($f['siteScope'], viewer: $user, context: $context)['items'])
+                ->filter(fn (array $item): bool => $item['days_until'] !== null && $item['days_until'] <= 0);
+            [$checksDue, $drillsDue] = [$due->where('type', '!=', 'drill')->count(), $due->where('type', 'drill')->count()];
+        }
+
+        return ['header_boxes' => app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class)
+            ->boxes($user, $f['siteScope'] === null ? null : array_map('intval', (array) $f['siteScope']), $f['now'], $context, $checksDue, $drillsDue)];
+    }
+
+    /**
+     * G2 (B5.2/K9): the Incidents and safety reviews rail's attention counts, from the boxes' own counts, in one locked
+     * read with the viewer's Sites. A count this person can't read is left out (null), never sent as 0.
+     */
+    public function railCounts(Request $request): JsonResponse
+    {
+        return response()->json(HealthSafetyReadContext::within($request->user(), $this->sourceReadPermissions(),
+            fn (HealthSafetyReadContext $context): array => app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class)
+                ->railCounts($context->consumeSourceViewer([], fn (User $current): User => $current), $context)));
+    }
+
+    /**
+     * Background part "queue" (G2, B2.2): WorkSafe to decide or tell, actions this person may check, incidents needing an
+     * owner (provider managers), close-anyway requests (approvers) and where reviews are up to. A block the person can't
+     * act on or read is null, so the page leaves it out rather than showing a 0.
+     */
+    private function overviewQueue(Request $request, HealthSafetyReadContext $context): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        [$user, $scope] = [$f['user'], $f['siteScope']];
+        $header = app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class);
+        $set = $header::setFor($user);
+        $manages = $user->canDo('hazards.manage');
+        $closeAnyway = $user->canDo('healthSafety.closureExceptions.approve')
+            ? $header->closeAnywayCount($user, $scope === null ? null : array_map('intval', (array) $scope), $context) : null;
+
+        return ['queue' => [
+            'set' => $set,
+            'can_manage' => $manages,
+            'worksafe' => $this->dashboardService->worksafeQueue($scope, $user, 10, $context),
+            'to_check' => $manages ? $this->dashboardService->checkQueue($scope, $user, 10, $context) : null,
+            'incidents_need_owner' => $set === $header::SET_INCIDENTS
+                ? $header->incidentsNeedingOwnerQueue($user, $scope === null ? null : array_map('intval', (array) $scope), $context) : null,
+            'close_anyway' => $closeAnyway,
+            'stages' => $this->dashboardService->reviewStages($scope, $user, $context),
+        ]];
+    }
+
+    /** Background parts "chart_*" (G2): one header chart, counted like the boxes. */
+    private function overviewChart(string $group, Request $request, HealthSafetyReadContext $context): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        $chart = substr($group, strlen('chart_'));
+
+        return ['header_'.$group => app(\App\Services\HealthSafety\HsOverviewHeaderReadService::class)
+            ->chart($chart, $f['user'], $f['siteScope'] === null ? null : array_map('intval', (array) $f['siteScope']), $f['now'], $context)];
+    }
+
+    /** Background part "detail": the charts and lists on the Prevention and Harm tabs and the Site comparison. */
+    private function overviewDetail(Request $request, HealthSafetyReadContext $context, HealthSafetyReadMaterialisationProof $proof): array
+    {
+        $f = $this->overviewFrame($request, $context);
+        [$user, $siteId, $siteIds, $siteScope, $from, $to] = [$f['user'], $f['siteId'], $f['siteIds'], $f['siteScope'], $f['from'], $f['to']];
+        $incidentCategories = IncidentOccurrencePeriod::apply(ClientIncident::query(), $f['incidentPeriod']['from'], $f['incidentPeriod']['to'])
+            ->where('type', '!=', 'near_miss');
+        if ($siteId !== null) {
+            app(IncidentAccessService::class)->forSiteIds($incidentCategories, [$siteId]);
+        }
+        $incidentCategories = $proof->protect($context->applyIncidentSourceScope($incidentCategories));
+
+        return [
             'frequency_operands' => $this->kpiService->nearMissOperands(null, null, $siteScope, $user, $context),
             'hazard_burndown' => $this->kpiService->hazardBurndown(6, $siteScope),
             'incidents_by_category' => $incidentCategories->select('type', DB::raw('COUNT(*) as count'))
@@ -330,8 +531,7 @@ class HealthSafetyDashboardController extends Controller
                 ->map(fn ($r) => ['label' => $r->type, 'count' => (int) $r->count])->all(),
             'site_league' => $this->siteLeagueOrEmpty($from, $to, $siteScope, $user, $context),
 
-            // Leading tab — open-hazards list (row 3) + worker-participation KPI (row 1).
-            // Participation operands use canonical current source admission and nullable availability.
+            // Leading tab — open-hazards list (row 3).
             'open_hazards_list' => rescue(fn () => SiteHazard::query()
                 ->with('site:id,name')
                 ->whereIn('status', ['open', 'in_progress'])
@@ -349,27 +549,10 @@ class HealthSafetyDashboardController extends Controller
                     'site' => $h->site?->name,
                 ])
                 ->all(), [], false),
-            'worker_participation' => $always['worker_participation'],
 
             // First-aid activity (leading care-activity signal, trailing 30 days) — surfaced
             // on the Leading tab. First-aid-only treatment is NOT recordable / excluded from TRIFR.
             'first_aid' => $this->kpiService->firstAidActivity(null, null, $siteScope, $user, $context),
-
-            // Safe Work Procedures hub card — approved count + review-due + high-risk coverage gaps.
-            'procedures' => rescue(function () use ($siteScope) {
-                $highRisk = ['manual_handling', 'challenging_behaviour', 'lone_working', 'medication'];
-                $approvedQuery = $this->applicableProcedureQuery($siteScope);
-                $covered = (clone $approvedQuery)
-                    ->with('publishedVersion')->get()->map(fn ($procedure) => $procedure->publishedValue('category'))->filter(fn ($category) => in_array($category, $highRisk, true))->unique()
-                    ->all();
-
-                return [
-                    'approved' => (clone $approvedQuery)->count(),
-                    'review_due' => (clone $approvedQuery)
-                        ->whereNotNull('published_review_date')->where('published_review_date', '<=', now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays(30)->toDateString())->count(),
-                    'coverage_gap_categories' => count(array_diff($highRisk, $covered)),
-                ];
-            }, ['approved' => 0, 'review_due' => 0, 'coverage_gap_categories' => 0], false),
 
             // Restraint & behaviour-support governance (Ngā Paerewa least-restrictive practice) —
             // lagging signals + unreviewed queue. Surfaced on the Lagging tab. See RestraintKpiService.

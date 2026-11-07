@@ -952,7 +952,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Health and safety', href: '/health-safety' },
                 { title: 'Reports', href: '/health-safety/reports' },
                 { title: 'Health & safety analytics', href: '/health-safety/analytics' },
             ]}

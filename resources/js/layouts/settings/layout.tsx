@@ -207,7 +207,7 @@ const navSections: NavSection[] = [
             {
                 icon: Plug,
                 title: 'Device Integrations',
-                href: '/security-devices/integrations',
+                href: '/security-devices/setup/services?tab=connected',
                 permission: 'securityDevices.integrationsView',
             },
             {

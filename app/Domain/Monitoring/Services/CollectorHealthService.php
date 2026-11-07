@@ -5,6 +5,7 @@ namespace App\Domain\Monitoring\Services;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\CollectorCheckpoint;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -20,7 +21,8 @@ final class CollectorHealthService
         $at ??= CarbonImmutable::now('UTC');
         $staleAfter = max(60, min(3600, (int) config('monitoring.collector.heartbeat_stale_seconds', 180)));
 
-        return DB::transaction(function () use ($collector, $at, $staleAfter): MonitoringCollector {
+        $wentOffline = false;
+        $result = DB::transaction(function () use ($collector, $at, $staleAfter, &$wentOffline): MonitoringCollector {
             $locked = MonitoringCollector::query()->with('checkpoint')->whereKey($collector->id)->lockForUpdate()->firstOrFail();
             if ($locked->revoked_at !== null || $locked->status === 'revoked') {
                 return $locked;
@@ -40,6 +42,7 @@ final class CollectorHealthService
                         'suppressed_at' => $at,
                     ]);
                 }
+                $wentOffline = true;
                 $this->event($locked, 'offline', 'high', [
                     ...$roster,
                     'backlog_items' => (int) $locked->backlog_items,
@@ -49,6 +52,13 @@ final class CollectorHealthService
 
             return $locked->fresh(['checkpoint']);
         }, 3);
+
+        // S&D Phase D: a hub that stops answering opens an alert on its device.
+        if ($wentOffline) {
+            app(DeviceAlertEngine::class)->onHub($result, true, $at);
+        }
+
+        return $result;
     }
 
     /** @param array<string, mixed> $status */
@@ -60,7 +70,8 @@ final class CollectorHealthService
         $receivedAt ??= CarbonImmutable::now('UTC');
         $heartbeat = $this->validatedHeartbeat($status);
 
-        return DB::transaction(function () use ($collector, $heartbeat, $receivedAt): MonitoringCollector {
+        $hubChange = null;
+        $result = DB::transaction(function () use ($collector, $heartbeat, $receivedAt, &$hubChange): MonitoringCollector {
             $locked = MonitoringCollector::query()->with('checkpoint')->whereKey($collector->id)->lockForUpdate()->firstOrFail();
             if ($locked->revoked_at !== null || $locked->status === 'revoked') {
                 throw new DomainException('Collector is unavailable.');
@@ -120,6 +131,7 @@ final class CollectorHealthService
                         'suppressed_at' => $receivedAt,
                     ]);
                 }
+                $hubChange = 'offline';
                 $this->event($locked, 'offline', 'high', [
                     ...$roster,
                     'backlog_items' => $heartbeat['spool_items'],
@@ -146,6 +158,7 @@ final class CollectorHealthService
                 $backlogAge = $heartbeat['oldest_spool_item_at'] === null
                     ? 0
                     : max(0, $heartbeat['oldest_spool_item_at']->diffInSeconds($receivedAt));
+                $hubChange = 'online';
                 $this->event($locked, 'online', 'info', [
                     'affected_monitor_ids' => $outage['monitor_ids'],
                     'affected_monitor_roster_sha256' => $outage['roster_sha256'],
@@ -160,6 +173,13 @@ final class CollectorHealthService
 
             return $locked->fresh(['checkpoint']);
         }, 3);
+
+        // S&D Phase D: the hub's alert opens when its path breaks and closes when it's back.
+        if ($hubChange !== null) {
+            app(DeviceAlertEngine::class)->onHub($result, $hubChange === 'offline', $receivedAt);
+        }
+
+        return $result;
     }
 
     /**

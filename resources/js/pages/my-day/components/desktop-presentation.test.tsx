@@ -187,7 +187,6 @@ describe('My Day desktop presentation', () => {
                 onNote={note}
                 onMeal={vi.fn()}
                 onObservation={vi.fn()}
-                onIncident={vi.fn()}
             />,
         );
         fireEvent.click(screen.getByRole('button', { name: 'Daily note' }));

@@ -27,6 +27,7 @@ use App\Http\Controllers\Sites\SiteRoomController;
 use App\Http\Controllers\Sites\SiteTypePlanController;
 use App\Http\Controllers\Sites\SiteTypePlanPinController;
 use App\Http\Controllers\Sites\SiteVendorController;
+use App\Http\Controllers\Sites\SiteWorkController;
 use App\Http\Controllers\Sites\SiteZoneController;
 use App\Models\Site;
 use App\Models\SiteChecklistRun;
@@ -236,6 +237,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/inspections/{schedule}', [SiteInspectionController::class, 'destroy'])
             ->name('sites.inspections.destroy')
             ->middleware('permission:checklists.schedule');
+
+        // Choices for the Sites-list pop-ups (JSON): this Site's inspection
+        // schedules or the assets the viewer may log maintenance for.
+        Route::get('/work-options', [SiteWorkController::class, 'options'])
+            ->name('sites.work.options');
 
         // Hardware
         Route::get('/hardware', [SiteHardwareController::class, 'index'])
@@ -553,6 +559,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('sites.inspections.global')
         ->middleware('permission:checklists.view');
 
+    // Overdue checklists, inspections and maintenance behind the Sites list's
+    // Overdue meter (JSON, scoped like the Sites list).
+    Route::get('/sites/overdue-work', [SiteWorkController::class, 'overdue'])
+        ->name('sites.work.overdue')
+        ->middleware('permission:sites.viewAny');
+
     // Global Vendors & Credentials — cross-site dashboard.
     // Pipe-OR matches the controller's view check: either permission grants access.
     Route::get('/vendors', [SiteVendorController::class, 'globalIndex'])
@@ -605,6 +617,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:reports.sites.view');
     Route::get('/sites/reports/asset-condition', [SiteReportingController::class, 'assetConditionReport'])
         ->name('sites.reports.asset-condition')
+        ->middleware('permission:reports.sites.view');
+    Route::get('/sites/reports/inspections-maintenance', [SiteReportingController::class, 'inspectionsMaintenance'])
+        ->name('sites.reports.inspections-maintenance')
         ->middleware('permission:reports.sites.view');
     Route::get('/sites/reports/vendor-export', [SiteReportingController::class, 'vendorContactsExport'])
         ->name('sites.reports.vendor-export')

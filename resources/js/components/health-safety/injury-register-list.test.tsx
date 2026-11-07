@@ -38,5 +38,5 @@ it('keeps unknown private counts distinct from healthy zero and preserves medica
     render(<InjuryRegisterList rows={[row]} total={1} returnTo="/health-safety/injuries" medical />);
     expect(screen.getByText('Plans not available · 0 checks · 1 file')).toBeInTheDocument();
     fireEvent.contextMenu(screen.getAllByRole('row')[1], { clientX: 70, clientY: 100 });
-    for (const name of ['Open injury', 'Linked records', 'Recovery plans', 'Fitness-for-work checks', 'Evidence', 'History']) expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
+    for (const name of ['Open injury', 'Linked records', 'Recovery plans', 'Fitness-for-work checks', 'Files', 'History']) expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
 });

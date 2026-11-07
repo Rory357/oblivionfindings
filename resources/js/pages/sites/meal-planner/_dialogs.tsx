@@ -412,7 +412,8 @@ export function PlanEntryDialog({
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-w-xl">
+            {/* Title and buttons stay in view; only the fields scroll. */}
+            <DialogContent className="flex max-h-[88dvh] max-w-xl flex-col overflow-hidden">
                 <DialogHeader>
                     <DialogTitle>
                         {isNew ? 'Add meal' : 'Edit meal'}
@@ -422,637 +423,679 @@ export function PlanEntryDialog({
                         any planning notes.
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={submit} className="space-y-3">
-                    {!isNew &&
-                        entry?.allergen_override_at &&
-                        existingOverrideReason && (
-                            <div className="flex items-start gap-2 rounded-md border border-status-critical/30 bg-status-critical-bg/60 p-2 text-xs text-status-critical">
-                                <Lock className="mt-0.5 h-3.5 w-3.5 flex-none" />
-                                <div>
-                                    <div className="font-medium">
-                                        Allergen override on file
-                                    </div>
-                                    <div className="mt-0.5">
-                                        &ldquo;{existingOverrideReason}&rdquo;
-                                    </div>
-                                    {entry.allergen_override_by && (
-                                        <div className="mt-0.5 text-status-critical/80">
-                                            by {entry.allergen_override_by.name}{' '}
-                                            ·{' '}
-                                            {new Date(
-                                                entry.allergen_override_at,
-                                            ).toLocaleString('en-NZ')}
+                <form
+                    onSubmit={submit}
+                    className="flex min-h-0 flex-1 flex-col gap-4"
+                >
+                    <div className="scrollbar-pretty -mx-2 min-h-0 flex-1 space-y-3 overflow-y-auto px-2 py-1">
+                        {!isNew &&
+                            entry?.allergen_override_at &&
+                            existingOverrideReason && (
+                                <div className="flex items-start gap-2 rounded-md border border-status-critical/30 bg-status-critical-bg/60 p-2 text-xs text-status-critical">
+                                    <Lock className="mt-0.5 h-3.5 w-3.5 flex-none" />
+                                    <div>
+                                        <div className="font-medium">
+                                            Allergen override on file
                                         </div>
-                                    )}
+                                        <div className="mt-0.5">
+                                            &ldquo;{existingOverrideReason}
+                                            &rdquo;
+                                        </div>
+                                        {entry.allergen_override_by && (
+                                            <div className="mt-0.5 text-status-critical/80">
+                                                by{' '}
+                                                {
+                                                    entry.allergen_override_by
+                                                        .name
+                                                }{' '}
+                                                ·{' '}
+                                                {new Date(
+                                                    entry.allergen_override_at,
+                                                ).toLocaleString('en-NZ')}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <Label>Date</Label>
-                            <Input
-                                type="date"
-                                value={form.data.plan_date}
-                                onChange={(e) =>
-                                    form.setData('plan_date', e.target.value)
-                                }
-                                required
-                            />
-                        </div>
-                        <div>
-                            <Label>Meal slot</Label>
-                            <Select
-                                value={form.data.meal_slot}
-                                onValueChange={(v) =>
-                                    form.setData('meal_slot', v as MealSlot)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {MEAL_SLOTS.map((s) => (
-                                        <SelectItem key={s} value={s}>
-                                            {SLOT_LABEL[s]}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    {/* Source mode toggle — recipe / ad-hoc / takeaway */}
-                    <div>
-                        <Label className="mb-2 block">Meal type</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {(
-                                [
-                                    {
-                                        key: 'recipe',
-                                        label: 'From recipe',
-                                        icon: ChefHat,
-                                        desc: 'Cooked from a saved recipe',
-                                    },
-                                    {
-                                        key: 'ad_hoc',
-                                        label: 'Ad-hoc cook',
-                                        icon: Utensils,
-                                        desc: 'Cooked without a recipe',
-                                    },
-                                    {
-                                        key: 'takeaway',
-                                        label: 'Takeaway',
-                                        icon: ShoppingBag,
-                                        desc: 'Ordered in from a vendor',
-                                    },
-                                ] as {
-                                    key: SourceType;
-                                    label: string;
-                                    icon: typeof ChefHat;
-                                    desc: string;
-                                }[]
-                            ).map((m) => {
-                                const ModeIcon = m.icon;
-                                const isActive =
-                                    form.data.source_type === m.key;
-                                return (
-                                    <Button
-                                        unstyled
-                                        key={m.key}
-                                        type="button"
-                                        onClick={() => {
-                                            form.setData('source_type', m.key);
-                                            // Clear fields that don't belong to the new mode
-                                            if (m.key !== 'recipe')
-                                                form.setData('recipe_id', null);
-                                            if (m.key !== 'ad_hoc')
-                                                form.setData('ad_hoc_name', '');
-                                            if (m.key !== 'takeaway') {
-                                                form.setData(
-                                                    'takeaway_vendor',
-                                                    '',
-                                                );
-                                                form.setData(
-                                                    'takeaway_cost',
-                                                    '',
-                                                );
-                                                form.setData(
-                                                    'takeaway_reference',
-                                                    '',
-                                                );
-                                            }
-                                        }}
-                                        className={`flex flex-col items-start gap-1 rounded-md border p-2 text-left transition ${isActive ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-accent'}`}
-                                    >
-                                        <ModeIcon
-                                            className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
-                                        />
-                                        <div className="text-xs font-medium">
-                                            {m.label}
-                                        </div>
-                                        <div className="text-[10px] text-muted-foreground">
-                                            {m.desc}
-                                        </div>
-                                    </Button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {form.data.source_type === 'recipe' && (
-                        <div>
-                            <Label>Recipe</Label>
-                            <Select
-                                value={
-                                    form.data.recipe_id
-                                        ? String(form.data.recipe_id)
-                                        : ''
-                                }
-                                onValueChange={(v) =>
-                                    form.setData(
-                                        'recipe_id',
-                                        v === '' ? null : Number(v),
-                                    )
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Pick a recipe" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {recipes.map((r) => (
-                                        <SelectItem
-                                            key={r.id}
-                                            value={String(r.id)}
-                                        >
-                                            {r.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-
-                    {form.data.source_type === 'ad_hoc' && (
-                        <>
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <Label>Ad-hoc meal name</Label>
+                                <Label>Date</Label>
                                 <Input
-                                    value={form.data.ad_hoc_name}
+                                    type="date"
+                                    value={form.data.plan_date}
                                     onChange={(e) =>
                                         form.setData(
-                                            'ad_hoc_name',
+                                            'plan_date',
                                             e.target.value,
                                         )
                                     }
-                                    placeholder="e.g. Cheese toasties"
+                                    required
                                 />
                             </div>
-                            {allergenReminder ? (
-                                <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
-                                    <ShieldAlert
-                                        className="mt-0.5 h-3.5 w-3.5 flex-none"
-                                        aria-hidden="true"
-                                    />
-                                    <span>
-                                        {allergenReminder} Ad-hoc meals aren't
-                                        auto-checked — confirm ingredients
-                                        before serving.
-                                    </span>
-                                </div>
-                            ) : (
-                                <div className="flex items-start gap-2 rounded-md border border-muted bg-muted/30 p-2 text-xs text-muted-foreground">
-                                    <Info
-                                        className="mt-0.5 h-3.5 w-3.5 flex-none"
-                                        aria-hidden="true"
-                                    />
-                                    <span>
-                                        No allergen check available for ad-hoc
-                                        meals — check ingredients carefully
-                                        before serving.
-                                    </span>
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {form.data.source_type === 'takeaway' && (
-                        <>
-                            <div className="grid grid-cols-12 gap-3">
-                                <div className="col-span-12 sm:col-span-6">
-                                    <Label>Vendor</Label>
-                                    <Input
-                                        list={
-                                            pastVendors.length
-                                                ? 'past-takeaway-vendors'
-                                                : undefined
-                                        }
-                                        value={form.data.takeaway_vendor}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'takeaway_vendor',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="e.g. Hell Pizza, Sushi Train…"
-                                        required
-                                    />
-                                    {pastVendors.length > 0 && (
-                                        <datalist id="past-takeaway-vendors">
-                                            {pastVendors.map((v) => (
-                                                <option key={v} value={v} />
-                                            ))}
-                                        </datalist>
-                                    )}
-                                </div>
-                                <div className="col-span-7 sm:col-span-3">
-                                    <Label>Cost (NZD)</Label>
-                                    <div className="relative">
-                                        <span className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-sm text-muted-foreground">
-                                            $
-                                        </span>
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            min={0}
-                                            value={form.data.takeaway_cost}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'takeaway_cost',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="0.00"
-                                            className="pl-6"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="col-span-5 sm:col-span-3">
-                                    <Label>Order ref</Label>
-                                    <Input
-                                        value={form.data.takeaway_reference}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'takeaway_reference',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="#12345"
-                                    />
-                                </div>
+                            <div>
+                                <Label>Meal slot</Label>
+                                <Select
+                                    value={form.data.meal_slot}
+                                    onValueChange={(v) =>
+                                        form.setData('meal_slot', v as MealSlot)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {MEAL_SLOTS.map((s) => (
+                                            <SelectItem key={s} value={s}>
+                                                {SLOT_LABEL[s]}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
-                                {allergenReminder ? (
-                                    <ShieldAlert
-                                        className="mt-0.5 h-3.5 w-3.5 flex-none"
-                                        aria-hidden="true"
-                                    />
-                                ) : (
-                                    <Info
-                                        className="mt-0.5 h-3.5 w-3.5 flex-none"
-                                        aria-hidden="true"
-                                    />
-                                )}
-                                <span>
-                                    <strong>Takeaway meal</strong> —{' '}
-                                    {allergenReminder
-                                        ? `${allergenReminder} Confirm dietary suitability with the vendor before serving.`
-                                        : 'allergen check unavailable. Confirm dietary suitability with the vendor before serving.'}
-                                </span>
-                            </div>
-                        </>
-                    )}
-                    <div>
-                        <Label>Servings</Label>
-                        <Input
-                            type="number"
-                            min={1}
-                            value={form.data.servings}
-                            onChange={(e) =>
-                                form.setData('servings', Number(e.target.value))
-                            }
-                        />
-                    </div>
-                    <div>
-                        <Label>
-                            Meal record{' '}
-                            <span className="font-normal text-muted-foreground">
-                                (free-text note)
-                            </span>
-                        </Label>
-                        <Textarea
-                            value={form.data.notes}
-                            onChange={(e) =>
-                                form.setData('notes', e.target.value)
-                            }
-                            rows={2}
-                            placeholder="Intake / refusals (e.g. 'Aroha ate half, refused vegetables'; 'Mila — dairy-free portion plated')"
-                        />
-                        <p className="mt-1 text-[11px] text-muted-foreground">
-                            One free-text note for the whole meal — not a
-                            per-resident intake record.
-                        </p>
-                    </div>
-                    {showResidents && residents.length > 0 && (
+                        </div>
+                        {/* Source mode toggle — recipe / ad-hoc / takeaway */}
                         <div>
-                            <div className="mb-1 flex items-center justify-between">
-                                <Label className="mb-0">
-                                    Residents{' '}
-                                    <span className="font-normal text-muted-foreground">
-                                        (allergens checked against these)
-                                    </span>
-                                </Label>
-                                <div className="flex gap-2 text-[11px] font-medium text-primary">
-                                    <Button
-                                        unstyled
-                                        type="button"
-                                        onClick={() =>
-                                            form.setData(
-                                                'client_ids',
-                                                residents.map((r) => r.id),
-                                            )
-                                        }
-                                        className="hover:underline"
-                                    >
-                                        All
-                                    </Button>
-                                    <Button
-                                        unstyled
-                                        type="button"
-                                        onClick={() =>
-                                            form.setData('client_ids', [])
-                                        }
-                                        className="hover:underline"
-                                    >
-                                        None
-                                    </Button>
-                                </div>
-                            </div>
-                            <div className="mt-1 grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
-                                {residents.map((c) => {
-                                    const selected = (
-                                        form.data.client_ids ?? []
-                                    ).includes(c.id);
+                            <Label className="mb-2 block">Meal type</Label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {(
+                                    [
+                                        {
+                                            key: 'recipe',
+                                            label: 'From recipe',
+                                            icon: ChefHat,
+                                            desc: 'Cooked from a saved recipe',
+                                        },
+                                        {
+                                            key: 'ad_hoc',
+                                            label: 'Ad-hoc cook',
+                                            icon: Utensils,
+                                            desc: 'Cooked without a recipe',
+                                        },
+                                        {
+                                            key: 'takeaway',
+                                            label: 'Takeaway',
+                                            icon: ShoppingBag,
+                                            desc: 'Ordered in from a vendor',
+                                        },
+                                    ] as {
+                                        key: SourceType;
+                                        label: string;
+                                        icon: typeof ChefHat;
+                                        desc: string;
+                                    }[]
+                                ).map((m) => {
+                                    const ModeIcon = m.icon;
+                                    const isActive =
+                                        form.data.source_type === m.key;
                                     return (
-                                        <label
-                                            key={c.id}
-                                            className={cn(
-                                                'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-                                                selected
-                                                    ? 'bg-sites-bg'
-                                                    : 'hover:bg-accent',
-                                            )}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selected}
-                                                onChange={() =>
-                                                    toggleClient(c.id)
+                                        <Button
+                                            unstyled
+                                            key={m.key}
+                                            type="button"
+                                            onClick={() => {
+                                                form.setData(
+                                                    'source_type',
+                                                    m.key,
+                                                );
+                                                // Clear fields that don't belong to the new mode
+                                                if (m.key !== 'recipe')
+                                                    form.setData(
+                                                        'recipe_id',
+                                                        null,
+                                                    );
+                                                if (m.key !== 'ad_hoc')
+                                                    form.setData(
+                                                        'ad_hoc_name',
+                                                        '',
+                                                    );
+                                                if (m.key !== 'takeaway') {
+                                                    form.setData(
+                                                        'takeaway_vendor',
+                                                        '',
+                                                    );
+                                                    form.setData(
+                                                        'takeaway_cost',
+                                                        '',
+                                                    );
+                                                    form.setData(
+                                                        'takeaway_reference',
+                                                        '',
+                                                    );
                                                 }
-                                                className="accent-[var(--sites)]"
+                                            }}
+                                            className={`flex flex-col items-start gap-1 rounded-md border p-2 text-left transition ${isActive ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-accent'}`}
+                                        >
+                                            <ModeIcon
+                                                className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
                                             />
-                                            <span className="min-w-0 flex-1">
-                                                <span className="block truncate font-medium text-foreground">
-                                                    {c.name}
-                                                </span>
-                                                <span className="flex flex-wrap items-center gap-1 text-[10.5px] leading-tight">
-                                                    {c.allergens.length > 0 && (
-                                                        <span className="inline-flex items-center gap-0.5 text-status-critical">
-                                                            <ShieldAlert className="h-2.5 w-2.5" />
-                                                            {c.allergens.join(
-                                                                ', ',
-                                                            )}
-                                                        </span>
-                                                    )}
-                                                    {c.texture &&
-                                                        c.texture.level < 7 && (
-                                                            <span className="inline-flex items-center gap-0.5 text-primary">
-                                                                <Soup className="h-2.5 w-2.5" />
-                                                                IDDSI{' '}
-                                                                {
-                                                                    c.texture
-                                                                        .level
-                                                                }
-                                                            </span>
-                                                        )}
-                                                    {c.fluids && (
-                                                        <span className="inline-flex items-center gap-0.5 text-primary">
-                                                            <CupSoda className="h-2.5 w-2.5" />
-                                                            {c.fluids}
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            </span>
-                                        </label>
+                                            <div className="text-xs font-medium">
+                                                {m.label}
+                                            </div>
+                                            <div className="text-[10px] text-muted-foreground">
+                                                {m.desc}
+                                            </div>
+                                        </Button>
                                     );
                                 })}
                             </div>
                         </div>
-                    )}
 
-                    {careClauses.length > 0 && (
-                        <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
-                            <Soup
-                                className="mt-0.5 h-4 w-4 flex-none"
-                                aria-hidden="true"
-                            />
+                        {form.data.source_type === 'recipe' && (
                             <div>
-                                <div className="font-semibold">
-                                    {textureResidents.length > 0
-                                        ? 'Texture-modified diet'
-                                        : 'Thickened fluids'}
-                                </div>
-                                <div className="mt-0.5">
-                                    {careClauses.join(', ')}. Confirm this meal
-                                    is prepared to the right texture and
-                                    consistency.
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {dietaryMismatchList.length > 0 && (
-                        <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
-                            <Leaf
-                                className="mt-0.5 h-4 w-4 flex-none"
-                                aria-hidden="true"
-                            />
-                            <div>
-                                <div className="font-semibold">
-                                    Dietary requirement
-                                </div>
-                                <div className="mt-0.5">
-                                    {joinNames(
-                                        dietaryMismatchList.map(
-                                            (m) =>
-                                                `${firstName(m.resident.name)} is ${m.requirements.join(', ')}`,
-                                        ),
-                                    )}{' '}
-                                    — confirm this meal meets{' '}
-                                    {dietaryMismatchList.length === 1
-                                        ? 'it'
-                                        : 'them'}
-                                    .
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Single live region: loading → failure/result is announced to assistive tech (P0-1/P0-6). */}
-                    <div role="status" aria-live="assertive" aria-atomic="true">
-                        {reportLoading && (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Loader2
-                                    className="h-3.5 w-3.5 animate-spin"
-                                    aria-hidden="true"
-                                />{' '}
-                                Checking dietary conflicts…
+                                <Label>Recipe</Label>
+                                <Select
+                                    value={
+                                        form.data.recipe_id
+                                            ? String(form.data.recipe_id)
+                                            : ''
+                                    }
+                                    onValueChange={(v) =>
+                                        form.setData(
+                                            'recipe_id',
+                                            v === '' ? null : Number(v),
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Pick a recipe" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {recipes.map((r) => (
+                                            <SelectItem
+                                                key={r.id}
+                                                value={String(r.id)}
+                                            >
+                                                {r.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         )}
-                        {reportError && !reportLoading && (
-                            <div className="rounded-md border-2 border-status-critical bg-status-critical-bg/60 p-3 text-sm">
-                                <div className="mb-1 flex items-center gap-2 font-semibold text-status-critical">
+
+                        {form.data.source_type === 'ad_hoc' && (
+                            <>
+                                <div>
+                                    <Label>Ad-hoc meal name</Label>
+                                    <Input
+                                        value={form.data.ad_hoc_name}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'ad_hoc_name',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g. Cheese toasties"
+                                    />
+                                </div>
+                                {allergenReminder ? (
+                                    <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
+                                        <ShieldAlert
+                                            className="mt-0.5 h-3.5 w-3.5 flex-none"
+                                            aria-hidden="true"
+                                        />
+                                        <span>
+                                            {allergenReminder} Ad-hoc meals
+                                            aren't auto-checked — confirm
+                                            ingredients before serving.
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-start gap-2 rounded-md border border-muted bg-muted/30 p-2 text-xs text-muted-foreground">
+                                        <Info
+                                            className="mt-0.5 h-3.5 w-3.5 flex-none"
+                                            aria-hidden="true"
+                                        />
+                                        <span>
+                                            No allergen check available for
+                                            ad-hoc meals — check ingredients
+                                            carefully before serving.
+                                        </span>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {form.data.source_type === 'takeaway' && (
+                            <>
+                                <div className="grid grid-cols-12 gap-3">
+                                    <div className="col-span-12 sm:col-span-6">
+                                        <Label>Vendor</Label>
+                                        <Input
+                                            list={
+                                                pastVendors.length
+                                                    ? 'past-takeaway-vendors'
+                                                    : undefined
+                                            }
+                                            value={form.data.takeaway_vendor}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'takeaway_vendor',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="e.g. Hell Pizza, Sushi Train…"
+                                            required
+                                        />
+                                        {pastVendors.length > 0 && (
+                                            <datalist id="past-takeaway-vendors">
+                                                {pastVendors.map((v) => (
+                                                    <option key={v} value={v} />
+                                                ))}
+                                            </datalist>
+                                        )}
+                                    </div>
+                                    <div className="col-span-7 sm:col-span-3">
+                                        <Label>Cost (NZD)</Label>
+                                        <div className="relative">
+                                            <span className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-sm text-muted-foreground">
+                                                $
+                                            </span>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                min={0}
+                                                value={form.data.takeaway_cost}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'takeaway_cost',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="0.00"
+                                                className="pl-6"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="col-span-5 sm:col-span-3">
+                                        <Label>Order ref</Label>
+                                        <Input
+                                            value={form.data.takeaway_reference}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'takeaway_reference',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="#12345"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
+                                    {allergenReminder ? (
+                                        <ShieldAlert
+                                            className="mt-0.5 h-3.5 w-3.5 flex-none"
+                                            aria-hidden="true"
+                                        />
+                                    ) : (
+                                        <Info
+                                            className="mt-0.5 h-3.5 w-3.5 flex-none"
+                                            aria-hidden="true"
+                                        />
+                                    )}
+                                    <span>
+                                        <strong>Takeaway meal</strong> —{' '}
+                                        {allergenReminder
+                                            ? `${allergenReminder} Confirm dietary suitability with the vendor before serving.`
+                                            : 'allergen check unavailable. Confirm dietary suitability with the vendor before serving.'}
+                                    </span>
+                                </div>
+                            </>
+                        )}
+                        <div>
+                            <Label>Servings</Label>
+                            <Input
+                                type="number"
+                                min={1}
+                                value={form.data.servings}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'servings',
+                                        Number(e.target.value),
+                                    )
+                                }
+                            />
+                        </div>
+                        <div>
+                            <Label>
+                                Meal record{' '}
+                                <span className="font-normal text-muted-foreground">
+                                    (free-text note)
+                                </span>
+                            </Label>
+                            <Textarea
+                                value={form.data.notes}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
+                                rows={2}
+                                placeholder="Intake / refusals (e.g. 'Aroha ate half, refused vegetables'; 'Mila — dairy-free portion plated')"
+                            />
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                                One free-text note for the whole meal — not a
+                                per-resident intake record.
+                            </p>
+                        </div>
+                        {showResidents && residents.length > 0 && (
+                            <div>
+                                <div className="mb-1 flex items-center justify-between">
+                                    <Label className="mb-0">
+                                        Residents{' '}
+                                        <span className="font-normal text-muted-foreground">
+                                            (allergens checked against these)
+                                        </span>
+                                    </Label>
+                                    <div className="flex gap-2 text-[11px] font-medium text-primary">
+                                        <Button
+                                            unstyled
+                                            type="button"
+                                            onClick={() =>
+                                                form.setData(
+                                                    'client_ids',
+                                                    residents.map((r) => r.id),
+                                                )
+                                            }
+                                            className="hover:underline"
+                                        >
+                                            All
+                                        </Button>
+                                        <Button
+                                            unstyled
+                                            type="button"
+                                            onClick={() =>
+                                                form.setData('client_ids', [])
+                                            }
+                                            className="hover:underline"
+                                        >
+                                            None
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="mt-1 grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
+                                    {residents.map((c) => {
+                                        const selected = (
+                                            form.data.client_ids ?? []
+                                        ).includes(c.id);
+                                        return (
+                                            <label
+                                                key={c.id}
+                                                className={cn(
+                                                    'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                                                    selected
+                                                        ? 'bg-sites-bg'
+                                                        : 'hover:bg-accent',
+                                                )}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selected}
+                                                    onChange={() =>
+                                                        toggleClient(c.id)
+                                                    }
+                                                    className="accent-[var(--sites)]"
+                                                />
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate font-medium text-foreground">
+                                                        {c.name}
+                                                    </span>
+                                                    <span className="flex flex-wrap items-center gap-1 text-[10.5px] leading-tight">
+                                                        {c.allergens.length >
+                                                            0 && (
+                                                            <span className="inline-flex items-center gap-0.5 text-status-critical">
+                                                                <ShieldAlert className="h-2.5 w-2.5" />
+                                                                {c.allergens.join(
+                                                                    ', ',
+                                                                )}
+                                                            </span>
+                                                        )}
+                                                        {c.texture &&
+                                                            c.texture.level <
+                                                                7 && (
+                                                                <span className="inline-flex items-center gap-0.5 text-primary">
+                                                                    <Soup className="h-2.5 w-2.5" />
+                                                                    IDDSI{' '}
+                                                                    {
+                                                                        c
+                                                                            .texture
+                                                                            .level
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                        {c.fluids && (
+                                                            <span className="inline-flex items-center gap-0.5 text-primary">
+                                                                <CupSoda className="h-2.5 w-2.5" />
+                                                                {c.fluids}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {careClauses.length > 0 && (
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
+                                <Soup
+                                    className="mt-0.5 h-4 w-4 flex-none"
+                                    aria-hidden="true"
+                                />
+                                <div>
+                                    <div className="font-semibold">
+                                        {textureResidents.length > 0
+                                            ? 'Texture-modified diet'
+                                            : 'Thickened fluids'}
+                                    </div>
+                                    <div className="mt-0.5">
+                                        {careClauses.join(', ')}. Confirm this
+                                        meal is prepared to the right texture
+                                        and consistency.
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {dietaryMismatchList.length > 0 && (
+                            <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
+                                <Leaf
+                                    className="mt-0.5 h-4 w-4 flex-none"
+                                    aria-hidden="true"
+                                />
+                                <div>
+                                    <div className="font-semibold">
+                                        Dietary requirement
+                                    </div>
+                                    <div className="mt-0.5">
+                                        {joinNames(
+                                            dietaryMismatchList.map(
+                                                (m) =>
+                                                    `${firstName(m.resident.name)} is ${m.requirements.join(', ')}`,
+                                            ),
+                                        )}{' '}
+                                        — confirm this meal meets{' '}
+                                        {dietaryMismatchList.length === 1
+                                            ? 'it'
+                                            : 'them'}
+                                        .
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Single live region: loading → failure/result is announced to assistive tech (P0-1/P0-6). */}
+                        <div
+                            role="status"
+                            aria-live="assertive"
+                            aria-atomic="true"
+                        >
+                            {reportLoading && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Loader2
+                                        className="h-3.5 w-3.5 animate-spin"
+                                        aria-hidden="true"
+                                    />{' '}
+                                    Checking dietary conflicts…
+                                </div>
+                            )}
+                            {reportError && !reportLoading && (
+                                <div className="rounded-md border-2 border-status-critical bg-status-critical-bg/60 p-3 text-sm">
+                                    <div className="mb-1 flex items-center gap-2 font-semibold text-status-critical">
+                                        <ShieldAlert
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />{' '}
+                                        Couldn't verify allergens for this meal
+                                    </div>
+                                    <p className="text-status-critical">
+                                        Do not save until allergens are
+                                        verified.
+                                    </p>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="mt-2 border-status-critical/50 text-status-critical hover:bg-status-critical-bg"
+                                        onClick={retryCheck}
+                                    >
+                                        <Loader2
+                                            className={cn(
+                                                'mr-1.5 h-3.5 w-3.5',
+                                                reportLoading
+                                                    ? 'animate-spin'
+                                                    : 'hidden',
+                                            )}
+                                            aria-hidden="true"
+                                        />{' '}
+                                        Retry check
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+
+                        {hasHard && (
+                            <div
+                                role="alert"
+                                className="rounded-md border-2 border-status-critical bg-status-critical-bg/60 p-3 text-sm"
+                            >
+                                <div className="mb-2 flex items-center gap-2 font-semibold text-status-critical">
                                     <ShieldAlert
                                         className="h-4 w-4"
                                         aria-hidden="true"
                                     />{' '}
-                                    Couldn't verify allergens for this meal
+                                    Clinical safety block — resolve before
+                                    saving
                                 </div>
-                                <p className="text-status-critical">
-                                    Do not save until allergens are verified.
-                                </p>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="mt-2 border-status-critical/50 text-status-critical hover:bg-status-critical-bg"
-                                    onClick={retryCheck}
+                                <ul className="space-y-1.5 text-status-critical">
+                                    {report.hard_blocks.map((panel) => {
+                                        const sorted = [...panel.matches].sort(
+                                            (a, b) =>
+                                                Number(
+                                                    b.severity === 'critical',
+                                                ) -
+                                                Number(
+                                                    a.severity === 'critical',
+                                                ),
+                                        );
+                                        return (
+                                            <li
+                                                key={panel.client_id}
+                                                className="flex flex-wrap items-center gap-1.5"
+                                            >
+                                                <strong>
+                                                    {panel.client_name}:
+                                                </strong>
+                                                {sorted.map((m, i) => (
+                                                    <span
+                                                        key={i}
+                                                        className={cn(
+                                                            'inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[11px] font-medium',
+                                                            m.severity ===
+                                                                'critical'
+                                                                ? 'bg-status-critical text-white'
+                                                                : 'bg-status-critical-bg text-status-critical',
+                                                        )}
+                                                    >
+                                                        {m.label}
+                                                        {m.severity ===
+                                                            'critical' && (
+                                                            <span className="text-[8.5px] font-bold uppercase">
+                                                                ⚠ Critical
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                                <GuardrailCard
+                                    unstyled
+                                    className="mt-3 flex items-start gap-2 rounded-md border border-status-critical/40 bg-card/60 p-2 text-xs text-status-critical"
                                 >
-                                    <Loader2
-                                        className={cn(
-                                            'mr-1.5 h-3.5 w-3.5',
-                                            reportLoading
-                                                ? 'animate-spin'
-                                                : 'hidden',
-                                        )}
-                                        aria-hidden="true"
-                                    />{' '}
-                                    Retry check
-                                </Button>
+                                    <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                    <span>
+                                        Clinical meal restrictions cannot be
+                                        overridden in meal planning. Choose a
+                                        verified safe meal or report a
+                                        discrepancy for clinical review.
+                                    </span>
+                                </GuardrailCard>
+                            </div>
+                        )}
+
+                        {hasSoft && !hasHard && (
+                            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm">
+                                <div className="mb-2 flex items-center gap-2 font-medium text-status-warning">
+                                    <AlertTriangle className="h-4 w-4" /> Heads
+                                    up — soft warnings
+                                </div>
+                                <ul className="space-y-1 text-status-warning">
+                                    {report.soft_warnings.map((panel) => (
+                                        <li key={panel.client_id}>
+                                            <strong>{panel.client_name}</strong>
+                                            :{' '}
+                                            {panel.matches
+                                                .map(
+                                                    (m) =>
+                                                        `${m.label}${m.kind === 'dislike' ? ' (dislike)' : ''}`,
+                                                )
+                                                .join(', ')}
+                                        </li>
+                                    ))}
+                                </ul>
+                                <label className="mt-2 flex items-center gap-2 text-xs text-status-warning">
+                                    <input
+                                        type="checkbox"
+                                        checked={acknowledgedSoft}
+                                        onChange={(e) =>
+                                            setAcknowledgedSoft(
+                                                e.target.checked,
+                                            )
+                                        }
+                                    />
+                                    I've reviewed these and want to plan this
+                                    meal anyway
+                                </label>
+                            </div>
+                        )}
+
+                        {hasHard && hasSoft && (
+                            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
+                                <strong>Also noted:</strong>{' '}
+                                {report.soft_warnings
+                                    .flatMap((p) =>
+                                        p.matches.map(
+                                            (m) =>
+                                                `${p.client_name} — ${m.label}`,
+                                        ),
+                                    )
+                                    .join('; ')}
                             </div>
                         )}
                     </div>
-
-                    {hasHard && (
-                        <div
-                            role="alert"
-                            className="rounded-md border-2 border-status-critical bg-status-critical-bg/60 p-3 text-sm"
-                        >
-                            <div className="mb-2 flex items-center gap-2 font-semibold text-status-critical">
-                                <ShieldAlert
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                />{' '}
-                                Clinical safety block — resolve before saving
-                            </div>
-                            <ul className="space-y-1.5 text-status-critical">
-                                {report.hard_blocks.map((panel) => {
-                                    const sorted = [...panel.matches].sort(
-                                        (a, b) =>
-                                            Number(b.severity === 'critical') -
-                                            Number(a.severity === 'critical'),
-                                    );
-                                    return (
-                                        <li
-                                            key={panel.client_id}
-                                            className="flex flex-wrap items-center gap-1.5"
-                                        >
-                                            <strong>
-                                                {panel.client_name}:
-                                            </strong>
-                                            {sorted.map((m, i) => (
-                                                <span
-                                                    key={i}
-                                                    className={cn(
-                                                        'inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[11px] font-medium',
-                                                        m.severity ===
-                                                            'critical'
-                                                            ? 'bg-status-critical text-white'
-                                                            : 'bg-status-critical-bg text-status-critical',
-                                                    )}
-                                                >
-                                                    {m.label}
-                                                    {m.severity ===
-                                                        'critical' && (
-                                                        <span className="text-[8.5px] font-bold uppercase">
-                                                            ⚠ Critical
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            ))}
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                            <GuardrailCard
-                                unstyled
-                                className="mt-3 flex items-start gap-2 rounded-md border border-status-critical/40 bg-card/60 p-2 text-xs text-status-critical"
-                            >
-                                <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                <span>
-                                    Clinical meal restrictions cannot be
-                                    overridden in meal planning. Choose a
-                                    verified safe meal or report a discrepancy
-                                    for clinical review.
-                                </span>
-                            </GuardrailCard>
-                        </div>
-                    )}
-
-                    {hasSoft && !hasHard && (
-                        <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm">
-                            <div className="mb-2 flex items-center gap-2 font-medium text-status-warning">
-                                <AlertTriangle className="h-4 w-4" /> Heads up —
-                                soft warnings
-                            </div>
-                            <ul className="space-y-1 text-status-warning">
-                                {report.soft_warnings.map((panel) => (
-                                    <li key={panel.client_id}>
-                                        <strong>{panel.client_name}</strong>:{' '}
-                                        {panel.matches
-                                            .map(
-                                                (m) =>
-                                                    `${m.label}${m.kind === 'dislike' ? ' (dislike)' : ''}`,
-                                            )
-                                            .join(', ')}
-                                    </li>
-                                ))}
-                            </ul>
-                            <label className="mt-2 flex items-center gap-2 text-xs text-status-warning">
-                                <input
-                                    type="checkbox"
-                                    checked={acknowledgedSoft}
-                                    onChange={(e) =>
-                                        setAcknowledgedSoft(e.target.checked)
-                                    }
-                                />
-                                I've reviewed these and want to plan this meal
-                                anyway
-                            </label>
-                        </div>
-                    )}
-
-                    {hasHard && hasSoft && (
-                        <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
-                            <strong>Also noted:</strong>{' '}
-                            {report.soft_warnings
-                                .flatMap((p) =>
-                                    p.matches.map(
-                                        (m) => `${p.client_name} — ${m.label}`,
-                                    ),
-                                )
-                                .join('; ')}
-                        </div>
-                    )}
 
                     <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
                         <div className="flex gap-2">

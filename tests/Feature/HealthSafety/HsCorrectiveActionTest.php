@@ -548,7 +548,11 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_can_start_action(): void
     {
-        $action = HsCorrectiveAction::factory()->assigned()->create();
+        // D1: a start needs an owner who can still own the action (H&S manage and view at the event's site).
+        $site = Site::factory()->create();
+        $owner = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
+        $event = HsEvent::factory()->create(['site_id' => $site->id, 'event_category' => HsEvent::CATEGORY_HAZARD]);
+        $action = HsCorrectiveAction::factory()->assigned()->create(['hs_event_id' => $event->id, 'assigned_to_user_id' => $owner->id]);
         $result = $this->service->start($action);
 
         $this->assertEquals(HsCorrectiveAction::STATUS_IN_PROGRESS, $result->status);
@@ -944,7 +948,8 @@ class HsCorrectiveActionTest extends TestCase
     {
         $site = Site::factory()->create();
         $actor = $this->siteBoundUser($site, ['hazards.manage']);
-        $owner = $this->siteBoundUser($site, ['hazards.manage']);
+        // D1: the owner can still own the action when work starts (H&S manage and view at the site).
+        $owner = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
         $alert = ControlRoomAlert::factory()->triaging()->create(['site_id' => $site->id]);
         $eventFactory = HsEvent::factory()->state([
             'site_id' => $site->id,

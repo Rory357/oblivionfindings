@@ -10,7 +10,11 @@ import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, SelectInput } from '@/components/wizard/primitives';
-import { toDatetimeLocal, workerTimeOffset } from '@/lib/datetime';
+import {
+    formatDurationMinutes,
+    toDatetimeLocal,
+    workerTimeOffset,
+} from '@/lib/datetime';
 import { hsLabel } from '@/lib/health-safety/hs-labels';
 import {
     restraintHref,
@@ -18,6 +22,22 @@ import {
     type RestraintWorkspace,
 } from '@/lib/health-safety/restraint-navigation';
 import { useMemo } from 'react';
+
+/** The restraint summary's limit (the server's max:120). */
+const RESTRAINT_SUMMARY_MAX = 120;
+
+/**
+ * Whole minutes from start to end, rounded down: the same sum the server checks (RestraintService). Null while the
+ * restraint is still going, or when the end isn't after the start (the server then explains which time to fix).
+ */
+export function elapsedWholeMinutes(
+    started: string | null | undefined,
+    ended: string | null | undefined,
+): number | null {
+    if (!started || !ended) return null;
+    const ms = Date.parse(ended) - Date.parse(started);
+    return Number.isFinite(ms) && ms > 0 ? Math.floor(ms / 60000) : null;
+}
 import { SourceCommandStatus } from './command-status';
 import {
     EMPTY_RESTRAINT_PICKERS,
@@ -34,8 +54,10 @@ export const EVENT_COMMAND_LABELS: Record<
 > = {
     create: 'Record a restraint',
     correct: 'Correct what was recorded',
-    review: 'Record review',
-    'assign-review': 'Choose who reviews this',
+    // G4-5 (Stephan, 1 Nov 2026): "restraint review" is always the restraint's own step; "safety review" is only the
+    // Health and safety record.
+    review: 'Record restraint review',
+    'assign-review': 'Choose restraint review owner',
     'link-incident': 'Link an incident',
     'unlink-incident': 'Unlink the incident',
     'add-observation': 'Record a check',
@@ -44,11 +66,11 @@ export const EVENT_COMMAND_LABELS: Record<
     'correct-debrief': 'Correct debrief',
     'add-followup': 'Add follow-up',
     'reassign-followup': 'Change follow-up owner',
-    'complete-followup': 'Record follow-up outcome',
+    'complete-followup': 'Record outcome',
     'correct-followup': 'Correct follow-up outcome',
     'cancel-followup': 'Cancel follow-up',
-    'add-evidence': 'Add evidence',
-    'remove-evidence': 'Remove evidence',
+    'add-evidence': 'Add file',
+    'remove-evidence': 'Remove file',
 };
 /** The save button names what it does (never a bare "Save and confirm"). */
 const SAVE_LABELS: Record<RestraintEventCommand | 'create', string> = {
@@ -234,6 +256,7 @@ export function RestraintEventCommandForm({
             client_id: String(prescope?.clientId ?? ''),
             site_id: String(prescope?.siteId ?? ''),
             restraint_type: d?.restraint_type ?? '',
+            summary: d?.summary ?? '',
             severity: d?.severity ?? '',
             started_at: toDatetimeLocal(d?.started_at),
             started_offset: d?.started_at ? workerTimeOffset(d.started_at) : '',
@@ -594,12 +617,15 @@ export function RestraintEventCommandForm({
                       }
                     : { reason: v.reason }),
                 restraint_type: v.restraint_type,
+                summary: v.summary.trim() || null,
                 severity: v.severity,
                 started_at: instant('started_at', 'started_offset'),
                 ended_at: instant('ended_at', 'ended_offset'),
-                duration_minutes: v.duration_minutes
-                    ? Number(v.duration_minutes)
-                    : null,
+                // F2 (readiness audit, 6 Nov 2026): worked out from the start and end, the way the server checks it.
+                duration_minutes: elapsedWholeMinutes(
+                    instant('started_at', 'started_offset'),
+                    instant('ended_at', 'ended_offset'),
+                ),
                 trigger_description: v.trigger_description || null,
                 de_escalation_attempted: v.de_escalation_attempted || null,
                 restraint_description: v.restraint_description,
@@ -624,6 +650,8 @@ export function RestraintEventCommandForm({
                 changed.authorised_by = v.authorised_by
                     ? Number(v.authorised_by)
                     : null;
+            if (facts.summary !== (d.summary ?? null))
+                changed.summary = facts.summary;
             for (const key of [
                 'restraint_type',
                 'severity',
@@ -818,6 +846,21 @@ export function RestraintEventCommandForm({
                         <>
                             {command === 'create' &&
                                 person('client_id', 'Person', pickers.clients)}
+                            <Field
+                                label="What happened, in a few words"
+                                hint={`One short line for the title, like “Held arm to stop a fall”. Up to ${RESTRAINT_SUMMARY_MAX} characters.`}
+                                required={command === 'create'}
+                                error={form.errors.summary}
+                            >
+                                <Input
+                                    value={form.data.summary}
+                                    maxLength={RESTRAINT_SUMMARY_MAX}
+                                    required={command === 'create'}
+                                    onChange={(event) =>
+                                        change('summary', event.target.value)
+                                    }
+                                />
+                            </Field>
                             {select(
                                 'restraint_type',
                                 'Restraint type',
@@ -856,20 +899,23 @@ export function RestraintEventCommandForm({
                                 false,
                             )}
                             <Field
-                                label="Duration in minutes"
+                                label="Duration"
                                 error={form.errors.duration_minutes}
+                                hint="Worked out from the start and end times."
                             >
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    value={form.data.duration_minutes}
-                                    onChange={(event) =>
-                                        change(
-                                            'duration_minutes',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
+                                <p className="text-sm text-foreground" aria-live="polite">
+                                    {(() => {
+                                        const minutes = elapsedWholeMinutes(
+                                            instant('started_at', 'started_offset'),
+                                            instant('ended_at', 'ended_offset'),
+                                        );
+                                        return minutes == null
+                                            ? form.data.ended_at
+                                                ? 'Check the times: the end must be after the start.'
+                                                : 'Still going: add the end time when it ends.'
+                                            : formatDurationMinutes(minutes);
+                                    })()}
+                                </p>
                             </Field>
                             {text(
                                 'trigger_description',

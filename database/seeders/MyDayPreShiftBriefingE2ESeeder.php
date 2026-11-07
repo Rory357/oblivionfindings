@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Enums\ClientGender;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -86,7 +87,7 @@ final class MyDayPreShiftBriefingE2ESeeder extends Seeder
                 'last_name' => 'Briefing',
                 'preferred_name' => 'PW Briefing',
                 'date_of_birth' => '1986-04-28',
-                'gender' => 'not_stated',
+                'gender' => ClientGender::PreferNotToSay->value,
                 'site_id' => $site->id,
                 'service_context_id' => $context->id,
                 'status' => 'active',

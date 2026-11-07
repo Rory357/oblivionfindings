@@ -1,26 +1,18 @@
+import { PopupCallout, PopupField, PopupForm } from '@/components/popup';
 import { QuietLine } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Command,
     CommandInput,
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Field } from '@/components/wizard/primitives';
-import { useSettingsLeaveConfirmation } from '@/hooks/use-settings-leave-confirmation';
 import { formatDateTime } from '@/lib/datetime';
 import { router, useForm } from '@inertiajs/react';
-import { Check } from 'lucide-react';
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { Check, ClipboardList, UserCog } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
 
 export type IncidentOwnership = {
     revision: number;
@@ -107,8 +99,7 @@ export function IncidentOwnershipPanel({
     const history = ownership.history ?? [];
     const latest = history[0];
     const assignLabel = incidentAssignLabel(ownership);
-    const named =
-        ownership.owner?.name ?? ownership.last_owner_name ?? null;
+    const named = ownership.owner?.name ?? ownership.last_owner_name ?? null;
     const shownName = named ?? 'Owner not recorded';
     const incomingDelivered = latest?.deliveries.some(
         (delivery) =>
@@ -194,7 +185,9 @@ export function IncidentOwnershipPanel({
                             aria-controls={historyId}
                             onClick={() => setHistoryOpen((value) => !value)}
                         >
-                            {historyOpen ? 'Hide owner history' : 'Owner history'}
+                            {historyOpen
+                                ? 'Hide owner history'
+                                : 'Owner history'}
                         </Button>
                     ) : null}
                 </div>
@@ -209,7 +202,10 @@ export function IncidentOwnershipPanel({
                         }
                         action={
                             ownership.can_assign
-                                ? { label: assignLabel, onClick: () => setOpen(true) }
+                                ? {
+                                      label: assignLabel,
+                                      onClick: () => setOpen(true),
+                                  }
                                 : null
                         }
                     />
@@ -238,25 +234,27 @@ export function IncidentOwnershipPanel({
                             </div>
                         </div>
                         <div className="sg-pf">
-                          <div className="grid w-full gap-1">
-                            {ownership.state === 'replacement_needed' ? (
-                                <p>
-                                    Previous owner: {shownName}. Their current
-                                    access or eligibility no longer supports
-                                    this assignment.
-                                </p>
-                            ) : null}
-                            {ownership.state === 'historical' ? (
-                                <p>
-                                    Historical ownership. Reopen the incident
-                                    through its normal controls before
-                                    reassigning it.
-                                </p>
-                            ) : null}
-                            {assignedLine ? <p>{assignedLine}</p> : null}
-                            {deliveries}
-                            {assignButton ? <div>{assignButton}</div> : null}
-                          </div>
+                            <div className="grid w-full gap-1">
+                                {ownership.state === 'replacement_needed' ? (
+                                    <p>
+                                        Previous owner: {shownName}. Their
+                                        current access or eligibility no longer
+                                        supports this assignment.
+                                    </p>
+                                ) : null}
+                                {ownership.state === 'historical' ? (
+                                    <p>
+                                        Historical ownership. Reopen the
+                                        incident through its normal controls
+                                        before reassigning it.
+                                    </p>
+                                ) : null}
+                                {assignedLine ? <p>{assignedLine}</p> : null}
+                                {deliveries}
+                                {assignButton ? (
+                                    <div>{assignButton}</div>
+                                ) : null}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -379,14 +377,6 @@ export function AssignIncidentOwner({
     const [retry, setRetry] = useState(0);
     const [confirmationFailure, setConfirmationFailure] = useState(false);
     const stale = form.data.expected_revision !== ownership.revision;
-    const guard = useSettingsLeaveConfirmation(
-        form.isDirty || form.processing,
-        'Discard this ownership change?',
-        'Your selected owner and unsaved reason will be discarded. Cancel to keep editing.',
-    );
-    const requestClose = () => {
-        if (!form.processing) guard.request(onClose);
-    };
     useEffect(() => {
         if (!ownership.can_assign) {
             setOptions([]);
@@ -403,7 +393,10 @@ export function AssignIncidentOwner({
             fetch(
                 `/incidents/${incidentId}/owners/options?${new URLSearchParams({ q: search })}`,
                 {
-                    headers: { Accept: 'application/json' },
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
                     credentials: 'same-origin',
                     signal: controller.signal,
                 },
@@ -432,8 +425,7 @@ export function AssignIncidentOwner({
         form.setData('request_uuid', crypto.randomUUID());
         setConfirmationFailure(false);
     };
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
+    const submit = () => {
         if (
             form.processing ||
             loading ||
@@ -471,232 +463,225 @@ export function AssignIncidentOwner({
             },
         });
     };
+    const reassign = ownership.revision > 0;
+    const reasonMissing = reassign && !form.data.reason.trim();
+    const reasonId = `incident-owner-reason-${incidentId}`;
     return (
-        <>
-            <Dialog
-                open
-                onOpenChange={(open) => {
-                    if (!open) requestClose();
-                }}
-            >
-                <DialogContent className="frontline-dialog max-h-[90dvh] overflow-y-auto sm:max-w-xl">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {ownership.revision > 0
-                                ? 'Reassign incident owner'
-                                : 'Assign incident owner'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            {reference} ·{' '}
-                            {ownership.owner
-                                ? `Current owner: ${ownership.owner.name}.`
-                                : 'No eligible owner is currently assigned.'}{' '}
-                            Response, investigation and action owners stay
-                            separate.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={submit} className="space-y-4">
-                        {!ownership.can_assign && (
-                            <p
-                                role="alert"
-                                className="text-subtle text-status-warning"
-                            >
-                                You cannot change the incident owner with your
-                                current access. Your reason has been kept.
-                            </p>
-                        )}
-                        {confirmationFailure && (
-                            <p
-                                role="alert"
-                                className="text-subtle text-status-warning"
-                            >
-                                The owner save could not be confirmed. Your
-                                entries have been kept. Check the incident
-                                ownership history before trying again.
-                            </p>
-                        )}
-                        {stale ? (
-                            <div role="alert" className="text-subtle space-y-2">
-                                <p>
-                                    The incident owner has changed. Review the
-                                    current owner above, then choose again. Your
-                                    reason has been kept.
-                                </p>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="frontline-hit frontline-focus"
-                                    disabled={
-                                        form.processing || !ownership.can_assign
-                                    }
-                                    onClick={() => {
-                                        form.setData(
-                                            'expected_revision',
-                                            ownership.revision,
-                                        );
-                                        form.setData('owner_user_id', '');
-                                        form.setData(
-                                            'request_uuid',
-                                            crypto.randomUUID(),
-                                        );
-                                        form.clearErrors();
-                                        setSelected(null);
-                                        setRetry((value) => value + 1);
-                                    }}
-                                >
-                                    Use current owner version
-                                </Button>
-                            </div>
-                        ) : null}
-                        {ownership.can_assign && (
-                            <Command
-                                shouldFilter={false}
-                                label="Search eligible incident owners"
-                                className="border border-border"
-                            >
-                                <CommandInput
-                                    placeholder="Search eligible staff…"
-                                    value={search}
-                                    onValueChange={setSearch}
-                                    disabled={form.processing}
-                                />
-                                <CommandList label="Eligible incident owners">
-                                    {loading ? (
-                                        <p
-                                            role="status"
-                                            className="text-subtle p-3"
-                                        >
-                                            Checking eligible staff…
-                                        </p>
-                                    ) : lookupError ? (
-                                        <div
-                                            role="alert"
-                                            className="text-subtle space-y-2 p-3"
-                                        >
-                                            <p>
-                                                Eligible staff could not be
-                                                loaded. Your entries have been
-                                                kept.
-                                            </p>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="frontline-hit frontline-focus"
-                                                disabled={form.processing}
-                                                onClick={() =>
-                                                    setRetry(
-                                                        (value) => value + 1,
-                                                    )
-                                                }
-                                            >
-                                                Retry staff lookup
-                                            </Button>
-                                        </div>
-                                    ) : options.length === 0 ? (
-                                        <p className="text-subtle p-3 text-muted-foreground">
-                                            No eligible staff match this search.
-                                        </p>
-                                    ) : (
-                                        options.map((owner) => (
-                                            <CommandItem
-                                                key={owner.id}
-                                                value={String(owner.id)}
-                                                className="frontline-tap frontline-focus"
-                                                disabled={form.processing}
-                                                onSelect={() => {
-                                                    setSelected(owner);
-                                                    change(
-                                                        'owner_user_id',
-                                                        String(owner.id),
-                                                    );
-                                                }}
-                                            >
-                                                {owner.name}
-                                                {selected?.id === owner.id ? (
-                                                    <Check
-                                                        className="ml-auto size-4"
-                                                        aria-hidden="true"
-                                                    />
-                                                ) : null}
-                                            </CommandItem>
-                                        ))
-                                    )}
-                                </CommandList>
-                            </Command>
-                        )}
-                        {ownership.can_assign && selected ? (
-                            <p className="text-subtle">
-                                Selected owner: <strong>{selected.name}</strong>
-                            </p>
-                        ) : null}
-                        {form.errors.owner_user_id ? (
-                            <p
-                                role="alert"
-                                className="text-subtle text-destructive"
-                            >
-                                {form.errors.owner_user_id}
-                            </p>
-                        ) : null}
-                        <Field
-                            label="Reason for this ownership change"
-                            required={ownership.revision > 0}
-                            error={form.errors.reason}
-                        >
-                            <Textarea
-                                value={form.data.reason}
-                                disabled={
-                                    form.processing || !ownership.can_assign
-                                }
-                                onChange={(event) =>
-                                    change('reason', event.target.value)
-                                }
-                                maxLength={4000}
-                                rows={3}
-                            />
-                        </Field>
-                        {form.errors.expected_revision ||
-                        form.errors.request_uuid ? (
-                            <p
-                                role="alert"
-                                className="text-subtle text-destructive"
-                            >
-                                {form.errors.expected_revision ??
-                                    form.errors.request_uuid}
-                            </p>
-                        ) : null}
-                        <div className="flex flex-wrap justify-end gap-2">
+        <PopupForm
+            open
+            onClose={onClose}
+            size="sm"
+            icon={UserCog}
+            title={
+                reassign ? 'Reassign incident owner' : 'Assign incident owner'
+            }
+            description="The owner sees this incident through to close. Response, investigation and action owners stay separate."
+            context={{
+                title: reference,
+                icon: ClipboardList,
+                note: ownership.owner
+                    ? `Current owner: ${ownership.owner.name}`
+                    : 'No owner yet',
+            }}
+            callout={
+                !ownership.can_assign
+                    ? {
+                          tone: 'warning',
+                          content:
+                              'You cannot change the incident owner with your current access. Your reason has been kept.',
+                      }
+                    : confirmationFailure
+                      ? {
+                            tone: 'warning',
+                            content:
+                                'The owner save could not be confirmed. Your entries have been kept. Check the incident ownership history before trying again.',
+                        }
+                      : undefined
+            }
+            error={form.errors.expected_revision ?? form.errors.request_uuid}
+            submitLabel="Save owner"
+            processingLabel="Saving owner…"
+            processing={form.processing}
+            submitDisabled={
+                loading ||
+                lookupError ||
+                stale ||
+                !ownership.can_assign ||
+                !selected ||
+                reasonMissing
+            }
+            onSubmit={submit}
+            dirty={form.isDirty}
+            draftName={`${reassign ? 'Reassign' : 'Assign'} owner for ${reference}`}
+            testId="assign-incident-owner"
+        >
+            {stale ? (
+                <PopupCallout tone="warning">
+                    <div className="grid gap-2">
+                        <p>
+                            The incident owner has changed. Review the current
+                            owner above, then choose again. Your reason has been
+                            kept.
+                        </p>
+                        <div>
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="frontline-tap frontline-focus"
-                                disabled={form.processing}
-                                onClick={requestClose}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="frontline-tap frontline-focus"
+                                size="sm"
                                 disabled={
-                                    form.processing ||
-                                    loading ||
-                                    lookupError ||
-                                    stale ||
-                                    !ownership.can_assign ||
-                                    !selected ||
-                                    (ownership.revision > 0 &&
-                                        !form.data.reason.trim())
+                                    form.processing || !ownership.can_assign
                                 }
+                                onClick={() => {
+                                    form.setData(
+                                        'expected_revision',
+                                        ownership.revision,
+                                    );
+                                    form.setData('owner_user_id', '');
+                                    form.setData(
+                                        'request_uuid',
+                                        crypto.randomUUID(),
+                                    );
+                                    form.clearErrors();
+                                    setSelected(null);
+                                    setRetry((value) => value + 1);
+                                }}
                             >
-                                {form.processing
-                                    ? 'Saving owner…'
-                                    : 'Save owner'}
+                                Use current owner version
                             </Button>
                         </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
-            {guard.confirmation}
-        </>
+                    </div>
+                </PopupCallout>
+            ) : null}
+            {ownership.can_assign ? (
+                <PopupField
+                    label="New owner"
+                    required
+                    hint={
+                        selected ? (
+                            <>
+                                Selected owner: <strong>{selected.name}</strong>
+                            </>
+                        ) : (
+                            'Only staff who can own incidents at this Site are listed.'
+                        )
+                    }
+                    error={form.errors.owner_user_id}
+                >
+                    <Command
+                        shouldFilter={false}
+                        label="Search eligible incident owners"
+                        className="rounded-md border border-input"
+                    >
+                        <CommandInput
+                            placeholder="Search staff by name…"
+                            value={search}
+                            onValueChange={setSearch}
+                            disabled={form.processing}
+                        />
+                        <CommandList
+                            label="Eligible incident owners"
+                            className="max-h-56"
+                        >
+                            {loading ? (
+                                <p
+                                    role="status"
+                                    className="text-subtle p-3 text-muted-foreground"
+                                >
+                                    Checking eligible staff…
+                                </p>
+                            ) : lookupError ? (
+                                <div
+                                    role="alert"
+                                    className="text-subtle grid gap-2 p-3"
+                                >
+                                    <p>
+                                        Eligible staff could not be loaded. Your
+                                        entries have been kept.
+                                    </p>
+                                    <div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={form.processing}
+                                            onClick={() =>
+                                                setRetry((value) => value + 1)
+                                            }
+                                        >
+                                            Retry staff lookup
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : options.length === 0 ? (
+                                <p className="text-subtle p-3 text-muted-foreground">
+                                    No eligible staff match this search.
+                                </p>
+                            ) : (
+                                options.map((owner) => {
+                                    const isCurrent =
+                                        ownership.owner?.id === owner.id;
+                                    return (
+                                        <CommandItem
+                                            key={owner.id}
+                                            value={String(owner.id)}
+                                            className="frontline-tap frontline-focus gap-2.5"
+                                            disabled={form.processing}
+                                            onSelect={() => {
+                                                setSelected(owner);
+                                                change(
+                                                    'owner_user_id',
+                                                    String(owner.id),
+                                                );
+                                            }}
+                                        >
+                                            <span
+                                                className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground"
+                                                aria-hidden="true"
+                                            >
+                                                {initialsOf(owner.name)}
+                                            </span>
+                                            <span className="min-w-0 flex-1 truncate">
+                                                {owner.name}
+                                            </span>
+                                            {isCurrent ? (
+                                                <span className="text-caption shrink-0">
+                                                    Current owner
+                                                </span>
+                                            ) : null}
+                                            {selected?.id === owner.id ? (
+                                                <Check
+                                                    className="size-4 shrink-0 text-primary"
+                                                    aria-hidden="true"
+                                                />
+                                            ) : null}
+                                        </CommandItem>
+                                    );
+                                })
+                            )}
+                        </CommandList>
+                    </Command>
+                </PopupField>
+            ) : null}
+            <PopupField
+                label="Reason for this ownership change"
+                htmlFor={reasonId}
+                required={reassign}
+                hint={
+                    reassign
+                        ? 'Needed to change an existing owner. It is kept in the ownership history.'
+                        : 'Optional. It is kept in the ownership history.'
+                }
+                error={form.errors.reason}
+            >
+                <Textarea
+                    id={reasonId}
+                    value={form.data.reason}
+                    disabled={form.processing || !ownership.can_assign}
+                    onChange={(event) => change('reason', event.target.value)}
+                    maxLength={4000}
+                    rows={3}
+                />
+            </PopupField>
+        </PopupForm>
     );
 }

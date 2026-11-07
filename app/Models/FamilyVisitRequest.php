@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -48,7 +49,7 @@ class FamilyVisitRequest extends Model
 
     public function scopeUpcoming($query)
     {
-        return $query->where('requested_date', '>=', now()->toDateString())
+        return $query->where('requested_date', '>=', WorkerClock::today()->toDateString())
             ->whereIn('status', ['pending', 'approved']);
     }
 }

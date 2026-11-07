@@ -19,6 +19,10 @@ func run(args []string) error {
 		fmt.Println(version)
 		return nil
 	}
+	if len(args) == 1 && args[0] == "update-helper" {
+		// Started by the service itself when it switches releases (D3); takes no arguments.
+		return runUpdateHelper()
+	}
 	if len(args) != 1 || args[0] != "service" {
 		return errors.New("use: oblivion-collector service|version; installation and enrolment belong to setup")
 	}

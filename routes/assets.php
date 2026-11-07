@@ -53,14 +53,20 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::middleware('permission:sites.create')->group(function () {
+        // Opens the Sites list with the Add site pop-up (old links keep working).
         Route::get('/sites/create', [SiteController::class, 'create'])->name('sites.create');
         Route::post('/sites', [SiteController::class, 'store'])->name('sites.store');
     });
 
     Route::middleware('permission:sites.update')->group(function () {
+        // Opens the Site page with the Edit site pop-up (old links keep working).
         Route::get('/sites/{site}/edit', [SiteController::class, 'edit'])
             ->whereNumber('site')
             ->name('sites.edit');
+        // What the Edit site pop-up loads (JSON).
+        Route::get('/sites/{site}/edit-details', [SiteController::class, 'editDetails'])
+            ->whereNumber('site')
+            ->name('sites.edit-details');
         Route::put('/sites/{site}', [SiteController::class, 'update'])
             ->whereNumber('site')
             ->name('sites.update');
@@ -104,6 +110,9 @@ Route::middleware(['auth'])->group(function () {
             ->name('sites.clients.unlink');
 
         // Site contacts
+        Route::get('/sites/{site}/contacts/staff', [SiteContactController::class, 'staff'])
+            ->whereNumber('site')
+            ->name('sites.contacts.staff');
         Route::post('/sites/{site}/contacts', [SiteContactController::class, 'store'])
             ->whereNumber('site')
             ->name('sites.contacts.store');

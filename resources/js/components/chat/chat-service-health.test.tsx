@@ -17,17 +17,22 @@ vi.mock('./api', async () => ({
 const snapshot = () => ({
     checked_at: new Date().toISOString(),
     rollout_enabled: false,
-    services: ['messaging', 'realtime', 'push', 'uploads', 'calling'].map(
-        (id) => ({
-            id,
-            state: id === 'messaging' ? 'passed' : 'not_configured',
-            detail: 'Fictional diagnostic result',
-            owner: 'Service owner example',
-            checked_at: new Date().toISOString(),
-            trend: 'unknown',
-            compared_at: null,
-        }),
-    ),
+    services: [
+        'messaging',
+        'realtime',
+        'push',
+        'uploads',
+        'calling',
+        'relay',
+    ].map((id) => ({
+        id,
+        state: id === 'messaging' ? 'passed' : 'not_configured',
+        detail: 'Fictional diagnostic result',
+        owner: 'Service owner example',
+        checked_at: new Date().toISOString(),
+        trend: 'unknown',
+        compared_at: null,
+    })),
 });
 beforeEach(() => {
     vi.mocked(chatRequest).mockReset();
@@ -37,9 +42,9 @@ afterEach(() => {
     cleanup();
     vi.useRealTimers();
 });
-it('starts with all five approved cards unchecked and runs diagnostics only after an explicit action', async () => {
+it('starts with all six approved cards unchecked and runs diagnostics only after an explicit action', async () => {
     render(<ChatServiceHealth actorId={1} />);
-    expect(screen.getAllByText('Not checked')).toHaveLength(5);
+    expect(screen.getAllByText('Not checked')).toHaveLength(6);
     expect(chatRequest).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Check services' }));
     await screen.findByText('Check passed');
@@ -48,7 +53,7 @@ it('starts with all five approved cards unchecked and runs diagnostics only afte
         expect.objectContaining({ method: 'POST', body: '{}' }),
     );
     expect(screen.getByText(/Shared Chat rollout is disabled/)).toBeVisible();
-    expect(screen.getAllByText('Owner: Service owner example')).toHaveLength(5);
+    expect(screen.getAllByText('Owner: Service owner example')).toHaveLength(6);
     expect(
         screen.getByRole('heading', { name: 'Push notifications' }),
     ).toBeVisible();
@@ -81,7 +86,7 @@ it.each([403, 419])(
                 'no longer have access',
             ),
         );
-        expect(screen.getAllByText('Not checked')).toHaveLength(5);
+        expect(screen.getAllByText('Not checked')).toHaveLength(6);
         expect(screen.queryByText('Check passed')).not.toBeInTheDocument();
         expect(
             screen.queryByText('Owner: Service owner example'),
@@ -96,7 +101,7 @@ it('ignores incomplete snapshots instead of silently hiding missing service card
     render(<ChatServiceHealth actorId={1} />);
     fireEvent.click(screen.getByRole('button', { name: 'Check services' }));
     await screen.findByRole('alert');
-    expect(screen.getAllByText('Not checked')).toHaveLength(5);
+    expect(screen.getAllByText('Not checked')).toHaveLength(6);
 });
 it('prevents overlapping checks and aborts on leaving the settings section', async () => {
     let resolve!: (value: unknown) => void;
@@ -117,7 +122,7 @@ it('prevents overlapping checks and aborts on leaving the settings section', asy
     await act(async () => {
         resolve(snapshot());
     });
-    expect(screen.getAllByText('Not checked')).toHaveLength(5);
+    expect(screen.getAllByText('Not checked')).toHaveLength(6);
 });
 it('marks an ageing snapshot without silently running another check', async () => {
     vi.useFakeTimers();
@@ -151,7 +156,7 @@ it('clears health results on account replacement and ignores the previous check'
     await act(async () => {
         finish(snapshot());
     });
-    expect(screen.getAllByText('Not checked')).toHaveLength(5);
+    expect(screen.getAllByText('Not checked')).toHaveLength(6);
     fireEvent.click(screen.getByRole('button', { name: 'Check services' }));
     await screen.findByText('Check passed');
     expect(

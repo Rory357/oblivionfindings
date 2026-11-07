@@ -22,16 +22,22 @@ final class ChatAdministrationController extends Controller
     public function audit(Request $request)
     {
         abort_unless($request->user()?->canDo('settings.access.manage'), 403);
-        $rows = AuditLog::query()->where(fn ($actions) => $actions->where('action', 'chat.settings.updated')->orWhere('action', 'chat.offboarding.completed'))
+        $rows = AuditLog::query()->whereIn('action', ['chat.settings.updated', 'chat.offboarding.completed', 'chat.calling.updated'])
             ->with('user:id,name')->orderByDesc('id')->limit(50)->get();
         $people = User::whereIn('id', $rows->where('action', 'chat.offboarding.completed')->map(fn ($row) => $row->meta['person_id'] ?? null)->filter())->pluck('name', 'id');
 
         return $this->json(['entries' => $rows->map(fn (AuditLog $row) => [
             'id' => $row->id,
-            'kind' => $row->action === 'chat.settings.updated' ? 'policy' : 'offboarding',
+            'kind' => match ($row->action) {
+                'chat.settings.updated' => 'policy',
+                'chat.calling.updated' => 'calling',
+                default => 'offboarding',
+            },
             'actor' => $row->user?->name ?? 'Former staff member',
             'created_at' => $row->created_at?->toISOString(),
             'changes' => $row->action === 'chat.settings.updated' ? $this->changes($row->meta['before'] ?? [], $row->meta['after'] ?? []) : [],
+            // Calling changes name each key that changed, never its value.
+            'calling_changes' => $row->action === 'chat.calling.updated' ? array_values($row->meta['changes'] ?? []) : [],
             'offboarding' => $row->action === 'chat.offboarding.completed' ? [
                 'person' => $people[$row->meta['person_id'] ?? 0] ?? 'Former account',
                 'memberships_ended' => (int) ($row->meta['memberships_ended'] ?? 0),

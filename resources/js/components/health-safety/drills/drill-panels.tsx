@@ -632,7 +632,7 @@ export function DrillConnections({
                 action={
                     d.can.schedule_next
                         ? {
-                              label: 'Schedule next drill',
+                              label: 'Plan the next drill',
                               onClick: () =>
                                   move('connections', 'schedule-next'),
                           }

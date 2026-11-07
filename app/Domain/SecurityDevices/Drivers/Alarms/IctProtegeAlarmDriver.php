@@ -32,20 +32,18 @@ final class IctProtegeAlarmDriver implements DeviceDriver
             name: 'Protege GX & WX Direct Integration',
             deviceClass: DriverDeviceClass::AlarmPanel,
             supportLevel: DriverSupportLevel::Planned,
-            transportSummary: 'SIA DC-09 IP (available now) · Protege GX SOAP Web Service (planned)',
+            transportSummary: 'Alarm reports (SIA DC-09) to Oblivion’s alarm receiver · no direct control',
             models: ['ICT Protege GX', 'ICT Protege WX (PRT-WX-DIN)'],
             capabilities: [
                 DriverCapability::AlarmEventsSiaDc09,
                 DriverCapability::AlarmZoneStatus,
-                DriverCapability::AlarmArm,
-                DriverCapability::AlarmDisarm,
-                DriverCapability::AccessDoorUnlock,
             ],
-            summary: 'Live IP alarm reporting works today through the SIA DC-09 IP Receiver driver. Direct local area arm/disarm and door unlock via the ICT Protege GX SOAP Web Service is planned pending ICT technology partner SDK access.',
+            summary: 'A Protege panel can send its alarm reports to Oblivion’s alarm receiver. View only: Oblivion can’t arm, disarm or unlock doors on it. Not tested on real hardware.',
             officialDocs: [
                 ['label' => 'Integrated Control Technology (ICT)', 'url' => 'https://www.ict.co/'],
             ],
             limitationsNote: 'ICT Protege GX SOAP/Automation API documentation and licensing require ICT partner registration; Protege WX does not expose a third-party REST API.',
+            viewOnly: true,
         );
     }
 

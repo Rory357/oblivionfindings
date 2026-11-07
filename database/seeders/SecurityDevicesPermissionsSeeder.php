@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\SecurityDevices\Support\SecurityDevicesRebuildPermissions;
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
@@ -43,6 +44,8 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             ['key' => 'securityDevices.integrations.manage', 'description' => 'Manage device sync and discovery', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.monitoring.manage', 'description' => 'Author monitoring profiles, coverage, dependencies, maintenance windows, and retention', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.reports.view', 'description' => 'View hardware and compliance reports', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            // Safety fix round (7 Nov 2026). Grant migration 2026_11_07_100100_grant_care_alerts_attend.
+            ['key' => 'securityDevices.careAlerts.attend', 'description' => 'Open and attend to the care and safety alerts sent to you, at your own Sites (no snooze, no other alerts)', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.observe', 'description' => 'View authorised device command history', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.operate', 'description' => 'Run approved low-risk device diagnostics and actions', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.manage', 'description' => 'Run standard state-changing device management', 'group' => 'security_devices', 'module' => 'Security & Devices'],
@@ -164,11 +167,15 @@ class SecurityDevicesPermissionsSeeder extends Seeder
         $this->attachToRole('team_lead', [
             'securityDevices.viewAny',
             'securityDevices.devices.view',
+            // Safety fix round (Stephan, 7 Nov 2026: "Open just that alert"). Grant migration 2026_11_07_100100.
+            'securityDevices.careAlerts.attend',
         ]);
 
         $this->attachToRole('support_worker', [
             'securityDevices.viewAny',
             'securityDevices.devices.view',
+            // Safety fix round (Stephan, 7 Nov 2026: "Open just that alert"). Grant migration 2026_11_07_100100.
+            'securityDevices.careAlerts.attend',
         ]);
 
         $this->attachToRole('auditor', [
@@ -179,6 +186,33 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.reports.view',
             'securityDevices.commands.observe',
         ]);
+
+        // ── 4. The rebuild's keys, by the same rule as their grant migration ──
+        $this->grantRebuildKeys();
+    }
+
+    /**
+     * Each rebuild key goes to every role that holds its "from" key (less its except_roles), as the
+     * 2026_11_01 grant migration does on deploy.
+     */
+    private function grantRebuildKeys(): void
+    {
+        foreach (SecurityDevicesRebuildPermissions::KEYS as $key => $definition) {
+            $permission = Permission::firstOrCreate(
+                ['key' => $key],
+                ['description' => $definition['description'], 'group' => $definition['group'], 'module' => $definition['module']],
+            );
+
+            Role::query()
+                ->whereHas('permissions', fn ($query) => $query->where('key', $definition['from']))
+                ->whereNotIn('name', $definition['except_roles'] ?? [])
+                ->each(fn (Role $role) => $role->permissions()->syncWithoutDetaching([$permission->id]));
+
+            // A database seeded before a role was excepted gives the key back.
+            Role::query()
+                ->whereIn('name', $definition['except_roles'] ?? [])
+                ->each(fn (Role $role) => $role->permissions()->detach($permission->id));
+        }
     }
 
     /**

@@ -311,7 +311,7 @@ describe('Incident ownership controls', () => {
         fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
         fireEvent.click(
             within(screen.getByRole('alertdialog')).getByRole('button', {
-                name: 'Cancel',
+                name: 'Keep editing',
             }),
         );
         expect(
@@ -546,5 +546,22 @@ describe('Incident ownership controls', () => {
         expect(
             screen.queryByRole('button', { name: 'Assign someone' }),
         ).not.toBeInTheDocument();
+    });
+
+    it('marks eligible-owner lookups as XMLHttpRequest so referrerless pages preserve their back URL', async () => {
+        render(panel(ownership()));
+        fireEvent.click(screen.getByRole('button', { name: 'Assign someone' }));
+        await screen.findByRole('option', {
+            name: 'Test Eligible Coordinator',
+        });
+        expect(state.fetch).toHaveBeenCalledWith(
+            '/incidents/42/owners/options?q=',
+            expect.objectContaining({
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            }),
+        );
     });
 });

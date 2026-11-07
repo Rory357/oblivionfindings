@@ -17,6 +17,7 @@ use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
 use App\Models\ServiceAgreement;
+use App\Services\HealthSafety\RestraintCommandValues;
 use App\Services\HealthSafety\RestraintService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\References\ReferenceNumberGenerator;
@@ -25,6 +26,7 @@ use App\Services\Respite\RespiteRestraintReadService;
 use App\Services\Respite\RespiteShiftSync;
 use App\Services\Respite\RespiteStateTransitionService;
 use App\Services\Respite\RespiteStayScope;
+use App\Support\Respite\RespiteWallClock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -190,7 +192,7 @@ class RespiteStayController extends Controller
                 $booking = $stay->booking;
                 $this->states->assertStayExtension($stay->status, $booking->status);
 
-                $newEnd = Carbon::parse($validated['new_end']);
+                $newEnd = RespiteWallClock::toUtc($validated['new_end']);
                 $currentEnd = collect([$stay->actual_end, $booking->end_at])
                     ->filter()
                     ->map(fn ($end) => Carbon::parse($end))
@@ -268,7 +270,7 @@ class RespiteStayController extends Controller
                 $stay->update([
                     'bed_hold_status' => $validated['bed_hold_status'],
                     'bed_hold_reason' => $validated['bed_hold_reason'] ?? null,
-                    'bed_hold_until' => $validated['bed_hold_until'] ?? null,
+                    'bed_hold_until' => RespiteWallClock::toUtc($validated['bed_hold_until'] ?? null),
                     'absence_records' => $absenceRecords,
                     'updated_by' => auth()->id(),
                 ]);
@@ -364,7 +366,7 @@ class RespiteStayController extends Controller
                 'source' => $validated['source'] ?? null,
                 'count_received' => $validated['count_received'] ?? null,
                 'discrepancies' => $validated['discrepancies'] ?? null,
-                'first_dose_due_at' => $validated['first_dose_due_at'] ?? null,
+                'first_dose_due_at' => RespiteWallClock::toUtc($validated['first_dose_due_at'] ?? null),
                 'override_reason' => $validated['override_reason'] ?? null,
                 'reconciled_by_user_id' => auth()->id(),
                 'reconciled_at' => in_array($validated['status'], ['completed', 'overridden'], true) ? now() : null,
@@ -415,10 +417,15 @@ class RespiteStayController extends Controller
             'related_incident_id' => 'nullable|integer',
         ]);
 
+        // Actual times, like the H&S restraint command: the form sends NZ
+        // wall-clock with its explicit offset, stored as UTC.
+        $validated['started_at'] = RestraintCommandValues::instant($validated['started_at'], 'started_at');
+        $validated['ended_at'] = RestraintCommandValues::instant($validated['ended_at'] ?? null, 'ended_at');
+
         $event = DB::transaction(function () use ($request, $stay, $validated): RestraintEvent {
             $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true);
-            $started = Carbon::parse($validated['started_at']);
-            $ended = isset($validated['ended_at']) ? Carbon::parse($validated['ended_at']) : null;
+            $started = Carbon::parse($validated['started_at'], 'UTC');
+            $ended = $validated['ended_at'] !== null ? Carbon::parse($validated['ended_at'], 'UTC') : null;
             $withinSupportPlan = (bool) ($validated['within_support_plan'] ?? true);
             $behaviourSupportPlanId = isset($validated['behaviour_support_plan_id'])
                 ? (int) $validated['behaviour_support_plan_id']
@@ -524,7 +531,7 @@ class RespiteStayController extends Controller
                 'severity' => $validated['severity'],
                 'status' => 'submitted',
                 'submitted_at' => now(),
-                'occurred_at' => $validated['occurred_at'] ?? now(),
+                'occurred_at' => RespiteWallClock::toUtc($validated['occurred_at'] ?? null) ?? now(),
                 'title' => $validated['title'],
                 'description' => $validated['description'],
                 'requires_followup' => in_array($validated['severity'], ['high', 'critical'], true),
@@ -606,6 +613,7 @@ class RespiteStayController extends Controller
             'escalated_to_hdc' => 'nullable|in:no,offered,requested,submitted',
             'status' => 'nullable|in:open,acknowledged,resolved,escalated',
         ]);
+        $validated = RespiteWallClock::inputsToUtc($validated, ['received_at', 'acknowledged_at']);
 
         $complaint = RespiteComplaint::create([
             ...$validated,
@@ -646,7 +654,7 @@ class RespiteStayController extends Controller
             return;
         }
 
-        $nights = max(1, Carbon::parse($start)->startOfDay()->diffInDays(Carbon::parse($end)->startOfDay()));
+        $nights = max(1, RespiteWallClock::nights(Carbon::parse($start), Carbon::parse($end)));
         $hours = $nights * 24;
         $budget = 0.0;
 

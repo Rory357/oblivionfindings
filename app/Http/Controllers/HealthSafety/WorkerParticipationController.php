@@ -13,8 +13,8 @@ use App\Models\HsCommitteeMeeting;
 use App\Models\HsConsultation;
 use App\Models\HsRepresentative;
 use App\Models\User;
-use App\Notifications\HealthSafety\CommitteeMeetingScheduled;
 use App\Services\HealthSafety\WorkerParticipationEvidenceReadService;
+use App\Services\HealthSafety\WorkerParticipationMeetingDeliveryService;
 use App\Services\HealthSafety\WorkerParticipationRegisterReadService;
 use App\Services\HealthSafety\WorkerParticipationSchedulingNormalizer;
 use App\Services\UserSiteAccessService;
@@ -23,7 +23,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -40,7 +39,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * SiteCalendarAggregator) — this controller no longer writes orphaned,
  * per-attendee HrCalendarEvent rows. Committee-meeting attendance lives in the
  * hs_meeting_attendees pivot (HsCommitteeMeeting::attendeeUsers), scheduling a
- * meeting notifies attendees + the site workforce, and recurring participation
+ * meeting stages notices for attendees + the site workforce (#14, sent after the
+ * save by WorkerParticipationMeetingDeliveryService), and recurring participation
  * duties (HSR <=3yr term re-election, 2-day/yr training) are created as
  * ComplianceObligations via ComplianceEngineService (with reminders scheduled).
  */
@@ -193,7 +193,7 @@ class WorkerParticipationController extends Controller
         $this->assertCreatableSite($request, $validated['site_id']);
         $validated = $this->scheduledValues($validated, $request);
 
-        [$committee, $meeting, $attendeeIds] = DB::transaction(function () use ($validated, $request): array {
+        [$committee, $meeting] = DB::transaction(function () use ($validated, $request): array {
             $committee = HsCommittee::create([
                 'name' => $validated['name'],
                 'site_id' => $validated['site_id'],
@@ -204,7 +204,7 @@ class WorkerParticipationController extends Controller
                 'status' => 'active',
                 'created_by' => $request->user()->id,
             ]);
-            if (! $request->boolean('schedule_meeting')) { return [$committee, null, []]; }
+            if (! $request->boolean('schedule_meeting')) { return [$committee, null]; }
 
             $meeting = $committee->meetings()->create([
                 'scheduled_at' => $validated['scheduled_at'],
@@ -215,12 +215,13 @@ class WorkerParticipationController extends Controller
             ]);
             $attendeeIds = $this->cleanIds($validated['attendees'] ?? $committee->members ?? []);
             $meeting->attendeeUsers()->sync($attendeeIds);
-            return [$committee, $meeting, $attendeeIds];
+            // #14: the notices are staged in the same save, after the Site is checked again; nothing is sent inline.
+            $this->stageMeetingNotices($request, $meeting, 'scheduled', $attendeeIds, workforce: true);
+
+            return [$committee, $meeting];
         });
 
         if ($meeting !== null) {
-            $this->notifyMeeting($meeting, $attendeeIds, $committee, notifyWorkers: true);
-
             return back()->with('success', 'Committee created and first meeting scheduled.');
         }
 
@@ -232,7 +233,7 @@ class WorkerParticipationController extends Controller
         $this->assertWritableSite($request, $committee->site_id);
         $data = $this->scheduledValues($request->validated(), $request);
 
-        [$meeting, $attendeeIds] = DB::transaction(function () use ($data, $request, $committee): array {
+        DB::transaction(function () use ($data, $request, $committee): void {
             $meeting = $committee->meetings()->create([
                 'scheduled_at' => $data['scheduled_at'],
                 'location' => $data['location'] ?? null,
@@ -243,17 +244,15 @@ class WorkerParticipationController extends Controller
             // Attendance and its meeting commit together; calendar occurrences are derived live.
             $attendeeIds = $this->cleanIds($data['attendees'] ?? $committee->members ?? []);
             $meeting->attendeeUsers()->sync($attendeeIds);
-            return [$meeting, $attendeeIds];
+            $this->stageMeetingNotices($request, $meeting, 'scheduled', $attendeeIds, workforce: true);
         });
-
-        $this->notifyMeeting($meeting, $attendeeIds, $committee, notifyWorkers: true);
 
         return back()->with('success', 'Meeting scheduled successfully.');
     }
 
-    public function updateMeeting(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
+    public function updateMeeting(Request $request, int|string $meeting): RedirectResponse
     {
-        $this->assertWritableMeeting($request, $meeting);
+        $meetingId = $this->writableMeetingId($request, $meeting);
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:scheduled,in_progress,completed,cancelled'],
             'scheduled_at' => ['sometimes', 'date'],
@@ -272,47 +271,54 @@ class WorkerParticipationController extends Controller
 
         $validated = $this->scheduledValues($validated, $request);
 
-        $rescheduled = isset($validated['scheduled_at'])
-            && Carbon::parse($validated['scheduled_at'])->ne($meeting->scheduled_at);
-
         if (array_key_exists('action_items', $validated)) {
             $validated['actions_due_count'] = collect($validated['action_items'] ?? [])
                 ->filter(fn ($i) => ($i['status'] ?? null) !== 'done')->count();
         }
 
-        $meeting->update($validated);
+        DB::transaction(function () use ($request, $meetingId, $validated): void {
+            $meeting = $this->lockedMeeting($request, $meetingId);
+            $rescheduled = isset($validated['scheduled_at'])
+                && Carbon::parse($validated['scheduled_at'])->ne($meeting->scheduled_at);
 
-        // Reschedule re-notifies attendees; the calendar entry is source-linked
-        // (derived live by the provider) so there are no stale rows to chase.
-        if ($rescheduled) {
-            $this->notifyMeeting($meeting->fresh(), $meeting->attendeeUsers()->pluck('users.id')->all(), $meeting->committee, notifyWorkers: false);
-        }
+            $this->updateExactly($meeting, $validated);
+
+            // Reschedule re-notifies attendees; the calendar entry is source-linked
+            // (derived live by the provider) so there are no stale rows to chase.
+            if ($rescheduled) {
+                $this->stageMeetingNotices($request, $meeting, 'rescheduled',
+                    $meeting->attendeeUsers()->pluck('users.id')->all(), workforce: false);
+            }
+        });
 
         return back()->with('success', 'Meeting updated successfully.');
     }
 
-    public function addMeetingAttendees(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
+    public function addMeetingAttendees(Request $request, int|string $meeting): RedirectResponse
     {
-        $this->assertWritableMeeting($request, $meeting);
+        $meetingId = $this->writableMeetingId($request, $meeting);
         $validated = $request->validate([
             'user_ids' => ['required', 'array', 'min:1'],
             'user_ids.*' => ['integer', 'exists:users,id'],
         ]);
 
-        $before = $meeting->attendeeUsers()->pluck('users.id')->all();
-        $meeting->attendeeUsers()->syncWithoutDetaching($this->cleanIds($validated['user_ids']));
-        $newIds = array_values(array_diff($this->cleanIds($validated['user_ids']), $before));
+        DB::transaction(function () use ($request, $meetingId, $validated): void {
+            $meeting = $this->lockedMeeting($request, $meetingId);
+            $before = $meeting->attendeeUsers()->pluck('users.id')->all();
+            $meeting->attendeeUsers()->syncWithoutDetaching($this->cleanIds($validated['user_ids']));
+            $newIds = array_values(array_diff($this->cleanIds($validated['user_ids']), $before));
 
-        if ($newIds) {
-            $this->notifyMeeting($meeting, $newIds, $meeting->committee, notifyWorkers: false);
-        }
+            if ($newIds) {
+                $this->stageMeetingNotices($request, $meeting, 'attendees_added', $newIds, workforce: false);
+            }
+        });
 
         return back()->with('success', 'Attendees added successfully.');
     }
 
-    public function completeMeeting(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
+    public function completeMeeting(Request $request, int|string $meeting): RedirectResponse
     {
-        $this->assertWritableMeeting($request, $meeting);
+        $meetingId = $this->writableMeetingId($request, $meeting);
         $validated = $request->validate([
             'minutes' => ['nullable', 'string', 'max:10000'],
             'action_items' => ['nullable', 'array'],
@@ -324,48 +330,52 @@ class WorkerParticipationController extends Controller
             'actual_attendee_ids.*' => ['integer', 'exists:users,id'],
         ]);
 
-        // Mark who actually attended on the pivot (additive — keeps invitees).
-        $attended = $this->cleanIds($validated['actual_attendee_ids'] ?? []);
-        if ($attended) {
-            $meeting->attendeeUsers()->syncWithoutDetaching(
-                collect($attended)->mapWithKeys(fn ($id) => [$id => ['attended' => true, 'response' => 'accepted']])->all()
-            );
-        }
+        DB::transaction(function () use ($request, $meetingId, $validated): void {
+            $meeting = $this->lockedMeeting($request, $meetingId);
 
-        $items = $validated['action_items'] ?? $meeting->action_items ?? [];
+            // Mark who actually attended on the pivot (additive — keeps invitees).
+            $attended = $this->cleanIds($validated['actual_attendee_ids'] ?? []);
+            if ($attended) {
+                $meeting->attendeeUsers()->syncWithoutDetaching(
+                    collect($attended)->mapWithKeys(fn ($id) => [$id => ['attended' => true, 'response' => 'accepted']])->all()
+                );
+            }
 
-        $meeting->update([
-            'minutes' => $validated['minutes'] ?? $meeting->minutes,
-            'action_items' => $items,
-            'actions_due_count' => collect($items)->filter(fn ($i) => ($i['status'] ?? null) !== 'done')->count(),
-            'status' => 'completed',
-            'ended_at' => now(),
-        ]);
+            $items = $validated['action_items'] ?? $meeting->action_items ?? [];
+
+            $this->updateExactly($meeting, [
+                'minutes' => $validated['minutes'] ?? $meeting->minutes,
+                'action_items' => $items,
+                'actions_due_count' => collect($items)->filter(fn ($i) => ($i['status'] ?? null) !== 'done')->count(),
+                'status' => 'completed',
+                'ended_at' => now(),
+            ]);
+        });
 
         return back()->with('success', 'Meeting completed successfully.');
     }
 
-    public function cancelMeeting(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
+    public function cancelMeeting(Request $request, int|string $meeting): RedirectResponse
     {
-        $this->assertWritableMeeting($request, $meeting);
+        $meetingId = $this->writableMeetingId($request, $meeting);
         // No more title-LIKE calendar cleanup — the provider derives entries from
         // the meeting row, so flipping status to cancelled is enough.
-        $meeting->update(['status' => 'cancelled']);
+        DB::transaction(fn () => $this->updateExactly($this->lockedMeeting($request, $meetingId), ['status' => 'cancelled']));
 
         return back()->with('success', 'Meeting cancelled successfully.');
     }
 
-    public function uploadMeetingMinutes(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
+    public function uploadMeetingMinutes(Request $request, int|string $meeting): RedirectResponse
     {
-        $this->assertWritableMeeting($request, $meeting);
+        $meetingId = $this->writableMeetingId($request, $meeting);
         $request->validate(['document' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx']]);
 
-        $path = $request->file('document')->store("health-safety/meetings/{$meeting->id}", 'private');
+        $path = $request->file('document')->store("health-safety/meetings/{$meetingId}", 'private');
         try {
-            $meeting->update([
+            DB::transaction(fn () => $this->updateExactly($this->lockedMeeting($request, $meetingId), [
                 'minutes_document_path' => $path,
                 'minutes_document_name' => $request->file('document')->getClientOriginalName(),
-            ]);
+            ]));
         } catch (\Throwable $error) {
             // The record still points at its earlier minutes: remove only the file this request stored.
             if (is_string($path) && $path !== '') { \Illuminate\Support\Facades\Storage::disk('private')->delete($path); }
@@ -382,28 +392,80 @@ class WorkerParticipationController extends Controller
     }
 
     /**
-     * Notify the named attendees (database + email) and, on initial scheduling,
-     * post an in-app notice to all other workers rostered at the committee's site
-     * — HSWA requires all workers be notified of upcoming committee meetings and
-     * given a reasonable opportunity to provide input.
+     * #14 (Stephan, 31 Oct: "Build it"): stage the meeting's notices in the meeting's own save, instead of sending
+     * them inline. The delivery service records the meeting's current source, then stages one durable notice per
+     * named new attendee (in the app and by email) and, on first scheduling, one in-app notice per current worker at
+     * the committee's Site, as HSWA asks. Each notice is sent after the save commits and only while its recipient can
+     * still be told; it carries only generic words and a link to the meeting.
      */
-    private function notifyMeeting(HsCommitteeMeeting $meeting, array $attendeeIds, ?HsCommittee $committee, bool $notifyWorkers): void
+    private function stageMeetingNotices(Request $request, HsCommitteeMeeting $meeting, string $reason, array $newAttendeeIds, bool $workforce): void
     {
-        $attendeeIds = $this->cleanIds($attendeeIds);
+        $delivery = app(WorkerParticipationMeetingDeliveryService::class);
+        $event = $delivery->recordCurrentEpoch($meeting, $request->user(), $reason);
+        $delivery->stageToAudience($request->user(), $event['event_id'], $this->cleanIds($newAttendeeIds), $workforce);
+    }
 
-        if ($attendeeIds) {
-            $users = User::whereIn('id', $attendeeIds)->get();
-            Notification::send($users, new CommitteeMeetingScheduled($meeting, $committee, forAttendee: true));
-        }
+    /**
+     * A meeting route's ID, checked against the manager's Sites before the meeting itself is read: only its id and
+     * committee are loaded first, so another Site's meeting (and its minutes) is never hydrated.
+     */
+    private function writableMeetingId(Request $request, int|string $meeting): int
+    {
+        $id = $this->readRecordId($meeting);
+        $identity = HsCommitteeMeeting::query()->whereKey($id)->first(['id', 'hs_committee_id']);
+        abort_unless($identity !== null, 404);
+        $this->assertWritableSite($request, HsCommittee::withTrashed()->whereKey($identity->hs_committee_id)->value('site_id'));
 
-        if ($notifyWorkers && $committee?->site_id) {
-            $workers = User::whereHas('shifts', fn ($q) => $q->where('site_id', $committee->site_id))
-                ->whereNotIn('id', $attendeeIds)
-                ->get();
-            if ($workers->isNotEmpty()) {
-                Notification::send($workers, new CommitteeMeetingScheduled($meeting, $committee, forAttendee: false));
-            }
+        return $id;
+    }
+
+    /** The full meeting, locked inside the write transaction, with its Site checked again on the locked row. */
+    private function lockedMeeting(Request $request, int $id): HsCommitteeMeeting
+    {
+        $meeting = HsCommitteeMeeting::query()->whereKey($id)->lockForUpdate()->firstOrFail();
+        $this->assertWritableMeeting($request, $meeting);
+
+        return $meeting;
+    }
+
+    /**
+     * Save only the requested change. After the update the row is read again: if anything else on it differs from
+     * what this request read and wrote (an unrequested change made meanwhile), the whole save is refused with 409 and
+     * rolls back, with no audit or notice.
+     */
+    private function updateExactly(HsCommitteeMeeting $meeting, array $values): void
+    {
+        $original = $meeting->getRawOriginal();
+        $meeting->update($values);
+        $written = $meeting->getAttributes();
+        $actual = (array) DB::table('hs_committee_meetings')->where('id', $meeting->id)->lockForUpdate()->first();
+        foreach ($actual as $column => $value) {
+            if ($column === 'updated_at') { continue; }
+            $expected = array_key_exists($column, $meeting->getChanges()) ? ($written[$column] ?? null) : ($original[$column] ?? null);
+            abort_unless(self::sameStoredValue($expected, $value), 409, 'This meeting was changed by someone else. Reload it and try again.');
         }
+    }
+
+    /** Stored values compare as text, JSON by content (MySQL keeps its own key order). */
+    private static function sameStoredValue(mixed $expected, mixed $actual): bool
+    {
+        if ($expected === null || $actual === null) { return $expected === $actual; }
+        $expected = $expected instanceof \DateTimeInterface ? $expected->format('Y-m-d H:i:s') : (string) $expected;
+        $actual = (string) $actual;
+        if ($expected === $actual) { return true; }
+        $left = json_decode($expected, true); $right = json_decode($actual, true);
+        if (is_array($left) && is_array($right)) { return self::canonical($left) === self::canonical($right); }
+        // Dates may come back with or without fractional seconds.
+        $leftTime = strtotime($expected); $rightTime = strtotime($actual);
+
+        return $leftTime !== false && $rightTime !== false && preg_match('/^\d{4}-\d{2}-\d{2}/', $expected) === 1 && $leftTime === $rightTime;
+    }
+
+    private static function canonical(array $value): array
+    {
+        if (! array_is_list($value)) { ksort($value); }
+
+        return array_map(fn ($item) => is_array($item) ? self::canonical($item) : $item, $value);
     }
 
     /* ================================================================== */

@@ -35,7 +35,7 @@ afterEach(() => {
     shared.get.mockClear();
     shared.governance = false;
 });
-const baseline: CommandCentreHeroProps = {
+const baseline = {
     leadingLagging: {
         lagging: {
             incidents: 2,
@@ -66,7 +66,7 @@ const baseline: CommandCentreHeroProps = {
     fleetIncidents30d: 0,
     procedures: { approved: 4, review_due: 0, coverage_gap_categories: 0 },
     orgName: 'Oblivion Care',
-};
+} satisfies CommandCentreHeroProps;
 
 describe('H&S shared header and source-aware attention', () => {
     it.each([null, 0, 45])(

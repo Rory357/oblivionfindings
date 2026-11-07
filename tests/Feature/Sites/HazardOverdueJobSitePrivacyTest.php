@@ -165,5 +165,24 @@ test('upcoming assigned reminders exclude remote ended inactive and missing-prof
         Notification::assertNotSentTo($excluded, HazardOverdueNotification::class);
     }
 
-    expect($hazards->every(fn (SiteHazard $hazard): bool => $hazard->refresh()->warning_sent_at !== null))->toBeTrue();
+    // D1 (readiness audit, 6 Nov 2026): only the hazard whose warning reached someone is marked; the rest are tried again.
+    expect($hazards->map(fn (SiteHazard $hazard): bool => $hazard->refresh()->warning_sent_at !== null)->all())
+        ->toBe([true, false, false, false, false]);
+});
+
+test('an overdue hazard that reached nobody is not marked as told and is tried again', function () {
+    Notification::fake();
+
+    $hazardSite = Site::factory()->create(['type' => 'house']);
+    $reporter = hazardReminderUser($hazardSite);
+    $hazard = hazardReminderHazard($hazardSite, $reporter, null);
+
+    app()->call([app(HazardOverdueJob::class), 'handle']);
+    expect($hazard->refresh()->overdue_notified_at)->toBeNull();
+
+    $officer = hazardReminderUser($hazardSite, healthSafetyOfficer: true);
+    app()->call([app(HazardOverdueJob::class), 'handle']);
+
+    Notification::assertSentTo($officer, HazardOverdueNotification::class);
+    expect($hazard->refresh()->overdue_notified_at)->not->toBeNull();
 });

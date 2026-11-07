@@ -32,7 +32,7 @@ final class SafeWorkProcedurePresenter
         'procedure.created' => 'Procedure created', 'procedure.revised' => 'Working revision saved',
         'procedure.submitted_for_review' => 'Submitted for review', 'procedure.approved' => 'Version approved',
         'procedure.changes_requested' => 'Changes requested', 'procedure.review_recorded' => 'Review recorded',
-        'procedure.archived' => 'Procedure archived', 'procedure.restored' => 'Restored for review',
+        'procedure.archived' => 'Procedure archived', 'procedure.restored' => 'Restored for review', 'procedure.withdrawn' => 'Draft withdrawn',
         'procedure.evidence_added' => 'Document added', 'procedure.evidence_removed' => 'Document removed',
         'procedure.acknowledged' => 'Version read and acknowledged',
         'procedure.review_requested' => 'Source review requested', 'procedure.review_request_start' => 'Source review started',
@@ -77,7 +77,7 @@ final class SafeWorkProcedurePresenter
         $version = $kind === 'working' ? (int) $record->current_version : (int) $viewed->version_number;
         $content = self::content($snapshot, $viewer);
         $manage = $access->canManage($record, $viewer);
-        $mutable = $record->status !== 'archived' && $kind !== 'historical';
+        $mutable = ! in_array($record->status, ['archived', 'withdrawn'], true) && $kind !== 'historical';
         $commands = $mutable && $manage;
         $acknowledgement = self::acknowledgement($record, $viewed, $viewer, $kind, $manage, $access);
         $readableVersions = $record->versions->filter(fn (SafeWorkProcedureVersion $v) => (int) $v->safe_work_procedure_id === (int) $record->id && $access->canViewVersion($record, $v, $viewer));
@@ -85,6 +85,9 @@ final class SafeWorkProcedurePresenter
         $manifest = is_array($viewed?->document_manifest) ? $viewed->document_manifest : [];
         $attachments = self::attachments($record, $viewed, $manifest);
         $reviewRequests = self::reviewRequests($record, $viewer, $returnTo, $kind, $viewed, $access);
+        // Only a draft that never had an approved copy may leave the register (Withdraw draft, 6 Nov 2026).
+        $neverPublished = $record->published_version_id === null && $record->approved_at === null
+            && ! $record->versions->contains(fn (SafeWorkProcedureVersion $v) => $access->isApprovedVersion($v));
 
         return [...$content,
             'id' => (int) $record->id,
@@ -119,6 +122,7 @@ final class SafeWorkProcedurePresenter
                 'created_at' => $v->created_at?->toIso8601String(), ...self::provenance($v),
             ])->values()->all(),
             'history' => self::history($record, $readableVersions, $canReadWorking, $viewer, $reviewRequests),
+            'withdrawal' => $record->status === 'withdrawn' && $canReadWorking ? self::withdrawal($record) : null,
             'review_requests' => $reviewRequests,
             'acknowledgement' => $acknowledgement,
             'acknowledged' => $acknowledgement['acknowledged'],
@@ -131,12 +135,24 @@ final class SafeWorkProcedurePresenter
                 'approve' => $mutable && $kind === 'working' && $record->status === 'under_review' && $access->canApprove($record, $viewer),
                 'request_changes' => $commands && $kind === 'working' && in_array($record->status, ['under_review', 'approved'], true),
                 'record_review' => $commands && $kind === 'published',
+                'withdraw' => $commands && $kind === 'working' && $record->status === 'draft' && $neverPublished,
                 'archive' => $commands, 'restore' => $manage && $record->status === 'archived' && $kind !== 'historical',
                 'add_evidence' => $commands && $kind === 'working', 'remove_evidence' => $commands && $kind === 'working',
                 'acknowledge' => $acknowledgement['eligible'] && ! $acknowledgement['acknowledged'],
                 'manage_review_requests' => $kind !== 'historical' && $access->canManageReviewRequests($record, $viewer),
             ],
         ];
+    }
+
+    /** Who withdrew the draft, when and why: read from the attributable audit entry the command wrote. */
+    private static function withdrawal(SafeWorkProcedure $record): ?array
+    {
+        $log = AuditLog::query()->where('auditable_type', $record->getMorphClass())->where('auditable_id', $record->id)
+            ->where('action', 'procedure.withdrawn')->with('user:id,name')->latest('id')->first();
+        $meta = is_array($log?->meta) ? $log->meta : [];
+
+        return $log ? ['reason' => self::text($meta['note'] ?? null), 'by' => $log->user ? ['id' => (int) $log->user->id, 'name' => $log->user->name] : null,
+            'at' => $log->created_at?->toIso8601String()] : null;
     }
 
     /** Profile rows always describe the publication, even while its successor is drafted. */

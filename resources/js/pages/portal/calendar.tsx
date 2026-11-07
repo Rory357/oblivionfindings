@@ -15,6 +15,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { toDateInput } from '@/lib/datetime';
 import type { DatesSetArg, EventClickArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import listPlugin from '@fullcalendar/list';
@@ -280,7 +281,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
         // The calendar picker has no `min`; keep the old "today or later" rule.
         if (
             form.data.requested_date &&
-            form.data.requested_date < new Date().toISOString().split('T')[0]
+            form.data.requested_date < toDateInput(new Date())
         ) {
             form.setError('requested_date', 'Choose today or a later date.');
             return;

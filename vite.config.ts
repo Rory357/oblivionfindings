@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import path from 'path';
 import { defineConfig } from 'vite';
+import { leafletSsrStub } from './build/leaflet-ssr-stub';
 import { nodeModulesFsAllow } from './build/node-modules-fs-allow';
 import { pdfjsAssets } from './build/pdfjs-assets';
 
@@ -95,6 +96,7 @@ export default defineConfig({
         ],
     },
     plugins: [
+        leafletSsrStub(),
         pdfjsAssets(),
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],

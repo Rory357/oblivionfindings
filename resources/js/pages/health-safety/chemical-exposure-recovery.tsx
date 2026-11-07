@@ -82,17 +82,19 @@ function RecoveryWorkspace({ can }: Props) {
         finally { if (request.current === controller) { request.current = null; if (!controller.signal.aborted) setBusy(false); } }
     };
     const rows = view === 'staging' ? currentStages?.attempts : currentCleanups?.attempts;
+    // F6 (readiness audit, 6 Nov 2026): without access, the trail and back link go only where this person can open, and
+    // the page says plainly whose page it is.
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & Safety', href: '/health-safety' },
-        { title: 'Private exposures', href: CHEMICAL_EXPOSURES }, { title: 'Evidence recovery', href: BASE }]}>
-        <Head title="Private evidence recovery" /><PageLayout hero={<PageHeader frontline variant="profile" title="Private evidence recovery" icon={ShieldCheck} backHref={CHEMICAL_EXPOSURES}
+        ...(allowed ? [{ title: 'Private exposures', href: CHEMICAL_EXPOSURES }] : []), { title: 'Evidence recovery', href: BASE }]}>
+        <Head title="Private evidence recovery" /><PageLayout hero={<PageHeader frontline variant="profile" title="Private evidence recovery" icon={ShieldCheck} backHref={allowed ? CHEMICAL_EXPOSURES : '/health-safety'}
             subline="Your original upload and removal attempts · current private source access"
             actions={allowed ? <PageHeaderGlassButton icon={RefreshCw} onClick={refresh}>Check recorded recovery state</PageHeaderGlassButton> : undefined}
             meters={allowed ? <>
                 <PageHeaderMeterBlock label="Upload attempts" onClick={() => setView('staging')}><PageHeaderMeterBig>{currentStages?.attempts.length ?? 'Unconfirmed'}</PageHeaderMeterBig><PageHeaderMeterCaption>On this page · not a saved evidence count</PageHeaderMeterCaption></PageHeaderMeterBlock>
                 <PageHeaderMeterBlock label="Removal cleanups" onClick={() => setView('cleanups')}><PageHeaderMeterBig>{currentCleanups?.attempts.length ?? 'Unconfirmed'}</PageHeaderMeterBig><PageHeaderMeterCaption>On this page · physical cleanup checked separately</PageHeaderMeterCaption></PageHeaderMeterBlock>
-            </> : undefined} rail={<PageHeaderRail items={[{ key: 'staging', label: 'Upload attempts', icon: FileCheck2 }, { key: 'cleanups', label: 'Removal cleanups', icon: Trash2 }]}
-                value={view} onSelect={setView} ariaLabel="Evidence recovery views" />} />}>
-            <div className="space-y-4"><p role="status" className="text-subtle">{allowed ? 'A staged file is not a saved attachment. Removing evidence from a record and physically cleaning its bytes are separate steps.' : 'Current private source access is unavailable. Recovery details and changes are withheld.'}</p>
+            </> : undefined} rail={allowed ? <PageHeaderRail items={[{ key: 'staging', label: 'Upload attempts', icon: FileCheck2 }, { key: 'cleanups', label: 'Removal cleanups', icon: Trash2 }]}
+                value={view} onSelect={setView} ariaLabel="Evidence recovery views" /> : undefined} />}>
+            <div className="space-y-4"><p role="status" className="text-subtle">{allowed ? 'A staged file is not a saved attachment. Removing evidence from a record and physically cleaning its bytes are separate steps.' : 'This page is for people who record private chemical exposures, to finish their own unfinished uploads. You don’t have access to it. If you think you should, ask your manager.'}</p>
                 {allowed && message && <p role="status" className="text-subtle text-status-warning">{message}</p>}
                 {allowed && busy && <p role="status" className="text-subtle">Checking the original recovery record…</p>}
                 {allowed && rows && (!rows.length ? <p className="text-subtle">No admitted recovery attempts are available on this page.</p> : <ul className="space-y-4">{rows.map((row) => <li key={row.id} className="space-y-3 rounded-lg border border-border bg-card p-4">

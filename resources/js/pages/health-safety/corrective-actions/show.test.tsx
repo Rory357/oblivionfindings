@@ -153,7 +153,7 @@ describe('Permanent corrective action', () => {
         expect(
             screen.getByText(/The safety review is closed/),
         ).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Mark done' }));
         expect(state.replace).toHaveBeenCalledWith(
             expect.objectContaining({
                 url: expect.stringContaining(
@@ -222,7 +222,7 @@ describe('Permanent corrective action', () => {
         ).toBeInTheDocument();
         expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
         expect(
-            screen.queryByRole('button', { name: 'Verify action' }),
+            screen.queryByRole('button', { name: 'Check it worked' }),
         ).not.toBeInTheDocument();
     });
 
@@ -286,5 +286,92 @@ describe('Permanent corrective action', () => {
             {},
             expect.any(Object),
         );
+    });
+});
+
+describe('An action whose owner has left (M13, B1.6)', () => {
+    it('leads with "Choose a new owner" and Start says why it waits, without posting', () => {
+        const data = workspace();
+        data.action.status = 'open';
+        data.ownership = { ...data.ownership, state: 'replacement_needed' };
+        data.can = { ...data.can, start: false, complete: false };
+        data.blocked = { start: { reason: 'Choose a new owner first', unblock: 'Someone who manages health and safety at this site chooses a new owner.' } };
+        data.next_step = { key: 'choose_owner', can: true };
+        render(<ActionShow workspace={data} />);
+
+        expect(screen.getByText('Owner needs replacing')).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'Choose a new owner' }).length).toBeGreaterThan(0);
+        const start = screen.getByRole('button', { name: 'Start action' });
+        expect(start).toBeDisabled();
+        expect(screen.getByText('Choose a new owner first')).toBeInTheDocument();
+        fireEvent.click(start);
+        expect(state.post).not.toHaveBeenCalled();
+    });
+});
+
+describe('Step activity for restricted vs failed history reads (P12)', () => {
+    it('shows step activity without "The activity couldn’t be loaded" for a cross-site admin whose evidence access is restricted', () => {
+        const data = workspace();
+        data.history_state = 'restricted';
+        data.action.status = 'verified';
+        data.action.effectiveness_confirmed = false;
+        data.action.created_at = '2026-11-01T21:00:00Z';
+        data.action.created_by_name = 'Demo Manager';
+        data.action.assigned_at = '2026-11-01T21:05:00Z';
+        data.action.assigned_by_name = 'Demo Manager';
+        data.action.verified_at = '2026-11-02T01:30:00Z';
+        data.action.verified_by_name = 'Harbour Lead';
+        data.action.evidence = {
+            ...data.action.evidence,
+            can_upload: false,
+            load_state: 'unavailable',
+        };
+        data.can = {
+            start: false,
+            complete: false,
+            verify: false,
+            return: false,
+            close: false,
+        };
+        render(<ActionShow workspace={data} />);
+
+        expect(
+            screen.queryByText(/The activity couldn’t be loaded/),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Nothing recorded at this step yet.'),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /Checked/ }));
+        expect(
+            screen.queryByText(/The activity couldn’t be loaded/),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByText('checked the action: didn’t work'),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /Done/ }));
+        expect(
+            screen.getByText('Completion details need separate access.'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(/The activity couldn’t be loaded/),
+        ).not.toBeInTheDocument();
+    });
+
+    it('still shows the load-error message when participant history genuinely failed to load', () => {
+        const data = workspace();
+        data.history_state = 'error';
+        data.action.evidence = {
+            ...data.action.evidence,
+            load_state: 'unavailable',
+        };
+        render(<ActionShow workspace={data} />);
+
+        expect(
+            screen.getByText(
+                'The activity couldn’t be loaded. It is still kept in History.',
+            ),
+        ).toBeInTheDocument();
     });
 });

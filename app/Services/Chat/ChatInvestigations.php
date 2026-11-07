@@ -11,16 +11,22 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Case-based, time-limited, read-only inspection of private staff chats.
  *
  * Only holders of `chat.investigate` (assigned to named people, never a
  * role default) may use it, and settings access alone never implies it.
- * Every lookup, grant, view, revocation and refused expired access is
- * written to `chat_investigation_events`, a separate audit domain from
+ * Every lookup, grant, view, export, revocation and refused expired access
+ * is written to `chat_investigation_events`, a separate audit domain from
  * the settings audit. Inspection never creates a participant row, a read
  * cursor, a notification or a realtime event.
+ *
+ * One case may cover several conversations (approved 22 October 2026):
+ * they are granted together under one case reference, reason and access
+ * period, but each keeps its own grant row so expiry, ending and logging
+ * stay per conversation. `case_batch` links the rows granted together.
  */
 final class ChatInvestigations
 {
@@ -30,6 +36,9 @@ final class ChatInvestigations
     public const DURATIONS = [1, 8, 24, 72, 168];
 
     public const PAGE = 100;
+
+    /** Most conversations one case grant may cover in a single logged step. */
+    public const MAX_CONVERSATIONS = 20;
 
     public function __construct(private readonly OpsMessageVisibilityService $staff) {}
 
@@ -80,26 +89,46 @@ final class ChatInvestigations
         return $conversations->map(fn (OpsConversation $conversation) => $this->describe($conversation))->values()->all();
     }
 
-    public function grant(User $actor, array $data, ?string $ip = null): int
+    /**
+     * Grants one or more private staff conversations under one case
+     * reference, reason and access period. All rows are created, or none.
+     *
+     * @return array{grant_ids: list<int>, case_batch: string}
+     */
+    public function grant(User $actor, array $data, ?string $ip = null): array
     {
-        return DB::transaction(function () use ($actor, $data, $ip): int {
+        $ids = collect($data['conversation_ids'] ?? [$data['conversation_id'] ?? null])
+            ->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        abort_if($ids->isEmpty(), 422, 'Choose at least one conversation.');
+        abort_if($ids->count() > self::MAX_CONVERSATIONS, 422, 'Choose at most '.self::MAX_CONVERSATIONS.' conversations for one case.');
+
+        return DB::transaction(function () use ($actor, $data, $ip, $ids): array {
             $this->authorizeInvestigator($actor);
-            $conversation = OpsConversation::whereKey($data['conversation_id'])->lockForUpdate()->firstOrFail();
-            $this->assertInvestigable($conversation);
+            $conversations = OpsConversation::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            abort_unless($conversations->count() === $ids->count(), 404, 'One of the chosen conversations no longer exists.');
+            $conversations->each(fn (OpsConversation $conversation) => $this->assertInvestigable($conversation));
             abort_unless(in_array((int) $data['duration_hours'], self::DURATIONS, true), 422, 'Choose an approved access period.');
             $case = trim($data['case_reference']);
             $reason = trim($data['reason']);
             abort_if($case === '' || $reason === '', 422, 'A case reference and a reason are required.');
             $now = now();
-            $id = DB::table('chat_investigation_grants')->insertGetId([
-                'investigator_id' => $actor->id, 'conversation_id' => $conversation->id,
-                'case_reference' => $case, 'reason' => Crypt::encryptString($reason),
-                'expires_at' => $now->copy()->addHours((int) $data['duration_hours']),
-                'created_at' => $now, 'updated_at' => $now,
-            ]);
-            $this->log($actor, 'access_granted', $conversation->id, $case, grantId: $id, meta: ['duration_hours' => (int) $data['duration_hours']], ip: $ip);
+            $batch = (string) Str::uuid();
+            $encrypted = Crypt::encryptString($reason);
+            $grantIds = [];
+            // The investigator's chosen order is kept, so the case lists them as picked.
+            foreach ($ids as $conversationId) {
+                $id = DB::table('chat_investigation_grants')->insertGetId([
+                    'investigator_id' => $actor->id, 'conversation_id' => $conversationId,
+                    'case_reference' => $case, 'case_batch' => $batch, 'reason' => $encrypted,
+                    'expires_at' => $now->copy()->addHours((int) $data['duration_hours']),
+                    'created_at' => $now, 'updated_at' => $now,
+                ]);
+                $this->log($actor, 'access_granted', $conversationId, $case, grantId: $id,
+                    meta: ['duration_hours' => (int) $data['duration_hours'], 'case_batch' => $batch, 'conversations_in_case' => $ids->count()], ip: $ip);
+                $grantIds[] = $id;
+            }
 
-            return $id;
+            return ['grant_ids' => $grantIds, 'case_batch' => $batch];
         });
     }
 
@@ -113,6 +142,7 @@ final class ChatInvestigations
         return $rows->map(fn ($row) => [
             'id' => (int) $row->id,
             'case_reference' => $row->case_reference,
+            'case_batch' => $row->case_batch,
             'conversation' => $conversations->has($row->conversation_id) ? $this->describe($conversations[$row->conversation_id]) : null,
             'expires_at' => CarbonImmutable::parse($row->expires_at, 'UTC')->toISOString(),
             'revoked_at' => $row->revoked_at ? CarbonImmutable::parse($row->revoked_at, 'UTC')->toISOString() : null,
@@ -120,29 +150,64 @@ final class ChatInvestigations
         ])->values()->all();
     }
 
-    /** Opens an active grant. Expired, revoked or someone else's grants are refused and the refusal is logged. */
-    public function open(User $actor, int $grantId, ?int $before = null, ?string $ip = null): array
+    /**
+     * The actor's own active grant. Someone else's grant is refused; an
+     * expired or ended one is refused and the refusal is logged.
+     */
+    public function activeGrant(User $actor, int $grantId, ?string $ip = null, string $attempt = 'view'): object
     {
         $this->authorizeInvestigator($actor);
         $grant = DB::table('chat_investigation_grants')->where('id', $grantId)->first();
         abort_unless($grant && (int) $grant->investigator_id === (int) $actor->id, 403, 'This case access belongs to another investigator.');
         if (! $this->active($grant)) {
-            $this->log($actor, 'access_refused_expired', (int) $grant->conversation_id, $grant->case_reference, grantId: $grantId, ip: $ip);
+            $this->log($actor, 'access_refused_expired', (int) $grant->conversation_id, $grant->case_reference, grantId: $grantId,
+                meta: $attempt === 'view' ? [] : ['attempt' => $attempt], ip: $ip);
             abort(403, 'This case access has expired or was ended. Record a new case reason to continue.');
         }
+
+        return $grant;
+    }
+
+    /**
+     * The actor's grants that were made together with this one, in the
+     * order they were granted. A grant made on its own is its own case.
+     */
+    public function caseGrants(User $actor, object $grant): Collection
+    {
+        if ($grant->case_batch === null) {
+            return collect([$grant]);
+        }
+
+        return DB::table('chat_investigation_grants')->where('case_batch', $grant->case_batch)
+            ->where('investigator_id', $actor->id)->orderBy('id')->get();
+    }
+
+    /** Opens an active grant. Expired, revoked or someone else's grants are refused and the refusal is logged. */
+    public function open(User $actor, int $grantId, ?int $before = null, ?string $ip = null): array
+    {
+        $grant = $this->activeGrant($actor, $grantId, $ip);
         $conversation = OpsConversation::whereKey($grant->conversation_id)->with('participants.user:id,name')->firstOrFail();
         $this->assertInvestigable($conversation);
         $page = $this->messages($conversation, $before);
         $this->log($actor, $before ? 'messages_viewed' : 'conversation_viewed', $conversation->id, $grant->case_reference, grantId: $grantId,
             meta: ['message_ids' => array_column($page['messages'], 'id')], ip: $ip);
+        $siblings = $this->caseGrants($actor, $grant);
+        $siblingConversations = OpsConversation::whereIn('id', $siblings->pluck('conversation_id'))->with('participants.user:id,name')->get()->keyBy('id');
 
         return [
             'grant' => [
                 'id' => (int) $grant->id, 'case_reference' => $grant->case_reference,
+                'case_batch' => $grant->case_batch,
                 'reason' => Crypt::decryptString($grant->reason),
                 'expires_at' => CarbonImmutable::parse($grant->expires_at, 'UTC')->toISOString(),
             ],
             'conversation' => $this->describe($conversation),
+            // The other conversations granted under this case: metadata only.
+            'case_conversations' => $siblings->map(fn ($row) => [
+                'grant_id' => (int) $row->id,
+                'conversation' => $siblingConversations->has($row->conversation_id) ? $this->describe($siblingConversations[$row->conversation_id]) : null,
+                'active' => $this->active($row),
+            ])->values()->all(),
             'holds' => DB::table('chat_preservation_holds')->where('conversation_id', $conversation->id)->orderByDesc('id')->get()
                 ->map(fn ($hold) => ['id' => (int) $hold->id, 'case_reference' => $hold->case_reference, 'active' => $hold->released_at === null,
                     'placed_at' => CarbonImmutable::parse($hold->placed_at, 'UTC')->toISOString()])->values()->all(),
@@ -187,6 +252,20 @@ final class ChatInvestigations
         ]);
     }
 
+    /**
+     * The whole canonical record of one conversation, oldest first, for a
+     * controlled export. Null when it is longer than $limit messages.
+     */
+    public function fullRecord(OpsConversation $conversation, int $limit): ?array
+    {
+        $query = OpsMessage::withTrashed()->where('conversation_id', $conversation->id)->whereNull('client_id');
+        if ((clone $query)->count() > $limit) {
+            return null;
+        }
+
+        return $this->present($query->orderBy('id')->get());
+    }
+
     private function active(object $grant): bool
     {
         return $grant->revoked_at === null && CarbonImmutable::parse($grant->expires_at, 'UTC')->isFuture();
@@ -204,24 +283,31 @@ final class ChatInvestigations
             ->when($before, fn ($query) => $query->where('id', '<', $before))
             ->orderByDesc('id')->limit(self::PAGE + 1)->get();
         $page = $rows->take(self::PAGE);
-        $ids = $page->pluck('id');
-        $names = User::whereIn('id', $page->pluck('sender_id')->filter()->unique())->pluck('name', 'id');
+
+        return [
+            'messages' => $this->present($page->reverse()->values()),
+            'next_before' => $rows->count() > self::PAGE ? (int) $page->last()->id : null,
+        ];
+    }
+
+    /** Messages with sender, removal, attachment names and earlier versions, in the given order. */
+    private function present(Collection $messages): array
+    {
+        $ids = $messages->pluck('id');
+        $names = User::whereIn('id', $messages->pluck('sender_id')->filter()->unique())->pluck('name', 'id');
         $attachments = DB::table('chat_attachments')->whereIn('message_id', $ids)->orderBy('id')->get(['message_id', 'name', 'mime_type', 'size_bytes'])->groupBy('message_id');
         $revisions = DB::table('chat_message_revisions')->whereIn('message_id', $ids)->orderBy('version')->get(['message_id', 'version', 'previous_state', 'created_at'])->groupBy('message_id');
 
-        return [
-            'messages' => $page->reverse()->map(fn (OpsMessage $message) => [
-                'id' => (int) $message->id,
-                'sender' => $names[$message->sender_id] ?? 'Former staff member',
-                'content' => (string) $message->content,
-                'created_at' => $message->created_at?->toISOString(),
-                'edited_at' => $message->edited_at ? CarbonImmutable::parse($message->edited_at)->toISOString() : null,
-                'removed_at' => $message->deleted_at?->toISOString(),
-                'attachments' => ($attachments[$message->id] ?? collect())->map(fn ($file) => ['name' => $file->name, 'mime_type' => $file->mime_type, 'size_bytes' => (int) $file->size_bytes])->values()->all(),
-                'previous_versions' => $this->previousVersions($revisions[$message->id] ?? collect()),
-            ])->values()->all(),
-            'next_before' => $rows->count() > self::PAGE ? (int) $page->last()->id : null,
-        ];
+        return $messages->map(fn (OpsMessage $message) => [
+            'id' => (int) $message->id,
+            'sender' => $names[$message->sender_id] ?? 'Former staff member',
+            'content' => (string) $message->content,
+            'created_at' => $message->created_at?->toISOString(),
+            'edited_at' => $message->edited_at ? CarbonImmutable::parse($message->edited_at)->toISOString() : null,
+            'removed_at' => $message->deleted_at?->toISOString(),
+            'attachments' => ($attachments[$message->id] ?? collect())->map(fn ($file) => ['name' => $file->name, 'mime_type' => $file->mime_type, 'size_bytes' => (int) $file->size_bytes])->values()->all(),
+            'previous_versions' => $this->previousVersions($revisions[$message->id] ?? collect()),
+        ])->values()->all();
     }
 
     private function previousVersions(Collection $revisions): array

@@ -90,7 +90,8 @@ final class ChatFamilyWorkDelivery
         }
 
         return DB::transaction(function () use ($id, $event): int {
-            $conversation = OpsConversation::whereKey($event->conversation_id)->lockForUpdate()->first();
+            // Shared: the conversation is only read here; family work writers still exclude delivery.
+            $conversation = OpsConversation::whereKey($event->conversation_id)->sharedLock()->first();
             $row = DB::table('chat_family_work_deliveries')->where('id', $id)->lockForUpdate()->first();
             if (! $row || $row->status !== 'pending' || $row->available_at > now()->toDateTimeString()) {
                 return 0;
@@ -119,6 +120,7 @@ final class ChatFamilyWorkDelivery
                 throw new \RuntimeException('Family assignment notice was not persisted.');
             }
             $this->finish($id, 'delivered');
+            app(ChatRealtime::class)->noticeChanged([(int) $user->id], 'family_work');
 
             return 1;
         });

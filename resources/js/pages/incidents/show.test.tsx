@@ -247,22 +247,23 @@ describe('Incident evidence page integration', () => {
 
 describe('Permanent incident workspace', () => {
     it.each([
-        ['draft', 'submit', 'Submit for review'],
-        ['submitted', 'review', 'Review incident'],
-        ['reviewed', 'close', 'Close incident'],
-        ['closed', 'reopen', 'Reopen incident'],
+        ['draft', 'submit', 'Submit for review', 'progress'],
+        ['submitted', 'review', 'Complete manager review', 'progress'],
+        ['reviewed', 'close', 'Close incident', 'progress'],
+        ['closed', 'reopen', 'Reopen incident', 'banner'],
     ] as const)(
-        'places the permitted %s transition in the header once',
-        (status, permission, label) => {
+        'offers the permitted %s transition once, as the next step or (reopening) in the header',
+        (status, permission, label, place) => {
             const incident = detail();
             incident.status = status;
             incident.can[permission] = true;
             incident.close_gate.allowed = true;
             render(<IncidentShow detail={incident} />);
-            const action = within(screen.getByRole('banner')).getByRole(
-                'button',
-                { name: label },
-            );
+            const where =
+                place === 'progress'
+                    ? screen.getByRole('region', { name: 'Progress' })
+                    : screen.getByRole('banner');
+            const action = within(where).getByRole('button', { name: label });
             expect(
                 screen.getAllByRole('button', { name: label }),
             ).toHaveLength(1);
@@ -273,7 +274,7 @@ describe('Permanent incident workspace', () => {
         },
     );
 
-    it('keeps draft editing available beside submission and promotes it when submission is unavailable', () => {
+    it('keeps draft editing in the header beside the submit next step', () => {
         const incident = detail();
         incident.status = 'draft';
         incident.can.update = true;
@@ -284,7 +285,7 @@ describe('Permanent incident workspace', () => {
             within(header).getByRole('button', { name: 'Edit draft' }),
         ).toBeVisible();
         expect(
-            within(header).getByRole('button', { name: 'Submit for review' }),
+            within(screen.getByRole('region', { name: 'Progress' })).getByRole('button', { name: 'Submit for review' }),
         ).toBeVisible();
         incident.can.submit = false;
         view.rerender(<IncidentShow detail={incident} />);
@@ -491,7 +492,7 @@ describe('Permanent incident workspace', () => {
         ).toHaveValue('');
     });
 
-    it('shows the record facts and one stage line with the next step in the header', () => {
+    it('shows the record facts and the four round steps in the header, with the next step in the Progress card', () => {
         const incident = detail();
         incident.followups = [
             {
@@ -511,33 +512,37 @@ describe('Permanent incident workspace', () => {
         const stages = within(header).getByRole('list', {
             name: /Where the incident is up to/,
         });
-        expect(within(stages).getAllByRole('listitem')).toHaveLength(6);
-        expect(within(header).getByText('Next step')).toBeVisible();
+        expect(
+            within(stages).getAllByRole('listitem').map((item) => within(item).getByRole('button').querySelector('b')?.textContent),
+        ).toEqual(['Reported', 'Assigned', 'Manager review', 'Closed']);
+        expect(within(header).queryByText('Next step')).not.toBeInTheDocument();
+        expect(
+            within(screen.getByRole('region', { name: 'Progress' })).getByText('Next step'),
+        ).toBeVisible();
         expect(
             within(header).getByRole('tab', { name: /Follow-ups/ }),
         ).toHaveTextContent('1');
     });
 
-    it('keeps restricted or unavailable safety work unknown instead of claiming none', () => {
+    it('keeps restricted safety work unknown: no review card, no reference, and plain words in the next step', () => {
         const incident = detail();
+        incident.status = 'submitted';
+        incident.can.review = true;
         incident.linked_access = {
             control_room: 'absent',
             health_safety: 'restricted',
         };
-        const view = render(<IncidentShow detail={incident} />);
-        const stages = () =>
-            within(screen.getByRole('banner')).getByRole('list', {
-                name: /Where the incident is up to/,
-            });
-        expect(within(stages()).getByText('Access restricted')).toBeVisible();
-        incident.linked_access.health_safety = 'absent';
-        view.rerender(<IncidentShow detail={incident} />);
+        render(<IncidentShow detail={incident} />);
+        const steps = within(screen.getByRole('banner')).getByRole('list', {
+            name: /Where the incident is up to/,
+        });
+        expect(within(steps).queryByText(/safety review/i)).toBeNull();
+        expect(screen.queryByRole('region', { name: 'Linked safety review' })).toBeNull();
         expect(
-            within(stages()).getByText('No safety review linked'),
+            within(screen.getByRole('region', { name: 'Progress' })).getByText(
+                'The incident closes after that, once its linked safety work is finished.',
+            ),
         ).toBeVisible();
-        expect(
-            within(stages()).queryByText('Access restricted'),
-        ).not.toBeInTheDocument();
     });
 
     it('does not call an unknown safety-review connection absent in its detail section', () => {
@@ -591,10 +596,28 @@ describe('Permanent incident workspace', () => {
             ),
         };
         render(<IncidentShow detail={incident} />);
-        const stages = within(screen.getByRole('banner')).getByRole('list', {
+        const steps = within(screen.getByRole('banner')).getByRole('list', {
             name: /Where the incident is up to/,
         });
-        expect(within(stages).getByText('2 corrective actions')).toBeVisible();
+        expect(within(steps).getByText('Waiting for the safety review')).toBeVisible();
+        const card = screen.getByRole('region', { name: 'Linked safety review' });
+        expect(within(card).getByText('2 of 4 actions checked')).toBeVisible();
+        expect(within(card).getByText('Actions under way')).toBeVisible();
+        const open = within(card).getByRole('link', { name: 'Open safety review' });
+        expect(open).toHaveAttribute('href', '/health-safety/events/5');
+        // An outline button: the only filled button on the page is the next step's.
+        expect(open.className).toContain('btn-soft-secondary');
+    });
+
+    it('shows the linked safety review card only to people who can open the review', () => {
+        const incident = detail();
+        incident.linked_access = { control_room: 'absent', health_safety: 'restricted' };
+        const view = render(<IncidentShow detail={incident} />);
+        expect(screen.queryByRole('region', { name: 'Linked safety review' })).toBeNull();
+        incident.linked_access = { control_room: 'absent', health_safety: 'absent' };
+        view.rerender(<IncidentShow detail={incident} />);
+        expect(screen.queryByRole('region', { name: 'Linked safety review' })).toBeNull();
+        expect(screen.queryByRole('link', { name: 'Open safety review' })).toBeNull();
     });
 
     it('keeps an unsaved follow-up through hiding and section navigation', () => {
@@ -782,15 +805,159 @@ describe('Permanent incident workspace', () => {
             within(screen.getByRole('banner')).getByText(/INC-2026-0042/),
         ).toBeVisible();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-        expect(screen.getByText('A person fell in the lounge.')).toBeVisible();
+        // No disabled button: closing isn't offered until the checks are done, and the bar says what is left.
+        expect(screen.queryByRole('button', { name: 'Close incident' })).not.toBeInTheDocument();
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getByText('1 thing left before the incident can close. Closure readiness lists them.')).toBeVisible();
+        // Closure readiness is one line that opens its list.
+        const readiness = screen.getByRole('region', { name: 'Closure readiness' });
+        const toggle = within(readiness).getByRole('button', { name: /Closure readiness/ });
+        expect(toggle).toHaveTextContent('1 thing left · 0 done · then you or another manager close it');
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(within(readiness).queryByRole('link', { name: 'Complete incident follow-ups' })).toBeNull();
+        fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
         expect(
-            within(screen.getByRole('banner')).getByRole('button', {
-                name: 'Close incident',
-            }),
-        ).toBeDisabled();
-        expect(
-            screen.getByRole('link', { name: 'Complete incident follow-ups' }),
+            within(readiness).getByRole('link', { name: 'Complete incident follow-ups' }),
         ).toHaveAttribute('href', '/incidents/42?section=followups');
+        // The Closed step (where it is up to) lists the same thing under "Still to do".
+        expect(within(progress).getByText('Still to do')).toBeVisible();
+    });
+
+    it('opens on the step the incident is on and shows what was added at a picked step', () => {
+        const incident = detail();
+        incident.status = 'submitted';
+        incident.submitted_at = '2026-10-07T01:48:00Z';
+        incident.can.review = true;
+        incident.attachments = [
+            {
+                id: 1, name: 'lounge.jpg', mime: 'image/jpeg', size: 10, portal_visible: false, notes: null,
+                uploaded_by: 'Test Reporter', created_at: '2026-10-07T01:45:00Z', download_url: '/x',
+            },
+        ];
+        render(<IncidentShow detail={incident} />);
+        const steps = within(screen.getByRole('banner')).getByRole('list', { name: /Where the incident is up to/ });
+        const review = within(steps).getByRole('button', { name: /Manager review/ });
+        expect(review).toHaveAttribute('aria-pressed', 'true');
+        expect(review).toHaveTextContent('Not started');
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getByText('Complete the manager review')).toBeVisible();
+        expect(within(progress).getByText('The incident can close after that.')).toBeVisible();
+        expect(within(progress).getByText('The manager review hasn’t been done yet.')).toBeVisible();
+        expect(within(progress).queryByRole('button', { name: /Back to the current step/ })).toBeNull();
+
+        fireEvent.click(within(steps).getByRole('button', { name: /Reported/ }));
+        expect(within(steps).getByRole('button', { name: /Reported/ })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(progress).getByText('By Test Reporter · Wed 7 Oct, 2:48 pm')).toBeVisible();
+        expect(within(progress).getByText('A person fell in the lounge.')).toBeVisible();
+        expect(within(progress).getByText('Staff stayed with the person.')).toBeVisible();
+        expect(within(progress).getByText('1 file')).toBeVisible();
+        expect(within(progress).queryByRole('button', { name: /Add files/ })).toBeNull();
+        expect(within(progress).getByText(/reported the incident with 1 file/)).toBeVisible();
+        expect(
+            within(progress).getByText(
+                'A submitted report can’t be changed. A dated note is added beside the reporter’s words, and Test Reporter is told.',
+            ),
+        ).toBeVisible();
+        // The next step stays put whichever step is picked.
+        expect(within(progress).getByRole('button', { name: 'Complete manager review' })).toBeVisible();
+        fireEvent.click(within(progress).getByRole('button', { name: /Back to the current step/ }));
+        expect(within(steps).getByRole('button', { name: /Manager review/ })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('shows the reporter’s timed ticks under “Done straight away” (decision 18)', () => {
+        const incident = Object.assign(detail(), {
+            status: 'submitted',
+            immediate_response: [
+                { key: 'made_safe', done: true, at: '2026-10-26T06:45:00Z', detail: null },
+                { key: 'medical_rung', done: true, at: '2026-10-26T06:50:00Z', detail: 'On-call nurse' },
+                { key: 'family_told', done: false, at: null, detail: 'Hemi will ring tomorrow morning' },
+            ],
+        });
+        render(<IncidentShow detail={incident} />);
+        const steps = within(screen.getByRole('banner')).getByRole('list', { name: /Where the incident is up to/ });
+        fireEvent.click(within(steps).getByRole('button', { name: /Reported/ }));
+        const ticks = within(screen.getByRole('region', { name: 'Progress' })).getByRole('list', {
+            name: 'Done straight away',
+        });
+        const items = within(ticks).getAllByRole('listitem');
+        expect(items.map((item) => item.textContent)).toEqual([
+            'Checked the person and made them safe7:45 pm',
+            'Nurse, GP or 111 rung · On-call nurse7:50 pm',
+            'Family/whānau told · Hemi will ring tomorrow morningNot yet',
+        ]);
+    });
+
+    it('tells a viewer who cannot do the next step who does, without a disabled button', () => {
+        const incident = detail();
+        incident.status = 'submitted';
+        incident.client = { id: 3, first_name: 'Aroha', last_name: 'Kingi', site: 'Kauri House' };
+        render(<IncidentShow detail={incident} />);
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        expect(within(progress).getByText('Complete the manager review')).toBeVisible();
+        expect(within(progress).getByText(/^A manager at Kauri House completes it\./)).toBeVisible();
+        expect(within(progress).queryAllByRole('button').filter((button) => (button as HTMLButtonElement).disabled)).toHaveLength(0);
+        expect(within(progress).queryByRole('button', { name: 'Complete manager review' })).toBeNull();
+    });
+
+    it('shows dated notes beside the reporter’s words and adds one through the note pop-up', () => {
+        const incident = detail() as IncidentDetail & {
+            notes: { id: number; field: string; note: string; author_name: string; created_at: string }[];
+            can: IncidentDetail['can'] & { add_note: boolean };
+        };
+        incident.status = 'submitted';
+        incident.submitted_at = '2026-10-07T01:48:00Z';
+        incident.can.add_note = true;
+        incident.notes = [
+            {
+                id: 9, field: 'what_happened', note: 'She told us later she was reaching for her cardigan.',
+                author_name: 'Rāwiri Ngata', created_at: '2026-10-08T02:00:00Z',
+            },
+        ];
+        render(<IncidentShow detail={incident} />);
+        const steps = within(screen.getByRole('banner')).getByRole('list', { name: /Where the incident is up to/ });
+        fireEvent.click(within(steps).getByRole('button', { name: /Reported/ }));
+        const progress = screen.getByRole('region', { name: 'Progress' });
+        const beside = within(progress).getByRole('list', { name: 'Notes beside What happened' });
+        expect(beside).toHaveTextContent('Rāwiri Ngata · Thu 8 Oct, 3:00 pm: She told us later she was reaching for her cardigan.');
+        expect(within(progress).getByText(/added a note beside “What happened”/)).toBeVisible();
+
+        const adds = within(progress).getAllByRole('button', { name: 'Add a note' });
+        expect(adds).toHaveLength(2);
+        fireEvent.click(adds[1]);
+        const dialog = screen.getByRole('dialog', { name: 'Add a note' });
+        expect(within(dialog).getByText(/INC-2026-0042 · What we did straight away/)).toBeVisible();
+        const submit = within(dialog).getByRole('button', { name: 'Add note' });
+        expect(submit).toBeDisabled();
+        fireEvent.change(within(dialog).getByRole('textbox', { name: /Note/ }), {
+            target: { value: 'The rug was moved out the same evening.' },
+        });
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Add note' }));
+        expect(state.post).toHaveBeenCalledWith('/incidents/42/notes', {
+            field: 'done_straight_away',
+            note: 'The rug was moved out the same evening.',
+        });
+    });
+
+    it('offers no "Add a note" without the server’s permission, and none on a draft', () => {
+        const incident = detail() as IncidentDetail & { can: IncidentDetail['can'] & { add_note: boolean } };
+        incident.status = 'submitted';
+        incident.can.add_note = false;
+        const view = render(<IncidentShow detail={incident} />);
+        const pick = () =>
+            fireEvent.click(
+                within(within(screen.getByRole('banner')).getByRole('list', { name: /Where the incident is up to/ })).getByRole(
+                    'button',
+                    { name: /Reported/ },
+                ),
+            );
+        pick();
+        expect(screen.queryByRole('button', { name: 'Add a note' })).toBeNull();
+        incident.can.add_note = true;
+        incident.status = 'draft';
+        view.rerender(<IncidentShow detail={incident} />);
+        expect(screen.queryByRole('button', { name: 'Add a note' })).toBeNull();
+        expect(screen.queryByText(/A submitted report can’t be changed/)).toBeNull();
     });
 
     it('offers a bounded response request only with source and destination authority', () => {
@@ -826,16 +993,17 @@ describe('Permanent incident workspace', () => {
             },
         );
         fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+        // The pop-up kit's discard guard ("Discard this draft?" · Keep editing · Discard draft).
         fireEvent.click(
             within(screen.getByRole('alertdialog')).getByRole('button', {
-                name: 'Cancel',
+                name: 'Keep editing',
             }),
         );
-        expect(within(dialog).getByRole('textbox')).toHaveValue(
+        expect(within(screen.getByRole('dialog')).getByRole('textbox')).toHaveValue(
             'Please coordinate additional support at the house.',
         );
         fireEvent.click(
-            within(dialog).getByRole('button', { name: 'Request response' }),
+            within(screen.getByRole('dialog')).getByRole('button', { name: 'Request response' }),
         );
         expect(state.post).toHaveBeenCalledWith(
             '/control-room/incidents/create-alert',
@@ -852,7 +1020,7 @@ describe('Permanent incident workspace', () => {
         const incident = detail();
         const view = render(<IncidentShow detail={incident} />);
         const summary = screen.getByRole('region', {
-            name: 'Incident summary',
+            name: 'Incident overview',
         });
         const side = screen.getByRole('complementary');
         expect(
@@ -871,7 +1039,7 @@ describe('Permanent incident workspace', () => {
         expect(summary).toBeInTheDocument();
     });
 
-    it('puts the next step for an active response in the header, with its wording kept', () => {
+    it('puts the next step for an active response in the Progress card, with its wording kept', () => {
         render(
             <IncidentShow
                 detail={{
@@ -881,7 +1049,7 @@ describe('Permanent incident workspace', () => {
             />,
         );
         expect(
-            within(screen.getByRole('banner')).getByText(
+            within(screen.getByRole('region', { name: 'Progress' })).getByText(
                 /The operational response is still active\. Response and incident review are separate decisions\./,
             ),
         ).toBeVisible();
@@ -901,31 +1069,34 @@ describe('Permanent incident workspace', () => {
         };
         const view = render(<IncidentShow detail={incident} />);
         expect(
-            within(screen.getByRole('banner')).getByRole('link', {
+            within(screen.getByRole('region', { name: 'Progress' })).getByRole('link', {
                 name: 'Open response',
             }),
         ).toHaveAttribute('href', '/control-room/alerts/11');
         expect(
             screen.getAllByRole('link', { name: 'Open response' }),
         ).toHaveLength(1);
+        // Closing waits for its checks: never offered as a disabled button.
         expect(
-            within(screen.getByRole('banner')).getByRole('button', {
-                name: 'Close incident',
-            }),
-        ).toBeDisabled();
+            screen.queryByRole('button', { name: 'Close incident' }),
+        ).not.toBeInTheDocument();
         incident.control_room_alert.url = null;
         view.rerender(<IncidentShow detail={incident} />);
         expect(
             screen.queryByRole('link', { name: 'Open response' }),
         ).not.toBeInTheDocument();
         expect(
-            within(screen.getByRole('banner')).getByRole('button', {
-                name: 'Close incident',
-            }),
-        ).toBeDisabled();
+            screen.queryByRole('button', { name: 'Close incident' }),
+        ).not.toBeInTheDocument();
         expect(
             screen.getByText(/permitted Control Room responder/),
         ).toBeVisible();
+        // Once its checks are done, closing stays reachable in the header while the response holds the next step.
+        incident.close_gate.allowed = true;
+        view.rerender(<IncidentShow detail={incident} />);
+        expect(
+            within(screen.getByRole('banner')).getByRole('button', { name: 'Close incident' }),
+        ).toBeEnabled();
     });
 
     it('retains register filters and opens shareable sections, including browser-back URLs', () => {

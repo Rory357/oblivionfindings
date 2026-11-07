@@ -44,14 +44,41 @@ export type ChatConversation = {
         eligible_owner_ids: number[];
     };
 };
+// Formatted text (C2.6, docs/chat-experience/c2.6-message-model.md): rendered as elements, never as HTML.
+export type ChatDocumentMark =
+    | 'bold'
+    | 'italic'
+    | 'underline'
+    | 'strike'
+    | 'code';
+export type ChatDocumentInline =
+    | { type: 'text'; text: string; marks: ChatDocumentMark[] }
+    | { type: 'mention'; user_id: number; label: string }
+    | {
+          type: 'link';
+          href: string;
+          content: { type: 'text'; text: string; marks: ChatDocumentMark[] }[];
+      };
+export type ChatDocumentBlock =
+    | { type: 'paragraph'; content: ChatDocumentInline[] }
+    | { type: 'list'; ordered: boolean; items: ChatDocumentBlock[][] }
+    | { type: 'quote'; blocks: ChatDocumentBlock[] }
+    | { type: 'code'; text: string };
+export type ChatDocument = { v: 1; blocks: ChatDocumentBlock[] };
 export type ChatMessage = {
     id: number;
     sender_id: number;
     sender_name: string;
     mine: boolean;
     content: string;
+    kind?: 'text' | 'card' | 'poll' | 'sticker' | 'call' | 'system';
+    // Null for plain text; content always holds the plain-text copy.
+    document?: ChatDocument | null;
     deleted: boolean;
     pinned: boolean;
+    // Who pinned it ("You" for the viewer) and when; null for unpinned messages.
+    pinned_by_name?: string | null;
+    pinned_at?: string | null;
     saved?: boolean;
     mentions?: ChatMention[];
     created_at: string;
@@ -84,7 +111,13 @@ export type ChatMessage = {
         name: string;
         url: string | null;
     }[];
-    reactions: { emoji: string; count: number; mine: boolean }[];
+    // people: who reacted ("You" for the viewer), first 20, in the order they reacted.
+    reactions: {
+        emoji: string;
+        count: number;
+        mine: boolean;
+        people?: string[];
+    }[];
 };
 export type ChatPolicy = {
     enabled: boolean;
@@ -110,6 +143,8 @@ export type ChatHistory = {
     messages: ChatMessage[];
     has_more: boolean;
     sync_cursor?: string;
+    /** The newest change the cursor covers; live events with a lower change ID are skipped. */
+    sync_change_id?: number;
     has_more_changes?: boolean;
 };
 
@@ -118,5 +153,6 @@ export type ChatChanges = {
     messages: ChatMessage[];
     new_message_ids: number[];
     sync_cursor: string;
+    sync_change_id?: number;
     has_more_changes: boolean;
 };

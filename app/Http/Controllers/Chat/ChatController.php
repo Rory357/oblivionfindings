@@ -14,6 +14,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Chat\ChatAccess;
 use App\Services\Chat\ChatAudience;
+use App\Services\Chat\ChatDocument;
 use App\Services\Chat\ChatFamilyContacts;
 use App\Services\Chat\ChatFamilyResponse;
 use App\Services\Chat\ChatFileSafety;
@@ -23,6 +24,7 @@ use App\Services\Chat\ChatMessageDelivery;
 use App\Services\Chat\ChatMessageEditing;
 use App\Services\Chat\ChatPrivateDrafts;
 use App\Services\Chat\ChatProjection;
+use App\Services\Chat\ChatReactionEmoji;
 use App\Services\Chat\ChatRealtime;
 use App\Services\Chat\ChatSendAttempts;
 use App\Services\Chat\ChatSettings;
@@ -84,10 +86,15 @@ final class ChatController extends Controller
                 ->when($staff, fn ($cover) => $cover->orWhere(fn ($family) => $family->where('conversation_type', 'family')->where('care_team_cover', true)
                     ->whereHas('client', fn ($clients) => $this->family->scopeViewableClients($clients, $user)))))
             ->when($client, fn ($query) => $query->where('client_id', $client->id)->where('conversation_type', 'family'))
+            // A live event names one conversation: refresh just its row (empty when no longer visible).
+            ->when($only = $request->integer('only') ?: null, fn ($query) => $query->whereKey($only))
             ->with(['client', 'participants.user'])
             ->orderByDesc('updated_at')->get();
         $conversations = $this->access->filterAllowed($user, $conversations)
-            ->map(fn ($conversation) => $this->projection->conversation($conversation, $user))->values();
+            ->map(fn ($conversation) => $this->projection->conversation($conversation, $user, summary: true))->values();
+        if ($only) {
+            return response()->json(['conversations' => $conversations, 'only' => $only])->header('Cache-Control', 'private, no-store');
+        }
         $people = $staff ? $this->visibility->visibleCurrentStaffQuery($user)->where('users.id', '!=', $user->id)->get(['users.id', 'users.name']) : collect();
         if (! $staff && $client) {
             $people = app(ChatFamilyContacts::class)->namedPeople($client)
@@ -130,8 +137,11 @@ final class ChatController extends Controller
             $after = $this->access->messages($conversation, $request->user(), true)->where('id', '>=', $target->id)->orderBy('id')->limit(26)->get();
             $rows = $before->concat($after)->values();
 
+            $position = app(ChatMessageChanges::class)->latestId($conversation);
+
             return response()->json([
-                'sync_cursor' => app(ChatMessageChanges::class)->cursor($conversation, $request->user()),
+                'sync_cursor' => app(ChatMessageChanges::class)->cursor($conversation, $request->user(), $position),
+                'sync_change_id' => $position,
                 'conversation' => $this->projection->conversation($conversation, $request->user()),
                 'messages' => $this->projection->messages($rows, $request->user(), $conversation),
                 'has_more' => $this->access->messages($conversation, $request->user(), true)->where('id', '<', $rows->first()->id)->exists(),
@@ -142,8 +152,11 @@ final class ChatController extends Controller
             ->when($data['q'] ?? null, fn ($query, $q) => $query->whereNull('deleted_at')->where('content', 'like', '%'.addcslashes($q, '%_\\').'%'))
             ->with(['sender:id,name', 'reactions.user:id,name'])->orderByDesc('id')->limit(51)->get();
 
+        $position = app(ChatMessageChanges::class)->latestId($conversation);
+
         return response()->json([
-            'sync_cursor' => app(ChatMessageChanges::class)->cursor($conversation, $request->user()),
+            'sync_cursor' => app(ChatMessageChanges::class)->cursor($conversation, $request->user(), $position),
+            'sync_change_id' => $position,
             'conversation' => $this->projection->conversation($conversation, $request->user()),
             'messages' => $this->projection->messages($rows->take(50)->reverse()->values(), $request->user(), $conversation),
             'has_more' => $rows->count() > 50,
@@ -249,7 +262,7 @@ final class ChatController extends Controller
         $conversation = $client
             ? app(ClientPortalMembershipService::class)->withLockedMembership($client, $user, $create)
             : DB::transaction($create);
-        app(ChatRealtime::class)->queueConversation($conversation->id);
+        app(ChatRealtime::class)->queueConversation($conversation->id, inbox: 'added');
 
         return response()->json(['conversation' => $this->projection->conversation($conversation, $user)], 201);
     }
@@ -288,14 +301,16 @@ final class ChatController extends Controller
         }
         $settings = $this->settings->forConversation($conversation);
         abort_unless($settings['enabled'] && ($conversation->conversation_type !== 'family' || $settings['family_enabled']), 403);
+        // A formatted message is the source of its text: content and mentions are written from it.
+        $document = app(ChatDocument::class)->requested($request);
         $data = $request->validate([
             'audience_token' => ['nullable', 'string', 'size:64'],
             'recoverable_send' => ['sometimes', 'boolean'],
             'draft_version' => ['nullable', 'required_with:draft_boundary', 'integer', 'min:0', 'max:9007199254740000'],
             'draft_boundary' => ['nullable', 'required_with:draft_version', 'string', 'regex:/^[a-f0-9]{64}$/D'],
-            'mutation_id' => ['required', 'uuid'], 'content' => ['nullable', 'string', 'max:10000'],
+            'mutation_id' => ['required', 'uuid'], 'content' => [Rule::excludeIf($document !== null), 'nullable', 'string', 'max:10000'],
             'reply_to_id' => ['nullable', 'integer'],
-            'mentions' => ['sometimes', 'array', 'max:30'],
+            'mentions' => [Rule::excludeIf($document !== null), 'sometimes', 'array', 'max:30'],
             'mentions.*' => ['array:user_id,start,length'],
             'mentions.*.user_id' => ['required', 'integer', 'min:1'],
             'mentions.*.start' => ['required', 'integer', 'between:0,10000'],
@@ -307,6 +322,10 @@ final class ChatController extends Controller
             'captions' => ['sometimes', 'array', 'max:'.$settings['max_files']],
             'captions.*' => ['nullable', 'string', 'max:1000'],
         ]);
+        if ($document !== null) {
+            $data['content'] = app(ChatDocument::class)->plainText($document);
+            $data['mentions'] = app(ChatDocument::class)->mentions($document);
+        }
         $files = $request->file('files', []);
         if (isset($data['draft_version'])) {
             abort_unless($request->header('X-Chat-Actor') === (string) $request->user()->id, 403);
@@ -336,7 +355,7 @@ final class ChatController extends Controller
         }
         $paths = [];
         try {
-            $message = DB::transaction(function () use ($request, $conversation, $data, $files, $scans, $uploadIds, $attachmentCount, &$paths) {
+            $message = DB::transaction(function () use ($request, $conversation, $data, $document, $files, $scans, $uploadIds, $attachmentCount, &$paths) {
                 $locked = OpsConversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
                 $this->access->authorize($request->user(), $locked, true);
                 $existing = OpsMessage::withTrashed()->where('sender_id', $request->user()->id)->where('mutation_id', $data['mutation_id'])->first();
@@ -359,6 +378,7 @@ final class ChatController extends Controller
                     'content' => trim($data['content'] ?? ''), 'message_type' => $attachmentCount ? 'attachment' : 'text',
                     'client_id' => $locked->conversation_type === 'family' ? $locked->client_id : null,
                     'mutation_id' => $data['mutation_id'], 'reply_to_id' => $data['reply_to_id'] ?? null,
+                    'body_document' => $document,
                 ]);
                 foreach ($mentions as $mention) {
                     DB::table('chat_message_mentions')->insert($mention + ['message_id' => $message->id, 'created_at' => now()]);
@@ -444,18 +464,27 @@ final class ChatController extends Controller
         $data = $request->validate(['message_id' => ['required', 'integer', 'min:1'], 'unread_marker' => ['nullable', 'uuid']]);
 
         return DB::transaction(function () use ($request, $conversation, $data) {
-            $locked = OpsConversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
+            // Shared: only the reader's own row changes, so readers no longer queue behind each other;
+            // membership writers still hold the conversation exclusively.
+            $locked = OpsConversation::whereKey($conversation->id)->sharedLock()->firstOrFail();
             $this->access->authorize($request->user(), $locked);
             $message = $this->access->messages($locked, $request->user(), true)->findOrFail($data['message_id']);
             $member = $locked->participants()->firstOrCreate(['user_id' => $request->user()->id], ['role' => OpsConversationParticipant::COVER_READER]);
             if ((int) $member->last_read_message_id < $message->id) {
                 $member->update(['last_read_message_id' => $message->id, 'last_read_at' => $message->created_at]);
             }
+            // Reading the conversation clears its bell entries up to what was read.
+            app(ChatMessageDelivery::class)->markConversationNoticesRead($request->user(), $locked, (int) $member->last_read_message_id);
             // A delayed acknowledgement from an older view must not erase a new reminder.
             if ($member->unread_marker && $member->unread_marker === ($data['unread_marker'] ?? null)) {
                 $member->update(['unread_marker' => null]);
             }
             Cache::forget('user:'.$request->user()->id.':ops-unread:v1');
+            // The reader's other tabs update their badge, bell and list row.
+            $realtime = app(ChatRealtime::class);
+            $realtime->unreadChanged([$request->user()->id]);
+            $realtime->noticeChanged([$request->user()->id], 'cleared');
+            $realtime->queueConversation($locked->id, $request->user()->id, 'read');
 
             return response()->noContent();
         });
@@ -466,7 +495,8 @@ final class ChatController extends Controller
         $data = $request->validate(['is_muted' => ['sometimes', 'boolean'], 'is_favourite' => ['sometimes', 'boolean'], 'is_archived_for_user' => ['sometimes', 'boolean'], 'mark_unread' => ['sometimes', 'boolean']]);
 
         return DB::transaction(function () use ($request, $conversation, $data) {
-            $conversation = OpsConversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
+            // Shared: personal settings change only the person's own row.
+            $conversation = OpsConversation::whereKey($conversation->id)->sharedLock()->firstOrFail();
             $this->access->authorize($request->user(), $conversation);
             $member = $conversation->participants()->firstOrCreate(['user_id' => $request->user()->id], ['role' => OpsConversationParticipant::COVER_READER]);
             if (array_key_exists('mark_unread', $data)) {
@@ -475,6 +505,12 @@ final class ChatController extends Controller
             }
             $member->fill($data)->save();
             Cache::forget('user:'.$request->user()->id.':ops-unread:v1');
+            // The person's other tabs update their badge and list.
+            $realtime = app(ChatRealtime::class);
+            $realtime->unreadChanged([$request->user()->id]);
+            $member->wasChanged('is_archived_for_user')
+                ? $realtime->inboxChanged([$request->user()->id], 'archived')
+                : $realtime->queueConversation($conversation->id, $request->user()->id, 'preferences');
 
             return response()->noContent();
         });
@@ -482,7 +518,11 @@ final class ChatController extends Controller
 
     public function action(Request $request, OpsMessage $message)
     {
-        $data = $request->validate(['action' => ['required', Rule::in(['pin', 'delete', 'react', 'save'])], 'active' => ['required_unless:action,delete', 'boolean'], 'emoji' => ['required_if:action,react', Rule::in(['👍', '❤️', '😊', '✅', '🙏', '😢'])],
+        $data = $request->validate(['action' => ['required', Rule::in(['pin', 'delete', 'react', 'save'])], 'active' => ['required_unless:action,delete', 'boolean'], 'emoji' => ['required_if:action,react', 'nullable', function (string $attribute, mixed $value, \Closure $fail): void {
+            if ($value !== null && ! ChatReactionEmoji::valid($value)) {
+                $fail('Choose one emoji to react with.');
+            }
+        }],
             'mutation_id' => ['required_if:action,delete', 'uuid'], 'version' => ['required_if:action,delete', 'integer', 'min:0']]);
 
         if ($data['action'] === 'delete') {
@@ -492,9 +532,13 @@ final class ChatController extends Controller
         }
 
         return DB::transaction(function () use ($request, $message, $data) {
-            OpsConversation::whereKey($message->conversation_id)->lockForUpdate()->firstOrFail();
+            $conversation = OpsConversation::whereKey($message->conversation_id)->lockForUpdate()->firstOrFail();
             $message = OpsMessage::whereKey($message->id)->lockForUpdate()->firstOrFail();
             $this->access->message($request->user(), $message, $data['action'] !== 'save');
+            // A pin is shown to everyone, so only the care team pins in a family conversation;
+            // relatives keep "Save for me".
+            abort_if($data['action'] === 'pin' && $conversation->participants()->where('user_id', $request->user()->id)->value('role') === 'family',
+                403, 'Only the care team can pin messages in this conversation. Use Save for me instead.');
             if ($data['action'] === 'save') {
                 $identity = ['user_id' => $request->user()->id, 'message_id' => $message->id];
                 if ($data['active']) {
@@ -503,7 +547,14 @@ final class ChatController extends Controller
                     DB::table('chat_saved_messages')->where($identity)->delete();
                 }
             } elseif ($data['action'] === 'pin') {
-                $message->update(['is_pinned' => $data['active']]);
+                if ((bool) $message->is_pinned !== (bool) $data['active']) {
+                    $message->update($data['active']
+                        ? ['is_pinned' => true, 'pinned_by' => $request->user()->id, 'pinned_at' => now()]
+                        : ['is_pinned' => false, 'pinned_by' => null, 'pinned_at' => null]);
+                    AuditLog::create(['user_id' => $request->user()->id, 'client_id' => $conversation->client_id,
+                        'action' => $data['active'] ? 'chat.message.pinned' : 'chat.message.unpinned',
+                        'meta' => ['conversation_id' => $conversation->id, 'message_id' => $message->id]]);
+                }
             } else {
                 $existing = $message->reactions()->where('user_id', $request->user()->id)->where('emoji', $data['emoji'])->first();
                 if (! $data['active']) {
@@ -513,7 +564,8 @@ final class ChatController extends Controller
                 }
             }
 
-            app(ChatMessageChanges::class)->record($message, $data['action'] === 'save' ? $request->user()->id : null);
+            app(ChatMessageChanges::class)->record($message, $data['action'] === 'save' ? $request->user()->id : null,
+                kind: ['pin' => 'pin', 'react' => 'reaction', 'save' => 'save'][$data['action']]);
 
             return response()->noContent();
         });

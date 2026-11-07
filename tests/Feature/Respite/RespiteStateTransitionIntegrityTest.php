@@ -355,9 +355,11 @@ class RespiteStateTransitionIntegrityTest extends TestCase
             ->assertSessionHasErrors('status');
 
         $extendedEnd = $booking->end_at->copy()->addDay();
+        // The extend dialog posts NZ wall-clock; storage is UTC.
+        $extendedEndNz = $extendedEnd->copy()->setTimezone('Pacific/Auckland')->format('Y-m-d H:i:s');
         $this->actingAs($this->admin)
             ->post(route('respite.stays.extend', $stay), [
-                'new_end' => $extendedEnd->format('Y-m-d H:i:s'),
+                'new_end' => $extendedEndNz,
             ])
             ->assertRedirect()
             ->assertSessionHasNoErrors();
@@ -366,7 +368,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post(route('respite.stays.extend', $stay), [
-                'new_end' => $extendedEnd->format('Y-m-d H:i:s'),
+                'new_end' => $extendedEndNz,
             ])
             ->assertRedirect()
             ->assertSessionHasErrors('new_end');

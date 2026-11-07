@@ -28,6 +28,8 @@ final class IncidentRegisterReadService
         'incidents.create', 'incidents.followups.manage', 'incidents.followups.complete', 'incidents.templates.manage',
         'incidents.portal.manage', 'incidents.update', 'incidents.submit', 'incidents.approve', 'incidents.reopen',
         'safeguarding.create', 'safeguarding.viewAny', 'clients.viewAny', 'clients.viewAssigned',
+        // P4: deciding whether a safeguarding incident's words show reads the safeguarding concern rules.
+        'safeguarding.viewSensitive', 'safeguarding.declassification.approve', 'safeguarding.viewAllSites',
         'reports.viewAny', 'hazards.view', 'hazards.manage', 'compliance.view',
         'controlRoom.viewAny', 'controlRoom.alerts.view', 'controlRoom.alerts.manage', 'controlRoom.alerts.assign',
         'controlRoom.alerts.escalate', 'controlRoom.alerts.create', 'medications.controlled.view',
@@ -94,12 +96,30 @@ final class IncidentRegisterReadService
             } finally { $working->setUserResolver($resolver); }
         }));
     }
+    /**
+     * The register's query checks (owner lens, record kind, period). The header inbox's follow-up request runs
+     * them too, so it is refused exactly when the page is.
+     *
+     * @return array{0: string, 1: array<string, mixed>}
+     */
+    public function validatedQuery(Request $request): array
+    {
+        $owner = $request->validate(['owner' => ['nullable', 'in:all,me,needs_owner']])['owner'] ?? 'all';
+        $period = $request->validate([
+            'kind' => ['nullable', 'in:all,incidents,near_misses'],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
+        ]);
+
+        return [$owner, $period];
+    }
+
     private function compose(Request $request, User $user, CurrentAuthorizationReads $reads, ?callable $detailConsumer): array
     {
 
         abort_unless($user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned'), 403);
 
-        $owner = $request->validate(['owner' => ['nullable', 'in:all,me,needs_owner']])['owner'] ?? 'all';
+        [$owner, $period] = $this->validatedQuery($request);
         $q = trim((string) $request->get('q', ''));
         $tab = $request->get('tab', 'all'); // all|open|investigation|followups|worksafe|near_misses|review|closed
         // Back-compat: the legacy ?type=near_miss lens now lands on the tab.
@@ -110,11 +130,6 @@ final class IncidentRegisterReadService
         $clientId = $request->get('client_id');
         $siteId = $request->get('site_id');
         $source = $request->get('source');
-        $period = $request->validate([
-            'kind' => ['nullable', 'in:all,incidents,near_misses'],
-            'from' => ['nullable', 'date_format:Y-m-d'],
-            'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
-        ]);
         $from = $period['from'] ?? null;
         $to = $period['to'] ?? null;
         $kind = $period['kind'] ?? 'all';
@@ -133,9 +148,13 @@ final class IncidentRegisterReadService
                 ->tap(fn (Builder $query) => app(IncidentAccessService::class)->apply($query, $user, $reads))
                 ->when($q !== '', function ($query) use ($q) {
                     $term = '%'.$q.'%';
-                    $query->where(fn ($sub) => $sub->where('description', 'like', $term)
-                        ->orWhere('type', 'like', $term)
-                        ->orWhere('title', 'like', $term));
+                    // P4: a safeguarding incident's words are never searched; its type still is.
+                    $query->where(fn ($sub) => $sub->where(fn ($words) => $words
+                        ->where(fn ($text) => $text->where('description', 'like', $term)->orWhere('title', 'like', $term))
+                        ->where(fn ($kind) => $kind->where('type', '!=', 'safeguarding')->orWhereNull('type'))
+                        ->whereNotExists(fn ($linked) => $linked->selectRaw('1')->from('safeguarding_concerns')
+                            ->whereColumn('safeguarding_concerns.related_incident_id', 'client_incidents.id')))
+                        ->orWhere('type', 'like', $term));
                 })
                 ->when($severity, fn ($query) => $query->where('severity', $severity))
                 ->when($clientId, fn ($query) => $query->where('client_id', $clientId))
@@ -157,7 +176,20 @@ final class IncidentRegisterReadService
         $p30 = now()->subDays(30);
         $p60 = now()->subDays(60);
         $p90 = now()->subDays(90);
+
+        // G4-4 (Stephan, 1 Nov): a support worker's list uses her four status words — Draft · Sent (nobody has taken
+        // it on) · Being followed up · Closed. "Sent" is the canonical needs-an-owner qualification, so the words
+        // match the ownership the incident page shows. Only frontline readers (assigned clients only) get it.
+        $frontline = ! $user->canDo('incidents.viewAny');
+        $sentIds = $frontline
+            ? $this->owners->applyOwnerFilter((clone $base)->where('client_incidents.status', 'submitted'), $user, 'needs_owner', $reads)
+                ->reorder()->pluck('client_incidents.id')->map(fn ($id): int => (int) $id)->all()
+            : [];
         $applyTab = fn ($query, string $t) => match ($t) {
+            'drafts' => $query->where('status', 'draft'),
+            'sent' => $frontline && $sentIds !== [] ? $query->whereIn('client_incidents.id', $sentIds) : $query->whereRaw('1 = 0'),
+            'followed_up' => $query->whereIn('status', ['submitted', 'reviewed'])
+                ->when($sentIds !== [], fn ($q) => $q->whereNotIn('client_incidents.id', $sentIds)),
             'open' => $query->where('status', '!=', 'closed'),
             'investigation' => $query->whereIn('investigation_status', ['pending', 'in_progress']),
             'worksafe' => $this->whereCanonicalWorksafeEvent($query),
@@ -189,6 +221,13 @@ final class IncidentRegisterReadService
             'closed_recent' => $countFor('closed_recent'),
             'worksafe_pending' => $countFor('worksafe_pending'),
         ];
+        $frontlineCounts = $frontline ? [
+            'own_drafts' => (clone $base)->where('status', 'draft')->where('reported_by', $user->id)->count(),
+            'drafts' => $countFor('drafts'),
+            'sent' => count($sentIds),
+            'followed_up' => $countFor('followed_up'),
+            'closed_recent' => $tabCounts['closed_recent'],
+        ] : null;
 
         // Rows for the active tab. Follow-ups due is a worklist of follow-up rows;
         // every other tab is a list of incident rows.
@@ -214,6 +253,8 @@ final class IncidentRegisterReadService
                 ]);
             $rowsKind = 'followups';
         } else {
+            // P4: one instance, so each row's linked-concern check is remembered.
+            $sgContent = app(IncidentSafeguardingContent::class);
             $rows = $applyTab((clone $base), $tab)
                 ->with($this->currentRelations([
                     'client:id,first_name,last_name,site_id',
@@ -231,7 +272,7 @@ final class IncidentRegisterReadService
                 ->orderByDesc('id')
                 ->paginate(50, ['*'], 'page', max(1, (int) $request->query('page', 1)))
                 ->withQueryString()
-                ->through(function (ClientIncident $incident) use ($user, $reads): array {
+                ->through(function (ClientIncident $incident) use ($user, $reads, $sgContent): array {
                     $directEvent = $incident->hsEvent;
                     $event = $directEvent !== null
                         && $this->journeys->hsEventIsCanonicalForIncident($incident, $directEvent)
@@ -245,7 +286,8 @@ final class IncidentRegisterReadService
                         'ownership' => $this->owners->summaryInCurrentReads($user, $incident, $reads),
                         'occurred_at' => $incident->occurred_at,
                         'type' => $incident->type,
-                        'description' => $incident->description,
+                        'description' => $sgContent->restricted($user, $incident) && filled($incident->description)
+                            ? $sgContent::RESTRICTED : $incident->description,
                         'severity' => $incident->severity,
                         'status' => $incident->status,
                         'source' => $incident->source,
@@ -276,6 +318,8 @@ final class IncidentRegisterReadService
                                 ?? $incident->client->site?->name,
                         ] : null,
                         'reporter' => $incident->reporter ? ['name' => $incident->reporter->name] : null,
+                        // G4-4: her own draft gets "Finish"; other people's drafts for her clients stay visible (Q7).
+                        'reported_by_me' => (int) $incident->reported_by === (int) $user->id,
                     ];
                 });
             $rowsKind = 'incidents';
@@ -335,6 +379,11 @@ final class IncidentRegisterReadService
 
         $sites = null;
         $clients = null;
+        if ($frontline) {
+            // Her own Sites for the header's Site chip (G4-4); the list itself stays her assigned clients only.
+            $scopeIds = $this->sites->accessibleSiteIds($user, $this->healthSafetySiteBypassPermissions(), $reads);
+            $sites = $reads->query(Site::query()->where('is_active', true)->whereIn('id', $scopeIds))->orderBy('name')->get(['id', 'name']);
+        }
         if ($user->canDo('incidents.viewAny')) {
             $scopeIds = $this->sites->accessibleSiteIds($user, $this->healthSafetySiteBypassPermissions(), $reads);
             $siteQuery = $reads->query(Site::query()->where('is_active', true)->whereIn('id', $scopeIds));
@@ -382,6 +431,7 @@ final class IncidentRegisterReadService
             ],
             'tab' => $tab,
             'tabCounts' => $tabCounts,
+            'frontline' => $frontlineCounts,
             'rows' => $rows->toArray(),
             'rowsKind' => $rowsKind,
             'hero' => $hero,

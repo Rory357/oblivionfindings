@@ -181,6 +181,33 @@ final class RestraintRegisterServiceTest extends RestraintEventCommandTestCase
         $this->assertSame($result['reviewers'], $result['followupOwners']);
     }
 
+    public function test_picker_staff_skip_other_sites_early_and_check_each_person_once(): void
+    {
+        // Readiness audit O6 (6 Nov 2026): every staff member was checked against every Site, one query at a time.
+        $event = $this->event();
+        $elsewhere = Site::factory()->create(['is_active' => true]);
+        $local = $this->staff(['restraints.review', 'clients.viewAny']);
+        $secondary = $this->staff(['restraints.review', 'clients.viewAny'], $elsewhere);
+        HrEmployeeProfile::where('user_id', $secondary->id)->update(['secondary_site_ids' => [$this->site->id]]);
+        $remote = collect(range(1, 15))->map(fn () => $this->staff([], $elsewhere));
+
+        $result = $this->register()->pickers($this->actor, [], $event);
+        $this->assertContains($local->id, $this->ids($result['staff']));
+        $this->assertContains($secondary->id, $this->ids($result['staff']), 'A secondary Site still counts.');
+        $this->assertSame([], array_values(array_intersect($remote->pluck('id')->all(), $this->ids($result['staff']))));
+
+        \Illuminate\Support\Facades\DB::flushQueryLog();
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        $this->register()->pickers($this->actor, [], $event);
+        $withRemote = count(\Illuminate\Support\Facades\DB::getQueryLog());
+        $remote->each(fn () => $this->staff([], $elsewhere));
+        \Illuminate\Support\Facades\DB::flushQueryLog();
+        $this->register()->pickers($this->actor, [], $event);
+        $moreRemote = count(\Illuminate\Support\Facades\DB::getQueryLog());
+        \Illuminate\Support\Facades\DB::disableQueryLog();
+        $this->assertLessThanOrEqual($withRemote + 2, $moreRemote, '15 more staff at another Site add no per-person checks.');
+    }
+
     public function test_fresh_rbac_client_and_hr_revocation_defeat_warm_callers(): void
     {
         $this->event();

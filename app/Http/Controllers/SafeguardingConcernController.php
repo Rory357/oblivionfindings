@@ -61,19 +61,31 @@ class SafeguardingConcernController extends Controller
             'to' => $request->get('to') ?: null,
         ];
 
+        // P1 (readiness audit, 6 Nov 2026): a need-to-know concern this reader sees only as a locked shell must not be
+        // found by what it says — its category, its subject or its words. Only its reference matches, as on the row.
+        $openDetail = function ($q) use ($user, $canSensitive): void {
+            if ($canSensitive || $user->canDo('safeguarding.declassification.approve')) {
+                return;
+            }
+            $q->where(fn ($w) => $w->where('is_sensitive', false)->orWhereNull('is_sensitive')
+                ->orWhere('assigned_to_user_id', $user->id)->orWhere('reported_by_user_id', $user->id));
+        };
+
         // Footer filters applied to any concern query; tab scope is layered on top.
-        $applyFilters = function ($q) use ($filters) {
+        $applyFilters = function ($q) use ($filters, $openDetail) {
             if ($filters['severity']) {
                 $q->where('severity', $filters['severity']);
             }
             if ($filters['category']) {
                 $q->where('abuse_category', $filters['category']);
+                $openDetail($q);
             }
             if ($filters['site_id']) {
                 $q->where('site_id', $filters['site_id']);
             }
             if ($filters['subject_id']) {
                 $q->where('subject_type', Client::class)->where('subject_id', $filters['subject_id']);
+                $openDetail($q);
             }
             if ($filters['from']) {
                 $q->whereDate('reported_at', '>=', $filters['from']);
@@ -83,10 +95,13 @@ class SafeguardingConcernController extends Controller
             }
             if ($filters['q']) {
                 $term = $filters['q'];
-                $q->where(function ($w) use ($term) {
+                $q->where(function ($w) use ($term, $openDetail) {
                     $w->where('reference_number', 'like', "%{$term}%")
-                        ->orWhere('description', 'like', "%{$term}%")
-                        ->orWhere('subject_name', 'like', "%{$term}%");
+                        ->orWhere(function ($words) use ($term, $openDetail) {
+                            $words->where(fn ($text) => $text->where('description', 'like', "%{$term}%")
+                                ->orWhere('subject_name', 'like', "%{$term}%"));
+                            $openDetail($words);
+                        });
                 });
             }
         };
@@ -337,7 +352,9 @@ class SafeguardingConcernController extends Controller
         // A concern at a Site outside the viewer's Sites answers "not found", so its existence there isn't revealed;
         // one they can see but may not open answers "forbidden". Either way nothing about it (files, investigations,
         // risk reviews) is loaded first.
-        abort_unless($this->concernPolicy->applyVisibleScope(SafeguardingConcern::query()->whereKey($concern->getKey()), $user)->exists(), 404);
+        abort_unless($this->concernPolicy->applySiteScope(SafeguardingConcern::query()->whereKey($concern->getKey()), $user)->exists(), 404);
+        // P2: the person it names as the alleged perpetrator gets a plain refusal that doesn't say why.
+        abort_if($this->concernPolicy->namesAsAllegedPerpetrator($user, $concern), 403, SafeguardingConcernPolicy::NAMED_PERSON_MESSAGE);
         abort_unless($user->can('view', $concern), 403);
 
         $canSensitive = $user->can('viewSensitive', SafeguardingConcern::class);
@@ -412,6 +429,14 @@ class SafeguardingConcernController extends Controller
         $request->validate([
             'assigned_to_user_id' => 'required|exists:users,id',
         ]);
+
+        // P2: the person a concern names as the alleged perpetrator can't lead it.
+        $assignee = User::query()->find((int) $request->assigned_to_user_id);
+        if ($assignee && $this->concernPolicy->namesAsAllegedPerpetrator($assignee, $concern)) {
+            throw ValidationException::withMessages([
+                'assigned_to_user_id' => "This person is named as the alleged perpetrator, so they can't lead this concern.",
+            ]);
+        }
 
         $concern->update([
             'assigned_to_user_id' => $request->assigned_to_user_id,
@@ -942,6 +967,22 @@ class SafeguardingConcernController extends Controller
             return $base; // redacted shell — the dialog renders the locked state
         }
 
+        // P3 (Stephan, 6 Nov 2026: "Their report + status only"): someone who can open the concern only because they
+        // reported it sees what was reported and where it's up to. Not the people named, the triage, investigations,
+        // risk reviews, referrals, action plans, files, linked records or later notes.
+        if ($this->concernPolicy->isReporterOnly($user, $concern)) {
+            return [
+                ...$base,
+                'reporter_view' => true,
+                'concern_type' => $concern->concern_type,
+                'abuse_category' => $concern->abuse_category,
+                'location' => $concern->location,
+                'description' => $concern->description,
+                'immediate_actions' => $concern->immediate_actions,
+                'closed_at' => $concern->closed_at?->toISOString(),
+            ];
+        }
+
         $concern->load([
             'subject', 'allegedPerpetrator', 'reportedBy', 'assignedTo', 'closedBy', 'triagedBy',
             'site', 'investigations.leadInvestigator', 'externalReports.reportedBy',
@@ -1106,6 +1147,10 @@ class SafeguardingConcernController extends Controller
             'related_incident_ref' => $concern->relatedIncident?->reference_number,
             'hs_event' => $hsEvent,
             'control_room_alert_id' => $controlRoomAlertId,
+            // B5 (Stephan, 6 Nov 2026: "Keep checks, say what to close"): what must be closed before "No further
+            // action" or closing, each with a link. The terminal service still decides.
+            'close_checklist' => in_array($concern->status, ['closed', 'no_action_required'], true)
+                ? [] : app(\App\Services\Safeguarding\SafeguardingCloseChecklist::class)->forConcern($concern),
             'access_log' => $this->recentAccessLog($concern),
             'can' => [
                 'update' => $user->can('update', $concern),
@@ -1114,7 +1159,9 @@ class SafeguardingConcernController extends Controller
                 'request_declassification' => $user->can('requestDeclassification', $concern),
                 'approve_declassification' => $user->can('approveDeclassification', $concern),
             ],
+            // P2: the alleged perpetrator isn't offered as the lead.
             'assignable_staff' => User::staff()->select('id', 'name')->orderBy('name')->get()
+                ->reject(fn (User $u) => $this->concernPolicy->namesAsAllegedPerpetrator($u, $concern))
                 ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values()->all(),
         ];
     }

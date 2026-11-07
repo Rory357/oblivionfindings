@@ -175,6 +175,16 @@ final class ControlRoomGovernanceReadService
                 self::$eventDetailReads[$context] = $frames;
             }
             $readableIncidentIds = $incidentDetails->keys()->flip();
+            // P4 (Stephan, 6 Nov 2026: "Safeguarding access only"): a safeguarding incident's words reach an alert
+            // reader only with safeguarding access to it; otherwise the alert shows it as restricted.
+            if ($readableIncidentIds->isNotEmpty()) {
+                $sgContent = app(\App\Services\Incidents\IncidentSafeguardingContent::class);
+                $sgRows = \App\Models\ClientIncident::query()->whereIn('id', $readableIncidentIds->keys()->all())
+                    ->get(['id', 'type', 'reported_by', 'site_id', 'client_id']);
+                $sgContent->prime($sgRows);
+                $sgHidden = $sgRows->filter(fn ($incident) => $sgContent->restricted($current, $incident))->pluck('id')->all();
+                $readableIncidentIds = $readableIncidentIds->except($sgHidden);
+            }
             $readableEventIds = $eventDetails->keys()->flip();
 
             return $records->map(function (array $record, int $id) use ($alerts, $current, $context, $readableIncidentIds, $readableEventIds, $incidentDetails, $eventDetails, $incidentQueries): array {

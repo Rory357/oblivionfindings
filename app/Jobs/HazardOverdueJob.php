@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class HazardOverdueJob implements ShouldQueue
 {
@@ -36,11 +37,13 @@ class HazardOverdueJob implements ShouldQueue
             ->with(['site:id,name', 'assignedTo:id,name'])
             ->get();
 
+        // D1 (readiness audit, 6 Nov 2026): a hazard is marked as told only when someone was actually told, so one with
+        // no reachable assignee (or H&S officer) is tried again on the next run instead of going quiet for good.
         foreach ($warningHazards as $hazard) {
             if ($this->canReceiveForSite($hazard->assignedTo, (int) $hazard->site_id, $siteAccess)) {
                 $hazard->assignedTo->notify(new HazardOverdueNotification($hazard, 'warning'));
+                $hazard->update(['warning_sent_at' => now()]);
             }
-            $hazard->update(['warning_sent_at' => now()]);
         }
 
         // Find overdue hazards
@@ -58,18 +61,27 @@ class HazardOverdueJob implements ShouldQueue
                 ->get();
 
         foreach ($overdueHazards as $hazard) {
+            $told = 0;
             if ($this->canReceiveForSite($hazard->assignedTo, (int) $hazard->site_id, $siteAccess)) {
                 $hazard->assignedTo->notify(new HazardOverdueNotification($hazard, 'overdue'));
+                $told++;
             }
 
             // Also notify H&S officers
             foreach ($hsOfficers as $officer) {
                 if ($this->canReceiveForSite($officer, (int) $hazard->site_id, $siteAccess)) {
                     $officer->notify(new HazardOverdueNotification($hazard, 'overdue_escalation'));
+                    $told++;
                 }
             }
 
-            $hazard->update(['overdue_notified_at' => now()]);
+            if ($told > 0) {
+                $hazard->update(['overdue_notified_at' => now()]);
+            } else {
+                Log::warning('Overdue hazard reached nobody; it will be tried again on the next run.', [
+                    'hazard_id' => $hazard->id, 'site_id' => $hazard->site_id,
+                ]);
+            }
         }
     }
 

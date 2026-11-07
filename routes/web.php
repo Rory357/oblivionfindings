@@ -4,6 +4,7 @@ use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\Careers\ReferenceController;
 use App\Domain\Referrals\Http\Controllers\PublicProviderController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Middleware\CalmPageOnLockConflict;
 use App\Http\Middleware\RetryPageReadOnLockConflict;
 use App\Http\Controllers\It\ItAssistController;
 use App\Http\Controllers\It\ItCatalogController;
@@ -469,7 +470,7 @@ require __DIR__.'/portal.php';
 require __DIR__.'/clients.php';
 require __DIR__.'/staff.php';
 // Page loads here retry when a save briefly holds a row their proof locks (RetryPageReadOnLockConflict).
-Route::middleware(RetryPageReadOnLockConflict::class)->group(function () {
+Route::middleware([CalmPageOnLockConflict::class, RetryPageReadOnLockConflict::class])->group(function () {
     require __DIR__.'/incidents.php';
     require __DIR__.'/tasks.php';
 });
@@ -514,7 +515,8 @@ require __DIR__.'/finance.php';
 require __DIR__.'/health-clinical.php';
 
 // Health & Safety module
-Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/health-safety.php');
+// Outermost: a page whose retries still clash shows a calm "busy" page, never a 500 (CalmPageOnLockConflict).
+Route::middleware([CalmPageOnLockConflict::class, RetryPageReadOnLockConflict::class])->group(fn () => require __DIR__.'/health-safety.php');
 
 // API routes (medication file exports retry on a busy row too)
 Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/api_medications.php');

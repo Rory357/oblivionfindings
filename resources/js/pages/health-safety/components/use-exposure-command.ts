@@ -3,7 +3,7 @@ import { CHEMICAL_EXPOSURES } from '@/lib/health-safety/chemical-exposure-naviga
 import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 
-export type ExposureCommand = 'create_exposure' | 'correct_exposure' | 'review_exposure' | 'assign_followup' | 'reassign_followup' | 'complete_followup' | 'upload_evidence' | 'remove_evidence';
+export type ExposureCommand = 'create_exposure' | 'correct_exposure' | 'review_exposure' | 'assign_followup' | 'reassign_followup' | 'complete_followup' | 'upload_evidence' | 'remove_evidence' | 'mark_entered_in_error';
 export type ExposureCommandTarget = {
     actorId: number; command: ExposureCommand; rootId: number | null; substanceId: number | null;
     sourceType: 'exposure' | 'review' | 'followup' | 'evidence'; sourceId: number | null; expectedVersion: number | null;
@@ -19,7 +19,7 @@ const object = (value: unknown): value is Record<string, unknown> => !!value && 
 const positive = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 /** An exact private receipt confirms the submitted command; it never grants saved read or destination delivery. */
 export function confirmsExposureReceipt(value: unknown, target: ExposureCommandTarget, key: string): value is ExposureReceipt {
-    const sourceType = target.command === 'review_exposure' ? 'review' : ['assign_followup', 'reassign_followup', 'complete_followup'].includes(target.command)
+    const sourceType = target.command === 'review_exposure' || target.command === 'mark_entered_in_error' ? 'review' : ['assign_followup', 'reassign_followup', 'complete_followup'].includes(target.command)
         ? 'followup' : ['upload_evidence', 'remove_evidence'].includes(target.command) ? 'evidence' : 'exposure';
     if (!positive(target.actorId) || target.sourceType !== sourceType || (target.command === 'create_exposure'
         ? !positive(target.substanceId) || target.rootId !== null || target.sourceId !== null || target.expectedVersion !== null

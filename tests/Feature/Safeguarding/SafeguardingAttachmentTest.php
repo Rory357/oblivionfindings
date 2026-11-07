@@ -106,6 +106,31 @@ class SafeguardingAttachmentTest extends TestCase
             ->assertOk();
     }
 
+    public function test_need_to_know_concern_files_follow_its_locked_page(): void
+    {
+        // Readiness audit B3 (6 Nov 2026): a need-to-know concern shows an outsider a locked shell, so its files —
+        // even ones not marked sensitive — must not download either.
+        $uploader = $this->makeSafeguardingUser(['safeguarding.update']);
+        $concern = SafeguardingConcern::factory()->create(['is_sensitive' => true]);
+        $att = $this->attachment($concern, false, $uploader);
+
+        $outsider = $this->makeSafeguardingUser(['safeguarding.viewAny']);
+        $this->actingAs($outsider)
+            ->get("/safeguarding/{$concern->id}/attachments/{$att->id}/download")
+            ->assertForbidden();
+
+        $cleared = $this->makeSafeguardingUser(['safeguarding.viewAny', 'safeguarding.viewSensitive']);
+        $this->actingAs($cleared)
+            ->get("/safeguarding/{$concern->id}/attachments/{$att->id}/download")
+            ->assertOk();
+
+        $assignee = $this->makeSafeguardingUser(['safeguarding.viewAny']);
+        $concern->update(['assigned_to_user_id' => $assignee->id]);
+        $this->actingAs($assignee)
+            ->get("/safeguarding/{$concern->id}/attachments/{$att->id}/download")
+            ->assertOk();
+    }
+
     public function test_non_sensitive_download_is_allowed(): void
     {
         $uploader = $this->makeSafeguardingUser(['safeguarding.update']);

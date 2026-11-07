@@ -192,6 +192,24 @@ test('the unified hub renders with the full aggregated contract', function () {
     expect($names)->toContain($candidate->full_name);
 });
 
+test('the hub loads when an active position has requisitions (eager-load constraint gets the relation)', function () {
+    $position = HrPosition::factory()->create([
+        'title' => 'Support Worker',
+        'is_active' => true,
+        'headcount_budget' => 5,
+        'current_headcount' => 1,
+    ]);
+    ['requisition' => $requisition] = makeApplicant($this->hr->id);
+    $requisition->forceFill(['position_id' => $position->id])->save();
+
+    $response = $this->actingAs($this->hr)->get(route('hr.recruitment.index'));
+
+    $response->assertOk();
+    $row = collect($response->inertiaProps('support.positions'))->firstWhere('id', $position->id);
+    expect($row)->not->toBeNull()
+        ->and($row['vacancies'])->toBe(2); // 5 budget − 1 filled − 2 openings on the visible requisition
+});
+
 test('the retired tab routes redirect into the unified hub', function () {
     $this->actingAs($this->hr)->get('/hr/recruitment/kanban')
         ->assertRedirect(route('hr.recruitment.index', ['tab' => 'board']));

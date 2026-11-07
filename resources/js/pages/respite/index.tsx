@@ -15,7 +15,12 @@ export default function RespiteIndex(data: RespiteWorkspaceData) {
     const can = page.props.auth?.can?.respite ?? {};
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Respite', href: '/respite' },
+            ]}
+        >
             <Head title="Respite" />
             <RespiteWorkspace data={data} can={can} />
         </AppLayout>

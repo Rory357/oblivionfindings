@@ -15,7 +15,6 @@ use App\Domain\Hr\Services\HrCalendarAggregator;
 use App\Domain\Hr\Services\LeaveReportService;
 use App\Domain\Hr\Services\WellbeingIndicatorService;
 use App\Http\Controllers\Hr\ComplianceCalendarController;
-use App\Http\Controllers\Sites\SiteReportingController;
 use App\Http\Controllers\SummaryController;
 use App\Http\Controllers\TimelineController;
 use App\Models\Asset;
@@ -26,6 +25,8 @@ use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
+use App\Services\Sites\Reports\SiteReportFilters;
+use App\Services\Sites\Reports\SiteReportService;
 use Illuminate\Http\Request;
 use Inertia\Testing\AssertableInertia;
 
@@ -74,11 +75,12 @@ it('counts donor funds ending in the next 90 days, not every dated fund', functi
 it('counts asset warranties expiring in the next 30 days on the condition report', function () {
     $viewer = User::factory()->create(['approved_at' => now()]);
     $role = Role::query()->create(['name' => 'asset_condition_'.$viewer->id, 'label' => 'Asset condition', 'level' => 50, 'type' => 'custom']);
-    $permission = Permission::query()->firstOrCreate(
-        ['key' => 'reports.sites.view'],
-        ['description' => 'reports.sites.view', 'group' => 'test', 'module' => 'Test'],
-    );
-    $role->permissions()->sync([$permission->id]);
+    // Site reports only count Sites the viewer can access; sites.viewAll covers every Site.
+    $permissions = collect(['reports.sites.view', 'sites.viewAll'])->map(fn (string $key) => Permission::query()->firstOrCreate(
+        ['key' => $key],
+        ['description' => $key, 'group' => 'test', 'module' => 'Test'],
+    )->id);
+    $role->permissions()->sync($permissions->all());
     $viewer->roles()->sync([$role->id]);
 
     Asset::factory()->create(['warranty_expires_at' => now()->addDays(10)]);
@@ -142,17 +144,30 @@ it('starts a new Bradford spell only after a gap of more than one day', function
 });
 
 it('reports hazard time to close as positive days', function () {
-    $hazard = fn (string $status, int $daysOpen) => (new SiteHazard)->forceFill([
+    $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    $empty = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    $reporter = User::factory()->create();
+    $hazard = fn (string $status, ?int $daysOpen) => SiteHazard::withoutEvents(fn () => SiteHazard::create([
+        'site_id' => $site->id,
+        'reference_number' => 'HZ-'.uniqid(),
+        'hazard_type' => 'other',
+        'severity' => 'low',
+        'likelihood' => 'rare',
+        'risk_rating' => 'low',
+        'description' => 'Close-time fixture',
+        'reported_by_user_id' => $reporter->id,
         'status' => $status,
-        'created_at' => now()->subDays(10),
-        'closed_at' => now()->subDays(10 - $daysOpen),
-    ]);
-    $site = (new Site)->setRelation('hazards', collect([$hazard('closed', 2), $hazard('closed', 5), $hazard('mitigated', 9)]));
-    $average = new ReflectionMethod(SiteReportingController::class, 'calculateHazardAvgCloseDays');
-    $controller = app(SiteReportingController::class);
+        'closed_at' => $daysOpen === null ? null : now()->subDays(10 - $daysOpen),
+    ]))->forceFill(['created_at' => now()->subDays(10)])->saveQuietly();
+    $hazard('closed', 2);
+    $hazard('closed', 5);
+    $hazard('open', null);
 
-    expect($average->invoke($controller, collect([$site])))->toBe(3.5)
-        ->and($average->invoke($controller, collect([(new Site)->setRelation('hazards', collect())])))->toBeNull();
+    $filters = SiteReportFilters::fromRequest(Request::create('/sites/reports', 'GET', ['period' => '30d']));
+    $report = app(SiteReportService::class)->report([$site->id, $empty->id], $filters);
+
+    expect($report['sites'][$site->id]['avg_days_to_close'])->toBe(3.5)
+        ->and($report['sites'][$empty->id]['avg_days_to_close'])->toBeNull();
 });
 
 it('states whole days in bill overdue and board pre-read notices', function () {

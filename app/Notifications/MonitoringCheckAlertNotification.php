@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Channels\PushChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -33,8 +34,18 @@ class MonitoringCheckAlertNotification extends Notification
         if (in_array('mail', $this->channels, true) && ! empty($notifiable->email)) {
             $resolved[] = 'mail';
         }
+        // S&D Phase D: push when Setup › Alerts & checks turns it on (sent only to people's own subscriptions).
+        if (in_array('push', $this->channels, true)) {
+            $resolved[] = PushChannel::class;
+        }
 
         return $resolved;
+    }
+
+    /** @return array{title: string, body: string, data: array<string, string>} */
+    public function toPush(object $notifiable): array
+    {
+        return ['title' => $this->title, 'body' => $this->summary, 'data' => ['url' => $this->actionUrl]];
     }
 
     public function toMail(object $notifiable): MailMessage

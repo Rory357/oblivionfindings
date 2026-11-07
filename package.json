@@ -14,7 +14,9 @@
         "seed": "php artisan db:seed",
         "seed:fresh": "php artisan migrate:fresh --seed",
         "test": "vitest run",
+        "test:live": "node --test \"live/test/*.test.mjs\"",
         "test:watch": "vitest",
+        "test:relay": "node --test \"relay/test/*.test.mjs\"",
         "types": "node --max-old-space-size=6144 ./node_modules/typescript/bin/tsc --noEmit",
         "visual:test": "playwright test -c playwright.config.ts",
         "visual:test:legacy": "playwright test -c playwright.config.ts --project=chromium-desktop --project=chromium-desktop-visual",
@@ -39,8 +41,7 @@
         "prettier-plugin-organize-imports": "^4.1.0",
         "prettier-plugin-tailwindcss": "^0.6.11",
         "typescript-eslint": "^8.23.0",
-        "vitest": "^4.1.5",
-        "ws": "^8.22.0"
+        "vitest": "^4.1.5"
     },
     "dependencies": {
         "@dnd-kit/core": "^6.3.1",
@@ -92,7 +93,6 @@
         "livekit-client": "^2.22.4",
         "lucide-react": "^0.475.0",
         "pdfjs-dist": "^6.3.289",
-        "pusher-js": "^8.6.0",
         "react": "^19.2.0",
         "react-colorful": "^5.6.1",
         "react-dom": "^19.2.0",

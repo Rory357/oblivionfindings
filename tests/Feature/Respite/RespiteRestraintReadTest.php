@@ -174,7 +174,7 @@ final class RespiteRestraintReadTest extends RestraintEventCommandTestCase
         $stay = $this->stay();
         $viewer = $this->staff(['clients.viewAny', 'respite.viewAny', 'respite.stays.manage']);
         $this->actingAs($viewer)->post(route('respite.stays.restraints.store', $stay), [
-            'started_at' => now()->subHour()->toDateTimeString(), 'restraint_type' => 'physical_hold', 'severity' => 'medium',
+            'started_at' => now()->subHour()->timezone('Pacific/Auckland')->toIso8601String(), 'restraint_type' => 'physical_hold', 'severity' => 'medium',
             'trigger_description' => 'Escalating distress', 'de_escalation_attempted' => 'Calm voice and space offered',
             'restraint_description' => 'Brief guided hold', 'within_support_plan' => false,
             'deviation_reason' => 'No current plan covers this stay',

@@ -23,4 +23,14 @@ Route::prefix('obli')->name('api.obli.')->middleware('throttle:obli-api')->group
     Route::get('/tickets/{ticket}/replies/{requestUuid}', [ObliApiController::class, 'recoverReply'])->whereNumber('ticket')->whereUuid('requestUuid')->name('tickets.replies.recover');
     Route::get('/tickets', [ObliApiController::class, 'tickets'])->name('tickets.index');
     Route::post('/tickets', [ObliComputerContextController::class, 'storeTicket'])->middleware('throttle:obli-ticket')->name('tickets.store');
+    // S&D Phase I: Obli fixes things (sd-obli-fix-protocol.md). The engine checks session, computer and limits.
+    Route::post('/fixes', [\App\Http\Controllers\Obli\ObliFixController::class, 'store'])->middleware('throttle:obli-ticket')->name('fixes.store');
+    Route::get('/fixes/{uuid}', [\App\Http\Controllers\Obli\ObliFixController::class, 'show'])->whereUuid('uuid')->name('fixes.show');
+    Route::post('/fixes/{uuid}/approve', [\App\Http\Controllers\Obli\ObliFixController::class, 'approve'])->whereUuid('uuid')->name('fixes.approve');
+    Route::post('/fixes/{uuid}/turn', [\App\Http\Controllers\Obli\ObliFixController::class, 'turn'])->whereUuid('uuid')->name('fixes.turn');
+    Route::post('/fixes/{uuid}/stop', [\App\Http\Controllers\Obli\ObliFixController::class, 'stop'])->whereUuid('uuid')->name('fixes.stop');
+    Route::post('/fixes/{uuid}/resume', [\App\Http\Controllers\Obli\ObliFixController::class, 'resume'])->whereUuid('uuid')->name('fixes.resume');
+    Route::post('/fixes/{uuid}/ticket', [\App\Http\Controllers\Obli\ObliFixController::class, 'ticket'])->whereUuid('uuid')->middleware('throttle:obli-ticket')->name('fixes.ticket');
+    Route::post('/fixes/{uuid}/cancel-request', [\App\Http\Controllers\Obli\ObliFixController::class, 'cancelRequest'])->whereUuid('uuid')->name('fixes.cancel-request');
+    Route::post('/offline-reports', [\App\Http\Controllers\Obli\ObliFixController::class, 'offlineReport'])->middleware('throttle:obli-ticket')->name('offline-reports.store');
 });

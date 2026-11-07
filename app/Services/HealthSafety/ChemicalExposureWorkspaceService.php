@@ -46,7 +46,7 @@ final class ChemicalExposureWorkspaceService
             $f = $this->filters($filters);
             if ($f['site_id'] !== null) { $this->access->assertSite($f['site_id'], $reads, $sites); }
             if ($f['substance_id'] !== null) { $this->access->assertSubstance($f['substance_id'], $current, $reads); }
-            $query = $this->access->readableQuery($current, $reads, $sites)
+            $query = $this->access->readableQuery($current, $reads, $sites)->notEnteredInError()
                 ->when($f['site_id'] !== null, fn ($q) => $q->where('site_id', $f['site_id']))
                 ->when($f['substance_id'] !== null, fn ($q) => $q->where('hazardous_substance_id', $f['substance_id']));
             // Exact identity discovery only. Date/filter/order/medical predicates wait for original association admission.
@@ -169,7 +169,7 @@ final class ChemicalExposureWorkspaceService
         if ($followupId !== null) { $this->positive($followupId, 'followup'); }
         return $this->within($viewer, function ($context, $current, $reads, $sites) use ($id, $pages, $followupId) {
             [$root, $proof] = $this->admittedRootInReads($id, $current, $reads, $sites);
-            $can = ['correct' => false, 'review' => false, 'assign_followup' => false, 'upload_evidence' => false];
+            $can = ['correct' => false, 'review' => false, 'assign_followup' => false, 'upload_evidence' => false, 'mark_entered_in_error' => false];
             if ($proof['attribution_state'] === 'repair_required') {
                 return ['exposure_access' => 'readable', 'id' => $id, 'record' => null, 'source_integrity' => 'repair_required',
                     'command_context' => null, 'history' => $this->unavailable(), 'reviews' => $this->unavailable(),
@@ -185,7 +185,9 @@ final class ChemicalExposureWorkspaceService
                 'href' => $proof['incident_binding'] === 'recorded' ? '/incidents/'.$proof['incident_id'] : null,
                 'reason' => $proof['incident_binding'] === 'unknown' ? 'Original association evidence is unknown.' : null];
             $manage = $current->canDo('hazards.manage');
-            $can = array_fill_keys(array_keys($can), $manage);
+            $enteredInError = $this->enteredInError($root, $current, $reads, $sites);
+            // Entered in error (6 Nov 2026): kept as it is, so every change is off; marking needs the same authority as any change.
+            $can = array_fill_keys(array_keys($can), $manage && $enteredInError === null);
             if ($proof['incident_binding'] === 'unknown' && $root->related_incident_id !== null) { $can['assign_followup'] = false; }
             $focus = $followupId === null ? null : $this->resolveFollowupFocus($root, $followupId, $current, $reads, $sites);
             if ($focus !== null) { $pages['followups_page'] = $focus['page']; }
@@ -194,7 +196,7 @@ final class ChemicalExposureWorkspaceService
             $detail = ['exposure_access' => 'readable', 'id' => $id, 'record' => $record, 'source_integrity' => $proof['attribution_state'],
                 'command_context' => ['root_type' => 'exposure', 'root_id' => $id, 'expected_version' => (int) $root->source_revision,
                     'source_version_id' => $proof['source_version_id']],
-                'reviews' => $reviews, 'followups' => $followups,
+                'entered_in_error' => $enteredInError, 'reviews' => $reviews, 'followups' => $followups,
                 'attachments' => $this->children($root, 'evidence', $pages['evidence_page'], $current, $reads, $sites),
                 'history' => $this->history($root, $pages['history_page'], $current, $reads, $sites),
                 // Source acceptance/outbox membership is not proof of destination availability or dispatch.
@@ -412,6 +414,22 @@ final class ChemicalExposureWorkspaceService
         return $record;
     }
 
+    /**
+     * Who marked the record as entered in error, when and why, or null. Any such entry locks the record; the words shown
+     * come only from its accepted, digest-checked version, never from the raw row.
+     */
+    private function enteredInError(SubstanceExposureRecord $root, User $current, CurrentAuthorizationReads $reads, array $sites): ?array
+    {
+        if (! ChemicalExposureSourceService::enteredInError((int) $root->id, $reads)) { return null; }
+        $identity = $reads->query(ChemicalExposureSourceVersion::query())->where('exposure_id', $root->id)
+            ->where('command', 'mark_entered_in_error')->orderBy('aggregate_revision')->first(['id']);
+        if (! $identity) { return ['reason' => null, 'at' => null, 'by' => null, 'attribution_state' => 'repair_required']; }
+        $version = $this->acceptedVersionInReads((int) $identity->id, $current, $reads, $sites);
+        $reason = $version->content['facts']['reason'] ?? null;
+        return ['reason' => is_string($reason) ? $reason : null, 'at' => $version->recorded_at->toISOString(),
+            'by' => array_intersect_key($version->actor_snapshot, ['id' => true, 'name' => true]), 'attribution_state' => 'recorded'];
+    }
+
     private function children(SubstanceExposureRecord $root, string $kind, int $page, User $current,
         CurrentAuthorizationReads $reads, array $sites): array
     {
@@ -419,6 +437,8 @@ final class ChemicalExposureWorkspaceService
             'evidence' => ChemicalExposureEvidence::class };
         $identities = $reads->query($model::query())->where('exposure_id', $root->id)->orderByDesc('id')
             ->get(['id', 'exposure_id', 'source_schema_version', 'source_revision']);
+        // A record marked as entered in error takes no further changes; its children are shown read-only.
+        $open = ! ChemicalExposureSourceService::enteredInError((int) $root->id, $reads);
         $damage = [];
         foreach ($identities as $identity) {
             try {
@@ -467,9 +487,9 @@ final class ChemicalExposureWorkspaceService
                             ? 'recorded' : (($version?->content['facts']['assignment_attribution_state'] ?? null) === 'recorded' ? 'recorded' : 'legacy_unknown'),
                         'completion_attribution_state' => $child->completed_at === null ? null
                             : ($version?->command === 'complete_followup' ? 'recorded' : 'legacy_unknown'),
-                        'attribution_state' => $state, 'can_reassign' => $current->canDo('hazards.manage') && $child->completed_at === null
+                        'attribution_state' => $state, 'can_reassign' => $open && $current->canDo('hazards.manage') && $child->completed_at === null
                             && ! ($root->related_incident_id !== null && ! is_array($root->original_context)),
-                        'can_complete' => $current->canDo('hazards.manage')
+                        'can_complete' => $open && $current->canDo('hazards.manage')
                             && (int) $child->assigned_to === (int) $current->id && $child->completed_at === null
                             && ($version?->recorded_at !== null || $child->created_at !== null)];
                 } else {
@@ -490,7 +510,7 @@ final class ChemicalExposureWorkspaceService
                         'mime' => $child->mime, 'size' => (int) $child->size, 'uploaded_by' => $this->actor($child->uploaded_by, $reads),
                         'source_version_id' => (int) $version->id, 'source_revision' => (int) $child->source_revision,
                         'href' => $actual === null ? null : ChemicalExposureReturn::BASE.'/'.$root->id.'/evidence/'.$child->id.'/download',
-                        'can_remove' => $current->canDo('hazards.manage')];
+                        'can_remove' => $open && $current->canDo('hazards.manage')];
                 }
             } catch (LogicException) { $damage[(int) $identity->id] = true; $items[] = $this->damagedChild((int) $identity->id); }
         }

@@ -3,6 +3,11 @@ export const INJURY_READ_SECTIONS = ['overview', 'recovery', 'capacity', 'schedu
 const positive = (value: string | null) => !!value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value));
 const single = (query: URLSearchParams, key: string) => query.getAll(key).length === 1 ? query.get(key) : null;
 const bytes = (value: string) => new TextEncoder().encode(value).length;
+// Each pattern on its own line so the disable stays on it after Prettier rewraps the checks below.
+// eslint-disable-next-line no-control-regex -- refuses control characters and spaces in a return link on purpose (link safety).
+const UNSAFE_LINK_CHARACTER = /[\\#\u0000-\u0020\u007f]/;
+// eslint-disable-next-line no-control-regex -- refuses control characters in a filter value on purpose (return-link safety).
+const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
 const date = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value + 'T00:00:00Z')) && new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) === value;
 const enums: Record<string, readonly string[]> = {
     tab: ['all', 'reported', 'under_treatment', 'return_to_work', 'recovered', 'closed', 'worksafe', 'acc'],
@@ -12,8 +17,7 @@ const enums: Record<string, readonly string[]> = {
     period: ['all', 'week', '30d', 'quarter', 'year'], acc_open: ['0', '1', 'false', 'true'], worksafe: ['0', '1', 'false', 'true'],
 };
 export function injuryReadLeaf(value: string | null | undefined): string | null {
-    // eslint-disable-next-line no-control-regex -- refuses control characters and spaces in a return link on purpose (link safety).
-    if (!value || bytes(value) > 1500 || !value.startsWith('/') || value.startsWith('//') || /[\\#\u0000-\u0020\u007f]/.test(value)) return null;
+    if (!value || bytes(value) > 1500 || !value.startsWith('/') || value.startsWith('//') || UNSAFE_LINK_CHARACTER.test(value)) return null;
     let target: URL; try { target = new URL(value, 'https://injury-leaf.invalid'); } catch { return null; }
     if (target.origin !== 'https://injury-leaf.invalid' || target.pathname !== value.split('?')[0] || target.searchParams.has('return_to')) return null;
     const record = target.pathname.match(/^\/health-safety\/injuries\/([1-9]\d*)$/);
@@ -26,8 +30,7 @@ export function injuryReadLeaf(value: string | null | undefined): string | null 
     } else {
         for (const key of ['tab', 'q', 'site_id', 'severity', 'status', 'treatment', 'acc_open', 'worksafe', 'period', 'from', 'to', 'type', 'body_part', 'page']) {
             const value = single(target.searchParams, key);
-            // eslint-disable-next-line no-control-regex -- refuses control characters in a filter value on purpose (return-link safety).
-            if (!value || bytes(value) > 200 || /[\u0000-\u001f\u007f]/.test(value)) continue;
+            if (!value || bytes(value) > 200 || CONTROL_CHARACTER.test(value)) continue;
             if (['site_id', 'page'].includes(key) && !positive(value)) continue;
             if (['from', 'to'].includes(key) && !date(value)) continue;
             if (enums[key] && !enums[key].includes(value)) continue;

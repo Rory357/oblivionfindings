@@ -125,6 +125,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\NetworkConfig\Contracts\NetworkCliSshTransport;
 use App\Domain\SecurityDevices\NetworkConfig\Services\PhpseclibNetworkCliTransport;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Events\FleetSignalEmitted;
 use App\Events\FleetWanderingAlertTriggered;
 use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
@@ -241,6 +242,7 @@ use App\Services\Notifications\PushProvider;
 use App\Services\Notifications\SmsProvider;
 use App\Services\Notifications\TwilioSmsProvider;
 use App\Services\Notifications\WebPushProvider;
+use App\Services\Push\WebPushSender;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\UserSiteAccessService;
 use App\Support\SchemaCache;
@@ -554,9 +556,13 @@ class AppServiceProvider extends ServiceProvider
         ));
 
         $this->app->bind(WebPushProvider::class);
+        // One sender per process so its VAPID tokens are reused per push service (RFC 8292 section 5).
+        $this->app->singleton(WebPushSender::class);
 
         $this->app->singleton(DeliveryProviderManager::class);
         $this->app->scoped(UserSiteAccessService::class);
+        // Each viewer's S&D Sites are worked out once per request or queue job.
+        $this->app->scoped(SecurityDevicesAccessService::class);
 
         // Request-scoped so the Inertia middleware's badge pass and the
         // /my-day and /tasks controllers share one provider fan-out per
@@ -642,9 +648,11 @@ class AppServiceProvider extends ServiceProvider
         Site::observe(SiteObserver::class);
         SiteHazard::observe(SiteHazardObserver::class);
         SiteChecklistRun::observe(SiteChecklistRunObserver::class);
-        DeviceEvent::observe(
+        DeviceEvent::observe([
             DeviceEventObserver::class,
-        );
+            // S&D Phase E: safety events also open an alert in Security & devices › Alerts.
+            \App\Domain\SecurityDevices\Alerts\SafetyEventObserver::class,
+        ]);
 
         // H&S → Control Room bridge observers
         ClientIncident::observe(ClientIncidentObserver::class);
@@ -770,6 +778,12 @@ class AppServiceProvider extends ServiceProvider
 
             if ($request->is('api/obli/*')) {
                 return Limit::perMinute(1000)->by('obli-surface:'.$request->ip());
+            }
+
+            // Oblivion Live reports every connect and disconnect from one address; a restart
+            // reconnects everyone at once. Requests are signed and checked in the controller.
+            if ($request->is('chat/api/live/presence')) {
+                return Limit::perMinute(20000)->by('chat-live-presence:'.$request->ip());
             }
 
             // Service identities have their configured per-identity limit in

@@ -35,11 +35,14 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
         [$own] = $this->world();
         foreach (self::ROLES as $role) {
             $viewer = $this->viewer($role, $own);
-            [$full, $fullQueries] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia())->get('/health-safety'));
+            [$full] = $this->measure(fn () => $this->actingAs($viewer)->get('/health-safety', $this->inertia()));
+            // Since step C the first response is cheap too, so compare with the same request also asking for the headline part.
+            [, $fullQueries] = $this->measure(fn () => $this->actingAs($viewer)
+                ->get('/health-safety', [...$this->inertia('health-safety/dashboard'), 'X-Inertia-Partial-Data' => 'inbox,kpis']));
             // The page's KPI work must not run at all for the inbox request (any call on these mocks fails the test).
             $this->mock(HsDashboardService::class);
             $this->mock(HsKpiService::class);
-            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia('health-safety/dashboard'))->get('/health-safety'));
+            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->get('/health-safety', $this->inertia('health-safety/dashboard')));
             $this->app->forgetInstance(HsDashboardService::class);
             $this->app->forgetInstance(HsKpiService::class);
 
@@ -67,8 +70,8 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
 
         $statuses = [];
         foreach (['no permission' => $noPermission, 'no Site' => $noSite, 'officer' => $this->viewer('health_safety_officer', $own)] as $label => $user) {
-            $full = $this->actingAs($user)->withHeaders($this->inertia())->get('/health-safety')->status();
-            $inbox = $this->actingAs($user)->withHeaders($this->inertia('health-safety/dashboard'))->get('/health-safety')->status();
+            $full = $this->actingAs($user)->get('/health-safety', $this->inertia())->status();
+            $inbox = $this->actingAs($user)->get('/health-safety', $this->inertia('health-safety/dashboard'))->status();
             $this->assertSame($full, $inbox, "{$label}: the inbox request must answer like the page.");
             $statuses[$label] = $inbox;
         }
@@ -82,14 +85,14 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
         [$own] = $this->world();
         foreach (self::ROLES as $role) {
             $viewer = $this->viewer($role, $own);
-            [$full] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia())->get('/tasks'));
+            [$full] = $this->measure(fn () => $this->actingAs($viewer)->get('/tasks', $this->inertia()));
             // The same partial request but also asking for the task list goes the normal way and builds it, so the
             // difference between the two is exactly the page work the inbox request skips. (A ratio against the full
             // page stopped meaning anything once the sidebar count moved out of the first load and roles are read
             // once per page view: the full /tasks page became cheap in this small test world.)
             [, $withListQueries] = $this->measure(fn () => $this->actingAs($viewer)
-                ->withHeaders([...$this->inertia('tasks/index'), 'X-Inertia-Partial-Data' => 'inbox,items'])->get('/tasks'));
-            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia('tasks/index'))->get('/tasks'));
+                ->get('/tasks', [...$this->inertia('tasks/index'), 'X-Inertia-Partial-Data' => 'inbox,items']));
+            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->get('/tasks', $this->inertia('tasks/index')));
 
             $full->assertOk()->assertJsonPath('component', 'tasks/index');
             $inbox->assertOk()->assertJsonPath('component', 'tasks/index')->assertJsonMissingPath('props.items')->assertJsonMissingPath('props.stats');
@@ -100,6 +103,61 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
             }
             $this->assertLessThan($withListQueries, $inboxQueries, "{$role}: the inbox request must not build the task list ({$inboxQueries} queries vs {$withListQueries} when the list is asked for).");
         }
+    }
+
+    /**
+     * /incidents sends every register prop as Inertia::always, so its inbox request used to rebuild and resend the whole
+     * register. Stephan (31 Oct, "Change it"): it now gets only the inbox; the page keeps the register it just loaded.
+     */
+    public function test_the_incidents_inbox_request_skips_the_register_and_answers_like_the_page(): void
+    {
+        [$own] = $this->world();
+        $noPermission = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $viewers = ['no permission' => $noPermission];
+        foreach (self::ROLES as $role) {
+            $viewers[$role] = $this->viewer($role, $own);
+        }
+
+        $served = 0;
+        foreach ($viewers as $label => $viewer) {
+            [$full] = $this->measure(fn () => $this->actingAs($viewer)->get('/incidents', $this->inertia()));
+            // The inbox request as it used to cost: the same partial request also asking for the register rows.
+            [, $withRegisterQueries] = $this->measure(fn () => $this->actingAs($viewer)
+                ->get('/incidents', [...$this->inertia('incidents/index'), 'X-Inertia-Partial-Data' => 'inbox,rows']));
+            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->get('/incidents', $this->inertia('incidents/index')));
+
+            $this->assertSame($full->status(), $inbox->status(), "{$label}: the inbox request must answer like the page.");
+            if ($full->status() !== 200) {
+                continue;
+            }
+
+            $served++;
+            $inbox->assertJsonPath('component', 'incidents/index')->assertHeader('Referrer-Policy', 'no-referrer');
+            $this->assertStringContainsString('no-store', (string) $inbox->headers->get('Cache-Control'), $label);
+            $this->assertStringContainsString('private', (string) $inbox->headers->get('Cache-Control'), $label);
+            $props = $inbox->json('props');
+            $this->assertArrayHasKey('inbox', $props, $label);
+            foreach (['viewer_id', 'filters', 'rows', 'hero', 'sites', 'clients', 'can', 'detail'] as $register) {
+                $this->assertArrayHasKey($register, $full->json('props'), "{$label}: the page sends {$register}.");
+                $this->assertArrayNotHasKey($register, $props, "{$label}: the inbox request must not send {$register}.");
+            }
+            foreach (array_diff(array_keys($props), ['inbox', 'taskNav']) as $key) {
+                $this->assertSame($full->json("props.{$key}"), $props[$key], "{$label}: {$key} must match the full page.");
+            }
+            $this->assertLessThan($withRegisterQueries, $inboxQueries, "{$label}: the inbox request must not build the register ({$inboxQueries} vs {$withRegisterQueries} queries).");
+        }
+        $this->assertSame(403, $this->actingAs($noPermission)->get('/incidents', $this->inertia('incidents/index'))->status());
+
+        // A query the page refuses is refused for the inbox request too, with the same message. (Last, because a
+        // refusal leaves its message in the session for the next request.)
+        foreach ($viewers as $label => $viewer) {
+            $page = $this->actingAs($viewer)->get('/incidents?owner=everyone', $this->inertia());
+            $pageErrors = session('errors')?->getBag('default')->toArray();
+            $inbox = $this->actingAs($viewer)->get('/incidents?owner=everyone', $this->inertia('incidents/index'));
+            $this->assertSame($page->status(), $inbox->status(), "{$label}: an invalid owner lens must be refused alike.");
+            $this->assertSame($pageErrors, session('errors')?->getBag('default')->toArray(), "{$label}: with the same message.");
+        }
+        $this->assertGreaterThanOrEqual(2, $served, 'At least two roles must open the register.');
     }
 
     public function test_only_a_request_for_shared_deferred_props_alone_counts(): void

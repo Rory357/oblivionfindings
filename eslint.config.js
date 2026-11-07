@@ -6,6 +6,14 @@ import { builtinRules } from 'eslint/use-at-your-own-risk';
 import globals from 'globals';
 import typescript from 'typescript-eslint';
 
+// Chat's live updates are Oblivion Live (clean room, docs/chat-experience/clean-room/). These
+// engines were replaced and must not return without Stephan's approval and a register entry.
+const REPLACED_CHAT_ENGINES = ['pusher-js', 'laravel-echo', 'ws'].map((name) => ({
+    name,
+    message:
+        'Chat live updates use Oblivion Live (resources/js/components/chat/live/). See docs/chat-experience/clean-room/REGISTER.md.',
+}));
+
 /** @type {import('eslint').Linter.Config[]} */
 export default [
     {
@@ -162,7 +170,14 @@ export default [
                     'no-accent-active-state': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-blanket-descendant-size': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
+                    'no-emoji-icon': builtinRules.get('no-restricted-syntax'),
                     'no-oblivion-fallback': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
+                    'no-edge-accent-line': builtinRules.get(
                         'no-restricted-syntax',
                     ),
                 },
@@ -191,6 +206,55 @@ export default [
                         "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/])",
                     message:
                         'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white / bg-primary-foreground, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. On a hero, use PageHeaderPrimaryButton (white primary) or PageHeaderGlassButton (glass secondary). See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                },
+            ],
+            // DESIGN.md non-negotiable 8 (Stephan, 31 Oct 2026: "never look like this it is obvious a AI thing"):
+            // no coloured line on any edge of a box. Matches one class string that pairs a thick edge width
+            // (border-t/l/r/b-2|3|4|8|[Npx]) with a coloured edge (border-t/l/r/b-primary|status-*|category-*|…).
+            'design/no-edge-accent-line': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/^(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:2|3|4|8|\\[\\d+px\\])(?=\\s|$))(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:primary|status-|category-|destructive|chart-|live|accent))/], TemplateElement[value.raw=/^(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:2|3|4|8|\\[\\d+px\\])(?=\\s|$))(?=[\\s\\S]*(?:^|\\s)(?:[^\\s:]+:)*border-[tlrbxy]-(?:primary|status-|category-|destructive|chart-|live|accent))/])',
+                    message:
+                        'No coloured line on any edge of a card, surface, strip, panel or pop-up (DESIGN.md non-negotiable 8 and the anti-pattern "Coloured edge lines"). Keep the neutral border; say what the box means with its title, a StatusBadge, a ring or an icon.',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "Chat — the Chat v3 boards" and its anti-patterns (corrected
+        // 2026-10-22). Chat is rebuilt to the approved boards; these guard the
+        // rebuild. The ignored files predate the rule and are rebuilt in stage 4.
+        files: [
+            'resources/js/components/chat/**/*.{ts,tsx}',
+            'resources/js/pages/chat/**/*.{ts,tsx}',
+        ],
+        ignores: [
+            '**/*.test.tsx',
+            '**/*.test.ts',
+            'resources/js/components/chat/chat-attachment-publication.tsx',
+            'resources/js/components/chat/chat-attachment-queue.tsx',
+            'resources/js/components/chat/chat-voice-recorder.tsx',
+            'resources/js/components/chat/chat-thread.tsx',
+        ],
+        rules: {
+            'design/no-blanket-descendant-size': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/\\[&_[^\\]]+\\]:min-[hw]-/], TemplateElement[value.raw=/\\[&_[^\\]]+\\]:min-[hw]-/])',
+                    message:
+                        'Blanket descendant min-height/min-width rules also catch switches and compact controls. Give a control that needs a larger target .frontline-hit. See DESIGN.md non-negotiable 5 and "Chat — the Chat v3 boards".',
+                },
+            ],
+            'design/no-emoji-icon': [
+                'error',
+                {
+                    selector:
+                        'JSXText[value=/[\\uD83C-\\uD83E][\\uDC00-\\uDFFF]|[\\u2600-\\u27BF]/]',
+                    message:
+                        'Emoji are message content (messages, reactions, the emoji picker, stickers), never icons or labels in chat chrome. Use a lucide icon. See DESIGN.md "Icons" and "Chat — the Chat v3 boards".',
                 },
             ],
         },
@@ -357,6 +421,7 @@ export default [
                 'error',
                 {
                     paths: [
+                        ...REPLACED_CHAT_ENGINES,
                         {
                             // DESIGN.md "Skeleton vs loader" + anti-pattern "Bare <Deferred>".
                             name: '@inertiajs/react',
@@ -397,6 +462,7 @@ export default [
                 'error',
                 {
                     paths: [
+                        ...REPLACED_CHAT_ENGINES,
                         {
                             name: '@/components/page/page-hero',
                             message:
@@ -426,6 +492,39 @@ export default [
                             group: ['@fullcalendar/*'],
                             message:
                                 'Calendars reuse pages/sites/calendar (SiteCalendar + _parts) with a data adapter, not a new FullCalendar skin. See DESIGN.md "Calendars".',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        // The calendar migration targets above skip that block, but not this ban.
+        files: [
+            'resources/js/pages/hr/calendar/index.tsx',
+            'resources/js/pages/operations/clients/calendar.tsx',
+            'resources/js/pages/operations/clients/tabs/legacy-profile-sections.tsx',
+            'resources/js/pages/portal/calendar.tsx',
+            'resources/js/test/client-profile-appointment-access.test.tsx',
+        ],
+        rules: {
+            'no-restricted-imports': ['error', { paths: REPLACED_CHAT_ENGINES }],
+        },
+    },
+    {
+        // The Oblivion Live gateway uses Node's built-in modules only (spec section 1).
+        files: ['live/**/*.mjs'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            // Anything that isn't node:… or a relative path. (A gitignore-style group
+                            // with "!node:*" still refused node:assert/strict and ./helpers.mjs.)
+                            regex: '^(?!node:|\\.\\.?/)',
+                            message:
+                                'The Oblivion Live gateway uses only node: built-ins and its own modules.',
                         },
                     ],
                 },

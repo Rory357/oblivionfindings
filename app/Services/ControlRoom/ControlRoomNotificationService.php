@@ -9,9 +9,12 @@ use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Notifications\ControlRoomAlertNotification;
+use App\Jobs\Notifications\DeliverControlRoomAlertNotificationJob;
 use App\Services\NotificationService;
 use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Central notification service for Control Room alerts.
@@ -27,6 +30,18 @@ class ControlRoomNotificationService
     private const OUTBOX_TEMPLATE_PREFIX = 'control-room-alert-notification-v2:';
 
     private const MAX_OUTBOX_ATTEMPTS = 3;
+
+    /** O2: an SLA-breach escalation notice staged in the escalation's transaction and sent after it commits. */
+    private const ESCALATION_TEMPLATE = 'control-room-sla-escalation-v1';
+
+    /**
+     * O2: for SLA-breach escalations only, role holders are loaded once per service instance (one SLA job run: the job
+     * gets a fresh instance each run) with the relations their access check reads, keyed by role names. Every other
+     * caller resolves fresh, as before. Who receives a notice is still decided per alert, exactly as before.
+     *
+     * @var array<string, Collection<int, User>>
+     */
+    private array $slaRoleHolderMemo = [];
 
     public function __construct(
         private readonly Dispatcher $dispatcher,
@@ -144,6 +159,29 @@ class ControlRoomNotificationService
             || (int) $communication->retry_count >= self::MAX_OUTBOX_ATTEMPTS
             || ! in_array($communication->status, ['pending', 'failed'], true)
         ) {
+            return [];
+        }
+
+        // O2: an SLA-breach escalation notice staged by notifySlaBreachEscalation(). Its recipients were decided when the
+        // breach was recorded; the medication content rule is checked again now, as sendToUsers() did.
+        if ($communication->purpose === 'escalation'
+            && $communication->template_used === self::ESCALATION_TEMPLATE
+            && $communication->channel === 'in_app'
+            && $communication->target_user_id !== null
+        ) {
+            $alert = ControlRoomAlert::query()->findOrFail($communication->alert_id);
+            $user = User::query()->findOrFail($communication->target_user_id);
+            if (! $this->authorizedRecipients($alert, collect([$user]))->contains('id', $user->id)) {
+                $communication->forceFill([
+                    'superseded_at' => now(),
+                    'status_detail' => 'Superseded because the recipient no longer has access to this alert.',
+                ])->save();
+
+                return [];
+            }
+            $this->dispatcher->send($user, new ControlRoomAlertNotification($alert, (array) $communication->notification_payload));
+            $communication->forceFill(['status' => 'sent', 'status_detail' => null, 'sent_at' => now()])->save();
+
             return [];
         }
 
@@ -284,20 +322,58 @@ class ControlRoomNotificationService
 
         $users = $this->authorizedRecipients(
             $alert,
-            $this->resolveUsersByRoles($alert, $roles->unique()->values()->toArray()),
+            $this->resolveUsersByRoles($alert, $roles->unique()->values()->toArray(), preload: true),
         );
         if ($users->isEmpty()) {
             return;
         }
 
         $breachLabel = implode(', ', $breachTypes);
-
-        $this->sendToUsers($alert, $users, 'escalation', [
+        $extraContext = [
             'escalation_reason' => "SLA breach: {$breachLabel}",
             'breach_types' => $breachTypes,
             'escalation_level' => $alert->escalation_level,
-        ]);
+        ];
+
+        // O2 (Stephan, 6 Nov 2026: "Yes, H&S builds it"; Gemini's proposal): the same recipients and the same notice as
+        // before, but the notice rows are written here, in the caller's transaction, and sent after it commits, so the
+        // alert row lock isn't held while notices go out. A rollback discards the rows and nothing is sent; a send that
+        // fails after commit stays pending or failed for the recovery sweep (RecoverControlRoomAlertNotificationsJob).
+        $content = $this->buildContent($alert, 'escalation', $extraContext);
+        $ids = $users->map(fn (User $user): int => (int) Communication::query()->firstOrCreate(
+            ['delivery_key' => hash('sha256', implode('|', [
+                self::ESCALATION_TEMPLATE, $alert->id, (int) $alert->escalation_level, implode(',', $breachTypes), $user->id,
+            ]))],
+            [
+                'alert_id' => $alert->id,
+                'channel' => 'in_app',
+                'direction' => 'outbound',
+                'purpose' => 'escalation',
+                'target_user_id' => $user->id,
+                'content' => $content,
+                'notification_payload' => $extraContext,
+                'template_used' => self::ESCALATION_TEMPLATE,
+                'status' => 'pending',
+                'initiated_by_user_id' => null,
+            ],
+        )->id)->unique()->values()->all();
+
+        DB::afterCommit(function () use ($ids): void {
+            foreach ($ids as $id) {
+                try {
+                    DeliverControlRoomAlertNotificationJob::dispatch($id);
+                } catch (\Throwable $exception) {
+                    // The row is durable and stays pending or failed for the recovery sweep.
+                    Log::error('Control Room SLA escalation notice could not be sent yet', [
+                        'communication_id' => $id,
+                        'exception' => $exception::class,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        });
     }
+
 
     /**
      * Notify on queue auto-escalation.
@@ -396,7 +472,7 @@ class ControlRoomNotificationService
      * 'managers_core' and 'coordinators', which are not role names) or
      * literal role names (Settings and the SLA page), so both resolve.
      */
-    protected function resolveUsersByRoles(ControlRoomAlert $alert, array $roleNames): Collection
+    protected function resolveUsersByRoles(ControlRoomAlert $alert, array $roleNames, bool $preload = false): Collection
     {
         $names = collect($roleNames)
             ->filter(fn (mixed $name): bool => is_string($name) && $name !== '')
@@ -406,21 +482,31 @@ class ControlRoomNotificationService
             return collect();
         }
 
-        $groups = app(NotificationService::class);
-        $userIds = User::query()
-            ->whereHas('roles', fn ($rq) => $rq->whereIn('name', $names))
-            ->pluck('id');
-        foreach ($names as $name) {
-            $userIds = $userIds->merge($groups->resolveRoleGroupUserIds($name));
+        $memoKey = $names->sort()->implode('|');
+        if ($preload && array_key_exists($memoKey, $this->slaRoleHolderMemo)) {
+            $holders = $this->slaRoleHolderMemo[$memoKey];
+        } else {
+            $groups = app(NotificationService::class);
+            $userIds = User::query()
+                ->whereHas('roles', fn ($rq) => $rq->whereIn('name', $names))
+                ->pluck('id');
+            foreach ($names as $name) {
+                $userIds = $userIds->merge($groups->resolveRoleGroupUserIds($name));
+            }
+
+            $holders = $userIds->isEmpty() ? collect() : User::query()
+                ->whereIn('id', $userIds->unique()->values())
+                // O2: the relations the access check reads, loaded in one go rather than per person.
+                ->when($preload, fn ($query) => $query->with([
+                    'roles.permissions', 'permissionOverrides', 'hrEmployeeProfile', 'staffProfile',
+                ]))
+                ->get(['id', 'name', 'email']);
+            if ($preload) {
+                $this->slaRoleHolderMemo[$memoKey] = $holders;
+            }
         }
 
-        if ($userIds->isEmpty()) {
-            return collect();
-        }
-
-        return User::query()
-            ->whereIn('id', $userIds->unique()->values())
-            ->get(['id', 'name', 'email'])
+        return $holders
             ->filter(fn (User $user): bool => $this->alertAccess->canReceiveRoleRoutedNotification($alert, $user))
             ->values();
     }

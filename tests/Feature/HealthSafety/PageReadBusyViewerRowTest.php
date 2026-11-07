@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\User;
 use App\Support\Database\LockConflictRetry;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
 use PDO;
 use Tests\Support\CommittedDatabaseTestCase;
@@ -36,6 +37,8 @@ final class PageReadBusyViewerRowTest extends CommittedDatabaseTestCase
 
     public function test_h_and_s_incident_and_task_pages_load_while_a_save_holds_the_viewers_user_row(): void
     {
+        // Its own roles: committed tests restore every table afterwards, so nothing leaks to or from other tests.
+        $this->seed(RbacSeeder::class);
         $site = Site::factory()->create();
         $admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $admin->roles()->attach(Role::where('name', 'admin')->sole());

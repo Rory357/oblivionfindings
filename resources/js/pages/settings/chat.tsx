@@ -4,6 +4,7 @@ import {
 } from '@/components/chat-governance/chat-governance-dialogs';
 import { ChatError } from '@/components/chat/api';
 import { chatActorRequest } from '@/components/chat/chat-actor-request';
+import { ChatCallingSettings } from '@/components/chat/chat-calling-settings';
 import { ChatResponseSettings } from '@/components/chat/chat-response-settings';
 import { ChatServiceHealth } from '@/components/chat/chat-service-health';
 import { reviewLatestChatSettings } from '@/components/chat/chat-settings-conflict';
@@ -65,7 +66,11 @@ type SettingsProps = {
     chatSites: { id: number; name: string }[];
     callingReady: boolean;
     chatInvestigator?: boolean;
+    /** Administrators only: the relay and voice-call server settings. */
+    chatCallingManager?: boolean;
 };
+
+type ChatSettingsView = 'policy' | 'calling';
 
 export default function ChatSettingsPage(props: SettingsProps) {
     const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
@@ -84,6 +89,7 @@ function ChatSettingsSession({
     chatSites,
     callingReady,
     chatInvestigator = false,
+    chatCallingManager = false,
 }: SettingsProps & { actorId: number }) {
     const [governance, setGovernance] = useState<ChatGovernanceDialog | null>(
         null,
@@ -111,8 +117,13 @@ function ChatSettingsSession({
     const [conflict, setConflict] = useState(false);
     const [latestReviewed, setLatestReviewed] = useState(false);
     const dirty = chatPolicyChanges(saved, draft, chatSites).length > 0;
+    // The calling settings keep their own draft; the page only needs to know it exists.
+    const [view, setView] = useState<ChatSettingsView>('policy');
+    const [callingDirty, setCallingDirty] = useState(false);
+    const [callingKey, setCallingKey] = useState(0);
+    const [callingReview, setCallingReview] = useState(0);
     const leave = useSettingsLeaveConfirmation(
-        dirty && !denied,
+        (dirty || callingDirty) && !denied,
         'Discard unsaved Chat settings?',
         'Your changes have not been saved. Stay here to keep reviewing them.',
         undefined,
@@ -211,6 +222,7 @@ function ChatSettingsSession({
     const [pending, setPending] = useState<{
         section: ChatSettingSection;
         scope: string;
+        view: ChatSettingsView;
     } | null>(null);
     const heading = useRef<HTMLHeadingElement>(null);
     const reviewButton = useRef<HTMLButtonElement>(null);
@@ -234,13 +246,26 @@ function ChatSettingsSession({
         setDraft((current) => editChatSetting(current, scope, field, next));
         setNotice('');
     }
-    function navigate(target: { section: ChatSettingSection; scope: string }) {
-        if (dirty) {
-            setPending(target);
+    function navigate(target: {
+        section: ChatSettingSection;
+        scope: string;
+        view?: ChatSettingsView;
+    }) {
+        const next = { ...target, view: target.view ?? 'policy' };
+        if (dirty || callingDirty) {
+            setPending(next);
             return;
         }
+        open(next);
+    }
+    function open(target: {
+        section: ChatSettingSection;
+        scope: string;
+        view: ChatSettingsView;
+    }) {
         setSection(target.section);
         setScope(target.scope);
+        setView(target.view);
         setNotice('');
         requestAnimationFrame(() => heading.current?.focus());
     }
@@ -393,11 +418,14 @@ function ChatSettingsSession({
                                     variant="ghost"
                                     disabled={saving}
                                     aria-current={
-                                        section === key ? 'page' : undefined
+                                        view === 'policy' && section === key
+                                            ? 'page'
+                                            : undefined
                                     }
                                     className={cn(
                                         'min-h-[44px] shrink-0 justify-start whitespace-nowrap',
-                                        section === key &&
+                                        view === 'policy' &&
+                                            section === key &&
                                             'bg-primary-fill/10 text-primary',
                                     )}
                                     onClick={() =>
@@ -423,393 +451,440 @@ function ChatSettingsSession({
                                     {label}
                                 </Button>
                             ))}
-                        </div>
-                    </nav>
-                    <section
-                        className="min-w-0 rounded-2xl border bg-background"
-                        aria-labelledby="chat-settings-heading"
-                    >
-                        <header className="space-y-3 border-b p-5">
-                            <p className="text-xs font-semibold tracking-wide text-primary uppercase">
-                                Global Settings / Chat
-                            </p>
-                            <h1
-                                id="chat-settings-heading"
-                                ref={heading}
-                                tabIndex={-1}
-                                className="text-page-title"
-                            >
-                                {chatSettingSections[section]}
-                            </h1>
-                            <div className="grid gap-2">
-                                <Label htmlFor="chat-policy-scope">
-                                    Policy scope
-                                </Label>
-                                <Select
+                            {chatCallingManager && (
+                                <Button
+                                    variant="ghost"
                                     disabled={saving}
-                                    value={String(scope)}
-                                    onValueChange={(value) =>
+                                    aria-current={
+                                        view === 'calling' ? 'page' : undefined
+                                    }
+                                    className={cn(
+                                        'min-h-[44px] shrink-0 justify-start whitespace-nowrap',
+                                        view === 'calling' &&
+                                            'bg-primary-fill/10 text-primary',
+                                    )}
+                                    onClick={() =>
                                         navigate({
                                             section,
-                                            scope: value,
+                                            scope,
+                                            view: 'calling',
                                         })
                                     }
                                 >
-                                    <SelectTrigger
-                                        id="chat-policy-scope"
-                                        className="frontline-tap min-w-0"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="organisation">
-                                            Organisation defaults
-                                        </SelectItem>
-                                        {chatSites.map((site) => (
-                                            <SelectItem
-                                                key={site.id}
-                                                value={String(site.id)}
-                                            >
-                                                {site.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                {scope === 'organisation'
-                                    ? 'Applies to private staff conversations and site conversations without an override.'
-                                    : 'Applies to client conversations and managed channels at ' +
-                                      scopeName +
-                                      '. Private staff conversations without a site use organisation defaults. Access still follows current roles and approved relationships.'}
-                            </p>
-                            <StatusBadge
-                                variant={
-                                    scope !== 'organisation' && hasOverride
-                                        ? 'info'
-                                        : 'neutral'
-                                }
-                            >
-                                {scope === 'organisation'
-                                    ? 'Organisation default'
-                                    : hasOverride
-                                      ? 'Site/service override'
-                                      : 'Inherited organisation defaults'}
-                            </StatusBadge>
-                        </header>
-                        <div className="min-w-0 space-y-5 p-5">
-                            {notice && (
-                                <p
-                                    role="status"
-                                    className="flex items-center gap-2 rounded-lg bg-status-success-bg p-3 text-sm text-status-success"
-                                >
-                                    <Check className="size-4" />
-                                    {notice}
-                                </p>
-                            )}
-                            {section === 'general' && (
-                                <>
-                                    {toggle(
-                                        'enabled',
-                                        'Controls new messages and conversations. Existing history remains available to authorised people.',
-                                    )}
-                                    <p className="text-sm text-muted-foreground">
-                                        Staff can start direct chats and private
-                                        groups with eligible colleagues. Managed
-                                        site channels require current
-                                        channel-management authority. A policy
-                                        setting never adds someone to a
-                                        conversation.
-                                    </p>
-                                </>
-                            )}
-                            {section === 'family' && (
-                                <>
-                                    {toggle(
-                                        'family_enabled',
-                                        'Separate family conversations with disclosed authorised care-team cover.',
-                                    )}
-                                    <ChatResponseSettings
-                                        value={draft}
-                                        sites={chatSites}
-                                        policyScope={scope}
-                                        dirty={dirty}
-                                        disabled={saving}
-                                        onReview={() => setReview(true)}
-                                        onChange={(next) => {
-                                            setDraft((current) => ({
-                                                ...current,
-                                                ...next,
-                                            }));
-                                            setNotice('');
-                                        }}
-                                    />
-                                    <ChatUrgentContactSettings
-                                        value={value('urgent_contact') ?? null}
-                                        source={source('urgent_contact')}
-                                        disabled={saving}
-                                        onChange={(next) =>
-                                            edit('urgent_contact', next)
-                                        }
-                                    />
-                                    <p className="rounded-lg bg-muted/40 p-3 text-sm">
-                                        Unconfigured services show no
-                                        response-time promise. Configured clocks
-                                        count working hours and exclude
-                                        configured holidays.
-                                    </p>
-                                    <div>
-                                        <Button
-                                            variant="outline"
-                                            className="min-h-[44px]"
-                                            onClick={() =>
-                                                setGovernance('portal-access')
-                                            }
-                                        >
-                                            Review client contact relationships
-                                        </Button>
-                                    </div>
-                                </>
-                            )}
-                            {section === 'files' && (
-                                <>
-                                    {toggle(
-                                        'files_enabled',
-                                        'Files stay in the conversation until separately reviewed for publication to client records.',
-                                    )}
-                                    {toggle(
-                                        'voice_notes_enabled',
-                                        'Allow recorded voice messages up to two minutes. File sharing and the local audio safety checks must also be available. Stopping a recording never sends it.',
-                                    )}
-                                    <div>
-                                        {number('max_file_mb', 1, 20)}
-                                        {number('max_files', 1, 5)}
-                                    </div>
-                                    {number(
-                                        'message_change_window_minutes',
-                                        0,
-                                        10080,
-                                    )}
-                                    <p className="text-sm text-muted-foreground">
-                                        The edit/removal window applies to a
-                                        sender’s own messages from the time
-                                        sent. Leave blank until policy is
-                                        agreed; 0 disables editing and removal.
-                                        Earlier text stays in restricted audit
-                                        history. Existing client records are
-                                        unchanged.
-                                    </p>
-                                </>
-                            )}
-                            {section === 'calls' && (
-                                <>
-                                    <p className="rounded-lg bg-muted/40 p-3 text-sm">
-                                        {callingReady
-                                            ? 'Self-hosted calling has been configured and marked verified.'
-                                            : 'Not ready: configure and verify the self-hosted calling service before enabling calls.'}
-                                    </p>
-                                    {toggle(
-                                        'calls_enabled',
-                                        'Audio only. Calls stay inside Oblivion.',
-                                        !callingReady &&
-                                            !value('calls_enabled'),
-                                    )}
-                                    {toggle(
-                                        'family_calls_enabled',
-                                        'Approved family members and authorised care-team participants only.',
-                                        !callingReady &&
-                                            !value('family_calls_enabled'),
-                                    )}
-                                    {number('max_call_participants', 2, 8)}
-                                    <p className="text-sm text-muted-foreground">
-                                        Voice only. No video, screen sharing,
-                                        recording, transcription or public
-                                        phone-number calls. Changes to
-                                        enablement apply to new calls; active
-                                        calls can finish.
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Web calls need an available browser.
-                                        Locked-phone calling belongs to the
-                                        later native app.
-                                    </p>
-                                </>
-                            )}
-                            {section === 'notifications' && (
-                                <>
-                                    <h2 className="font-semibold">
-                                        Notification preferences
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        Chat notices recheck access, mute
-                                        preferences and quiet hours. Message
-                                        notices also recheck unread state;
-                                        family handover notices recheck current
-                                        ownership. Notices keep client names and
-                                        message content private. In-app notices
-                                        are connected; email and push delivery
-                                        are not available yet.
-                                    </p>
-                                    <a
-                                        href="/settings/notifications"
-                                        className="inline-flex min-h-[44px] items-center text-sm text-primary underline underline-offset-4"
-                                    >
-                                        Open notification preferences
-                                    </a>
-                                </>
-                            )}
-                            {section === 'privacy' && (
-                                <>
-                                    <h2 className="font-semibold">
-                                        Privacy and records
-                                    </h2>
-                                    <ul className="space-y-3 text-sm text-muted-foreground">
-                                        <li>
-                                            Settings access does not authorise
-                                            inspection of private conversations.
-                                        </li>
-                                        <li>
-                                            No call recording, automatic
-                                            transcript or automatic care note.
-                                        </li>
-                                        <li>
-                                            Retention policy is awaiting
-                                            approval. Automatic deletion is not
-                                            enabled.
-                                        </li>
-                                        <li>
-                                            Investigation, export and
-                                            preservation actions require
-                                            separately authorised case access.
-                                        </li>
-                                        <li>
-                                            Settings changes are version checked
-                                            and audited.
-                                        </li>
-                                    </ul>
-                                    <p className="rounded-lg bg-muted/40 p-3 text-sm">
-                                        No automatic deletion or invented
-                                        retention period. Approved preservation
-                                        and retention policy is required before
-                                        rollout.
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            variant="outline"
-                                            className="min-h-[44px]"
-                                            onClick={() =>
-                                                setGovernance('investigation')
-                                            }
-                                        >
-                                            Investigation access
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            className="min-h-[44px]"
-                                            onClick={() =>
-                                                setGovernance('holds')
-                                            }
-                                        >
-                                            Exports and preservation holds
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            className="min-h-[44px]"
-                                            onClick={() =>
-                                                setGovernance('offboarding')
-                                            }
-                                        >
-                                            Offboarding and expired access
-                                        </Button>
-                                    </div>
-                                </>
-                            )}
-                            {section === 'access' && (
-                                <>
-                                    <h2 className="font-semibold">
-                                        Channels and access
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        One organisation. The directory follows
-                                        current staff roles and approved sites.
-                                        Family conversations follow current
-                                        client relationships and explicit
-                                        invitations. Site overrides cannot widen
-                                        record access.
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        New members see history from joining
-                                        onward, unless specific earlier messages
-                                        were explicitly reviewed and shared.
-                                        Expired employment or family
-                                        relationships remove future access
-                                        without silently deleting existing
-                                        records.
-                                    </p>
-                                    <div>
-                                        <Button
-                                            variant="outline"
-                                            className="min-h-[44px]"
-                                            onClick={() =>
-                                                setGovernance(
-                                                    'effective-access',
-                                                )
-                                            }
-                                        >
-                                            Inspect effective access
-                                        </Button>
-                                    </div>
-                                </>
-                            )}
-                            {section === 'health' && (
-                                <ChatServiceHealth actorId={actorId} />
+                                    Chat calling settings
+                                </Button>
                             )}
                         </div>
-                        <footer className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t bg-background p-4">
-                            <p className="text-sm text-muted-foreground">
-                                {dirty
-                                    ? policyChanges.length + ' unsaved changes'
-                                    : 'No unsaved changes'}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                {scope !== 'organisation' && hasOverride && (
+                    </nav>
+                    {view === 'calling' ? (
+                        <ChatCallingSettings
+                            key={callingKey}
+                            actorId={actorId}
+                            headingRef={heading}
+                            onDirtyChange={setCallingDirty}
+                            reviewRequest={callingReview}
+                        />
+                    ) : (
+                        <section
+                            className="min-w-0 rounded-2xl border bg-background"
+                            aria-labelledby="chat-settings-heading"
+                        >
+                            <header className="space-y-3 border-b p-5">
+                                <p className="text-xs font-semibold tracking-wide text-primary uppercase">
+                                    Global Settings / Chat
+                                </p>
+                                <h1
+                                    id="chat-settings-heading"
+                                    ref={heading}
+                                    tabIndex={-1}
+                                    className="text-page-title"
+                                >
+                                    {chatSettingSections[section]}
+                                </h1>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="chat-policy-scope">
+                                        Policy scope
+                                    </Label>
+                                    <Select
+                                        disabled={saving}
+                                        value={String(scope)}
+                                        onValueChange={(value) =>
+                                            navigate({
+                                                section,
+                                                scope: value,
+                                            })
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            id="chat-policy-scope"
+                                            className="frontline-tap min-w-0"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="organisation">
+                                                Organisation defaults
+                                            </SelectItem>
+                                            {chatSites.map((site) => (
+                                                <SelectItem
+                                                    key={site.id}
+                                                    value={String(site.id)}
+                                                >
+                                                    {site.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                    {scope === 'organisation'
+                                        ? 'Applies to private staff conversations and site conversations without an override.'
+                                        : 'Applies to client conversations and managed channels at ' +
+                                          scopeName +
+                                          '. Private staff conversations without a site use organisation defaults. Access still follows current roles and approved relationships.'}
+                                </p>
+                                <StatusBadge
+                                    variant={
+                                        scope !== 'organisation' && hasOverride
+                                            ? 'info'
+                                            : 'neutral'
+                                    }
+                                >
+                                    {scope === 'organisation'
+                                        ? 'Organisation default'
+                                        : hasOverride
+                                          ? 'Site/service override'
+                                          : 'Inherited organisation defaults'}
+                                </StatusBadge>
+                            </header>
+                            <div className="min-w-0 space-y-5 p-5">
+                                {notice && (
+                                    <p
+                                        role="status"
+                                        className="flex items-center gap-2 rounded-lg bg-status-success-bg p-3 text-sm text-status-success"
+                                    >
+                                        <Check className="size-4" />
+                                        {notice}
+                                    </p>
+                                )}
+                                {section === 'general' && (
+                                    <>
+                                        {toggle(
+                                            'enabled',
+                                            'Controls new messages and conversations. Existing history remains available to authorised people.',
+                                        )}
+                                        <p className="text-sm text-muted-foreground">
+                                            Staff can start direct chats and
+                                            private groups with eligible
+                                            colleagues. Managed site channels
+                                            require current channel-management
+                                            authority. A policy setting never
+                                            adds someone to a conversation.
+                                        </p>
+                                    </>
+                                )}
+                                {section === 'family' && (
+                                    <>
+                                        {toggle(
+                                            'family_enabled',
+                                            'Separate family conversations with disclosed authorised care-team cover.',
+                                        )}
+                                        <ChatResponseSettings
+                                            value={draft}
+                                            sites={chatSites}
+                                            policyScope={scope}
+                                            dirty={dirty}
+                                            disabled={saving}
+                                            onReview={() => setReview(true)}
+                                            onChange={(next) => {
+                                                setDraft((current) => ({
+                                                    ...current,
+                                                    ...next,
+                                                }));
+                                                setNotice('');
+                                            }}
+                                        />
+                                        <ChatUrgentContactSettings
+                                            value={
+                                                value('urgent_contact') ?? null
+                                            }
+                                            source={source('urgent_contact')}
+                                            disabled={saving}
+                                            onChange={(next) =>
+                                                edit('urgent_contact', next)
+                                            }
+                                        />
+                                        <p className="rounded-lg bg-muted/40 p-3 text-sm">
+                                            Unconfigured services show no
+                                            response-time promise. Configured
+                                            clocks count working hours and
+                                            exclude configured holidays.
+                                        </p>
+                                        <div>
+                                            <Button
+                                                variant="outline"
+                                                className="min-h-[44px]"
+                                                onClick={() =>
+                                                    setGovernance(
+                                                        'portal-access',
+                                                    )
+                                                }
+                                            >
+                                                Review client contact
+                                                relationships
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                                {section === 'files' && (
+                                    <>
+                                        {toggle(
+                                            'files_enabled',
+                                            'Files stay in the conversation until separately reviewed for publication to client records.',
+                                        )}
+                                        {toggle(
+                                            'voice_notes_enabled',
+                                            'Allow recorded voice messages up to two minutes. File sharing and the local audio safety checks must also be available. Stopping a recording never sends it.',
+                                        )}
+                                        <div>
+                                            {number('max_file_mb', 1, 20)}
+                                            {number('max_files', 1, 5)}
+                                        </div>
+                                        {number(
+                                            'message_change_window_minutes',
+                                            0,
+                                            10080,
+                                        )}
+                                        <p className="text-sm text-muted-foreground">
+                                            The edit/removal window applies to a
+                                            sender’s own messages from the time
+                                            sent. Leave blank until policy is
+                                            agreed; 0 disables editing and
+                                            removal. Earlier text stays in
+                                            restricted audit history. Existing
+                                            client records are unchanged.
+                                        </p>
+                                    </>
+                                )}
+                                {section === 'calls' && (
+                                    <>
+                                        <p className="rounded-lg bg-muted/40 p-3 text-sm">
+                                            {callingReady
+                                                ? 'Self-hosted calling has been configured and marked verified.'
+                                                : 'Not ready: configure and verify the self-hosted calling service before enabling calls.'}
+                                        </p>
+                                        {toggle(
+                                            'calls_enabled',
+                                            'Audio only. Calls stay inside Oblivion.',
+                                            !callingReady &&
+                                                !value('calls_enabled'),
+                                        )}
+                                        {toggle(
+                                            'family_calls_enabled',
+                                            'Approved family members and authorised care-team participants only.',
+                                            !callingReady &&
+                                                !value('family_calls_enabled'),
+                                        )}
+                                        {number('max_call_participants', 2, 8)}
+                                        <p className="text-sm text-muted-foreground">
+                                            Voice only. No video, screen
+                                            sharing, recording, transcription or
+                                            public phone-number calls. Changes
+                                            to enablement apply to new calls;
+                                            active calls can finish.
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Web calls need an available browser.
+                                            Locked-phone calling belongs to the
+                                            later native app.
+                                        </p>
+                                    </>
+                                )}
+                                {section === 'notifications' && (
+                                    <>
+                                        <h2 className="font-semibold">
+                                            Notification preferences
+                                        </h2>
+                                        <p className="text-sm text-muted-foreground">
+                                            Chat notices recheck access, mute
+                                            preferences and quiet hours. Message
+                                            notices also recheck unread state;
+                                            family handover notices recheck
+                                            current ownership. Notices keep
+                                            client names and message content
+                                            private. In-app notices are
+                                            connected; email and push delivery
+                                            are not available yet.
+                                        </p>
+                                        <a
+                                            href="/settings/notifications"
+                                            className="inline-flex min-h-[44px] items-center text-sm text-primary underline underline-offset-4"
+                                        >
+                                            Open notification preferences
+                                        </a>
+                                    </>
+                                )}
+                                {section === 'privacy' && (
+                                    <>
+                                        <h2 className="font-semibold">
+                                            Privacy and records
+                                        </h2>
+                                        <ul className="space-y-3 text-sm text-muted-foreground">
+                                            <li>
+                                                Settings access does not
+                                                authorise inspection of private
+                                                conversations.
+                                            </li>
+                                            <li>
+                                                No call recording, automatic
+                                                transcript or automatic care
+                                                note.
+                                            </li>
+                                            <li>
+                                                Retention policy is awaiting
+                                                approval. Automatic deletion is
+                                                not enabled.
+                                            </li>
+                                            <li>
+                                                Investigation, export and
+                                                preservation actions require
+                                                separately authorised case
+                                                access.
+                                            </li>
+                                            <li>
+                                                Settings changes are version
+                                                checked and audited.
+                                            </li>
+                                        </ul>
+                                        <p className="rounded-lg bg-muted/40 p-3 text-sm">
+                                            No automatic deletion or invented
+                                            retention period. Approved
+                                            preservation and retention policy is
+                                            required before rollout.
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button
+                                                variant="outline"
+                                                className="min-h-[44px]"
+                                                onClick={() =>
+                                                    setGovernance(
+                                                        'investigation',
+                                                    )
+                                                }
+                                            >
+                                                Investigation access
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                className="min-h-[44px]"
+                                                onClick={() =>
+                                                    setGovernance('holds')
+                                                }
+                                            >
+                                                Exports and preservation holds
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                className="min-h-[44px]"
+                                                onClick={() =>
+                                                    setGovernance('offboarding')
+                                                }
+                                            >
+                                                Offboarding and expired access
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                                {section === 'access' && (
+                                    <>
+                                        <h2 className="font-semibold">
+                                            Channels and access
+                                        </h2>
+                                        <p className="text-sm text-muted-foreground">
+                                            One organisation. The directory
+                                            follows current staff roles and
+                                            approved sites. Family conversations
+                                            follow current client relationships
+                                            and explicit invitations. Site
+                                            overrides cannot widen record
+                                            access.
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            New members see history from joining
+                                            onward, unless specific earlier
+                                            messages were explicitly reviewed
+                                            and shared. Expired employment or
+                                            family relationships remove future
+                                            access without silently deleting
+                                            existing records.
+                                        </p>
+                                        <div>
+                                            <Button
+                                                variant="outline"
+                                                className="min-h-[44px]"
+                                                onClick={() =>
+                                                    setGovernance(
+                                                        'effective-access',
+                                                    )
+                                                }
+                                            >
+                                                Inspect effective access
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                                {section === 'health' && (
+                                    <ChatServiceHealth actorId={actorId} />
+                                )}
+                            </div>
+                            <footer className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t bg-background p-4">
+                                <p className="text-sm text-muted-foreground">
+                                    {dirty
+                                        ? policyChanges.length +
+                                          ' unsaved changes'
+                                        : 'No unsaved changes'}
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {scope !== 'organisation' &&
+                                        hasOverride && (
+                                            <Button
+                                                variant="outline"
+                                                className="min-h-[44px]"
+                                                disabled={saving}
+                                                onClick={() => {
+                                                    setDraft((current) =>
+                                                        inheritChatSection(
+                                                            current,
+                                                            scope,
+                                                            section,
+                                                        ),
+                                                    );
+                                                    setReview(true);
+                                                }}
+                                            >
+                                                Reset to inherited
+                                            </Button>
+                                        )}
                                     <Button
                                         variant="outline"
                                         className="min-h-[44px]"
-                                        disabled={saving}
-                                        onClick={() => {
-                                            setDraft((current) =>
-                                                inheritChatSection(
-                                                    current,
-                                                    scope,
-                                                    section,
-                                                ),
-                                            );
-                                            setReview(true);
-                                        }}
+                                        disabled={!dirty || saving}
+                                        onClick={discard}
                                     >
-                                        Reset to inherited
+                                        Discard
                                     </Button>
-                                )}
-                                <Button
-                                    variant="outline"
-                                    className="min-h-[44px]"
-                                    disabled={!dirty || saving}
-                                    onClick={discard}
-                                >
-                                    Discard
-                                </Button>
-                                <Button
-                                    className="min-h-[44px]"
-                                    disabled={!dirty || saving}
-                                    ref={reviewButton}
-                                    onClick={() => setReview(true)}
-                                >
-                                    Review changes
-                                </Button>
-                            </div>
-                        </footer>
-                    </section>
+                                    <Button
+                                        className="min-h-[44px]"
+                                        disabled={!dirty || saving}
+                                        ref={reviewButton}
+                                        onClick={() => setReview(true)}
+                                    >
+                                        Review changes
+                                    </Button>
+                                </div>
+                            </footer>
+                        </section>
+                    )}
                 </div>
                 <a
                     href="/legal/chat-third-party-notices.txt"
@@ -863,13 +938,13 @@ function ChatSettingsSession({
                                 variant="outline"
                                 onClick={() => {
                                     if (pending) {
-                                        discard();
-                                        setSection(pending.section);
-                                        setScope(pending.scope);
+                                        if (callingDirty) {
+                                            // A new key remounts the calling form on its saved values.
+                                            setCallingKey((key) => key + 1);
+                                            setCallingDirty(false);
+                                        } else discard();
+                                        open(pending);
                                         setPending(null);
-                                        requestAnimationFrame(() =>
-                                            heading.current?.focus(),
-                                        );
                                     }
                                 }}
                             >
@@ -879,7 +954,9 @@ function ChatSettingsSession({
                                 className="min-h-[44px]"
                                 onClick={() => {
                                     setPending(null);
-                                    setReview(true);
+                                    if (callingDirty)
+                                        setCallingReview((count) => count + 1);
+                                    else setReview(true);
                                 }}
                             >
                                 Review changes

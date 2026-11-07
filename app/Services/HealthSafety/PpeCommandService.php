@@ -545,7 +545,8 @@ final class PpeCommandService
                 $result = $this->accept($root, $root, $current, 'create_'.$rootType, $values['idempotency_key'], $fingerprint, null, $version, $reads);
                 $this->bindStaging($staged, $root, $current, $result, $fingerprint, $reads);
                 return $result;
-            });
+            // Staged files are written inside the transaction, so only a file-free command may re-run after a deadlock.
+            }, $staged === []);
         } catch (Throwable $failure) {
             $this->rejectStaging($actor, $staged);
             $this->translateDuplicate($failure);
@@ -676,7 +677,8 @@ final class PpeCommandService
                     $this->schedulePurge($cleanup->id);
                 }
                 return $result;
-            });
+            // Staged files are written inside the transaction, so only a file-free command may re-run after a deadlock.
+            }, $staged === []);
         } catch (Throwable $failure) {
             $this->rejectStaging($actor, $staged);
             $this->translateDuplicate($failure);

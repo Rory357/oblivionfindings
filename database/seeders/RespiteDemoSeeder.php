@@ -172,8 +172,9 @@ class RespiteDemoSeeder extends Seeder
             ]
         );
 
-        $start = Carbon::now()->subDay()->setTime(10, 0);
-        $end = Carbon::now()->addDays(3)->setTime(10, 0);
+        // 10 am NZ arrival and departure, stored as UTC.
+        $start = $this->nzTenAm(-1);
+        $end = $this->nzTenAm(3);
         $request = RespiteBookingRequest::query()->updateOrCreate(
             ['referral_id' => $referral->id, 'client_id' => $client->id],
             [
@@ -382,9 +383,9 @@ class RespiteDemoSeeder extends Seeder
                 'status' => 'active',
             ]);
         RespiteBooking::query()->updateOrCreate(
-            ['client_id' => $pendingClient->id, 'start_at' => now()->addDays(7)->setTime(10, 0)],
+            ['client_id' => $pendingClient->id, 'start_at' => $this->nzTenAm(7)],
             [
-                'end_at' => now()->addDays(10)->setTime(10, 0),
+                'end_at' => $this->nzTenAm(10),
                 'status' => 'pending',
                 'location_id' => $site->id,
                 'funding_status' => 'pending_approval',
@@ -394,5 +395,14 @@ class RespiteDemoSeeder extends Seeder
         );
 
         $this->command?->info('Respite demo data seeded.');
+    }
+
+    /** 10 am NZ wall-clock, $days from today, as a UTC Carbon for storage. */
+    private function nzTenAm(int $days): Carbon
+    {
+        return Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))
+            ->addDays($days)
+            ->setTime(10, 0)
+            ->utc();
     }
 }

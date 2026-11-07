@@ -5,8 +5,11 @@ namespace App\Domain\SecurityDevices\Iot\Mqtt;
 use App\Domain\Monitoring\Enums\RuntimeMessageType;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\MonitoringOutboxPublisher;
+use App\Domain\SecurityDevices\Alerts\DeviceAlertEngine;
+use App\Domain\SecurityDevices\Alerts\SafetyEventObserver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
+use App\Domain\SecurityDevices\Iot\Readings\SensorAlertRules;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\SignalSource;
@@ -119,10 +122,23 @@ final class MqttSensorIntakeService
                     'label' => $spec['label'],
                     'value' => $num,
                     'unit' => $spec['unit'],
-                    'state' => $this->evaluateReadingState($key, $num),
+                    'state' => SensorAlertRules::evaluate($device, $key, $num),
                     'observed_at' => $at->toISOString(),
                 ];
             }
+        }
+
+        // S&D Phase F: a bed sensor's in or out of bed, kept as 1 (in bed) or 0 (out of bed) so a
+        // linked falls plan can tell night staff (Care\CareRules). No alert limits of its own.
+        $inBed = self::bedOccupancy($data);
+        if ($inBed !== null) {
+            $newReadings['occupancy'] = [
+                'label' => 'In bed',
+                'value' => $inBed ? 1.0 : 0.0,
+                'unit' => '',
+                'state' => 'healthy',
+                'observed_at' => $at->toISOString(),
+            ];
         }
 
         $battery = null;
@@ -133,12 +149,14 @@ final class MqttSensorIntakeService
 
         $eventsToCreate = $this->extractDiscreteEvents($data);
 
+        $readingChanges = [];
         $eventsCreated = DB::transaction(function () use (
+            &$readingChanges,
+            &$newReadings,
             $device,
             $siteId,
             $sourceProtocol,
             $channelRef,
-            $newReadings,
             $battery,
             $eventsToCreate,
             $at,
@@ -149,6 +167,17 @@ final class MqttSensorIntakeService
             $observed = is_array($meta['observed'] ?? null) ? $meta['observed'] : [];
             $existingReadings = is_array($observed['sensor_readings'] ?? null) ? $observed['sensor_readings'] : [];
 
+            // S&D Phase E + E6: evaluate each reading against the locked device's stored sensor limits.
+            foreach ($newReadings as $key => $reading) {
+                if ($key !== 'occupancy') {
+                    $reading['state'] = SensorAlertRules::evaluate($locked, (string) $key, (float) $reading['value']);
+                    $newReadings[$key] = $reading;
+                }
+                $before = is_array($existingReadings[$key] ?? null) ? (string) ($existingReadings[$key]['state'] ?? 'healthy') : 'healthy';
+                if ($before !== $reading['state']) {
+                    $readingChanges[$key] = $reading;
+                }
+            }
             $mergedReadings = array_replace($existingReadings, $newReadings);
             $observed['sensor_readings'] = $mergedReadings;
             $observed['last_telemetry_protocol'] = $sourceProtocol;
@@ -185,6 +214,10 @@ final class MqttSensorIntakeService
                 $deviceEvent = $hasSignalSource
                     ? DeviceEvent::query()->create($eventAttributes)
                     : DeviceEvent::withoutEvents(fn () => DeviceEvent::query()->create($eventAttributes));
+                if (! $hasSignalSource) {
+                    // Model events were off for Control Room's bridge; the S&D safety alert still opens.
+                    app(SafetyEventObserver::class)->created($deviceEvent);
+                }
 
                 try {
                     $this->outbox->stage(
@@ -216,6 +249,21 @@ final class MqttSensorIntakeService
 
             return $createdCount;
         });
+
+        // S&D Phase E: readings over time, for the sensor page graphs and the battery forecast.
+        app(\App\Domain\SecurityDevices\Iot\Readings\SensorReadingHistory::class)->record(
+            (int) $device->id,
+            [...array_map(fn (array $reading): float => (float) $reading['value'], $newReadings), ...($battery !== null ? ['battery' => $battery] : [])],
+            $at,
+        );
+        $fresh = $device->fresh() ?? $device;
+        $alerts = app(DeviceAlertEngine::class);
+        foreach ($readingChanges as $key => $reading) {
+            $alerts->onReading($fresh, (string) $key, (string) $reading['label'], (string) $reading['state'], (float) $reading['value'], (string) $reading['unit'], $at);
+        }
+        if ($battery !== null) {
+            $alerts->onBattery($fresh, $battery, $at);
+        }
 
         return [
             'accepted' => true,
@@ -293,20 +341,37 @@ final class MqttSensorIntakeService
         return null;
     }
 
-    private function evaluateReadingState(string $metric, float $value): string
+    /**
+     * In bed (true), out of bed (false), or null when the message says nothing about a bed. Reads
+     * `in_bed`, `bed_status` and `occupancy` (occupied / vacant), as bed sensors send them.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function bedOccupancy(array $data): ?bool
     {
-        return match ($metric) {
-            'co2' => $value >= 1500 ? 'critical' : ($value >= 1000 ? 'warning' : 'healthy'),
-            'temperature' => ($value < 12 || $value > 32) ? 'warning' : 'healthy',
-            'humidity' => ($value < 25 || $value > 75) ? 'warning' : 'healthy',
-            default => 'healthy',
-        };
+        foreach (['in_bed', 'bed_status', 'occupancy'] as $key) {
+            if (! array_key_exists($key, $data)) {
+                continue;
+            }
+            $raw = $data[$key];
+            if (is_bool($raw)) {
+                return $raw;
+            }
+            if (is_int($raw) || (is_string($raw) && in_array($raw, ['0', '1'], true))) {
+                return (int) $raw === 1;
+            }
+            $word = is_string($raw) ? strtolower(trim($raw)) : '';
+
+            return match ($word) {
+                'in_bed', 'in bed', 'occupied', 'on', 'true', 'present' => true,
+                'out_of_bed', 'out of bed', 'leave', 'left', 'vacant', 'off', 'false', 'absent', 'empty' => false,
+                default => null,
+            };
+        }
+
+        return null;
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     * @return list<array{event_type: string, severity: string, payload: array<string, scalar|null>}>
-     */
     private function extractDiscreteEvents(array $data): array
     {
         $events = [];

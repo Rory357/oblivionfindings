@@ -6,7 +6,6 @@
  * itself, so they show only when every active assessment is on this page —
  * never a page-local count dressed as a total.
  */
-import { boardReportHref } from '@/lib/health-safety/board-reports';
 import { hsLabel } from '@/lib/health-safety/hs-labels';
 import {
     RaRegisterTable,
@@ -18,6 +17,16 @@ import type {
     RaPickers,
     RaRow,
 } from '@/components/health-safety/risk-assessments/types';
+import {
+    LeadBlock,
+    QuietRows,
+    RegisterBlocks,
+    RegisterBoxes,
+    RegisterRailLine,
+    overdueNote,
+    shortDay,
+    type LeadRow,
+} from '@/components/health-safety/register-kit';
 import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import {
     EntityContextMenu,
@@ -27,7 +36,6 @@ import {
     PageHeader,
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
-    PageHeaderGlassButton,
     PageHeaderPrimaryButton,
     PageHeaderSearch,
     PageLayout,
@@ -59,6 +67,8 @@ import {
     useSafetyWorkspaceDrafts,
 } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
+import { safetyHubCrumbs } from '@/lib/health-safety/workspace-navigation';
+import type { SharedData } from '@/types';
 import {
     RISK_REGISTER,
     riskHref,
@@ -68,8 +78,11 @@ import {
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Archive,
+    CalendarClock,
+    CheckCircle2,
     Clock,
     FileEdit,
+    Grid3x3,
     LayoutGrid,
     Plus,
     ShieldAlert,
@@ -132,7 +145,15 @@ interface Props {
     pickers: RaPickers;
     can: { manage: boolean; viewReports?: boolean };
     filters: Filters;
+    /** G4-14: the header's other counts and the one lead block (same proven register and filters). */
+    register_summary?: RaRegisterSummary;
 }
+
+export type RaRegisterSummary = {
+    boxes: { reviews_overdue: number; reviews_due_30d: number; awaiting_approval: number; reviewed_30d: number };
+    lead: Array<{ kind: 'review_overdue' | 'draft' | 'review_soon'; review_due_at: string | null; row: RaRow }>;
+    lead_total: number;
+};
 
 const VIEWS: {
     key: keyof Props['tabCounts'];
@@ -143,9 +164,10 @@ const VIEWS: {
     { key: 'active', label: 'Active', icon: ShieldAlert },
     { key: 'drafts', label: 'Drafts', icon: FileEdit },
     { key: 'due', label: 'Due for review', icon: Clock },
-    { key: 'high', label: 'High & extreme', icon: TriangleAlert },
-    { key: 'closed', label: 'Historical', icon: Archive },
+    { key: 'high', label: 'High risk', icon: TriangleAlert },
 ];
+/** Reached from links; shown on the strip only while it's the open view. */
+const HISTORICAL = { key: 'closed' as const, label: 'Historical', icon: Archive };
 
 const STATUS_OPTIONS = [
     { value: 'active', label: 'Active' },
@@ -202,7 +224,9 @@ export default function RiskAssessmentsIndex({
     pickers,
     can,
     filters,
+    register_summary: summary,
 }: Props) {
+    const safetyCan = usePage<SharedData>().props.auth.can;
     const returnTo = riskReturn(usePage().url);
     const rowMenu = useEntityContextMenu<RaRow>();
     const [creating, setCreating] = useState(false);
@@ -253,13 +277,15 @@ export default function RiskAssessmentsIndex({
     };
     const actionsFor = (row: RaRow) => raMenuItems(row, can.manage, handlers);
 
-    const views: GroupedProfileNavTab[] = VIEWS.map((view) => ({
+    const views: GroupedProfileNavTab[] = [...VIEWS, ...(filters.tab === 'closed' ? [HISTORICAL] : [])].map((view) => ({
         key: view.key,
         label: view.label,
         icon: view.icon,
         count: tabCounts[view.key],
     }));
     const moreActive = [
+        filters.status,
+        filters.risk_level,
         filters.client_id,
         filters.hs_event_id,
         filters.risk_acceptable,
@@ -374,11 +400,49 @@ export default function RiskAssessmentsIndex({
         </>
     );
 
+    // Header and lead links keep the Site only, as the header counts follow the register's filters.
+    const siteLink = (tab: string, extra: Record<string, string> = {}) =>
+        `${RISK_REGISTER}?${new URLSearchParams({ tab, ...(filters.site_id ? { site_id: String(filters.site_id) } : {}), ...extra })}`;
+    const lead: LeadRow[] = (summary?.lead ?? []).map(({ kind, review_due_at: due, row }) => {
+        const place = row.attached_to.type === 'standalone' ? null : row.attached_to.name;
+        if (kind === 'draft') {
+            return {
+                key: `draft-${row.id}`,
+                when: null,
+                title: row.title,
+                sub: [place, 'draft'].filter(Boolean).join(' · '),
+                chip: { label: 'Waiting to be approved', tone: 'neutral' },
+                action: can.manage ? { label: 'Approve and start using', onClick: () => openDetail(row.id, 'approve'), ariaLabel: `Approve and start using: ${row.title}` } : null,
+                who: can.manage ? null : 'Health and safety approve it',
+            };
+        }
+        if (kind === 'review_soon') {
+            return {
+                key: `soon-${row.id}`,
+                when: due ? { day: shortDay(due), note: 'review due' } : null,
+                title: row.title,
+                sub: [place, due ? `review due ${shortDay(due)}` : null].filter(Boolean).join(' · '),
+                chip: null,
+                action: null,
+                who: row.assessed_by_name ? `${row.assessed_by_name} reviews it` : null,
+            };
+        }
+        return {
+            key: `overdue-${row.id}`,
+            when: due ? { day: shortDay(due), note: overdueNote(due) } : null,
+            title: row.title,
+            sub: [place, due ? `review overdue since ${shortDay(due)}` : 'review overdue'].filter(Boolean).join(' · '),
+            chip: { label: 'Review overdue', tone: 'critical' },
+            action: can.manage ? { label: 'Review', onClick: () => openDetail(row.id, 'review'), ariaLabel: `Review: ${row.title}` } : null,
+            who: can.manage ? null : 'Health and safety review it',
+        };
+    });
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Health & safety', href: '/health-safety' },
+                ...safetyHubCrumbs('prevention', safetyCan),
                 { title: 'Risk assessments', href: RISK_REGISTER },
             ]}
         >
@@ -406,18 +470,6 @@ export default function RiskAssessmentsIndex({
                                         placeholder="Search assessments…"
                                         ariaLabel="Search risk assessments"
                                     />
-                                    {can.viewReports && (
-                                        <PageHeaderGlassButton asChild>
-                                            <a
-                                                href={
-                                                    boardReportHref('risk-register')
-                                                }
-                                                aria-label="Open the risk assessment report"
-                                            >
-                                                Risk assessment report
-                                            </a>
-                                        </PageHeaderGlassButton>
-                                    )}
                                     {can.manage && (
                                         <PageHeaderPrimaryButton
                                             icon={Plus}
@@ -428,56 +480,57 @@ export default function RiskAssessmentsIndex({
                                     )}
                                 </>
                             }
-                            filters={
-                                <>
-                                    {select(
-                                        'All sites',
-                                        'site_id',
-                                        pickers.sites.map((p) => ({
-                                            value: String(p.id),
-                                            label: p.name,
-                                        })),
-                                        true,
-                                    )}
-                                    {select(
-                                        'All statuses',
-                                        'status',
-                                        STATUS_OPTIONS,
-                                    )}
-                                    {select(
-                                        'All risk levels',
-                                        'risk_level',
-                                        LEVEL_OPTIONS,
-                                    )}
-                                    <MoreFilters
-                                        active={moreActive}
-                                        filters={filters}
-                                        pickers={pickers}
-                                        onChange={go}
+                            strip={
+                                summary ? (
+                                    <RegisterBoxes
+                                        boxes={[
+                                            { key: 'reviews_overdue', label: 'Reviews overdue', value: summary.boxes.reviews_overdue, alert: true, icon: Clock, href: siteLink('due') },
+                                            { key: 'reviews_due_30d', label: 'Reviews due · next 30 days', value: summary.boxes.reviews_due_30d, icon: CalendarClock, href: siteLink('active') },
+                                            { key: 'awaiting_approval', label: 'Waiting to be approved', value: summary.boxes.awaiting_approval, icon: FileEdit, href: siteLink('drafts') },
+                                            { key: 'reviewed_30d', label: 'Reviewed · last 30 days', value: summary.boxes.reviewed_30d, icon: CheckCircle2, href: siteLink('active') },
+                                        ]}
                                     />
-                                    {selected && (
-                                        <PageHeaderFilterButton
-                                            icon={X}
-                                            onClick={() =>
-                                                router.get(
-                                                    RISK_REGISTER,
-                                                    { tab: filters.tab },
-                                                    {
-                                                        preserveState: true,
-                                                        preserveScroll: true,
-                                                    },
-                                                )
-                                            }
-                                        >
-                                            Clear filters
-                                        </PageHeaderFilterButton>
-                                    )}
-                                </>
+                                ) : undefined
                             }
                             rail={
-                                <SafetyWorkspaceRail
-                                    hub="prevention"
-                                    current="risks"
+                                <RegisterRailLine
+                                    rail={<SafetyWorkspaceRail hub="prevention" current="risks" />}
+                                    filters={
+                                        <>
+                                            {select(
+                                                `All sites · ${pickers.sites.length}`,
+                                                'site_id',
+                                                pickers.sites.map((p) => ({
+                                                    value: String(p.id),
+                                                    label: p.name,
+                                                })),
+                                                true,
+                                            )}
+                                            <MoreFilters
+                                                active={moreActive}
+                                                filters={filters}
+                                                pickers={pickers}
+                                                onChange={go}
+                                            />
+                                            {selected && (
+                                                <PageHeaderFilterButton
+                                                    icon={X}
+                                                    onClick={() =>
+                                                        router.get(
+                                                            RISK_REGISTER,
+                                                            { tab: filters.tab },
+                                                            {
+                                                                preserveState: true,
+                                                                preserveScroll: true,
+                                                            },
+                                                        )
+                                                    }
+                                                >
+                                                    Clear filters
+                                                </PageHeaderFilterButton>
+                                            )}
+                                        </>
+                                    }
                                 />
                             }
                         />
@@ -506,7 +559,32 @@ export default function RiskAssessmentsIndex({
                         }
                         className="grid min-w-0 gap-5"
                     >
+                        {summary ? (
+                            <RegisterBlocks
+                                lead={
+                                    <LeadBlock
+                                        rows={lead}
+                                        empty="No reviews are overdue or due this week, and nothing is waiting to be approved."
+                                        more={
+                                            summary.lead_total > lead.length
+                                                ? { text: `${summary.lead_total - lead.length} more need doing`, action: { label: 'See all', href: siteLink('due') } }
+                                                : null
+                                        }
+                                    />
+                                }
+                                side={
+                                    complete ? (
+                                        <QuietRows
+                                            rows={[
+                                                { key: 'map', icon: Grid3x3, title: 'Risk map', sub: 'Before and after controls', href: '#risk-map' },
+                                            ]}
+                                        />
+                                    ) : undefined
+                                }
+                            />
+                        ) : null}
                         {complete ? (
+                            <div id="risk-map" className="scroll-mt-5">
                             <SideBySide cols="minmax(0, 1.15fr) minmax(0, 1fr)">
                                 <RiskMap
                                     title="Risk map"
@@ -541,13 +619,14 @@ export default function RiskAssessmentsIndex({
                                     title="Highest risks first"
                                     sub="Before controls → after controls"
                                     action={{
-                                        label: 'High & extreme',
+                                        label: 'High risk',
                                         onClick: () => go({ tab: 'high' }),
                                     }}
                                     items={highest}
                                     limit={5}
                                 />
                             </SideBySide>
+                            </div>
                         ) : null}
                         <RaRegisterTable
                             rows={assessments.data}
@@ -640,6 +719,24 @@ function MoreFilters({
                 align="end"
                 className="grid w-80 max-w-[calc(100vw-2rem)] gap-3"
             >
+                <FilterField label="Status">
+                    <SelectInput
+                        ariaLabel="Status"
+                        placeholder="All statuses"
+                        value={filters.status ?? 'all'}
+                        onChange={(value) => onChange({ status: value === 'all' ? null : value })}
+                        options={[{ value: 'all', label: 'All statuses' }, ...STATUS_OPTIONS]}
+                    />
+                </FilterField>
+                <FilterField label="Risk level">
+                    <SelectInput
+                        ariaLabel="Risk level"
+                        placeholder="All risk levels"
+                        value={filters.risk_level ?? 'all'}
+                        onChange={(value) => onChange({ risk_level: value === 'all' ? null : value })}
+                        options={[{ value: 'all', label: 'All risk levels' }, ...LEVEL_OPTIONS]}
+                    />
+                </FilterField>
                 <FilterField label="Client">
                     <SelectInput
                         ariaLabel="Client"

@@ -525,7 +525,7 @@ class RestraintService
     private function eventValues(array $input, bool $create): array
     {
         $needed = $create ? 'required' : 'sometimes';
-        $rules = ['client_id' => [$needed, 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'], 'stay_id' => ['nullable', 'integer', 'min:1'], 'behaviour_support_plan_id' => ['nullable', 'integer', 'min:1'], 'behaviour_support_plan_version_id' => ['nullable', 'integer', 'min:1'], 'started_at' => [$needed, 'string'], 'ended_at' => ['nullable', 'string'], 'duration_minutes' => ['nullable', 'integer', 'min:0'], 'restraint_type' => [$needed, Rule::in(['physical', 'chemical', 'mechanical', 'seclusion', 'environmental'])], 'severity' => [$needed, Rule::in(['low', 'medium', 'high', 'critical'])], 'trigger_description' => [$needed, 'string', 'max:20000'], 'de_escalation_attempted' => [$needed, 'string', 'max:20000'], 'restraint_description' => [$needed, 'string', 'max:20000'], 'staff_involved' => ['nullable', 'array'], 'staff_involved.*' => ['integer', 'min:1', 'distinct'], 'person_response' => ['nullable', 'string', 'max:20000'], 'post_incident_support' => ['nullable', 'string', 'max:20000'], 'injury_occurred' => ['sometimes', 'boolean'], 'injury_details' => ['nullable', 'string', 'max:20000'], 'within_support_plan' => ['sometimes', 'boolean'], 'deviation_reason' => ['nullable', 'string', 'max:20000'], 'authorised_by' => ['nullable', 'integer', 'min:1']];
+        $rules = ['client_id' => [$needed, 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'], 'stay_id' => ['nullable', 'integer', 'min:1'], 'behaviour_support_plan_id' => ['nullable', 'integer', 'min:1'], 'behaviour_support_plan_version_id' => ['nullable', 'integer', 'min:1'], 'started_at' => [$needed, 'string'], 'ended_at' => ['nullable', 'string'], 'duration_minutes' => ['nullable', 'integer', 'min:0'], 'restraint_type' => [$needed, Rule::in(['physical', 'chemical', 'mechanical', 'seclusion', 'environmental'])], 'summary' => ['nullable', 'string', 'max:120'], 'severity' => [$needed, Rule::in(['low', 'medium', 'high', 'critical'])], 'trigger_description' => [$needed, 'string', 'max:20000'], 'de_escalation_attempted' => [$needed, 'string', 'max:20000'], 'restraint_description' => [$needed, 'string', 'max:20000'], 'staff_involved' => ['nullable', 'array'], 'staff_involved.*' => ['integer', 'min:1', 'distinct'], 'person_response' => ['nullable', 'string', 'max:20000'], 'post_incident_support' => ['nullable', 'string', 'max:20000'], 'injury_occurred' => ['sometimes', 'boolean'], 'injury_details' => ['nullable', 'string', 'max:20000'], 'within_support_plan' => ['sometimes', 'boolean'], 'deviation_reason' => ['nullable', 'string', 'max:20000'], 'authorised_by' => ['nullable', 'integer', 'min:1']];
         if ($create) {
             $rules['related_incident_id'] = ['nullable', 'integer', 'min:1'];
         } else {
@@ -548,6 +548,11 @@ class RestraintService
         if (array_key_exists('staff_involved', $v)) {
             $v['staff_involved'] = RestraintCommandValues::ids($v['staff_involved'] ?? []);
         }
+        // The summary is one plain line for the title: spaces and line breaks collapse, and blank means none.
+        if (array_key_exists('summary', $v)) {
+            $summary = trim(preg_replace('/\s+/u', ' ', (string) $v['summary']) ?? '');
+            $v['summary'] = $summary === '' ? null : $summary;
+        }
         foreach (['started_at', 'ended_at'] as $field) {
             if (array_key_exists($field, $v)) {
                 $v[$field] = RestraintCommandValues::instant($v[$field], $field);
@@ -561,15 +566,15 @@ class RestraintService
     {
         if ($row->ended_at) {
             if ($row->ended_at->lte($row->started_at)) {
-                throw ValidationException::withMessages(['ended_at' => 'End must follow actual start.']);
+                throw ValidationException::withMessages(['ended_at' => 'The end time must be after the start time.']);
             }
             $minutes = (int) floor($row->started_at->diffInSeconds($row->ended_at) / 60);
             if (isset($v['duration_minutes']) && $v['duration_minutes'] !== $minutes) {
-                throw ValidationException::withMessages(['duration_minutes' => 'Duration must equal elapsed whole minutes, rounded down from actual instants.']);
+                throw ValidationException::withMessages(['duration_minutes' => 'The duration must match the start and end times (whole minutes). Leave it blank and it is worked out for you.']);
             } $row->duration_minutes = $minutes;
         } else {
             if (isset($v['duration_minutes'])) {
-                throw ValidationException::withMessages(['duration_minutes' => 'Ongoing events have no completed elapsed duration.']);
+                throw ValidationException::withMessages(['duration_minutes' => 'A restraint that is still going has no duration yet. Add the end time when it ends.']);
             } $row->duration_minutes = null;
         }
         if ($row->injury_occurred && blank($row->injury_details)) {

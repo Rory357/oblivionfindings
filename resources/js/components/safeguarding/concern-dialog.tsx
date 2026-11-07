@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,7 @@ import {
     Search,
     Shield,
     ShieldAlert,
+    ShieldCheck,
     Trash2,
     UserCog,
     User as UserIcon,
@@ -63,6 +65,9 @@ export type ConcernDetail = {
     stage_index: number;
     occurred_at: string | null;
     reported_at: string | null;
+    // P3: true when the viewer sees the concern only as its reporter (their report and its status).
+    reporter_view?: boolean;
+    closed_at?: string | null;
     // Present only when not restricted:
     concern_type?: string;
     abuse_category?: string | null;
@@ -190,6 +195,7 @@ export type ConcernDetail = {
     related_incident_ref?: string | null;
     hs_event?: { id: number; reference_number: string; status: string } | null;
     control_room_alert_id?: number | null;
+    close_checklist?: CloseCheckItem[];
     access_log?: { by: string; at: string | null }[];
     can?: {
         update: boolean;
@@ -324,6 +330,32 @@ export function SafeguardingConcernDialog({
                         staff cleared to view sensitive concerns.
                     </p>
                 </div>
+            </WizardShell>
+        );
+    }
+
+    if (d.reporter_view) {
+        return (
+            <WizardShell
+                open={open}
+                onClose={onClose}
+                title={`Concern ${d.reference_number}`}
+                description="Your report"
+                railIcon={FileText}
+                railTitle="Your report"
+                railSub={d.reference_number}
+                steps={[
+                    {
+                        key: 'report',
+                        label: 'Your report',
+                        blurb: d.status_label,
+                        icon: FileText,
+                    },
+                ]}
+                stepIndex={0}
+                onStepClick={() => {}}
+            >
+                <ReporterView d={d} />
             </WizardShell>
         );
     }
@@ -1501,6 +1533,90 @@ const TRIAGE_PATHS = [
     },
 ];
 
+// Errors the triage pane shows beside their own field. Anything else the server
+// sends back (a refusal under `triage` or `override_reason`, or a field with no
+// error slot) goes in the refusal banner, so no refusal is ever silently lost.
+const TRIAGE_FIELD_ERRORS = new Set(['substantiation', 'initial_risk', 'path', 'notes']);
+
+// The server's refusals are in plain words (6 Nov 2026). Only the close flow's "say why you're closing anyway" is
+// reworded here, because triage has no "close anyway": the work must be finished, or another path chosen.
+const TRIAGE_REFUSAL_WORDS: Array<[RegExp, string]> = [
+    [
+        /unlogged referral|referral isn.t logged|open safeguarding work|safeguarding work is still open|override reason|closing anyway/i,
+        'An external referral is still to be logged, or other safeguarding work is still open. Log the referral or finish the open work first, or choose another path.',
+    ],
+];
+
+export function triageRefusals(errors: Partial<Record<string, string>>): string[] {
+    const words = Object.entries(errors)
+        .filter(([key, message]) => !TRIAGE_FIELD_ERRORS.has(key) && !!message)
+        .map(([, message]) => TRIAGE_REFUSAL_WORDS.find(([pattern]) => pattern.test(message as string))?.[1] ?? (message as string));
+
+    return Array.from(new Set(words));
+}
+
+export type CloseCheckItem = {
+    key: string;
+    label: string;
+    detail: string;
+    done: boolean;
+    href: string | null;
+};
+
+/** Close keys the terminal service hard-blocks on whichever way the concern ends (no override). */
+const LINKED_CLOSE_KEYS = ['links', 'hs_event', 'control_room'];
+
+/**
+ * B5 (Stephan, 6 Nov 2026: "Keep checks, say what to close"): what must be closed first, in plain words, each with a
+ * link to where it is done. The server decides; this list only says what it will look for.
+ */
+export function CloseChecklist({ title, items }: { title: string; items: CloseCheckItem[] }) {
+    if (!items.length) {
+        return null;
+    }
+    return (
+        <div>
+            <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {title}
+            </p>
+            <ul className="overflow-hidden rounded-xl border border-border" aria-label={title}>
+                {items.map((item) => (
+                    <li
+                        key={item.key}
+                        className="flex items-center gap-3 border-b border-border px-3.5 py-2.5 last:border-0"
+                    >
+                        <span
+                            className={`grid h-6 w-6 shrink-0 place-items-center rounded-md ${item.done ? 'bg-status-success-bg text-status-success' : 'bg-status-warning-bg text-status-warning'}`}
+                            aria-label={item.done ? 'Done' : 'Still to do'}
+                        >
+                            {item.done ? (
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : (
+                                <X className="h-3.5 w-3.5" />
+                            )}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-medium text-foreground">
+                                {item.label}
+                            </p>
+                            <p className="text-[11.5px] text-muted-foreground">
+                                {item.detail}
+                            </p>
+                        </div>
+                        {item.href && !item.done ? (
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={item.href}>
+                                    <ExternalLink className="h-3.5 w-3.5" /> Open
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const staff = d.assignable_staff ?? [];
     const form = useForm<{
@@ -1542,6 +1658,7 @@ export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void
             onSuccess: onSuccessGuard(onDone),
         });
     };
+    const refusals = triageRefusals(form.errors);
     const cta =
         form.data.path === 'investigate'
             ? 'Triage → investigate'
@@ -1625,6 +1742,20 @@ export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void
                         concern can't enter <b>Investigating</b> without one.
                     </InfoCard>
                 ) : null}
+                {form.data.path === 'no_action' &&
+                (d.close_checklist ?? []).some((item) => !item.done) ? (
+                    <>
+                        <InfoCard icon={AlertTriangle} tone="warn">
+                            <b>No further action</b> ends the concern, so
+                            everything below must be closed first. Close them,
+                            or choose another path.
+                        </InfoCard>
+                        <CloseChecklist
+                            title="Close these first"
+                            items={d.close_checklist ?? []}
+                        />
+                    </>
+                ) : null}
                 {form.data.path === 'no_action' ? (
                     <Field label="Rationale" required error={form.errors.notes}>
                         <Textarea
@@ -1636,6 +1767,23 @@ export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void
                             placeholder="Why does this need no further safeguarding action?"
                         />
                     </Field>
+                ) : null}
+                {refusals.length ? (
+                    <Alert variant="critical">
+                        <AlertTriangle />
+                        <AlertTitle>The concern wasn’t triaged</AlertTitle>
+                        <AlertDescription>
+                            {refusals.length === 1 ? (
+                                <p>{refusals[0]}</p>
+                            ) : (
+                                <ul className="list-inside list-disc">
+                                    {refusals.map((refusal) => (
+                                        <li key={refusal}>{refusal}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </AlertDescription>
+                    </Alert>
                 ) : null}
             </PaneShell>
         </>
@@ -1752,6 +1900,13 @@ export function ClosePane({ d, onDone }: { d: ConcernDetail; onDone: () => void 
                     </div>
                 </div>
 
+                <CloseChecklist
+                    title="Linked work to close first"
+                    items={(d.close_checklist ?? []).filter((item) =>
+                        LINKED_CLOSE_KEYS.includes(item.key),
+                    )}
+                />
+
                 {blocked ? (
                     <>
                         <InfoCard icon={AlertTriangle} tone="warn">
@@ -1818,6 +1973,65 @@ export function ClosePane({ d, onDone }: { d: ConcernDetail; onDone: () => void 
 /* ------------------------------------------------------------------ */
 /*  Lifecycle stage tracker                                            */
 /* ------------------------------------------------------------------ */
+
+/**
+ * P3: what the person who reported a concern sees afterwards: their report and where it's up to. The safeguarding
+ * lead's work (people named, triage, investigation, plans, files) isn't shown.
+ */
+export function ReporterView({ d }: { d: ConcernDetail }) {
+    return (
+        <div className="grid gap-4 sm:grid-cols-2">
+            <LifecycleTracker d={d} />
+
+            <InfoCard icon={ShieldCheck}>
+                You reported this concern. Here you can see what you reported
+                and where it's up to. The safeguarding lead handles the rest and
+                keeps the details private.
+            </InfoCard>
+
+            <ReviewCard icon={FileText} title="What you reported" span>
+                <p className="text-sm whitespace-pre-wrap text-foreground">
+                    {d.description || '—'}
+                </p>
+            </ReviewCard>
+
+            <ReviewCard icon={Search} title="Details">
+                <ReviewRow label="Type" value={titleCase(d.concern_type)} />
+                <ReviewRow
+                    label="Category"
+                    value={titleCase(d.abuse_category)}
+                />
+                <ReviewRow label="Where" value={d.location || '—'} />
+            </ReviewCard>
+
+            <ReviewCard icon={Clock} title="Where it's up to">
+                <ReviewRow label="Status" value={d.status_label} />
+                <ReviewRow
+                    label="Reported"
+                    value={d.reported_at ? formatDateTime(d.reported_at) : '—'}
+                />
+                {d.closed_at ? (
+                    <ReviewRow
+                        label="Closed"
+                        value={formatDateTime(d.closed_at)}
+                    />
+                ) : null}
+            </ReviewCard>
+
+            {d.immediate_actions ? (
+                <ReviewCard
+                    icon={ClipboardCheck}
+                    title="What you did straight away"
+                    span
+                >
+                    <p className="text-sm whitespace-pre-wrap text-foreground">
+                        {d.immediate_actions}
+                    </p>
+                </ReviewCard>
+            ) : null}
+        </div>
+    );
+}
 
 function LifecycleTracker({ d }: { d: ConcernDetail }) {
     const idx = d.stage_index;

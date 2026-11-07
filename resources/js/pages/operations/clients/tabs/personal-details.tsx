@@ -1,12 +1,15 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { genderLabel, genderRecordedAsNotice } from '@/lib/client-gender';
 import { ageOnWorkerDay } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     Accessibility,
+    AlertTriangle,
     Bed,
     Brain,
     Briefcase,
@@ -42,6 +45,11 @@ type ClientPersonalDetailsClient = {
     preferred_pronouns?: string | null;
     date_of_birth?: string | null;
     gender?: string | null;
+    gender_description?: string | null;
+    /** Readable label from the server, e.g. "Another gender: takatāpui". */
+    gender_label?: string | null;
+    /** Text typed before Gender was a dropdown, waiting for a choice. */
+    gender_recorded_as?: string | null;
     nhi_number?: string | null;
     status?: string | null;
     phone?: string | null;
@@ -200,6 +208,9 @@ export function PersonalDetailsTab({
     const age = ageOnWorkerDay(client.date_of_birth);
     const address = joinAddress(client);
     const languages = (client.languages ?? []).filter(Boolean);
+    const gender =
+        client.gender_label ??
+        genderLabel(client.gender, client.gender_description);
 
     return (
         <div className="space-y-6" data-test="client-personal-details-tab">
@@ -225,6 +236,26 @@ export function PersonalDetailsTab({
                     </Button>
                 ) : null}
             </div>
+
+            {client.gender_recorded_as && !gender ? (
+                <Alert variant="warning" data-test="gender-recorded-as-notice">
+                    <AlertTriangle />
+                    <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                        <p>
+                            {genderRecordedAsNotice(client.gender_recorded_as)}
+                        </p>
+                        {onEdit ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onEdit}
+                            >
+                                Choose an option
+                            </Button>
+                        ) : null}
+                    </AlertDescription>
+                </Alert>
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <Card>
@@ -269,7 +300,12 @@ export function PersonalDetailsTab({
                         <DetailRow
                             icon={UserCircle2}
                             label="Gender"
-                            value={client.gender}
+                            value={
+                                gender ??
+                                (client.gender_recorded_as
+                                    ? `Recorded as ‘${client.gender_recorded_as}’`
+                                    : null)
+                            }
                         />
                         <DetailRow
                             icon={UserCircle2}

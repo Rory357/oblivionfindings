@@ -59,6 +59,16 @@ class SafeWorkProcedureController extends Controller
         return Inertia::render('health-safety/procedures/index', [
             'procedures' => $paginator, 'filters' => $filters, 'tab' => $filters['tab'], 'tabCounts' => $counts, 'detail' => null,
             'hero' => ['library' => ['approved' => $counts['approved'], 'under_review' => $counts['under_review'], 'draft' => $counts['draft'], 'archived' => $counts['archived']], 'attention' => ['review_due_soon' => $dueSoon, 'review_overdue' => $overdue, 'review_unknown' => $facetRows->filter(fn ($row) => $row['published_version_id'] && $row['review_date'] === null)->count(), 'unapproved' => $facetRows->filter(fn ($row) => ! $row['published_version_id'] && $row['status'] !== 'archived')->count(), 'coverage_gaps' => $gaps], 'nz' => ['worksafe_approved' => null, 'nga_paerewa_documented' => null, 'review_overdue' => $overdue, 'coverage_gaps' => $gaps, 'high_risk_covered' => count(array_intersect(['manual_handling', 'challenging_behaviour', 'lone_working', 'medication'], $categories)) === 4]],
+            // G4-14 (board approved 1 Nov 2026): the lead block — published procedures past their review date (oldest
+            // first, with their owner), then the areas that have no published procedure yet.
+            'register_summary' => [
+                'lead' => $facetRows->filter(fn ($row) => $row['published_version_id'] && $row['review_date'] && $row['review_date'] < $today)
+                    ->sortBy('review_date')->take(3)
+                    ->map(fn ($row) => ['id' => (int) $row['id'], 'title' => $row['title'], 'review_date' => $row['review_date'], 'owner' => $row['owner']['name'] ?? null])
+                    ->values()->all(),
+                'review_overdue' => $overdue,
+                'gap_categories' => array_values(array_diff(SafeWorkProcedureService::CATEGORIES, $categories)),
+            ],
             'can' => ['view' => true, 'create' => $current->canDo('procedures.create') || $current->canDo('procedures.manage'), 'manage' => $current->canDo('procedures.manage'), 'approve' => $current->canDo('procedures.approve')],
             ...$this->access->pickerOptions($current), 'categories' => collect(SafeWorkProcedureService::CATEGORIES)->map(fn ($key) => ['value' => $key, 'label' => ucwords(str_replace('_', ' ', $key))])->all(),
         ]);
@@ -133,6 +143,13 @@ class SafeWorkProcedureController extends Controller
         return $this->transition($request, $procedure, 'restore');
     }
 
+    public function withdraw(Request $request, SafeWorkProcedure $procedure): RedirectResponse
+    {
+        $this->service->lifecycle($procedure, $request->user(), 'withdraw', $request->all());
+
+        return back()->with('success', 'Draft withdrawn. It no longer shows in the register; its history and your reason are kept.');
+    }
+
     private function transition(Request $request, SafeWorkProcedure $procedure, string $command): RedirectResponse
     {
         $this->service->lifecycle($procedure, $request->user(), $command, $request->all());
@@ -197,7 +214,8 @@ class SafeWorkProcedureController extends Controller
             if ($filters['site_id'] !== null) {
                 abort_unless(in_array($filters['site_id'], $sites, true), 403);
             }
-            $records = $reads->query(SafeWorkProcedure::query())->with(['publishedVersion.approvedBy', 'versions', 'owner', 'approvedBy'])->orderBy('title')->get();
+            // Withdrawn drafts leave every list; they stay readable on their own page and in history.
+            $records = $reads->query(SafeWorkProcedure::query()->where('status', '!=', 'withdrawn'))->with(['publishedVersion.approvedBy', 'versions', 'owner', 'approvedBy'])->orderBy('title')->get();
             $rows = $records->map(function ($record) use ($current, $sites) {
                 $published = $record->status !== 'archived' && $record->publishedVersion && (int) $record->publishedVersion->safe_work_procedure_id === (int) $record->id && $this->access->isApprovedVersion($record->publishedVersion) && $this->access->audienceAllows($record->publishedSnapshot(), $current, $sites);
                 $working = $this->access->workingAllowed($record, $current, $sites) && $this->access->allSitesAllowed($record->applicable_sites ?? [], $sites, $current);

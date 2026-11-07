@@ -118,6 +118,40 @@ describe('DeferredPanel', () => {
         expect(screen.queryByText(/could not be loaded/)).toBeNull();
     });
 
+    // A panel whose props load in two background groups (H&S Overview "Needs attention": worklists in 'work',
+    // kpis in 'headline'). The faster group landing first is normal, not a failure (R3, 31 Oct).
+    function SplitPanel() {
+        return (
+            <DeferredPanel<{ worklists: Card; kpis: Card }>
+                data={['worklists', 'kpis']}
+                label="Needs attention"
+                fallback={<p>skeleton</p>}
+            >
+                {({ worklists, kpis }) => <p>{worklists.total + kpis.total} need attention</p>}
+            </DeferredPanel>
+        );
+    }
+
+    it('keeps the skeleton, not an error, when one group has landed and the other is still loading', () => {
+        render(<SplitPanel />);
+        emit('start', { visit: { only: ['worklists', 'backbone'] } });
+        emit('start', { visit: { only: ['kpis'] } });
+        emit('success', { page: { props: { worklists: { total: 2 }, backbone: {} } } });
+        emit('finish', { visit: { only: ['worklists', 'backbone'], cancelled: false, interrupted: false } });
+
+        expect(screen.queryByText('Needs attention could not be loaded')).toBeNull();
+        expect(screen.getByText('skeleton')).toBeTruthy();
+    });
+
+    it('still reports a failure when a group finishes without its own key', () => {
+        render(<SplitPanel />);
+        emit('start', { visit: { only: ['kpis'] } });
+        emit('success', { page: { props: { worklists: { total: 2 } } } });
+        emit('finish', { visit: { only: ['kpis'], cancelled: false, interrupted: false } });
+
+        expect(screen.getByText('Needs attention could not be loaded')).toBeTruthy();
+    });
+
     it('shows the error, not an empty card, when the server says the read failed', () => {
         mocks.props = { ...mocks.props, myTasks: { total: 0, unavailable: true } };
         render(<Panel />);

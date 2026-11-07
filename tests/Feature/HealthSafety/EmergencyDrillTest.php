@@ -32,6 +32,8 @@ use Tests\TestCase;
  */
 class EmergencyDrillTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -342,7 +344,7 @@ class EmergencyDrillTest extends TestCase
         $expected = app(DrillComplianceService::class)->compliancePct();
 
         $this->actingAs($this->officer())
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $p) => $p->where('kpis.drill_compliance_pct', $expected));
     }

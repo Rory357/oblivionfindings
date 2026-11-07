@@ -34,7 +34,7 @@ final class SafeguardingTerminalTransitionService
 
     public const CLOSE_ANY_PERMISSION = 'safeguarding.closeAny';
 
-    private const SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
+    private const SITE_BYPASS_PERMISSIONS = UserSiteAccessService::SAFEGUARDING_SITE_BYPASS_PERMISSIONS;
 
     private const TRANSACTION_ATTEMPTS = 3;
 
@@ -320,7 +320,7 @@ final class SafeguardingTerminalTransitionService
         if ($concern->concern_type === 'incident_escalation' && $concern->related_incident_id) {
             $incident = ClientIncident::query()->lockForUpdate()->find($concern->related_incident_id);
             if (! $incident) {
-                throw new DomainException('The canonical incident journey is unavailable.');
+                throw new DomainException('Its linked incident can’t be found. Ask an administrator to check the links.');
             }
         }
 
@@ -379,13 +379,13 @@ final class SafeguardingTerminalTransitionService
         }
 
         if ($events->count() !== 1) {
-            throw new DomainException('One canonical H&S safeguarding event is required.');
+            throw new DomainException('Its H&S safety review can’t be found, or there is more than one. Ask an administrator to check the links.');
         }
 
         /** @var HsEvent $event */
         $event = $events->first();
         if ($incident && $incident->hs_event_id && (int) $incident->hs_event_id !== (int) $event->id) {
-            throw new DomainException('The incident and H&S safeguarding journey do not identify the same event.');
+            throw new DomainException('Its incident and its H&S safety review don’t match. Ask an administrator to check the links.');
         }
         if (! $incident) {
             $expectedKey = HsEvent::buildIdempotencyKey(
@@ -394,7 +394,7 @@ final class SafeguardingTerminalTransitionService
                 HsEvent::CATEGORY_SAFEGUARDING,
             );
             if (! hash_equals($expectedKey, (string) $event->idempotency_key)) {
-                throw new DomainException('The H&S safeguarding event provenance is invalid.');
+                throw new DomainException('Its H&S safety review doesn’t match this concern. Ask an administrator to check the links.');
             }
         }
 
@@ -412,15 +412,15 @@ final class SafeguardingTerminalTransitionService
             ->unique()
             ->values();
         if ($alertIds->count() !== 1) {
-            throw new DomainException('The canonical Control Room safeguarding alert is missing or conflicting.');
+            throw new DomainException('Its Control Room alert can’t be found, or there is more than one. Ask an administrator to check the links.');
         }
 
         $alert = ControlRoomAlert::query()->lockForUpdate()->find($alertIds->first());
         if (! $alert) {
-            throw new DomainException('The canonical Control Room safeguarding alert is unavailable.');
+            throw new DomainException('Its Control Room alert can’t be found. Ask an administrator to check the links.');
         }
         if (! $incident && (int) data_get($alert->context, 'concern_id') !== (int) $concern->id) {
-            throw new DomainException('The Control Room alert does not belong to this safeguarding concern.');
+            throw new DomainException('Its Control Room alert belongs to a different concern. Ask an administrator to check the links.');
         }
 
         return $alert;
@@ -458,12 +458,12 @@ final class SafeguardingTerminalTransitionService
         $hasUpdatePermission = $actor->canDo('safeguarding.update');
         $isAssignedOwner = (int) $concern->assigned_to_user_id === (int) $actor->id;
         if (! $hasUpdatePermission && ! $isAssignedOwner) {
-            throw new AuthorizationException('This action is unauthorized.');
+            throw new AuthorizationException('You can’t triage or close this concern.');
         }
         if ($concern->assigned_to_user_id !== null
             && ! $isAssignedOwner
             && ! $actor->canDo(self::CLOSE_ANY_PERMISSION)) {
-            throw new AuthorizationException('Only the assigned safeguarding lead or an explicitly authorised safeguarding lead can close this concern.');
+            throw new AuthorizationException('Only its safeguarding lead, or someone allowed to close any concern, can close it.');
         }
 
         $this->assertCanonicalSiteTuple($aggregate);
@@ -484,7 +484,7 @@ final class SafeguardingTerminalTransitionService
                     'safeguarding.update' => $hasUpdatePermission,
                     self::CLOSE_ANY_PERMISSION => $actor->canDo(self::CLOSE_ANY_PERMISSION),
                     self::OVERRIDE_PERMISSION => $actor->canDo(self::OVERRIDE_PERMISSION),
-                    'reports.viewAny' => $actor->canDo('reports.viewAny'),
+                    'safeguarding.viewAllSites' => $actor->canDo('safeguarding.viewAllSites'),
                     'safeguarding.viewSensitive' => $actor->canDo('safeguarding.viewSensitive'),
                 ],
             ]),
@@ -508,7 +508,7 @@ final class SafeguardingTerminalTransitionService
             ->values();
 
         if ($siteIds->count() !== 1) {
-            throw new DomainException('The safeguarding, H&S and Control Room records do not share one canonical Site.');
+            throw new DomainException('This concern, its H&S safety review and its Control Room alert are at different Sites. Ask an administrator to check the links.');
         }
     }
 
@@ -557,17 +557,17 @@ final class SafeguardingTerminalTransitionService
         }
         if ($overrideReason === null) {
             throw ValidationException::withMessages([
-                'override_reason' => 'Open work or an unlogged referral remains — record why you are closing anyway.',
+                'override_reason' => 'Some safeguarding work is still open, or a referral isn’t logged yet. Say why you’re closing anyway.',
             ]);
         }
         if (! $actor->canDo(self::OVERRIDE_PERMISSION)) {
             throw ValidationException::withMessages([
-                'override_reason' => 'An override reason alone cannot authorise closure with open safeguarding work.',
+                'override_reason' => 'A reason alone can’t close a concern with open safeguarding work. Closing with open work needs its own permission.',
             ]);
         }
         if (mb_strlen($overrideReason) < 20) {
             throw ValidationException::withMessages([
-                'override_reason' => 'Record a specific override reason of at least 20 characters.',
+                'override_reason' => 'Say why you’re closing anyway, in at least 20 characters.',
             ]);
         }
 
@@ -583,12 +583,12 @@ final class SafeguardingTerminalTransitionService
             || $event->closed_at === null
             || $event->closed_by === null
             || blank($event->closure_summary)) {
-            throw new DomainException('Close the canonical H&S safeguarding event with its required evidence first.');
+            throw new DomainException('Its H&S safety review is still open. Close it first, with its WorkSafe decision and closing summary.');
         }
         if ($aggregate['hs_investigations']->contains(
             fn (HsInvestigation $investigation): bool => $investigation->status !== HsInvestigation::STATUS_COMPLETED,
         )) {
-            throw new DomainException('Complete the canonical H&S investigation before closing safeguarding.');
+            throw new DomainException('Its H&S safety review’s investigation isn’t complete yet. Complete it first.');
         }
         if ($aggregate['hs_actions']->contains(
             fn (HsCorrectiveAction $action): bool => ! in_array($action->status, [
@@ -596,7 +596,7 @@ final class SafeguardingTerminalTransitionService
                 HsCorrectiveAction::STATUS_CLOSED,
             ], true),
         )) {
-            throw new DomainException('Verify or close the canonical H&S corrective work before closing safeguarding.');
+            throw new DomainException('Its H&S safety review still has actions to check or close. Check or close them first.');
         }
 
         /** @var ControlRoomAlert $alert */
@@ -605,16 +605,16 @@ final class SafeguardingTerminalTransitionService
             || $alert->resolved_at === null
             || $alert->resolved_by_user_id === null
             || blank($alert->resolution_code)) {
-            throw new DomainException('Resolve the canonical Control Room safeguarding response with its required evidence first.');
+            throw new DomainException('Its Control Room alert isn’t resolved yet. Resolve it first, with a resolution.');
         }
         if ($alert->status === ControlRoomAlert::STATUS_CLOSED
             && ($alert->closed_at === null || $alert->closed_by_user_id === null)) {
-            throw new DomainException('The canonical Control Room alert closure provenance is incomplete.');
+            throw new DomainException('Its Control Room alert was closed without a record of who closed it. Ask an administrator to check it.');
         }
         if ($aggregate['alert_tasks']->contains(
             fn (AlertTask $task): bool => ! in_array($task->status, AlertTask::TERMINAL_STATUSES, true),
         )) {
-            throw new DomainException('Complete, cancel with governance, or transfer every protective Control Room task first.');
+            throw new DomainException('Its Control Room alert still has open tasks. Finish, cancel or hand over each one first.');
         }
 
         $actionsBySourceTask = $aggregate['hs_actions']->keyBy('source_control_room_task_id');
@@ -625,7 +625,7 @@ final class SafeguardingTerminalTransitionService
                 || $task->transferred_at === null
                 || $task->transferred_by_user_id === null
                 || ! in_array($action->status, [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED], true)) {
-                throw new DomainException('Transferred protective work does not have one completed canonical H&S action.');
+                throw new DomainException('A Control Room task handed over to H&S doesn’t have one finished H&S action. Check or close that action first.');
             }
         }
     }
@@ -705,7 +705,7 @@ final class SafeguardingTerminalTransitionService
         string $requestHash,
     ): void {
         if ($transition->target_status !== $targetStatus || ! hash_equals($transition->request_hash, $requestHash)) {
-            throw new DomainException('A different terminal transition request already owns this safeguarding concern.');
+            throw new DomainException('Someone else is triaging or closing this concern right now. Refresh the page to see where it’s up to.');
         }
     }
 

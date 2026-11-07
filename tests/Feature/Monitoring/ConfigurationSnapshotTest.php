@@ -448,7 +448,7 @@ it('requires Device permission and canonical Site visibility before returning a 
         ->assertNotFound();
 });
 
-it('keeps raw snapshot payloads out of logs and the Network and IT workspace props', function (): void {
+it('keeps raw snapshot payloads out of logs and the device page props', function (): void {
     $logHandler = new TestHandler;
     Log::swap(new IlluminateLogger(new MonologLogger('snapshot-test', [$logHandler])));
     $this->seed(RbacSeeder::class);
@@ -465,15 +465,13 @@ it('keeps raw snapshot payloads out of logs and the Network and IT workspace pro
     $admin = User::factory()->create(['approved_at' => now()]);
     $admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
 
+    // S&D rebuild C6: the Network & IT workspace is gone; settings backups show on the device's own page.
     $this->actingAs($admin)
         ->get('/security-devices/network-it?tab=configuration-firmware')
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page->where(
-            'networkItWorkspace.activeTab.configuration.0.deviceId',
-            $device->id,
-        )->etc());
+        ->assertRedirect('/security-devices/devices?tab=network');
 
-    $response = $this->actingAs($admin)->get('/security-devices/network-it?tab=configuration-firmware');
+    $response = $this->actingAs($admin)->get('/security-devices/devices/'.$device->id);
+    $response->assertOk();
     expect($response->getContent())->not->toContain('RAW-SNAPSHOT-PAYLOAD-SENTINEL');
     expect(json_encode($logHandler->getRecords(), JSON_THROW_ON_ERROR))
         ->not->toContain('RAW-SNAPSHOT-PAYLOAD-SENTINEL');

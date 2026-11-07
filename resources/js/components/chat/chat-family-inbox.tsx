@@ -272,7 +272,8 @@ function FamilyInboxSession({
                     }
                 }
             },
-            { interval: () => 10000 },
+            // Live: refreshed when a conversation or the list changes; polled only while down.
+            { topics: ['conversation.changed', 'inbox.changed'] },
         );
         return () => {
             stop();

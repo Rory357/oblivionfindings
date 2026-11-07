@@ -32,6 +32,8 @@ class StoreHsCorrectiveActionRequest extends FormRequest
             ])],
             'assigned_to_user_id' => ['required', 'integer'],
             'due_date' => ['required', 'date_format:Y-m-d'],
+            // Q11: the failed action this revised action replaces (checked server-side against the review).
+            'replaces_action_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 

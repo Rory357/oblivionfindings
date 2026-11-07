@@ -1,0 +1,486 @@
+<?php
+
+namespace Tests\Feature\SecurityDevices;
+
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Alerts\Models\DeviceAlert;
+use App\Domain\SecurityDevices\Enums\AssignmentType;
+use App\Domain\SecurityDevices\Iot\Readings\SensorReadingHistory;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Client;
+use App\Models\Permission;
+use App\Models\Queclink\QueclinkDevice;
+use App\Models\Queclink\QueclinkPendingCommand;
+use App\Models\Queclink\QueclinkRawFrame;
+use App\Models\Role;
+use App\Models\Site;
+use App\Models\User;
+use Carbon\CarbonImmutable;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\SecurityDevicesPermissionsSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
+use Tests\TestCase;
+
+/**
+ * S&D rebuild Phase E: the sensor page (pg-sdr-7) and the care tracker page (pg-sdr-8, 8b, 8c).
+ * Another Site's device is 404; a tracker's location never reaches the page without active consent;
+ * a command is refused without securityDevices.trackers.command. Synthetic Sites and people only.
+ */
+class SensorTrackerPagesTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private const string IMEI = '867963000000017';
+
+    private Site $home;
+
+    private Site $other;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RbacSeeder::class);
+        $this->seed(SecurityDevicesPermissionsSeeder::class);
+
+        $this->home = Site::factory()->create(['name' => 'Synthetic House', 'is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $this->other = Site::factory()->create(['name' => 'Synthetic Lodge', 'is_active' => true, 'archived' => false, 'archived_at' => null]);
+    }
+
+    /** @param list<string> $keys */
+    private function viewerWith(array $keys): User
+    {
+        $user = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->home->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        foreach ($keys as $key) {
+            $user->permissionOverrides()->attach(Permission::query()->where('key', $key)->firstOrFail()->id, ['allowed' => true]);
+        }
+
+        return $user;
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function sensor(Site $site, array $attributes = []): Device
+    {
+        $device = Device::factory()->facilities()->create([
+            'name' => 'Synthetic room sensor',
+            'manufacturer' => 'Synthetic',
+            'model' => 'AM-1',
+            'provider' => 'mqtt',
+            'battery_level' => 64,
+            'location_description' => 'Room 3',
+            ...$attributes,
+        ]);
+        $this->onSite($device, $site);
+
+        return $device;
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function tracker(Site $site, array $attributes = []): Device
+    {
+        $device = Device::factory()->tracking()->create([
+            'name' => 'Synthetic care tracker',
+            'provider' => 'queclink',
+            'imei' => self::IMEI,
+            'model' => 'GL320MG',
+            'battery_level' => 77,
+            ...$attributes,
+        ]);
+        $this->onSite($device, $site);
+        QueclinkDevice::query()->create([
+            'imei' => self::IMEI,
+            'device_id' => $device->id,
+            'binding_uuid' => (string) str()->uuid(),
+            'model_hint' => 'GL320MG',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'connection_state' => QueclinkDevice::CONN_CONNECTED,
+            'first_seen_at' => now()->subDays(5),
+            'last_seen_at' => now()->subMinute(),
+            'last_frame_at' => now()->subMinute(),
+        ]);
+
+        return $device;
+    }
+
+    private function onSite(Device $device, Site $site): void
+    {
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now()->subDays(3),
+        ]);
+    }
+
+    public function test_another_sites_sensor_and_tracker_are_404(): void
+    {
+        $viewer = $this->viewerWith([
+            'securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view',
+            'securityDevices.integrations.manage', 'securityDevices.commands.operate', 'securityDevices.commands.control',
+            'securityDevices.trackers.command',
+        ]);
+        $sensor = $this->sensor($this->other, ['name' => 'Synthetic Lodge sensor']);
+        $tracker = $this->tracker($this->other, ['name' => 'Synthetic Lodge tracker']);
+
+        $this->actingAs($viewer)->get('/security-devices/devices/'.$sensor->id)->assertNotFound();
+        $this->actingAs($viewer)->get('/security-devices/devices/'.$sensor->id.'?tab=alerts')->assertNotFound();
+        $this->actingAs($viewer)->get('/security-devices/devices/'.$tracker->id)->assertNotFound();
+        $this->actingAs($viewer)->get('/security-devices/devices/'.$tracker->id.'?tab=console')->assertNotFound();
+        $this->actingAs($viewer)
+            ->postJson('/security-devices/devices/'.$tracker->id.'/tracker/commands', ['command' => 'read_config'])
+            ->assertNotFound();
+
+        $this->assertSame(0, QueclinkPendingCommand::query()->count());
+    }
+
+    public function test_sensor_page_shows_readings_limits_battery_and_alerts(): void
+    {
+        $viewer = $this->viewerWith(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view']);
+        $at = CarbonImmutable::now()->subMinutes(2);
+        $sensor = $this->sensor($this->home, [
+            'meta' => ['observed' => [
+                'last_telemetry_at' => $at->toIso8601String(),
+                'last_telemetry_protocol' => 'mqtt',
+                'sensor_readings' => [
+                    'temperature' => ['label' => 'Temperature', 'value' => 21.4, 'unit' => 'C', 'state' => 'healthy', 'observed_at' => $at->toIso8601String()],
+                    'co2' => ['label' => 'CO2', 'value' => 1210, 'unit' => 'ppm', 'state' => 'warning', 'observed_at' => $at->toIso8601String()],
+                    'rssi' => ['label' => 'Radio signal (RSSI)', 'value' => -87, 'unit' => 'dBm', 'state' => 'healthy', 'observed_at' => $at->toIso8601String()],
+                ],
+            ]],
+        ]);
+        $history = app(SensorReadingHistory::class);
+        foreach ([180, 120, 60] as $minutes) {
+            $history->record((int) $sensor->id, ['temperature' => 21.0, 'co2' => 900], CarbonImmutable::now()->subMinutes($minutes));
+        }
+        $alert = DeviceAlert::query()->create([
+            'device_id' => $sensor->id,
+            'site_id' => $this->home->id,
+            'kind' => 'reading_co2',
+            'severity' => 'warning',
+            'title' => 'Synthetic room sensor: co2 1210 ppm',
+            'state' => DeviceAlert::STATE_OPEN,
+            'opened_at' => now()->subMinutes(30),
+        ]);
+
+        $this->actingAs($viewer)
+            ->get('/security-devices/devices/'.$sensor->id)
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $page->component('security-devices/devices/sensor')
+                    ->where('device.kind', 'sensor')
+                    ->where('tab', 'readings')
+                    ->where('tabs', [['key' => 'readings', 'label' => 'Readings'], ['key' => 'alerts', 'label' => 'Alerts']])
+                    ->where('meters.0.label', 'Temperature')
+                    ->where('meters.0.value', '21.4 °C')
+                    ->where('meters.1.label', 'CO₂')
+                    ->where('meters.1.tone', 'warning')
+                    ->where('meters.2.label', 'Battery')
+                    ->where('meters.2.value', '64%')
+                    ->where('readings.series.0.key', 'temperature')
+                    ->where('readings.series.0.limits', [
+                        ['value' => 12, 'label' => 'Alert below 12 °C'],
+                        ['value' => 32, 'label' => 'Alert above 32 °C'],
+                    ])
+                    ->where('readings.series.1.limits.0.label', 'Alert at 1,000 ppm')
+                    ->where('alerts', null);
+                $props = $page->toArray()['props'];
+                $this->assertCount(96, $props['readings']['series'][0]['points']);
+                $this->assertNotEmpty(array_filter($props['readings']['series'][0]['points'], fn ($value) => $value !== null));
+                // Signal is "where it is", never a reading of its own.
+                $this->assertSame(['temperature', 'co2'], array_column($props['readings']['series'], 'key'));
+                $this->assertContains(['label' => 'Signal', 'text' => '−87 dBm', 'at' => null], $props['readings']['where']['rows']);
+            });
+
+        $this->actingAs($viewer)
+            ->get('/security-devices/devices/'.$sensor->id.'?tab=alerts&range=7d')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('security-devices/devices/sensor')
+                ->where('tab', 'alerts')
+                ->where('range', '7d')
+                ->where('readings', null)
+                ->where('alerts.0.href', '/security-devices/alerts?alert='.$alert->id)
+                ->where('alerts.0.sub', 'Still open'));
+    }
+
+    public function test_a_viewer_without_events_permission_gets_no_alerts_tab(): void
+    {
+        $viewer = $this->viewerWith(['securityDevices.viewAny', 'securityDevices.devices.view']);
+        $sensor = $this->sensor($this->home);
+
+        $this->actingAs($viewer)
+            ->get('/security-devices/devices/'.$sensor->id.'?tab=alerts')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('security-devices/devices/sensor')
+                ->where('tab', 'readings')
+                ->where('tabs', [['key' => 'readings', 'label' => 'Readings']])
+                ->where('alerts', null));
+    }
+
+    public function test_tracker_location_is_hidden_without_active_consent(): void
+    {
+        $admin = User::factory()->create(['approved_at' => now()]);
+        $admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $client = Client::factory()->create(['site_id' => $this->home->id, 'first_name' => 'Synthetic', 'preferred_name' => null]);
+        $device = Device::factory()->tracking()->create([
+            'name' => 'Synthetic care tracker',
+            'provider' => 'queclink',
+            'imei' => self::IMEI,
+            'model' => 'GL320MG',
+            'battery_level' => 77,
+        ]);
+        // Worn by a client WITHOUT a location consent.
+        $assignment = DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+            'assignable_id' => $client->id,
+            'assignment_type' => AssignmentType::Permanent,
+            'assigned_at' => now(),
+            'consent_id' => null,
+        ]);
+        $unit = QueclinkDevice::query()->create([
+            'imei' => self::IMEI,
+            'device_id' => $device->id,
+            'binding_uuid' => (string) str()->uuid(),
+            'model_hint' => 'GL320MG',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'connection_state' => QueclinkDevice::CONN_CONNECTED,
+            'last_seen_at' => now()->subMinute(),
+            'last_frame_at' => now()->subMinute(),
+        ]);
+        QueclinkRawFrame::query()->create([
+            'queclink_device_id' => $unit->id,
+            'canonical_device_id' => $device->id,
+            'device_assignment_id' => $assignment->id,
+            'imei' => self::IMEI,
+            'direction' => QueclinkRawFrame::DIRECTION_INBOUND,
+            'frame_type' => QueclinkRawFrame::FRAME_RESP,
+            'command_word' => 'GTFRI',
+            'raw_frame' => '',
+            'encrypted_raw_frame' => Crypt::encryptString('+RESP:GTFRI,5E0100,'.self::IMEI.',,0,0,1,1,0.0,0,12.0,174.763336,-36.848461,20261028010000,,,,,,77,0006$'),
+            'encrypted_parsed_payload' => Crypt::encryptString(json_encode(['latitude' => -36.848461, 'longitude' => 174.763336, 'battery_pct' => 77])),
+            'parse_ok' => true,
+        ]);
+
+        foreach (['', '?tab=console'] as $query) {
+            $response = $this->actingAs($admin)->get('/security-devices/devices/'.$device->id.$query)->assertOk();
+            $body = (string) $response->getContent();
+            $this->assertStringNotContainsString('174.763336', $body);
+            $this->assertStringNotContainsString('-36.848461', $body);
+            $this->assertStringNotContainsString(self::IMEI, $body);
+        }
+
+        $this->actingAs($admin)
+            ->get('/security-devices/devices/'.$device->id)
+            ->assertInertia(function ($page): void {
+                $page->component('security-devices/devices/tracker')
+                    ->where('device.kind', 'care_tracker')
+                    ->where('privacy.shown', false)
+                    ->where('privacy.state', 'consent_required')
+                    ->where('privacy.person.consent.active', false)
+                    ->where('location.position', null)
+                    ->where('location.fix.note', 'Location is hidden because Synthetic’s location consent is not active.')
+                    ->where('meters.0.label', 'Last position')
+                    ->where('meters.0.value', 'Hidden')
+                    ->where('can.locate', false);
+                $options = collect($page->toArray()['props']['commands']['options'])->pluck('key')->all();
+                // Asking for a position is held back while the location can't be shown.
+                $this->assertNotContains('request_location', $options);
+                $this->assertContains('read_config', $options);
+            });
+
+        $this->actingAs($admin)
+            ->postJson('/security-devices/devices/'.$device->id.'/tracker/commands', ['command' => 'request_location'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('command');
+        $this->assertSame(0, QueclinkPendingCommand::query()->count());
+    }
+
+    public function test_a_tracker_command_is_refused_without_the_tracker_command_permission(): void
+    {
+        $base = [
+            'securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.integrations.manage',
+            'securityDevices.commands.operate', 'securityDevices.commands.control',
+        ];
+        $without = $this->viewerWith($base);
+        $with = $this->viewerWith([...$base, 'securityDevices.trackers.command']);
+        $device = $this->tracker($this->home);
+
+        $this->actingAs($without)
+            ->postJson('/security-devices/devices/'.$device->id.'/tracker/commands', ['command' => 'read_config'])
+            ->assertForbidden();
+        $this->actingAs($without)
+            ->get('/security-devices/devices/'.$device->id)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('security-devices/devices/tracker')
+                ->where('can.command', false)
+                ->where('commands.options', []));
+        $this->assertSame(0, QueclinkPendingCommand::query()->count());
+
+        // A risky command needs a reason, even with the permission.
+        $this->actingAs($with)
+            ->postJson('/security-devices/devices/'.$device->id.'/tracker/commands', ['command' => 'reboot'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('reason');
+
+        $this->actingAs($with)
+            ->postJson('/security-devices/devices/'.$device->id.'/tracker/commands', ['command' => 'read_config'])
+            ->assertOk()
+            ->assertJsonPath('status', QueclinkPendingCommand::STATUS_QUEUED);
+        $this->assertSame(1, QueclinkPendingCommand::query()->count());
+        $this->assertSame('GTRTO', QueclinkPendingCommand::query()->sole()->command_word);
+    }
+
+    public function test_sensor_alert_limits_are_configurable_permission_checked_and_audited(): void
+    {
+        $without = $this->viewerWith(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.devices.update']);
+        $manager = $this->viewerWith(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'securityDevices.automations.manage']);
+        $at = CarbonImmutable::now()->subMinute();
+
+        $sensor = $this->sensor($this->home, [
+            'meta' => ['observed' => [
+                'last_telemetry_at' => $at->toIso8601String(),
+                'sensor_readings' => [
+                    'temperature' => ['label' => 'Temperature', 'value' => 14.5, 'unit' => 'C', 'state' => 'healthy', 'observed_at' => $at->toIso8601String()],
+                    'co2' => ['label' => 'CO2', 'value' => 900, 'unit' => 'ppm', 'state' => 'healthy', 'observed_at' => $at->toIso8601String()],
+                ],
+            ]],
+        ]);
+        $otherSensor = $this->sensor($this->other, ['name' => 'Other Site sensor']);
+
+        // Refused without securityDevices.automations.manage, and 404 for another Site's sensor.
+        $this->actingAs($without)
+            ->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+                'metrics' => ['temperature' => ['enabled' => true, 'below' => 16, 'above' => null]],
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($manager)
+            ->putJson('/security-devices/devices/'.$otherSensor->id.'/alert-limits', [
+                'metrics' => ['temperature' => ['enabled' => true, 'below' => 16, 'above' => null]],
+            ])
+            ->assertNotFound();
+
+        // Invalid bounds (below >= above) rejected with 422.
+        $this->actingAs($manager)
+            ->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+                'metrics' => ['temperature' => ['enabled' => true, 'below' => 25, 'above' => 20]],
+            ])
+            ->assertUnprocessable();
+
+        // Save custom per-sensor limits: Too cold below 16 °C, CO2 above 1,200 ppm, Battery under 15%.
+        $this->actingAs($manager)
+            ->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+                'metrics' => [
+                    'temperature' => ['enabled' => true, 'below' => 16, 'above' => null],
+                    'co2' => ['enabled' => true, 'warning_at' => 1200, 'critical_at' => null],
+                ],
+                'battery' => ['enabled' => true, 'below' => 15],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'security_devices.sensor_limits.updated',
+            'auditable_type' => $sensor->getMorphClass(),
+            'auditable_id' => $sensor->id,
+            'user_id' => $manager->id,
+        ]);
+
+        // 14.5 °C is now below the custom 16 °C limit, so a reading_temperature alert opened immediately.
+        $this->assertDatabaseHas('security_device_alerts', [
+            'device_id' => $sensor->id,
+            'kind' => 'reading_temperature',
+            'state' => DeviceAlert::STATE_OPEN,
+        ]);
+
+        $this->actingAs($manager)
+            ->get('/security-devices/devices/'.$sensor->id)
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $page->component('security-devices/devices/sensor')
+                    ->where('can.manage_rules', true)
+                    ->where('meters.0.tone', 'warning')
+                    ->where('meters.0.caption.text', 'Below the usual range')
+                    ->where('readings.series.0.limits', [
+                        ['value' => 16, 'label' => 'Alert below 16 °C'],
+                    ])
+                    ->where('readings.series.1.limits', [
+                        ['value' => 1200, 'label' => 'Alert at 1,200 ppm'],
+                    ]);
+                $rules = collect($page->toArray()['props']['readings']['rules'])->keyBy('key');
+                $this->assertSame('Too cold below 16 °C', $rules['temperature']['label']);
+                $this->assertSame('CO₂ above 1,200 ppm', $rules['co2']['label']);
+                $this->assertSame('Battery under 15%', $rules['battery']['label']);
+            });
+
+        // Subsequent MQTT telemetry also uses the stored custom limits (1,100 ppm stays healthy when limit is 1,200 ppm; 17.5 °C recovers temperature).
+        app(\App\Domain\SecurityDevices\Iot\Mqtt\MqttSensorIntakeService::class)->applyTelemetry(
+            $sensor->fresh(),
+            (int) $this->home->id,
+            'mqtt',
+            'sensors/room-3',
+            ['temperature' => 17.5, 'co2' => 1100],
+            CarbonImmutable::now('UTC'),
+        );
+
+        $this->assertDatabaseHas('security_device_alerts', [
+            'device_id' => $sensor->id,
+            'kind' => 'reading_temperature',
+            'state' => DeviceAlert::STATE_DONE,
+        ]);
+        $this->assertDatabaseMissing('security_device_alerts', [
+            'device_id' => $sensor->id,
+            'kind' => 'reading_co2',
+        ]);
+    }
+
+    public function test_changing_limits_never_reads_as_a_recovery_and_safety_sensors_keep_their_battery_alert(): void
+    {
+        // Audit fixes (5 Nov): sensible limits only, a rule change says who closed the alert, and the
+        // sensor keeps what changed; a scald probe's battery alert can't be turned off.
+        $manager = $this->viewerWith(['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'securityDevices.automations.manage']);
+        $manager->forceFill(['name' => 'Jordan Peri'])->save();
+        $at = CarbonImmutable::now()->subMinute();
+        $sensor = $this->sensor($this->home, [
+            'meta' => ['observed' => [
+                'last_telemetry_at' => $at->toIso8601String(),
+                'sensor_readings' => [
+                    'temperature' => ['label' => 'Temperature', 'value' => 34.0, 'unit' => 'C', 'state' => 'warning', 'observed_at' => $at->toIso8601String()],
+                ],
+            ]],
+        ]);
+        app(\App\Domain\SecurityDevices\Alerts\DeviceAlertEngine::class)->onReading($sensor, 'temperature', 'Temperature', 'warning', 34.0, 'C', CarbonImmutable::now('UTC'));
+        $alert = DeviceAlert::query()->where('device_id', $sensor->id)->where('kind', 'reading_temperature')->sole();
+
+        // A limit no sensor could ever read is refused.
+        $this->actingAs($manager)->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+            'metrics' => ['temperature' => ['enabled' => true, 'below' => 12, 'above' => 100000]],
+        ])->assertUnprocessable();
+
+        // Raising the high limit ends the alert: it closes as a rule change by Jordan, not "back to 34 °C".
+        $this->actingAs($manager)->putJson('/security-devices/devices/'.$sensor->id.'/alert-limits', [
+            'metrics' => ['temperature' => ['enabled' => true, 'below' => 12, 'above' => 36]],
+        ])->assertOk();
+        $closed = $alert->fresh();
+        $this->assertSame(DeviceAlert::STATE_DONE, $closed->state);
+        $this->assertSame('rule_changed', $closed->close_reason);
+        $this->assertSame('Temperature alert limits changed by Jordan Peri', $closed->events()->where('kind', 'rule_changed')->value('text'));
+        $this->assertFalse($closed->events()->where('kind', 'recovered')->exists());
+        $history = \App\Domain\SecurityDevices\Iot\Readings\SensorAlertRules::history($sensor->fresh());
+        $this->assertSame('Jordan Peri', $history[0]['by']);
+        $this->assertSame(['Temperature below 12 °C or above 32 °C → Temperature below 12 °C or above 36 °C'], $history[0]['changes']);
+
+        // A tap probe watching for scalds keeps its battery alert.
+        $probe = $this->sensor($this->home, ['name' => 'Bathroom tap probe', 'config' => ['care' => ['scald_watch' => true]]]);
+        $this->actingAs($manager)->putJson('/security-devices/devices/'.$probe->id.'/alert-limits', [
+            'battery' => ['enabled' => false, 'below' => 20],
+        ])->assertUnprocessable()->assertJsonValidationErrors('battery.enabled');
+    }
+}

@@ -1,0 +1,49 @@
+{
+  "id": "chat3",
+  "name": "Chat v3 — proposed rebuild",
+  "group": "Screens and parts",
+  "items": [
+    {
+      "t": "Chat v3 — workspace: staff and family threads, the conversation list",
+      "w": 1600,
+      "h": 2949,
+      "l": "ChatV3-Workspace.html",
+      "d": "ChatV3-Workspace.html#d"
+    },
+    {
+      "t": "Chat v3 — writing: emoji, reactions, stickers, GIFs, formatting, attach, voice, commands",
+      "w": 1600,
+      "h": 2416,
+      "l": "ChatV3-Compose.html",
+      "d": "ChatV3-Compose.html#d"
+    },
+    {
+      "t": "Chat v3 — message actions: menus, message info, share, threads, pins, priority, polls, links",
+      "w": 1600,
+      "h": 2481,
+      "l": "ChatV3-Messages.html",
+      "d": "ChatV3-Messages.html#d"
+    },
+    {
+      "t": "Chat v3 — only in Oblivion: care cards, privacy check, on-shift, handover digest, confirm",
+      "w": 1600,
+      "h": 2349,
+      "l": "ChatV3-Oblivion.html",
+      "d": "ChatV3-Oblivion.html#d"
+    },
+    {
+      "t": "Chat v3 — calls: Calls page, ringing, video, screen sharing, call docks, call records",
+      "w": 1600,
+      "h": 3168,
+      "l": "ChatV3-Calls.html",
+      "d": "ChatV3-Calls.html#d"
+    },
+    {
+      "t": "Chat v3 — family portal conversation",
+      "w": 1600,
+      "h": 1744,
+      "l": "ChatV3-Family.html",
+      "d": "ChatV3-Family.html#d"
+    }
+  ]
+}

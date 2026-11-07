@@ -73,6 +73,15 @@ import {
     AddSiteDialog,
     type AddSiteReferenceData,
 } from '@/components/sites/add-site-dialog';
+import { EditSiteDialog } from '@/components/sites/edit-site-dialog';
+import {
+    type SiteWorkCan,
+    SiteWorkDialogs,
+    SiteWorkMenu,
+    type SiteWorkSite,
+    siteWorkMenuItems,
+    useSiteWork,
+} from '@/components/sites/work';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
@@ -112,6 +121,7 @@ type Site = {
     vacancies?: number;
     open_hazards_count?: number;
     overdue_checklists_count?: number;
+    overdue_inspections_count?: number;
     open_maintenance_count?: number;
     readiness?: {
         score: number;
@@ -150,6 +160,7 @@ type Summary = {
     hazards_week_delta: number;
     overdue: number;
     overdue_checks: number;
+    overdue_inspections: number;
     overdue_maintenance: number;
     /** On-time checklist completion over the last 90 days. */
     checks_on_time: {
@@ -180,7 +191,7 @@ type Can = {
     sites?: { create?: boolean; update?: boolean; archive?: boolean };
     calendar?: { create?: boolean };
     hazards?: { create?: boolean };
-    checklists?: { run?: boolean };
+    checklists?: { run?: boolean; view?: boolean };
 };
 
 type PageProps = {
@@ -195,6 +206,8 @@ type PageProps = {
     };
     savedViewCounts: SavedViewCounts;
     addSite: AddSiteReferenceData;
+    /** Inspections & maintenance actions (SiteController::siteWorkPayload). */
+    siteWork?: { can: SiteWorkCan; sites: SiteWorkSite[] };
     auth: { user?: { name?: string } | null; can?: Can };
     labels?: Record<string, string>;
 };
@@ -239,8 +252,17 @@ function hazardsOf(s: Site): number {
 }
 
 function overdueOf(s: Site): number {
-    return (s.overdue_checklists_count ?? 0) + (s.open_maintenance_count ?? 0);
+    return (
+        (s.overdue_checklists_count ?? 0) +
+        (s.overdue_inspections_count ?? 0) +
+        (s.open_maintenance_count ?? 0)
+    );
 }
+
+const NO_SITE_WORK: { can: SiteWorkCan; sites: SiteWorkSite[] } = {
+    can: { schedule: false, record: false, maintenance: false },
+    sites: [],
+};
 
 /** Status meridian — the record's worst ALERT state (LIST_STYLE_GUIDE.md
  *  §2.1). Record status (Active/Archived/…) never drives it. */
@@ -507,9 +529,25 @@ export default function SitesIndex() {
         summary,
         labels,
         addSite,
+        siteWork = NO_SITE_WORK,
     } = usePage<PageProps>().props;
     const can = auth?.can ?? {};
-    const [addSiteOpen, setAddSiteOpen] = useState(false);
+    // /sites/create redirects here with ?add=1 (old links and bookmarks).
+    const [addSiteOpen, setAddSiteOpen] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).get('add') === '1',
+    );
+    const [editSiteId, setEditSiteId] = useState<number | null>(null);
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has('add')) return;
+        // Drop the one-off flag so a refresh or "back" doesn't reopen it.
+        url.searchParams.delete('add');
+        window.history.replaceState(window.history.state, '', url);
+    }, []);
+    const work = useSiteWork();
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
 
@@ -658,11 +696,12 @@ export default function SitesIndex() {
                 },
             },
             { separator: true },
-            can.sites?.update && {
-                label: 'Edit details',
-                icon: Pencil,
-                onClick: () => router.visit(`/sites/${s.id}/edit`),
-            },
+            can.sites?.update &&
+                !s.archived && {
+                    label: 'Edit details',
+                    icon: Pencil,
+                    onClick: () => setEditSiteId(s.id),
+                },
             can.calendar?.create && {
                 label: 'Add calendar event',
                 icon: Calendar,
@@ -680,6 +719,21 @@ export default function SitesIndex() {
                 icon: ClipboardCheck,
                 onClick: () => router.visit(`/sites/${s.id}/checklists/runs`),
             },
+            // Inspections & maintenance with this site filled in. Archived
+            // sites can't take new work (SitePolicy::update refuses them).
+            ...(s.archived
+                ? []
+                : siteWorkMenuItems(
+                      siteWork.can,
+                      {
+                          id: s.id,
+                          name: s.name,
+                          type: s.type,
+                          region: s.region,
+                          is_active: s.is_active,
+                      },
+                      work.open,
+                  )),
             { separator: true },
             s.archived
                 ? can.sites?.archive && {
@@ -782,6 +836,11 @@ export default function SitesIndex() {
 
     /* ---------------- Event Horizon header ---------------- */
 
+    // Checklist runs and inspection schedules are both "checks" here; the
+    // Overdue list splits them.
+    const overdueChecks =
+        summary.overdue_checks + (summary.overdue_inspections ?? 0);
+
     const header = (
         <PageHeader
             icon={Building2}
@@ -808,6 +867,10 @@ export default function SitesIndex() {
                     >
                         {selectMode ? 'Done selecting' : 'Select'}
                     </PageHeaderGlassButton>
+                    <SiteWorkMenu
+                        can={siteWork.can}
+                        onSelect={(kind) => work.open({ kind })}
+                    />
                     {can.sites?.create ? (
                         <PageHeaderPrimaryButton
                             icon={Plus}
@@ -895,14 +958,15 @@ export default function SitesIndex() {
                     <PageHeaderMeterBlock
                         label="Overdue"
                         tone={summary.overdue > 0 ? 'warning' : 'success'}
-                        ariaLabel={`View overdue items by ${siteSingular.toLowerCase()}`}
-                        onClick={() => setLayout('table')}
+                        ariaLabel="Open the list of overdue checks and maintenance"
+                        onClick={work.openOverdue}
                     >
                         <PageHeaderMeterBig>
                             {summary.overdue}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {summary.overdue_checks} checks ·{' '}
+                            {overdueChecks}{' '}
+                            {overdueChecks === 1 ? 'check' : 'checks'} ·{' '}
                             {summary.overdue_maintenance} maintenance
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
@@ -1290,6 +1354,19 @@ export default function SitesIndex() {
                 />
             ) : null}
 
+            <SiteWorkDialogs
+                work={work}
+                sites={siteWork.sites}
+                overdue={{
+                    footerLink: can.checklists?.view
+                        ? {
+                              href: '/sites/inspections',
+                              label: 'Open inspections & maintenance',
+                          }
+                        : undefined,
+                }}
+            />
+
             {can.sites?.create ? (
                 <AddSiteDialog
                     isOpen={addSiteOpen}
@@ -1300,6 +1377,13 @@ export default function SitesIndex() {
                             only: ['sites', 'summary', 'savedViewCounts'],
                         })
                     }
+                />
+            ) : null}
+            {can.sites?.update ? (
+                <EditSiteDialog
+                    siteId={editSiteId}
+                    isOpen={editSiteId !== null}
+                    onClose={() => setEditSiteId(null)}
                 />
             ) : null}
         </AppLayout>

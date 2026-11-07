@@ -161,13 +161,16 @@ class ClientIncidentProvider implements ContextualHealthSafetyTaskProvider, HasM
 
                 $journey['incident_owner'] = $ownership;
                 if (! $leaf->isStillIncident($incident, $parents, $reads)) { return null; }
+                // P4 (Stephan, 6 Nov 2026): a safeguarding incident's card names its kind only, for everyone; its words
+                // are on the incident page for people with safeguarding access.
+                $safeguardingWords = app(\App\Services\Incidents\IncidentSafeguardingContent::class)->isSafeguarding($incident);
 
                 return new TaskItem(
                     id: 'incident-'.$incident->id,
                     source: $this->sourceKey(),
                     sourceLabel: $this->label(),
                     ref: $incident->reference_number,
-                    title: $incident->title
+                    title: (! $safeguardingWords ? $incident->title : null)
                         ?: ucfirst(str_replace('_', ' ', (string) $incident->type)).' incident',
                     status: (string) $incident->status,
                     bucket: match ($incident->status) {
@@ -183,7 +186,7 @@ class ClientIncidentProvider implements ContextualHealthSafetyTaskProvider, HasM
                     createdAt: optional($incident->created_at)->toIso8601String(),
                     link: "/incidents/{$incident->id}",
                     type: 'Incident',
-                    description: $incident->description ? str($incident->description)->limit(140)->toString() : null,
+                    description: ! $safeguardingWords && $incident->description ? str($incident->description)->limit(140)->toString() : null,
                     journey: $journey,
                     sourceContext: str_replace('_', ' ', (string) ($incident->source ?: 'incident report')),
                     actionLabel: match ($ownership['state']) {

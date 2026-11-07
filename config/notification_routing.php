@@ -76,7 +76,19 @@ return [
             'target_groups' => ['managers_core', 'auditors'],
         ],
         'incidents.high_unreviewed_reminder' => [
+            // B2 (6 Nov 2026): not every manager role org-wide; only these groups, and only those who can open the incident.
+            'include_managers' => false,
             'target_groups' => ['managers_core', 'coordinators'],
+        ],
+        // #16: only the person the follow-up is assigned to; never managers (it's private health information).
+        'health_safety.chemical_exposure_followup_assigned' => [
+            'include_managers' => false,
+            'target_groups' => ['entity_user'],
+        ],
+        // #14: the meeting's own audience (named attendees, and the Site's current workforce on first scheduling).
+        'healthSafety.meeting_update' => [
+            'include_managers' => false,
+            'target_groups' => ['entity_user'],
         ],
 
         // --- HR: Leave ---
