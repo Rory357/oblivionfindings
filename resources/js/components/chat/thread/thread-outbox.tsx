@@ -22,11 +22,11 @@ export function ThreadOutboxMessages({
 }) {
     if (!outbox.entries.length) return null;
     return (
-        <ol aria-label="Messages waiting to send" className="space-y-4">
+        <ol aria-label="Messages waiting to send" className="mt-3 space-y-2">
             {outbox.entries.map((entry) => (
                 <li
                     key={entry.id}
-                    className="ml-auto w-fit max-w-[90%] space-y-2 rounded-2xl border border-dashed bg-muted/40 px-4 py-3 sm:max-w-[75%]"
+                    className="ml-auto w-fit max-w-[78%] space-y-1.5 rounded-2xl bg-primary/10 px-3 py-2"
                 >
                     <p className="text-xs font-medium">You</p>
                     {entry.reply && (
@@ -60,7 +60,7 @@ export function ThreadOutboxMessages({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                size="sm"
+                                size="xs"
                                 disabled={!composerEmpty}
                                 title={
                                     composerEmpty
@@ -74,7 +74,7 @@ export function ThreadOutboxMessages({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                size="sm"
+                                size="xs"
                                 onClick={() => outbox.discard(entry)}
                             >
                                 Remove
@@ -83,7 +83,7 @@ export function ThreadOutboxMessages({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="sm"
+                                    size="xs"
                                     disabled={!outbox.canSend}
                                     onClick={() => void outbox.send(entry)}
                                 >
@@ -132,7 +132,7 @@ export function ThreadOutboxBar({
                 <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="xs"
                     disabled={!outbox.canSend}
                     onClick={() => void outbox.sendAll()}
                 >

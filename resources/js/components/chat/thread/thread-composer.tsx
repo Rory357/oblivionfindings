@@ -116,7 +116,7 @@ export function ThreadComposer({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="mt-2 min-h-[44px]"
+                                className="mt-2"
                                 onClick={composer.retryRestore}
                             >
                                 Retry restoring draft
@@ -143,7 +143,7 @@ export function ThreadComposer({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="size-[44px] shrink-0"
+                                className="size-8 shrink-0"
                                 aria-label="Cancel reply"
                                 disabled={recoveryLocked}
                                 onClick={() => composer.setReply(null)}
@@ -163,7 +163,6 @@ export function ThreadComposer({
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        className="min-h-[44px]"
                                         onClick={composer.retryReply}
                                     >
                                         Retry reply
@@ -172,7 +171,6 @@ export function ThreadComposer({
                                 <Button
                                     type="button"
                                     variant="ghost"
-                                    className="min-h-[44px]"
                                     disabled={recoveryLocked}
                                     onClick={() => composer.setReply(null)}
                                 >
@@ -278,20 +276,19 @@ export function ThreadComposer({
                             )}
                         >
                             <p>{sendError}</p>
-                            <p>
-                                {pending
-                                    ? !canWrite
-                                        ? 'Check again to confirm the result. This will not resend your message.'
-                                        : 'Retry checks the result first and keeps the same reference to avoid duplicates.'
-                                    : 'The message was not accepted. Your draft and files are kept so you can correct them and try again.'}
-                            </p>
+                            {!pending && (
+                                <p>
+                                    Your text and files are kept, so you can fix
+                                    them and send again.
+                                </p>
+                            )}
                         </div>
                     )}
                     {pending && !canWrite && (
                         <Button
                             type="button"
                             variant="outline"
-                            className="mb-2 h-auto min-h-[44px] whitespace-normal"
+                            className="mb-2 h-auto whitespace-normal"
                             disabled={sending}
                             onClick={() => void composer.send(true)}
                         >
@@ -370,7 +367,7 @@ export function ThreadComposer({
                                             type="button"
                                             variant="ghost"
                                             size="icon"
-                                            className="size-[44px] shrink-0"
+                                            className="size-8 shrink-0"
                                             aria-label="Attach files"
                                             disabled={locked}
                                             onClick={() =>
@@ -388,7 +385,7 @@ export function ThreadComposer({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="size-[44px] shrink-0"
+                                    className="size-8 shrink-0"
                                     aria-label="Insert emoji"
                                     disabled={locked || draft.length > 9997}
                                     onClick={() =>
@@ -405,7 +402,7 @@ export function ThreadComposer({
                                             type="button"
                                             variant="ghost"
                                             size="icon"
-                                            className="size-[44px] shrink-0"
+                                            className="size-8 shrink-0"
                                             aria-label="Record a voice message"
                                             disabled={
                                                 locked ||
@@ -420,7 +417,7 @@ export function ThreadComposer({
                                     )}
                                 <Button
                                     type="submit"
-                                    className="ml-auto min-h-[44px] shrink-0 px-4"
+                                    className="ml-auto shrink-0 px-4"
                                     disabled={
                                         sending ||
                                         recoveryLocked ||

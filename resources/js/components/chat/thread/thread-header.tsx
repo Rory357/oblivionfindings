@@ -35,21 +35,21 @@ export function ThreadHeader({
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="size-[44px] shrink-0 md:hidden"
+                    className="size-8 shrink-0 md:hidden"
                     aria-label="Back to conversations"
                     onClick={onBack}
                 >
                     <ArrowLeft />
                 </Button>
             )}
-            <div className="hidden size-[44px] shrink-0 items-center justify-center rounded-2xl bg-primary/10 font-semibold text-primary sm:flex">
+            <div className="hidden size-8 shrink-0 items-center justify-center rounded-2xl bg-primary/10 font-semibold text-primary sm:flex">
                 {conversation.title.slice(0, 2).toUpperCase()}
             </div>
             <Button
                 ref={detailsTrigger}
                 variant="ghost"
                 type="button"
-                className="h-auto min-h-[44px] min-w-0 flex-1 flex-col items-start gap-0 rounded px-1 text-left focus-visible:outline-2 focus-visible:outline-primary [&>*]:max-w-full"
+                className="h-auto min-w-0 flex-1 flex-col items-start gap-0 rounded px-1 text-left focus-visible:outline-2 focus-visible:outline-primary [&>*]:max-w-full"
                 onClick={onDetails}
             >
                 <h2 className="truncate font-semibold">
@@ -69,7 +69,7 @@ export function ThreadHeader({
             <Button
                 variant="ghost"
                 size="icon"
-                className="size-[44px]"
+                className="size-8"
                 aria-label="Search this conversation"
                 onClick={onToggleSearch}
             >
@@ -78,7 +78,7 @@ export function ThreadHeader({
             <Button
                 variant="ghost"
                 size="icon"
-                className="hidden size-[44px] sm:inline-flex"
+                className="hidden size-8 sm:inline-flex"
                 aria-label={
                     conversation.favourite
                         ? 'Remove favourite'
@@ -164,7 +164,7 @@ export function ThreadSearchBar({
                     variant="ghost"
                     size="icon"
                     aria-label="Close search"
-                    className="size-[44px] shrink-0"
+                    className="size-8 shrink-0"
                     onClick={onClose}
                 >
                     <X />
@@ -176,11 +176,7 @@ export function ThreadSearchBar({
                     className="flex items-center justify-between gap-2 bg-status-warning-bg px-4 py-2 text-sm text-status-warning"
                 >
                     <span>Search updates paused. {search.error}</span>
-                    <Button
-                        variant="ghost"
-                        className="min-h-[44px]"
-                        onClick={search.retry}
-                    >
+                    <Button variant="ghost" onClick={search.retry}>
                         Retry search
                     </Button>
                 </div>

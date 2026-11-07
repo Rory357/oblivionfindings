@@ -18,6 +18,22 @@ import { ThreadMessage, type ThreadMessageProps } from './thread-message';
 
 const canObserve = () => typeof IntersectionObserver !== 'undefined';
 
+/** Messages more than five minutes apart, or from someone else, start a new run. */
+const GROUP_GAP_MS = 5 * 60 * 1000;
+export function startsGroup(
+    previous: ChatMessage | undefined,
+    message: ChatMessage,
+) {
+    return (
+        !previous ||
+        previous.mine !== message.mine ||
+        previous.sender_id !== message.sender_id ||
+        previous.deleted !== message.deleted ||
+        Date.parse(message.created_at) - Date.parse(previous.created_at) >
+            GROUP_GAP_MS
+    );
+}
+
 /**
  * The message history. Older messages load as the reader nears the top (spec 6.2: without moving
  * the reader's position: the row they were looking at is pinned in place); a button remains where
@@ -39,9 +55,11 @@ export function ThreadMessageList({
     loadOlder,
     onScroll,
     onReturnToLatest,
+    canReact,
     onJump,
     onReact,
-    onActions,
+    onReply,
+    onMenu,
     children,
 }: {
     viewport: RefObject<HTMLDivElement | null>;
@@ -59,9 +77,12 @@ export function ThreadMessageList({
     loadOlder: () => Promise<boolean | null>;
     onScroll: () => void;
     onReturnToLatest: () => void;
+    /** The reader can react and reply here. */
+    canReact: boolean;
     onJump: ThreadMessageProps['onJump'];
     onReact: ThreadMessageProps['onReact'];
-    onActions: ThreadMessageProps['onActions'];
+    onReply: ThreadMessageProps['onReply'];
+    onMenu: ThreadMessageProps['onMenu'];
     /** Messages not in the history yet (an unconfirmed send, the outbox). */
     children?: ReactNode;
 }) {
@@ -187,7 +208,7 @@ export function ThreadMessageList({
             {contextMessage && (
                 <Button
                     variant="outline"
-                    className="mb-3 min-h-[44px]"
+                    className="mb-3"
                     onClick={onReturnToLatest}
                 >
                     Return to latest messages
@@ -204,26 +225,34 @@ export function ThreadMessageList({
                     .slice(rowWindow.start, rowWindow.end + 1)
                     .map((message, offset) => {
                         const index = rowWindow.start + offset;
+                        const previous = messages[index - 1];
+                        const showDay =
+                            !previous ||
+                            formatDate(previous.created_at) !==
+                                formatDate(message.created_at);
                         return (
                             <ThreadMessage
                                 key={message.id}
                                 message={message}
                                 actorId={actorId}
                                 conversationId={conversationId}
-                                showDay={
-                                    index === 0 ||
-                                    formatDate(
-                                        messages[index - 1].created_at,
-                                    ) !== formatDate(message.created_at)
+                                showDay={showDay}
+                                groupStart={
+                                    showDay ||
+                                    inSearch ||
+                                    startsGroup(previous, message) ||
+                                    message.id === firstUnreadId
                                 }
                                 firstUnread={message.id === firstUnreadId}
                                 highlighted={contextMessage === message.id}
                                 inSearch={inSearch}
+                                canReact={canReact}
                                 spacing={personal.spacing}
                                 textSize={personal.text_size}
                                 onJump={onJump}
                                 onReact={onReact}
-                                onActions={onActions}
+                                onReply={onReply}
+                                onMenu={onMenu}
                             />
                         );
                     })}

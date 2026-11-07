@@ -95,9 +95,7 @@ describe('Chat thread (C2.7)', () => {
         HTMLElement.prototype.scrollTo = vi.fn();
         HTMLElement.prototype.scrollIntoView = vi.fn();
         vi.spyOn(document, 'hasFocus').mockReturnValue(false);
-        vi.mocked(chatRequest).mockImplementation(
-            async () => history as never,
-        );
+        vi.mocked(chatRequest).mockImplementation(async () => history as never);
     });
     afterEach(() => {
         vi.unstubAllGlobals();
@@ -139,7 +137,9 @@ describe('Chat thread (C2.7)', () => {
 
         setOnline(true);
         expect(
-            await screen.findByText('2 messages not sent yet. Check, then send.'),
+            await screen.findByText(
+                '2 messages not sent yet. Check, then send.',
+            ),
         ).toBeInTheDocument();
         expect(posted).toHaveLength(0);
 
@@ -149,12 +149,14 @@ describe('Chat thread (C2.7)', () => {
             'Running late',
             'Ten minutes away',
         ]);
-        expect(new Set(posted.map((body) => body.get('mutation_id'))).size).toBe(
-            2,
-        );
+        expect(
+            new Set(posted.map((body) => body.get('mutation_id'))).size,
+        ).toBe(2);
         await waitFor(() =>
             expect(
-                screen.queryByRole('list', { name: 'Messages waiting to send' }),
+                screen.queryByRole('list', {
+                    name: 'Messages waiting to send',
+                }),
             ).not.toBeInTheDocument(),
         );
     });
